@@ -830,9 +830,9 @@ function Dialer({
         margin: compact ? '4px auto 16px' : '4px auto 22px', maxWidth: 320,
         width: '100%', boxSizing: 'border-box',
         padding: compact ? '14px 12px' : '18px 20px', borderRadius: 18,
-        background: 'linear-gradient(180deg, rgba(0,82,204,0.10), rgba(10,21,48,0.40))',
+        background: '#ffffff',
         border: `1px solid ${c.border}`,
-        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04), 0 8px 28px -16px rgba(0,82,204,0.5)',
+        boxShadow: '0 1px 2px rgba(15,23,42,0.04), 0 8px 24px -16px rgba(0,35,230,0.18)',
         textAlign: 'center', minHeight: 64,
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4,
       }}>

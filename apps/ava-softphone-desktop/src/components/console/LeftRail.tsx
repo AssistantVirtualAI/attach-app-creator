@@ -302,11 +302,9 @@ function CompactRail({ view, onChange, onOpenSettings, items }: { view: ConsoleV
   return (
     <aside style={{
       position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 30,
-      background: `linear-gradient(180deg, ${c.deepPanel}f2, ${c.midnight}f7)`,
+      background: c.deepPanel,
       borderTop: `1px solid ${c.border}`,
-      backdropFilter: 'blur(14px)',
-      WebkitBackdropFilter: 'blur(14px)',
-      boxShadow: '0 -12px 32px -16px rgba(0,0,0,0.5)',
+      boxShadow: '0 -8px 24px -16px rgba(15,23,42,0.12)',
     }}>
       <div className="lemtel-rail-h">
         {all.map((v) => {

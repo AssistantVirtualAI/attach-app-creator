@@ -19,7 +19,7 @@ export default function TitleBar(_props: Props = {}) {
     <div
       style={{
         height: 42,
-        background: 'rgba(10,21,48,0.85)',
+        background: colors.deepPanel,
         borderBottom: `1px solid ${colors.border}`,
         color: colors.text,
         display: 'flex',
@@ -29,7 +29,6 @@ export default function TitleBar(_props: Props = {}) {
         position: 'relative',
         zIndex: 1000,
         overflow: 'visible',
-        backdropFilter: 'blur(14px)',
         ...dragStyle,
       }}
     >

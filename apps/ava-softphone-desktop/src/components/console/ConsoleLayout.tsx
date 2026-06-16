@@ -165,9 +165,8 @@ export default function ConsoleLayout({
             position: 'absolute', top: 0, left: 0, right: 0, zIndex: 8,
             height: 54, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
             padding: '8px 10px', boxSizing: 'border-box',
-            background: `linear-gradient(180deg, ${c.deepPanel}f6, ${c.midnight}e8)`,
+            background: c.deepPanel,
             borderBottom: `1px solid ${c.border}`,
-            backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
             WebkitAppRegion: 'drag' as any,
           }}>
             <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, lineHeight: 1.1 }}>

@@ -27,57 +27,58 @@ export interface ThemeTokens {
   shadow: string;
 }
 
+/* Light (default) — clean, airy, high‑clarity */
+const light: ThemeTokens = {
+  mode: 'light',
+  bg: '#f6f8fc',
+  bgGradient:
+    'radial-gradient(1200px 700px at 8% -10%, rgba(0,35,230,0.06), transparent 60%), radial-gradient(900px 600px at 110% 110%, rgba(102,128,255,0.05), transparent 55%), #f6f8fc',
+  surface: '#ffffff',
+  surfaceElev: '#ffffff',
+  surfaceHover: '#eef2f9',
+  border: '#e3e8f1',
+  borderStrong: '#c9d2e3',
+  text: '#0f172a',
+  textMuted: '#475569',
+  textSubtle: '#94a3b8',
+  accent: '#0023e6',
+  accentSoft: '#e6ebff',
+  accentGradient: 'linear-gradient(135deg, #0023e6 0%, #6680ff 100%)',
+  accentGlow: '0 8px 24px -12px rgba(0,35,230,0.35)',
+  success: '#16a34a',
+  danger: '#dc2626',
+  warning: '#d97706',
+  ringGlow: '0 0 0 3px rgba(0,35,230,0.18)',
+  glass: '#ffffff',
+  glassBorder: '#e3e8f1',
+  shadow: '0 1px 2px rgba(15,23,42,0.04), 0 8px 24px -12px rgba(15,23,42,0.10)',
+};
+
+/* Soft dark — re-tuned, less pitch-black */
 const dark: ThemeTokens = {
   mode: 'dark',
-  bg: '#05060d',
+  bg: '#0f1424',
   bgGradient:
-    'radial-gradient(1400px 700px at 8% -12%, rgba(0,35,230,0.20), transparent 60%), radial-gradient(900px 600px at 108% 110%, rgba(124,76,255,0.14), transparent 55%), linear-gradient(180deg, #05060d 0%, #07091a 100%)',
-  surface: 'rgba(255,255,255,0.04)',
-  surfaceElev: 'rgba(255,255,255,0.06)',
-  surfaceHover: 'rgba(0,35,230,0.10)',
-  border: 'rgba(140,170,255,0.10)',
-  borderStrong: 'rgba(140,170,255,0.22)',
+    'radial-gradient(1200px 700px at 8% -10%, rgba(0,35,230,0.16), transparent 60%), linear-gradient(180deg, #0f1424 0%, #131932 100%)',
+  surface: 'rgba(255,255,255,0.05)',
+  surfaceElev: 'rgba(255,255,255,0.07)',
+  surfaceHover: 'rgba(255,255,255,0.10)',
+  border: 'rgba(180,200,255,0.14)',
+  borderStrong: 'rgba(180,200,255,0.26)',
   text: '#eaf0ff',
-  textMuted: 'rgba(234,240,255,0.62)',
-  textSubtle: 'rgba(234,240,255,0.38)',
-  accent: '#3355ff',
-  accentSoft: 'rgba(0,35,230,0.16)',
+  textMuted: 'rgba(234,240,255,0.66)',
+  textSubtle: 'rgba(234,240,255,0.42)',
+  accent: '#6680ff',
+  accentSoft: 'rgba(0,35,230,0.20)',
   accentGradient: 'linear-gradient(135deg, #0023e6 0%, #6680ff 60%, #a78bfa 100%)',
   accentGlow: '0 10px 36px -10px rgba(0,35,230,0.55)',
   success: '#22d39a',
   danger: '#ff5577',
   warning: '#ffb84a',
-  ringGlow: '0 0 0 3px rgba(0,35,230,0.28)',
-  glass: 'rgba(255,255,255,0.04)',
-  glassBorder: 'rgba(140,170,255,0.12)',
-  shadow: '0 18px 60px -22px rgba(0,0,0,0.7)',
-};
-
-
-const light: ThemeTokens = {
-  mode: 'light',
-  bg: '#f4f6fb',
-  bgGradient:
-    'radial-gradient(1200px 600px at 10% -10%, rgba(0,35,230,0.10), transparent 60%), radial-gradient(800px 500px at 110% 110%, rgba(236,72,153,0.07), transparent 55%), #f4f6fb',
-  surface: 'rgba(255,255,255,0.85)',
-  surfaceElev: '#ffffff',
-  surfaceHover: 'rgba(15,18,28,0.04)',
-  border: 'rgba(15,18,28,0.08)',
-  borderStrong: 'rgba(15,18,28,0.16)',
-  text: '#0f121c',
-  textMuted: 'rgba(15,18,28,0.62)',
-  textSubtle: 'rgba(15,18,28,0.42)',
-  accent: '#0023e6',
-  accentSoft: 'rgba(0,35,230,0.12)',
-  accentGradient: 'linear-gradient(135deg, #0023e6 0%, #6680ff 50%, #a78bfa 100%)',
-  accentGlow: '0 8px 32px -8px rgba(0,35,230,0.32)',
-  success: '#059669',
-  danger: '#dc2626',
-  warning: '#d97706',
-  ringGlow: '0 0 0 4px rgba(0,35,230,0.14)',
-  glass: 'rgba(255,255,255,0.7)',
-  glassBorder: 'rgba(15,18,28,0.06)',
-  shadow: '0 12px 40px -16px rgba(15,18,28,0.18)',
+  ringGlow: '0 0 0 3px rgba(102,128,255,0.30)',
+  glass: 'rgba(255,255,255,0.05)',
+  glassBorder: 'rgba(180,200,255,0.16)',
+  shadow: '0 18px 60px -22px rgba(0,0,0,0.6)',
 };
 
 interface ThemeCtx {
@@ -96,16 +97,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       const saved = localStorage.getItem(STORAGE_KEY) as ThemeMode | null;
       if (saved === 'dark' || saved === 'light') return saved;
     } catch {}
-    return 'dark';
+    return 'light';
   });
-
 
   const t = mode === 'dark' ? dark : light;
 
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, mode);
-    } catch {}
+    try { localStorage.setItem(STORAGE_KEY, mode); } catch {}
     document.documentElement.style.background = t.bg;
     document.documentElement.style.color = t.text;
     document.body.style.background = t.bg;
@@ -127,84 +125,88 @@ export function useTheme() {
 }
 
 /* ============================================================
-   v1.0.4 Design Tokens — Lemtel dark glassmorphism + AI glow
-   Plain object, imported as `import { theme } from '../lib/theme'`.
+   Design tokens consumed via `import { theme } from '../lib/theme'`.
+   These are the LIGHT defaults. Components that read theme.colors.*
+   pick up the refresh automatically. The dark variant above is used
+   via the ThemeProvider toggle.
    ============================================================ */
 export const theme = {
   colors: {
-    // Aligned with AVA Statistic portal — primary #0023e6 (HSL 231 100% 50%).
-    bg: '#05060d',
+    // Base surfaces
+    bg: '#f6f8fc',
     bgGradient:
-      'radial-gradient(1400px 700px at 8% -12%, rgba(0,35,230,0.20), transparent 60%), radial-gradient(900px 600px at 108% 110%, rgba(124,76,255,0.16), transparent 55%), linear-gradient(180deg, #05060d 0%, #07091a 100%)',
-    bgCard: 'rgba(255,255,255,0.04)',
-    bgCardHover: 'rgba(255,255,255,0.07)',
-    bgElev: 'rgba(255,255,255,0.06)',
-    border: 'rgba(140,170,255,0.10)',
-    borderGold: 'rgba(255,184,74,0.45)',
-    borderAI: 'rgba(124,76,255,0.32)',
+      'radial-gradient(1200px 700px at 8% -10%, rgba(0,35,230,0.06), transparent 60%), radial-gradient(900px 600px at 110% 110%, rgba(102,128,255,0.05), transparent 55%), #f6f8fc',
+    bgCard: '#ffffff',
+    bgCardHover: '#eef2f9',
+    bgElev: '#ffffff',
+    border: '#e3e8f1',
+    borderGold: '#e7c980',
+    borderAI: '#cdbcff',
+
+    // Brand
     primary: '#0023e6',
     primaryLight: '#6680ff',
-    gold: '#ffb84a',
-    goldSoft: '#ffd07a',
-    goldDim: 'rgba(255,184,74,0.18)',
+    primarySoft: '#e6ebff',
+
+    // Accents (re-tuned for white background contrast)
+    gold: '#b8860b',
+    goldSoft: '#d4a73a',
+    goldDim: '#fff3d6',
     ai: '#7a4cff',
     aiLight: '#a78bfa',
-    aiGlow: 'rgba(122,76,255,0.28)',
-    green: '#22d39a',
-    red: '#ff5577',
-    yellow: '#ffb84a',
-    text: '#eaf0ff',
-    textSub: '#9eabd4',
-    textDim: 'rgba(234,240,255,0.40)',
-    // Console tokens — dark glass layers
-    midnight: '#05060d',
-    deepPanel: 'rgba(11,16,30,0.78)',
-    graphite: 'rgba(18,24,42,0.66)',
+    aiGlow: 'rgba(122,76,255,0.18)',
+
+    // Status
+    green: '#16a34a',
+    red: '#dc2626',
+    yellow: '#d97706',
+    success: '#16a34a',
+    warning: '#d97706',
+    danger: '#dc2626',
+
+    // Text
+    text: '#0f172a',
+    textSub: '#475569',
+    textDim: '#94a3b8',
+
+    // Console aliases (kept so legacy screens map onto the new palette)
+    midnight: '#f6f8fc',
+    deepPanel: '#ffffff',
+    graphite: '#f8fafc',
     lemtelBlue: '#0023e6',
-    signalGold: '#ffb84a',
-    avaCyan: '#23d6ff',
+    signalGold: '#b8860b',
+    avaCyan: '#0891b2',
     avaViolet: '#7a4cff',
-    textIce: '#eaf0ff',
-    mutedSilver: 'rgba(234,240,255,0.55)',
-    success: '#22d39a',
-    warning: '#ffb84a',
-    danger: '#ff5577',
+    textIce: '#0f172a',
+    mutedSilver: '#64748b',
   },
   glow: {
-    gold: '0 8px 28px -8px rgba(255,184,74,0.45)',
-    blue: '0 10px 36px -10px rgba(0,35,230,0.55)',
-    ai: '0 10px 30px -8px rgba(122,76,255,0.45)',
-    green: '0 8px 22px -6px rgba(34,211,154,0.45)',
-    red: '0 8px 22px -6px rgba(255,85,119,0.45)',
+    gold: '0 8px 20px -10px rgba(184,134,11,0.35)',
+    blue: '0 8px 24px -12px rgba(0,35,230,0.35)',
+    ai: '0 8px 22px -10px rgba(122,76,255,0.30)',
+    green: '0 6px 18px -8px rgba(22,163,74,0.35)',
+    red: '0 6px 18px -8px rgba(220,38,38,0.35)',
   },
   glass: {
     card: {
-      background: 'rgba(255,255,255,0.04)',
-      border: '1px solid rgba(140,170,255,0.12)',
+      background: '#ffffff',
+      border: '1px solid #e3e8f1',
       borderRadius: 16,
-      backdropFilter: 'blur(22px) saturate(160%)',
-      WebkitBackdropFilter: 'blur(22px) saturate(160%)',
-      boxShadow: '0 18px 60px -22px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.04)',
+      boxShadow: '0 1px 2px rgba(15,23,42,0.04), 0 8px 24px -12px rgba(15,23,42,0.10)',
     } as React.CSSProperties,
     cardGold: {
-      background: 'rgba(255,255,255,0.05)',
-      border: '1px solid rgba(255,184,74,0.40)',
+      background: '#ffffff',
+      border: '1px solid #e7c980',
       borderRadius: 16,
-      backdropFilter: 'blur(22px) saturate(160%)',
-      WebkitBackdropFilter: 'blur(22px) saturate(160%)',
-      boxShadow: '0 18px 60px -22px rgba(255,184,74,0.30)',
+      boxShadow: '0 8px 22px -14px rgba(184,134,11,0.30)',
     } as React.CSSProperties,
     cardAI: {
-      background: 'rgba(255,255,255,0.05)',
-      border: '1px solid rgba(124,76,255,0.36)',
+      background: '#ffffff',
+      border: '1px solid #cdbcff',
       borderRadius: 16,
-      backdropFilter: 'blur(22px) saturate(160%)',
-      WebkitBackdropFilter: 'blur(22px) saturate(160%)',
-      boxShadow: '0 18px 60px -22px rgba(124,76,255,0.35)',
+      boxShadow: '0 8px 22px -14px rgba(122,76,255,0.28)',
     } as React.CSSProperties,
   },
   font: { xs: 10, sm: 12, base: 14, md: 16, lg: 20, xl: 24, xxl: 32 },
   radius: { sm: 8, md: 12, lg: 16, xl: 20 },
 } as const;
-
-
