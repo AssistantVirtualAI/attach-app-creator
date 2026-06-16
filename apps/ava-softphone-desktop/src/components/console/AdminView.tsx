@@ -89,6 +89,7 @@ function ModalShell({ title, onClose, width = 460, children }: { title: string; 
 }
 
 function ExtensionsTable() {
+  const { isAdmin, loading: roleLoading } = useDesktopRole();
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
