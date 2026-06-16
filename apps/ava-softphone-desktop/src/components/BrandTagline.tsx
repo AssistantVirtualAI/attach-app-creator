@@ -77,6 +77,9 @@ export default function BrandTagline({
       {showPoweredBy && (
         <div
           style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
             fontSize: poweredFs,
             fontWeight: 700,
             letterSpacing: size === 'lg' ? 3 : 2,
@@ -84,10 +87,17 @@ export default function BrandTagline({
             textTransform: 'uppercase',
           }}
         >
-          Powered by{' '}
-          <span style={{ color: colors.gold, letterSpacing: size === 'lg' ? 2.4 : 1.6 }}>
-            AVA AI
-          </span>
+          Powered by
+          <img
+            src="/ava-statistics-logo.png"
+            alt="AVA Statistics"
+            style={{
+              height: size === 'lg' ? 26 : size === 'md' ? 22 : 18,
+              width: 'auto',
+              display: 'inline-block',
+              verticalAlign: 'middle',
+            }}
+          />
         </div>
       )}
     </div>
