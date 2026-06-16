@@ -326,7 +326,7 @@ function Sidebar({
   );
 }
 
-function ChannelView({ channel, userId, t }: { channel: Channel; userId: string; t: (en: string, fr: string) => string }) {
+function ChannelView({ channel, userId, userName, directory, t }: { channel: Channel; userId: string; userName: string | null; directory: DirectoryMember[]; t: (en: string, fr: string) => string }) {
   const { messages, send, remove, react, uploadAttachment, getSignedUrl, query } = useChatMessages(channel.id);
   const [draft, setDraft] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -334,11 +334,33 @@ function ChannelView({ channel, userId, t }: { channel: Channel; userId: string;
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
+  const markRead = useMarkRead();
+  const { typingUsers, sendTyping } = useTyping(channel.id, userName);
+  const { query: pinsQ, pin, unpin } = usePins(channel.id);
+  const call = useChatCall();
+
+  const isDm = channel.channel_type === "dm";
+  const isGroup = channel.channel_type === "private" && (channel.members?.length ?? 0) > 2;
+  const otherDmUserId = isDm ? (channel.members || []).find((id) => id !== userId) : null;
+  const otherDm = otherDmUserId ? directory.find((d) => d.user_id === otherDmUserId) : null;
+
+  const headerTitle = isDm
+    ? (otherDm?.full_name || otherDm?.email || "Direct message")
+    : channel.name;
+  const headerIcon = isDm ? <AtSign className="h-4 w-4" />
+    : isGroup ? <UsersIcon className="h-4 w-4" />
+    : channel.channel_type === "private" ? <Lock className="h-4 w-4" /> : <Hash className="h-4 w-4" />;
+
   useEffect(() => {
     requestAnimationFrame(() => {
       scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
     });
   }, [messages.length]);
+
+  useEffect(() => {
+    if (messages.length) markRead.mutate(channel.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channel.id, messages.length]);
 
   const handleSend = async () => {
     const content = draft.trim();
@@ -358,60 +380,95 @@ function ChannelView({ channel, userId, t }: { channel: Channel; userId: string;
     finally { setUploading(false); }
   };
 
+  const handleCall = () => {
+    if (isDm && otherDm?.extension) { call(otherDm.extension); return; }
+    if (isGroup) {
+      const exts = (channel.members || [])
+        .filter((id) => id !== userId)
+        .map((id) => directory.find((d) => d.user_id === id)?.extension)
+        .filter(Boolean) as string[];
+      if (exts.length === 0) return toast.error(t("No extensions for group members", "Aucune extension pour les membres"));
+      call(exts, { conferenceId: `chat-${channel.id}` });
+      send.mutate({ content: `📞 ${userName || "Someone"} ${t("started a group call. Join: ", "a démarré un appel de groupe. Rejoindre: ")} conf-${channel.id.slice(0,6)}` });
+    }
+  };
+
+  const canCall = (isDm && !!otherDm?.extension) || isGroup;
+  const pinnedMsgs = pinsQ.data?.messages ?? [];
+
   return (
     <>
       <div className="border-b px-4 py-2 flex items-center gap-2">
-        {channel.channel_type === "private" ? <Lock className="h-4 w-4" /> : <Hash className="h-4 w-4" />}
-        <h2 className="font-semibold">{channel.name}</h2>
-        {channel.description && <span className="text-sm text-muted-foreground hidden md:inline">— {channel.description}</span>}
+        {headerIcon}
+        <h2 className="font-semibold">{headerTitle}</h2>
+        {channel.description && !isDm && <span className="text-sm text-muted-foreground hidden md:inline">— {channel.description}</span>}
         <div className="ml-auto flex items-center gap-2">
-          <div className="w-56"><ChatSearchBar /></div>
-          <Badge variant="outline" className="text-xs">{channel.members?.length ?? 0} {t("members", "membres")}</Badge>
+          <div className="w-56 hidden lg:block"><ChatSearchBar /></div>
+          {!isDm && <Badge variant="outline" className="text-xs">{channel.members?.length ?? 0} {t("members", "membres")}</Badge>}
+          {canCall && (
+            <Button size="sm" variant="outline" className="gap-1.5" onClick={handleCall}>
+              <Phone className="h-3.5 w-3.5" /> {isGroup ? t("Call group", "Appeler le groupe") : t("Call", "Appeler")}
+            </Button>
+          )}
         </div>
       </div>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+      {pinnedMsgs.length > 0 && (
+        <div className="border-b bg-muted/30 px-4 py-1.5 text-xs flex items-center gap-2 overflow-x-auto">
+          <Pin className="h-3 w-3 shrink-0" />
+          {pinnedMsgs.slice(0, 3).map((m: any) => (
+            <span key={m.id} className="truncate max-w-[240px] text-muted-foreground">
+              <strong className="text-foreground">{m.sender_name}:</strong> {m.content}
+            </span>
+          ))}
+        </div>
+      )}
 
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
         {query.isLoading && <Skeleton className="h-20 w-full" />}
         {!query.isLoading && messages.length === 0 && (
           <div className="text-center text-muted-foreground text-sm py-12">
             {t("No messages yet. Say hi 👋", "Aucun message. Lance la discussion 👋")}
           </div>
         )}
-        {messages.filter((m: any) => !m.parent_message_id).map((m) => (
-          <MessageBubble
-            key={m.id}
-            msg={m}
-            isOwn={m.sender_id === userId}
-            onDelete={() => remove.mutate(m.id)}
-            onReact={(emoji) => react.mutate({ id: m.id, emoji })}
-            onOpenThread={() => setThreadParent(m)}
-            getSignedUrl={getSignedUrl}
-            t={t}
-          />
-        ))}
+        {messages.filter((m: any) => !m.parent_message_id).map((m) => {
+          const isPinned = pinnedMsgs.some((p: any) => p.id === m.id);
+          return (
+            <MessageBubble
+              key={m.id}
+              msg={m}
+              isOwn={m.sender_id === userId}
+              isPinned={isPinned}
+              onDelete={() => remove.mutate(m.id)}
+              onReact={(emoji) => react.mutate({ id: m.id, emoji })}
+              onOpenThread={() => setThreadParent(m)}
+              onTogglePin={() => isPinned ? unpin.mutate(m.id) : pin.mutate(m.id)}
+              getSignedUrl={getSignedUrl}
+              t={t}
+            />
+          );
+        })}
       </div>
+
+      {typingUsers.length > 0 && (
+        <div className="px-4 py-1 text-xs text-muted-foreground italic">
+          {typingUsers.map((u) => u.name).join(", ")} {t("is typing…", "est en train d'écrire…")}
+        </div>
+      )}
+
       <ThreadPanel parent={threadParent} channelId={channel.id} onClose={() => setThreadParent(null)} />
 
-
       <div className="border-t p-3 flex items-end gap-2">
-        <Button
-          size="icon" variant="ghost" disabled={uploading}
-          onClick={() => fileRef.current?.click()}
-        >
+        <Button size="icon" variant="ghost" disabled={uploading} onClick={() => fileRef.current?.click()}>
           <Paperclip className="h-4 w-4" />
         </Button>
-        <input
-          ref={fileRef}
-          type="file"
-          className="hidden"
-          onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
-        />
+        <input ref={fileRef} type="file" className="hidden"
+          onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} />
         <Input
           value={draft}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={(e) => { setDraft(e.target.value); if (e.target.value) sendTyping(userId); }}
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-          placeholder={t(`Message #${channel.name}`, `Message #${channel.name}`)}
+          placeholder={t(`Message ${isDm ? "@" + headerTitle : "#" + channel.name}`, `Message ${isDm ? "@" + headerTitle : "#" + channel.name}`)}
         />
         <Button onClick={handleSend} disabled={!draft.trim() || send.isPending}>
           <Send className="h-4 w-4" />
