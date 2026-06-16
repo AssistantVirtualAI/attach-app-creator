@@ -202,12 +202,12 @@ export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch,
             display: 'flex', alignItems: 'center', gap: 11,
             padding: '7px 11px', borderRadius: 9,
             background: 'transparent', border: 'none',
-            color: c.textSub, fontSize: 11.5, fontWeight: 600,
+            color: isDark ? darkTextSub : c.textSub, fontSize: 11.5, fontWeight: 600,
             cursor: 'pointer', textAlign: 'left',
             WebkitAppRegion: 'no-drag' as any,
           }}
           onMouseEnter={(e) => { e.currentTarget.style.color = c.signalGold; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = c.textSub; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = isDark ? darkTextSub : c.textSub; }}
         >
           <span style={{ fontSize: 14 }}>💡</span>
           Restart tour
