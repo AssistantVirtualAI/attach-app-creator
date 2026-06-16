@@ -227,20 +227,60 @@ export default function ProfileMenu() {
   const meta = STATUS_META[status];
   const initials = (name || email || '?').slice(0, 2).toUpperCase();
 
+  // ---- Sync indicator & conflict handling ----
+  type SyncState = 'idle' | 'saving' | 'saved' | 'error' | 'conflict' | 'offline';
+  const [syncState, setSyncState] = useState<SyncState>('idle');
+  const [syncDetail, setSyncDetail] = useState<string>('');
+  const lastLocalWriteRef = useRef<{ at: number; status: Status; note?: string | null } | null>(null);
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const flashSaved = (label = 'Synced') => {
+    setSyncState('saved'); setSyncDetail(label);
+    if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+    savedTimerRef.current = setTimeout(() => setSyncState('idle'), 2500);
+  };
+
+  // Online/offline indicator (and retry pending writes)
+  useEffect(() => {
+    const on = () => { if (syncState === 'offline') setSyncState('idle'); };
+    const off = () => { setSyncState('offline'); setSyncDetail('Offline — changes will sync when back online'); };
+    window.addEventListener('online', on);
+    window.addEventListener('offline', off);
+    if (!navigator.onLine) off();
+    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
+  }, [syncState]);
+
+  const withSync = async <T,>(label: string, fn: () => Promise<T>): Promise<T | undefined> => {
+    setSyncState('saving'); setSyncDetail(label);
+    try {
+      const out = await fn();
+      flashSaved(label);
+      return out;
+    } catch (e: any) {
+      setSyncState('error');
+      setSyncDetail(e?.message?.slice(0, 80) || 'Sync failed — will retry');
+      return undefined;
+    }
+  };
+
   const persistPresence = async (s: Status, note?: string, untilTs?: number | null) => {
     const m = STATUS_META[s];
-    try {
-      await supabase.rpc('upsert_user_presence', {
+    const noteVal = s === 'meeting'
+      ? (note ?? meetingNote ?? null)
+      : (untilTs ? `until:${new Date(untilTs).toISOString()}` : null);
+    lastLocalWriteRef.current = { at: Date.now(), status: s, note: noteVal };
+    await withSync('Status', async () => {
+      const { error } = await supabase.rpc('upsert_user_presence', {
         _status: s,
-        _message: s === 'meeting'
-          ? (note ?? meetingNote ?? null)
-          : (untilTs ? `until:${new Date(untilTs).toISOString()}` : null),
+        _message: noteVal,
         _emoji: m.icon,
         _call_state: 'idle',
         _platform: 'desktop',
       });
-    } catch (e) { /* offline / noop */ }
+      if (error) throw error;
+    });
   };
+
 
   const clearExpiryTimer = () => {
     if (expiryTimerRef.current) { clearTimeout(expiryTimerRef.current); expiryTimerRef.current = null; }
