@@ -30,6 +30,10 @@ export default function SettingsPage({
   const [tab, setTab] = useState<Tab>('account');
   const [mics, setMics] = useState<MediaDeviceInfo[]>([]);
   const [speakers, setSpeakers] = useState<MediaDeviceInfo[]>([]);
+  const [initialMode] = useState(mode);
+  const [savedToast, setSavedToast] = useState(false);
+  const dirty = mode !== initialMode;
+
 
   useEffect(() => {
     navigator.mediaDevices?.enumerateDevices().then((devs) => {
