@@ -52,9 +52,11 @@ export default function SetupWizard({ onComplete }: { onComplete: (creds: Creds)
         setLoading(false);
         return;
       }
+      // Note: do NOT select '*' — sip_password is column-revoked for browser
+      // clients and would cause the whole row read to fail (returning N/A).
       const { data: softphoneUser } = await supabase
         .from('pbx_softphone_users')
-        .select('*')
+        .select('extension,display_name,sip_domain,wss_url,organization_id,status')
         .eq('portal_user_id', authData.user.id)
         .maybeSingle();
       const credentials: Creds = {
