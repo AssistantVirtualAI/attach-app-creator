@@ -1,86 +1,102 @@
-# Desktop App — Visual Overhaul + Global Theme Propagation
+# Teams-style team chat (Slack-style, AVA-branded)
 
-## Root causes (why nothing seems to change today)
+Reuses the existing `org_chat_*` tables, `user_presence`, `org_chat_reads`, `chat-attachments` storage bucket, and the `org-chat` edge function. Two UIs (web admin + desktop softphone) stay in perfect sync via Postgres Realtime + Realtime broadcast channels.
 
-1. **Theme only affects Settings**: Only `SettingsPage` reads from `useTheme()`. Every other component (`TitleBar`, `SoftphonePane`, `ProfileMenu`, `SetupWizard`, `AIInsights`, `RecordingsList`, `OutputDevicePicker`, `BrandTagline`, `MessagesHarness`) imports the **static** `theme` constant from `lib/theme.tsx` — a frozen light palette. So switching mode never repaints the app.
-2. **Duplicate status/profile**: `TitleBar` renders `ProfileMenu` (AVAILABLE pill), and `SoftphonePane` header re-renders Ext badge + REGISTERED dot + `ProfileMenu` again. On narrow widths both stack.
-3. **Type/density**: Static sizes (10–14 px), no fluid clamps, monospace dialer field looks dated next to the glass surfaces.
+## 1. Backend (small additions only)
 
----
+Single migration:
+- `org_chat_typing` (ephemeral) — `channel_id, user_id, expires_at` with auto-expiry, RLS scoped to channel members. Used for typing dots; written via realtime `presence` channel primarily, table as fallback.
+- `org_chat_message_pins` — pinned messages per channel with `pinned_by`, `pinned_at` (replaces array column for richer UX).
+- New RPCs:
+  - `create_group_chat(_name text, _member_ids uuid[])` → enforces caller is member, returns channel (replaces direct insert from desktop).
+  - `mark_channel_read(_channel_id uuid)` → upserts into `org_chat_reads`.
+  - `get_unread_counts()` → returns `{channel_id, unread}[]` for sidebar badges.
+  - `pin_message(_message_id uuid)` / `unpin_message(_message_id uuid)`.
+- Add to `org-chat` edge function: `create_group`, `mark_read`, `unread_counts`, `pin`/`unpin`, `typing` (broadcasts on realtime channel `chat:{channel_id}` only — no DB write).
+- Realtime publication: add `org_chat_message_pins` and `org_chat_reads`.
 
-## Part A — Global theme propagation (with Save button)
+No schema breaks — existing columns (`reactions`, `attachments`, `parent_message_id`, `reply_count`, `tsv`, `edited_at`, `pinned_messages`) are kept.
 
-### A1. Make tokens reactive via CSS variables
-- In `ThemeProvider` (`lib/theme.tsx`), on every `mode` change write each token to `document.documentElement.style.setProperty('--ava-bg', t.bg)`, etc. for all ~25 tokens.
-- Refactor the static `theme` export into **getters** that read `var(--ava-…)` with a hard-coded light fallback. Every component already calling `theme.colors.bg` will then auto-repaint when the variables flip — zero component churn.
-- Same treatment for `theme.glass.*` (the inline style objects become functions returning fresh objects from CSS vars).
+## 2. Shared chat hook layer (`src/hooks/useOrgChat.ts`)
 
-### A2. Pending + Save UX in Settings
-- Split state: `pendingMode` (local) vs. committed `mode` (context). Theme buttons set `pendingMode`. Live preview pane uses `pendingMode`.
-- Add sticky footer in `SettingsPage`:
-  - **Save** (primary, gradient) → `setMode(pendingMode)` + persist to `localStorage` + toast "Theme applied to all screens".
-  - **Revert** secondary → resets `pendingMode = mode`.
-  - Disabled when `pendingMode === mode`.
-- Broadcast via `storage` event (already wired) so the responsive overlay iframes also flip.
+Extend the existing hook with:
+- `useUnreadCounts()` — polled + invalidated on new message.
+- `useTyping(channelId)` — subscribes to realtime broadcast `chat:{id}` event `typing`, returns `{ typingUsers }`; exposes `sendTyping()` (throttled 2s).
+- `useReadReceipts(channelId)` — subscribes to `org_chat_reads`, returns last-read-at per user.
+- `usePinned(channelId)` — channel pins with optimistic toggle.
+- `useGroupChat()` — `createGroup({name, members})` via edge fn.
+- `useChatCallActions()` — wraps `lemtel:start-call` (desktop) / posts to softphone bridge (web) for "Call" buttons on DMs and groups.
 
-### A3. Reload safety
-- `ThemeProvider` already restores from `localStorage` on mount; once A1 lands the CSS vars get written before first paint via a tiny inline `<script>` in `index.html` reading `ava-softphone-theme` → applies a `data-ava-theme` attribute + base background to avoid white flash.
+## 3. Web UI — `src/pages/my/OrgChat.tsx` rewrite (Slack-style, AVA tokens)
 
----
+```text
+┌──────────────────────────────────────────────────────────────┐
+│ AVA-glass top bar: workspace name • search • new chat       │
+├──────────┬───────────────────────────────────────────────────┤
+│ Sidebar  │  Channel header (name, members, 📞 call, pin)    │
+│          ├───────────────────────────────────────────────────┤
+│ Channels │                                                   │
+│  # gen.. │  Message stream                                   │
+│  # ops   │   • avatar + name + presence dot                  │
+│  🔒 mkt  │   • markdown content                              │
+│          │   • reactions row, "Reply in thread", edit/del    │
+│ Groups   │   • attachment previews (img inline / file card)  │
+│  👥 …    │   • date dividers, unread separator               │
+│          │                                                   │
+│ Direct   │  Typing: "Alice is typing…"                       │
+│  🟢 Bob  │  Read receipts row under last own message         │
+│  ⚪ Sue  │                                                   │
+│          ├───────────────────────────────────────────────────┤
+│ + New    │  Composer: 📎 file • 😊 emoji • @mention picker  │
+│          │            multiline, ⌘↵ send                     │
+└──────────┴───────────────────────────────────────────────────┘
+            Right panel (slide-in) for active thread
+```
 
-## Part B — Visual identity refresh (futuristic, especially narrow widths)
+Components (new, under `src/components/chat/`):
+- `ChatSidebar.tsx` — channels, groups, DMs with unread badges + presence dots; "+ New chat" opens picker (DM / group / channel).
+- `ChatHeader.tsx` — title, member avatars, **call** button, pin drawer trigger, info.
+- `MessageList.tsx` — virtualized list, date dividers, unread marker, grouping consecutive messages by sender.
+- `MessageItem.tsx` — avatar, name, time, markdown body, hover actions (react/reply/edit/delete/pin), reaction chips.
+- `ThreadPanel.tsx` — right side panel using `useThread`.
+- `Composer.tsx` — textarea, attachments dropzone (uses existing `uploadAttachment`), `@mention` autocomplete from directory, emoji picker, typing broadcast.
+- `MentionPicker.tsx`, `EmojiPicker.tsx` (lightweight).
+- `NewChatDialog.tsx` — tabs: DM / Group / Channel.
 
-### B1. Remove duplicate status
-- Drop the `<ProfileMenu />` + status dot block from `SoftphonePane` header. Keep only the Ext badge + a single tiny SIP indicator (4 px dot, no text on `compact`).
-- `TitleBar` remains the **single** source of profile + presence. On `compact`/`ultraCompact` widths, `TitleBar` becomes the full status bar (Ext + status + ProfileMenu + sync + gear).
+Styling uses semantic tokens from `index.css` (no hardcoded colors); AVA cyberpunk-glass cards, primary `#0023e6` accents, Inter body, dense Slack-like rows.
 
-### B2. Futuristic effects
-- **Aurora mesh background**: animated 18s slow gradient drift on `<body>` using CSS `@keyframes` translating two radial blobs (brand blue + cyan).
-- **Glass v2**: increase blur to 20px, add inner 1px highlight (`box-shadow: inset 0 1px 0 rgba(255,255,255,0.08)`), corner radius 18.
-- **Neon focus ring**: `0 0 0 2px var(--ava-accent), 0 0 18px -2px var(--ava-accent)` on `:focus-visible`.
-- **Dialer keys**: subtle gradient bevel + active state with cyan glow + 60 ms scale(0.96) press. Letters under digits get a faint accent glow on hover.
-- **Dock**: floating pill (already glass), add scanline shimmer (1.5 s) on the active tab, animated icon morph on switch.
-- **Header**: gradient hairline border-bottom (blue→cyan→gold) instead of flat border.
-- **Number field**: replace `Enter a number…` monospace with a tabular-figures display font + animated caret + soft inner glow when focused. Right-aligned for entered digits.
-- **Brightness overlay**: tint shifts hue slightly per theme (cool for daylight, warm-blue for midnight).
+## 4. Desktop UI — `apps/ava-softphone-desktop/src/components/console/OrgChatView.tsx` rewrite
 
-### B3. Typography pass
-- Adopt fluid scale: `font-size: clamp(11px, 1.4vw, 13px)` for body, `clamp(20px, 3vw, 28px)` for titles.
-- Switch dialer digits to `Space Grotesk` 600 with `font-variant-numeric: tabular-nums lining-nums`.
-- Increase letter-spacing on caps pills (0.6 → 0.8). Lower opacity of dim text from 0.85 → 0.72 for hierarchy.
-- All-caps labels (`ABC`, `DEF`…) shrink to 9 px with 1.4 letter-spacing — currently competing with the digit.
-- Anti-alias: add `-webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility` globally.
+Same component vocabulary, lighter (no react-query) — uses the desktop's own supabase client. Reuses backend actions through `supabase.functions.invoke('org-chat', ...)`. Adds: threads side panel, reactions hover bar, mentions, attachments upload, typing dots, unread badges, pinned drawer, **📞 call** button wired to `window.dispatchEvent('lemtel:start-call', { to })`.
 
-### B4. Narrow-width polish (the screenshot case)
-- Header collapses to 40 px, Ext badge becomes icon-only with tooltip, status becomes 6 px dot.
-- Dock auto-shrinks tab labels to 9 px and uses 2-letter abbreviations when width < 380 px (no `HISTO…` truncation).
-- Add a 6 px safe-area top padding so the macOS traffic lights never overlap the title row.
+## 5. Calling integration
 
----
+- DM header → call button dials the other member's extension via existing `lemtel:start-call`.
+- Group header → "Call group" creates an ad-hoc conference by dialing the FreeSWITCH conference extension `conf:{channel_id}` (config already supports dynamic conferences); a system message is posted in the channel so other members can join with one click.
+- Web app reuses the same event channel through the softphone bridge iframe.
 
-## Files to touch
+## 6. Realtime channels used
 
-**Theme infra**
-- `apps/ava-softphone-desktop/src/lib/theme.tsx` — CSS var injection, reactive `theme` proxy.
-- `apps/ava-softphone-desktop/index.html` — pre-paint theme bootstrap script.
-- `apps/ava-softphone-desktop/src/styles/futuristic.css` — new aurora keyframes, neon ring, scanline, fluid type.
+- `postgres_changes` on `org_chat_messages`, `org_chat_channels`, `org_chat_message_pins`, `org_chat_reads`, `user_presence` — unchanged subscriptions for sync.
+- Realtime broadcast `chat:{channel_id}` events: `typing`, `stop_typing` (no DB writes — keeps it cheap).
 
-**Settings (Save flow)**
-- `apps/ava-softphone-desktop/src/components/SettingsPage.tsx` — pending state, Save/Revert footer.
+## 7. Out of scope (this pass)
 
-**Visual + dedupe**
-- `apps/ava-softphone-desktop/src/components/SoftphonePane.tsx` — strip duplicate ProfileMenu/status, new dialer treatment.
-- `apps/ava-softphone-desktop/src/components/TitleBar.tsx` — promote to single status bar (Ext + status + profile + actions).
-- `apps/ava-softphone-desktop/src/components/ProfileMenu.tsx` — compact variant.
-- `apps/ava-softphone-desktop/src/components/BrightnessOverlay.tsx` — theme-aware hue.
+- Voice/video huddles inside the chat UI (calling still uses the softphone).
+- E2E encryption, message scheduling, channel folders.
+- Bot/app marketplace.
 
-**Untouched**: edge functions, RLS, mobile app, landing page, PBX provisioning.
+## Files touched
 
----
+```text
+supabase/migrations/<new>.sql                          (pins, typing, RPCs, realtime)
+supabase/functions/org-chat/index.ts                   (+ create_group, mark_read, unread_counts, pin/unpin, typing)
+src/hooks/useOrgChat.ts                                (+ unread/typing/pins/group hooks)
+src/pages/my/OrgChat.tsx                               (rewrite using new components)
+src/components/chat/*                                  (NEW: Sidebar, Header, MessageList, MessageItem, ThreadPanel, Composer, MentionPicker, EmojiPicker, NewChatDialog)
+src/pages/telephony/TelephonyTeam.tsx                  (point to new hook signatures if needed)
+apps/ava-softphone-desktop/src/components/console/OrgChatView.tsx   (rewrite, same feature set)
+apps/ava-softphone-desktop/src/components/chat/*       (NEW: mirror components, no react-query)
+```
 
-## Verification
-1. Switch theme in Settings → press Save → confirm TitleBar, dialer, dock, dock pills, recents, voicemail all flip.
-2. Reload app → theme persists, no white flash.
-3. Resize to 380 px → only one status row, no truncated dock labels, ProfileMenu reachable from TitleBar.
-4. Tab through dialer → neon focus ring visible in all 4 themes.
-5. Responsive lab (`?lab=responsive`) → theme syncs across iframes via storage event.
+After implementation: typecheck the project, send/receive across web + desktop, verify DMs, group creation, threads, reactions, mentions, edit/delete, file upload + image preview, typing dots, unread badges, presence dots, search, pin/unpin, and the DM/group call buttons.
