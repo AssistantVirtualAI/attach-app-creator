@@ -351,6 +351,64 @@ async function execTool(
     return { insights: data ?? [] };
   }
 
+  if (name === "get_voicemail_detail") {
+    const id: string = args?.voicemail_id;
+    if (!id) return { error: "missing_voicemail_id" };
+    const { data: vm } = await admin
+      .from("pbx_voicemails")
+      .select("id, organization_id, extension, caller_number, caller_name, received_at, duration_seconds, transcript, ai_summary, ai_tags, read_at, audio_storage_path")
+      .eq("id", id)
+      .maybeSingle();
+    if (!vm || vm.organization_id !== spu.organization_id || vm.extension !== spu.extension)
+      return { error: "forbidden" };
+    let audio_url: string | null = null;
+    if (vm.audio_storage_path) {
+      const { data: s } = await admin.storage.from("voicemails").createSignedUrl(vm.audio_storage_path, 3600);
+      audio_url = s?.signedUrl ?? null;
+    }
+    return { voicemail: { ...vm, audio_url } };
+  }
+
+  if (name === "get_call_detail") {
+    const id: string = args?.call_id;
+    if (!id) return { error: "missing_call_id" };
+    const { data: c } = await admin
+      .from("pbx_call_records")
+      .select("id, organization_id, extension, direction, caller_number, destination_number, start_at, duration_seconds, call_status, hangup_cause, sentiment, ai_summary")
+      .eq("id", id)
+      .maybeSingle();
+    if (!c || c.organization_id !== spu.organization_id || c.extension !== spu.extension)
+      return { error: "forbidden" };
+    const { data: tr } = await admin
+      .from("pbx_call_transcripts")
+      .select("content, speaker_segments")
+      .eq("call_record_id", id)
+      .maybeSingle();
+    const { data: rec } = await admin
+      .from("pbx_call_recordings")
+      .select("id, duration_seconds, recording_name")
+      .eq("call_record_id", id)
+      .maybeSingle();
+    return { call: c, transcript: tr ?? null, recording: rec ?? null };
+  }
+
+  if (name === "get_recording_detail") {
+    const id: string = args?.recording_id;
+    if (!id) return { error: "missing_recording_id" };
+    const { data: r } = await admin
+      .from("pbx_call_recordings")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
+    if (!r || r.organization_id !== spu.organization_id) return { error: "forbidden" };
+    let audio_url: string | null = null;
+    if (r.storage_path) {
+      const { data: s } = await admin.storage.from("recordings").createSignedUrl(r.storage_path, 3600).catch(() => ({ data: null } as any));
+      audio_url = s?.signedUrl ?? null;
+    }
+    return { recording: { ...r, audio_url } };
+  }
+
   return { error: "unknown_tool" };
 }
 
