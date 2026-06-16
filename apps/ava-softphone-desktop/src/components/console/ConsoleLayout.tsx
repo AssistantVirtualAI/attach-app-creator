@@ -250,8 +250,8 @@ export default function ConsoleLayout({
         </AppErrorBoundary>
       </main>
 
-      {!compact && <AIPanel open={aiOpen} onToggle={() => setAiOpen((v) => !v)} />}
-      {compact && aiOpen && <AIPanel open={aiOpen} onToggle={() => setAiOpen((v) => !v)} />}
+      <AIPanel open={aiOpen} onToggle={() => setAiOpen((v) => !v)} />
+
 
 
       {compact && (
