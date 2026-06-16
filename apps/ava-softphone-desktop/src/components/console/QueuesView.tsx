@@ -235,7 +235,7 @@ export default function QueuesView({ isAdmin, isSuperAdmin, isSupervisor }: Prop
               busy={busy}
               canAdmin={canAdmin}
               onAgentAction={(action, extra) => call(action, extra)}
-              onMonitor={(targetExt, mode) => call('monitor-call', { target_extension: targetExt, mode, supervisor_extension: meRow?.extension })}
+              onMonitor={(targetExt, mode) => call('monitor-start', { agent_extension: targetExt, monitor_type: mode, supervisor_extension: meRow?.extension })}
               onMove={moveAgent}
             />
           )}
