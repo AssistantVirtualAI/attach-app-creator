@@ -249,12 +249,13 @@ export default function RecordingsView({ scope = 'mine' }: { scope?: 'mine' | 'o
 
   const runTranscribeAnalyze = async () => {
     if (!sel) return;
-    setAiLoading(true); setAiError(null);
+    setAiLoading(true); setAiError(null); setAiStage('fetching');
     try {
       const organization_id = (sel as any).organization_id || LEMTEL_ORG;
       const callId = (sel as any).callId || sel.id;
       let txt = transcript;
       if (!txt) {
+        setAiStage('transcribing');
         const r1 = await supabase.functions.invoke('ai-transcribe-call', {
           body: { callId, call_record_id: callId, organization_id,
                   recording_path: (sel as any).recording_path, recording_name: (sel as any).recording_name },
@@ -264,6 +265,7 @@ export default function RecordingsView({ scope = 'mine' }: { scope?: 'mine' | 'o
         if (txt) setTranscript(txt);
       }
       if (!txt) throw new Error('No transcript available for AI analysis yet');
+      setAiStage('analyzing');
       const r2 = await supabase.functions.invoke('ai-analyze-call', {
         body: { callId, call_record_id: callId, organization_id, transcript_text: txt,
                 recording_path: (sel as any).recording_path, recording_name: (sel as any).recording_name },
@@ -272,8 +274,10 @@ export default function RecordingsView({ scope = 'mine' }: { scope?: 'mine' | 'o
       const ai = (r2.data as any)?.analysis || (r2.data as any) || null;
       setAnalysis(ai);
       if (ai?.summary) updateItem(sel.id, { summary: ai.summary, topics: ai.topics || sel.topics, sentiment: ai.sentiment || sel.sentiment });
+      setAiStage('done');
     } catch (e: any) {
       setAiError(aiErr(e));
+      setAiStage('error');
     } finally {
       setAiLoading(false);
     }
