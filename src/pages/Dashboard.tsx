@@ -14,6 +14,8 @@ import { AgentSelector } from '@/components/dashboard/AgentSelector';
 import { DateRangeSelector } from '@/components/dashboard/DateRangeSelector';
 import { ReportGenerator } from '@/components/reports/ReportGenerator';
 import { useDashboardMetrics, DashboardMetrics } from '@/hooks/useDashboardMetrics';
+import { useDashboardOverview } from '@/hooks/useDashboardOverview';
+import { DashboardOverviewGrid } from '@/components/dashboard/DashboardOverviewGrid';
 import { useDashboardAgents, useAgentDashboardMetrics } from '@/hooks/useDashboardAgentMetrics';
 import { useAgentReports } from '@/hooks/useAgentReports';
 import { useTranslation } from '@/hooks/useTranslation';
