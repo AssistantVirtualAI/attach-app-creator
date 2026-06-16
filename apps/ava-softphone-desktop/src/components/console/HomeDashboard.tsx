@@ -367,7 +367,7 @@ export default function HomeDashboard({
           <span style={{ flex: 1 }}>Could not load stats: {stats.error}</span>
           <button onClick={() => stats.refresh()} className="ava-range-btn" style={{
             padding: '6px 12px', borderRadius: 8, border: `1px solid ${tones.red.ring}`,
-            background: '#fff', color: c.danger, fontWeight: 700, fontSize: 12, cursor: 'pointer',
+            background: c.bgCard, color: c.danger, fontWeight: 700, fontSize: 12, cursor: 'pointer',
           }}>Retry</button>
         </div>
       )}
@@ -629,7 +629,8 @@ function MetricDetailDrawer(props: {
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          width: 'min(560px, 100%)', height: '100dvh', background: '#f6f8fd',
+          width: 'min(560px, 100%)', height: '100dvh', background: c.bg,
+          color: c.text,
           borderLeft: `1px solid ${c.border}`,
           display: 'flex', flexDirection: 'column',
           boxShadow: '-20px 0 50px -20px rgba(8,14,32,0.45)',
@@ -655,20 +656,20 @@ function MetricDetailDrawer(props: {
             }}>Close</button>
         </div>
 
-        <div style={{ padding: '10px 18px', background: '#fff', borderBottom: `1px solid ${c.border}`, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ padding: '10px 18px', background: c.bgCard, borderBottom: `1px solid ${c.border}`, display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 11, color: c.mutedSilver, fontWeight: 600 }}>Shareable link</span>
           <input readOnly value={shareUrl} aria-label="Shareable URL for this metric view"
-            style={{ flex: 1, fontSize: 11, padding: '5px 8px', border: `1px solid ${c.border}`, borderRadius: 6, background: '#f8fafc', color: c.textIce, fontFamily: 'monospace' }} />
+            style={{ flex: 1, fontSize: 11, padding: '5px 8px', border: `1px solid ${c.border}`, borderRadius: 6, background: c.bgElev, color: c.textIce, fontFamily: 'monospace' }} />
           <button onClick={() => { try { navigator.clipboard?.writeText(shareUrl); } catch { /* noop */ } }}
             className="ava-drawer-close"
             aria-label="Copy shareable link to clipboard"
-            style={{ fontSize: 11, fontWeight: 700, padding: '5px 10px', borderRadius: 6, border: `1px solid ${tone.ring}`, background: '#fff', color: tone.from, cursor: 'pointer' }}>
+            style={{ fontSize: 11, fontWeight: 700, padding: '5px 10px', borderRadius: 6, border: `1px solid ${tone.ring}`, background: c.bgCard, color: tone.from, cursor: 'pointer' }}>
             Copy
           </button>
         </div>
 
         {seriesForMetric.length > 0 && (
-          <div style={{ padding: '14px 18px 0', background: '#fff', borderBottom: `1px solid ${c.border}` }}>
+          <div style={{ padding: '14px 18px 0', background: c.bgCard, borderBottom: `1px solid ${c.border}` }}>
             <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 1.4, color: c.mutedSilver, textTransform: 'uppercase', marginBottom: 6 }}>
               Daily trend
             </div>
@@ -699,7 +700,7 @@ function MetricDetailDrawer(props: {
               <span style={{ fontSize: 12, fontWeight: 500 }}>{error}</span>
               <button onClick={load} className="ava-drawer-close" style={{
                 padding: '6px 12px', borderRadius: 8, border: `1px solid ${tones.red.ring}`,
-                background: '#fff', color: c.danger, fontWeight: 700, fontSize: 12, cursor: 'pointer',
+                background: c.bgCard, color: c.danger, fontWeight: 700, fontSize: 12, cursor: 'pointer',
               }}>Retry</button>
             </div>
           ) : !rows || rows.length === 0 ? (
@@ -734,7 +735,7 @@ function DetailRow({ metric, row, tone }: { metric: MetricKey; row: any; tone: T
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 12,
-      padding: '11px 12px', background: '#fff',
+      padding: '11px 12px', background: c.bgCard,
       border: `1px solid ${c.border}`, borderLeft: `3px solid ${tone.from}`,
       borderRadius: 10,
     }}>
