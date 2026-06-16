@@ -113,3 +113,72 @@
     transition: none !important;
   }
 }
+
+/* ============================================================
+   Responsive scaling — applies to every console page
+   .ava-page is the outer wrapper used by HomeDashboard; other
+   views use inline padding that we override with a generic
+   selector for the main content slot.
+   ============================================================ */
+
+main {
+  font-family: 'DM Sans', sans-serif;
+}
+
+/* Headings everywhere in the desktop app */
+main h1, main h2, main h3, .ava-display {
+  font-family: 'Space Grotesk', 'DM Sans', sans-serif;
+  letter-spacing: -0.01em;
+}
+
+/* Page enter — softer, broader */
+.lemtel-page-enter > * > * {
+  animation: ava-page-enter-soft 280ms cubic-bezier(.2,.7,.2,1) both;
+}
+@keyframes ava-page-enter-soft {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Tablet (≤960) */
+@media (max-width: 960px) {
+  .ava-page { padding: 22px 22px !important; }
+  main h1, .ava-display { letter-spacing: -0.4px; }
+  /* Two-column hero collapses to one column */
+  .ava-glass.ava-aurora-border[style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+  }
+  .ava-glass.ava-aurora-border[style*="grid-template-columns"] > div[style*="border-left"] {
+    border-left: none !important;
+    border-top: 1px solid rgba(180,196,224,0.55) !important;
+    padding-left: 0 !important;
+    padding-top: 16px !important;
+  }
+}
+
+/* Mobile (≤640) */
+@media (max-width: 640px) {
+  .ava-page { padding: 16px 14px 24px !important; max-width: 100% !important; }
+  main h1, .ava-display { font-size: 26px !important; }
+  main { font-size: 14px; }
+
+  /* Card grids stay tight but breathing */
+  .ava-glass { border-radius: 14px !important; }
+
+  /* Page headers shrink padding */
+  header.ava-glass { padding: 16px 16px 18px !important; border-radius: 14px !important; }
+  header.ava-glass h1 { font-size: 20px !important; }
+
+  /* Stat numerals stay big but contained */
+  .ava-page .tabular-nums.ava-display { font-size: 26px !important; }
+}
+
+/* Wide desktops (≥1440) breathe more */
+@media (min-width: 1440px) {
+  .ava-page { padding: 32px 40px !important; }
+}
+
+/* Tap-friendly buttons on touch */
+@media (hover: none) {
+  button { min-height: 40px; }
+}
