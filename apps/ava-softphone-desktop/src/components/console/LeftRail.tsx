@@ -15,14 +15,14 @@ const NAV_KEY: Record<string, I18nKey> = {
   contacts: 'nav.contacts', admin: 'nav.admin', settings: 'nav.settings',
   telecom: 'nav.telecom', orgchat: 'nav.orgchat', aiadmin: 'nav.aiadmin', reports: 'nav.reports',
   customers: 'nav.admin', voiceagents: 'nav.ai', pbxlive: 'nav.pbxlive',
-  audit: 'nav.admin',
+  audit: 'nav.admin', queues: 'nav.calls',
 };
 
 export type ConsoleView =
   | 'home' | 'dialer' | 'calls' | 'messages' | 'voicemail'
   | 'recordings' | 'ai' | 'contacts' | 'admin' | 'settings'
   | 'telecom' | 'orgchat' | 'aiadmin' | 'reports' | 'pbxlive'
-  | 'customers' | 'voiceagents' | 'audit';
+  | 'customers' | 'voiceagents' | 'audit' | 'queues';
 
 const ICON: Record<ConsoleView, string> = {
   home: 'M3 11l9-8 9 8v10a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1V11z',
@@ -42,6 +42,7 @@ const ICON: Record<ConsoleView, string> = {
   customers: 'M3 7h18M3 12h18M3 17h18M7 3v18',
   voiceagents: 'M12 1a4 4 0 0 0-4 4v6a4 4 0 0 0 8 0V5a4 4 0 0 0-4-4zM5 11a7 7 0 0 0 14 0M12 18v4',
   audit: 'M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11',
+  queues: 'M3 6h18M3 12h12M3 18h18M19 10l3 2-3 2v-4z',
   settings: 'M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z',
 };
 
@@ -51,9 +52,10 @@ const LABEL: Record<ConsoleView, string> = {
   contacts: 'Contacts', admin: 'Admin', settings: 'Settings',
   telecom: 'Telecom', orgchat: 'Org Chat', aiadmin: 'AI Admin', reports: 'Reports',
   customers: 'Customers', voiceagents: 'Voice Agents', pbxlive: 'PBX Live', audit: 'Audit',
+  queues: 'Call Queues',
 };
 
-const USER_ITEMS: ConsoleView[] = ['home', 'dialer', 'calls', 'messages', 'voicemail', 'recordings', 'orgchat', 'ai', 'telecom', 'contacts'];
+const USER_ITEMS: ConsoleView[] = ['home', 'dialer', 'calls', 'queues', 'messages', 'voicemail', 'recordings', 'orgchat', 'ai', 'telecom', 'contacts'];
 const ADMIN_ITEMS: ConsoleView[] = ['pbxlive', 'customers', 'voiceagents', 'reports', 'admin', 'aiadmin', 'audit'];
 
 interface Props {
@@ -94,21 +96,10 @@ export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch,
       WebkitAppRegion: 'drag' as any,
       position: 'relative',
     }}>
-      {/* Premium glow strip — synced to PBX + sync */}
+      {/* quiet accent strip */}
       <div aria-hidden style={{
-        position: 'absolute', top: 0, left: 0, right: 0, height: 2,
-        background: `linear-gradient(90deg, transparent, ${glowColor}, transparent)`,
-        opacity: healthy ? 0.95 : pbx === 'error' ? 0.8 : 0.45,
-        boxShadow: `0 0 18px ${glowColor}, 0 0 36px ${glowColor}66`,
-        transition: 'all .4s ease',
-        animation: healthy ? 'statusPulse 2.6s ease-in-out infinite' : undefined,
-        pointerEvents: 'none',
-      }} />
-      <div aria-hidden style={{
-        position: 'absolute', top: 0, bottom: 0, right: -1, width: 1,
-        background: `linear-gradient(180deg, transparent, ${glowColor}55, transparent)`,
-        opacity: healthy ? 0.6 : 0.25,
-        transition: 'opacity .4s ease',
+        position: 'absolute', top: 0, left: 0, right: 0, height: 1,
+        background: c.border,
         pointerEvents: 'none',
       }} />
 
@@ -127,31 +118,22 @@ export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch,
         </div>
       </div>
 
-      {/* Status chip — PBX + sync */}
+      {/* Quiet org chip — no sync mentions */}
       <div style={{
         margin: '0 4px 12px', padding: '7px 10px',
         borderRadius: 10,
-        background: `linear-gradient(135deg, ${glowColor}14, transparent)`,
-        border: `1px solid ${glowColor}44`,
+        background: 'rgba(255,255,255,0.02)',
+        border: `1px solid ${c.border}`,
         display: 'flex', alignItems: 'center', gap: 8,
         WebkitAppRegion: 'no-drag' as any,
-        boxShadow: healthy ? `0 0 14px -4px ${glowColor}99` : 'none',
-        transition: 'all .35s ease',
       }}>
         <span style={{
-          width: 8, height: 8, borderRadius: '50%',
-          background: glowColor,
-          boxShadow: `0 0 8px ${glowColor}`,
-          animation: healthy ? 'statusPulse 2s ease-in-out infinite' : undefined,
+          width: 7, height: 7, borderRadius: '50%',
+          background: pbx === 'registered' ? '#22c55e' : pbx === 'error' ? '#ef4444' : c.mutedSilver,
         }} />
-        <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15, minWidth: 0 }}>
-          <span style={{ fontSize: 10.5, fontWeight: 700, color: c.textIce, letterSpacing: 0.4 }}>
-            {pbx === 'registered' ? 'PBX Online' : pbx === 'error' ? 'PBX Error' : 'Connecting…'}
-          </span>
-          <span style={{ fontSize: 9.5, color: c.mutedSilver, letterSpacing: 0.3 }}>
-            {syncConnected ? (lastEvent ? `Sync · ${formatAge(ageMs)}` : 'Sync live') : 'Sync offline'}
-          </span>
-        </div>
+        <span style={{ fontSize: 11, fontWeight: 600, color: c.textIce, letterSpacing: 0.3 }}>
+          {pbx === 'registered' ? 'Online' : pbx === 'error' ? 'Offline' : 'Connecting…'}
+        </span>
       </div>
 
       <button
