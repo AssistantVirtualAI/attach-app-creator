@@ -19,6 +19,7 @@ import VoiceAgentsView from './VoiceAgentsView';
 import PBXLiveView from './PBXLiveView';
 import QueuesView from './QueuesView';
 import AuditView from './AuditView';
+import SyncStatusView from './SyncStatusView';
 import SoftphonePane from '../SoftphonePane';
 import SettingsPage from '../SettingsPage';
 import { AppErrorBoundary } from '../AppErrorBoundary';
@@ -232,6 +233,7 @@ export default function ConsoleLayout({
           {view === 'pbxlive' && <PBXLiveView />}
           {view === 'queues' && <QueuesView isAdmin={isAdmin} isSuperAdmin={isSuperAdmin} isSupervisor={isSupervisor} />}
           {view === 'audit' && <AuditView />}
+          {view === 'sync' && <SyncStatusView />}
           {view === 'settings' && (
             <SettingsPage
               creds={creds}
