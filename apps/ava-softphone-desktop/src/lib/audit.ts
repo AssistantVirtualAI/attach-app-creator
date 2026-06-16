@@ -17,6 +17,7 @@ export type AuditAction =
   | 'pbx.create_denied_non_admin'
   | 'pbx.create_duplicate_detected'
   | 'pbx.create_conflict_resolved'
+  | 'pbx.create_idempotent_replay'
   | 'pbx.create_succeeded';
 
 export function audit(action: AuditAction, resourceId?: string | null, metadata?: Record<string, unknown>): void {
