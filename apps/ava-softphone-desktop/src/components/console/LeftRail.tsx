@@ -152,25 +152,26 @@ export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch,
       </div>
 
       <button
+        className="lemtel-rail-search"
         onClick={onOpenSearch}
         style={{
           margin: '4px 4px 12px', padding: '9px 11px',
           background: railElev,
           border: `1px solid ${c.border}`,
-          borderRadius: 10, color: c.textSub,
+          borderRadius: 10, color: isDark ? darkTextSub : c.textSub,
           fontSize: 11.5, textAlign: 'left', cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           WebkitAppRegion: 'no-drag' as any,
-          transition: 'border-color .18s ease, background .18s ease',
+          transition: 'border-color .18s ease, background .18s ease, color .18s ease',
         }}
-        onMouseEnter={(e) => { e.currentTarget.style.borderColor = c.borderGold; }}
-        onMouseLeave={(e) => { e.currentTarget.style.borderColor = c.border; e.currentTarget.style.background = railElev; }}
+        onMouseEnter={(e) => { e.currentTarget.style.borderColor = c.borderGold; e.currentTarget.style.color = isDark ? darkTextIce : c.textIce; }}
+        onMouseLeave={(e) => { e.currentTarget.style.borderColor = c.border; e.currentTarget.style.background = railElev; e.currentTarget.style.color = isDark ? darkTextSub : c.textSub; }}
       >
         <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
           {t('nav.search')}
         </span>
-          <kbd style={{ fontSize: 9, padding: '2px 5px', borderRadius: 4, background: railHover, color: c.text, fontFamily: 'inherit' }}>⌘K</kbd>
+          <kbd style={{ fontSize: 9, padding: '2px 5px', borderRadius: 4, background: isDark ? 'rgba(255,255,255,0.10)' : railHover, color: isDark ? darkTextIce : c.text, fontFamily: 'inherit' }}>⌘K</kbd>
       </button>
 
       <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2, WebkitAppRegion: 'no-drag' as any, overflowY: 'auto' }}>
