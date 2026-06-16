@@ -229,7 +229,7 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
               <span className="font-semibold text-sm leading-tight">
-                {hasExtension ? `Ext ${ext}` : "No extension"}
+                {hasExtension ? `Ext ${extLabel}` : "No extension"}
               </span>
               {sp.config?.mock && <Badge variant="outline" className="h-4 text-[9px] px-1">DEMO</Badge>}
             </div>
