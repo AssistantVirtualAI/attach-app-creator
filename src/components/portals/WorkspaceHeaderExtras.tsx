@@ -61,11 +61,14 @@ export function WorkspaceHeaderExtras() {
   return (
     <div className="flex items-center gap-2">
       {isAdmin && (
-        <Button asChild size="sm" variant="outline" className="h-8 gap-1.5">
-          <Link to={isSuper ? "/platform" : "/customer"}>
-            <Shield className="h-3.5 w-3.5" />
-            <span className="hidden md:inline">Admin Portal</span>
-          </Link>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-8 gap-1.5"
+          onClick={() => navigate(isSuper ? "/platform" : "/customer")}
+        >
+          <Shield className="h-3.5 w-3.5" />
+          <span className="hidden md:inline">Admin Portal</span>
         </Button>
       )}
       <DropdownMenu>
