@@ -554,6 +554,7 @@ export default function AdminView() {
         {sec === 'call-history' && <CallsView scope="org" />}
         {sec === 'registrations' && <LiveRegistrationsTable />}
         {sec === 'sync' && <SyncStatus />}
+        {sec === 'audit-trail' && <AuditTrail />}
       </div>
     </div>
   );
