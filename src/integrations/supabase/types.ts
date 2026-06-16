@@ -6879,6 +6879,57 @@ export type Database = {
         }
         Relationships: []
       }
+      pbx_voicemail_greetings: {
+        Row: {
+          created_at: string
+          duration_seconds: number | null
+          extension: string | null
+          id: string
+          is_active: boolean
+          name: string
+          organization_id: string
+          source: string
+          storage_path: string
+          text_script: string | null
+          updated_at: string
+          user_id: string
+          voice_id: string | null
+          voice_name: string | null
+        }
+        Insert: {
+          created_at?: string
+          duration_seconds?: number | null
+          extension?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          organization_id: string
+          source?: string
+          storage_path: string
+          text_script?: string | null
+          updated_at?: string
+          user_id: string
+          voice_id?: string | null
+          voice_name?: string | null
+        }
+        Update: {
+          created_at?: string
+          duration_seconds?: number | null
+          extension?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          organization_id?: string
+          source?: string
+          storage_path?: string
+          text_script?: string | null
+          updated_at?: string
+          user_id?: string
+          voice_id?: string | null
+          voice_name?: string | null
+        }
+        Relationships: []
+      }
       pbx_voicemail_settings: {
         Row: {
           ai_summary_enabled: boolean
