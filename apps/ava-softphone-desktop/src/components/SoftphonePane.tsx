@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useSoftphone, ManualStatus } from '@/hooks/useSoftphone';
+import { useSoftphone } from '@/hooks/useSoftphone';
 import RecentsList from './RecentsList';
 import ContactsList from './ContactsList';
 import VoicemailList from './VoicemailList';
