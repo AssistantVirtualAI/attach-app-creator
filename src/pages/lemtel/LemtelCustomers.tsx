@@ -290,6 +290,15 @@ export default function LemtelCustomers() {
                     onChange={e => { setDomainTouched(true); setForm({ ...form, domain: e.target.value.trim().toLowerCase() }); }}
                   />
                 </div>
+                <div>
+                  <Label>Admin email (optional — they get an invite + org_admin role)</Label>
+                  <Input
+                    type="email"
+                    value={form.adminEmail}
+                    placeholder="admin@customer.com"
+                    onChange={e => setForm({ ...form, adminEmail: e.target.value.trim().toLowerCase() })}
+                  />
+                </div>
               </div>
               <DialogFooter>
                 <Button onClick={handleCreate} disabled={saving}>
