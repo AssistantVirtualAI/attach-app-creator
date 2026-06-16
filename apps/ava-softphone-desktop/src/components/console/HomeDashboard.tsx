@@ -19,20 +19,23 @@ function fmtRelative(iso: string | null) {
 
 function Stat({ label, value, accent, hint }: { label: string; value: string | number; accent: string; hint?: string }) {
   return (
-    <div style={{
-      background: `linear-gradient(160deg, ${c.deepPanel}, ${c.bgCard})`,
-      border: `1px solid ${c.border}`,
-      borderRadius: 14, padding: '14px 16px',
-      display: 'flex', flexDirection: 'column', gap: 4,
-      position: 'relative', overflow: 'hidden',
-    }}>
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: accent, opacity: 0.7 }} />
-      <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: c.mutedSilver }}>{label}</span>
-      <span style={{ fontSize: 26, fontWeight: 700, color: c.textIce, fontFamily: 'JetBrains Mono, monospace' }}>{value}</span>
-      {hint && <span style={{ fontSize: 10.5, color: c.textSub }}>{hint}</span>}
+    <div
+      className="ava-glass ava-lift"
+      style={{
+        background: 'rgba(255,255,255,0.78)',
+        border: `1px solid ${c.border}`,
+        borderRadius: 16, padding: '16px 18px',
+        display: 'flex', flexDirection: 'column', gap: 4,
+        position: 'relative', overflow: 'hidden',
+      }}>
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${accent}, ${c.cyan})`, opacity: 0.85 }} />
+      <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', color: c.mutedSilver }}>{label}</span>
+      <span className="tabular-nums ava-display" style={{ fontSize: 30, fontWeight: 600, color: c.textIce, fontFamily: "'Space Grotesk', sans-serif", letterSpacing: -0.6, lineHeight: 1.05 }}>{value}</span>
+      {hint && <span style={{ fontSize: 11, color: c.textSub }}>{hint}</span>}
     </div>
   );
 }
+
 
 function attentionColor(item: AttentionItem) {
   if (item.tone === 'danger') return c.danger;
@@ -52,52 +55,54 @@ export default function HomeDashboard({
   const freshnessAccent = stats.cdrFreshness === 'live' ? c.success : stats.cdrFreshness === 'stale' ? c.signalGold : c.mutedSilver;
 
   return (
-    <div style={{ padding: '28px 32px', maxWidth: 1180, margin: '0 auto', animation: 'fadeIn .3s ease-out' }}>
+    <div className="ava-page" style={{ padding: '28px 32px', maxWidth: 1240, margin: '0 auto', animation: 'fadeIn .3s ease-out' }}>
       <header style={{ marginBottom: 24 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 11, fontWeight: 700, letterSpacing: 2, color: c.signalGold, textTransform: 'uppercase' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 11, fontWeight: 700, letterSpacing: 2, color: c.signalGold, textTransform: 'uppercase', flexWrap: 'wrap' }}>
           <span>Command Center</span>
           {orgName && (
-            <span style={{ padding: '2px 8px', borderRadius: 999, background: 'rgba(35,214,255,0.08)', border: `1px solid ${c.borderAI}`, color: c.avaCyan, fontSize: 9.5, letterSpacing: 1 }}>
+            <span style={{ padding: '3px 10px', borderRadius: 999, background: 'rgba(33,212,253,0.10)', border: `1px solid ${c.borderAI}`, color: c.avaCyan, fontSize: 10, letterSpacing: 1 }}>
               {orgName}
             </span>
           )}
-          <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 9.5, color: c.mutedSilver, letterSpacing: 0.6 }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: healthy ? '#23d6ff' : pbx === 'error' ? '#ff5577' : c.mutedSilver, boxShadow: `0 0 6px currentColor` }} />
+          <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, color: c.mutedSilver, letterSpacing: 0.6 }}>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: healthy ? c.cyan : pbx === 'error' ? c.danger : c.mutedSilver, boxShadow: `0 0 8px currentColor` }} />
             {pbx === 'registered' ? 'PBX Online' : pbx === 'error' ? 'PBX Error' : 'Connecting'} · {syncConnected ? (lastEvent ? `Sync ${formatAge(ageMs)}` : 'Sync Live') : 'Sync Offline'}
           </span>
         </div>
-        <h1 style={{ fontSize: 28, fontWeight: 700, color: c.textIce, margin: '6px 0 4px', letterSpacing: -0.3 }}>
+        <h1 className="ava-display" style={{ fontSize: 34, fontWeight: 600, color: c.textIce, margin: '8px 0 6px', letterSpacing: -0.7, fontFamily: "'Space Grotesk', sans-serif", lineHeight: 1.1 }}>
           {greeting}, {displayName.split(' ')[0] || 'there'}
         </h1>
-        <p style={{ fontSize: 13, color: c.mutedSilver, margin: 0 }}>
+        <p style={{ fontSize: 13.5, color: c.mutedSilver, margin: 0, lineHeight: 1.55 }}>
           Ext {extension} · Live CDR, recordings, voicemail, and AVA insights for your own extension.
         </p>
       </header>
 
-      <section style={{
-        background: `linear-gradient(135deg, rgba(255,230,0,0.12), rgba(35,214,255,0.07), rgba(122,76,255,0.08))`,
-        border: `1px solid ${c.borderAI}`,
-        borderRadius: 18, padding: '20px 22px', marginBottom: 22,
-        display: 'grid', gridTemplateColumns: '1.4fr 0.8fr', gap: 20, alignItems: 'center',
-        boxShadow: '0 18px 48px -28px rgba(35,214,255,0.55)',
-      }}>
-        <div>
-          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1.8, color: c.avaCyan, textTransform: 'uppercase', marginBottom: 6 }}>
+
+      <section
+        className="ava-glass ava-aurora-border"
+        style={{
+          background: 'linear-gradient(135deg, rgba(0,35,230,0.10), rgba(33,212,253,0.08), rgba(212,167,58,0.08))',
+          borderRadius: 20, padding: '22px 24px', marginBottom: 22,
+          display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 0.9fr)', gap: 24, alignItems: 'center',
+        }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 2, color: c.avaCyan, textTransform: 'uppercase', marginBottom: 6 }}>
             Live Phone-System Brief
           </div>
-          <div style={{ fontSize: 14.5, color: c.textIce, lineHeight: 1.55 }}>
+          <div style={{ fontSize: 14.5, color: c.textIce, lineHeight: 1.6 }}>
             {stats.loading ? 'Loading the live PBX picture…' : (
               <>Today: <strong style={{ color: c.signalGold }}>{stats.totalCallsToday} call{stats.totalCallsToday === 1 ? '' : 's'}</strong>, <strong style={{ color: c.success }}>{stats.answeredToday} answered</strong>, <strong style={{ color: c.danger }}>{stats.missedToday} missed</strong>, and <strong style={{ color: c.avaCyan }}>{stats.recordingsToday} recording{stats.recordingsToday === 1 ? '' : 's'}</strong>. The latest CDR is {fmtRelative(stats.lastCallAt)}.</>
             )}
           </div>
         </div>
-        <div style={{ borderLeft: `1px solid ${c.borderAI}`, paddingLeft: 18, display: 'grid', gap: 9 }}>
+        <div style={{ borderLeft: `1px solid ${c.border}`, paddingLeft: 20, display: 'grid', gap: 10, minWidth: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: c.mutedSilver }}><span>CDR freshness</span><strong style={{ color: freshnessAccent }}>{stats.cdrFreshness.toUpperCase()}</strong></div>
-          <div style={{ height: 8, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}><div style={{ width: stats.cdrFreshness === 'live' ? '100%' : stats.cdrFreshness === 'stale' ? '58%' : '18%', height: '100%', background: freshnessAccent }} /></div>
+          <div style={{ height: 8, borderRadius: 999, background: 'rgba(11,21,48,0.08)', overflow: 'hidden' }}><div style={{ width: stats.cdrFreshness === 'live' ? '100%' : stats.cdrFreshness === 'stale' ? '58%' : '18%', height: '100%', background: `linear-gradient(90deg, ${freshnessAccent}, ${c.cyan})` }} /></div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: c.mutedSilver }}><span>Recording coverage</span><strong style={{ color: c.signalGold }}>{stats.recordingCoveragePct}%</strong></div>
-          <div style={{ height: 8, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}><div style={{ width: `${Math.max(4, stats.recordingCoveragePct)}%`, height: '100%', background: c.signalGold }} /></div>
+          <div style={{ height: 8, borderRadius: 999, background: 'rgba(11,21,48,0.08)', overflow: 'hidden' }}><div style={{ width: `${Math.max(4, stats.recordingCoveragePct)}%`, height: '100%', background: `linear-gradient(90deg, ${c.signalGold}, ${c.goldSoft})` }} /></div>
         </div>
       </section>
+
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 14, marginBottom: 24 }}>
         <Stat label="Calls Today" value={stats.totalCallsToday} accent={c.avaCyan} hint="Scoped to extension" />
@@ -164,12 +169,16 @@ export default function HomeDashboard({
 }
 
 const quickBtn = (accent: string): React.CSSProperties => ({
-  padding: '10px 16px',
-  background: c.bgCard,
+  padding: '11px 18px',
+  background: 'rgba(255,255,255,0.78)',
   border: `1px solid ${c.border}`,
-  borderLeft: `2px solid ${accent}`,
-  borderRadius: 10,
-  color: c.textIce, fontSize: 12.5, fontWeight: 600,
+  borderLeft: `3px solid ${accent}`,
+  borderRadius: 12,
+  color: c.textIce, fontSize: 13, fontWeight: 600,
   cursor: 'pointer',
-  transition: 'all 160ms ease',
+  transition: 'all 200ms cubic-bezier(.2,.7,.2,1)',
+  backdropFilter: 'blur(10px)',
+  WebkitBackdropFilter: 'blur(10px)',
+  boxShadow: '0 4px 14px -8px rgba(11,21,48,0.18)',
 });
+
