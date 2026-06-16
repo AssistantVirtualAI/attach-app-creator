@@ -829,7 +829,6 @@ function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt
   );
 }
 
-function MembersTable({ supervisors, agents, canAssign, onRemoveOne, onBulkRemove, txt }: any) {
 // localStorage-backed state hook
 function usePersistedState<T>(key: string, initial: T): [T, (v: T) => void] {
   const [val, setVal] = useState<T>(() => {
