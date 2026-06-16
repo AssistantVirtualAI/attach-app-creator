@@ -164,12 +164,38 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     try { localStorage.setItem(STORAGE_KEY, mode); } catch {}
-    document.documentElement.setAttribute('data-ava-theme', mode);
-    document.documentElement.style.background = t.bg;
-    document.documentElement.style.color = t.text;
+    const root = document.documentElement;
+    root.setAttribute('data-ava-theme', mode);
+    // Push every token to a CSS variable so the static `theme` export and
+    // any raw consumer of `var(--ava-…)` repaint instantly on mode change.
+    const set = (k: string, val: string) => root.style.setProperty(`--ava-${k}`, val);
+    set('bg', t.bg);
+    set('bg-gradient', t.bgGradient);
+    set('surface', t.surface);
+    set('surface-elev', t.surfaceElev);
+    set('surface-hover', t.surfaceHover);
+    set('border', t.border);
+    set('border-strong', t.borderStrong);
+    set('text', t.text);
+    set('text-muted', t.textMuted);
+    set('text-subtle', t.textSubtle);
+    set('accent', t.accent);
+    set('accent-soft', t.accentSoft);
+    set('accent-gradient', t.accentGradient);
+    set('accent-glow', t.accentGlow);
+    set('success', t.success);
+    set('danger', t.danger);
+    set('warning', t.warning);
+    set('ring-glow', t.ringGlow);
+    set('glass', t.glass);
+    set('glass-border', t.glassBorder);
+    set('shadow', t.shadow);
+    root.style.background = t.bg;
+    root.style.color = t.text;
     document.body.style.background = t.bg;
     document.body.style.color = t.text;
   }, [mode, t]);
+
 
   // Cross-document sync: when the parent (or any same-origin doc) writes the
   // theme key, iframes/other windows pick it up live — used by the responsive
