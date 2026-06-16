@@ -170,6 +170,27 @@ function ExtensionsTable() {
     }
   };
 
+  const createExtension = async (form: any) => {
+    setSaving(true);
+    try {
+      const scope = await resolveDesktopTenantScope();
+      const out: any = { ...form };
+      ['voicemail_enabled', 'enabled', 'voicemail_attach_file',
+       'voicemail_local_after_email', 'do_not_disturb',
+       'forward_all_enabled', 'forward_busy_enabled', 'forward_no_answer_enabled']
+        .forEach((k) => { if (typeof out[k] === 'boolean') out[k] = out[k] ? 'true' : 'false'; });
+      const { error: err } = await supabase.functions.invoke('fusionpbx-proxy', {
+        body: { action: 'create-extension', organization_id: scope.organization_id, params: { domain_uuid: scope.domain_uuid, ...out } },
+      });
+      if (err) throw err;
+      setCreating(false);
+      await reload(true);
+      window.dispatchEvent(new Event('ava:pbx-resource-saved'));
+    } catch (e: any) {
+      alert('Create failed: ' + (e?.message || 'unknown'));
+    } finally { setSaving(false); }
+  };
+
   const cols = ['Ext', 'Display Name', 'User', 'Voicemail', 'Status', ''];
   return (
     <>
