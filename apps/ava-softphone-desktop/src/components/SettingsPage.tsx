@@ -483,3 +483,14 @@ function ThemePreview({ t, mode }: { t: any; mode: string }) {
     </div>
   );
 }
+
+function Badge({ children, bg, fg }: { children: React.ReactNode; bg: string; fg: string }) {
+  return (
+    <span style={{
+      padding: '4px 10px', borderRadius: 999,
+      background: bg, color: fg,
+      fontSize: 11, fontWeight: 700, letterSpacing: 0.3,
+      border: `1px solid ${fg}33`,
+    }}>{children}</span>
+  );
+}
