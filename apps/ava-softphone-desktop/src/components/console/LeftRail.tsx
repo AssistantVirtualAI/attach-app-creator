@@ -78,7 +78,7 @@ export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch,
   const { mode } = useTheme();
   const isDark = mode === 'dark' || mode === 'midnight';
   const { pbx, syncConnected, lastEvent, ageMs, healthy } = useSyncStatus();
-  const { extension: myExtension } = useTenant();
+  const { extension: myExtension, loading: tenantLoading } = useTenant();
 
   // Super admins see admin items in the Platform group below, not duplicated above
   const ITEMS: ConsoleView[] = isSuperAdmin ? USER_ITEMS : isAdmin ? [...USER_ITEMS, ...ADMIN_ITEMS] : USER_ITEMS;
