@@ -180,6 +180,16 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
     }
   }, [toast]);
 
+  const todayCallsForTip = summary?.today_calls ?? 0;
+  const unreadVmForTip = summary?.unread_voicemail ?? 0;
+  const insightsTip = useMemo(() => {
+    if (!summary?.has_extension) return null;
+    if (unreadVmForTip > 0) return `${unreadVmForTip} unread voicemail${unreadVmForTip === 1 ? "" : "s"} — open Voicemail to listen.`;
+    if (todayCallsForTip === 0) return "No calls yet today. Stay ready — set status to Available.";
+    if (todayCallsForTip >= 20) return `High volume: ${todayCallsForTip} calls today. Consider a short break.`;
+    return `${todayCallsForTip} call${todayCallsForTip === 1 ? "" : "s"} handled today. Keep it up.`;
+  }, [summary, todayCallsForTip, unreadVmForTip]);
+
   if (!isMember) return null;
 
   const extLabel = ext || "—";
