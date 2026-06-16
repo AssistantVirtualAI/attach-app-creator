@@ -368,7 +368,7 @@ type Section =
   | 'extensions' | 'devices' | 'numbers' | 'ivrs' | 'queues' | 'ringgroups'
   | 'gateways' | 'sip-profiles' | 'conferences' | 'hold-music' | 'dialplans'
   | 'time-conditions' | 'registrations' | 'voicemails' | 'recordings'
-  | 'call-history' | 'feature-codes' | 'sync';
+  | 'call-history' | 'feature-codes' | 'sync' | 'audit-trail';
 
 const NAV_GROUPS: { label: string; items: { id: Section; label: string }[] }[] = [
   {
