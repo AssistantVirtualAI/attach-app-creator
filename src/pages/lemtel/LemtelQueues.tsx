@@ -111,9 +111,15 @@ export default function LemtelQueues() {
                         <TableCell>{q.record_enabled ? <Badge>On</Badge> : <Badge variant="outline">Off</Badge>}</TableCell>
                         <TableCell>{q.enabled ? <Badge>Enabled</Badge> : <Badge variant="outline">Disabled</Badge>}</TableCell>
                         <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex gap-1 justify-end">
-                            <Button size="sm" variant="ghost" onClick={() => setSelectedId(q.id)}><Users className="w-4 h-4" /></Button>
-                            {perms.canManage && <QueueDialog mode="edit" queue={q} trigger={<Button size="sm" variant="ghost"><Pencil className="w-4 h-4" /></Button>} />}
+                          <div className="flex gap-1.5 justify-end flex-wrap">
+                            <Button size="sm" variant="outline" onClick={() => setSelectedId(q.id)} title="Manage agents">
+                              <Users className="w-3.5 h-3.5 mr-1" /> Agents
+                            </Button>
+                            {perms.canManage && <QueueDialog mode="edit" queue={q} trigger={
+                              <Button size="sm" variant="outline" title="Edit queue settings">
+                                <Pencil className="w-3.5 h-3.5 mr-1" /> Edit
+                              </Button>
+                            } />}
                             {perms.canManage && <DeleteQueueBtn queue={q} />}
                           </div>
                         </TableCell>
