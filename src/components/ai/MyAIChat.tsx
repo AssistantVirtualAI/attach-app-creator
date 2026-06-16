@@ -231,6 +231,24 @@ export function MyAIChat({
 
 export function MyAIChatLauncher() {
   const [open, setOpen] = useState(false);
+  const [initialPrompt, setInitialPrompt] = useState<string | null>(null);
+  const [autoAnswer] = useAutoAnswerSetting();
+  const pageContext = usePageContext();
+  const lastHandledRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!autoAnswer) return;
+    const id = pageContext.voicemail_id || pageContext.call_id || pageContext.recording_id;
+    if (!id) return;
+    const key = `${pageContext.page}:${id}`;
+    if (lastHandledRef.current === key) return;
+    const prompt = autoPromptFor(pageContext);
+    if (!prompt) return;
+    lastHandledRef.current = key;
+    setInitialPrompt(prompt);
+    setOpen(true);
+  }, [autoAnswer, pageContext]);
+
   return (
     <>
       <Button
@@ -240,10 +258,15 @@ export function MyAIChatLauncher() {
         aria-label="Open AVA assistant"
       >
         <Sparkles className="h-6 w-6" />
+        {autoAnswer && <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-emerald-500 border-2 border-background" />}
       </Button>
       {open && (
         <div className="fixed bottom-24 right-5 z-50 w-[380px] max-w-[calc(100vw-2.5rem)] h-[560px] max-h-[calc(100vh-8rem)] shadow-2xl rounded-lg overflow-hidden">
-          <MyAIChat onClose={() => setOpen(false)} />
+          <MyAIChat
+            onClose={() => setOpen(false)}
+            initialPrompt={initialPrompt}
+            onPromptConsumed={() => setInitialPrompt(null)}
+          />
         </div>
       )}
     </>
