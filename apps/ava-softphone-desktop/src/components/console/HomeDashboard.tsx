@@ -1,10 +1,13 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { theme } from '../../lib/theme';
 import { useTenant } from '../../hooks/useTenant';
-import { useDashboardStats, AttentionItem, RangeKey } from '../../hooks/useDashboardStats';
+import { useDashboardStats, AttentionItem, RangeKey, DailySeries } from '../../hooks/useDashboardStats';
 import { useSyncStatus, formatAge } from '../../hooks/useSyncStatus';
+import { supabase } from '../../lib/supabaseClient';
 
 const { colors: c } = theme;
+
+const STORAGE_KEY = 'ava.home.range.v1';
 
 function fmtRelative(iso: string | null) {
   if (!iso) return 'No CDR yet';
@@ -18,46 +21,81 @@ function fmtRelative(iso: string | null) {
 }
 
 type Tone = {
-  from: string;     // gradient start
-  to: string;       // gradient end
-  ring: string;     // border / glow color
-  ink: string;      // text/value color
-  chip: string;     // small chip bg
+  from: string;
+  to: string;
+  ring: string;   // strong border / focus ring
+  shadow: string; // glow
 };
 
+// Deeper, AA-contrast tones for white text on the gradient surface.
 const tones: Record<string, Tone> = {
-  cyan:   { from: '#0891b2', to: '#21d4fd', ring: 'rgba(8,145,178,0.55)',  ink: '#062c3a', chip: 'rgba(8,145,178,0.18)' },
-  red:    { from: '#dc2626', to: '#fb7185', ring: 'rgba(220,38,38,0.55)',  ink: '#3b0a0a', chip: 'rgba(220,38,38,0.18)' },
-  green:  { from: '#0f9d58', to: '#34d399', ring: 'rgba(15,157,88,0.55)',  ink: '#06281a', chip: 'rgba(15,157,88,0.18)' },
-  gold:   { from: '#d4a73a', to: '#fbbf24', ring: 'rgba(212,167,58,0.60)', ink: '#3b2a05', chip: 'rgba(212,167,58,0.22)' },
-  violet: { from: '#7a4cff', to: '#c084fc', ring: 'rgba(122,76,255,0.55)', ink: '#21104f', chip: 'rgba(122,76,255,0.18)' },
-  blue:   { from: '#0023e6', to: '#4d6dff', ring: 'rgba(0,35,230,0.55)',   ink: '#06133f', chip: 'rgba(0,35,230,0.18)' },
-  pink:   { from: '#db2777', to: '#f472b6', ring: 'rgba(219,39,119,0.55)', ink: '#3d0a26', chip: 'rgba(219,39,119,0.18)' },
-  slate:  { from: '#475569', to: '#94a3b8', ring: 'rgba(71,85,105,0.55)',  ink: '#0b1530', chip: 'rgba(71,85,105,0.18)' },
+  cyan:   { from: '#0e7490', to: '#0891b2', ring: 'rgba(8,145,178,0.85)',  shadow: 'rgba(8,145,178,0.45)' },
+  red:    { from: '#b91c1c', to: '#dc2626', ring: 'rgba(185,28,28,0.85)',  shadow: 'rgba(185,28,28,0.45)' },
+  green:  { from: '#047857', to: '#0f9d58', ring: 'rgba(4,120,87,0.85)',   shadow: 'rgba(4,120,87,0.45)' },
+  gold:   { from: '#a16207', to: '#d4a73a', ring: 'rgba(161,98,7,0.85)',   shadow: 'rgba(161,98,7,0.45)' },
+  violet: { from: '#5b21b6', to: '#7a4cff', ring: 'rgba(91,33,182,0.85)',  shadow: 'rgba(91,33,182,0.45)' },
+  blue:   { from: '#1e3a8a', to: '#0023e6', ring: 'rgba(0,35,230,0.85)',   shadow: 'rgba(0,35,230,0.45)' },
+  pink:   { from: '#9d174d', to: '#db2777', ring: 'rgba(157,23,77,0.85)',  shadow: 'rgba(157,23,77,0.45)' },
+  slate:  { from: '#334155', to: '#475569', ring: 'rgba(51,65,85,0.85)',   shadow: 'rgba(51,65,85,0.45)' },
 };
 
-function Stat({ label, value, tone, hint }: { label: string; value: string | number; tone: Tone; hint?: string }) {
+type MetricKey = 'calls' | 'missed' | 'answered' | 'recordings' | 'voicemail' | 'sms' | 'live' | 'realtime';
+
+function Sparkline({ data, color = 'rgba(255,255,255,0.95)' }: { data: number[]; color?: string }) {
+  if (!data || data.length === 0) return null;
+  const w = 100, h = 28;
+  const max = Math.max(1, ...data);
+  const step = data.length > 1 ? w / (data.length - 1) : w;
+  const pts = data.map((v, i) => `${(i * step).toFixed(2)},${(h - (v / max) * (h - 4) - 2).toFixed(2)}`).join(' ');
+  const area = `0,${h} ${pts} ${w},${h}`;
   return (
-    <div
-      className="ava-lift"
+    <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ width: '100%', height: 28, display: 'block' }} aria-hidden>
+      <polygon points={area} fill="rgba(255,255,255,0.18)" />
+      <polyline points={pts} fill="none" stroke={color} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function Stat({
+  label, value, tone, hint, series, onClick,
+}: {
+  label: string; value: string | number; tone: Tone; hint?: string;
+  series?: number[]; onClick?: () => void;
+}) {
+  const interactive = !!onClick;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={!interactive}
+      className="ava-lift ava-focus"
+      aria-label={`${label}: ${value}${hint ? ` — ${hint}` : ''}`}
       style={{
+        textAlign: 'left',
         background: `linear-gradient(135deg, ${tone.from} 0%, ${tone.to} 100%)`,
         border: `1px solid ${tone.ring}`,
-        borderRadius: 18, padding: '18px 20px',
+        borderRadius: 18, padding: '16px 18px',
         display: 'flex', flexDirection: 'column', gap: 6,
         position: 'relative', overflow: 'hidden',
-        boxShadow: `0 10px 28px -14px ${tone.ring}, inset 0 1px 0 rgba(255,255,255,0.35)`,
+        boxShadow: `0 10px 28px -14px ${tone.shadow}, inset 0 1px 0 rgba(255,255,255,0.35)`,
         color: '#fff',
+        cursor: interactive ? 'pointer' : 'default',
+        font: 'inherit',
       }}>
       <div style={{
         position: 'absolute', inset: 0,
         background: 'radial-gradient(120% 80% at 100% 0%, rgba(255,255,255,0.28), transparent 55%)',
         pointerEvents: 'none',
       }} />
-      <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 1.6, textTransform: 'uppercase', color: 'rgba(255,255,255,0.92)', position: 'relative' }}>{label}</span>
-      <span className="tabular-nums" style={{ fontSize: 34, fontWeight: 700, color: '#fff', fontFamily: "'Space Grotesk', sans-serif", letterSpacing: -0.6, lineHeight: 1.05, position: 'relative', textShadow: '0 2px 12px rgba(0,0,0,0.18)' }}>{value}</span>
-      {hint && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.88)', position: 'relative' }}>{hint}</span>}
-    </div>
+      <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 1.6, textTransform: 'uppercase', color: 'rgba(255,255,255,0.95)', position: 'relative' }}>{label}</span>
+      <span className="tabular-nums" style={{ fontSize: 32, fontWeight: 700, color: '#fff', fontFamily: "'Space Grotesk', sans-serif", letterSpacing: -0.6, lineHeight: 1.05, position: 'relative', textShadow: '0 2px 12px rgba(0,0,0,0.20)' }}>{value}</span>
+      {series && series.length > 0 && (
+        <div style={{ position: 'relative', marginTop: 2 }}>
+          <Sparkline data={series} />
+        </div>
+      )}
+      {hint && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.92)', position: 'relative' }}>{hint}</span>}
+    </button>
   );
 }
 
@@ -75,6 +113,16 @@ const RANGES: { key: RangeKey; label: string }[] = [
   { key: 'custom', label: 'Custom' },
 ];
 
+function loadPersistedRange(): { range: RangeKey; customFrom: string; customTo: string } | null {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const v = JSON.parse(raw);
+    if (!v?.range) return null;
+    return { range: v.range, customFrom: v.customFrom || '', customTo: v.customTo || '' };
+  } catch { return null; }
+}
+
 export default function HomeDashboard({
   displayName, extension, onQuickDial,
 }: { displayName: string; extension: string; onQuickDial: () => void }) {
@@ -82,16 +130,25 @@ export default function HomeDashboard({
   const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
   const { orgId, orgName, extension: tenantExt } = useTenant();
 
-  const [range, setRange] = useState<RangeKey>('today');
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const weekAgo = useMemo(() => { const d = new Date(); d.setDate(d.getDate() - 6); return d.toISOString().slice(0, 10); }, []);
-  const [customFrom, setCustomFrom] = useState<string>(weekAgo);
-  const [customTo, setCustomTo] = useState<string>(today);
+
+  const persisted = useMemo(() => loadPersistedRange(), []);
+  const [range, setRange] = useState<RangeKey>(persisted?.range ?? 'today');
+  const [customFrom, setCustomFrom] = useState<string>(persisted?.customFrom || weekAgo);
+  const [customTo, setCustomTo] = useState<string>(persisted?.customTo || today);
+
+  useEffect(() => {
+    try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ range, customFrom, customTo })); } catch { /* noop */ }
+  }, [range, customFrom, customTo]);
 
   const stats = useDashboardStats(orgId, tenantExt || extension, range, customFrom, customTo);
   const { pbx, syncConnected, lastEvent, ageMs, healthy } = useSyncStatus();
   const freshnessAccent = stats.cdrFreshness === 'live' ? c.success : stats.cdrFreshness === 'stale' ? c.signalGold : c.mutedSilver;
   const rangeLabel = range === 'today' ? 'Today' : range === 'week' ? 'Last 7 days' : range === 'month' ? 'Last 30 days' : `${customFrom} → ${customTo}`;
+
+  const [detail, setDetail] = useState<null | { metric: MetricKey; title: string; tone: Tone }>(null);
+  const openDetail = (metric: MetricKey, title: string, tone: Tone) => setDetail({ metric, title, tone });
 
   return (
     <div className="ava-page" style={{ padding: '28px 32px', maxWidth: 1240, margin: '0 auto', animation: 'fadeIn .3s ease-out' }}>
@@ -128,22 +185,20 @@ export default function HomeDashboard({
               border: active ? '1px solid transparent' : `1px solid ${c.border}`,
               background: active
                 ? `linear-gradient(135deg, ${tones.blue.from}, ${tones.cyan.to})`
-                : 'rgba(255,255,255,0.85)',
+                : 'rgba(255,255,255,0.92)',
               color: active ? '#fff' : c.textIce,
               fontSize: 12, fontWeight: 700, letterSpacing: 0.3,
               cursor: 'pointer',
-              boxShadow: active ? `0 6px 18px -8px ${tones.blue.ring}` : 'none',
+              boxShadow: active ? `0 6px 18px -8px ${tones.blue.shadow}` : 'none',
               transition: 'all 180ms ease',
             }}>{r.label}</button>
           );
         })}
         {range === 'custom' && (
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginLeft: 6 }}>
-            <input type="date" value={customFrom} max={customTo} onChange={(e) => setCustomFrom(e.target.value)}
-              style={dateInput()} />
+            <input type="date" value={customFrom} max={customTo} onChange={(e) => setCustomFrom(e.target.value)} style={dateInput()} />
             <span style={{ color: c.mutedSilver, fontSize: 12 }}>→</span>
-            <input type="date" value={customTo} min={customFrom} max={today} onChange={(e) => setCustomTo(e.target.value)}
-              style={dateInput()} />
+            <input type="date" value={customTo} min={customFrom} max={today} onChange={(e) => setCustomTo(e.target.value)} style={dateInput()} />
           </div>
         )}
         <span style={{ marginLeft: 'auto', fontSize: 11, color: c.mutedSilver }}>{rangeLabel}</span>
@@ -175,15 +230,29 @@ export default function HomeDashboard({
         </div>
       </section>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 14, marginBottom: 26 }}>
-        <Stat label={`Calls · ${rangeLabel}`} value={stats.totalCallsToday} tone={tones.cyan} hint="Scoped to extension" />
-        <Stat label="Missed" value={stats.missedToday} tone={tones.red} hint={rangeLabel} />
-        <Stat label="Answered" value={stats.answeredToday} tone={tones.green} hint={rangeLabel} />
-        <Stat label="Recordings" value={stats.recordingsToday} tone={tones.gold} hint={stats.lastRecordingAt ? `Latest ${fmtRelative(stats.lastRecordingAt)}` : 'None in range'} />
-        <Stat label="Unread SMS" value={stats.unreadSms} tone={tones.pink} hint="All threads" />
-        <Stat label="Voicemail" value={stats.unreadVoicemail} tone={tones.violet} hint="Needs review" />
-        <Stat label="Live Calls" value={stats.liveCalls} tone={tones.blue} hint="In progress" />
-        <Stat label="Realtime" value={syncConnected ? 'Live' : 'Off'} tone={syncConnected ? tones.cyan : tones.slate} hint={lastEvent ? formatAge(ageMs) : 'Idle'} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 26 }}>
+        <Stat label={`Calls · ${rangeLabel}`} value={stats.totalCallsToday} tone={tones.cyan}
+          series={stats.series.calls} hint="Scoped to extension"
+          onClick={() => openDetail('calls', `All calls — ${rangeLabel}`, tones.cyan)} />
+        <Stat label="Missed" value={stats.missedToday} tone={tones.red}
+          series={stats.series.missed} hint={rangeLabel}
+          onClick={() => openDetail('missed', `Missed calls — ${rangeLabel}`, tones.red)} />
+        <Stat label="Answered" value={stats.answeredToday} tone={tones.green}
+          series={stats.series.answered} hint={rangeLabel}
+          onClick={() => openDetail('answered', `Answered calls — ${rangeLabel}`, tones.green)} />
+        <Stat label="Recordings" value={stats.recordingsToday} tone={tones.gold}
+          series={stats.series.recordings}
+          hint={stats.lastRecordingAt ? `Latest ${fmtRelative(stats.lastRecordingAt)}` : 'None in range'}
+          onClick={() => openDetail('recordings', `Recordings — ${rangeLabel}`, tones.gold)} />
+        <Stat label="Unread SMS" value={stats.unreadSms} tone={tones.pink} hint="All threads"
+          onClick={() => openDetail('sms', 'Unread SMS threads', tones.pink)} />
+        <Stat label="Voicemail" value={stats.unreadVoicemail} tone={tones.violet} hint="Needs review"
+          onClick={() => openDetail('voicemail', `Voicemails — ${rangeLabel}`, tones.violet)} />
+        <Stat label="Live Calls" value={stats.liveCalls} tone={tones.blue} hint="In progress"
+          onClick={() => openDetail('live', 'Live calls right now', tones.blue)} />
+        <Stat label="Realtime" value={syncConnected ? 'Live' : 'Off'} tone={syncConnected ? tones.cyan : tones.slate}
+          hint={lastEvent ? formatAge(ageMs) : 'Idle'}
+          onClick={() => openDetail('realtime', 'Realtime sync status', syncConnected ? tones.cyan : tones.slate)} />
       </div>
 
       <div style={{ marginBottom: 26 }}>
@@ -215,7 +284,7 @@ export default function HomeDashboard({
                 background: `linear-gradient(135deg, ${tone.from}, ${tone.to})`,
                 border: `1px solid ${tone.ring}`,
                 borderRadius: 14,
-                boxShadow: `0 10px 24px -14px ${tone.ring}`,
+                boxShadow: `0 10px 24px -14px ${tone.shadow}`,
                 color: '#fff',
               }}>
                 <div style={{
@@ -227,19 +296,34 @@ export default function HomeDashboard({
                 }}>{it.tag.charAt(0)}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13.5, fontWeight: 700, color: '#fff' }}>{it.title}</div>
-                  <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.9)', marginTop: 2 }}>{it.detail}</div>
+                  <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.92)', marginTop: 2 }}>{it.detail}</div>
                 </div>
                 <span style={{
                   fontSize: 10, fontWeight: 800, letterSpacing: 0.8,
                   padding: '5px 10px', borderRadius: 999,
                   background: 'rgba(255,255,255,0.22)', color: '#fff',
-                  border: '1px solid rgba(255,255,255,0.4)',
+                  border: '1px solid rgba(255,255,255,0.45)',
                 }}>{it.tag}</span>
               </div>
             );
           })}
         </div>
       </div>
+
+      {detail && (
+        <MetricDetailDrawer
+          metric={detail.metric}
+          title={detail.title}
+          tone={detail.tone}
+          orgId={orgId}
+          extension={tenantExt || extension}
+          range={range}
+          customFrom={customFrom}
+          customTo={customTo}
+          series={stats.series}
+          onClose={() => setDetail(null)}
+        />
+      )}
     </div>
   );
 }
@@ -252,15 +336,201 @@ const quickBtn = (tone: Tone): React.CSSProperties => ({
   color: '#fff', fontSize: 13, fontWeight: 700, letterSpacing: 0.2,
   cursor: 'pointer',
   transition: 'all 200ms cubic-bezier(.2,.7,.2,1)',
-  boxShadow: `0 8px 20px -12px ${tone.ring}, inset 0 1px 0 rgba(255,255,255,0.3)`,
+  boxShadow: `0 8px 20px -12px ${tone.shadow}, inset 0 1px 0 rgba(255,255,255,0.3)`,
 });
 
 const dateInput = (): React.CSSProperties => ({
   padding: '6px 10px',
   borderRadius: 8,
   border: `1px solid ${c.border}`,
-  background: 'rgba(255,255,255,0.95)',
+  background: 'rgba(255,255,255,0.98)',
   color: c.textIce,
   fontSize: 12,
   fontWeight: 600,
 });
+
+/* ---------------- Metric Detail Drawer ---------------- */
+
+import { rangeBounds } from '../../hooks/useDashboardStats';
+
+function MetricDetailDrawer(props: {
+  metric: MetricKey;
+  title: string;
+  tone: Tone;
+  orgId: string | null;
+  extension: string | null;
+  range: RangeKey;
+  customFrom: string;
+  customTo: string;
+  series: DailySeries;
+  onClose: () => void;
+}) {
+  const { metric, title, tone, orgId, extension, range, customFrom, customTo, series, onClose } = props;
+  const [rows, setRows] = useState<any[] | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        if (!orgId) { setRows([]); return; }
+        if (metric === 'sms') {
+          let q = supabase.from('pbx_sms_threads')
+            .select('id, peer_number, last_message_at, unread_count')
+            .eq('organization_id', orgId)
+            .gt('unread_count', 0)
+            .order('last_message_at', { ascending: false })
+            .limit(50);
+          if (extension) q = q.eq('extension', extension);
+          const { data } = await q;
+          if (!cancelled) setRows(data || []);
+          return;
+        }
+        if (metric === 'live') {
+          let q = supabase.from('telecom_live_calls')
+            .select('id, caller_id_number, destination_number, started_at, extension')
+            .eq('organization_id', orgId)
+            .order('started_at', { ascending: false })
+            .limit(50);
+          if (extension) q = q.eq('extension', extension);
+          const { data } = await q;
+          if (!cancelled) setRows(data || []);
+          return;
+        }
+        if (metric === 'realtime') { if (!cancelled) setRows([]); return; }
+
+        const { from, to } = rangeBounds(range, customFrom, customTo);
+        let q = supabase.from('pbx_call_records')
+          .select('id, caller_id_number, destination_number, start_at, duration, missed_call, call_status, hangup_cause, has_recording, recording_name, recording_path, voicemail_message, extension')
+          .eq('organization_id', orgId)
+          .gte('start_at', from)
+          .lte('start_at', to)
+          .order('start_at', { ascending: false })
+          .limit(200);
+        if (extension) q = q.eq('extension', extension);
+        const { data } = await q;
+        const all = (data || []) as any[];
+        const filtered = all.filter((r) => {
+          if (metric === 'calls') return true;
+          if (metric === 'missed') return r.missed_call || r.call_status === 'missed' || r.hangup_cause === 'NO_ANSWER';
+          if (metric === 'answered') return !(r.missed_call || r.call_status === 'missed' || r.hangup_cause === 'NO_ANSWER');
+          if (metric === 'recordings') return r.has_recording || r.recording_name || r.recording_path;
+          if (metric === 'voicemail') return r.missed_call || r.hangup_cause === 'NO_ANSWER' || (r.voicemail_message && r.voicemail_message !== 'false');
+          return true;
+        });
+        if (!cancelled) setRows(filtered);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [metric, orgId, extension, range, customFrom, customTo]);
+
+  const seriesForMetric =
+    metric === 'missed' ? series.missed :
+    metric === 'answered' ? series.answered :
+    metric === 'recordings' ? series.recordings :
+    metric === 'calls' || metric === 'voicemail' ? series.calls : [];
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(8,14,32,0.55)',
+        display: 'flex', justifyContent: 'flex-end', zIndex: 1000,
+        backdropFilter: 'blur(4px)',
+      }}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: 'min(560px, 100%)', height: '100%', background: '#f6f8fd',
+          borderLeft: `1px solid ${c.border}`,
+          display: 'flex', flexDirection: 'column',
+          boxShadow: '-20px 0 50px -20px rgba(8,14,32,0.45)',
+          animation: 'slideInRight .25s ease-out',
+        }}>
+        <div style={{
+          padding: '16px 18px',
+          background: `linear-gradient(135deg, ${tone.from}, ${tone.to})`,
+          color: '#fff', display: 'flex', alignItems: 'center', gap: 12,
+        }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 1.6, textTransform: 'uppercase', opacity: 0.9 }}>Detail</div>
+            <div style={{ fontSize: 17, fontWeight: 700, marginTop: 2, lineHeight: 1.25 }}>{title}</div>
+          </div>
+          <button onClick={onClose} aria-label="Close" style={{
+            background: 'rgba(255,255,255,0.18)', color: '#fff', border: '1px solid rgba(255,255,255,0.35)',
+            borderRadius: 10, padding: '6px 10px', cursor: 'pointer', fontWeight: 700, fontSize: 12,
+          }}>Close</button>
+        </div>
+
+        {seriesForMetric.length > 0 && (
+          <div style={{ padding: '14px 18px 0', background: '#fff', borderBottom: `1px solid ${c.border}` }}>
+            <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 1.4, color: c.mutedSilver, textTransform: 'uppercase', marginBottom: 6 }}>
+              Daily trend
+            </div>
+            <div style={{
+              padding: 12, borderRadius: 12,
+              background: `linear-gradient(135deg, ${tone.from}, ${tone.to})`,
+              boxShadow: `inset 0 1px 0 rgba(255,255,255,0.3)`,
+            }}>
+              <Sparkline data={seriesForMetric} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10.5, color: c.mutedSilver, margin: '6px 2px 12px' }}>
+              <span>{series.dates[0]}</span>
+              <span>{series.dates[series.dates.length - 1]}</span>
+            </div>
+          </div>
+        )}
+
+        <div style={{ flex: 1, overflow: 'auto', padding: 16 }}>
+          {loading ? (
+            <div style={{ padding: 24, textAlign: 'center', color: c.mutedSilver, fontSize: 13 }}>Loading…</div>
+          ) : !rows || rows.length === 0 ? (
+            <div style={{ padding: 24, textAlign: 'center', color: c.mutedSilver, fontSize: 13 }}>
+              {metric === 'realtime' ? 'Realtime status is live above.' : 'No matching records in this range.'}
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {rows.map((r: any) => (
+                <DetailRow key={r.id} metric={metric} row={r} tone={tone} />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DetailRow({ metric, row, tone }: { metric: MetricKey; row: any; tone: Tone }) {
+  const time = row.start_at || row.started_at || row.last_message_at;
+  const primary =
+    metric === 'sms' ? (row.peer_number || 'Unknown') :
+    (row.caller_id_number || row.destination_number || 'Unknown');
+  const secondary =
+    metric === 'sms' ? `${row.unread_count || 0} unread` :
+    metric === 'live' ? `Live · ${row.destination_number || ''}` :
+    `${row.destination_number || ''}${row.duration ? ` · ${Math.round(row.duration)}s` : ''}`;
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 12,
+      padding: '11px 12px', background: '#fff',
+      border: `1px solid ${c.border}`, borderLeft: `3px solid ${tone.from}`,
+      borderRadius: 10,
+    }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: c.textIce, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{primary}</div>
+        <div style={{ fontSize: 11.5, color: c.mutedSilver, marginTop: 2 }}>{secondary}</div>
+      </div>
+      <div style={{ fontSize: 11, color: c.mutedSilver, whiteSpace: 'nowrap' }}>
+        {time ? new Date(time).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}
+      </div>
+    </div>
+  );
+}
