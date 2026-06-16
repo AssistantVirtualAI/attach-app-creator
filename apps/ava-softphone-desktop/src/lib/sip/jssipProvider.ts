@@ -889,10 +889,16 @@ class JsSipProvider {
   stop() {
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     this.reconnectTimer = null;
+    if (this.keepAliveTimer) clearInterval(this.keepAliveTimer);
+    this.keepAliveTimer = null;
+    if (this.statusGraceTimer) clearTimeout(this.statusGraceTimer);
+    this.statusGraceTimer = null;
+    this.unbindWindowListeners();
     try { this.ua?.stop(); } catch { /* noop */ }
     this.ua = null;
     this.session = null;
     this.secondSession = null;
+    this.lastStableStatus = 'disconnected';
     this.update({ status: 'disconnected', callState: 'idle', direction: null, startedAt: null });
   }
 }
