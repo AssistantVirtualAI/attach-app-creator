@@ -54,14 +54,14 @@ const TOP_VOICES: { id: string; name: string }[] = [
 const inputBase: React.CSSProperties = {
   width: '100%', boxSizing: 'border-box',
   padding: '9px 11px', borderRadius: 10,
-  background: '#0a1430',
-  border: `1px solid ${c.border}`,
-  color: c.textIce, fontSize: 13, outline: 'none',
+  background: c.bgElev,
+  border: `1px solid ${c.borderStrong}`,
+  color: c.text, fontSize: 13, outline: 'none',
   fontFamily: 'inherit',
 };
 const labelStyle: React.CSSProperties = {
   fontSize: 10, fontWeight: 800, letterSpacing: 1,
-  color: c.mutedSilver, textTransform: 'uppercase', marginBottom: 6,
+  color: c.textSub, textTransform: 'uppercase', marginBottom: 6,
 };
 
 function FieldRenderer({ f, value, onChange, fullForm }: {
@@ -170,9 +170,10 @@ function TtsGreetingField({ value, onChange, field, fullForm }: {
 
   return (
     <div style={{
-      border: `1px solid ${c.border}`, borderRadius: 10, padding: 12,
-      background: 'rgba(11,181,214,0.04)', display: 'grid', gap: 10,
+      border: `1px solid ${c.borderStrong}`, borderRadius: 10, padding: 12,
+      background: c.primarySoft, display: 'grid', gap: 10,
     }}>
+
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px', gap: 8 }}>
         <input value={value ?? ''} onChange={(e) => onChange(e.target.value)}
           placeholder="Filename on PBX (e.g. welcome.mp3)"
@@ -304,39 +305,52 @@ export default function PbxEditSheet({
     if (!validate()) return;
     setDirty(false);
     onSave(form);
+    // Broadcast so other open views (portal in another tab/window) refresh.
+    try {
+      window.dispatchEvent(new CustomEvent('ava:pbx-resource-saved', { detail: { title } }));
+      localStorage.setItem('ava:pbx-resync', String(Date.now()));
+    } catch {}
   };
+
+  const panelBg = c.bgCard;
+  const headerBg = c.bgElev;
 
   return createPortal(
     <div onClick={tryClose} style={{
       position: 'fixed', inset: 0, zIndex: 10000,
-      background: 'rgba(2,6,20,0.72)',
+      background: 'rgba(2,6,20,0.55)',
+      backdropFilter: 'blur(4px)',
+      WebkitBackdropFilter: 'blur(4px)',
       display: 'flex', justifyContent: 'flex-end',
       animation: 'fadeIn 140ms ease-out',
     }}>
       <div onClick={(e) => e.stopPropagation()} style={{
         width: `min(${width}px, 100%)`, height: '100%', maxWidth: '100vw',
-        background: '#0c1733',
-        borderLeft: `1px solid ${c.border}`,
+        background: panelBg,
+        backdropFilter: 'blur(24px) saturate(160%)',
+        WebkitBackdropFilter: 'blur(24px) saturate(160%)',
+        borderLeft: `1px solid ${c.borderStrong}`,
         display: 'flex', flexDirection: 'column',
-        boxShadow: '-30px 0 80px rgba(0,0,0,0.6)',
+        boxShadow: '-30px 0 80px rgba(0,0,0,0.35)',
         animation: 'slideInRight 180ms cubic-bezier(.2,.8,.2,1)',
+        color: c.text,
       }}>
         <header style={{
           position: 'sticky', top: 0, zIndex: 2,
           padding: '16px 22px', borderBottom: `1px solid ${c.border}`,
-          background: '#0c1733',
+          background: headerBg,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
         }}>
-          <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: c.textIce, letterSpacing: 0.2, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: c.text, letterSpacing: 0.2, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {title}{dirty && <span style={{ color: c.signalGold, marginLeft: 8, fontSize: 11 }}>● unsaved</span>}
           </h2>
           <button onClick={tryClose} aria-label="Close" style={{
             width: 30, height: 30, borderRadius: 8, border: `1px solid ${c.border}`,
-            background: 'transparent', color: c.mutedSilver, cursor: 'pointer', fontSize: 14, flexShrink: 0,
+            background: 'transparent', color: c.textSub, cursor: 'pointer', fontSize: 14, flexShrink: 0,
           }}>✕</button>
         </header>
 
-        <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '18px 22px', WebkitOverflowScrolling: 'touch' }}>
+        <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '18px 22px', WebkitOverflowScrolling: 'touch', background: panelBg }}>
           {groups.map((g) => (
             <section key={g.section} style={{ marginBottom: 22 }}>
               <div style={{
@@ -345,7 +359,7 @@ export default function PbxEditSheet({
                 paddingBottom: 6, borderBottom: `1px solid ${c.border}`,
               }}>{g.section}</div>
               {g.description && (
-                <div style={{ fontSize: 11, color: c.mutedSilver, marginBottom: 12 }}>{g.description}</div>
+                <div style={{ fontSize: 11, color: c.textSub, marginBottom: 12 }}>{g.description}</div>
               )}
               <div style={{
                 display: 'grid',
@@ -361,7 +375,7 @@ export default function PbxEditSheet({
                       <div style={{ fontSize: 10, color: c.danger, marginTop: 4 }}>{errors[f.key]}</div>
                     )}
                     {f.hint && f.type !== 'checkbox' && !errors[f.key] && (
-                      <div style={{ fontSize: 10, color: c.mutedSilver, marginTop: 4 }}>{f.hint}</div>
+                      <div style={{ fontSize: 10, color: c.textSub, marginTop: 4 }}>{f.hint}</div>
                     )}
                   </div>
                 ))}
@@ -373,7 +387,7 @@ export default function PbxEditSheet({
         <footer style={{
           position: 'sticky', bottom: 0, zIndex: 2,
           padding: '14px 22px', borderTop: `1px solid ${c.border}`,
-          background: '#0c1733',
+          background: headerBg,
           display: 'flex', gap: 10, justifyContent: 'flex-end', flexWrap: 'wrap',
         }}>
           {Object.keys(errors).length > 0 && (
@@ -383,14 +397,16 @@ export default function PbxEditSheet({
           )}
           <button onClick={tryClose} style={{
             padding: '9px 16px', borderRadius: 10, background: 'transparent',
-            border: `1px solid ${c.border}`, color: c.textIce,
+            border: `1px solid ${c.borderStrong}`, color: c.text,
             fontSize: 12, fontWeight: 700, cursor: 'pointer',
           }}>Cancel</button>
           <button onClick={handleSave} disabled={saving} style={{
             padding: '9px 20px', borderRadius: 10, border: 'none',
             color: '#fff', fontSize: 12, fontWeight: 800, cursor: 'pointer',
-            background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`,
+            background: c.gradients ? undefined : `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`,
+            backgroundImage: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`,
             opacity: saving ? 0.6 : 1,
+            boxShadow: '0 8px 24px -10px rgba(0,35,230,0.45)',
           }}>{saving ? 'Saving…' : 'Save & sync to PBX'}</button>
         </footer>
       </div>

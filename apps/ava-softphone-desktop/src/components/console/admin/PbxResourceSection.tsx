@@ -109,6 +109,20 @@ export default function PbxResourceSection({
 
   useEffect(() => { reload(); }, [reload]);
 
+  // Auto-sync: refresh whenever any other view (portal tab / sibling sheet) writes a PBX resource.
+  useEffect(() => {
+    const onSaved = () => { reload(); };
+    const onStorage = (e: StorageEvent) => { if (e.key === 'ava:pbx-resync') reload(); };
+    window.addEventListener('ava:pbx-resource-saved', onSaved as any);
+    window.addEventListener('storage', onStorage);
+    const interval = window.setInterval(() => { if (!document.hidden) reload(); }, 60_000);
+    return () => {
+      window.removeEventListener('ava:pbx-resource-saved', onSaved as any);
+      window.removeEventListener('storage', onStorage);
+      window.clearInterval(interval);
+    };
+  }, [reload]);
+
   const save = async (record: any) => {
     setSaving(true);
     try {
