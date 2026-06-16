@@ -111,9 +111,15 @@ export default function LemtelQueues() {
                         <TableCell>{q.record_enabled ? <Badge>On</Badge> : <Badge variant="outline">Off</Badge>}</TableCell>
                         <TableCell>{q.enabled ? <Badge>Enabled</Badge> : <Badge variant="outline">Disabled</Badge>}</TableCell>
                         <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex gap-1 justify-end">
-                            <Button size="sm" variant="ghost" onClick={() => setSelectedId(q.id)}><Users className="w-4 h-4" /></Button>
-                            {perms.canManage && <QueueDialog mode="edit" queue={q} trigger={<Button size="sm" variant="ghost"><Pencil className="w-4 h-4" /></Button>} />}
+                          <div className="flex gap-1.5 justify-end flex-wrap">
+                            <Button size="sm" variant="outline" onClick={() => setSelectedId(q.id)} title="Manage agents">
+                              <Users className="w-3.5 h-3.5 mr-1" /> Agents
+                            </Button>
+                            {perms.canManage && <QueueDialog mode="edit" queue={q} trigger={
+                              <Button size="sm" variant="outline" title="Edit queue settings">
+                                <Pencil className="w-3.5 h-3.5 mr-1" /> Edit
+                              </Button>
+                            } />}
                             {perms.canManage && <DeleteQueueBtn queue={q} />}
                           </div>
                         </TableCell>
@@ -240,6 +246,36 @@ function QueueDialog({ mode, queue, trigger }: { mode: 'create' | 'edit'; queue?
   const { toast } = useToast();
   const qc = useQueryClient();
   const raw = (queue?.raw_data || {}) as any;
+  const [moh, setMoh] = useState<Array<{ name: string; path: string | null }>>([]);
+  const [mohLoading, setMohLoading] = useState(false);
+  const [recRule, setRecRule] = useState<{ enabled: boolean; mode: 'all' | 'inbound' | 'outbound'; announce: boolean; retention_days: number }>({
+    enabled: !!queue?.record_enabled, mode: 'all', announce: true, retention_days: 90,
+  });
+
+  useEffect(() => {
+    if (!open) return;
+    (async () => {
+      setMohLoading(true);
+      const { data } = await supabase.from('pbx_hold_music').select('name, path').eq('organization_id', LEMTEL_ORG).order('name');
+      setMoh((data || []) as any);
+      setMohLoading(false);
+      if (queue?.id) {
+        const { data: rr } = await supabase.from('pbx_queue_recording_rules' as any).select('*').eq('queue_id', queue.id).maybeSingle();
+        if (rr) setRecRule({ enabled: (rr as any).enabled, mode: (rr as any).mode, announce: (rr as any).announce, retention_days: (rr as any).retention_days });
+      }
+    })();
+  }, [open, queue?.id]);
+
+  const syncMoh = async () => {
+    setMohLoading(true);
+    try {
+      await supabase.functions.invoke('fusionpbx-proxy', { body: { organization_id: LEMTEL_ORG, action: 'sync-hold-music' } });
+      const { data } = await supabase.from('pbx_hold_music').select('name, path').eq('organization_id', LEMTEL_ORG).order('name');
+      setMoh((data || []) as any);
+    } catch (e: any) { toast({ title: 'MOH sync failed', description: e.message, variant: 'destructive' }); }
+    finally { setMohLoading(false); }
+  };
+
   const [form, setForm] = useState({
     queue_name: queue?.name || '',
     queue_extension: queue?.extension || '',
@@ -284,6 +320,20 @@ function QueueDialog({ mode, queue, trigger }: { mode: 'create' | 'edit'; queue?
       });
       if (error) throw error;
       if (data?.ok === false) throw new Error(data?.message || 'FusionPBX error');
+      // Persist queue-level recording rule (works for both create + edit)
+      try {
+        let qid = queue?.id;
+        if (!qid && form.queue_name) {
+          const { data: qrow } = await supabase.from('pbx_call_queues').select('id').eq('organization_id', LEMTEL_ORG).eq('name', form.queue_name).maybeSingle();
+          qid = qrow?.id;
+        }
+        if (qid) {
+          await supabase.from('pbx_queue_recording_rules' as any).upsert({
+            organization_id: LEMTEL_ORG, queue_id: qid,
+            enabled: recRule.enabled, mode: recRule.mode, announce: recRule.announce, retention_days: recRule.retention_days,
+          }, { onConflict: 'queue_id' });
+        }
+      } catch (rrErr) { console.warn('recording rule save failed', rrErr); }
       toast({ title: mode === 'create' ? 'Queue created' : 'Queue updated' });
       await supabase.functions.invoke('fusionpbx-proxy', { body: { organization_id: LEMTEL_ORG, action: 'sync-all', params: { resources: ['queues'] } } });
       qc.invalidateQueries({ queryKey: ['pbx'] });
@@ -312,7 +362,19 @@ function QueueDialog({ mode, queue, trigger }: { mode: 'create' | 'edit'; queue?
               </Select>
             </div>
             <div><Label>Caller ID prefix</Label><Input value={form.queue_cid_prefix} onChange={(e) => setForm({ ...form, queue_cid_prefix: e.target.value })} placeholder="e.g. [Sales]" /></div>
-            <div><Label>Music on hold</Label><Input value={form.queue_moh_sound} onChange={(e) => setForm({ ...form, queue_moh_sound: e.target.value })} /></div>
+            <div>
+              <div className="flex items-center justify-between"><Label>Music on hold</Label>
+                <button type="button" className="text-[10px] underline text-muted-foreground" onClick={syncMoh} disabled={mohLoading}>{mohLoading ? 'Syncing…' : 'Sync from PBX'}</button>
+              </div>
+              <Select value={form.queue_moh_sound} onValueChange={(v) => setForm({ ...form, queue_moh_sound: v })}>
+                <SelectTrigger><SelectValue placeholder="Choose music on hold" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="$${hold_music}">Default ($${'{'}hold_music{'}'})</SelectItem>
+                  <SelectItem value="local_stream://default">Local stream (default)</SelectItem>
+                  {moh.map((m) => <SelectItem key={m.name} value={m.path || m.name}>{m.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="col-span-2"><Label>Description</Label><Textarea value={form.queue_description} onChange={(e) => setForm({ ...form, queue_description: e.target.value })} rows={2} /></div>
           </div>
 
@@ -344,9 +406,29 @@ function QueueDialog({ mode, queue, trigger }: { mode: 'create' | 'edit'; queue?
             <div className="grid grid-cols-2 gap-3">
               <div><Label>Announce sound</Label><Input value={form.queue_announce_sound} onChange={(e) => setForm({ ...form, queue_announce_sound: e.target.value })} placeholder="path/to/sound.wav" /></div>
               <div><Label>Announce frequency (sec)</Label><Input type="number" value={form.queue_announce_frequency} onChange={(e) => setForm({ ...form, queue_announce_frequency: e.target.value })} /></div>
-              <div className="flex items-center gap-2"><Switch checked={!!form.queue_record_template} onCheckedChange={(v) => setForm({ ...form, queue_record_template: v ? '${strftime(%Y)}/${strftime(%b)}/${strftime(%d)}/${uuid}.${record_ext}' : '' })} /><Label>Record calls</Label></div>
+              <div className="flex items-center gap-2"><Switch checked={!!form.queue_record_template} onCheckedChange={(v) => setForm({ ...form, queue_record_template: v ? '${strftime(%Y)}/${strftime(%b)}/${strftime(%d)}/${uuid}.${record_ext}' : '' })} /><Label>Record calls on PBX</Label></div>
               <div className="flex items-center gap-2"><Switch checked={form.queue_abandoned_resume_allowed} onCheckedChange={(v) => setForm({ ...form, queue_abandoned_resume_allowed: v })} /><Label>Allow resume after abandon</Label></div>
-              <div className="flex items-center gap-2"><Switch checked={form.queue_enabled} onCheckedChange={(v) => setForm({ ...form, queue_enabled: v })} /><Label>Enabled</Label></div>
+              <div className="flex items-center gap-2"><Switch checked={form.queue_enabled} onCheckedChange={(v) => setForm({ ...form, queue_enabled: v })} /><Label>Queue enabled</Label></div>
+            </div>
+
+            <div className="mt-4 p-3 rounded-md border bg-muted/30">
+              <div className="text-xs font-semibold mb-2">Queue recording rule</div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex items-center gap-2"><Switch checked={recRule.enabled} onCheckedChange={(v) => setRecRule({ ...recRule, enabled: v })} /><Label>Enable recording for this queue</Label></div>
+                <div>
+                  <Label>Mode</Label>
+                  <Select value={recRule.mode} onValueChange={(v: any) => setRecRule({ ...recRule, mode: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All calls</SelectItem>
+                      <SelectItem value="inbound">Inbound only</SelectItem>
+                      <SelectItem value="outbound">Outbound only</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2"><Switch checked={recRule.announce} onCheckedChange={(v) => setRecRule({ ...recRule, announce: v })} /><Label>Announce recording</Label></div>
+                <div><Label>Retention (days)</Label><Input type="number" value={recRule.retention_days} onChange={(e) => setRecRule({ ...recRule, retention_days: Number(e.target.value) || 90 })} /></div>
+              </div>
             </div>
           </div>
         </div>
@@ -378,7 +460,7 @@ function DeleteQueueBtn({ queue }: { queue: any }) {
       toast({ title: 'Failed', description: e.message, variant: 'destructive' });
     } finally { setBusy(false); }
   };
-  return <Button size="sm" variant="ghost" onClick={onClick} disabled={busy}>{busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4 text-destructive" />}</Button>;
+  return <Button size="sm" variant="outline" onClick={onClick} disabled={busy} title="Delete queue">{busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <><Trash2 className="w-3.5 h-3.5 mr-1 text-destructive" /> Delete</>}</Button>;
 }
 
 // ---------- Agents per queue ----------
