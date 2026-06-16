@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, Phone, FileText, Voicemail, MessageSquare, Headphones,
-  Sliders, Sparkles, Download, User, Settings, Users,
+  Sliders, Sparkles, Download, User, Settings, Users, PlayCircle,
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
