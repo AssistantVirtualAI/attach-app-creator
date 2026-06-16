@@ -263,11 +263,17 @@ export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch,
 }
 
 function RailItem({ v, active, onClick, label }: { v: ConsoleView; active: boolean; onClick: () => void; label?: string }) {
+  const { mode } = useTheme();
+  const isDark = mode === 'dark' || mode === 'midnight';
   const isAI = v === 'ai';
   const accent = isAI ? c.avaViolet : c.signalGold;
   const hoverSurface = 'var(--ava-surface-hover, rgba(255,255,255,0.12))';
+  const darkTextSub = 'rgba(230,240,255,0.82)';
+  const darkTextIce = '#f1f7ff';
   return (
     <button
+      className="lemtel-rail-item"
+      data-active={String(active)}
       onClick={onClick}
       aria-label={label ?? LABEL[v]}
       aria-current={active ? 'page' : undefined}
@@ -279,28 +285,26 @@ function RailItem({ v, active, onClick, label }: { v: ConsoleView; active: boole
               ? 'linear-gradient(90deg, rgba(122,76,255,0.16), rgba(33,212,253,0.05))'
               : 'linear-gradient(90deg, rgba(0,35,230,0.14), rgba(33,212,253,0.06))')
           : 'transparent',
-        border: '1px solid ' + (active ? 'rgba(0,35,230,0.18)' : 'transparent'),
-        color: active ? c.textIce : c.textSub,
+        border: '1px solid ' + (active ? (isDark ? 'rgba(0,35,230,0.35)' : 'rgba(0,35,230,0.18)') : 'transparent'),
+        color: active ? (isDark ? darkTextIce : c.textIce) : (isDark ? darkTextSub : c.textSub),
         fontSize: 13, fontWeight: active ? 700 : 600,
         cursor: 'pointer', textAlign: 'left',
         transition: 'all 200ms cubic-bezier(.2,.7,.2,1)',
         position: 'relative',
         outline: 'none',
-        boxShadow: active ? '0 6px 18px -10px rgba(0,35,230,0.45)' : 'none',
+        boxShadow: active ? (isDark ? '0 6px 18px -10px rgba(77,109,255,0.55)' : '0 6px 18px -10px rgba(0,35,230,0.45)') : 'none',
       }}
-      onFocus={(e) => { e.currentTarget.style.boxShadow = `0 0 0 3px ${accent}33, 0 6px 18px -10px rgba(0,35,230,0.45)`; }}
-      onBlur={(e) => { e.currentTarget.style.boxShadow = active ? '0 6px 18px -10px rgba(0,35,230,0.45)' : 'none'; }}
       onMouseEnter={(e) => {
         if (!active) {
-          e.currentTarget.style.background = hoverSurface;
-          e.currentTarget.style.color = c.textIce;
+          e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.10)' : hoverSurface;
+          e.currentTarget.style.color = isDark ? darkTextIce : c.textIce;
           e.currentTarget.style.transform = 'translateX(2px)';
         }
       }}
       onMouseLeave={(e) => {
         if (!active) {
           e.currentTarget.style.background = 'transparent';
-          e.currentTarget.style.color = c.textSub;
+          e.currentTarget.style.color = isDark ? darkTextSub : c.textSub;
           e.currentTarget.style.transform = 'translateX(0)';
         }
       }}
@@ -310,7 +314,7 @@ function RailItem({ v, active, onClick, label }: { v: ConsoleView; active: boole
           position: 'absolute', left: 0, top: 8, bottom: 8, width: 3,
           borderRadius: 3,
           background: isAI ? 'linear-gradient(180deg,#7a4cff,#21d4fd)' : 'linear-gradient(180deg,#0023e6,#21d4fd)',
-          boxShadow: '0 0 12px rgba(0,35,230,0.55)',
+          boxShadow: isDark ? '0 0 14px rgba(77,109,255,0.70)' : '0 0 12px rgba(0,35,230,0.55)',
         }} />
       )}
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={active ? (isAI ? '#7a4cff' : '#0023e6') : 'currentColor'} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
