@@ -457,6 +457,7 @@ export default function ProfileMenu() {
         >
           {status === 'meeting' && meetingNote ? `Meeting · ${meetingNote}` : `${meta.icon} ${meta.label}`}
         </span>
+        <SyncBadge state={syncState} detail={syncDetail} />
         <span style={{ fontSize: 9, opacity: 0.6 }}>▾</span>
       </button>
 
