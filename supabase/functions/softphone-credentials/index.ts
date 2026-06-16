@@ -166,11 +166,24 @@ Deno.serve(async (req) => {
       `wss://${sipDomain}:7443`,
     ]));
 
-    let password = await decryptSecret(sp.sip_password) || "";
+    let password = "";
+    let passwordSource: "encrypted_softphone_user" | "plain_softphone_user" | "extension_raw_data" | "fusionpbx_proxy" | "none" = "none";
+    const rawSipPwd: string | null = sp.sip_password || null;
+    if (rawSipPwd) {
+      const decrypted = await decryptSecret(rawSipPwd);
+      if (decrypted) {
+        password = decrypted;
+        passwordSource = rawSipPwd.startsWith("aesgcm:") ? "encrypted_softphone_user" : "plain_softphone_user";
+      }
+    }
     if (!password && sp.extension_id) {
       const { data: ext } = await supabase
         .from("pbx_extensions").select("raw_data").eq("id", sp.extension_id).maybeSingle();
-      password = (ext?.raw_data as any)?.password || (ext?.raw_data as any)?.sip_password || "";
+      const extPwd = (ext?.raw_data as any)?.password || (ext?.raw_data as any)?.sip_password || "";
+      if (extPwd) {
+        password = extPwd;
+        passwordSource = "extension_raw_data";
+      }
     }
 
     // Fallback: ask FusionPBX directly via proxy, then persist for next time.
@@ -187,6 +200,7 @@ Deno.serve(async (req) => {
           || "";
         if (fpPwd) {
           password = fpPwd;
+          passwordSource = "fusionpbx_proxy";
           await supabaseAdmin
             .from("pbx_softphone_users")
             .update({ sip_password: fpPwd })
