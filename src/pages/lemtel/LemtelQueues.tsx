@@ -34,12 +34,19 @@ const qCopy = {
 type Perms = { canManage: boolean; canAssign: boolean; reason: string };
 
 function usePerms(): Perms {
-  const { isAdmin, isSupervisor, loading } = useCallCenterRole();
+  const { isAdmin, isSupervisor, isSuperAdmin, isLemtelAdmin, isOrgAdmin, role, loading } = useCallCenterRole();
   if (loading) return { canManage: false, canAssign: false, reason: 'loading' };
+  const reason = isSuperAdmin ? 'super_admin'
+    : isLemtelAdmin ? 'lemtel_admin'
+    : isOrgAdmin ? 'org_admin'
+    : role === 'admin' ? 'cc_admin'
+    : role === 'supervisor' ? 'supervisor'
+    : role === 'agent' ? 'agent'
+    : 'viewer';
   return {
     canManage: isAdmin,
     canAssign: isAdmin || isSupervisor,
-    reason: isAdmin ? 'admin' : isSupervisor ? 'supervisor' : 'agent',
+    reason,
   };
 }
 
