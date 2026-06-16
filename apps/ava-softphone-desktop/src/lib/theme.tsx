@@ -171,6 +171,20 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     document.body.style.color = t.text;
   }, [mode, t]);
 
+  // Cross-document sync: when the parent (or any same-origin doc) writes the
+  // theme key, iframes/other windows pick it up live — used by the responsive
+  // audit overlay so all preview widths track the active theme instantly.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== STORAGE_KEY || !e.newValue) return;
+      if (cycle.includes(e.newValue as ThemeMode) && e.newValue !== mode) {
+        setModeState(e.newValue as ThemeMode);
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [mode]);
+
   const setMode = (m: ThemeMode) => setModeState(m);
   const toggle = () =>
     setModeState((m) => cycle[(cycle.indexOf(m) + 1) % cycle.length]);
