@@ -209,6 +209,7 @@ const MyTelecomSettings = lazy(() => import("./pages/my/TelecomSettings"));
 const MyOrgChat = lazy(() => import("./pages/my/OrgChat"));
 const MyAIAssistant = lazy(() => import("./pages/my/AIAssistant"));
 const MyVoicemail = lazy(() => import("./pages/my/Voicemail"));
+const MyGreetings = lazy(() => import("./pages/my/Greetings"));
 const MyRecordings = lazy(() => import("./pages/my/Recordings"));
 const CustomerAdminAIChat = lazy(() => import("./pages/customer/AdminAIChat"));
 const CustomerSyncHealth = lazy(() => import("./pages/customer/SyncHealthCenter"));
