@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react';
 import type { SyncEvent } from './useRealtimeSync';
+import { sipProvider, type SipStatus } from '../lib/sip/jssipProvider';
 
-export type PbxStatus = 'registered' | 'connecting' | 'error';
+export type PbxStatus = Extract<SipStatus, 'registered' | 'connecting' | 'connected' | 'disconnected' | 'error'>;
 
 export function useSyncStatus() {
-  const [pbx, setPbx] = useState<PbxStatus>('connecting');
+  const [pbx, setPbx] = useState<PbxStatus>(() => {
+    const current = sipProvider.getSnapshot().status;
+    return current === 'idle' ? 'connecting' : current;
+  });
   const [syncConnected, setSyncConnected] = useState(false);
   const [lastEvent, setLastEvent] = useState<SyncEvent | null>(null);
   const [tick, setTick] = useState(0);
@@ -12,7 +16,7 @@ export function useSyncStatus() {
   useEffect(() => {
     const onSip = (e: Event) => {
       const d = (e as CustomEvent).detail;
-      if (d === 'registered' || d === 'connecting' || d === 'error') setPbx(d);
+      if (d === 'registered' || d === 'connecting' || d === 'connected' || d === 'disconnected' || d === 'error') setPbx(d);
     };
     const onSyncStatus = (e: Event) => {
       const d = (e as CustomEvent).detail;
