@@ -666,10 +666,31 @@ function IvrsTable() {
   };
 
   const create = async (form: any) => {
+    if (!isAdmin) { toast.error('Admin role required to create auto-attendants.'); return; }
     setSaving(true);
     try {
       const me = await getMeContext();
       const orgId = me.organization_id || LEMTEL_ORG;
+      const name = String(form.ivr_menu_name || '').trim();
+      const ext = String(form.ivr_menu_extension || '').trim();
+      if (name || ext) {
+        let q = supabase.from('pbx_ivrs').select('id, name, extension').eq('organization_id', orgId);
+        if (name) q = q.eq('name', name);
+        const { data: dup } = await q.maybeSingle();
+        if (dup) {
+          const choice = window.confirm(
+            `An auto-attendant named "${name}" already exists.\n\nClick OK to open it for editing instead, or Cancel to abort.`,
+          );
+          setSaving(false);
+          if (choice) {
+            setCreating(false);
+            await reload(false);
+            const match = data.find((r) => r.name === name);
+            if (match) setEditing(match);
+          }
+          return;
+        }
+      }
       const { error: err } = await supabase.functions.invoke('fusionpbx-proxy', {
         body: { action: 'create-ivr', organization_id: orgId, params: { domain_uuid: LEMTEL_DOMAIN, ...form } },
       });
@@ -677,8 +698,9 @@ function IvrsTable() {
       setCreating(false);
       await reload(true);
       window.dispatchEvent(new Event('ava:pbx-resource-saved'));
+      toast.success(`Auto-attendant "${name}" created and synced.`);
     } catch (e: any) {
-      alert('Create failed: ' + (e?.message || 'unknown'));
+      toast.error('Create failed: ' + (e?.message || 'unknown'));
     } finally { setSaving(false); }
   };
 
