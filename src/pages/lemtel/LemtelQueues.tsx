@@ -801,7 +801,7 @@ function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt
           Queue <span className="font-medium text-foreground">{queue.name}</span> · {agents.length} member{agents.length === 1 ? '' : 's'}
         </div>
         <div className="flex gap-2">
-          {perms.canAssign && <BulkAddBtn queueId={queue.id} extensions={availableExt} onAdd={bulkAdd} />}
+          {perms.canAssign && <BulkAddBtn queueId={queue.id} queueName={queue.name} extensions={availableExt} supCount={supervisors.length} agCount={regularAgents.length} onAdd={bulkAdd} />}
           <Button size="sm" variant="outline" onClick={resyncTiers} disabled={syncing}>
             {syncing ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1" />} Resync from PBX
           </Button>
