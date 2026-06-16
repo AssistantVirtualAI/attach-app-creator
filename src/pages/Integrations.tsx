@@ -90,7 +90,7 @@ export default function Integrations() {
       if (!user) return [];
 
       let query = supabase
-        .from('organization_integrations')
+        .from('organization_integrations_safe' as any)
         .select('*')
         .eq('user_id', user.id);
 
