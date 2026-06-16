@@ -356,6 +356,35 @@ export default function CustomerDetail() {
           </CardContent></Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Add user / extension</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Extension *</Label><Input value={addForm.extension} onChange={e => setAddForm({ ...addForm, extension: e.target.value })} placeholder="1001" /></div>
+            <div><Label>Display name</Label><Input value={addForm.name} onChange={e => setAddForm({ ...addForm, name: e.target.value })} /></div>
+            <div><Label>Email (optional — links portal user)</Label><Input type="email" value={addForm.email} onChange={e => setAddForm({ ...addForm, email: e.target.value.toLowerCase() })} /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
+            <Button onClick={handleAddUser}>Create</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Invite admin to {org?.name || 'tenant'}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Email</Label><Input type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value.toLowerCase())} placeholder="admin@customer.com" /></div>
+            <p className="text-xs text-muted-foreground">User receives a signup invite (or is linked if already registered) and gets <code>org_admin</code> on this tenant.</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setInviteOpen(false)}>Cancel</Button>
+            <Button onClick={handleInvite}>Send invite</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
