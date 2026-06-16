@@ -243,8 +243,12 @@ function CsvIO({ queues, disabled }: { queues: any[]; disabled: boolean }) {
 function QueueDialog({ mode, queue, trigger }: { mode: 'create' | 'edit'; queue?: any; trigger: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [tab, setTab] = useState<'settings' | 'agents'>('settings');
   const { toast } = useToast();
   const qc = useQueryClient();
+  const perms = usePerms();
+  const { language } = useLanguage();
+  const txt = qCopy[language === 'fr' ? 'fr' : 'en'];
   const raw = (queue?.raw_data || {}) as any;
   const [moh, setMoh] = useState<Array<{ name: string; path: string | null }>>([]);
   const [mohLoading, setMohLoading] = useState(false);
