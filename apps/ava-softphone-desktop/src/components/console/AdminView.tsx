@@ -845,10 +845,34 @@ function QueuesTable() {
   };
 
   const create = async (form: any) => {
+    if (!isAdmin) { toast.error('Admin role required to create call queues.'); return; }
     setSaving(true);
     try {
       const me = await getMeContext();
       const orgId = me.organization_id || LEMTEL_ORG;
+      const name = String(form.queue_name || '').trim();
+      const ext = String(form.queue_extension || '').trim();
+      if (name) {
+        const { data: dup } = await supabase
+          .from('pbx_call_queues')
+          .select('id, name, extension')
+          .eq('organization_id', orgId)
+          .eq('name', name)
+          .maybeSingle();
+        if (dup) {
+          const choice = window.confirm(
+            `A call queue named "${name}" already exists.\n\nClick OK to open it for editing instead, or Cancel to abort.`,
+          );
+          setSaving(false);
+          if (choice) {
+            setCreating(false);
+            await reload(false);
+            const match = data.find((r) => r.name === name);
+            if (match) setEditing(match);
+          }
+          return;
+        }
+      }
       const out: any = { ...form };
       if (out.queue_max_wait_time !== undefined) out.queue_max_wait_time = String(out.queue_max_wait_time);
       const { error: err } = await supabase.functions.invoke('fusionpbx-proxy', {
@@ -858,8 +882,9 @@ function QueuesTable() {
       setCreating(false);
       await reload(true);
       window.dispatchEvent(new Event('ava:pbx-resource-saved'));
+      toast.success(`Call queue "${name}"${ext ? ` (ext ${ext})` : ''} created and synced.`);
     } catch (e: any) {
-      alert('Create failed: ' + (e?.message || 'unknown'));
+      toast.error('Create failed: ' + (e?.message || 'unknown'));
     } finally { setSaving(false); }
   };
 
