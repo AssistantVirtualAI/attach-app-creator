@@ -14,6 +14,7 @@ import { supabase } from './lib/supabaseClient';
 import { setAuthToken } from './lib/avaApi';
 import { audit } from './lib/audit';
 import { sipProvider } from './lib/sip/jssipProvider';
+import { useSoftphone } from './hooks/useSoftphone';
 
 const LEMTEL_ORG_ID = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
 
@@ -74,6 +75,25 @@ type Creds = {
   refreshToken?: string;
   userId?: string;
 } | null;
+
+type ActiveCreds = Exclude<Creds, null>;
+
+function SipKeepAlive({ creds }: { creds: ActiveCreds }) {
+  const sp = useSoftphone({
+    extension: creds.extension,
+    displayName: creds.displayName,
+    sipDomain: creds.sipDomain,
+    wssUrl: creds.wssUrl,
+    accessToken: creds.accessToken,
+    refreshToken: creds.refreshToken,
+  });
+
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('lemtel:sip-status', { detail: sp.snap.status }));
+  }, [sp.snap.status]);
+
+  return null;
+}
 
 
 // ── CDR sync au démarrage ──────────────────────────────────
@@ -248,6 +268,7 @@ export default function App() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: t.bg, position: 'relative' }}>
+      <SipKeepAlive creds={creds} />
       <BrightnessOverlay />
       {!IS_EMBED && <TitleBar />}
       <div style={{ flex: 1, overflow: 'hidden', position: 'relative', zIndex: 1 }}>
