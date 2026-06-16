@@ -512,3 +512,68 @@ html[data-ava-theme="midnight"] {
   color: var(--ava-text-muted, #3b4a6b);
   font-size: clamp(0.75rem, 0.72rem + 0.1vw, 0.85rem);
 }
+
+/* ============================================================
+   Table & grid row contrast — readable in every theme, no more
+   washed-out gray-on-gray. Zebra striping + hover highlight.
+   ============================================================ */
+:where([data-ava-theme="daylight"]),
+:where([data-ava-theme="light"]) {
+  --ava-row-alt: rgba(11, 21, 48, 0.035);
+  --ava-row-hover: rgba(0, 35, 230, 0.08);
+  --ava-border-strong: rgba(11, 21, 48, 0.18);
+  --ava-table-head-bg: rgba(0, 35, 230, 0.06);
+}
+:where([data-ava-theme="dark"]),
+:where([data-ava-theme="midnight"]) {
+  --ava-row-alt: rgba(255, 255, 255, 0.04);
+  --ava-row-hover: rgba(120, 160, 255, 0.14);
+  --ava-border-strong: rgba(140, 180, 255, 0.30);
+  --ava-table-head-bg: rgba(33, 212, 253, 0.10);
+}
+
+:where([data-ava-theme]) table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+}
+:where([data-ava-theme]) thead tr,
+:where([data-ava-theme]) thead th {
+  background: var(--ava-table-head-bg) !important;
+  border-bottom: 2px solid var(--ava-border-strong) !important;
+}
+:where([data-ava-theme]) tbody tr {
+  transition: background 140ms ease;
+}
+:where([data-ava-theme]) tbody tr:nth-child(even) {
+  background: var(--ava-row-alt);
+}
+:where([data-ava-theme]) tbody tr:hover {
+  background: var(--ava-row-hover) !important;
+}
+:where([data-ava-theme]) tbody td {
+  border-bottom: 1px solid var(--ava-border-strong);
+}
+
+/* Inline rows / list items styled as cards (very common in this app) */
+:where([data-ava-theme]) .ava-row,
+:where([data-ava-theme]) [data-ava-row] {
+  background: var(--ava-bg-card, rgba(255,255,255,0.92));
+  border: 1px solid var(--ava-border-strong);
+  transition: background 140ms ease, border-color 140ms ease;
+}
+:where([data-ava-theme]) .ava-row:hover,
+:where([data-ava-theme]) [data-ava-row]:hover {
+  background: var(--ava-row-hover);
+  border-color: var(--ava-border-strong);
+}
+
+/* Scrollbar polish for the new scrollable home page */
+.ava-scroll::-webkit-scrollbar { width: 10px; height: 10px; }
+.ava-scroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(0,35,230,0.35), rgba(33,212,253,0.35));
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.ava-scroll::-webkit-scrollbar-track { background: transparent; }
