@@ -77,16 +77,63 @@ export default function ProfileMenu() {
     });
   }, []);
 
-  // On mount, push persisted status into the softphone so SIP state matches restored UI.
+  // On mount: load presence from backend (cross-device source of truth) and push SIP state.
   useEffect(() => {
-    const saved = (localStorage.getItem(STATUS_KEY) as Status) || 'available';
-    const meta = STATUS_META[saved] || STATUS_META.available;
-    const dispatch = () => window.dispatchEvent(
-      new CustomEvent('lemtel:set-status', { detail: meta.manual })
-    );
-    dispatch();
-    const t = setTimeout(dispatch, 1500); // re-apply after useSoftphone mounts
-    return () => clearTimeout(t);
+    let cancelled = false;
+    (async () => {
+      const { data: u } = await supabase.auth.getUser();
+      const uid = u?.user?.id;
+      const localSaved = (localStorage.getItem(STATUS_KEY) as Status) || 'available';
+      let saved: Status = STATUS_META[localSaved] ? localSaved : 'available';
+      if (uid) {
+        const { data: pres } = await supabase
+          .from('user_presence')
+          .select('status')
+          .eq('user_id', uid)
+          .maybeSingle();
+        const remote = pres?.status as Status | undefined;
+        if (remote && STATUS_META[remote]) {
+          saved = remote;
+          if (!cancelled) {
+            setStatus(remote);
+            try { localStorage.setItem(STATUS_KEY, remote); } catch { /* noop */ }
+          }
+        }
+      }
+      const m = STATUS_META[saved] || STATUS_META.available;
+      const dispatch = () => window.dispatchEvent(
+        new CustomEvent('lemtel:set-status', { detail: m.manual })
+      );
+      dispatch();
+      setTimeout(dispatch, 1500);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Realtime: sync status changes from other devices (mobile / web).
+  useEffect(() => {
+    let channel: any;
+    (async () => {
+      const { data: u } = await supabase.auth.getUser();
+      const uid = u?.user?.id;
+      if (!uid) return;
+      channel = supabase
+        .channel(`user-presence-${uid}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'user_presence', filter: `user_id=eq.${uid}` },
+          (payload: any) => {
+            const next = (payload.new?.status || payload.old?.status) as Status | undefined;
+            if (!next || !STATUS_META[next]) return;
+            if (next === statusRef.current) return;
+            setStatus(next);
+            try { localStorage.setItem(STATUS_KEY, next); } catch { /* noop */ }
+            window.dispatchEvent(new CustomEvent('lemtel:set-status', { detail: STATUS_META[next].manual }));
+          }
+        )
+        .subscribe();
+    })();
+    return () => { if (channel) supabase.removeChannel(channel); };
   }, []);
 
   // Listen to global shortcuts / tray status changes from the main process
