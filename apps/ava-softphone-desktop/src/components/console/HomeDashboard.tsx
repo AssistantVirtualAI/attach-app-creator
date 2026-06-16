@@ -735,7 +735,7 @@ function DetailRow({ metric, row, tone }: { metric: MetricKey; row: any; tone: T
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 12,
-      padding: '11px 12px', background: '#fff',
+      padding: '11px 12px', background: c.bgCard,
       border: `1px solid ${c.border}`, borderLeft: `3px solid ${tone.from}`,
       borderRadius: 10,
     }}>
