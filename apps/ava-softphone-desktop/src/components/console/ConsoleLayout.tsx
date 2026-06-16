@@ -205,6 +205,7 @@ export default function ConsoleLayout({
           {view === 'customers' && <CustomersView />}
           {view === 'voiceagents' && <VoiceAgentsView />}
           {view === 'pbxlive' && <PBXLiveView />}
+          {view === 'queues' && <QueuesView isAdmin={isAdmin} isSuperAdmin={isSuperAdmin} />}
           {view === 'audit' && <AuditView />}
           {view === 'settings' && (
             <SettingsPage
