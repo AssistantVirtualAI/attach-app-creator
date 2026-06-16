@@ -1,5 +1,5 @@
 import React from 'react';
-import { theme } from '../../lib/theme';
+import { theme, useTheme } from '../../lib/theme';
 import LemtelLogo from '../LemtelLogo';
 import { useTranslation, type I18nKey } from '../../lib/i18n';
 import LanguageSwitcher from '../ui/LanguageSwitcher';
