@@ -1,18 +1,22 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { ArrowLeft, Globe, Loader2, RefreshCw, LogIn } from 'lucide-react';
+import { ArrowLeft, Globe, Loader2, RefreshCw, LogIn, Upload, UserPlus, Mail, Link2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { RecordingWavePlayer } from '@/components/portal/RecordingWavePlayer';
 import { formatDistanceToNow } from 'date-fns';
 import { loadPbxRecordingAudio } from '@/lib/pbxRecordingAudio';
+import { useImpersonation } from '@/contexts/ImpersonationContext';
 
 async function pbxList(action: string, domain_uuid: string) {
   const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
