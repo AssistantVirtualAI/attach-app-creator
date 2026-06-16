@@ -1,67 +1,81 @@
-# Command Center — Phases 1 to 5
 
-Status: Phase 4 and Phase 5 continued. Extensions now read from `pbx_extensions_safe`, the safe view excludes PBX credentials/raw payloads, `pbx-admin-chatbot` is deployed, and audit rollback drafting is wired through `rollback_admin_action`.
+# Customers Management — A-to-Z per-domain PBX control
 
-Phase 0 is shipped (audit table, sync columns, sources registry, SourceBadge, WriteScopeButton, usePlatformAccess, logAdminAction). This plan covers everything left from the master plan.
+## Goals
+- One screen at `/org/lemtel/admin/customers` to create, edit, disable, delete and **impersonate** any customer (one customer = one FusionPBX domain + optional tenant org).
+- Each customer gets its own portal URL (`/c/:slug`) and a `Manage as this customer` action that locks the whole `/console/*` shell to that domain.
+- Lemtel super_admin / lemtel_admin can do everything from A→Z: extensions, devices, users, IVRs, queues, ring groups, time conditions, MoH, voicemail, DIDs, call forwarding, CDR + recordings, call history — all the existing console pages, but scoped to the impersonated domain.
+- Bulk-add users from CSV per customer.
 
-## Phase 1 — Desktop shell (Command Center)
+## 1. Customers list page (rewrite of `LemtelCustomers.tsx`)
 
-New left-rail console shell for the desktop app, distinct from the user softphone shell. Lives in `apps/ava-softphone-desktop/`.
+Top bar: search · `+ New Customer` · `Refresh` · `Sync all`.
 
-- New `src/components/console/ConsoleShell.tsx` with a collapsible left rail: Dashboard, Extensions, Devices, Live Registrations, Active Calls, CDR & Recordings, Voicemail, DIDs, Inbound Routes, IVRs, Ring Groups, Queues, AI (insights), Chatbot, Audit. Each item shows a `<SourceBadge>` next to its label.
-- Rail items gated by role (`org_admin` / `lemtel_admin` / `super_admin`) using a new `useDesktopRole()` hook backed by `has_role` + `is_lemtel_admin`.
-- New routes in `apps/ava-softphone-desktop/src/App.tsx` mounted under `/console/*` plus a top-right ProfileMenu that mirrors the web `UserAvatarMenu`.
-- Header strip per page: page title, source kind badge, write-scope dropdown, "Last synced" + refresh.
+Table columns: Customer name · Domain · Linked tenant · Extensions · Users · Status · Last synced · Actions.
 
-## Phase 2 — Inventory pages (read of `_safe` views, write via WriteScopeButton)
+Row actions (icon buttons):
+- `Open` → `/org/lemtel/admin/customers/:domainUuid` (existing detail page, expanded).
+- `Manage as` → enter impersonation, redirect to `/console`.
+- `Portal link` → copy `/c/:slug` (uses the tenant org slug, generated if missing).
+- `Edit` / `Disable` / `Delete`.
 
-For every entity in `PBX_SOURCES`, ship a Command Center page reusing one generic `<InventoryTable>` driven by a column descriptor file:
+`+ New Customer` dialog:
+1. Customer name + auto-slug + domain `<slug>.lemtel.tel`.
+2. Optional: create a tenant organization at the same time (default ON). When ON, server creates org via `setup_customer_organization` RPC and stores `fusionpbx_domain_uuid` on it.
+3. Optional Admin email — invites that user as `org_admin` of the new tenant.
+4. On submit calls `pbx-write create-domain`, then RPC to link the new domain to the new org row.
 
-- Extensions, Devices, IVRs, IVR options, Ring Groups, Queues, DIDs, Inbound Routes, Time Conditions, Voicemail boxes.
-- Each row: SourceBadge, edit dialog (push to PBX confirmation), delete (with audit log via `logAdminAction`).
-- Each list page calls the right `sync-*` action on demand + auto when `last_synced_at > staleAfterSeconds`.
-- Empty state always renders a diagnostic explaining why (no rows / RLS blocked / sync failed) just like Extensions does today.
+## 2. Customer Detail page (extend `CustomerDetail.tsx`)
 
-## Phase 3 — Live operations
+Keep current tabs and add the missing telephony surfaces so an admin can run the whole PBX without leaving:
 
-- Live Registrations page polling `fusionpbx-proxy?action=list-registrations` every 15 s.
-- Active Calls page polling `get-active-calls-live` every 5 s, with hangup / transfer / monitor actions wired through new `fusionpbx-proxy` actions (`hangup-call`, `transfer-call`, `eavesdrop-call`) — each logs to `pbx_admin_actions` with `requires confirmation` modal.
-- CDR & Recordings: paginated, filter by date/extension/queue; play recording via signed URL; "Analyze with AI" + "Transcribe" buttons calling existing edge functions and showing job status from `pbx_ai_jobs`.
+Tabs (left→right):
+- Overview (counts, last sync, alerts) — new
+- Users (existing) + `Import CSV` + `Add user` + `Send portal invite`
+- Extensions · Devices · IVR · Queues · Ring Groups · Time Conditions · MoH · Voicemail · DIDs · Inbound Routes · Outbound Rules
+- Call History (CDR) · Recordings (existing) · Live Calls
+- Settings (domain description / enabled, regional, billing notes)
+- Audit (per-domain admin actions)
 
-## Phase 4 — AI Insights & Chatbot
+`Import CSV` accepts `extension,name,email,password,voicemail_pin,outbound_cid` and calls a new edge function `customer-users-import` that loops over the rows: creates the FusionPBX extension (via `pbx-write create-extension`), upserts the local `pbx_softphone_users` row, and links to a profile by email when one exists. Returns a per-row success/error report.
 
-- `Insights` page surfacing `pbx_ai_insights` + `topic_aggregates` with coverage chart (rows analyzed vs total CDR) even when nothing is processed yet (so user sees baseline).
-- Chatbot panel (right drawer) consuming a new edge function `pbx-admin-chatbot` that:
-  - resolves source by entity (e.g. "extension 300") via Postgres functions,
-  - returns the row + a suggested action,
-  - exposes a "Run action" button which triggers the matching `fusionpbx-proxy` write and logs `pbx_admin_actions`.
+`Add user` is the single-row version of the same flow.
 
-## Phase 5 — Audit & manual presence
+`Send portal invite` calls `supabase.auth.admin.inviteUserByEmail` from an edge function and pre-assigns `org_admin` / `user` role on the tenant org.
 
-- New `Audit` page listing `pbx_admin_actions` with filters (entity, actor, action, result, rollback).
-- Per-row "Rollback" button (when `before_json` exists) that pushes the previous payload through the matching write action and records a new audit row with `rollback_of`.
-- Manual presence override already shipped; this phase adds the auto `on_call` reset on desktop softphone disconnect events too.
+## 3. Impersonation (replace the sessionStorage hack)
 
-## Acceptance (per the master spec)
+Use the existing `ImpersonationProvider` (already in `src/contexts/ImpersonationContext.tsx`) and wire it into the Lemtel admin shell:
+- `Manage as` calls `enter(orgId, name, { domainUuid, slug })`.
+- `<ImpersonationBanner />` mounts on every `/console/*` and `/org/lemtel/admin/*` page when active, with `Exit` button.
+- All console hooks/queries (`usePbxData`, `useSoftphoneUsers`, `useLiveRegistrations`, etc.) read `useImpersonation()` and substitute the active `organization_id` + `domain_uuid` so every page (Extensions, Devices, IVRs, Queues, CDR, Recordings, Voicemail, etc.) auto-scopes to the impersonated domain.
+- Edge functions that already accept `organization_id` / `domain_uuid` in the body keep working unchanged.
 
-- Source kind badge on every list page and detail header.
-- Every write goes through `<WriteScopeButton>` and logs to `pbx_admin_actions`.
-- Live pages refresh on the cadence declared in `PBX_SOURCES.staleAfterSeconds`.
-- A desktop-blocked user no longer sees Command Center routes (gated by `usePlatformAccess`).
-- AI Insights always renders coverage, even at 0 analyses.
-- Chatbot returns a real source + confirmable action for "show me extension 300".
+## 4. Backend pieces
 
-## Order of work
+Migrations:
+- `setup_customer_organization(_name, _slug, _domain_uuid, _admin_email)` SECURITY DEFINER RPC — creates org row, billing, role, links domain UUID, optionally invites admin. Guarded by `is_lemtel_admin` / `is_super_admin`.
+- Add `fusionpbx_domain_uuid` index on `organizations` (if missing) and constrain uniqueness.
+- Extend `pbx_admin_actions` usage: every customer write logs an audit row with `entity_type='customer'`.
 
-1. Phase 1 shell (no inventory yet) → ship and verify routes.
-2. Phase 2 inventory pages reusing one shared table component.
-3. Phase 3 live ops + recordings.
-4. Phase 4 insights + chatbot.
-5. Phase 5 audit + rollback.
+Edge functions:
+- `customer-users-import` — bulk CSV importer.
+- `customer-invite-admin` — wraps Supabase Auth `inviteUserByEmail` + role assignment.
+- Extend `pbx-write` with: `create-extension-batch`, `update-domain-status`, `delete-domain-cascade` (deletes local rows + PBX domain).
 
-## Technical notes
+## 5. Routes & nav
 
-- New files: `apps/ava-softphone-desktop/src/components/console/ConsoleShell.tsx`, `…/components/console/InventoryTable.tsx`, `…/pages/console/*.tsx` (one per entity), `…/hooks/useDesktopRole.ts`, `supabase/functions/pbx-admin-chatbot/index.ts`.
-- New edge actions in `fusionpbx-proxy`: `hangup-call`, `transfer-call`, `eavesdrop-call`.
-- Migration: index `pbx_admin_actions(organization_id, created_at desc)` + RPC `rollback_admin_action(_id uuid)` (server-side guard) — done in Phase 5.
-- All reads stay on `_safe` views; writes go through edge functions only.
+- Existing `/org/lemtel/admin/customers` and `/org/lemtel/admin/customers/:domainUuid` kept and rebuilt.
+- New public per-customer portal route `/c/:slug` that resolves slug→org_id and reuses the standard portal login.
+- Sidebar entry under Lemtel admin already exists; mark the row as primary entry-point.
+
+## Out of scope for this round
+- Customer billing portal / Stripe per-customer.
+- Reseller hierarchy beyond what `multi-tenant-reseller-v4` already provides.
+- Number porting workflows.
+
+## Open questions
+1. When a customer is created, should we **always** create a matching tenant org row, or keep it optional?
+2. For the per-customer portal URL — use the tenant org `slug` (e.g. `/c/acme`) or the domain (`/c/acme.lemtel.tel`)?
+3. CSV import: should missing extensions on FusionPBX be **created**, or only rows that already exist on the PBX be matched and linked?
+4. Should the impersonation banner also restrict destructive actions (delete domain, delete tenant) while impersonating?
