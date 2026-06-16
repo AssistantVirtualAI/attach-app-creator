@@ -928,6 +928,7 @@ const App = () => (
                   <Route path="softphone" element={<TelephonyWebphone />} />
                   <Route path="calls" element={<TelephonyMediaCenter scope="mine" />} />
                   <Route path="voicemail" element={<MyVoicemail />} />
+                  <Route path="greetings" element={<MyGreetingsLibrary />} />
                   <Route path="messages" element={<LemtelMessages />} />
                   <Route path="recordings" element={<MyRecordings />} />
                   <Route path="chat" element={<MyOrgChat />} />
