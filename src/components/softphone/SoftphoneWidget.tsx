@@ -3,6 +3,7 @@ import {
   Phone, PhoneOff, PhoneIncoming, Mic, MicOff, Pause, Play,
   X, Minimize2, Settings, Delete, ClipboardPaste, ArrowRightLeft,
   Plus, Hash, Volume2, MessageSquare, Users, Clock, Grid3x3,
+  Sparkles, RefreshCw, AlertCircle, CheckCircle2, ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +19,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
 import { SoftphoneDiagnostics } from "@/components/softphone/SoftphoneDiagnostics";
+import { useToast } from "@/hooks/use-toast";
 
 type Tab = "dial" | "recents" | "sms" | "contacts";
 
