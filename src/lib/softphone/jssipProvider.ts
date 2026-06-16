@@ -54,6 +54,9 @@ export interface SoftphoneConfig {
   wssUrls?: string[];
   password: string;
   mock: boolean;
+  passwordSource?: string;
+  sipUri?: string;
+  authUsername?: string;
 }
 
 type Listener = (snap: SoftphoneSnapshot) => void;
