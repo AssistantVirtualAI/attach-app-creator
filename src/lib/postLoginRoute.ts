@@ -18,36 +18,41 @@ const ROLE_PRIORITY: Record<ResellerRole, number> = {
 };
 
 /**
- * Determine where to send a user after they log in, based on their highest-privilege
- * membership in `org_members`. Falls back to `/my/dashboard` if no membership exists.
+ * Determine where to send a user after they log in.
+ * Uses the three-portal architecture:
+ *   - super_admin / ava_admin / master_admin     → /platform
+ *   - reseller_admin / customer_admin / org_admin / manager → /customer
+ *   - everyone else                              → /my
  */
 export async function getPostLoginRoute(userId: string): Promise<string> {
-  const { data, error } = await supabase
-    .from('org_members')
-    .select('role, organizations:org_id(slug, org_type)')
-    .eq('user_id', userId)
-    .limit(20);
+  try {
+    // 1. Super admin (global) — highest priority
+    const { data: isSuper } = await supabase.rpc('is_super_admin', { _user_id: userId });
+    if (isSuper === true) return '/platform';
 
-  if (error || !data?.length) return '/my/dashboard';
+    // 2. Reseller-tier roles from org_members
+    const { data: orgMemberRows } = await supabase
+      .from('org_members')
+      .select('role')
+      .eq('user_id', userId)
+      .limit(20);
 
-  const sorted = [...data].sort(
-    (a, b) =>
-      (ROLE_PRIORITY[a.role as ResellerRole] ?? 99) -
-      (ROLE_PRIORITY[b.role as ResellerRole] ?? 99),
-  );
-  const primary = sorted[0] as any;
-  const slug = primary.organizations?.slug;
+    const orgRoles = (orgMemberRows || []).map((r: any) => r.role as ResellerRole);
+    if (orgRoles.includes('ava_admin') || orgRoles.includes('master_admin')) return '/platform';
+    if (orgRoles.includes('reseller_admin') || orgRoles.includes('customer_admin')) return '/customer';
 
-  switch (primary.role as ResellerRole) {
-    case 'ava_admin':
-    case 'master_admin':
-      return '/admin/dashboard';
-    case 'reseller_admin':
-    case 'customer_admin':
-      return slug ? `/org/${slug}/dashboard` : '/dashboard';
-    case 'agent':
-    case 'user':
-    default:
-      return '/my/dashboard';
+    // 3. App-role from user_roles
+    const { data: userRoles } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId);
+    const appRoles = (userRoles || []).map((r: any) => r.role as string);
+    if (appRoles.includes('org_admin') || appRoles.includes('reseller_admin') || appRoles.includes('manager')) {
+      return '/customer';
+    }
+
+    return '/my';
+  } catch {
+    return '/my';
   }
 }
