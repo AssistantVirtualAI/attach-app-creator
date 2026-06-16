@@ -193,6 +193,7 @@ export default function SettingsPage({
               })}
             </div>
 
+            <ThemePreview t={t} mode={mode} />
           </div>
 
           <div>
@@ -366,5 +367,73 @@ function SelectField({ tokens, label, selectStyle, children }: { tokens: any; la
       <div style={{ fontSize: 11, color: tokens.textMuted, marginBottom: 6, fontWeight: 600, letterSpacing: 0.3, textTransform: 'uppercase' }}>{label}</div>
       <select style={selectStyle}>{children}</select>
     </label>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Live theme preview — typography, glass surface, focus ring, button */
+/* Updates instantly as `t` and `mode` change.                         */
+/* ------------------------------------------------------------------ */
+function ThemePreview({ t, mode }: { t: any; mode: string }) {
+  const [focused, setFocused] = React.useState(false);
+  return (
+    <div style={{ marginTop: 14 }}>
+      <div style={{ fontSize: 11, color: t.textMuted, marginBottom: 8, fontWeight: 600, letterSpacing: 0.3, textTransform: 'uppercase' }}>
+        Live preview · {mode}
+      </div>
+      <div
+        style={{
+          background: t.glass,
+          border: `1px solid ${t.glassBorder}`,
+          borderRadius: 16,
+          padding: 18,
+          boxShadow: t.shadow,
+          backdropFilter: 'blur(14px) saturate(140%)',
+          WebkitBackdropFilter: 'blur(14px) saturate(140%)',
+          display: 'flex', flexDirection: 'column', gap: 12,
+          color: t.text,
+        }}>
+        <div>
+          <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: -0.3 }}>The quick aurora call</div>
+          <div style={{ fontSize: 13, color: t.textMuted, marginTop: 2 }}>
+            Body text on a glass surface — should remain comfortably readable.
+          </div>
+          <div style={{ fontSize: 11, color: t.textSubtle, marginTop: 2 }}>Subtle caption · timestamp · meta</div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+          <button
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            style={{
+              padding: '9px 16px', borderRadius: 10, border: 'none',
+              background: t.accentGradient, color: '#fff',
+              fontWeight: 600, fontSize: 13, cursor: 'pointer',
+              boxShadow: focused ? t.ringGlow : t.accentGlow,
+              outline: 'none',
+            }}>
+            Primary action
+          </button>
+          <button
+            style={{
+              padding: '9px 16px', borderRadius: 10,
+              background: t.surface, color: t.text,
+              border: `1px solid ${t.border}`,
+              fontWeight: 600, fontSize: 13, cursor: 'pointer',
+            }}>
+            Secondary
+          </button>
+          <span style={{ fontSize: 11, color: t.textMuted }}>
+            Tab into the primary button to preview the focus ring.
+          </span>
+        </div>
+
+        <div style={{ display: 'flex', gap: 6 }}>
+          {[t.accent, t.success, t.warning, t.danger].map((c: string, i: number) => (
+            <div key={i} style={{ flex: 1, height: 8, borderRadius: 4, background: c }} />
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
