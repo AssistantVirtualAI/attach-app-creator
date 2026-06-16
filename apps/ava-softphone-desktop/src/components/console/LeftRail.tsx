@@ -4,7 +4,9 @@ import LemtelLogo from '../LemtelLogo';
 import { useTranslation, type I18nKey } from '../../lib/i18n';
 import LanguageSwitcher from '../ui/LanguageSwitcher';
 import { useSyncStatus, formatAge } from '../../hooks/useSyncStatus';
+import { useTenant } from '../../hooks/useTenant';
 import avaStatisticLogo from '../../assets/ava-statistic-logo.png';
+
 
 
 const { colors: c } = theme;
