@@ -138,8 +138,9 @@ export default function LemtelCustomers() {
       toast.success(`Domain ${form.domain} created`);
 
       // 2) Auto-create the matching tenant organization
+      let tenantOrgId: string | null = null;
       if (domainUuid) {
-        const { error: orgErr } = await (supabase as any).rpc('setup_customer_organization', {
+        const { data: newOrgId, error: orgErr } = await (supabase as any).rpc('setup_customer_organization', {
           _name: form.name,
           _slug: slugify(form.name),
           _domain_uuid: domainUuid,
@@ -147,17 +148,23 @@ export default function LemtelCustomers() {
           _admin_email: form.adminEmail || null,
         });
         if (orgErr) toast.error('Tenant org link failed: ' + orgErr.message);
-        else toast.success('Tenant organization linked');
+        else {
+          tenantOrgId = newOrgId as string;
+          toast.success('Tenant organization linked');
+        }
       } else {
         toast.warning('Could not link tenant org (missing domain_uuid in PBX response)');
       }
 
       // 3) Optionally invite the admin (sends email + assigns role)
-      if (form.adminEmail) {
-        await supabase.functions.invoke('customer-invite-admin', {
-          body: { organizationId: domainUuid ? undefined : null, email: form.adminEmail },
-        }).catch(() => {});
+      if (form.adminEmail && tenantOrgId) {
+        const { error: invErr } = await supabase.functions.invoke('customer-invite-admin', {
+          body: { organizationId: tenantOrgId, email: form.adminEmail },
+        });
+        if (invErr) toast.error('Invite failed: ' + invErr.message);
+        else toast.success(`Invite sent to ${form.adminEmail}`);
       }
+
 
       setForm({ name: '', domain: '', adminEmail: '' });
       setDomainTouched(false);
