@@ -182,64 +182,144 @@ function DirectoryPanel({ members, loading, onOpenDm, t }: {
 }
 
 function Sidebar({
-  channels, activeId, onSelect, loading, onCreate, t,
+  channels, activeId, onSelect, loading, unread, directory, onCreateChannel, onCreateGroup, t,
 }: {
   channels: Channel[]; activeId: string | null; onSelect: (id: string) => void;
-  loading: boolean; onCreate: (name: string, type: "public" | "private") => Promise<void>;
+  loading: boolean;
+  unread: Record<string, number>;
+  directory: DirectoryMember[];
+  onCreateChannel: (name: string, type: "public" | "private") => Promise<void>;
+  onCreateGroup: (name: string, ids: string[]) => Promise<void>;
   t: (en: string, fr: string) => string;
 }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [type, setType] = useState<"public" | "private">("public");
+  const [groupSel, setGroupSel] = useState<Set<string>>(new Set());
+  const [groupName, setGroupName] = useState("");
+
+  const dmChannels = channels.filter((c) => c.channel_type === "dm");
+  const groupChannels = channels.filter((c) => c.channel_type === "private" && c.members?.length > 2);
+  const named = channels.filter((c) => c.channel_type === "public" || (c.channel_type === "private" && (c.members?.length ?? 0) <= 2));
+
+  const dmLabel = (c: Channel) => {
+    const other = (c.members || []).find((id) => id !== (directory.find((d) => d.is_self)?.user_id));
+    return directory.find((d) => d.user_id === other)?.full_name || directory.find((d) => d.user_id === other)?.email || "Direct";
+  };
+
+  const Row = ({ c, label, icon }: { c: Channel; label: string; icon: React.ReactNode }) => (
+    <button
+      key={c.id}
+      onClick={() => onSelect(c.id)}
+      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm hover:bg-accent text-left ${c.id === activeId ? "bg-accent font-medium" : ""}`}
+    >
+      {icon}
+      <span className="truncate flex-1">{label}</span>
+      {unread[c.id] > 0 && c.id !== activeId && (
+        <Badge className="h-4 px-1.5 text-[10px]" variant="default">{unread[c.id]}</Badge>
+      )}
+    </button>
+  );
+
   return (
     <aside className="w-60 border-r bg-muted/30 flex flex-col">
       <div className="p-3 border-b flex items-center justify-between">
-        <h2 className="text-sm font-semibold">{t("Channels", "Canaux")}</h2>
+        <h2 className="text-sm font-semibold">{t("Team chat", "Discussion équipe")}</h2>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button size="icon" variant="ghost" className="h-7 w-7"><Plus className="h-4 w-4" /></Button>
           </DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle>{t("Create channel", "Créer un canal")}</DialogTitle></DialogHeader>
-            <div className="space-y-3">
-              <div>
-                <Label>{t("Name", "Nom")}</Label>
-                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="general" />
-              </div>
-              <div>
-                <Label>{t("Type", "Type")}</Label>
-                <Select value={type} onValueChange={(v: any) => setType(v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="public">{t("Public", "Public")}</SelectItem>
-                    <SelectItem value="private">{t("Private", "Privé")}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button onClick={async () => { await onCreate(name, type); setOpen(false); setName(""); }} disabled={!name.trim()}>
-                {t("Create", "Créer")}
-              </Button>
-            </DialogFooter>
+          <DialogContent className="max-w-md">
+            <DialogHeader><DialogTitle>{t("New conversation", "Nouvelle conversation")}</DialogTitle></DialogHeader>
+            <Tabs defaultValue="channel">
+              <TabsList className="grid grid-cols-2 w-full">
+                <TabsTrigger value="channel">{t("Channel", "Canal")}</TabsTrigger>
+                <TabsTrigger value="group">{t("Group", "Groupe")}</TabsTrigger>
+              </TabsList>
+              <TabsContent value="channel" className="space-y-3 pt-3">
+                <div>
+                  <Label>{t("Name", "Nom")}</Label>
+                  <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="general" />
+                </div>
+                <div>
+                  <Label>{t("Type", "Type")}</Label>
+                  <Select value={type} onValueChange={(v: any) => setType(v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="public">{t("Public", "Public")}</SelectItem>
+                      <SelectItem value="private">{t("Private", "Privé")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <DialogFooter>
+                  <Button onClick={async () => { await onCreateChannel(name, type); setOpen(false); setName(""); }} disabled={!name.trim()}>
+                    {t("Create", "Créer")}
+                  </Button>
+                </DialogFooter>
+              </TabsContent>
+              <TabsContent value="group" className="space-y-3 pt-3">
+                <div>
+                  <Label>{t("Group name", "Nom du groupe")}</Label>
+                  <Input value={groupName} onChange={(e) => setGroupName(e.target.value)} placeholder={t("Marketing crew", "Équipe marketing")} />
+                </div>
+                <div>
+                  <Label>{t("Members", "Membres")}</Label>
+                  <ScrollArea className="h-56 border rounded mt-1">
+                    <div className="p-2 space-y-1">
+                      {directory.filter((d) => !d.is_self).map((m) => (
+                        <label key={m.user_id} className="flex items-center gap-2 p-1 rounded hover:bg-accent cursor-pointer">
+                          <Checkbox checked={groupSel.has(m.user_id)} onCheckedChange={(v) => {
+                            const n = new Set(groupSel); v ? n.add(m.user_id) : n.delete(m.user_id); setGroupSel(n);
+                          }} />
+                          <span className="text-sm flex-1 truncate">{m.full_name || m.email}</span>
+                          {m.extension && <span className="text-[10px] text-muted-foreground">Ext {m.extension}</span>}
+                        </label>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </div>
+                <DialogFooter>
+                  <Button
+                    onClick={async () => {
+                      await onCreateGroup(groupName, Array.from(groupSel));
+                      setOpen(false); setGroupName(""); setGroupSel(new Set());
+                    }}
+                    disabled={!groupName.trim() || groupSel.size === 0}
+                  >{t("Create group", "Créer le groupe")}</Button>
+                </DialogFooter>
+              </TabsContent>
+            </Tabs>
           </DialogContent>
         </Dialog>
       </div>
       <ScrollArea className="flex-1">
-        <div className="p-2 space-y-0.5">
+        <div className="p-2 space-y-3">
           {loading && Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-7 w-full" />)}
-          {channels.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => onSelect(c.id)}
-              className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm hover:bg-accent text-left ${
-                c.id === activeId ? "bg-accent font-medium" : ""
-              }`}
-            >
-              {c.channel_type === "private" ? <Lock className="h-3.5 w-3.5" /> : <Hash className="h-3.5 w-3.5" />}
-              <span className="truncate">{c.name}</span>
-            </button>
-          ))}
+
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground px-2 mb-1">{t("Channels", "Canaux")}</div>
+            <div className="space-y-0.5">
+              {named.map((c) => <Row key={c.id} c={c} label={c.name} icon={c.channel_type === "private" ? <Lock className="h-3.5 w-3.5" /> : <Hash className="h-3.5 w-3.5" />} />)}
+            </div>
+          </div>
+
+          {groupChannels.length > 0 && (
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground px-2 mb-1">{t("Groups", "Groupes")}</div>
+              <div className="space-y-0.5">
+                {groupChannels.map((c) => <Row key={c.id} c={c} label={c.name} icon={<UsersIcon className="h-3.5 w-3.5" />} />)}
+              </div>
+            </div>
+          )}
+
+          {dmChannels.length > 0 && (
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground px-2 mb-1">{t("Direct messages", "Messages directs")}</div>
+              <div className="space-y-0.5">
+                {dmChannels.map((c) => <Row key={c.id} c={c} label={dmLabel(c)} icon={<AtSign className="h-3.5 w-3.5" />} />)}
+              </div>
+            </div>
+          )}
         </div>
       </ScrollArea>
     </aside>
