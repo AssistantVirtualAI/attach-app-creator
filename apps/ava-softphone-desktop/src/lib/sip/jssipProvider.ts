@@ -483,35 +483,37 @@ class JsSipProvider {
 
       ua.on('connecting', () => {
         this.logEvent('info', 'WebSocket connecting…');
-        this.update({ status: 'connecting' });
+        this.setStatus('connecting');
       });
       ua.on('connected', () => {
         this.logEvent('info', 'WebSocket connected ✓');
-        this.update({ status: 'connected' });
+        this.setStatus('connected');
       });
       ua.on('disconnected', (e: any) => {
         const cause = e?.code ? `code=${e.code} reason=${e.reason || ''}` : (e?.reason || 'unknown');
-        this.logEvent('warn', `Disconnected (${cause}) — reconnecting in 5s`);
-        this.update({ status: 'disconnected', errorCause: cause });
+        this.logEvent('warn', `Disconnected (${cause}) — silent reconnect in 1s`);
+        this.setStatus('disconnected', cause);
         if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
         this.reconnectTimer = setTimeout(() => {
           this.logEvent('info', 'Reconnect attempt…');
           try { ua.start(); } catch { /* noop */ }
-        }, 5000);
+        }, 1000);
       });
       ua.on('registered', () => {
         this.logEvent('info', 'Registered ✓');
-        this.update({ status: 'registered', errorCause: undefined });
+        this.setStatus('registered');
       });
       ua.on('unregistered', () => {
-        this.logEvent('warn', 'Unregistered');
+        this.logEvent('warn', 'Unregistered — keep-alive will re-register');
+        // Don't downgrade status; keep-alive will re-register on the next tick.
+        try { ua.register(); } catch { /* noop */ }
       });
       ua.on('registrationFailed', (e: any) => {
         const code = e?.response?.status_code;
         const reason = e?.response?.reason_phrase || e?.cause || 'registration failed';
         const detail = code ? `${code} ${reason}` : reason;
         this.logEvent('error', `Registration failed: ${detail}`);
-        this.update({ status: 'error', errorCause: detail });
+        this.setStatus('error', detail);
       });
       ua.on('newRTCSession', (e: any) => this.attachSession(e.session, e.originator));
 
@@ -523,10 +525,12 @@ class JsSipProvider {
         throw startErr;
       }
       this.ua = ua;
-      this.update({ status: 'connecting' });
+      this.setStatus('connecting');
+      this.bindWindowListeners();
+      this.startKeepAlive();
     } catch (err: any) {
       this.logEvent('error', `Init exception: ${String(err?.message || err)}`);
-      this.update({ status: 'error', errorCause: String(err?.message || err) });
+      this.setStatus('error', String(err?.message || err));
     }
   }
 
