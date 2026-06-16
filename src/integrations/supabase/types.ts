@@ -6879,9 +6879,69 @@ export type Database = {
         }
         Relationships: []
       }
+      pbx_voicemail_greeting_attempts: {
+        Row: {
+          attempt_number: number
+          duration_ms: number | null
+          error_message: string | null
+          error_payload: Json | null
+          finished_at: string | null
+          greeting_id: string
+          http_status: number | null
+          id: string
+          organization_id: string
+          request_id: string | null
+          started_at: string
+          status: string
+          user_id: string
+          voice_id: string | null
+        }
+        Insert: {
+          attempt_number?: number
+          duration_ms?: number | null
+          error_message?: string | null
+          error_payload?: Json | null
+          finished_at?: string | null
+          greeting_id: string
+          http_status?: number | null
+          id?: string
+          organization_id: string
+          request_id?: string | null
+          started_at?: string
+          status: string
+          user_id: string
+          voice_id?: string | null
+        }
+        Update: {
+          attempt_number?: number
+          duration_ms?: number | null
+          error_message?: string | null
+          error_payload?: Json | null
+          finished_at?: string | null
+          greeting_id?: string
+          http_status?: number | null
+          id?: string
+          organization_id?: string
+          request_id?: string | null
+          started_at?: string
+          status?: string
+          user_id?: string
+          voice_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pbx_voicemail_greeting_attempts_greeting_id_fkey"
+            columns: ["greeting_id"]
+            isOneToOne: false
+            referencedRelation: "pbx_voicemail_greetings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pbx_voicemail_greetings: {
         Row: {
           attempts: number
+          canceled_at: string | null
           created_at: string
           duration_seconds: number | null
           error_message: string | null
@@ -6902,6 +6962,7 @@ export type Database = {
         }
         Insert: {
           attempts?: number
+          canceled_at?: string | null
           created_at?: string
           duration_seconds?: number | null
           error_message?: string | null
@@ -6922,6 +6983,7 @@ export type Database = {
         }
         Update: {
           attempts?: number
+          canceled_at?: string | null
           created_at?: string
           duration_seconds?: number | null
           error_message?: string | null
