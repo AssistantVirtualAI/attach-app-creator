@@ -362,7 +362,19 @@ function QueueDialog({ mode, queue, trigger }: { mode: 'create' | 'edit'; queue?
               </Select>
             </div>
             <div><Label>Caller ID prefix</Label><Input value={form.queue_cid_prefix} onChange={(e) => setForm({ ...form, queue_cid_prefix: e.target.value })} placeholder="e.g. [Sales]" /></div>
-            <div><Label>Music on hold</Label><Input value={form.queue_moh_sound} onChange={(e) => setForm({ ...form, queue_moh_sound: e.target.value })} /></div>
+            <div>
+              <div className="flex items-center justify-between"><Label>Music on hold</Label>
+                <button type="button" className="text-[10px] underline text-muted-foreground" onClick={syncMoh} disabled={mohLoading}>{mohLoading ? 'Syncing…' : 'Sync from PBX'}</button>
+              </div>
+              <Select value={form.queue_moh_sound} onValueChange={(v) => setForm({ ...form, queue_moh_sound: v })}>
+                <SelectTrigger><SelectValue placeholder="Choose music on hold" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="$${hold_music}">Default ($${'{'}hold_music{'}'})</SelectItem>
+                  <SelectItem value="local_stream://default">Local stream (default)</SelectItem>
+                  {moh.map((m) => <SelectItem key={m.name} value={m.path || m.name}>{m.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="col-span-2"><Label>Description</Label><Textarea value={form.queue_description} onChange={(e) => setForm({ ...form, queue_description: e.target.value })} rows={2} /></div>
           </div>
 
