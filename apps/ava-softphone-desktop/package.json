@@ -17,6 +17,8 @@
     "build:linux": "vite build && tsc -p electron/tsconfig.json && electron-builder --linux",
     "dist": "npm run build",
     "smoke": "node scripts/smoke-electron.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "test:e2e": "playwright test"
   },
   "dependencies": {
