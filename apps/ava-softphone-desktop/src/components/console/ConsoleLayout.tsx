@@ -72,8 +72,8 @@ export default function ConsoleLayout({
   const [syncNote, setSyncNote] = useState<string | null>(null);
   const [compact, setCompact] = useState(() => typeof window !== 'undefined' && window.innerWidth < 640);
   const [tourOpen, setTourOpen] = useState(false);
-  const { isAdmin, isSuperAdmin } = useDesktopRole();
   const { orgId, orgName } = useTenant();
+  const { isAdmin, isSuperAdmin, isSupervisor } = useDesktopRole(orgId);
   useRealtimeSync(orgId);
 
   // Redirect non-admins away from admin-only views
