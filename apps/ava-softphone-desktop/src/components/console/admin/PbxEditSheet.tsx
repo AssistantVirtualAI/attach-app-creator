@@ -250,7 +250,7 @@ function TtsGreetingField({ value, onChange, field, fullForm }: {
 }
 
 export default function PbxEditSheet({
-  title, groups, initial, baseline, saving, width = 620, onCancel, onSave,
+  title, groups, initial, baseline, rules, saving, width = 620, onCancel, onSave,
 }: Props) {
   const [form, setForm] = useState<any>(initial || {});
   const [dirty, setDirty] = useState(false);
