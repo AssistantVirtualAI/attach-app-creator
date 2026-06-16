@@ -20,14 +20,19 @@ function detectSoftphonePlatform(): "app" | "desktop" | "mobile" {
 }
 
 function buildConfig(raw: any): SoftphoneConfig {
+  const extension = raw.extension;
+  const sipDomain = raw.sipDomain || raw.sip_domain || "lemtel.lemtel.tel";
   return {
-    extension: raw.extension,
-    displayName: raw.displayName || raw.display_name || raw.extension,
-    sipDomain: raw.sipDomain || raw.sip_domain || "lemtel.lemtel.tel",
+    extension,
+    displayName: raw.displayName || raw.display_name || extension,
+    sipDomain,
     wssUrl: raw.wssUrl || raw.wss_url || "wss://lemtel.lemtel.tel:7443",
     wssUrls: raw.wssUrls || raw.wss_urls || [],
     password: raw.password || raw.sip_password || "",
     mock: !!raw.mock,
+    passwordSource: raw.passwordSource || raw.password_source || undefined,
+    sipUri: raw.sipUri || raw.sip_uri || (extension ? `sip:${extension}@${sipDomain}` : undefined),
+    authUsername: raw.authUsername || raw.auth_username || extension,
   };
 }
 

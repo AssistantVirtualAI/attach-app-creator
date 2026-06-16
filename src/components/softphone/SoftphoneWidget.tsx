@@ -79,6 +79,7 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
   const [shake, setShake] = useState(false);
   const [relinking, setRelinking] = useState(false);
   const [showInsights, setShowInsights] = useState(true);
+  const [showCredInspector, setShowCredInspector] = useState(false);
 
   useEffect(() => { sp.setAudioEl(audioRef.current); }, [sp]);
 
@@ -461,6 +462,63 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
           )}
         </div>
       )}
+
+      {/* SIP credential inspector */}
+      <div className="rounded-md border border-border/60 bg-muted/30 text-[11px] overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setShowCredInspector((v) => !v)}
+          className="w-full flex items-center justify-between px-2.5 py-1.5 hover:bg-muted/60 transition"
+          aria-expanded={showCredInspector}
+        >
+          <span className="flex items-center gap-1.5 font-medium">
+            <Settings className="w-3 h-3" /> SIP credential inspector
+          </span>
+          <ChevronDown className={cn("w-3 h-3 transition-transform", showCredInspector && "rotate-180")} />
+        </button>
+        {showCredInspector && (
+          <dl className="px-2.5 py-2 space-y-1.5 border-t border-border/60">
+            <div className="flex items-start justify-between gap-2">
+              <dt className="text-muted-foreground shrink-0">SIP URI</dt>
+              <dd className="font-mono text-right break-all">
+                {sp.config?.sipUri || (sp.config?.extension ? `sip:${sp.config.extension}@${sp.config.sipDomain}` : "—")}
+              </dd>
+            </div>
+            <div className="flex items-start justify-between gap-2">
+              <dt className="text-muted-foreground shrink-0">Auth username</dt>
+              <dd className="font-mono text-right break-all">{sp.config?.authUsername || sp.config?.extension || "—"}</dd>
+            </div>
+            <div className="flex items-start justify-between gap-2">
+              <dt className="text-muted-foreground shrink-0">Domain</dt>
+              <dd className="font-mono text-right break-all">{sp.config?.sipDomain || "—"}</dd>
+            </div>
+            <div className="flex items-start justify-between gap-2">
+              <dt className="text-muted-foreground shrink-0">WSS</dt>
+              <dd className="font-mono text-right break-all text-[10px]">{sp.config?.wssUrl || "—"}</dd>
+            </div>
+            <div className="flex items-start justify-between gap-2">
+              <dt className="text-muted-foreground shrink-0">Password</dt>
+              <dd className="font-mono text-right">
+                {sp.config?.password
+                  ? `•••• (${sp.config.password.length} chars)`
+                  : <span className="text-rose-500">missing</span>}
+              </dd>
+            </div>
+            <div className="flex items-start justify-between gap-2">
+              <dt className="text-muted-foreground shrink-0">Password source</dt>
+              <dd className="text-right">
+                <Badge variant="outline" className="text-[10px] font-normal">
+                  {sp.config?.passwordSource || "unknown"}
+                </Badge>
+              </dd>
+            </div>
+            <div className="flex items-start justify-between gap-2">
+              <dt className="text-muted-foreground shrink-0">Registration</dt>
+              <dd className="text-right capitalize">{sipStatus}{sp.snap.errorCause ? ` · ${sp.snap.errorCause}` : ""}</dd>
+            </div>
+          </dl>
+        )}
+      </div>
       <div className={cn(
         "h-14 rounded-lg bg-muted/40 flex items-center justify-center font-mono text-2xl tabular-nums px-3 truncate",
         shake && "animate-[shake_0.4s]",
