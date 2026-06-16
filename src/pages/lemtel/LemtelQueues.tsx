@@ -957,48 +957,26 @@ function MembersTable({ queueId, queueName, supervisors, agents, canAssign, onRe
           </p>
         ) : (
           <>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  {canAssign && <TableHead className="w-8"><Checkbox checked={allSelected} onCheckedChange={toggleAll} /></TableHead>}
-                  <TableHead className="cursor-pointer select-none" onClick={() => toggleSort('name')}>Name{sortIcon('name')}</TableHead>
-                  <TableHead className="cursor-pointer select-none" onClick={() => toggleSort('extension')}>Extension{sortIcon('extension')}</TableHead>
-                  <TableHead className="cursor-pointer select-none" onClick={() => toggleSort('role')}>Role{sortIcon('role')}</TableHead>
-                  <TableHead className="cursor-pointer select-none" onClick={() => toggleSort('tier')}>Tier / Pos{sortIcon('tier')}</TableHead>
-                  {canAssign && <TableHead className="w-16"></TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paged.map((a: any) => (
-                  <TableRow key={a.id} data-state={selected[a.id] ? 'selected' : undefined}>
-                    {canAssign && (
-                      <TableCell><Checkbox checked={!!selected[a.id]} onCheckedChange={(v) => setSelected({ ...selected, [a.id]: !!v })} /></TableCell>
-                    )}
-                    <TableCell className="font-medium">{a.agent_name}</TableCell>
-                    <TableCell className="font-mono text-xs">{a.agent_id}</TableCell>
-                    <TableCell>
-                      <Badge variant={a._role === 'supervisor' ? 'default' : 'secondary'}>
-                        {a._role === 'supervisor' ? <Shield className="w-3 h-3 mr-1" /> : <Users className="w-3 h-3 mr-1" />}
-                        {a._role}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">T{a.tier_level} · #{a.tier_position}</TableCell>
-                    {canAssign && (
-                      <TableCell>
-                        <Button size="sm" variant="ghost" onClick={() => onRemoveOne(a)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
-                      </TableCell>
-                    )}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <VirtualMembersTable
+              rows={paged}
+              canAssign={canAssign}
+              selected={selected}
+              setSelected={setSelected}
+              onRemoveOne={onRemoveOne}
+              allSelected={allSelected}
+              toggleAll={toggleAll}
+              sortKey={sortKey}
+              sortDir={sortDir}
+              toggleSort={toggleSort}
+              sortIcon={sortIcon}
+            />
             <div className="flex items-center justify-between mt-3 text-xs text-muted-foreground flex-wrap gap-2">
-              <div>{filtered.length} member{filtered.length === 1 ? '' : 's'} · page {curPage + 1}/{totalPages}</div>
+              <div>{filtered.length} member{filtered.length === 1 ? '' : 's'} · page {curPage + 1}/{totalPages} <span className="opacity-60">(virtualized)</span></div>
               <div className="flex items-center gap-2">
                 <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setPage(0); }}>
                   <SelectTrigger className="h-8 w-20"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {[10, 25, 50, 100].map((n) => <SelectItem key={n} value={String(n)}>{n}</SelectItem>)}
+                    {[10, 25, 50, 100, 250, 500].map((n) => <SelectItem key={n} value={String(n)}>{n}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Button size="sm" variant="outline" className="h-8" disabled={curPage === 0} onClick={() => setPage(curPage - 1)}><ChevronLeft className="w-4 h-4" /></Button>
