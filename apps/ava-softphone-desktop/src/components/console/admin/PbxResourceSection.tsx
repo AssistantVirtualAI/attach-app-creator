@@ -3,6 +3,8 @@ import { theme } from '../../../lib/theme';
 import { supabase } from '../../../lib/supabaseClient';
 import { getMeContext } from '../../../lib/avaApi';
 import PbxEditSheet, { FieldGroup } from './PbxEditSheet';
+import ConflictMergeDialog, { ConflictField } from './ConflictMergeDialog';
+import type { RuleMap } from '../../../lib/pbxValidators';
 
 const { colors: c } = theme;
 const LEMTEL_ORG = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
