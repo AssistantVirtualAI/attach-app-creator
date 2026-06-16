@@ -811,18 +811,20 @@ function Dialer({
         textAlign: 'center', minHeight: 64,
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4,
       }}>
-        <div style={{
-          fontFamily: 'JetBrains Mono, Menlo, monospace',
-          fontSize: compact ? 24 : 30, letterSpacing: compact ? 1.5 : 3, fontWeight: 500,
-          color: dial ? c.textIce : c.textDim,
-          textShadow: dial ? '0 0 22px rgba(255,215,0,0.35)' : 'none',
-          minHeight: 36,
-          maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>
+        <div
+          className="ava-display-num"
+          style={{
+            fontSize: compact ? 26 : 32, letterSpacing: compact ? 0.4 : 0.8, fontWeight: 600,
+            lineHeight: 1.05,
+            color: dial ? c.textIce : c.textDim,
+            textShadow: dial ? '0 0 22px rgba(33,212,253,0.30)' : 'none',
+            minHeight: 36,
+            maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
           {dial || 'Enter a number'}
         </div>
         {dial && (
-          <div style={{ fontSize: 10, color: c.signalGold, letterSpacing: 1.6, textTransform: 'uppercase', fontWeight: 700 }}>
+          <div style={{ fontSize: 9.5, color: c.signalGold, letterSpacing: '0.18em', textTransform: 'uppercase', fontWeight: 700, opacity: 0.92 }}>
             Ready to dial · ext {extension}
           </div>
         )}
@@ -849,8 +851,8 @@ function Dialer({
               willChange: 'transform',
             }}
           >
-            <span style={{ fontSize: compact ? 22 : 24, fontWeight: 500, letterSpacing: 0.5 }}>{key}</span>
-            {sub && <span style={{ fontSize: 9, color: 'rgba(159,179,214,0.55)', letterSpacing: 2, fontWeight: 700 }}>{sub}</span>}
+            <span className="ava-display-num" style={{ fontSize: compact ? 23 : 26, fontWeight: 600, letterSpacing: '-0.01em', lineHeight: 1 }}>{key}</span>
+            {sub && <span style={{ fontSize: 8.5, color: 'rgba(159,179,214,0.72)', letterSpacing: '0.22em', fontWeight: 700, marginTop: 2 }}>{sub}</span>}
           </button>
         ))}
       </div>
@@ -863,7 +865,7 @@ function Dialer({
           style={{
             background: 'none', border: 'none',
             color: dial ? c.textSub : 'transparent',
-            fontSize: 11, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase',
+            fontSize: 10.5, fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase',
             cursor: dial ? 'pointer' : 'default', padding: 8, width: 56,
             transition: 'color 120ms ease',
           }}
@@ -1013,15 +1015,15 @@ function ActiveCall({
         display: 'inline-flex', alignItems: 'center', gap: 6,
         padding: '3px 10px', borderRadius: 999,
         background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.35)',
-        color: c.green, fontSize: 10, letterSpacing: 0.8, textTransform: 'uppercase',
+        color: c.green, fontSize: 9.5, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase',
         boxShadow: glow.green, marginBottom: 6,
       }}>
         <span style={{ width: 6, height: 6, borderRadius: '50%', background: c.green }} />
         {sp.snap.onHold ? 'On Hold' : 'Active Call'}
       </div>
-      <div style={{
-        fontFamily: 'JetBrains Mono, Menlo, monospace', fontSize: 22, fontWeight: 500,
-        color: c.gold, letterSpacing: 2, marginBottom: 4,
+      <div className="ava-display-num" style={{
+        fontSize: 26, fontWeight: 600,
+        color: c.gold, letterSpacing: '0.04em', marginBottom: 4, lineHeight: 1,
       }}>{timer}</div>
       <div style={{
         fontSize: 10, color: c.textSub, letterSpacing: 0.6,
