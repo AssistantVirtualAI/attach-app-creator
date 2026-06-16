@@ -441,19 +441,47 @@ export default function ProfileMenu() {
           {(Object.keys(STATUS_META) as Status[]).map((s) => {
             const m = STATUS_META[s];
             const active = s === status;
+            const isPending = pendingStatus === s;
+            const presets = LONG_STATUSES.includes(s) ? LONG_PRESETS : DURATION_PRESETS;
+            const needsDuration = TEMP_STATUSES.includes(s) || LONG_STATUSES.includes(s);
             return (
-              <button
-                key={s}
-                onClick={() => applyStatus(s)}
-                disabled={inCall}
-                title={inCall ? "Indisponible pendant un appel actif" : ''}
-                style={{ ...menuItem(active), opacity: inCall ? 0.5 : 1, cursor: inCall ? 'not-allowed' : 'pointer' }}
-              >
-                <span style={{ width: 8, height: 8, borderRadius: '50%', background: m.color, boxShadow: `0 0 8px ${m.color}` }} />
-                <span aria-hidden style={{ fontSize: 13, width: 18, textAlign: 'center' }}>{m.icon}</span>
-                <span style={{ flex: 1, textAlign: 'left' }}>{m.label}</span>
-                {active && <span style={{ fontSize: 11, color: m.color }}>✓</span>}
-              </button>
+              <div key={s}>
+                <button
+                  onClick={() => pickStatus(s)}
+                  disabled={inCall}
+                  title={inCall ? "Indisponible pendant un appel actif" : ''}
+                  style={{ ...menuItem(active), opacity: inCall ? 0.5 : 1, cursor: inCall ? 'not-allowed' : 'pointer' }}
+                >
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: m.color, boxShadow: `0 0 8px ${m.color}` }} />
+                  <span aria-hidden style={{ fontSize: 13, width: 18, textAlign: 'center' }}>{m.icon}</span>
+                  <span style={{ flex: 1, textAlign: 'left' }}>{m.label}</span>
+                  {active && expiryAt && (
+                    <span style={{ fontSize: 9.5, color: c.textSub }}>
+                      until {new Date(expiryAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  )}
+                  {active && <span style={{ fontSize: 11, color: m.color, marginLeft: 4 }}>✓</span>}
+                </button>
+                {isPending && needsDuration && (
+                  <div style={{
+                    margin: '2px 4px 8px', padding: '8px', borderRadius: 8,
+                    background: 'rgba(15,23,42,0.04)', border: `1px dashed ${c.border}`,
+                  }}>
+                    <div style={{ fontSize: 9.5, fontWeight: 700, color: c.textSub, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 6 }}>
+                      How long?
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                      {presets.map((p) => (
+                        <button key={p.label} onClick={() => applyStatus(s, p.mins)} style={miniBtn}>
+                          {p.label}
+                        </button>
+                      ))}
+                      <button onClick={() => applyStatus(s)} style={miniBtn}>Until I change it</button>
+                      <button onClick={() => setPendingStatus(null)} style={{ ...miniBtn, opacity: 0.7 }}>Cancel</button>
+                    </div>
+                  </div>
+                )}
+              </div>
             );
           })}
 
