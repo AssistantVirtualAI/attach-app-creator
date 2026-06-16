@@ -244,7 +244,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const LemtelAdminPage = ({ children }: { children: React.ReactNode }) => (
-  <ProtectedRoute><LemtelGuard><AdminPortalLayout>{children}</AdminPortalLayout></LemtelGuard></ProtectedRoute>
+  <ProtectedRoute><LemtelGuard><ImpersonationProvider><AdminPortalLayout>{children}</AdminPortalLayout></ImpersonationProvider></LemtelGuard></ProtectedRoute>
 );
 
 const LemtelUserPage = ({ children }: { children: React.ReactNode }) => (
