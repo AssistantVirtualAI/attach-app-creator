@@ -700,7 +700,7 @@ function MetricDetailDrawer(props: {
               <span style={{ fontSize: 12, fontWeight: 500 }}>{error}</span>
               <button onClick={load} className="ava-drawer-close" style={{
                 padding: '6px 12px', borderRadius: 8, border: `1px solid ${tones.red.ring}`,
-                background: '#fff', color: c.danger, fontWeight: 700, fontSize: 12, cursor: 'pointer',
+                background: c.bgCard, color: c.danger, fontWeight: 700, fontSize: 12, cursor: 'pointer',
               }}>Retry</button>
             </div>
           ) : !rows || rows.length === 0 ? (
