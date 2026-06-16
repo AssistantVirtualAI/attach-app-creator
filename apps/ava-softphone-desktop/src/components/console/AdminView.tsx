@@ -921,11 +921,12 @@ function QueuesTable() {
         {!loading && error && <div style={{ padding: 28, textAlign: 'center', color: c.danger, fontSize: 12 }}>{error}</div>}
       </div>
       {editing && <EditQueueModal queue={editing} saving={saving} onClose={() => setEditing(null)} onSave={(changes) => save(editing, changes)} />}
-      {creating && (
+      {creating && isAdmin && (
         <PbxEditSheet
           title="New Call Queue"
           groups={QUEUE_GROUPS}
           initial={{ queue_enabled: 'true', queue_strategy: 'ring-all', queue_max_wait_time: 60 }}
+          rules={QUEUE_RULES}
           saving={saving}
           width={680}
           onCancel={() => setCreating(false)}
