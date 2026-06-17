@@ -47,12 +47,13 @@ export default function MobilePreview() {
     iframeRef.current?.contentWindow?.postMessage({ source: 'ava-preview', ...msg }, '*');
   };
 
+  useEffect(() => {
+    document.title = 'Mobile Preview — AVA Softphone';
+  }, []);
+
   return (
     <div className="min-h-screen bg-background p-6">
-      <Helmet>
-        <title>Mobile Preview — AVA Softphone</title>
-        <meta name="description" content="Live in-browser preview of the AVA Softphone mobile app inside a phone frame." />
-      </Helmet>
+
 
       <div className="max-w-7xl mx-auto space-y-4">
         <header>
