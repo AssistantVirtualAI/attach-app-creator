@@ -347,7 +347,8 @@ export default function PbxEditSheet({
     if (!baseline || typeof baseline !== 'object') return [];
     const out: { key: string; label: string; section: string }[] = [];
     for (const g of groups) for (const f of g.fields) {
-      if (f.type === 'tts-greeting') continue;
+      if (f.type === 'tts-greeting' || f.type === 'queue-agents') continue;
+      if (f.virtual) continue;
       if (!(f.key in baseline)) out.push({ key: f.key, label: f.label, section: g.section });
     }
     return out;
