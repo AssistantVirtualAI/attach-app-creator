@@ -2242,6 +2242,25 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (action === "refresh-extension-registration") {
+      const extension = String(params.extension || body.extension || "").trim();
+      const domainName = String(params.domain_name || body.domain_name || "lemtel.lemtel.tel").trim();
+      const profileName = String(params.profile_name || body.profile_name || "internal").trim();
+      if (!extension) return json({ error: "extension required" }, 400);
+      const reload = await pbxWrite(`commands`, "POST", { commands: [{ command: "reloadxml", arguments: "" }] });
+      const flush = await pbxWrite(`commands`, "POST", {
+        commands: [{ command: "sofia", arguments: `profile ${profileName} flush_inbound_reg ${extension}@${domainName}` }],
+      });
+      if (organization_id) {
+        await admin.from("audit_logs").insert({
+          organization_id, user_id: userId, action: "pbx.extension_registration_refreshed",
+          resource_type: "pbx_extension", resource_id: extension,
+          metadata: { extension, domain_name: domainName, profile_name: profileName, reload_ok: reload?.ok, flush_ok: flush?.ok },
+        });
+      }
+      return json({ ok: !!reload?.ok && !!flush?.ok, reload, flush });
+    }
+
     // ---- Gateway restart (FreeSWITCH command via API) ----
     if (action === "restart-gateway") {
       const name = params.gateway_name;
