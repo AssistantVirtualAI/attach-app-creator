@@ -110,6 +110,18 @@ Deno.serve(async (req) => {
     if (!mode && Array.isArray(messages) && messages.length) {
       const apiKey = Deno.env.get("LOVABLE_API_KEY");
       if (!apiKey) return json({ error: "ai_not_configured" }, 500);
+
+      // Determine if the user is allowed to auto-execute (super_admin or org_admin)
+      let canExecute = isSuper;
+      if (!canExecute) {
+        const { data: hasOrgAdmin } = await admin.rpc("has_role", { _user_id: userId, _org_id: orgId, _role: "org_admin" });
+        canExecute = !!hasOrgAdmin;
+      }
+      if (!canExecute) {
+        const { data: isLemAdmin } = await admin.rpc("is_lemtel_admin", { _user_id: userId });
+        canExecute = !!isLemAdmin;
+      }
+
       const [callsRes, extRes, queuesRes, ivrsRes, vmRes, smsRes, usersRes, insightsRes, recRes, ringRes, gwRes] = await Promise.all([
         admin.from("pbx_call_records")
           .select("start_at,direction,caller_number,destination_number,duration_seconds,call_status,missed_call,extension")
@@ -148,15 +160,23 @@ Deno.serve(async (req) => {
           ? m.content
           : (Array.isArray(m.parts) ? m.parts.map((p: any) => p?.text ?? "").join("") : ""),
       }));
+
+      const sysPrompt = canExecute
+        ? `You are AVA, a telecom assistant for AVA Statistic. The user is an ADMIN and you can EXECUTE changes directly. Respond ONLY with valid JSON of the shape:
+{
+  "answer": "short reply in user's language",
+  "action": null | { "table": "pbx_extensions"|"pbx_call_queues"|"pbx_ivrs"|"pbx_ring_groups"|"business_hour_schedules"|"holiday_schedules"|"pbx_call_forwarding"|"pbx_voicemail_settings", "operation": "insert"|"update"|"delete", "row": {...}, "where": {...} }
+}
+Rules: NEVER include organization_id (added server-side). For destructive deletes set "action": null and ask for explicit confirmation in "answer". If unclear, set "action": null and ask a clarifying question. For pure questions, set "action": null and put the answer in "answer". DATA:\n\n${sysContext}`
+        : `You are AVA, a helpful telecom assistant for AVA Statistic. The user is NOT an admin — never claim to have made changes. Answer concisely in the user's language using the data below.\n\n${sysContext}`;
+
       const r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
         body: JSON.stringify({
           model: "google/gemini-2.5-flash",
-          messages: [
-            { role: "system", content: `You are AVA, a helpful telecom assistant for the AVA Statistic platform. Answer concisely in the user's language. You have full read access to this organization's phone system data below, and you can PROPOSE changes (extensions, queues, IVRs, ring groups, business hours, holidays) which an admin then confirms in the Admin tab. Use the data below to answer questions about users, extensions, queues, IVRs, voicemails, SMS, and call history.\n\n${sysContext}` },
-            ...flatMessages,
-          ],
+          messages: [{ role: "system", content: sysPrompt }, ...flatMessages],
+          ...(canExecute ? { response_format: { type: "json_object" } } : {}),
         }),
       });
       if (!r.ok) {
@@ -166,8 +186,66 @@ Deno.serve(async (req) => {
         return json({ error: "ai_failed", detail: t.slice(0, 300) }, 500);
       }
       const j = await r.json();
-      return json({ response: j.choices?.[0]?.message?.content ?? "" });
+      const raw = j.choices?.[0]?.message?.content ?? "";
+
+      if (!canExecute) return json({ response: raw });
+
+      // Parse JSON & execute action if present
+      let parsed: any = {};
+      try { parsed = JSON.parse(raw); } catch { return json({ response: raw }); }
+      const answer = parsed.answer ?? "";
+      const action = parsed.action;
+      if (!action || !action.operation || !action.table) return json({ response: answer || "(no response)" });
+
+      const allowed = new Set([
+        "business_hour_schedules", "holiday_schedules",
+        "pbx_extensions", "pbx_call_queues", "pbx_ivrs", "pbx_ring_groups",
+        "pbx_call_forwarding", "pbx_voicemail_settings",
+      ]);
+      if (!allowed.has(action.table)) {
+        return json({ response: `${answer}\n\n⚠ Cannot modify ${action.table}.` });
+      }
+
+      let execResult: any = null;
+      let execError: string | null = null;
+      try {
+        if (action.operation === "insert") {
+          const row = { ...(action.row || {}), organization_id: orgId };
+          const { data, error } = await admin.from(action.table).insert(row).select("*").single();
+          if (error) throw error;
+          execResult = data;
+        } else if (action.operation === "update") {
+          const where = { ...(action.where || {}), organization_id: orgId };
+          let q = admin.from(action.table).update(action.row || {});
+          for (const [k, v] of Object.entries(where)) q = q.eq(k, v as any);
+          const { data, error } = await q.select("*");
+          if (error) throw error;
+          execResult = data;
+        } else if (action.operation === "delete") {
+          const where = { ...(action.where || {}), organization_id: orgId };
+          let q = admin.from(action.table).delete();
+          for (const [k, v] of Object.entries(where)) q = q.eq(k, v as any);
+          const { data, error } = await q.select("*");
+          if (error) throw error;
+          execResult = data;
+        }
+      } catch (e: any) {
+        execError = e?.message || String(e);
+      }
+
+      await admin.from("audit_logs").insert({
+        organization_id: orgId, user_id: userId,
+        action: `ai_admin.${action.operation}`,
+        resource_type: action.table,
+        metadata: { source: "ai_admin_chat_auto", action, result: execResult, error: execError },
+      });
+
+      const successMsg = execError
+        ? `${answer}\n\n❌ Execution failed: ${execError}`
+        : `${answer}\n\n✅ Done — ${action.operation} on ${action.table} executed.`;
+      return json({ response: successMsg, executed: !execError, action, result: execResult });
     }
+
 
 
 
