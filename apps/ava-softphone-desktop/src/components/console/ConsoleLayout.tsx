@@ -21,6 +21,8 @@ import QueuesView from './QueuesView';
 import AuditView from './AuditView';
 import SyncStatusView from './SyncStatusView';
 import SoftphonePane from '../SoftphonePane';
+import CallControlGrid from '../CallControlGrid';
+import RecentsList from '../RecentsList';
 import SettingsPage from '../SettingsPage';
 import { AppErrorBoundary } from '../AppErrorBoundary';
 import IncomingCallToast from './IncomingCallToast';
