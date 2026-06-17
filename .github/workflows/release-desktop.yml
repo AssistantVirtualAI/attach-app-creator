@@ -8,6 +8,8 @@ on:
 jobs:
   build-mac:
     runs-on: self-hosted
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -22,16 +24,16 @@ jobs:
       - name: Package Mac
         working-directory: apps/ava-softphone-desktop
         run: npx electron-builder --mac --arm64 --x64 --publish never
+      - name: List dist files
+        working-directory: apps/ava-softphone-desktop
+        run: ls -la dist-electron/*.dmg dist-electron/*.zip 2>/dev/null
       - name: Create GitHub Release
         working-directory: apps/ava-softphone-desktop
         run: |
           gh release create ${{ github.ref_name }} \
             --title "Lemtel Telecom ${{ github.ref_name }}" \
             --notes "Release ${{ github.ref_name }}" \
-            --latest 2>/dev/null || true
-          gh release upload ${{ github.ref_name }} \
-            dist-electron/*.dmg \
-            dist-electron/*.zip \
-            --clobber 2>/dev/null || true
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            --latest || true
+          for f in dist-electron/*.dmg dist-electron/*.zip; do
+            gh release upload ${{ github.ref_name }} "$f" --clobber || true
+          done
