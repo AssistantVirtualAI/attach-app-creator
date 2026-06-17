@@ -791,7 +791,7 @@ export default function SoftphonePane({
    Sub-components
    ============================================================ */
 
-function Dialer({
+const Dialer = React.memo(function Dialer({
   dial, setDial, dialKeys, onCall, canCall, sipRegistered = true, extension, compact = false, ultraCompact = false,
 }: {
   dial: string; setDial: (s: string | ((p: string) => string)) => void;
@@ -799,6 +799,14 @@ function Dialer({
   sipRegistered?: boolean; extension: string;
   compact?: boolean; ultraCompact?: boolean;
 }) {
+  // Stable handlers so the memoized DialerKeypad below doesn't re-render
+  // on every keystroke (which was causing the wide-mode freeze).
+  const handleKey = useCallback((k: string) => setDial((p) => p + k), [setDial]);
+  const handleBackspace = useCallback(() => setDial((p) => p.slice(0, -1)), [setDial]);
+  const handleClear = useCallback(() => setDial(''), [setDial]);
+  const handleSubmit = useMemo(() => (canCall ? onCall : undefined), [canCall, onCall]);
+  const density = ultraCompact ? 'ultra' : compact ? 'compact' : 'spacious';
+
   return (
     <div style={{ animation: 'fadeIn .25s ease-out', padding: compact ? '2px 0 8px' : '4px 4px 8px', minWidth: 0 }}>
       <CallForwarding extension={extension} />
@@ -835,18 +843,18 @@ function Dialer({
 
       {/* Dialpad — locked baselines via DialerKeypad */}
       <div style={{ margin: compact ? '0 auto 16px' : '0 auto 26px', width: '100%' }}>
-        <DialerKeypad
-          density={ultraCompact ? 'ultra' : compact ? 'compact' : 'spacious'}
-          onKey={(k) => setDial((p) => p + k)}
-          onBackspace={() => setDial((p) => p.slice(0, -1))}
-          onSubmit={canCall ? onCall : undefined}
+        <MemoKeypad
+          density={density}
+          onKey={handleKey}
+          onBackspace={handleBackspace}
+          onSubmit={handleSubmit}
         />
       </div>
 
       {/* Action row */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 32 }}>
         <button
-          onClick={() => setDial('')}
+          onClick={handleClear}
           disabled={!dial}
           style={{
             background: 'none', border: 'none',
@@ -892,7 +900,7 @@ function Dialer({
         </button>
 
         <button
-          onClick={() => setDial((p) => p.slice(0, -1))}
+          onClick={handleBackspace}
           disabled={!dial}
           style={{
             background: 'none', border: 'none', color: dial ? c.textSub : 'transparent',
@@ -903,7 +911,12 @@ function Dialer({
       </div>
     </div>
   );
-}
+});
+
+// Memoized keypad — stable handler refs above keep this from re-rendering on
+// every parent state tick, which fixes the wide-screen dialer freeze.
+const MemoKeypad = React.memo(DialerKeypad);
+
 
 function CallingState({ who, onHangup }: { who: string; onHangup: () => void }) {
   return (
