@@ -66,45 +66,21 @@ export default function LemtelPortalCalls({ scope = 'org' }: { scope?: 'org' | '
   const analyze = async (call: any) => {
     const call_record_id = call.id;
     setAnalyzing(call_record_id);
-    try {
-      let transcript_text = '';
-
-      if (call.recording_url) {
-        const t = await supabase.functions.invoke('ai-transcribe-call', {
-          body: { call_record_id, recording_url: call.recording_url, organization_id: LEMTEL_ORG },
-        });
-        transcript_text =
-          (t.data as any)?.transcript_text ||
-          (t.data as any)?.transcript ||
-          (t.data as any)?.text || '';
-      }
-
-      if (!transcript_text) {
-        transcript_text = [
-          `CDR only call record.`,
-          `Direction: ${call.direction || 'unknown'}.`,
-          `Status: ${call.call_status || (call.missed_call ? 'missed' : 'unknown')}.`,
-          `From: ${call.caller_number || call.source_number || 'unknown'}.`,
-          `To: ${call.destination_number || call.destination || 'unknown'}.`,
-          `Duration: ${call.duration_seconds || 0} seconds.`,
-          `Started: ${call.start_at || 'unknown'}.`,
-          `Hangup cause: ${call.hangup_cause || 'unknown'}.`,
-        ].join('\n');
-      }
-
-      const a = await supabase.functions.invoke('ai-analyze-call', {
-        body: { call_record_id, transcript_text, organization_id: LEMTEL_ORG },
-      });
-      if (a.error || (a.data as any)?.error) throw new Error((a.data as any)?.error || a.error?.message || 'Analysis failed');
-
-      toast({ title: 'Analyzed' });
-      qc.invalidateQueries({ queryKey: ['pbx', 'pbx_call_records'] });
-    } catch (e: any) {
-      toast({ title: 'Analysis failed', description: e?.message, variant: 'destructive' });
-    } finally {
-      setAnalyzing(null);
-    }
+    setStages((s) => ({ ...s, [call_record_id]: { stage: 'downloading' } }));
+    const result = await runTranscribeAndAnalyze({
+      invoke: async (name, body) => await supabase.functions.invoke(name, { body }),
+      callRecordId: call_record_id,
+      organizationId: LEMTEL_ORG,
+      recordingUrl: call.recording_url || null,
+      onStage: (stage, detail) => setStages((s) => ({ ...s, [call_record_id]: { stage, detail } })),
+    });
+    if (result.stage === 'failed') toast({ title: 'Analysis failed', description: result.reason, variant: 'destructive' });
+    else if (result.stage === 'unavailable') toast({ title: 'Recording unavailable', description: result.reason || 'Audio could not be retrieved' });
+    else toast({ title: 'Analyzed' });
+    qc.invalidateQueries({ queryKey: ['pbx', 'pbx_call_records'] });
+    setAnalyzing(null);
   };
+
 
   const playRecording = async (c: any) => {
     setPlayingId(c.id); setAudioUrl(null);
