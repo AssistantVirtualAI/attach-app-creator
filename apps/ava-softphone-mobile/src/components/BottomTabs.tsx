@@ -1,15 +1,15 @@
 import React from 'react';
 import { colors, font, gradients, radius, shadow } from '../lib/theme';
 
-export type Tab = 'home' | 'calls' | 'ava' | 'queues' | 'more';
+export type Tab = 'home' | 'calls' | 'ava' | 'messages' | 'more';
 
 const SIDE: { id: Tab; label: string; icon: string }[] = [
   { id: 'home',   label: 'Home',   icon: '⌂' },
   { id: 'calls',  label: 'Calls',  icon: '☎' },
 ];
 const SIDE_RIGHT: { id: Tab; label: string; icon: string }[] = [
-  { id: 'queues', label: 'Queues', icon: '⇉' },
-  { id: 'more',   label: 'More',   icon: '⋯' },
+  { id: 'messages', label: 'Messages', icon: '✉' },
+  { id: 'more',     label: 'More',     icon: '⋯' },
 ];
 
 export default function BottomTabs({
