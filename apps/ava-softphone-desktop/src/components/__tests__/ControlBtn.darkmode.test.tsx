@@ -53,9 +53,9 @@ describe('ControlBtn — dark mode visibility (active)', () => {
   it.each(LABELS)('%s active state uses accent tint, not white-on-white', (label) => {
     render(<ControlBtn icon="•" label={label} onClick={() => {}} active danger={label === 'Mute'} warning={label === 'Hold'} />);
     const btn = screen.getByRole('button', { name: label });
-    // color-mix accent tint applied on top of themed surface, never raw white.
+    // color-mix accent tint applied on top of the themed surface var.
     expect(btn.style.background).toContain('color-mix');
-    expect(btn.style.background).not.toMatch(/rgba\(255,\s*255,\s*255,\s*0?\.9/);
+    expect(btn.style.background).toContain('--ava-surface-elev');
     expect(btn).toHaveAttribute('aria-pressed', 'true');
   });
 });
