@@ -279,6 +279,7 @@ function ForgotPasswordScreen({ initialEmail, accent, onBack }: { initialEmail: 
 
   return (
     <div style={wrap}>
+      <AccentSwitch accent={accent} readOnly />
       <GoldGlow />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 20px', position: 'relative', zIndex: 1 }}>
         <Brand />
