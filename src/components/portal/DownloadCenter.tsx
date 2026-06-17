@@ -6,7 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { QRCodeSVG } from 'qrcode.react';
 import { supabase } from '@/integrations/supabase/client';
 
-const GH_REPO = 'lemtel-telecom/desktop-releases';
+const GH_REPO = 'AssistantVirtualAI/attach-app-creator';
 
 function fmtSize(b?: number) {
   if (!b) return '';
@@ -59,11 +59,30 @@ export function DownloadCenter({ personalize = false }: { personalize?: boolean 
   const assetsList: any[] = Array.isArray((release as any)?.assets) ? (release as any).assets : [];
   const findAsset = (suffix: string) =>
     assetsList.find((a: any) => (a.name || '').toLowerCase().endsWith(suffix.toLowerCase()));
-  const macArm = platformUrls.mac_arm64 ? { name: 'macOS Apple Silicon', browser_download_url: platformUrls.mac_arm64, size: 0 } : findAsset('arm64.dmg');
-  const macX64 = platformUrls.mac_x64 ? { name: 'macOS Intel', browser_download_url: platformUrls.mac_x64, size: 0 } : findAsset('x64.dmg');
-  const win = platformUrls.windows ? { name: 'Windows', browser_download_url: platformUrls.windows, size: 0 } : findAsset('.exe');
-  const linux = platformUrls.linux ? { name: 'Linux', browser_download_url: platformUrls.linux, size: 0 } : findAsset('.AppImage');
+  const findAssetIntel = () =>
+    assetsList.find((a: any) => {
+      const n = (a.name || '').toLowerCase();
+      return n.endsWith('.dmg') && !n.includes('arm64');
+    });
+  const macArm = platformUrls.mac_arm64
+    ? { name: 'macOS Apple Silicon', browser_download_url: platformUrls.mac_arm64, size: 0 }
+    : findAsset('arm64.dmg');
+  const macX64 = platformUrls.mac_x64
+    ? { name: 'macOS Intel', browser_download_url: platformUrls.mac_x64, size: 0 }
+    : (findAsset('x64.dmg') || findAssetIntel());
+  const win = platformUrls.windows
+    ? { name: 'Windows', browser_download_url: platformUrls.windows, size: 0 }
+    : findAsset('.exe');
+  const linux = platformUrls.linux
+    ? { name: 'Linux', browser_download_url: platformUrls.linux, size: 0 }
+    : findAsset('.AppImage');
   const ver = (release as any)?.tag || (release as any)?.tag_name || '';
+
+  // Hardcoded fallback URLs from official release channel
+  const BASE_URL = `https://github.com/${GH_REPO}/releases/latest/download`;
+  const fallbackMacArm = `${BASE_URL}/Lemtel.Telecom-arm64.dmg`;
+  const fallbackMacIntel = `${BASE_URL}/Lemtel.Telecom.dmg`;
+  const fallbackWin = `${BASE_URL}/Lemtel.Telecom.Setup.exe`;
 
   const qrPayload = JSON.stringify({
     portal: 'avastatistic.ca',
@@ -83,14 +102,14 @@ export function DownloadCenter({ personalize = false }: { personalize?: boolean 
       <Card>
         <CardHeader><CardTitle className="flex items-center gap-2"><MonitorDown className="h-4 w-4" /> Desktop</CardTitle></CardHeader>
         <CardContent className="grid gap-3 sm:grid-cols-2">
-          <Button asChild variant="outline" disabled={!macArm}>
-            <a href={macArm?.browser_download_url ?? '#'}><Apple className="h-4 w-4 mr-2" /> macOS Apple Silicon {macArm && <span className="ml-2 text-xs text-muted-foreground">{fmtSize(macArm.size)}</span>}</a>
+          <Button asChild variant="outline" disabled={!macArm && !fallbackMacArm}>
+            <a href={macArm?.browser_download_url ?? fallbackMacArm}><Apple className="h-4 w-4 mr-2" /> macOS Apple Silicon {macArm && <span className="ml-2 text-xs text-muted-foreground">{fmtSize(macArm.size)}</span>}</a>
           </Button>
-          <Button asChild variant="outline" disabled={!macX64}>
-            <a href={macX64?.browser_download_url ?? '#'}><Apple className="h-4 w-4 mr-2" /> macOS Intel {macX64 && <span className="ml-2 text-xs text-muted-foreground">{fmtSize(macX64.size)}</span>}</a>
+          <Button asChild variant="outline" disabled={!macX64 && !fallbackMacIntel}>
+            <a href={macX64?.browser_download_url ?? fallbackMacIntel}><Apple className="h-4 w-4 mr-2" /> macOS Intel {macX64 && <span className="ml-2 text-xs text-muted-foreground">{fmtSize(macX64.size)}</span>}</a>
           </Button>
-          <Button asChild variant="outline" disabled={!win}>
-            <a href={win?.browser_download_url ?? '#'}><MonitorDown className="h-4 w-4 mr-2" /> Windows 10/11 {win && <span className="ml-2 text-xs text-muted-foreground">{fmtSize(win.size)}</span>}</a>
+          <Button asChild variant="outline" disabled={!win && !fallbackWin}>
+            <a href={win?.browser_download_url ?? fallbackWin}><MonitorDown className="h-4 w-4 mr-2" /> Windows 10/11 {win && <span className="ml-2 text-xs text-muted-foreground">{fmtSize(win.size)}</span>}</a>
           </Button>
           <Button asChild variant="outline" disabled={!linux}>
             <a href={linux?.browser_download_url ?? '#'}><MonitorDown className="h-4 w-4 mr-2" /> Linux AppImage {linux && <span className="ml-2 text-xs text-muted-foreground">{fmtSize(linux.size)}</span>}</a>

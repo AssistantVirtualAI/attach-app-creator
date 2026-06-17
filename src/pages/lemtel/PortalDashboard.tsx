@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "react-router-dom";
-import { Phone, PhoneIncoming, PhoneOutgoing, PhoneMissed, MessageSquare, Smartphone, Settings, Activity } from "lucide-react";
+import { Phone, PhoneIncoming, PhoneOutgoing, PhoneMissed, MessageSquare, Smartphone, Settings, Activity, Download, MonitorDown, Apple } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
@@ -205,6 +205,44 @@ export default function PortalDashboard() {
         <QuickLink to="/org/lemtel/portal/messages" Icon={MessageSquare} label="Messages" />
         <QuickLink to="/org/lemtel/portal/extensions" Icon={Smartphone} label="Extensions" />
       </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <MonitorDown className="h-4 w-4 text-primary" />
+            Download Desktop App
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-3 sm:grid-cols-3">
+          <Button asChild variant="outline" className="h-auto py-3 justify-start gap-3">
+            <a href="https://github.com/AssistantVirtualAI/attach-app-creator/releases/latest/download/Lemtel.Telecom-arm64.dmg" download>
+              <Apple className="h-4 w-4" />
+              <div className="flex flex-col items-start text-left">
+                <span className="text-sm font-medium">Mac M1 / M2 / M3</span>
+                <span className="text-xs text-muted-foreground">Apple Silicon · .dmg</span>
+              </div>
+            </a>
+          </Button>
+          <Button asChild variant="outline" className="h-auto py-3 justify-start gap-3">
+            <a href="https://github.com/AssistantVirtualAI/attach-app-creator/releases/latest/download/Lemtel.Telecom.dmg" download>
+              <Apple className="h-4 w-4" />
+              <div className="flex flex-col items-start text-left">
+                <span className="text-sm font-medium">Mac Intel</span>
+                <span className="text-xs text-muted-foreground">Intel chip · .dmg</span>
+              </div>
+            </a>
+          </Button>
+          <Button asChild variant="outline" className="h-auto py-3 justify-start gap-3">
+            <a href="https://github.com/AssistantVirtualAI/attach-app-creator/releases/latest/download/Lemtel.Telecom.Setup.exe" download>
+              <MonitorDown className="h-4 w-4" />
+              <div className="flex flex-col items-start text-left">
+                <span className="text-sm font-medium">Windows</span>
+                <span className="text-xs text-muted-foreground">10 / 11 · .exe</span>
+              </div>
+            </a>
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }

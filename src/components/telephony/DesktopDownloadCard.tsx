@@ -42,7 +42,7 @@ export const downloads: DownloadItem[] = [
     icon: "🍎",
     label: "Download for Mac (Intel)",
     sublabel: "macOS 11+ · Intel",
-    url: `${BASE}/Lemtel.Telecom-x64.dmg`,
+    url: `${BASE}/Lemtel.Telecom.dmg`,
     badge: ".dmg",
     color: "#555555",
   },
