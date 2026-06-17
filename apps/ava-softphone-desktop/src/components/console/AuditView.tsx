@@ -25,6 +25,7 @@ type Row = {
 const ACTION_FILTERS = ['all', 'create', 'update', 'delete', 'sync', 'rollback'] as const;
 
 export default function AuditView() {
+  const [tab, setTab] = useState<'admin' | 'ai'>('admin');
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<typeof ACTION_FILTERS[number]>('all');
