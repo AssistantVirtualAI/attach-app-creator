@@ -72,6 +72,7 @@ export default function ConsoleLayout({
   const [syncing, setSyncing] = useState(false);
   const [syncNote, setSyncNote] = useState<string | null>(null);
   const [compact, setCompact] = useState(() => typeof window !== 'undefined' && window.innerWidth < 640);
+  const [isWide, setIsWide] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 1100);
   const [tourOpen, setTourOpen] = useState(false);
   const [auditOpen, setAuditOpen] = useState(false);
   const isAuditChild = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('audit') === 'child';
