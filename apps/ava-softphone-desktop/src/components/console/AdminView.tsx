@@ -902,7 +902,8 @@ function QueuesTable() {
       const orgId = me.organization_id || LEMTEL_ORG;
       const name = String(form.queue_name || '').trim();
       const ext = String(form.queue_extension || '').trim();
-      const out: any = { ...form };
+      const { _queue_agents: agents, ...rest } = form || {};
+      const out: any = { ...rest };
       if (out.queue_max_wait_time !== undefined) out.queue_max_wait_time = String(out.queue_max_wait_time);
 
       const idempotencyKey = creating?.key || generateIdempotencyKey();
@@ -933,6 +934,19 @@ function QueuesTable() {
             body: { action: 'create-queue', organization_id: orgId, idempotency_key: idk, params: { domain_uuid: LEMTEL_DOMAIN, ...out } },
           });
           if (err) throw err;
+          // Best-effort: persist queue tiers right after the queue itself.
+          if (agents && agents.length) {
+            try {
+              await reload(true);
+              const { data: created } = await supabase
+                .from('pbx_call_queues')
+                .select('pbx_uuid')
+                .eq('organization_id', orgId)
+                .eq('name', name)
+                .maybeSingle();
+              if ((created as any)?.pbx_uuid) await syncQueueTiers((created as any).pbx_uuid, agents);
+            } catch { /* tier assignment is non-blocking */ }
+          }
           setCreating(null);
         },
         reload: (force) => reload(force),
