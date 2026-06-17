@@ -613,7 +613,7 @@ export default function SoftphonePane({
         )}
         {!inCall && !ringing && tab === 'recordings' && (
           <div style={{ animation: 'fadeIn .25s ease-out' }}>
-            <AppErrorBoundary compact onBack={() => setTab('dial')}><RecordingsList /></AppErrorBoundary>
+            <AppErrorBoundary compact onBack={() => setTab('dial')}><RecordingsList extension={creds.extension} /></AppErrorBoundary>
           </div>
         )}
         {!inCall && !ringing && tab === 'ai' && (
