@@ -1104,15 +1104,16 @@ function ControlBtn({
   icon: string; label: string; ariaLabel?: string; onClick: () => void;
   active?: boolean; danger?: boolean; warning?: boolean; disabled?: boolean; iconOnly?: boolean;
 }) {
+  // Theme-aware bg/border so buttons stay visible in dark + midnight modes.
+  // Active uses a tinted accent surface; inactive uses the themed elevated surface.
+  const accent = danger ? c.red : warning ? c.yellow : c.gold;
   const bg = active
-    ? danger ? 'rgba(254,226,226,0.98)' : warning ? 'rgba(255,247,237,0.98)' : 'rgba(255,251,235,0.98)'
-    : 'rgba(255,255,255,0.94)';
+    ? `color-mix(in srgb, ${accent} 22%, ${c.bgElev})`
+    : c.bgElev;
   const bd = active
-    ? danger ? 'rgba(220,38,38,0.65)' : warning ? 'rgba(217,119,6,0.68)' : 'rgba(224,168,0,0.70)'
-    : 'rgba(0,61,166,0.32)';
-  const col = active
-    ? danger ? c.red : warning ? c.yellow : c.gold
-    : c.text;
+    ? `color-mix(in srgb, ${accent} 65%, transparent)`
+    : c.borderStrong;
+  const col = active ? accent : c.text;
   return (
     <button
       onClick={onClick}
@@ -1128,15 +1129,16 @@ function ControlBtn({
         minWidth: iconOnly ? 48 : undefined,
         borderRadius: iconOnly ? 14 : 12,
         background: bg, border: `1px solid ${bd}`, color: col,
-        cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.55 : 1,
+        cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.7 : 1,
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         gap: iconOnly ? 0 : 6,
         fontSize: iconOnly ? 0 : 11, fontWeight: 800, letterSpacing: 0.3,
         transition: 'all .15s ease',
         boxShadow: active
-          ? `0 8px 18px -10px ${col}, inset 0 0 0 1px rgba(255,255,255,0.6)`
-          : '0 6px 18px -12px rgba(0,61,166,0.6), inset 0 0 0 1px rgba(255,255,255,0.55)',
+          ? `0 8px 18px -10px ${accent}, inset 0 0 0 1px rgba(255,255,255,0.10)`
+          : '0 6px 18px -12px rgba(0,35,230,0.35), inset 0 0 0 1px rgba(255,255,255,0.08)',
         whiteSpace: 'nowrap',
+        textShadow: '0 1px 0 rgba(0,0,0,0.15)',
       }}
     >
       <span aria-hidden="true" style={{ fontSize: iconOnly ? 20 : 14 }}>{icon}</span>
