@@ -112,7 +112,7 @@ export default function SyncStatusView() {
           disabled={!orgId || running}
           style={{
             padding: '10px 18px', borderRadius: 12, border: `1px solid ${"rgba(180,196,224,0.55)"}`,
-            background: running ? "rgba(245,247,252,0.6)" : 'linear-gradient(180deg, #0033ff, #001ea8)',
+            background: running ? "rgba(245,247,252,0.6)" : `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`,
             color: '#fff', fontWeight: 600, fontSize: 13, cursor: running ? 'wait' : 'pointer',
             opacity: !orgId ? 0.5 : 1,
           }}
