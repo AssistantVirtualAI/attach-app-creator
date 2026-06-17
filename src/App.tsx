@@ -41,6 +41,7 @@ import ClientDetail from "./pages/ClientDetail";
 import ClientLogin from "./pages/ClientLogin";
 import ClientForgotPassword from "./pages/ClientForgotPassword";
 import ClientResetPassword from "./pages/ClientResetPassword";
+import ResetPassword from "./pages/ResetPassword";
 import ClientPortal from "./pages/ClientPortal";
 import ClientAgentPortal from "./pages/ClientAgentPortal";
 import ClientConversations from "./pages/ClientConversations";
