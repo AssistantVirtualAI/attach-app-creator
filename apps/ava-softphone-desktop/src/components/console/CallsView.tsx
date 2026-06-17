@@ -110,13 +110,13 @@ export default function CallsView({ scope = 'mine' }: { scope?: 'mine' | 'org' }
     {
       table: 'pbx_call_records',
       organizationId: orgId,
-      events: ['INSERT', 'UPDATE'],
+      events: ['INSERT', 'UPDATE', 'DELETE'],
       debounceMs: 400,
       throttleMs: 2_000,
       shouldRefresh: (payload: any) => {
         if (scope === 'org') return true;
         const row = payload?.new || payload?.old || {};
-        return !extension || row.extension === extension;
+        return !extension || row.extension === extension || row.caller_number === extension || row.destination_number === extension || row.source_number === extension;
       },
     },
     () => load(true),
