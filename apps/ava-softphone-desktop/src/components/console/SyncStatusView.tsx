@@ -220,16 +220,16 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
 function StatusBadge({ progress }: { progress: SyncProgress }) {
   const map: Record<SyncProgress['state'], { bg: string; color: string; text: string }> = {
     idle: { bg: c.deepPanel, color: c.textSub, text: 'Idle' },
-    running: { bg: 'rgba(0,82,204,0.15)', color: '#0033ff', text: 'Running…' },
-    retrying: { bg: 'rgba(245,158,11,0.18)', color: '#b45309', text: `Retry ${progress.attempt ?? ''}` },
-    success: { bg: 'rgba(16,185,129,0.18)', color: '#047857', text: 'Success' },
-    failed: { bg: 'rgba(239,68,68,0.18)', color: '#b91c1c', text: 'Failed' },
+    running: { bg: `${c.lemtelBlue}26`, color: c.lemtelBlue, text: 'Running…' },
+    retrying: { bg: `${c.warning}2e`, color: c.warning, text: `Retry ${progress.attempt ?? ''}` },
+    success: { bg: `${c.success}2e`, color: c.success, text: 'Success' },
+    failed: { bg: `${c.danger}2e`, color: c.danger, text: 'Failed' },
   };
   const s = map[progress.state];
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
       <span style={{ padding: '4px 10px', borderRadius: 999, background: s.bg, color: s.color, fontSize: 11, fontWeight: 700 }}>{s.text}</span>
-      {progress.error && <span title={progress.error} style={{ fontSize: 11, color: '#b91c1c', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{progress.error}</span>}
+      {progress.error && <span title={progress.error} style={{ fontSize: 11, color: c.danger, maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{progress.error}</span>}
     </div>
   );
 }
