@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import type { Creds } from '../lib/creds';
 import { Store } from '../lib/creds';
+import { colors } from '../lib/theme';
 
 export default function SipConfigScreen({
   initial,
