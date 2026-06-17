@@ -226,7 +226,7 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
 /* ====== Forgot password screen ====== */
 const RESEND_COOLDOWN_SECONDS = 30;
 
-function ForgotPasswordScreen({ initialEmail, onBack }: { initialEmail: string; onBack: () => void }) {
+function ForgotPasswordScreen({ initialEmail, accent, onBack }: { initialEmail: string; accent: Accent; onBack: () => void }) {
   const [step, setStep] = useState<ForgotStep>('form');
   const [email, setEmail] = useState(initialEmail);
   const [busy, setBusy] = useState(false);
@@ -236,7 +236,7 @@ function ForgotPasswordScreen({ initialEmail, onBack }: { initialEmail: string; 
   const [resentInfo, setResentInfo] = useState<string | null>(null);
 
   // Cooldown countdown timer
-  React.useEffect(() => {
+  useEffect(() => {
     if (cooldown <= 0) return;
     const id = window.setInterval(() => setCooldown((s) => (s > 0 ? s - 1 : 0)), 1000);
     return () => window.clearInterval(id);
