@@ -40,8 +40,9 @@ export async function initBackgroundSync() {
   // Best-effort registration. The plugin is optional; if not installed,
   // background refresh is delivered by silent pushes + foreground sync.
   try {
-    // @ts-ignore — optional plugin
-    const mod = await import('@capacitor/background-runner').catch(() => null);
+    // @ts-ignore — optional plugin, resolved at runtime on native only
+    const pkg = '@capacitor/background-runner';
+    const mod = await import(/* @vite-ignore */ pkg).catch(() => null);
     if (!mod) return;
     const { BackgroundRunner } = mod as any;
     await BackgroundRunner.dispatchEvent({
