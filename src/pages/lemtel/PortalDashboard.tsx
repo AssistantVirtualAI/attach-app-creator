@@ -221,6 +221,42 @@ export default function PortalDashboard() {
   );
 }
 
+function DesktopDownloadButtons() {
+  const { data: release } = useQuery({
+    queryKey: ["gh-release-latest"],
+    queryFn: fetchLatestRelease,
+    staleTime: 30 * 60_000,
+    retry: false,
+  });
+  const items = [
+    { Icon: Apple, label: "Mac M1 / M2 / M3", sub: "Apple Silicon · .dmg", url: resolveUrl(release ?? null, "macArm") },
+    { Icon: Apple, label: "Mac Intel", sub: "Intel chip · .dmg", url: resolveUrl(release ?? null, "macIntel") },
+    { Icon: MonitorDown, label: "Windows", sub: "10 / 11 · .exe", url: resolveUrl(release ?? null, "windows") },
+  ];
+  return (
+    <CardContent className="grid gap-3 sm:grid-cols-3">
+      {items.map(({ Icon, label, sub, url }) => (
+        <Button key={label} asChild variant="outline" className="h-auto py-3 justify-start gap-3">
+          <a href={url} download>
+            <Icon className="h-4 w-4" />
+            <div className="flex flex-col items-start text-left">
+              <span className="text-sm font-medium">{label}</span>
+              <span className="text-xs text-muted-foreground">{sub}</span>
+            </div>
+            <Download className="h-4 w-4 ml-auto opacity-60" />
+          </a>
+        </Button>
+      ))}
+    </CardContent>
+  );
+}
+
+function _unused_close() {
+  return null;
+    </div>
+  );
+}
+
 function Kpi({ label, value, Icon, color, loading }: { label: string; value: number; Icon: any; color: string; loading?: boolean }) {
   return (
     <Card>
