@@ -44,9 +44,11 @@ export default function CallsView({ scope = 'mine' }: { scope?: 'mine' | 'org' }
   const [sel, setSel] = useState<CallRecord | null>(null);
   const [insight, setInsight] = useState<any>(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [stage, setStage] = useState<{ stage: TranscriptStage; detail?: string }>({ stage: 'idle' });
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [audioLoading, setAudioLoading] = useState(false);
   const [audioError, setAudioError] = useState<string | null>(null);
+
   const contentRef = useRef<HTMLDivElement | null>(null);
   const [contentWidth, setContentWidth] = useState(() => typeof window !== 'undefined' ? window.innerWidth : 1000);
   const [narrow, setNarrow] = useState(typeof window !== 'undefined' && window.innerWidth < 820);
