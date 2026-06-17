@@ -70,6 +70,7 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
   const [portalUrl, setPortalUrl] = useState('https://avastatistic.ca');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [failure, setFailure] = useState<AuthFailure | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [accent, setAccent] = useState<Accent>(loadAccent);
 
