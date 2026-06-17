@@ -26,7 +26,7 @@ Deno.serve(async (req) => {
       .select("organization_id, extension")
       .eq("portal_user_id", u.user.id)
       .maybeSingle();
-    if (!sp?.organization_id) return json({ error: "NO_SOFTPHONE_ACCOUNT" }, 404);
+    if (!sp?.organization_id) return json({ callsToday: 0, answeredToday: 0, missedToday: 0, voicemailsToday: 0, avgDurationSec: 0, activeExtensions: 0, last7Days: [0,0,0,0,0,0,0], topExtensions: [], noSoftphone: true });
 
     const orgId = sp.organization_id;
     const startOfDay = new Date(); startOfDay.setHours(0,0,0,0);
