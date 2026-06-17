@@ -67,10 +67,11 @@ export default function MobileApp() {
 function AuthenticatedShell({
   creds, tab, setTab, onSignOut,
 }: { creds: Creds; tab: Tab; setTab: (t: Tab) => void; onSignOut: () => void }) {
-  const [permsGateDone, setPermsGateDone] = useState<boolean | null>(null);
+  const [permsGateDone, setPermsGateDone] = useState<boolean | null>(isPreviewMode ? true : null);
 
   // Decide whether to show the onboarding permission gate.
   useEffect(() => {
+    if (isPreviewMode) return;
     let cancelled = false;
     (async () => {
       try {
