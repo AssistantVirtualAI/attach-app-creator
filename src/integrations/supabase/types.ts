@@ -4553,7 +4553,7 @@ export type Database = {
           notes: string | null
           organization_id: string
           pbx_dedup_key: string | null
-          pbx_uuid: string | null
+          pbx_uuid: string
           pdd: number | null
           pdd_ms: number | null
           raw_data: Json | null
@@ -4601,7 +4601,7 @@ export type Database = {
           notes?: string | null
           organization_id: string
           pbx_dedup_key?: string | null
-          pbx_uuid?: string | null
+          pbx_uuid: string
           pdd?: number | null
           pdd_ms?: number | null
           raw_data?: Json | null
@@ -4649,7 +4649,7 @@ export type Database = {
           notes?: string | null
           organization_id?: string
           pbx_dedup_key?: string | null
-          pbx_uuid?: string | null
+          pbx_uuid?: string
           pdd?: number | null
           pdd_ms?: number | null
           raw_data?: Json | null
