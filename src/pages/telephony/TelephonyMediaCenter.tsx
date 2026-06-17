@@ -13,6 +13,9 @@ import { RecordingWavePlayer } from "@/components/portal/RecordingWavePlayer";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { loadPbxRecordingAudio } from "@/lib/pbxRecordingAudio";
+import { runTranscribeAndAnalyze, isStubTranscript, type TranscriptStage } from "@/lib/transcriptStatus";
+import { TranscriptStagePill } from "@/components/transcripts/TranscriptStagePill";
+
 
 type Scope = "org" | "mine";
 
