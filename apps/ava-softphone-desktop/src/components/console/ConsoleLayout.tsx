@@ -31,8 +31,6 @@ import { useCallShortcuts } from '../../hooks/useShortcuts';
 import { callBus } from '../../hooks/useCallBus';
 import { useDesktopRole } from '../../hooks/useDesktopRole';
 import { useTenant } from '../../hooks/useTenant';
-import { useRealtimeSync } from '../../hooks/useRealtimeSync';
-import { useExtensionDataSync } from '../../hooks/useExtensionDataSync';
 import { theme } from '../../lib/theme';
 import { ava, setAuthToken } from '../../lib/avaApi';
 import { supabase } from '../../lib/supabaseClient';
@@ -77,10 +75,8 @@ export default function ConsoleLayout({
   const [tourOpen, setTourOpen] = useState(false);
   const [auditOpen, setAuditOpen] = useState(false);
   const isAuditChild = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('audit') === 'child';
-  const { orgId, orgName, extension: myExtension } = useTenant();
+  const { orgId, orgName } = useTenant();
   const { isAdmin, isSuperAdmin, isSupervisor } = useDesktopRole(orgId);
-  useRealtimeSync(orgId);
-  useExtensionDataSync(orgId, myExtension || creds.extension);
 
   // Redirect non-admins away from admin-only views
   useEffect(() => {
