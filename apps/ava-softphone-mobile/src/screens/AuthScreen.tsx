@@ -96,30 +96,46 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
   };
 
   const submitEmail = async () => {
-    const res = await fetch(`${base}/functions/v1/softphone-auth`, {
+    // Use Supabase Auth REST directly — there is no `softphone-auth` edge function.
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: SUPABASE_ANON,
+      },
       body: JSON.stringify({ email: email.trim(), password }),
+    }).catch((e) => { throw new Error('network: ' + (e?.message || 'failed to fetch')); });
+    const data = await res.json().catch(() => ({} as any));
+    if (!res.ok) throw new Error(data?.error_description || data?.msg || data?.error || `auth_${res.status}`);
+    onAuthenticated({
+      portalUrl,
+      email: data?.user?.email || email.trim(),
+      extension: '',
+      userId: data?.user?.id,
+      accessToken: data?.access_token,
+      refreshToken: data?.refresh_token,
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data?.error || 'Sign-in failed');
-    onAuthenticated({ ...data, portalUrl, email: email.trim() });
   };
 
   const submitExtension = async () => {
-    const res = await fetch(`${base}/functions/v1/extension-signin`, {
+    // Edge functions are hosted on the Supabase project, not the portal domain.
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/extension-signin`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: SUPABASE_ANON,
+        Authorization: `Bearer ${SUPABASE_ANON}`,
+      },
       body: JSON.stringify({
         extension: extension.trim(),
         password,
         sip_domain: sipDomain.trim() || undefined,
         platform: 'mobile',
       }),
-    });
-    const data = await res.json();
+    }).catch((e) => { throw new Error('network: ' + (e?.message || 'failed to fetch')); });
+    const data = await res.json().catch(() => ({} as any));
     if (!res.ok || !data?.access_token) {
-      throw new Error(data?.error || 'Sign-in failed');
+      throw new Error(data?.error || `signin_${res.status}`);
     }
     onAuthenticated({
       portalUrl,
