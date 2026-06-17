@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { theme } from '../../lib/theme';
 import PageHeader, { ListSkeleton, EmptyState } from './PageHeader';
+import AIAuditPanel from './AIAuditPanel';
 
 const { colors: c } = theme;
 
