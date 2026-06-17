@@ -14,8 +14,9 @@ import PrivacyScreen from './PrivacyScreen';
 import DataSafetyScreen from './DataSafetyScreen';
 import PermissionsScreen from './PermissionsScreen';
 import SupportScreen from './SupportScreen';
+import AIAuditScreen from './AIAuditScreen';
 
-type Sub = null | 'recordings' | 'voicemail' | 'messages' | 'contacts' | 'settings' | 'delete' | 'privacy' | 'datasafety' | 'permissions' | 'support';
+type Sub = null | 'recordings' | 'voicemail' | 'messages' | 'contacts' | 'settings' | 'delete' | 'privacy' | 'datasafety' | 'permissions' | 'support' | 'aiaudit';
 
 export default function MoreScreen({
   creds, sp, onSignOut, haptic,
