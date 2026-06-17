@@ -21,16 +21,15 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
-      - name: Create Release & Upload
+          EP_DRAFT: false
+          PUBLISH: never
+      - name: Upload to Release
         working-directory: apps/ava-softphone-desktop
         run: |
           gh release create ${{ github.ref_name }} \
-            dist-electron/*.dmg \
-            dist-electron/*.zip \
-            dist-electron/*-mac.zip \
             --title "Lemtel Telecom ${{ github.ref_name }}" \
             --notes "Auto-release ${{ github.ref_name }}" \
-            --latest 2>/dev/null || \
+            --latest 2>/dev/null || true
           gh release upload ${{ github.ref_name }} \
             dist-electron/*.dmg \
             dist-electron/*.zip \
