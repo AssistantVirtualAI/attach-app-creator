@@ -98,7 +98,7 @@ export default function MobilePreview() {
               <div className="flex flex-wrap gap-2">
                 {SUB_LINKS.map((s) => (
                   <Button key={s} size="sm" variant="ghost" className="capitalize"
-                    onClick={() => postNav({ type: 'set-sub', sub: s })}>
+                    onClick={() => postNav({ type: 'set-subpage', subpage: s })}>
                     {s}
                   </Button>
                 ))}
