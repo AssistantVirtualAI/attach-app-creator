@@ -235,7 +235,7 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
               </>
             )}
 
-            {error && <ErrorBanner>{error}</ErrorBanner>}
+            {error && <ErrorBanner failure={failure}>{error}</ErrorBanner>}
 
             <button
               type="submit"
