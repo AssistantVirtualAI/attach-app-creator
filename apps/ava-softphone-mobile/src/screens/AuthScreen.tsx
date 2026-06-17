@@ -40,6 +40,14 @@ const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 
 const isEmail = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim());
 
+type AuthStep = 'network' | 'edge-function' | 'supabase-auth' | 'token' | 'validation';
+type AuthFailure = { step: AuthStep; code: string; message: string; detail?: string };
+
+class AuthError extends Error {
+  step: AuthStep; code: string; detail?: string;
+  constructor(f: AuthFailure) { super(f.message); this.step = f.step; this.code = f.code; this.detail = f.detail; }
+}
+
 const mapAuthError = (raw: string): string => {
   const m = (raw || '').toLowerCase();
   if (m.includes('invalid_credentials') || m.includes('invalid login')) return 'Wrong email or password.';
@@ -47,7 +55,7 @@ const mapAuthError = (raw: string): string => {
   if (m.includes('app_access_disabled') || m.includes('mobile_access_disabled')) return 'Mobile access has not been enabled for this extension. Contact your admin.';
   if (m.includes('ambiguous_extension')) return 'Multiple extensions match — please enter the SIP domain.';
   if (m.includes('rate') && m.includes('limit')) return 'Too many attempts. Please wait a moment and try again.';
-  if (m.includes('network') || m.includes('failed to fetch')) return 'Network error — check your connection.';
+  if (m.includes('network') || m.includes('failed to fetch') || m.includes('load failed')) return 'Network error — check your connection.';
   if (m.includes('session') || m.includes('jwt')) return 'Your session expired. Please sign in again.';
   return raw || 'Something went wrong. Please try again.';
 };
