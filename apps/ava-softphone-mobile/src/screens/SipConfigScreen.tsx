@@ -125,19 +125,19 @@ const wrap: React.CSSProperties = {
 };
 const inputStyle: React.CSSProperties = {
   height: 44, padding: '0 12px', borderRadius: 10,
-  background: 'rgba(255,255,255,0.06)', color: 'inherit',
-  border: '1px solid rgba(255,255,255,0.1)', fontSize: 15, outline: 'none',
+  background: colors.graphite, color: colors.textIce,
+  border: `1px solid ${colors.border}`, fontSize: 15, outline: 'none',
 };
 const primaryBtn: React.CSSProperties = {
   height: 48, marginTop: 8, borderRadius: 12, border: 'none',
-  background: '#0023e6', color: '#fff', fontWeight: 600, fontSize: 15, cursor: 'pointer',
+  background: colors.lemtelBlue, color: '#fff', fontWeight: 600, fontSize: 15, cursor: 'pointer',
 };
 const ghostBtn: React.CSSProperties = {
-  height: 44, borderRadius: 12, border: '1px solid rgba(255,255,255,0.12)',
-  background: 'transparent', color: 'inherit', fontSize: 14, cursor: 'pointer',
+  height: 44, borderRadius: 12, border: `1px solid ${colors.border}`,
+  background: 'transparent', color: colors.textSub, fontSize: 14, cursor: 'pointer',
 };
 const errBox: React.CSSProperties = {
   padding: '10px 12px', borderRadius: 10,
-  background: 'rgba(239,68,68,0.12)', color: '#fecaca',
-  border: '1px solid rgba(239,68,68,0.3)', fontSize: 13,
+  background: `${colors.danger}1f`, color: colors.danger,
+  border: `1px solid ${colors.danger}4d`, fontSize: 13,
 };
