@@ -975,7 +975,14 @@ export const ava = {
         method: 'POST',
         body: JSON.stringify({ action: 'sync-all', organization_id: me.organization_id || undefined, resources: ['cdrs', 'extensions', 'queues', 'ivrs', 'ring_groups'] }),
       });
-      return { ok: data?.success !== false && !data?.error, success: data?.success !== false, stats: data?.stats || {}, errors: data?.errors || (data?.error ? [data.error] : []), syncedAt: new Date().toISOString(), raw: data };
+      const recent = await Promise.allSettled([
+        bestEffortCdrSync(500, 0, true),
+        invokeFusionSync({ action: 'sync-voicemail-messages', organization_id: me.organization_id || undefined, extension: me.extension || undefined, params: { extension: me.extension || undefined, page_size: 500, max_pages: 1 } }),
+        invokeFusionSync({ action: 'list-recordings', organization_id: me.organization_id || undefined, extension: me.extension || undefined, limit: 500, params: { extension: me.extension || undefined, limit: 500 } }),
+      ]);
+      const recentErrors = recent.filter((r) => r.status === 'rejected').map((r: any) => r.reason?.message || 'recent telephony refresh failed');
+      const errors = [...(data?.errors || (data?.error ? [data.error] : [])), ...recentErrors];
+      return { ok: data?.success !== false && !data?.error && recentErrors.length === 0, success: data?.success !== false && recentErrors.length === 0, stats: data?.stats || {}, errors, syncedAt: new Date().toISOString(), raw: data };
     } catch (err: any) {
       console.warn('[avaApi] sync-all failed:', err);
       return { ok: false, success: false, stats: {}, errors: [err?.message || 'Phone-system sync failed'], syncedAt: new Date().toISOString() };
