@@ -40,6 +40,7 @@ const audioCache = new Map<string, string>();
 export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string) => void }) {
   const [items, setItems] = useState<RecordingItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [working, setWorking] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [itemErrors, setItemErrors] = useState<Record<string, string>>({});
@@ -48,10 +49,11 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
   const [audioErrors, setAudioErrors] = useState<Record<string, string>>({});
   const [audioLoading, setAudioLoading] = useState<string | null>(null);
 
-  const load = useCallback(async (silent = false) => {
+  const load = useCallback(async (silent = false, force = false) => {
     if (!silent) { setLoading(true); setError(null); }
+    if (force) setRefreshing(true);
     try {
-      const data = await ava.recordings();
+      const data = force ? await ava.refreshRecordings() : await ava.recordings();
       setItems(Array.isArray(data) ? data : []);
     } catch (e: any) {
       if (!silent) {
@@ -60,6 +62,7 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
       }
     } finally {
       if (!silent) setLoading(false);
+      if (force) setRefreshing(false);
     }
   }, []);
 
@@ -187,10 +190,10 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
         <div style={{ fontSize: 11, color: c.textSub, letterSpacing: 1, textTransform: 'uppercase' }}>
           {items.length} recording{items.length !== 1 ? 's' : ''}
         </div>
-        <button onClick={() => load()} style={{
+        <button onClick={() => load(true, true)} disabled={refreshing} style={{
           background: 'rgba(255,255,255,0.05)', border: `1px solid ${c.border}`,
-          color: c.text, padding: '4px 10px', borderRadius: 8, fontSize: 11, cursor: 'pointer',
-        }}>↻ Refresh</button>
+          color: c.text, padding: '4px 10px', borderRadius: 8, fontSize: 11, cursor: refreshing ? 'wait' : 'pointer', opacity: refreshing ? 0.55 : 1,
+        }}>{refreshing ? 'Syncing…' : '↻ Refresh'}</button>
       </div>
 
       {error && (

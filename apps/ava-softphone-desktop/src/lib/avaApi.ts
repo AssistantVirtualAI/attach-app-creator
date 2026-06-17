@@ -502,32 +502,43 @@ async function readCallRecordRows(limit = 100, opts?: { scope?: 'mine' | 'org' }
 let cdrSyncInFlight: Promise<void> | null = null;
 let lastCdrSyncAt = 0;
 
-async function bestEffortCdrSync(limit = 200, minIntervalMs = 30_000) {
+async function invokeFusionSync(body: Record<string, unknown>) {
+  const res = await fetch(`${BACKEND.url}/functions/v1/fusionpbx-proxy`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': BACKEND.anonKey,
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+  const text = await res.text().catch(() => '');
+  let data: any = null;
+  try { data = text ? JSON.parse(text) : null; } catch { data = null; }
+  if (!res.ok) throw new Error(data?.error || text.slice(0, 180) || `FusionPBX sync failed (${res.status})`);
+  if (data?.error) throw new Error(String(data.error));
+  return data;
+}
+
+async function bestEffortCdrSync(limit = 200, minIntervalMs = 30_000, force = false) {
   const now = Date.now();
   if (cdrSyncInFlight) return cdrSyncInFlight;
-  if (now - lastCdrSyncAt < minIntervalMs) return;
+  if (!force && now - lastCdrSyncAt < minIntervalMs) return;
   lastCdrSyncAt = now;
   cdrSyncInFlight = (async () => {
     try {
       const me = await getMeContext();
-      await fetch(`${BACKEND.url}/functions/v1/fusionpbx-proxy`, {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'apikey': BACKEND.anonKey,
-        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-      },
-      body: JSON.stringify({
+      await invokeFusionSync({
         action: 'sync-cdrs',
         organization_id: me.organization_id || undefined,
         limit,
         page_size: Math.max(limit, 250),
         max_pages: 2,
         from_beginning: true,
-      }),
       });
     } catch (e) {
       console.warn('[AVA] CDR sync failed', e);
+      if (force) throw e;
     } finally {
       cdrSyncInFlight = null;
     }
@@ -543,24 +554,9 @@ async function bestEffortRecentTelephonySync(limit = 200) {
       extension: me.extension || undefined,
     };
     await Promise.allSettled([
-      fetch(`${BACKEND.url}/functions/v1/fusionpbx-proxy`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': BACKEND.anonKey,
-          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-        },
-        body: JSON.stringify({ action: 'sync-cdrs', organization_id: scope.organization_id, limit, page_size: Math.max(limit, 250), max_pages: 2, from_beginning: true }),
-      }),
-      fetch(`${BACKEND.url}/functions/v1/fusionpbx-proxy`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': BACKEND.anonKey,
-          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-        },
-        body: JSON.stringify({ action: 'sync-voicemail-messages', ...scope, params: { extension: scope.extension, page_size: Math.max(limit, 200), max_pages: 1 } }),
-      }),
+      invokeFusionSync({ action: 'sync-cdrs', organization_id: scope.organization_id, limit, page_size: Math.max(limit, 250), max_pages: 2, from_beginning: true }),
+      invokeFusionSync({ action: 'sync-voicemail-messages', ...scope, params: { extension: scope.extension, page_size: Math.max(limit, 200), max_pages: 1 } }),
+      invokeFusionSync({ action: 'list-recordings', ...scope, limit, params: { extension: scope.extension, limit } }),
     ]);
   } catch (e) {
     console.warn('[AVA] recent telephony sync failed', e);
@@ -576,6 +572,12 @@ export const ava = {
   calls: async (limit = 100, opts?: { scope?: 'mine' | 'org' }) => {
     if (MOCK) return MOCK_CALLS;
     await bestEffortCdrSync(Math.max(limit, 200));
+    return (await readCallRecordRows(limit, opts)).map(mapCdrToCall);
+  },
+  refreshCalls: async (limit = 150, opts?: { scope?: 'mine' | 'org' }) => {
+    if (MOCK) return MOCK_CALLS;
+    await bestEffortCdrSync(Math.max(limit, 250), 0, true);
+    window.dispatchEvent(new Event('lemtel:phone-sync-complete'));
     return (await readCallRecordRows(limit, opts)).map(mapCdrToCall);
   },
   scopedCallRecords: async (limit = 100, opts?: { scope?: 'mine' | 'org' }) => {
@@ -742,6 +744,13 @@ export const ava = {
       return [] as VoicemailItem[];
     }
   },
+  refreshVoicemails: async (limit = 50) => {
+    if (MOCK) return SAMPLE_VOICEMAIL_EMPTY;
+    await bestEffortRecentTelephonySync(Math.max(limit, 250));
+    window.dispatchEvent(new Event('lemtel:phone-sync-complete'));
+    const rows = await readCallRecordRows(Math.max(limit, 200));
+    return rows.filter(isVoicemailLike).map(mapCdrToVoicemail).slice(0, limit);
+  },
   markVoicemailRead: (id: string) =>
     call<{ ok: true }>(`/fn/${FN.fusionpbxProxy}`, { method: 'POST', body: JSON.stringify({ action: 'voicemail-read', id }) }, { ok: true }).catch(() => ({ ok: true as const })),
   recordings: async (limit = 100, opts?: { scope?: 'mine' | 'org' }) => {
@@ -771,6 +780,12 @@ export const ava = {
       console.warn('[avaApi] recording mapping failed:', err);
       return [] as RecordingItem[];
     }
+  },
+  refreshRecordings: async (limit = 100, opts?: { scope?: 'mine' | 'org' }) => {
+    if (MOCK) return SAMPLE_RECORDING_EMPTY;
+    await bestEffortRecentTelephonySync(Math.max(limit, 250));
+    window.dispatchEvent(new Event('lemtel:recordings-updated'));
+    return ava.recordings(limit, opts);
   },
 
   /**
