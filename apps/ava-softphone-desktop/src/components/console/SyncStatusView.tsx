@@ -93,9 +93,10 @@ export default function SyncStatusView() {
   // Derived: last successful sync per action.
   const lastOkByAction: Partial<Record<string, HealthRow>> = {};
   history.forEach((row) => {
-    if (row.status === 'ok' && !lastOkByAction[row.job_type]) lastOkByAction[row.job_type] = row;
+    if (row.status === 'ok' && row.last_success_at && !lastOkByAction[row.source]) lastOkByAction[row.source] = row;
   });
   const recentFailures = history.filter((r) => r.status !== 'ok').slice(0, 8);
+
 
   return (
     <div style={{ padding: 24, maxWidth: 980, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 20 }}>
