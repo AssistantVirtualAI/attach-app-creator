@@ -21,6 +21,9 @@ export interface FieldDef {
   hint?: string;
   required?: boolean;
   cols?: 1 | 2;            // half / full width inside group grid
+  // Mark fields that live outside the main FusionPBX row (joined tables, settings, derived)
+  // so the parity check doesn't flag them as "missing from PBX response".
+  virtual?: boolean;
   // tts-greeting: when generation succeeds, sets this key with returned filename/path text
   ttsFilenameSuggestion?: (form: any) => string;
 }
