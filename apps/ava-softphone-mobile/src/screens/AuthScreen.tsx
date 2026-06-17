@@ -428,7 +428,7 @@ function Footer() {
   );
 }
 
-function ModeToggle({ mode, onChange }: { mode: Mode; onChange: (m: Mode) => void }) {
+function ModeToggle({ mode, accent, onChange }: { mode: Mode; accent: Accent; onChange: (m: Mode) => void }) {
   return (
     <div style={{ display: 'flex', gap: 6, padding: 4, borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}` }}>
       {(['extension', 'email'] as Mode[]).map((m) => {
@@ -442,12 +442,52 @@ function ModeToggle({ mode, onChange }: { mode: Mode; onChange: (m: Mode) => voi
               flex: 1, padding: '9px 10px', borderRadius: 9, cursor: 'pointer',
               fontSize: 11, fontWeight: 800, letterSpacing: 0.8, textTransform: 'uppercase',
               border: 'none',
-              background: active ? `linear-gradient(135deg, ${C.gold}, ${C.avaCyan})` : 'transparent',
+              background: active ? accentGradient(accent) : 'transparent',
               color: active ? '#0b1530' : C.textSub,
               transition: 'background .15s ease, color .15s ease',
             }}
           >
             {m === 'extension' ? 'Extension' : 'Email'}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/* Accent (theme) switch — persisted in localStorage and applied via CSS var. */
+function AccentSwitch({ accent, onChange, readOnly }: { accent: Accent; onChange?: (a: Accent) => void; readOnly?: boolean }) {
+  const opts: { id: Accent; label: string }[] = [
+    { id: 'gold-cyan', label: 'Gold → Cyan' },
+    { id: 'cyan-gold', label: 'Cyan → Gold' },
+  ];
+  return (
+    <div style={{
+      position: 'absolute', top: 'calc(8px + var(--safe-top))', right: 10, zIndex: 2,
+      display: 'flex', gap: 4, padding: 3, borderRadius: 999,
+      background: 'rgba(16,26,48,0.65)', border: `1px solid ${C.border}`,
+      backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)',
+    }}>
+      {opts.map((o) => {
+        const active = accent === o.id;
+        return (
+          <button
+            key={o.id}
+            type="button"
+            disabled={readOnly}
+            onClick={() => onChange?.(o.id)}
+            aria-pressed={active}
+            title={`Theme: ${o.label}`}
+            style={{
+              border: 'none', cursor: readOnly ? 'default' : 'pointer',
+              padding: '5px 10px', borderRadius: 999,
+              fontSize: 10, fontWeight: 800, letterSpacing: 0.6, textTransform: 'uppercase',
+              background: active ? accentGradient(o.id) : 'transparent',
+              color: active ? '#0b1530' : C.textSub,
+              transition: 'background .15s ease, color .15s ease',
+            }}
+          >
+            {o.id === 'gold-cyan' ? 'G→C' : 'C→G'}
           </button>
         );
       })}
