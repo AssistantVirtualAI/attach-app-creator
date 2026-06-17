@@ -10,20 +10,28 @@ import MessagesScreen from './MessagesScreen';
 import ContactsScreen from './ContactsScreen';
 import SettingsScreen from './SettingsScreen';
 import DeleteAccountScreen from './DeleteAccountScreen';
+import PrivacyScreen from './PrivacyScreen';
+import DataSafetyScreen from './DataSafetyScreen';
+import PermissionsScreen from './PermissionsScreen';
+import SupportScreen from './SupportScreen';
 
-type Sub = null | 'recordings' | 'voicemail' | 'messages' | 'contacts' | 'settings' | 'delete';
+type Sub = null | 'recordings' | 'voicemail' | 'messages' | 'contacts' | 'settings' | 'delete' | 'privacy' | 'datasafety' | 'permissions' | 'support';
 
 export default function MoreScreen({
   creds, sp, onSignOut, haptic,
 }: { creds: Creds; sp: any; onSignOut: () => void; haptic: (s?: ImpactStyle) => Promise<void> }) {
   const [sub, setSub] = useState<Sub>(null);
 
-  if (sub === 'recordings') return <SubPage onBack={() => setSub(null)} title="Recordings"><RecordingsScreen /></SubPage>;
-  if (sub === 'voicemail')  return <SubPage onBack={() => setSub(null)} title="Voicemail"><VoicemailScreen haptic={haptic} /></SubPage>;
-  if (sub === 'messages')   return <SubPage onBack={() => setSub(null)} title="Messages"><MessagesScreen haptic={haptic} /></SubPage>;
-  if (sub === 'contacts')   return <SubPage onBack={() => setSub(null)} title="Contacts"><ContactsScreen sp={sp} /></SubPage>;
-  if (sub === 'settings')   return <SubPage onBack={() => setSub(null)} title="Settings"><SettingsScreen creds={creds} sp={sp} onSignOut={onSignOut} /></SubPage>;
-  if (sub === 'delete')     return <SubPage onBack={() => setSub(null)} title="Delete account"><DeleteAccountScreen onDone={onSignOut} /></SubPage>;
+  if (sub === 'recordings')  return <SubPage onBack={() => setSub(null)} title="Recordings"><RecordingsScreen /></SubPage>;
+  if (sub === 'voicemail')   return <SubPage onBack={() => setSub(null)} title="Voicemail"><VoicemailScreen haptic={haptic} /></SubPage>;
+  if (sub === 'messages')    return <SubPage onBack={() => setSub(null)} title="Messages"><MessagesScreen haptic={haptic} /></SubPage>;
+  if (sub === 'contacts')    return <SubPage onBack={() => setSub(null)} title="Contacts"><ContactsScreen sp={sp} /></SubPage>;
+  if (sub === 'settings')    return <SubPage onBack={() => setSub(null)} title="Settings"><SettingsScreen creds={creds} sp={sp} onSignOut={onSignOut} /></SubPage>;
+  if (sub === 'delete')      return <SubPage onBack={() => setSub(null)} title="Delete account"><DeleteAccountScreen onDone={onSignOut} /></SubPage>;
+  if (sub === 'privacy')     return <SubPage onBack={() => setSub(null)} title="Privacy"><PrivacyScreen /></SubPage>;
+  if (sub === 'datasafety')  return <SubPage onBack={() => setSub(null)} title="Data safety"><DataSafetyScreen /></SubPage>;
+  if (sub === 'permissions') return <SubPage onBack={() => setSub(null)} title="Permissions"><PermissionsScreen /></SubPage>;
+  if (sub === 'support')     return <SubPage onBack={() => setSub(null)} title="Support"><SupportScreen /></SubPage>;
 
   return (
     <div style={{ height: '100%', overflowY: 'auto', padding: '14px 14px 20px' }}>
@@ -53,9 +61,11 @@ export default function MoreScreen({
       <SectionTitle eyebrow="Account" title="Settings & privacy" />
       <Card padded={false}>
         <SettingsRow label="Settings" icon="⚙" onPress={() => setSub('settings')} />
-        <SettingsRow label="Privacy policy" icon="🛡" onPress={() => openExternal('https://avastatistic.ca/privacy')} />
+        <SettingsRow label="Permissions" icon="🔐" value="Mic, notifications, contacts" onPress={() => setSub('permissions')} />
+        <SettingsRow label="Privacy" icon="🛡" value="How we use your data" onPress={() => setSub('privacy')} />
+        <SettingsRow label="Data safety" icon="🗂" value="Store disclosures" onPress={() => setSub('datasafety')} />
         <SettingsRow label="Terms of service" icon="📄" onPress={() => openExternal('https://avastatistic.ca/terms')} />
-        <SettingsRow label="Support" icon="❔" value="help@avastatistic.ca" onPress={() => openExternal('mailto:help@avastatistic.ca')} />
+        <SettingsRow label="Support" icon="❔" value="support@avastatistic.ca" onPress={() => setSub('support')} />
       </Card>
 
       <SectionTitle eyebrow="Danger zone" title="Account control" />
