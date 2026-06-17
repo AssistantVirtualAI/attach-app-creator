@@ -44,7 +44,7 @@ async function triggerCdrSync() {
   try {
     const organizationId = await resolveCurrentOrganizationId();
     const { data } = await supabase.functions.invoke('fusionpbx-proxy', {
-      body: { action: 'sync-cdrs', organization_id: organizationId, limit: 500, page_size: 500, max_pages: 2 },
+      body: { action: 'sync-cdrs', organization_id: organizationId, limit: 500, page_size: 500, max_pages: 2, from_beginning: true },
     });
     console.log('CDR sync triggered:', data);
   } catch (err) {
