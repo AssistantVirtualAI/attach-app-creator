@@ -176,7 +176,15 @@ class JsSipProvider {
   }
 
   async init(cfg: SoftphoneConfig) {
+    // Skip re-init when already running with identical credentials — prevents the
+    // disconnect/reconnect loop caused by repeated mounts (route changes, StrictMode).
+    const sig = `${cfg.extension}|${cfg.sipDomain}|${cfg.password}|${cfg.wssUrl}`;
+    if (this.ua && (this as any).lastInitSig === sig && (this.snap.status === "registered" || this.snap.status === "connected" || this.snap.status === "connecting")) {
+      this.log("info", "config", `SIP already initialized for ext ${cfg.extension} — skipping re-init`);
+      return;
+    }
     if (this.ua) this.stop();
+    (this as any).lastInitSig = sig;
     this.config = cfg;
     this.update({ events: [], callEvents: [], wssReachable: null, errorCause: undefined });
     this.log("info", "config", `Initializing SIP for ext ${cfg.extension}@${cfg.sipDomain}`);
