@@ -96,6 +96,8 @@ export default function AuditView() {
 
       {tab === 'ai' ? <AIAuditPanel /> : (
       <>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
+
 
         {ACTION_FILTERS.map(f => (
           <button key={f} onClick={() => setFilter(f)} style={{
