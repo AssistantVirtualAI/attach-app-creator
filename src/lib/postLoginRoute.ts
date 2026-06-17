@@ -26,9 +26,13 @@ const ROLE_PRIORITY: Record<ResellerRole, number> = {
  */
 export async function getPostLoginRoute(userId: string): Promise<string> {
   try {
-    // 1. Super admin (global) — highest priority
-    const { data: isSuper } = await supabase.rpc('is_super_admin', { _user_id: userId });
-    if (isSuper === true) return '/platform';
+    // 1. Super admin (global) or Lemtel admin — highest priority → platform portal
+    const [{ data: isSuper }, { data: isLemtelAdmin }] = await Promise.all([
+      supabase.rpc('is_super_admin', { _user_id: userId }),
+      supabase.rpc('is_lemtel_admin', { _user_id: userId }),
+    ]);
+    if (isSuper === true || isLemtelAdmin === true) return '/platform';
+
 
     // 2. Reseller-tier roles from org_members
     const { data: orgMemberRows } = await supabase

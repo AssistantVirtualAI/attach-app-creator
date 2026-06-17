@@ -1,5 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
+import { theme } from '../lib/theme';
+
+const { colors: c } = theme;
 
 export default function CallForwarding({ extension }: { extension: string }) {
   const [enabled, setEnabled] = useState(false);
@@ -31,16 +34,16 @@ export default function CallForwarding({ extension }: { extension: string }) {
   };
 
   return (
-    <div style={{ marginBottom: 12, background: 'rgba(255,255,255,0.72)', border: '1px solid rgba(0,61,166,0.10)', borderRadius: 8, padding: 10, minWidth: 0 }}>
+    <div style={{ marginBottom: 12, background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 8, padding: 10, minWidth: 0 }}>
       <button
         onClick={() => setOpen((v) => !v)}
-        style={{ background: 'none', border: 'none', color: '#0E1B3D', fontSize: 11, fontWeight: 800, cursor: 'pointer', width: '100%', textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+        style={{ background: 'none', border: 'none', color: c.text, fontSize: 11, fontWeight: 800, cursor: 'pointer', width: '100%', textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
       >
         ↪ Call forwarding {enabled ? `· → ${target || '(unset)'}` : '· off'} {open ? '▾' : '▸'}
       </button>
       {open && (
         <div style={{ marginTop: 8 }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, marginBottom: 8 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, marginBottom: 8, color: c.text }}>
             <input
               type="checkbox"
               checked={enabled}
@@ -56,8 +59,8 @@ export default function CallForwarding({ extension }: { extension: string }) {
             placeholder="Extension or external number"
             style={{
               width: '100%', padding: 8, fontSize: 12, borderRadius: 6,
-              background: 'rgba(255,255,255,0.88)', color: '#0E1B3D',
-              border: '1px solid rgba(0,61,166,0.18)', outline: 'none', boxSizing: 'border-box',
+              background: c.bgElev, color: c.text,
+              border: `1px solid ${c.border}`, outline: 'none', boxSizing: 'border-box',
             }}
           />
         </div>

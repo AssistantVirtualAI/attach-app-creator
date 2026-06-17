@@ -17,8 +17,8 @@ const VOICES = [
 
 const input: React.CSSProperties = {
   width: '100%', boxSizing: 'border-box', padding: '9px 11px',
-  borderRadius: 10, background: '#0a1430',
-  border: `1px solid ${c.border}`, color: c.textIce, fontSize: 13,
+  borderRadius: 10, background: c.bgElev,
+  border: `1px solid ${c.border}`, color: c.text, fontSize: 13,
   outline: 'none', fontFamily: 'inherit',
 };
 

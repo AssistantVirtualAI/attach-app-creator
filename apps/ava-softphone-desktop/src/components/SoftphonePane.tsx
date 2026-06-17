@@ -808,7 +808,7 @@ function Dialer({
         margin: compact ? '4px auto 16px' : '4px auto 22px', maxWidth: 320,
         width: '100%', boxSizing: 'border-box',
         padding: compact ? '14px 12px' : '18px 20px', borderRadius: 18,
-        background: '#ffffff',
+        background: c.bgElev,
         border: `1px solid ${c.border}`,
         boxShadow: '0 1px 2px rgba(15,23,42,0.04), 0 8px 24px -16px rgba(0,35,230,0.18)',
         textAlign: 'center', minHeight: 64,
@@ -819,7 +819,7 @@ function Dialer({
           style={{
             fontSize: compact ? 26 : 32, letterSpacing: compact ? 0.4 : 0.8, fontWeight: 600,
             lineHeight: 1.05,
-            color: dial ? c.textIce : c.textDim,
+            color: dial ? c.text : c.textDim,
             textShadow: dial ? '0 0 22px rgba(33,212,253,0.30)' : 'none',
             minHeight: 36,
             maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
