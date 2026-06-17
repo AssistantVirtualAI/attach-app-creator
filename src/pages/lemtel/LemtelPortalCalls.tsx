@@ -12,6 +12,9 @@ import { format } from 'date-fns';
 import { usePbxCallRecords, usePbxSync, usePbxTestCdrEndpoint, LEMTEL_ORG } from '@/hooks/usePbxData';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { loadPbxRecordingAudio } from '@/lib/pbxRecordingAudio';
+import { runTranscribeAndAnalyze, isStubTranscript, type TranscriptStage } from '@/lib/transcriptStatus';
+import { TranscriptStagePill } from '@/components/transcripts/TranscriptStagePill';
+
 
 function statusBadge(c: any) {
   if (c.missed_call) return <Badge className="bg-red-500/15 text-red-600 border-red-500/30 border">Missed</Badge>;
