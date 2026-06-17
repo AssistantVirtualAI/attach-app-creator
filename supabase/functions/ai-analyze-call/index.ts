@@ -99,11 +99,14 @@ Deno.serve(async (req) => {
       .select("organization_id").eq("user_id", user.id).eq("organization_id", organization_id).maybeSingle();
     if (!member && !orgMember && !softphoneMember && !roleMember) return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: corsHeaders });
 
+    let transcriptProvider: string | null = null;
     if (!transcript_text) {
       const { data: existingTranscript } = await admin.from("pbx_call_transcripts")
-        .select("transcript_text").eq("call_record_id", call_record_id).order("created_at", { ascending: false }).limit(1).maybeSingle();
+        .select("transcript_text, provider").eq("call_record_id", call_record_id).order("created_at", { ascending: false }).limit(1).maybeSingle();
       transcript_text = existingTranscript?.transcript_text;
+      transcriptProvider = (existingTranscript as any)?.provider || null;
     }
+    const transcriptIsStub = !transcript_text || (transcriptProvider || "").startsWith("stub");
     if (!transcript_text) {
       let { data: call } = await admin.from("pbx_call_records")
         .select("caller_number, caller_name, destination_number, destination, direction, start_at, duration_seconds, billsec, hangup_cause, voicemail_message")
@@ -122,6 +125,32 @@ Deno.serve(async (req) => {
         call?.hangup_cause ? `Hangup cause: ${call.hangup_cause}.` : "",
         call?.voicemail_message && call.voicemail_message !== "false" ? `Voicemail: ${call.voicemail_message}` : "",
       ].filter(Boolean).join("\n");
+    }
+
+    // If the only "transcript" we have is metadata, don't fabricate an AI analysis.
+    if (transcriptIsStub) {
+      const pendingInsights = {
+        sentiment: null, satisfaction_score: null, intent: null,
+        topics: [], action_items: [], risks: [], sales_opportunities: [],
+        quality_score: null, escalation_needed: false, key_phrases: [],
+        summary: "Transcript not yet available — the call recording could not be retrieved. Click Retry transcription once the recording is synced.",
+      };
+      await admin.from("pbx_ai_insights").delete().eq("call_record_id", call_record_id);
+      await admin.from("pbx_ai_insights").insert({
+        organization_id, call_record_id,
+        sentiment: "neutral", satisfaction_score: 0, intent: "unknown",
+        topics: [], action_items: [], risks: [], sales_opportunities: [],
+        quality_score: 0, escalation_needed: false, key_phrases: [],
+        summary: pendingInsights.summary,
+        prompt_version: "v1", ai_model: "skipped-no-transcript",
+      });
+      return new Response(JSON.stringify({
+        ok: true, stub: true, reason: "no-transcript",
+        ...pendingInsights, insights: pendingInsights, analysis: pendingInsights,
+        transcript: transcript_text, transcript_text,
+        summary: pendingInsights.summary, sentiment: null, topics: [], action_items: [],
+        jobId: crypto.randomUUID(),
+      }), { headers: corsHeaders });
     }
 
     const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");

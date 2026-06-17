@@ -93,45 +93,111 @@ Deno.serve(async (req) => {
       await admin.from("pbx_call_transcripts").insert({
         organization_id, call_record_id, transcript_text: text, provider, language: "fr",
       });
-      await admin.from("pbx_call_records").update({ transcribed: true }).eq("id", call_record_id).then(() => {}, () => {});
+      await admin.from("pbx_call_records").update({ transcribed: !provider.startsWith("stub") }).eq("id", call_record_id).then(() => {}, () => {});
     };
 
-    // Try to fetch audio. Prefer direct URL, otherwise proxy through fusionpbx-proxy.
+    // Try to fetch audio. Order: direct URL → Supabase Storage path → fusionpbx-proxy → twilio-recording-proxy
     let audioBytes: Uint8Array | null = null;
     let audioMime = "audio/wav";
+    let audioSource: string | null = null;
+    const fetchErrors: string[] = [];
+    const isTwilio = /api\.twilio\.com/i.test(sourceUrl || "") || /^RE[0-9a-f]{32}$/i.test(call?.recording_name || "");
+
     try {
-      if (sourceUrl) {
-        const r = await fetch(sourceUrl);
-        if (r.ok) {
-          audioBytes = new Uint8Array(await r.arrayBuffer());
-          audioMime = detectMime(sourceUrl, r.headers.get("content-type"));
-        }
+      // 1. Direct URL (skip for Twilio — needs basic auth via proxy)
+      if (sourceUrl && !isTwilio) {
+        try {
+          const r = await fetch(sourceUrl);
+          if (r.ok) {
+            audioBytes = new Uint8Array(await r.arrayBuffer());
+            audioMime = detectMime(sourceUrl, r.headers.get("content-type"));
+            audioSource = "direct-url";
+          } else {
+            fetchErrors.push(`direct:${r.status}`);
+          }
+        } catch (e: any) { fetchErrors.push(`direct:${e?.message || "err"}`); }
       }
+
+      // 2. Supabase Storage
+      const storagePath = recording_path || call?.recording_path;
+      if (!audioBytes && storagePath && typeof storagePath === "string" && !storagePath.startsWith("http")) {
+        try {
+          const parts = storagePath.split("/");
+          const bucket = parts.shift()!;
+          const path = parts.join("/");
+          const dl = await admin.storage.from(bucket).download(path);
+          if (dl.data) {
+            audioBytes = new Uint8Array(await dl.data.arrayBuffer());
+            audioMime = detectMime(storagePath, dl.data.type);
+            audioSource = "storage";
+          } else if (dl.error) {
+            fetchErrors.push(`storage:${dl.error.message}`);
+          }
+        } catch (e: any) { fetchErrors.push(`storage:${e?.message || "err"}`); }
+      }
+
+      // 3. FusionPBX proxy
       if (!audioBytes && (recording_path || recording_name || call?.recording_path || call?.recording_name)) {
-        const proxyRes = await admin.functions.invoke("fusionpbx-proxy", {
-          body: {
-            organization_id, action: "get-recording",
-            xml_cdr_uuid: call_record_id,
-            record_path: recording_path || call?.recording_path,
-            record_name: recording_name || call?.recording_name,
-          },
-        });
-        const b64 = (proxyRes.data as any)?.audio_base64 || (proxyRes.data as any)?.recording_base64;
-        if (b64) {
-          const bin = atob(b64);
-          const arr = new Uint8Array(bin.length);
-          for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-          audioBytes = arr;
-          audioMime = detectMime(recording_name || call?.recording_name || "");
-        }
+        try {
+          const proxyRes = await admin.functions.invoke("fusionpbx-proxy", {
+            body: {
+              organization_id, action: "get-recording",
+              xml_cdr_uuid: call_record_id,
+              record_path: recording_path || call?.recording_path,
+              record_name: recording_name || call?.recording_name,
+            },
+          });
+          const b64 = (proxyRes.data as any)?.audio_base64 || (proxyRes.data as any)?.recording_base64;
+          if (b64) {
+            const bin = atob(b64);
+            const arr = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+            audioBytes = arr;
+            audioMime = detectMime(recording_name || call?.recording_name || "");
+            audioSource = "fusionpbx-proxy";
+          } else if (proxyRes.error) {
+            fetchErrors.push(`fusion:${proxyRes.error.message}`);
+          }
+        } catch (e: any) { fetchErrors.push(`fusion:${e?.message || "err"}`); }
       }
-    } catch (_) { /* fall through to stub */ }
+
+      // 4. Twilio recording proxy
+      if (!audioBytes && (isTwilio || /^RE/.test(call?.recording_name || ""))) {
+        try {
+          const proxyRes = await admin.functions.invoke("twilio-recording-proxy", {
+            body: { organization_id, recording_sid: call?.recording_name, recording_url: sourceUrl },
+          });
+          const b64 = (proxyRes.data as any)?.audio_base64;
+          if (b64) {
+            const bin = atob(b64);
+            const arr = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+            audioBytes = arr;
+            audioMime = "audio/wav";
+            audioSource = "twilio-proxy";
+          } else if (proxyRes.error) {
+            fetchErrors.push(`twilio:${proxyRes.error.message}`);
+          }
+        } catch (e: any) { fetchErrors.push(`twilio:${e?.message || "err"}`); }
+      }
+    } catch (e: any) { fetchErrors.push(`outer:${e?.message || "err"}`); }
+
+    console.log("ai-transcribe-call audio resolution", { call_record_id, audioSource, bytes: audioBytes?.length || 0, fetchErrors });
 
     const lovableKey = Deno.env.get("LOVABLE_API_KEY");
-    if (!lovableKey || !audioBytes || audioBytes.length === 0) {
-      const stub = fallbackTranscript || "Call metadata synced from FusionPBX. Audio transcription is pending.";
-      await writeTranscript(stub, "stub");
-      return json({ transcript_text: stub, stub: true, reason: !lovableKey ? "missing-ai-key" : "no-audio" });
+    if (!lovableKey) {
+      await writeTranscript(fallbackTranscript, "stub-no-key");
+      return json({ transcript_text: fallbackTranscript, stub: true, reason: "missing-ai-key", fetchErrors });
+    }
+    if (!audioBytes || audioBytes.length === 0) {
+      await writeTranscript(fallbackTranscript, "stub-no-audio");
+      return json({ transcript_text: fallbackTranscript, stub: true, reason: "no-audio", fetchErrors }, 200);
+    }
+
+    // Gemini supports inline audio up to ~20MB
+    if (audioBytes.length > 20 * 1024 * 1024) {
+      await writeTranscript(fallbackTranscript, "stub-too-large");
+      return json({ transcript_text: fallbackTranscript, stub: true, reason: "audio-too-large", size: audioBytes.length });
     }
 
     // Lovable AI Gateway (OpenAI-compatible) with inline audio
@@ -140,11 +206,12 @@ Deno.serve(async (req) => {
       method: "POST",
       headers: { "Lovable-API-Key": lovableKey, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-2.5-pro",
+        max_tokens: 8000,
         messages: [{
           role: "user",
           content: [
-            { type: "text", text: "Transcribe this phone call verbatim. Label speakers as Agent: and Caller:. Return only the transcript, no commentary." },
+            { type: "text", text: "Transcribe this phone call verbatim in the original language spoken (French or English). Label speakers as Agent: and Caller: on separate lines. Include filler words. Return ONLY the transcript text, no preamble, no commentary, no markdown." },
             { type: "input_audio", input_audio: { data: b64, format: audioMime.split("/")[1] || "wav" } },
           ],
         }],
@@ -153,13 +220,23 @@ Deno.serve(async (req) => {
     if (!aiRes.ok) {
       const errTxt = await aiRes.text();
       console.error("ai gateway error", aiRes.status, errTxt);
-      await writeTranscript(fallbackTranscript, "stub");
+      // 429 / 402 are user-facing billing issues — surface them, don't silently stub
+      if (aiRes.status === 429 || aiRes.status === 402) {
+        return json({ error: aiRes.status === 429 ? "rate-limited" : "credits-exhausted", details: errTxt }, aiRes.status);
+      }
+      await writeTranscript(fallbackTranscript, `stub-ai-${aiRes.status}`);
       return json({ transcript_text: fallbackTranscript, stub: true, error: `ai_gateway_${aiRes.status}` });
     }
     const data = await aiRes.json();
-    const transcript_text = String(data?.choices?.[0]?.message?.content || "").trim() || fallbackTranscript;
-    await writeTranscript(transcript_text, "lovable-ai");
-    return json({ transcript_text });
+    const finishReason = data?.choices?.[0]?.finish_reason;
+    const transcript_text = String(data?.choices?.[0]?.message?.content || "").trim();
+    console.log("ai-transcribe-call ai result", { finishReason, length: transcript_text.length, audioSource });
+    if (!transcript_text) {
+      await writeTranscript(fallbackTranscript, "stub-empty-ai");
+      return json({ transcript_text: fallbackTranscript, stub: true, reason: "empty-ai-response", finishReason });
+    }
+    await writeTranscript(transcript_text, "lovable-ai/gemini-2.5-pro");
+    return json({ transcript_text, audioSource, finishReason });
   } catch (e: any) {
     console.error("ai-transcribe-call error", e);
     return json({ error: e?.message || "transcription failed" }, 500);
