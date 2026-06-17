@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { ImpactStyle } from '@capacitor/haptics';
+import { Voicemail, Disc3, MessageSquareText } from 'lucide-react';
 import { colors, radius, font } from '../lib/theme';
 import VoicemailScreen from './VoicemailScreen';
 import RecordingsScreen from './RecordingsScreen';
@@ -7,10 +8,10 @@ import MessagesScreen from './MessagesScreen';
 
 type SubTab = 'voicemail' | 'recordings' | 'sms';
 
-const TABS: { id: SubTab; label: string; icon: string }[] = [
-  { id: 'voicemail',  label: 'Voicemail',  icon: '✉' },
-  { id: 'recordings', label: 'Recordings', icon: '◉' },
-  { id: 'sms',        label: 'SMS',        icon: '💬' },
+const TABS: { id: SubTab; label: string; Icon: typeof Voicemail; accent: string }[] = [
+  { id: 'voicemail',  label: 'Voicemail',  Icon: Voicemail,         accent: '#FFD86B' },
+  { id: 'recordings', label: 'Recordings', Icon: Disc3,             accent: '#7CD4FF' },
+  { id: 'sms',        label: 'SMS',        Icon: MessageSquareText, accent: '#B79CFF' },
 ];
 
 export default function InboxScreen({
@@ -24,34 +25,56 @@ export default function InboxScreen({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <header style={{ padding: '14px 14px 10px' }}>
-        <div style={{ fontSize: 11, color: colors.mutedSilver, textTransform: 'uppercase', letterSpacing: 1.4, fontWeight: 700 }}>
+      <header style={{ padding: '16px 16px 12px' }}>
+        <div style={{ fontSize: 11, color: colors.mutedSilver, textTransform: 'uppercase', letterSpacing: 1.6, fontWeight: 700 }}>
           Inbox
         </div>
-        <div style={{ fontSize: 22, fontWeight: 800, color: colors.textIce, marginTop: 2 }}>Messages</div>
+        <div style={{ fontSize: 24, fontWeight: 800, color: colors.textIce, marginTop: 2, letterSpacing: -0.3 }}>
+          Messages
+        </div>
       </header>
 
       <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6,
-        padding: '0 12px 10px',
+        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8,
+        padding: '0 14px 12px',
       }}>
-        {TABS.map((t) => {
-          const active = tab === t.id;
+        {TABS.map(({ id, label, Icon, accent }) => {
+          const active = tab === id;
           return (
             <button
-              key={t.id}
-              onClick={() => { haptic(); setTab(t.id); }}
+              key={id}
+              onClick={() => { haptic(); setTab(id); }}
               style={{
-                padding: '9px 6px', borderRadius: radius.md,
-                background: active ? 'rgba(255,215,0,0.12)' : 'rgba(255,255,255,0.03)',
-                border: `1px solid ${active ? colors.signalGold + '66' : colors.border}`,
-                color: active ? colors.signalGold : colors.mutedSilver,
-                fontSize: font.xs, fontWeight: 800, letterSpacing: 0.4,
-                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                position: 'relative',
+                padding: '12px 8px',
+                borderRadius: radius.lg,
+                background: active
+                  ? `linear-gradient(160deg, ${accent}22 0%, rgba(255,255,255,0.04) 100%)`
+                  : 'linear-gradient(160deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.015) 100%)',
+                border: `1px solid ${active ? accent + '80' : 'rgba(255,255,255,0.08)'}`,
+                color: active ? accent : colors.mutedSilver,
+                fontSize: font.xs, fontWeight: 700, letterSpacing: 0.4,
+                cursor: 'pointer',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+                boxShadow: active
+                  ? `0 8px 24px -8px ${accent}66, inset 0 1px 0 rgba(255,255,255,0.08)`
+                  : 'inset 0 1px 0 rgba(255,255,255,0.04)',
+                backdropFilter: 'blur(14px)',
+                transition: 'all 220ms cubic-bezier(.2,.8,.2,1)',
+                transform: active ? 'translateY(-1px)' : 'translateY(0)',
               }}
             >
-              <span style={{ fontSize: 14 }}>{t.icon}</span>
-              {t.label}
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                width: 32, height: 32, borderRadius: 10,
+                background: active
+                  ? `radial-gradient(circle at 30% 30%, ${accent}55, ${accent}11 70%)`
+                  : 'rgba(255,255,255,0.05)',
+                border: `1px solid ${active ? accent + '55' : 'rgba(255,255,255,0.06)'}`,
+              }}>
+                <Icon size={16} strokeWidth={2.2} />
+              </span>
+              {label}
             </button>
           );
         })}
