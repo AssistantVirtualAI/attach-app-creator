@@ -197,7 +197,7 @@ function DetailDrawer({ row, onClose, onRollback }: { row: Row; onClose: () => v
     }}>
       <div onClick={(e) => e.stopPropagation()} style={{
         width: '100%', maxWidth: 720, maxHeight: '85vh', overflowY: 'auto',
-        background: '#0c1733', borderRadius: 14, border: `1px solid ${c.border}`, padding: 22, color: c.textIce,
+        background: c.bgCard, borderRadius: 14, border: `1px solid ${c.border}`, padding: 22, color: c.textIce,
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, marginBottom: 14 }}>
           <div>
