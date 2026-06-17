@@ -21,7 +21,7 @@ export default function MoreScreen({
   if (sub === 'recordings') return <SubPage onBack={() => setSub(null)} title="Recordings"><RecordingsScreen /></SubPage>;
   if (sub === 'voicemail')  return <SubPage onBack={() => setSub(null)} title="Voicemail"><VoicemailScreen haptic={haptic} /></SubPage>;
   if (sub === 'messages')   return <SubPage onBack={() => setSub(null)} title="Messages"><MessagesScreen haptic={haptic} /></SubPage>;
-  if (sub === 'contacts')   return <SubPage onBack={() => setSub(null)} title="Contacts"><ContactsScreen sp={sp} haptic={haptic} /></SubPage>;
+  if (sub === 'contacts')   return <SubPage onBack={() => setSub(null)} title="Contacts"><ContactsScreen sp={sp} /></SubPage>;
   if (sub === 'settings')   return <SubPage onBack={() => setSub(null)} title="Settings"><SettingsScreen creds={creds} sp={sp} onSignOut={onSignOut} /></SubPage>;
   if (sub === 'delete')     return <SubPage onBack={() => setSub(null)} title="Delete account"><DeleteAccountScreen onDone={onSignOut} /></SubPage>;
 
