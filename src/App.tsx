@@ -292,6 +292,7 @@ const App = () => (
                 {/* Public download page */}
                 <Route path="/download" element={<Download />} />
                 <Route path="/mobile-preview" element={<MobilePreview />} />
+                <Route path="/m" element={<MobileEmbed />} />
                 
                 {/* Universal login - redirects based on user type */}
                 <Route path="/login" element={<UniversalLogin />} />
