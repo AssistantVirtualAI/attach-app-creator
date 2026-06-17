@@ -1,5 +1,13 @@
 import { supabase } from '@/integrations/supabase/client';
 
+export type ResellerRole =
+  | 'ava_admin'
+  | 'master_admin'
+  | 'reseller_admin'
+  | 'customer_admin'
+  | 'agent'
+  | 'user';
+
 /**
  * Determine where to send a user after they log in.
  * Uses the three-portal architecture:
