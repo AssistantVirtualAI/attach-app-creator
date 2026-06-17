@@ -23,24 +23,33 @@ export default function DialerFab({
           haptic(ImpactStyle.Medium);
           setOpen(true);
         }}
-        aria-label="Open keypad"
+        aria-label="Open keypad to place a call"
+        title="Keypad"
         style={{
           position: 'fixed',
-          right: 18,
-          bottom: `calc(96px + var(--safe-bottom))`,
-          width: 60,
-          height: 60,
+          // Respect right safe area (notch/rounded corners on landscape iOS)
+          right: `calc(16px + env(safe-area-inset-right, 0px))`,
+          // Sit above the bottom tab bar (tab height ~66 + 8 margin + safe area)
+          bottom: `calc(82px + env(safe-area-inset-bottom, 0px) + var(--safe-bottom))`,
+          // Min 44x44 tap target (Apple HIG) / 48dp (Material) — we use 64 for comfort
+          width: 64,
+          height: 64,
+          minWidth: 44,
+          minHeight: 44,
           borderRadius: '50%',
-          border: 'none',
+          border: '2px solid rgba(255,255,255,0.6)',
           cursor: 'pointer',
           background: gradients.shinyPrimary,
           color: '#fff',
-          fontSize: 26,
+          fontSize: 28,
           fontWeight: 700,
           display: 'grid',
           placeItems: 'center',
           boxShadow: shadow.lift,
           zIndex: 60,
+          outlineOffset: 3,
+          WebkitTapHighlightColor: 'transparent',
+          touchAction: 'manipulation',
         }}
       >
         ⌨
