@@ -1,0 +1,47 @@
+Nom de l'app
+AVA Softphone
+
+Sous-titre
+Appels, files d'attente et IA pour entreprise
+
+Catégorie principale
+Affaires
+
+Mots-clés
+softphone, téléphonie, voip, sip, enregistrement, transcription, ia, file, messagerie, telecom
+
+Description courte
+Softphone d'entreprise léger : historique d'appels, files, enregistrements avec transcription IA et assistant AVA.
+
+Texte promotionnel
+Gérez la téléphonie de votre entreprise depuis votre poche — appels, files d'attente, messagerie, enregistrements avec transcription IA et l'assistant AVA, le tout dans une seule app.
+
+Description
+AVA Softphone est le compagnon mobile léger de votre système téléphonique d'entreprise. Il se synchronise automatiquement avec votre PBX pour afficher en temps réel l'historique d'appels, les enregistrements transcrits par l'IA, l'activité des files d'attente, la messagerie vocale et un tableau de bord à l'échelle du domaine.
+
+Points forts :
+• Historique d'appels de l'entreprise en direct, rappel en un clic.
+• Tableau de bord du domaine : total d'appels, répondus, manqués, top extensions, tendance 7 jours.
+• Files d'attente (lecture seule) : appels en attente, agents en ligne, SLA, attente moyenne.
+• Enregistrements d'appels avec transcription IA, sentiment et résumé.
+• Boîte vocale avec transcriptions.
+• Assistant IA AVA — posez n'importe quelle question sur votre téléphonie.
+• Notifications push pour appels entrants, appels manqués et messages vocaux.
+• Conçu pour les utilisateurs d'extension — sans surcharge d'admin.
+
+Confidentialité et sécurité :
+• Toutes les données téléphoniques sont limitées à votre organisation et votre extension.
+• Les enregistrements transitent via des URL signées à courte durée — aucun secret PBX sur l'appareil.
+• Vous pouvez supprimer votre compte directement dans l'app (Plus → Supprimer mon compte).
+
+Support
+https://avastatistic.ca/support
+
+Marketing
+https://avastatistic.ca
+
+Politique de confidentialité
+https://avastatistic.ca/privacy
+
+Conditions d'utilisation
+https://avastatistic.ca/terms

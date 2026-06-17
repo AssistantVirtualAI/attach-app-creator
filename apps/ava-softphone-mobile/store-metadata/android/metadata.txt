@@ -1,34 +1,48 @@
 App Title
-Lemtel AI Phone
+AVA Softphone
 
 Short Description (80 chars)
-Calls, SMS, voicemail, recordings, transcripts, and AVA AI insights.
+Lightweight business softphone: calls, queues, recordings, AI transcripts, chat.
 
 Full Description
-Lemtel AI Phone brings your business communications into one elegant mobile app. Make and receive calls, manage SMS conversations, listen to voicemail, review call recordings, read transcripts, and use AVA AI to summarize calls, create follow-up actions, generate auto-attendant greetings, and connect voice agents.
+AVA Softphone is the lightweight mobile companion for your company phone system. It auto-syncs with your PBX so you always see live call history, call recordings with AI transcripts, queue activity, voicemail and a domain-wide stats dashboard.
 
 Key features:
-• Premium dialer with HD calling on Wi-Fi and mobile data.
-• SMS & MMS inbox with templates and AVA reply assist (rewrite, shorten, translate, professional).
-• Voicemail with transcription, sentiment, priority and one-tap callback.
-• Call recordings with waveform, transcripts, AI summaries, action items, and quality scoring.
-• AVA AI workspace: call intelligence, action center, greeting studio (ElevenLabs), queue builder, and voice-agent management.
-• Admin tools for IVRs, queues, ring groups, devices, and number assignment.
-• Push notifications for incoming calls, SMS and voicemail.
+• Live company call history with one-tap callback.
+• Domain dashboard with total calls, answered, missed, top extensions and a 7-day trend.
+• Call queues (read-only): waiting count, agents online, SLA, average wait.
+• Call recordings with AI transcription, sentiment and summary.
+• Voicemail inbox with transcriptions.
+• AVA AI assistant — ask anything about your phone system.
+• Push notifications for incoming calls, missed calls and voicemails.
+• Designed for regular extension users — no admin clutter.
 
-Access is controlled by your organization's permissions. All sensitive telephony operations are handled securely through AVA backend services — no PBX or SIP secrets are stored on the device.
+Privacy & security:
+• All telephony data is scoped by your organization and extension.
+• Recordings stream through short-lived signed URLs — no PBX secrets on the device.
+• You can delete your account directly from the app (More → Delete my account).
 
 Category
 Business
 
 Tags
-business phone, softphone, SMS, voicemail, call recording, transcription, AI, AVA, telecom, Lemtel, IVR
+softphone, business phone, voip, sip, call recording, transcription, ai, queue, voicemail, telecom
 
 Contact
-support@lemtel.tel
+help@avastatistic.ca
 
 Website
-https://lemtel.tel
+https://avastatistic.ca
 
 Privacy Policy
-https://lemtel.tel/privacy
+https://avastatistic.ca/privacy
+
+Terms of Service
+https://avastatistic.ca/terms
+
+Data Safety (Play Console mapping)
+• Microphone — Call functionality (required)
+• Contacts — App functionality (optional, user-controlled)
+• Account info — Account management
+• Phone activity — Call functionality
+• No advertising / no third-party tracking

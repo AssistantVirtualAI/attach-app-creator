@@ -2,27 +2,27 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.lemtel.softphone',
-  appName: 'Lemtel Telecom',
+  appName: 'AVA Softphone',
   webDir: 'dist',
   server: {
     androidScheme: 'https',
   },
   plugins: {
     SplashScreen: {
-      launchShowDuration: 2000,
-      backgroundColor: '#0a0a1a',
+      launchShowDuration: 1800,
+      backgroundColor: '#EEF3FB',
       showSpinner: false,
     },
     StatusBar: {
-      style: 'dark',
-      backgroundColor: '#001a3d',
+      style: 'light',
+      backgroundColor: '#0023e6',
     },
     PushNotifications: {
       presentationOptions: ['badge', 'sound', 'alert'],
     },
     LocalNotifications: {
       smallIcon: 'ic_stat_icon_config_sample',
-      iconColor: '#003DA6',
+      iconColor: '#0023e6',
     },
   },
 };
