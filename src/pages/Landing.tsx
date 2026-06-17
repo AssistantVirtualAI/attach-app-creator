@@ -25,6 +25,7 @@ import { CompetitorComparisonSection } from "@/components/landing/CompetitorComp
 import { WhatsNewSection } from "@/components/landing/WhatsNewSection";
 import { AppsShowcaseSection } from "@/components/landing/AppsShowcaseSection";
 import { LemtelInteractiveDemo } from "@/components/landing/LemtelInteractiveDemo";
+import { LandingDownloadSection } from "@/components/landing/LandingDownloadSection";
 import { useTranslation } from "@/hooks/useTranslation";
 
 const Landing = () => {
