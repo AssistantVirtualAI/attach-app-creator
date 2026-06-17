@@ -290,6 +290,20 @@ export default function SoftphonePane({
     return () => window.removeEventListener('lemtel:dial-now', onDial);
   }, [dial, sp.snap.status]);
 
+  // Wide-mode side panels (CallControlGrid / RecentsList) dispatch this to
+  // route a number into the dialer + immediately ring it.
+  useEffect(() => {
+    const onDialNumber = (e: Event) => {
+      const detail = (e as CustomEvent<{ number?: string }>).detail;
+      const number = detail?.number;
+      if (!number) return;
+      setDial(number);
+      setTimeout(() => { if (sp.snap.status === 'registered') sp.call(number); }, 80);
+    };
+    window.addEventListener('lemtel:dial-number', onDialNumber as EventListener);
+    return () => window.removeEventListener('lemtel:dial-number', onDialNumber as EventListener);
+  }, [sp]);
+
   // Custom protocol (lemtel://call/<number>) from Chrome extension / OS
   useEffect(() => {
     const api = (window as unknown as { electronAPI?: { onProtocolCall?: (cb: (d: { number: string }) => void) => void } }).electronAPI;
