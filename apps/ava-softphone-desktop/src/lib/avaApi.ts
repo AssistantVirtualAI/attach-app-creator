@@ -785,7 +785,11 @@ export const ava = {
     if (MOCK) return SAMPLE_RECORDING_EMPTY;
     await bestEffortRecentTelephonySync(Math.max(limit, 250));
     window.dispatchEvent(new Event('lemtel:recordings-updated'));
-    return ava.recordings(limit, opts);
+    const rows = await readCallRecordRows(Math.max(limit, 300), opts);
+    return rows
+      .filter((r) => r.has_recording === true || r.recording_path || r.recording_name)
+      .map(mapCdrToRecording)
+      .slice(0, limit);
   },
 
   /**
