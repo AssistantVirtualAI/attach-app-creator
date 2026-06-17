@@ -21,31 +21,34 @@ export default function PageHeader({
 }: Props) {
   return (
     <header
-      className="ava-glass"
+      className="ava-glass ava-page-header"
       style={{
         position: 'relative',
         padding: 'var(--ava-space-5) var(--ava-space-6) var(--ava-space-6)',
         marginBottom: 'var(--ava-space-5)',
         borderRadius: 'var(--ava-radius)',
-        background: c.bgCard,
-        border: `1px solid ${c.border}`,
         overflow: 'hidden',
       }}>
+      {/* brand-tinted overlay so the card never reads as flat grey */}
+      <div aria-hidden style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none',
+        background: `linear-gradient(135deg, ${c.lemtelBlue}14 0%, transparent 45%, ${accent}10 100%)`,
+      }} />
       {/* aurora hairline */}
       <div style={{
         position: 'absolute', top: 0, left: 0, right: 0, height: 2,
         background: `linear-gradient(90deg, ${accent}, ${c.lemtelBlue} 45%, ${c.cyan} 100%)`,
-        opacity: 0.9,
+        opacity: 0.95,
       }} />
       <div aria-hidden style={{
         position: 'absolute', top: -80, right: -60, width: 240, height: 240,
         borderRadius: '50%', pointerEvents: 'none',
-        background: `radial-gradient(circle, ${accent}1f 0%, transparent 65%)`,
+        background: `radial-gradient(circle, ${accent}33 0%, transparent 65%)`,
       }} />
       <div aria-hidden style={{
         position: 'absolute', bottom: -90, left: -60, width: 220, height: 220,
         borderRadius: '50%', pointerEvents: 'none',
-        background: `radial-gradient(circle, ${c.lemtelBlue}14 0%, transparent 65%)`,
+        background: `radial-gradient(circle, ${c.lemtelBlue}26 0%, transparent 65%)`,
       }} />
       <div className="ava-page-header-row" style={{ position: 'relative', display: 'flex', alignItems: 'flex-start', gap: 14, flexWrap: 'wrap' }}>
         {icon && (
@@ -53,27 +56,30 @@ export default function PageHeader({
             flexShrink: 0,
             width: 46, height: 46, borderRadius: 14,
             display: 'grid', placeItems: 'center',
-            background: `linear-gradient(135deg, ${accent}22, ${c.lemtelBlue}1c)`,
-            border: `1px solid ${accent}44`,
+            background: `linear-gradient(135deg, ${accent}33, ${c.lemtelBlue}2a)`,
+            border: `1px solid ${accent}66`,
             color: accent,
-            boxShadow: `0 8px 22px -10px ${accent}66`,
+            boxShadow: `0 8px 22px -10px ${accent}88`,
           }}>{icon}</div>
         )}
         <div style={{ flex: 1, minWidth: 200 }}>
           {eyebrow && (
-            <div style={{
-              fontSize: 10, fontWeight: 700, letterSpacing: 2,
+            <div className="ava-page-header-eyebrow" style={{
+              fontSize: 10.5, fontWeight: 800, letterSpacing: 2.4,
               color: accent, textTransform: 'uppercase', marginBottom: 6,
+              textShadow: `0 0 14px ${accent}55`,
             }}>{eyebrow}</div>
           )}
-          <h1 className="ava-display" style={{
-            fontWeight: 600, lineHeight: 1.15,
-            color: c.textIce, margin: '0 0 6px',
+          <h1 className="ava-display ava-page-header-title" style={{
+            fontWeight: 700, lineHeight: 1.15,
+            color: c.text, margin: '0 0 6px',
             letterSpacing: -0.4,
             fontFamily: "'Space Grotesk', 'DM Sans', sans-serif",
           }}>{title}</h1>
           {subtitle && (
-            <p style={{ fontSize: 13, color: c.mutedSilver, margin: 0, lineHeight: 1.55, maxWidth: 640 }}>
+            <p className="ava-page-header-subtitle" style={{
+              fontSize: 13.5, color: c.textSub, margin: 0, lineHeight: 1.55, maxWidth: 640, fontWeight: 500,
+            }}>
               {subtitle}
             </p>
           )}
