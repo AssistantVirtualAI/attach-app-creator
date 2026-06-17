@@ -10,7 +10,7 @@ import { ThemeProvider } from "@/context/ThemeContext";
 import { ClientProvider } from "@/context/ClientContext";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { AppErrorBoundary } from "@/components/errors/AppErrorBoundary";
-import MascotProvider from "@/components/mascot/MascotProvider";
+
 
 import Landing from "./pages/Landing";
 import AuthPage from "./pages/Auth";
@@ -978,7 +978,7 @@ const App = () => (
 
 
               </Routes>
-              <MascotProvider />
+              {/* MascotProvider removed — MyAIChatLauncher is the single AVA assistant */}
             </Suspense>
           </OrganizationProvider>
           </BrowserRouter>
