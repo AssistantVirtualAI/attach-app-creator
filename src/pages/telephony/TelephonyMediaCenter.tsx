@@ -178,6 +178,8 @@ function RecordingsTab({ orgId, extension, search }: { orgId: string; extension:
   const qc = useQueryClient();
   const [signed, setSigned] = useState<Record<string, string>>({});
   const [working, setWorking] = useState<string | null>(null);
+  const [stages, setStages] = useState<Record<string, { stage: TranscriptStage; detail?: string }>>({});
+
 
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["media", "recordings", orgId, extension],
