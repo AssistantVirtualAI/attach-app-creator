@@ -1111,7 +1111,7 @@ function ActiveCall({
   );
 }
 
-function ControlBtn({
+export function ControlBtn({
   icon, label, ariaLabel, onClick, active, danger, warning, disabled, iconOnly,
 }: {
   icon: string; label: string; ariaLabel?: string; onClick: () => void;
