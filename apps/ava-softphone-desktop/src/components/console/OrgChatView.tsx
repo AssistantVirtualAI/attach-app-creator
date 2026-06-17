@@ -161,7 +161,7 @@ export default function OrgChatView() {
   // Realtime presence
   useEffect(() => {
     if (!orgId) return;
-    const ch = supabase.channel(`presence:${orgId}`)
+    const ch = supabase.channel(`org-chat-presence-${orgId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'user_presence' }, () => {
         loadMembers(orgId);
       })
