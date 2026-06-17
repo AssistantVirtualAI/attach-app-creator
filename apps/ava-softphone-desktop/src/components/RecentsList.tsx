@@ -12,11 +12,13 @@ interface Props {
 function fmtTime(iso: string | null) {
   if (!iso) return '';
   const d = new Date(iso);
-  const now = new Date();
-  const sameDay = d.toDateString() === now.toDateString();
-  return sameDay
-    ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    : d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  if (Number.isNaN(d.getTime())) return '';
+  const sameYear = d.getFullYear() === new Date().getFullYear();
+  const opts: Intl.DateTimeFormatOptions = {
+    month: 'short', day: 'numeric', ...(sameYear ? {} : { year: 'numeric' }),
+    hour: '2-digit', minute: '2-digit',
+  };
+  return d.toLocaleString([], opts);
 }
 
 function fmtDur(s: number) {
@@ -29,22 +31,25 @@ function fmtDur(s: number) {
 export default function RecentsList({ extension, onCall }: Props) {
   const [rows, setRows] = useState<CallRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
-  const load = useCallback(async (silent = false) => {
+  const load = useCallback(async (silent = false, force = false) => {
     if (!silent) { setLoading(true); setErr(null); }
+    if (force) setRefreshing(true);
     try {
-      const data = await ava.calls(50);
+      const data = force ? await ava.refreshCalls(50, { extension }) : await ava.calls(50, { extension });
       setRows(Array.isArray(data) ? data : []);
       setLastUpdated(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
     } catch (e: any) {
-      if (!silent) {
+      if (!silent || force) {
         setErr(e?.message || 'Unable to load live call records.');
         setRows([]);
       }
     } finally {
       if (!silent) setLoading(false);
+      if (force) setRefreshing(false);
     }
   }, [extension]);
 
@@ -90,7 +95,7 @@ export default function RecentsList({ extension, onCall }: Props) {
         <span style={{ fontSize: 10, opacity: 0.5, letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 600 }}>
           {rows.length} call{rows.length > 1 ? 's' : ''}{lastUpdated ? ` · ${lastUpdated}` : ''}
         </span>
-        <button onClick={() => load()} style={refreshBtn} title="Refresh">↻</button>
+        <button onClick={() => load(true, true)} disabled={refreshing} style={{ ...refreshBtn, opacity: refreshing ? 0.55 : 1 }} title="Refresh live CDRs">{refreshing ? '…' : '↻'}</button>
       </div>
       {rows.map((r) => {
         const outbound = r.direction === 'out';
@@ -122,7 +127,7 @@ export default function RecentsList({ extension, onCall }: Props) {
                 </span>
                 {name || peer}
               </div>
-              <div style={{ fontSize: 10.5, opacity: 0.5, marginTop: 2, letterSpacing: 0.2 }}>
+              <div style={{ fontSize: 10.5, opacity: 0.62, marginTop: 2, letterSpacing: 0.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {fmtTime(r.startedAt)}{r.durationSec ? ` · ${fmtDur(r.durationSec)}` : ''}
               </div>
             </div>

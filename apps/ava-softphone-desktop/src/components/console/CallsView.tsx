@@ -71,11 +71,11 @@ export default function CallsView({ scope = 'mine' }: { scope?: 'mine' | 'org' }
     return () => ro.disconnect();
   }, []);
 
-  const load = useCallback(async (silent = false) => {
+  const load = useCallback(async (silent = false, force = false) => {
     if (!silent) setLoading(true);
     setError(null); setSyncing(true);
     try {
-      const scopedCalls = await ava.calls(150, { scope });
+      const scopedCalls = force ? await ava.refreshCalls(150, { scope }) : await ava.calls(150, { scope });
       setCalls(scopedCalls);
       setSel((current) => current ? scopedCalls.find((cr) => cr.id === current.id) || current : current);
     } catch (err: any) {
@@ -157,7 +157,7 @@ export default function CallsView({ scope = 'mine' }: { scope?: 'mine' | 'org' }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sel?.id]);
 
-  const retry = useCallback(() => load(false), [load]);
+  const retry = useCallback(() => load(false, true), [load]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -215,7 +215,7 @@ export default function CallsView({ scope = 'mine' }: { scope?: 'mine' | 'org' }
         {!loading && <div style={{ background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 12, overflow: 'hidden' }}>
           {filtered.map((cr) => (
             <button key={cr.id} onClick={() => setSel(cr)} style={{
-              display: 'grid', gridTemplateColumns: compactRows ? '22px minmax(0,1fr) 58px' : '24px minmax(0,1fr) 80px 90px 86px',
+              display: 'grid', gridTemplateColumns: compactRows ? '22px minmax(0,1fr)' : '24px minmax(0,1fr) 80px 90px 86px',
               alignItems: 'center', gap: compactRows ? 8 : 12, width: '100%',
               padding: compactRows ? '10px 10px' : '11px 14px', background: sel?.id === cr.id ? 'rgba(255,230,0,0.06)' : 'transparent',
               border: 'none', borderBottom: `1px solid ${c.border}`,
@@ -229,10 +229,10 @@ export default function CallsView({ scope = 'mine' }: { scope?: 'mine' | 'org' }
                   {cr.customer || (cr.direction === 'in' ? (cr.from || '') : (cr.to || '')) || 'Unknown caller'}
                 </span>
                 <span style={{ fontSize: 10.5, color: c.mutedSilver }}>
-                  {cr.direction === 'in' ? (cr.from || '') : (cr.to || '')}{compactRows ? ` · ${fmtDate(cr.startedAt)}` : ''} {cr.transcript_text ? '· transcript ready' : ''}
+                  {cr.direction === 'in' ? (cr.from || '') : (cr.to || '')}{compactRows ? ` · ${fmtDate(cr.startedAt)}${cr.durationSec ? ` · ${fmtDur(cr.durationSec)}` : ''}` : ''} {cr.transcript_text ? '· transcript ready' : ''}
                 </span>
               </span>
-              <span style={{ fontSize: 11, color: c.mutedSilver, fontFamily: 'JetBrains Mono, monospace' }}>{fmtDur(cr.durationSec)}</span>
+              <span style={{ fontSize: 11, color: c.mutedSilver, fontFamily: 'JetBrains Mono, monospace', display: compactRows ? 'none' : 'inline' }}>{fmtDur(cr.durationSec)}</span>
               {!compactRows && <span style={{ fontSize: 11, color: c.mutedSilver }}>{fmtDate(cr.startedAt)}</span>}
               {!compactRows && <span style={{ display: 'flex', gap: 5, justifyContent: 'flex-end', alignItems: 'center' }}>
                 {cr.hasRecording && <span title="Recording" style={badge(c.signalGold)}>REC</span>}

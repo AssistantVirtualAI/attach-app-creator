@@ -21,6 +21,7 @@ function fmtTime(iso: string | null) {
 export default function VoicemailList({ extension, onCall }: Props) {
   const [rows, setRows] = useState<VoicemailItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [playing, setPlaying] = useState<string | null>(null);
   const [audio, setAudio] = useState<Record<string, string>>(() => {
@@ -29,18 +30,20 @@ export default function VoicemailList({ extension, onCall }: Props) {
     return cached;
   });
 
-  const load = useCallback(async (silent = false) => {
+  const load = useCallback(async (silent = false, force = false) => {
     if (!silent) { setLoading(true); setErr(null); }
+    if (force) setRefreshing(true);
     try {
-      const data = await ava.voicemails(50);
+      const data = force ? await ava.refreshVoicemails(50, { extension }) : await ava.voicemails(50, { extension });
       setRows(Array.isArray(data) ? data : []);
     } catch (e: any) {
-      if (!silent) {
+      if (!silent || force) {
         setErr(e?.message || 'Unable to load voicemail.');
         setRows([]);
       }
     } finally {
       if (!silent) setLoading(false);
+      if (force) setRefreshing(false);
     }
   }, [extension]);
 
@@ -89,7 +92,7 @@ export default function VoicemailList({ extension, onCall }: Props) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
         <span style={{ fontSize: 11, opacity: 0.6 }}>{rows.length} message{rows.length > 1 ? 's' : ''}</span>
-        <button onClick={() => load()} style={refreshBtn}>↻</button>
+        <button onClick={() => load(true, true)} disabled={refreshing} style={{ ...refreshBtn, opacity: refreshing ? 0.55 : 1 }}>{refreshing ? '…' : '↻'}</button>
       </div>
       {rows.map((r) => {
         const peer = r.from || '?';

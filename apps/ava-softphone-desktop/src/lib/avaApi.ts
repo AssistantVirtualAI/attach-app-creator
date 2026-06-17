@@ -477,14 +477,15 @@ function mapCdrToRecording(r: any): RecordingItem {
 
 
 
-async function readCallRecordRows(limit = 100, opts?: { scope?: 'mine' | 'org' }): Promise<any[]> {
+async function readCallRecordRows(limit = 100, opts?: { scope?: 'mine' | 'org'; extension?: string | null }): Promise<any[]> {
   const me = await getMeContext();
   const orgFilter = me.organization_id ? `&organization_id=eq.${me.organization_id}` : '';
   const scopeOrg = opts?.scope === 'org';
+  const scopedExtension = cleanText(opts?.extension || me.extension);
   const extFilter = scopeOrg
     ? ''
-    : me.extension
-      ? `&or=(extension.eq.${me.extension},caller_number.eq.${me.extension},destination_number.eq.${me.extension},source_number.eq.${me.extension})`
+    : scopedExtension
+      ? `&or=(extension.eq.${encodeURIComponent(scopedExtension)},caller_number.eq.${encodeURIComponent(scopedExtension)},destination_number.eq.${encodeURIComponent(scopedExtension)},source_number.eq.${encodeURIComponent(scopedExtension)})`
       : '&id=is.null';
   const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,organization_id,extension,extension_uuid,pbx_uuid,domain_uuid,domain_name,caller_name,caller_number,destination,source_number,destination_number,start_at,duration_seconds,billsec,direction,call_status,missed_call,has_recording,recording_path,recording_name,hangup_cause,voicemail_message,transcribed,analyzed,mos,raw_data,notes,tags${orgFilter}${extFilter}&order=start_at.desc&limit=${limit}`;
 
@@ -502,32 +503,43 @@ async function readCallRecordRows(limit = 100, opts?: { scope?: 'mine' | 'org' }
 let cdrSyncInFlight: Promise<void> | null = null;
 let lastCdrSyncAt = 0;
 
-async function bestEffortCdrSync(limit = 200, minIntervalMs = 30_000) {
+async function invokeFusionSync(body: Record<string, unknown>) {
+  const res = await fetch(`${BACKEND.url}/functions/v1/fusionpbx-proxy`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': BACKEND.anonKey,
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+  const text = await res.text().catch(() => '');
+  let data: any = null;
+  try { data = text ? JSON.parse(text) : null; } catch { data = null; }
+  if (!res.ok) throw new Error(data?.error || text.slice(0, 180) || `FusionPBX sync failed (${res.status})`);
+  if (data?.error) throw new Error(String(data.error));
+  return data;
+}
+
+async function bestEffortCdrSync(limit = 200, minIntervalMs = 30_000, force = false) {
   const now = Date.now();
   if (cdrSyncInFlight) return cdrSyncInFlight;
-  if (now - lastCdrSyncAt < minIntervalMs) return;
+  if (!force && now - lastCdrSyncAt < minIntervalMs) return;
   lastCdrSyncAt = now;
   cdrSyncInFlight = (async () => {
     try {
       const me = await getMeContext();
-      await fetch(`${BACKEND.url}/functions/v1/fusionpbx-proxy`, {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'apikey': BACKEND.anonKey,
-        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-      },
-      body: JSON.stringify({
+      await invokeFusionSync({
         action: 'sync-cdrs',
         organization_id: me.organization_id || undefined,
         limit,
         page_size: Math.max(limit, 250),
         max_pages: 2,
         from_beginning: true,
-      }),
       });
     } catch (e) {
       console.warn('[AVA] CDR sync failed', e);
+      if (force) throw e;
     } finally {
       cdrSyncInFlight = null;
     }
@@ -535,35 +547,23 @@ async function bestEffortCdrSync(limit = 200, minIntervalMs = 30_000) {
   return cdrSyncInFlight;
 }
 
-async function bestEffortRecentTelephonySync(limit = 200) {
+async function bestEffortRecentTelephonySync(limit = 200, throwOnFailure = false) {
   try {
     const me = await getMeContext();
     const scope = {
       organization_id: me.organization_id || undefined,
       extension: me.extension || undefined,
     };
-    await Promise.allSettled([
-      fetch(`${BACKEND.url}/functions/v1/fusionpbx-proxy`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': BACKEND.anonKey,
-          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-        },
-        body: JSON.stringify({ action: 'sync-cdrs', organization_id: scope.organization_id, limit, page_size: Math.max(limit, 250), max_pages: 2, from_beginning: true }),
-      }),
-      fetch(`${BACKEND.url}/functions/v1/fusionpbx-proxy`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': BACKEND.anonKey,
-          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-        },
-        body: JSON.stringify({ action: 'sync-voicemail-messages', ...scope, params: { extension: scope.extension, page_size: Math.max(limit, 200), max_pages: 1 } }),
-      }),
+    const results = await Promise.allSettled([
+      invokeFusionSync({ action: 'sync-cdrs', organization_id: scope.organization_id, limit, page_size: Math.max(limit, 250), max_pages: 2, from_beginning: true }),
+      invokeFusionSync({ action: 'sync-voicemail-messages', ...scope, params: { extension: scope.extension, page_size: Math.max(limit, 200), max_pages: 1 } }),
+      invokeFusionSync({ action: 'list-recordings', ...scope, limit, params: { extension: scope.extension, limit } }),
     ]);
+    const failed = results.find((r) => r.status === 'rejected') as PromiseRejectedResult | undefined;
+    if (throwOnFailure && failed) throw failed.reason;
   } catch (e) {
     console.warn('[AVA] recent telephony sync failed', e);
+    if (throwOnFailure) throw e;
   }
 }
 
@@ -573,12 +573,18 @@ export const ava = {
     missed: 3, answered: 12, unreadSms: 5, voicemail: 2, aiActions: 4, pbxHealth: 'ok',
     brief: 'You have 3 missed calls and 2 unread voicemails requiring callbacks. One conversation flagged a renewal opportunity.',
   }),
-  calls: async (limit = 100, opts?: { scope?: 'mine' | 'org' }) => {
+  calls: async (limit = 100, opts?: { scope?: 'mine' | 'org'; extension?: string | null }) => {
     if (MOCK) return MOCK_CALLS;
     await bestEffortCdrSync(Math.max(limit, 200));
     return (await readCallRecordRows(limit, opts)).map(mapCdrToCall);
   },
-  scopedCallRecords: async (limit = 100, opts?: { scope?: 'mine' | 'org' }) => {
+  refreshCalls: async (limit = 150, opts?: { scope?: 'mine' | 'org'; extension?: string | null }) => {
+    if (MOCK) return MOCK_CALLS;
+    await bestEffortCdrSync(Math.max(limit, 250), 0, true);
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event('lemtel:phone-sync-complete'));
+    return (await readCallRecordRows(limit, opts)).map(mapCdrToCall);
+  },
+  scopedCallRecords: async (limit = 100, opts?: { scope?: 'mine' | 'org'; extension?: string | null }) => {
     if (MOCK) return MOCK_CALLS as any[];
     await bestEffortCdrSync(Math.max(limit, 200));
     return readCallRecordRows(limit, opts);
@@ -731,30 +737,38 @@ export const ava = {
   ringGroups: () => call<any>(`/db/pbx_ring_groups?select=*&order=name.asc`, {}, MOCK_RG)
     .then((raw: any) => MOCK ? raw as RingGroup[] : asArray(raw).map((r: any) => ({ id: r.id, name: r.name || 'Ring Group', members: 0, strategy: r.strategy || '—' }))),
   /* Phase 3 */
-  voicemails: async (limit = 50) => {
+  voicemails: async (limit = 50, opts?: { extension?: string | null }) => {
     if (MOCK) return SAMPLE_VOICEMAIL_EMPTY;
     await bestEffortCdrSync(Math.max(limit, 200));
     try {
-      const rows = await readCallRecordRows(Math.max(limit, 200));
+      const rows = await readCallRecordRows(Math.max(limit, 200), opts);
       return rows.filter(isVoicemailLike).map(mapCdrToVoicemail).slice(0, limit);
     } catch (err) {
       console.warn('[avaApi] voicemail mapping failed:', err);
       return [] as VoicemailItem[];
     }
   },
+  refreshVoicemails: async (limit = 50, opts?: { extension?: string | null }) => {
+    if (MOCK) return SAMPLE_VOICEMAIL_EMPTY;
+    await bestEffortRecentTelephonySync(Math.max(limit, 250), true);
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event('lemtel:phone-sync-complete'));
+    const rows = await readCallRecordRows(Math.max(limit, 200), opts);
+    return rows.filter(isVoicemailLike).map(mapCdrToVoicemail).slice(0, limit);
+  },
   markVoicemailRead: (id: string) =>
     call<{ ok: true }>(`/fn/${FN.fusionpbxProxy}`, { method: 'POST', body: JSON.stringify({ action: 'voicemail-read', id }) }, { ok: true }).catch(() => ({ ok: true as const })),
-  recordings: async (limit = 100, opts?: { scope?: 'mine' | 'org' }) => {
+  recordings: async (limit = 100, opts?: { scope?: 'mine' | 'org'; extension?: string | null }) => {
     if (MOCK) return SAMPLE_RECORDING_EMPTY;
     await bestEffortCdrSync(Math.max(limit, 200));
     try {
       const me = await getMeContext();
       const orgFilter = me.organization_id ? `&organization_id=eq.${me.organization_id}` : '';
       const scopeOrg = opts?.scope === 'org';
+      const scopedExtension = cleanText(opts?.extension || me.extension);
       const extFilter = scopeOrg
         ? ''
-        : me.extension
-          ? `&or=(extension.eq.${me.extension},caller_number.eq.${me.extension},destination_number.eq.${me.extension},source_number.eq.${me.extension})`
+        : scopedExtension
+          ? `&or=(extension.eq.${encodeURIComponent(scopedExtension)},caller_number.eq.${encodeURIComponent(scopedExtension)},destination_number.eq.${encodeURIComponent(scopedExtension)},source_number.eq.${encodeURIComponent(scopedExtension)})`
           : '&id=is.null';
       const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,organization_id,extension,extension_uuid,pbx_uuid,domain_uuid,domain_name,caller_name,caller_number,destination,destination_number,source_number,start_at,billsec,duration_seconds,has_recording,recording_path,recording_name,mos&has_recording=eq.true${orgFilter}${extFilter}&order=start_at.desc&limit=${limit}`;
       const res = await fetch(url, {
@@ -771,6 +785,16 @@ export const ava = {
       console.warn('[avaApi] recording mapping failed:', err);
       return [] as RecordingItem[];
     }
+  },
+  refreshRecordings: async (limit = 100, opts?: { scope?: 'mine' | 'org'; extension?: string | null }) => {
+    if (MOCK) return SAMPLE_RECORDING_EMPTY;
+    await bestEffortRecentTelephonySync(Math.max(limit, 250), true);
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event('lemtel:recordings-updated'));
+    const rows = await readCallRecordRows(Math.max(limit, 300), opts);
+    return rows
+      .filter((r) => r.has_recording === true || r.recording_path || r.recording_name)
+      .map(mapCdrToRecording)
+      .slice(0, limit);
   },
 
   /**
@@ -956,7 +980,14 @@ export const ava = {
         method: 'POST',
         body: JSON.stringify({ action: 'sync-all', organization_id: me.organization_id || undefined, resources: ['cdrs', 'extensions', 'queues', 'ivrs', 'ring_groups'] }),
       });
-      return { ok: data?.success !== false && !data?.error, success: data?.success !== false, stats: data?.stats || {}, errors: data?.errors || (data?.error ? [data.error] : []), syncedAt: new Date().toISOString(), raw: data };
+      const recent = await Promise.allSettled([
+        bestEffortCdrSync(500, 0, true),
+        invokeFusionSync({ action: 'sync-voicemail-messages', organization_id: me.organization_id || undefined, extension: me.extension || undefined, params: { extension: me.extension || undefined, page_size: 500, max_pages: 1 } }),
+        invokeFusionSync({ action: 'list-recordings', organization_id: me.organization_id || undefined, extension: me.extension || undefined, limit: 500, params: { extension: me.extension || undefined, limit: 500 } }),
+      ]);
+      const recentErrors = recent.filter((r) => r.status === 'rejected').map((r: any) => r.reason?.message || 'recent telephony refresh failed');
+      const errors = [...(data?.errors || (data?.error ? [data.error] : [])), ...recentErrors];
+      return { ok: data?.success !== false && !data?.error && recentErrors.length === 0, success: data?.success !== false && recentErrors.length === 0, stats: data?.stats || {}, errors, syncedAt: new Date().toISOString(), raw: data };
     } catch (err: any) {
       console.warn('[avaApi] sync-all failed:', err);
       return { ok: false, success: false, stats: {}, errors: [err?.message || 'Phone-system sync failed'], syncedAt: new Date().toISOString() };

@@ -67,6 +67,7 @@ function rangeCutoff(r: Range): number {
 export default function RecordingsView({ scope = 'mine' }: { scope?: 'mine' | 'org' } = {}) {
   const [items, setItems] = useState<RecordingItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState<Quality>('all');
   const [s, setS] = useState<Sent>('all');
@@ -87,17 +88,19 @@ export default function RecordingsView({ scope = 'mine' }: { scope?: 'mine' | 'o
   const [aiError, setAiError] = useState<string | null>(null);
   const [aiStage, setAiStage] = useState<'idle' | 'fetching' | 'transcribing' | 'analyzing' | 'done' | 'error'>('idle');
 
-  const load = useCallback(async (opts?: { silent?: boolean }) => {
+  const load = useCallback(async (opts?: { silent?: boolean; force?: boolean }) => {
     if (!opts?.silent) setLoading(true);
+    if (opts?.force) setRefreshing(true);
     setError(null);
     try {
-      const d = await ava.recordings(100, { scope });
+      const d = opts?.force ? await ava.refreshRecordings(100, { scope }) : await ava.recordings(100, { scope });
       setItems(Array.isArray(d) ? d : []);
     } catch (err: any) {
-      if (!opts?.silent) setItems([]);
+      if (!opts?.silent || opts?.force) setItems([]);
       setError(err?.message || 'Unable to load recordings from the phone system.');
     } finally {
       if (!opts?.silent) setLoading(false);
+      if (opts?.force) setRefreshing(false);
     }
   }, [scope]);
 
@@ -307,6 +310,7 @@ export default function RecordingsView({ scope = 'mine' }: { scope?: 'mine' | 'o
           subtitle="Searchable archive with AVA quality, sentiment, date range, and bulk export."
           accent={c.avaCyan}
           icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/></svg>}
+          right={<button onClick={() => load({ silent: true, force: true })} disabled={refreshing} style={{ ...chip(false), opacity: refreshing ? 0.55 : 1 }}>{refreshing ? 'SYNCING…' : 'SYNC NOW'}</button>}
         />
 
         <input
