@@ -1,10 +1,24 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import type { Creds } from '../lib/creds';
 import SipConfigScreen from './SipConfigScreen';
 
 type Mode = 'extension' | 'email';
 type Screen = 'login' | 'sip' | 'forgot';
 type ForgotStep = 'form' | 'confirm' | 'sent';
+type Accent = 'gold-cyan' | 'cyan-gold';
+
+const ACCENT_KEY = 'lemtel-auth-accent';
+const loadAccent = (): Accent => {
+  try {
+    const v = localStorage.getItem(ACCENT_KEY);
+    return v === 'cyan-gold' ? 'cyan-gold' : 'gold-cyan';
+  } catch { return 'gold-cyan'; }
+};
+const saveAccent = (a: Accent) => { try { localStorage.setItem(ACCENT_KEY, a); } catch {} };
+const accentGradient = (a: Accent) =>
+  a === 'cyan-gold'
+    ? 'linear-gradient(135deg, #0BB5D6 0%, #FFD700 100%)'
+    : 'linear-gradient(135deg, #FFD700 0%, #0BB5D6 100%)';
 
 // Desktop-parity palette
 const C = {
@@ -49,12 +63,19 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [accent, setAccent] = useState<Accent>(loadAccent);
+
+  // Persist + cascade accent gradient as a CSS variable.
+  useEffect(() => {
+    saveAccent(accent);
+    document.documentElement.style.setProperty('--auth-accent', accentGradient(accent));
+  }, [accent]);
 
   if (screen === 'sip') {
     return <SipConfigScreen onSaved={onAuthenticated} onCancel={() => setScreen('login')} />;
   }
   if (screen === 'forgot') {
-    return <ForgotPasswordScreen initialEmail={email} onBack={() => setScreen('login')} />;
+    return <ForgotPasswordScreen initialEmail={email} accent={accent} onBack={() => setScreen('login')} />;
   }
 
   const base = portalUrl.replace(/\/$/, '');
@@ -133,6 +154,7 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
 
   return (
     <div style={wrap}>
+      <AccentSwitch accent={accent} onChange={setAccent} />
       <GoldGlow />
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 20px', position: 'relative', zIndex: 1 }}>
@@ -140,7 +162,8 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
 
         <div style={cardStyle}>
           <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <ModeToggle mode={mode} onChange={(m) => { setMode(m); setError(null); setFieldErrors({}); }} />
+            <ModeToggle mode={mode} accent={accent} onChange={(m) => { setMode(m); setError(null); setFieldErrors({}); }} />
+
 
             <Field label="Portal URL" value={portalUrl} onChange={setPortalUrl} type="url" />
             {mode === 'email' ? (
@@ -201,12 +224,23 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
 }
 
 /* ====== Forgot password screen ====== */
-function ForgotPasswordScreen({ initialEmail, onBack }: { initialEmail: string; onBack: () => void }) {
+const RESEND_COOLDOWN_SECONDS = 30;
+
+function ForgotPasswordScreen({ initialEmail, accent, onBack }: { initialEmail: string; accent: Accent; onBack: () => void }) {
   const [step, setStep] = useState<ForgotStep>('form');
   const [email, setEmail] = useState(initialEmail);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErr, setFieldErr] = useState<string>('');
+  const [cooldown, setCooldown] = useState(0);
+  const [resentInfo, setResentInfo] = useState<string | null>(null);
+
+  // Cooldown countdown timer
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const id = window.setInterval(() => setCooldown((s) => (s > 0 ? s - 1 : 0)), 1000);
+    return () => window.clearInterval(id);
+  }, [cooldown]);
 
   const goConfirm = () => {
     setError(null);
@@ -216,8 +250,9 @@ function ForgotPasswordScreen({ initialEmail, onBack }: { initialEmail: string; 
     setStep('confirm');
   };
 
-  const sendReset = async () => {
-    setBusy(true); setError(null);
+  const sendReset = async (opts?: { resend?: boolean }) => {
+    if (busy || cooldown > 0) return; // multi-click guard
+    setBusy(true); setError(null); setResentInfo(null);
     try {
       const redirectTo = 'https://avastatistic.ca/reset-password';
       const res = await fetch(`${SUPABASE_URL}/auth/v1/recover`, {
@@ -233,15 +268,18 @@ function ForgotPasswordScreen({ initialEmail, onBack }: { initialEmail: string; 
         let detail: any = null; try { detail = await res.json(); } catch {}
         throw new Error(detail?.msg || detail?.error || `HTTP ${res.status}`);
       }
+      setCooldown(RESEND_COOLDOWN_SECONDS);
+      if (opts?.resend) setResentInfo('Reset email sent again.');
       setStep('sent');
     } catch (e: any) {
       setError(mapAuthError(e?.message));
-      setStep('form');
+      if (!opts?.resend) setStep('form');
     } finally { setBusy(false); }
   };
 
   return (
     <div style={wrap}>
+      <AccentSwitch accent={accent} readOnly />
       <GoldGlow />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 20px', position: 'relative', zIndex: 1 }}>
         <Brand />
@@ -285,7 +323,7 @@ function ForgotPasswordScreen({ initialEmail, onBack }: { initialEmail: string; 
               {error && <ErrorBanner>{error}</ErrorBanner>}
               <button
                 type="button"
-                onClick={sendReset}
+                onClick={() => sendReset()}
                 disabled={busy}
                 className="lemtel-btn-primary"
                 style={{ height: 50, borderRadius: 14, fontSize: 14, cursor: busy ? 'wait' : 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
@@ -309,6 +347,38 @@ function ForgotPasswordScreen({ initialEmail, onBack }: { initialEmail: string; 
               <p style={{ ...subheadingStyle, textAlign: 'center' }}>
                 If an account exists for <strong style={{ color: C.textIce }}>{email}</strong>, you’ll receive a reset link shortly. Open it on this device or a desktop browser to set a new password.
               </p>
+              {resentInfo && (
+                <div style={{
+                  fontSize: 12, color: C.green,
+                  padding: '8px 12px', borderRadius: 10,
+                  background: 'rgba(34,197,94,0.10)',
+                  border: '1px solid rgba(34,197,94,0.25)',
+                }}>{resentInfo}</div>
+              )}
+              {error && <ErrorBanner>{error}</ErrorBanner>}
+              <button
+                type="button"
+                onClick={() => sendReset({ resend: true })}
+                disabled={busy || cooldown > 0}
+                style={{
+                  height: 44, borderRadius: 12,
+                  border: `1px solid ${C.border}`,
+                  background: 'rgba(255,255,255,0.04)',
+                  color: cooldown > 0 ? C.textDim : C.textIce,
+                  fontSize: 13, fontWeight: 700, letterSpacing: 0.3,
+                  cursor: (busy || cooldown > 0) ? 'not-allowed' : 'pointer',
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  opacity: (busy || cooldown > 0) ? 0.7 : 1,
+                  transition: 'opacity .15s ease',
+                }}
+              >
+                {busy && <Spinner />}
+                {busy
+                  ? 'Sending…'
+                  : cooldown > 0
+                    ? `Resend email in ${cooldown}s`
+                    : 'Resend email'}
+              </button>
               <button type="button" onClick={onBack} className="lemtel-btn-primary" style={{ height: 50, borderRadius: 14, fontSize: 14, cursor: 'pointer' }}>
                 Back to sign in
               </button>
@@ -358,7 +428,7 @@ function Footer() {
   );
 }
 
-function ModeToggle({ mode, onChange }: { mode: Mode; onChange: (m: Mode) => void }) {
+function ModeToggle({ mode, accent, onChange }: { mode: Mode; accent: Accent; onChange: (m: Mode) => void }) {
   return (
     <div style={{ display: 'flex', gap: 6, padding: 4, borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}` }}>
       {(['extension', 'email'] as Mode[]).map((m) => {
@@ -372,12 +442,52 @@ function ModeToggle({ mode, onChange }: { mode: Mode; onChange: (m: Mode) => voi
               flex: 1, padding: '9px 10px', borderRadius: 9, cursor: 'pointer',
               fontSize: 11, fontWeight: 800, letterSpacing: 0.8, textTransform: 'uppercase',
               border: 'none',
-              background: active ? `linear-gradient(135deg, ${C.gold}, ${C.avaCyan})` : 'transparent',
+              background: active ? accentGradient(accent) : 'transparent',
               color: active ? '#0b1530' : C.textSub,
               transition: 'background .15s ease, color .15s ease',
             }}
           >
             {m === 'extension' ? 'Extension' : 'Email'}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/* Accent (theme) switch — persisted in localStorage and applied via CSS var. */
+function AccentSwitch({ accent, onChange, readOnly }: { accent: Accent; onChange?: (a: Accent) => void; readOnly?: boolean }) {
+  const opts: { id: Accent; label: string }[] = [
+    { id: 'gold-cyan', label: 'Gold → Cyan' },
+    { id: 'cyan-gold', label: 'Cyan → Gold' },
+  ];
+  return (
+    <div style={{
+      position: 'absolute', top: 'calc(8px + var(--safe-top))', right: 10, zIndex: 2,
+      display: 'flex', gap: 4, padding: 3, borderRadius: 999,
+      background: 'rgba(16,26,48,0.65)', border: `1px solid ${C.border}`,
+      backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)',
+    }}>
+      {opts.map((o) => {
+        const active = accent === o.id;
+        return (
+          <button
+            key={o.id}
+            type="button"
+            disabled={readOnly}
+            onClick={() => onChange?.(o.id)}
+            aria-pressed={active}
+            title={`Theme: ${o.label}`}
+            style={{
+              border: 'none', cursor: readOnly ? 'default' : 'pointer',
+              padding: '5px 10px', borderRadius: 999,
+              fontSize: 10, fontWeight: 800, letterSpacing: 0.6, textTransform: 'uppercase',
+              background: active ? accentGradient(o.id) : 'transparent',
+              color: active ? '#0b1530' : C.textSub,
+              transition: 'background .15s ease, color .15s ease',
+            }}
+          >
+            {o.id === 'gold-cyan' ? 'G→C' : 'C→G'}
           </button>
         );
       })}
