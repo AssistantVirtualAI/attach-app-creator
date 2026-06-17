@@ -577,7 +577,7 @@ export const ava = {
   refreshCalls: async (limit = 150, opts?: { scope?: 'mine' | 'org' }) => {
     if (MOCK) return MOCK_CALLS;
     await bestEffortCdrSync(Math.max(limit, 250), 0, true);
-    window.dispatchEvent(new Event('lemtel:phone-sync-complete'));
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event('lemtel:phone-sync-complete'));
     return (await readCallRecordRows(limit, opts)).map(mapCdrToCall);
   },
   scopedCallRecords: async (limit = 100, opts?: { scope?: 'mine' | 'org' }) => {
@@ -747,7 +747,7 @@ export const ava = {
   refreshVoicemails: async (limit = 50) => {
     if (MOCK) return SAMPLE_VOICEMAIL_EMPTY;
     await bestEffortRecentTelephonySync(Math.max(limit, 250));
-    window.dispatchEvent(new Event('lemtel:phone-sync-complete'));
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event('lemtel:phone-sync-complete'));
     const rows = await readCallRecordRows(Math.max(limit, 200));
     return rows.filter(isVoicemailLike).map(mapCdrToVoicemail).slice(0, limit);
   },
@@ -784,7 +784,7 @@ export const ava = {
   refreshRecordings: async (limit = 100, opts?: { scope?: 'mine' | 'org' }) => {
     if (MOCK) return SAMPLE_RECORDING_EMPTY;
     await bestEffortRecentTelephonySync(Math.max(limit, 250));
-    window.dispatchEvent(new Event('lemtel:recordings-updated'));
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event('lemtel:recordings-updated'));
     const rows = await readCallRecordRows(Math.max(limit, 300), opts);
     return rows
       .filter((r) => r.has_recording === true || r.recording_path || r.recording_name)
