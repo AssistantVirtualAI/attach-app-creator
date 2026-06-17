@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/card';
 
 const DEFAULT_URL =
   (import.meta.env.VITE_MOBILE_PREVIEW_URL as string | undefined) ||
-  'https://attach-app-creator.lovable.app';
+  `${window.location.origin}/m`;
 
 const TAB_LINKS: { label: string; tab: string }[] = [
   { label: 'Home', tab: 'home' },
