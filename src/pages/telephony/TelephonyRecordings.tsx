@@ -123,32 +123,60 @@ export default function TelephonyRecordings({ scope = 'org' }: { scope?: 'org' |
                 ) : (
                   <div className="text-xs text-muted-foreground text-center py-2 border rounded">Recording URL not available</div>
                 )}
-                <div className="flex items-center justify-between">
-                  {sentimentBadge(c.raw_data?.sentiment) || <Badge variant="outline">Not analyzed</Badge>}
-                  {!c.transcribed ? (
-                    <Button size="sm" variant="outline" onClick={() => transcribeAndAnalyze(c.id)} disabled={working === c.id}>
-                      {working === c.id ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Sparkles className="w-3 h-3 mr-1" />}
-                      Transcribe & Analyze
-                    </Button>
-                  ) : (
-                    <Button size="sm" variant="ghost" onClick={() => transcribeAndAnalyze(c.id)} disabled={working === c.id}>
-                      {working === c.id ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Sparkles className="w-3 h-3 mr-1" />}
-                      Retry
-                    </Button>
-                  )}
-                </div>
-                {c.transcribed && (
-                  <Button variant="ghost" size="sm" className="self-start" onClick={() => setExpanded(expanded === c.id ? null : c.id)}>
-                    <ChevronDown className={`w-4 h-4 mr-1 transition-transform ${expanded === c.id ? 'rotate-180' : ''}`} /> Details
-                  </Button>
-                )}
-                {expanded === c.id && (
-                  <div className="space-y-2 text-sm border-t pt-3">
-                    <div><span className="font-semibold">Summary:</span> <p className="text-muted-foreground mt-1">{c.raw_data?.summary || '—'}</p></div>
-                    {c.raw_data?.topics && <div className="flex flex-wrap gap-1">{(c.raw_data.topics as string[]).map(t => <Badge key={t} variant="outline" className="text-xs">{t}</Badge>)}</div>}
-                  </div>
-                )}
+                {(() => {
+                  const live = stages[c.id];
+                  const transcript = { provider: c.raw_data?.transcript_provider, transcript_text: c.raw_data?.transcript_text };
+                  const insight = { ai_model: c.raw_data?.ai?.ai_model, summary: c.raw_data?.ai?.summary || c.raw_data?.summary, quality_score: c.raw_data?.ai?.quality_score };
+                  const stubT = isStubTranscript(transcript);
+                  const q = estimateQuality(transcript, insight, c.duration_seconds);
+                  const stage: TranscriptStage = live?.stage
+                    ?? (working === c.id ? 'transcribing'
+                      : c.transcribed && !stubT ? 'complete'
+                      : c.transcribed && stubT ? 'unavailable'
+                      : 'idle');
+                  return (
+                    <>
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <TranscriptStagePill stage={stage} detail={live?.detail} compact />
+                        {sentimentBadge(c.raw_data?.sentiment)}
+                        {!stubT && c.transcribed && (
+                          <Badge variant="outline" className="text-[10px]">Quality {q.total}/100</Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-end">
+                        <Button size="sm" variant={c.transcribed ? 'ghost' : 'outline'} onClick={() => transcribeAndAnalyze(c.id)} disabled={working === c.id}>
+                          {working === c.id ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Sparkles className="w-3 h-3 mr-1" />}
+                          {c.transcribed ? 'Retry' : 'Transcribe & Analyze'}
+                        </Button>
+                      </div>
+                      {c.transcribed && (
+                        <Button variant="ghost" size="sm" className="self-start" onClick={() => setExpanded(expanded === c.id ? null : c.id)}>
+                          <ChevronDown className={`w-4 h-4 mr-1 transition-transform ${expanded === c.id ? 'rotate-180' : ''}`} /> Details
+                        </Button>
+                      )}
+                      {expanded === c.id && (
+                        <div className="space-y-2 text-sm border-t pt-3">
+                          {stubT ? (
+                            <div className="text-amber-600 dark:text-amber-300 text-xs">Transcript not yet available — the recording could not be retrieved. Use Retry once it has synced.</div>
+                          ) : (
+                            <>
+                              <div><span className="font-semibold">Summary:</span> <p className="text-muted-foreground mt-1">{insight.summary || '—'}</p></div>
+                              {c.raw_data?.topics && <div className="flex flex-wrap gap-1">{(c.raw_data.topics as string[]).map(t => <Badge key={t} variant="outline" className="text-xs">{t}</Badge>)}</div>}
+                              <div className="grid grid-cols-2 gap-2 text-[11px] text-muted-foreground pt-2">
+                                <div>Transcript length: {q.parts.transcriptLength}/40</div>
+                                <div>Speaker segments: {q.parts.speakerSegments}/25</div>
+                                <div>Silence ratio: {q.parts.silenceRatio}/15</div>
+                                <div>AI summary: {q.parts.aiSummary}/20</div>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </CardContent>
+
             </Card>
           ))}
         </div>
