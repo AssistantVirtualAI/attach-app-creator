@@ -128,10 +128,15 @@ export default function TelephonyRecordings({ scope = 'org' }: { scope?: 'org' |
                 )}
                 <div className="flex items-center justify-between">
                   {sentimentBadge(c.raw_data?.sentiment) || <Badge variant="outline">Not analyzed</Badge>}
-                  {!c.transcribed && (
+                  {!c.transcribed ? (
                     <Button size="sm" variant="outline" onClick={() => transcribeAndAnalyze(c.id)} disabled={working === c.id}>
                       {working === c.id ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Sparkles className="w-3 h-3 mr-1" />}
                       Transcribe & Analyze
+                    </Button>
+                  ) : (
+                    <Button size="sm" variant="ghost" onClick={() => transcribeAndAnalyze(c.id)} disabled={working === c.id}>
+                      {working === c.id ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Sparkles className="w-3 h-3 mr-1" />}
+                      Retry
                     </Button>
                   )}
                 </div>
