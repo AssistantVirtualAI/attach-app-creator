@@ -104,6 +104,7 @@ export default function ConsoleLayout({
   useEffect(() => {
     const onResize = () => {
       setCompact(window.innerWidth < 640);
+      setIsWide(window.innerWidth >= 1100);
     };
     onResize();
     window.addEventListener('resize', onResize);
