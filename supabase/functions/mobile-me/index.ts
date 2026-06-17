@@ -36,7 +36,32 @@ Deno.serve(async (req) => {
         .maybeSingle(),
     ]);
 
-    if (!sp) return json({ error: "NO_SOFTPHONE_ACCOUNT" }, 404);
+    if (!sp) {
+      // Graceful fallback: portal user without a provisioned softphone extension.
+      // Return a minimal identity so the mobile shell can render and surface a setup hint
+      // instead of blanking out with a 404.
+      console.warn("[mobile-me] no pbx_softphone_users row for user", u.user.id);
+      const { data: anyMember } = await admin
+        .from("org_members").select("org_id, role").eq("user_id", u.user.id).limit(1).maybeSingle();
+      const orgId = anyMember?.org_id || null;
+      const { data: org2 } = orgId
+        ? await admin.from("organizations").select("name, sip_domain, fusionpbx_domain_uuid").eq("id", orgId).maybeSingle()
+        : { data: null as any };
+      const portalUrl = Deno.env.get("AVA_PORTAL_URL") || "https://avastatistic.ca";
+      return json({
+        user: { id: u.user.id, name: profile?.full_name || u.user.email || "User", email: profile?.email || u.user.email || "", avatarUrl: profile?.avatar_url || undefined },
+        organization: { id: orgId, name: org2?.name || "Workspace", sipDomain: org2?.sip_domain || "", fusionpbxDomainUuid: org2?.fusionpbx_domain_uuid || undefined, portalUrl },
+        domain: { organizationId: orgId, sipDomain: org2?.sip_domain || "", fusionpbxDomainUuid: org2?.fusionpbx_domain_uuid || undefined, portalUrl },
+        extension: { number: "", displayName: "", sipDomain: org2?.sip_domain || "" },
+        access: { app: true, mobile: true },
+        role: anyMember?.role === "master_admin" || anyMember?.role === "ava_admin" ? "super_admin" : "agent",
+        dataScope: "extension_user",
+        permissions: { admin: false, canManageNumbers: false, canManageAgents: false, canManageUsers: false, canManageRouting: false, canViewDomainReports: false },
+        status: { sipState: "offline", doNotDisturb: false, forwarding: null, updatedAt: new Date().toISOString() },
+        noSoftphone: true,
+        setupHint: "Aucune extension softphone n'est rattachée à ce compte. Demandez à votre administrateur de provisionner une extension dans FusionPBX.",
+      });
+    }
     if (sp.app_access_enabled === false || sp.mobile_access_enabled === false) {
       return json({ error: "MOBILE_ACCESS_DISABLED", message: "Your administrator has disabled access to the mobile app." }, 403);
     }
