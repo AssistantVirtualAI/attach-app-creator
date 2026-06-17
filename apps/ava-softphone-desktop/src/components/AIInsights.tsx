@@ -202,6 +202,9 @@ export default function AIInsights() {
         </div>
       )}
 
+      <TranscriptionStatusPanel />
+
+
       {/* AI-generated period narrative */}
       <div style={{ ...theme.glass.cardAI, padding: 14 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8, flexWrap: 'wrap' }}>
