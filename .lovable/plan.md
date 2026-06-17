@@ -1,107 +1,113 @@
-# Plan — Privacy Disclosures + Desktop Transcription/Analysis Fix
+# Plan — Mobile App Roadmap + In‑Browser Mobile Preview Page
 
-## Part A — Mobile: Expanded Data Safety & Privacy-by-Design
+## Part 1 — New "Mobile Preview" page (visual)
 
-Rewrite `PrivacyScreen.tsx` and `DataSafetyScreen.tsx` (EN + FR) with concrete, store-ready disclosures organized by data category.
+Goal: a page in the main web app where you can see the mobile app rendered inside a realistic phone frame, switch devices/orientation, and navigate its tabs without installing anything on a device.
 
-### 1. Call History (CDRs)
-- **Collected**: caller/callee number, direction, start time, duration, disposition, queue, agent extension.
-- **Source**: synced from your company PBX via secure backend.
-- **Purpose**: display recent calls, dashboards, missed-call alerts.
-- **Retention**: mirrors PBX retention (default 90 days, configurable by admin).
-- **Sharing**: not shared with third parties; stays inside your workspace.
-- **Control**: "Clear local cache" + "Request data export" + "Delete account".
+### 1.1 Route + entry
+- New route `/mobile-preview` registered in `src/App.tsx`.
+- Add a "Mobile preview" entry in the admin/dev nav (next to existing internal tools) so it's reachable from the dashboard.
 
-### 2. Call Recordings
-- **Collected**: audio file URL + metadata; audio streamed on demand, not stored on device.
-- **Legal basis**: recording is governed by the company's PBX recording rules; user is informed before playback.
-- **Purpose**: QA, training, dispute resolution.
-- **Retention**: per workspace policy (default 30/60/90 days).
-- **Access**: gated by role; playback events written to audit log.
-- **Control**: users can request deletion of recordings tied to their extension via Support.
+### 1.2 Page: `src/pages/MobilePreview.tsx`
+Layout:
+- Header: title "AVA Softphone — Live Mobile Preview" + small description.
+- Toolbar:
+  - Device selector: iPhone 15 Pro (390×844), iPhone SE (375×667), Pixel 8 (412×915), iPad mini (768×1024).
+  - Orientation toggle (portrait/landscape).
+  - Theme toggle (light/dark) — passed as URL query to the iframe.
+  - "Reload" button.
+  - "Open in new tab" link.
+- Main: centered phone frame component (`PhoneFrame`) wrapping an `<iframe>` of the mobile app dev URL.
+- Right panel (desktop only): quick links that send `postMessage` to the iframe to jump to a tab (home / calls / ava / queues / more) and to specific subpages (Recordings, Voicemail, AI Audit, Data Safety, Privacy, Permissions).
 
-### 3. AI Transcription & Analysis
-- **Collected**: transcript text, speaker turns, sentiment score, summary, key topics.
-- **Processing**: audio sent to AVA AI Gateway (Lovable AI) over TLS, processed transiently, not used to train third-party models.
-- **Storage**: transcript + analysis stored in your workspace database, linked to the call.
-- **Purpose**: searchable history, coaching, sentiment trends.
-- **Retention**: same as the parent call recording.
-- **Control**: per-recording "Delete transcript" + workspace toggle "Disable AI analysis".
+### 1.3 Components
+- `src/components/mobile-preview/PhoneFrame.tsx` — pure CSS phone bezel (notch/dynamic island, rounded corners, speaker, side buttons, drop shadow). Accepts `width`, `height`, `variant: 'ios' | 'android'`.
+- `src/components/mobile-preview/DeviceToolbar.tsx` — toolbar controls.
+- `src/components/mobile-preview/MobileIframe.tsx` — iframe wrapper that:
+  - Loads `import.meta.env.VITE_MOBILE_PREVIEW_URL` (fallback to `http://localhost:5180` in dev and to the deployed mobile preview URL in prod).
+  - Forwards device pixel ratio + safe‑area CSS vars via query string.
+  - Listens for `message` events from the iframe (for "current tab" sync) and posts navigation commands.
 
-### 4. Account & Device
-- Email, display name, extension, role, device push token, app version, OS.
-- Purpose: authentication, push delivery, support diagnostics.
-- Retention: until account deletion (30-day grace, then purge).
+### 1.4 Mobile app side (tiny additions)
+- `apps/ava-softphone-mobile/src/MobileApp.tsx`: on mount, read `?tab=…` and `?theme=…` from URL and set initial tab; add `window.addEventListener('message', …)` to switch tabs/subpages on command.
+- `apps/ava-softphone-mobile/index.html`: add `<meta name="viewport" content="viewport-fit=cover">` if missing so safe-area vars work inside the frame.
 
-### 5. Diagnostics & Crash Logs
-- Anonymous error events, build version. No call content. Opt-out toggle in Permissions screen.
-
-### 6. User Controls (new section on `PrivacyScreen`)
-- Export my data (GET → JSON download via `mobile-data-export` function).
-- Delete my account (existing `DeleteAccountScreen`).
-- Revoke device (sign-out + push token removal).
-- Disable AI analysis on my calls (writes flag to `user_preferences`).
-- Manage permissions (links to `PermissionsScreen`).
-
-### 7. Permissions Disclosure Table (in `DataSafetyScreen`)
-| Permission | Why | Optional? |
-|---|---|---|
-| Microphone | Place/receive SIP calls | No |
-| Notifications | Inbound call alerts, voicemail | Yes |
-| Contacts | Match caller name in dialer | Yes |
-| Background refresh | Sync CDRs, queues, voicemail | Yes |
-
-Also update `store-metadata/{ios,android}/metadata{,-fr}.txt` Data Safety section to match.
+### 1.5 Out of scope for Part 1
+- No native device emulation (touch events use mouse fallback — that is enough for visual review).
+- No screen recording / video capture.
 
 ---
 
-## Part B — Desktop: Real AI Transcription + Analysis (replace stub)
+## Part 2 — Mobile app roadmap (next milestones)
 
-Current state: the panel returns "AI analysis unavailable — showing call metadata only." We need an actual pipeline.
+Grouped by theme. Each item is a self‑contained task we can ship one at a time.
 
-### B1. Backend — new/updated edge functions
-- **`transcribe-recording`** (new): input `{ recording_url, call_id, language? }`. Downloads audio (auth header against PBX), sends to Lovable AI Gateway model `google/gemini-3-flash-preview` with audio input (or whisper-compatible model if available in catalog) for transcription. Stores result in `call_transcripts (call_id, language, text, segments_jsonb, model, created_at)`.
-- **`analyze-call`** (new): input `{ call_id }`. Reads transcript, calls Gemini with structured Output schema → `{ summary, sentiment, sentiment_score, topics[], action_items[], risk_flags[] }`. Stores into `call_analyses`.
-- **`get-call-insights`** (new, read): returns transcript + analysis for the desktop panel; auto-triggers the two above if missing and `recording_url` exists.
+### A. Core telephony UX
+1. **In‑call quality HUD** — small badge on `ActiveCallSheet` showing MOS, jitter, packet loss from the SIP stats; tap to expand.
+2. **Call transfer UI** — attended + blind transfer sheet wired to `sp.transfer`.
+3. **Conference call** — add a 2nd party to an active call (DTMF + REFER flow already in `useSoftphone`).
+4. **Park / pickup** — UI on the call sheet + a "Parked calls" list in `MoreScreen`.
+5. **Bluetooth / speaker switcher** — audio output picker using Capacitor `WebView` + `navigator.mediaDevices`.
 
-### B2. Database migration
-- `call_transcripts` + `call_analyses` tables (workspace-scoped RLS via `has_role`/membership helper), GRANTs for `authenticated` + `service_role`.
-- Index on `call_id`.
+### B. Calls screen
+6. **Smart filters** — All / Missed / Recorded / Voicemail chips on `CallsScreen`.
+7. **Bulk actions** — multi‑select to delete, export, mark as reviewed.
+8. **Sticky day separators** — "Today / Yesterday / Mon Jun 16".
+9. **Caller name enrichment** — match against device contacts + workspace CRM.
 
-### B3. Desktop UI
-- Update the Call Detail panel that currently renders the stub. Replace the hard-coded "AI analysis unavailable…" branch with:
-  - Loading shimmer while `get-call-insights` is pending.
-  - On success: full transcript with speaker turns + collapsible segments, then Analysis card (sentiment chip, summary, topics chips, action items list).
-  - On error: inline error with "Retry" button that re-invokes `transcribe-recording` + `analyze-call`.
-- Wire "Re-run" button to force re-transcription (`force: true`).
+### C. AI & analytics on mobile
+10. **Per‑call AI panel** on `CallDetailScreen` — transcript, sentiment chip, summary, action items (uses existing `ai-transcribe-call` + `ai-analyze-call`).
+11. **AI insights tab inside `AVAChatScreen`** — "Ask AVA about my last 10 calls".
+12. **Weekly digest push** — Monday 9 am local: top metrics + 1 coaching tip.
 
-### B4. CDR Refresh fix
-- The refresh button currently re-renders cached data only. Update the CDR hook (likely `useExtensionDataSync` / `usePbxData`) so the refresh action:
-  1. Invalidates the query cache.
-  2. Calls the PBX sync edge function with `force: true` to pull the latest CDRs from the PBX in real time.
-  3. Awaits the sync, then refetches the safe view.
-- Ensure narrow/small-width history rows include date + time (not just time) — fix the responsive truncation in the CDR list component.
+### D. Notifications & background
+13. **Rich push** — caller avatar + Answer/Decline actions on iOS/Android.
+14. **VoIP push (CallKit / ConnectionService)** — true native incoming call screen.
+15. **Background CDR sync** — every 15 min via Capacitor Background Runner.
+16. **Do Not Disturb schedules** — per‑weekday quiet hours.
 
-### B5. Mobile parity (read-only)
-- `mobile-recordings` edge function returns transcript + analysis when present, so the mobile recordings screen can display them too (no new screens, just richer payload).
+### E. Privacy / data controls (continuation)
+17. **Data export download** — wire the existing "Export my data" button to `mobile-data-export` edge function (JSON + recordings zip).
+18. **Per‑contact recording opt‑out** — list of numbers that will never be recorded for me.
+19. **Retention enforcement job** — server cron that actually applies the user‑chosen retention windows from `DataSafetyScreen`.
+
+### F. Polish & accessibility
+20. **Dynamic Type / large text** support across all screens.
+21. **VoiceOver / TalkBack labels** audit on dialer, call sheet, tabs.
+22. **Haptic palette** — light/medium/heavy mapped consistently to actions.
+23. **Empty‑state illustrations** for Voicemail, Messages, Recordings, AI Audit.
+24. **i18n: French** completed on every screen (some new screens are EN‑only).
+
+### G. Distribution
+25. **Store metadata refresh** (`store-metadata/ios|android/metadata*.txt`) for the new features.
+26. **Release checklist update** in `apps/ava-softphone-mobile/RELEASE.md`.
 
 ---
 
-## Files
+## Suggested order
+1. Part 1 (Mobile Preview page) — small, gives a visual workspace for everything else.
+2. A1, A2, B6, B8 — visible quick wins.
+3. C10, C11 — AI on mobile.
+4. D13, D14 — push/CallKit.
+5. E17, E19 — privacy follow‑through.
+6. F + G — polish & ship.
 
-**Mobile (Part A):**
-- Edit: `apps/ava-softphone-mobile/src/screens/PrivacyScreen.tsx`, `DataSafetyScreen.tsx`, `PermissionsScreen.tsx`, `MoreScreen.tsx`
-- Edit: `store-metadata/{ios,android}/metadata.txt` + `metadata-fr.txt`
-- Add: `src/i18n` strings for new sections (EN/FR)
+---
 
-**Desktop + backend (Part B):**
-- New: `supabase/functions/transcribe-recording/index.ts`, `analyze-call/index.ts`, `get-call-insights/index.ts`
-- Migration: `call_transcripts`, `call_analyses` (+ RLS + GRANTs)
-- Edit: desktop Call Detail component (the one rendering the "AI analysis unavailable" stub)
-- Edit: `apps/ava-softphone-desktop/src/hooks/useExtensionDataSync.ts` (refresh forces live sync) and the CDR list cell for narrow width
-- Edit: `supabase/functions/mobile-recordings/index.ts` to include insights
+## Files (Part 1)
+**New**
+- `src/pages/MobilePreview.tsx`
+- `src/components/mobile-preview/PhoneFrame.tsx`
+- `src/components/mobile-preview/DeviceToolbar.tsx`
+- `src/components/mobile-preview/MobileIframe.tsx`
+
+**Edited**
+- `src/App.tsx` (route)
+- Nav component that lists internal tools (add link)
+- `apps/ava-softphone-mobile/src/MobileApp.tsx` (read `?tab` + accept `postMessage`)
+- `apps/ava-softphone-mobile/index.html` (viewport-fit if missing)
 
 ## Out of scope
-- New AI providers (uses existing Lovable AI Gateway).
-- Changing PBX recording retention policy itself.
-- Landing page.
+- Landing page changes.
+- Backend/RLS changes for Part 1.
+- Real device emulation (touch/gestures) inside the preview.
