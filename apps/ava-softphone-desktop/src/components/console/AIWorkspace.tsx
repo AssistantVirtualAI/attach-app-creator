@@ -195,7 +195,7 @@ function QueueOptimizer() {
   }, []);
   return (
     <>
-      <div style={{ fontSize: 11, fontWeight: 700, color: '#28E6A5', letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 12 }}>Last 30 days</div>
+      <div style={{ fontSize: 11, fontWeight: 700, color: c.success, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 12 }}>Last 30 days</div>
       {loading && <div style={{ fontSize: 12, color: c.mutedSilver }}>Loading queue stats…</div>}
       {!loading && rows.length === 0 && <div style={{ fontSize: 12, color: c.mutedSilver }}>No queues found.</div>}
       {rows.map((r, i) => (
@@ -204,7 +204,7 @@ function QueueOptimizer() {
             <div style={{ fontSize: 13, fontWeight: 700, color: c.textIce }}>{r.name}</div>
             <div style={{ fontSize: 11, color: c.mutedSilver, fontFamily: 'JetBrains Mono, monospace' }}>avg wait {r.wait} · SLA {r.sla}%</div>
           </div>
-          <div style={{ fontSize: 12, color: '#28E6A5', marginTop: 4 }}>↳ {r.rec}</div>
+          <div style={{ fontSize: 12, color: c.success, marginTop: 4 }}>↳ {r.rec}</div>
         </div>
       ))}
     </>
@@ -238,7 +238,7 @@ function VoiceAgentManager() {
   return (
     <>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: '#FF4D67', letterSpacing: 1.5, textTransform: 'uppercase' }}>Active voice agents</div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: c.danger, letterSpacing: 1.5, textTransform: 'uppercase' }}>Active voice agents</div>
       </div>
       {loading && <div style={{ fontSize: 12, color: c.mutedSilver }}>Loading voice agents…</div>}
       {!loading && agents.length === 0 && <div style={{ fontSize: 12, color: c.mutedSilver }}>No voice agents configured yet.</div>}
@@ -278,7 +278,7 @@ function CoachingInsights() {
   const tone = (sev?: string) => sev === 'high' ? '#FF4D67' : sev === 'medium' ? '#FFCC33' : '#23D6FF';
   return (
     <>
-      <div style={{ fontSize: 11, fontWeight: 700, color: '#FFCC33', letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 12 }}>This week</div>
+      <div style={{ fontSize: 11, fontWeight: 700, color: c.signalGold, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 12 }}>This week</div>
       {loading && <div style={{ fontSize: 12, color: c.mutedSilver }}>Loading insights…</div>}
       {!loading && items.length === 0 && <div style={{ fontSize: 12, color: c.mutedSilver }}>No AI insights generated this week. Analyze more calls to surface coaching opportunities.</div>}
       {items.map((r) => (

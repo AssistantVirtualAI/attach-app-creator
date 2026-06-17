@@ -212,7 +212,7 @@ function DetailDrawer({ row, onClose, onRollback }: { row: Row; onClose: () => v
             <button onClick={onClose} style={{ padding: '8px 12px', borderRadius: 8, background: 'transparent', border: `1px solid ${c.border}`, color: c.textIce, cursor: 'pointer', fontSize: 11 }}>Close</button>
           </div>
         </div>
-        {row.error && <div style={{ marginBottom: 12, padding: 10, borderRadius: 8, background: 'rgba(255,85,119,0.12)', border: '1px solid #ff557755', color: '#ff8aa0', fontSize: 12 }}>{row.error}</div>}
+        {row.error && <div style={{ marginBottom: 12, padding: 10, borderRadius: 8, background: `${c.danger}1f`, border: `1px solid ${c.danger}55`, color: c.danger, fontSize: 12 }}>{row.error}</div>}
         <Section title="Before" payload={row.before_json} />
         <Section title="After" payload={row.after_json} />
         <Section title="Diff" payload={row.diff_json} />

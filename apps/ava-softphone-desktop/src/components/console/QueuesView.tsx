@@ -179,7 +179,7 @@ export default function QueuesView({ isAdmin, isSuperAdmin, isSupervisor }: Prop
         <span style={{ fontSize: 11, color: c.mutedSilver }}>
           {canAdmin ? 'Admin' : canSupervise ? 'Supervisor' : meRow?.cc_role ? 'Agent' : 'View only'}
         </span>
-        {error && <span style={{ fontSize: 11, color: '#ef4444', marginLeft: 'auto' }}>{error}</span>}
+        {error && <span style={{ fontSize: 11, color: c.danger, marginLeft: 'auto' }}>{error}</span>}
       </header>
 
       {/* My status */}
@@ -290,7 +290,7 @@ function WaitingRow({ w }: { w: WaitingCall }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, padding: '4px 8px', background: 'rgba(245,158,11,0.08)', borderRadius: 6 }}>
       <span style={{ fontFamily: 'monospace' }}>{w.caller_number || 'Unknown'}</span>
-      <span style={{ color: '#f59e0b', fontFamily: 'monospace' }}>{String(mm).padStart(2, '0')}:{String(ss).padStart(2, '0')}</span>
+      <span style={{ color: c.warning, fontFamily: 'monospace' }}>{String(mm).padStart(2, '0')}:{String(ss).padStart(2, '0')}</span>
     </div>
   );
 }
