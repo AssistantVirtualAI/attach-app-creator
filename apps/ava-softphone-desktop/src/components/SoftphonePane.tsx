@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSoftphone } from '@/hooks/useSoftphone';
 import RecentsList from './RecentsList';
 import ContactsList from './ContactsList';
