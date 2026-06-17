@@ -124,7 +124,7 @@ textarea, input { user-select: text; }
 }
 .lemtel-btn-primary {
   border: none; color: #0b1530; font-weight: 800; letter-spacing: 0.4px;
-  background: linear-gradient(135deg, #FFD700 0%, #0BB5D6 100%);
+  background: var(--auth-accent, linear-gradient(135deg, #FFD700 0%, #0BB5D6 100%));
   box-shadow: 0 18px 40px -16px rgba(255,215,0,0.45), inset 0 1px 0 rgba(255,255,255,0.45);
   transition: transform .15s ease, box-shadow .15s ease, opacity .15s ease;
 }
