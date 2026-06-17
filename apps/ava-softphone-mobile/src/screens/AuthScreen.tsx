@@ -3,6 +3,8 @@ import type { Creds } from '../lib/creds';
 import SipConfigScreen from './SipConfigScreen';
 
 type Mode = 'extension' | 'email';
+type Screen = 'login' | 'sip' | 'forgot';
+type ForgotStep = 'form' | 'confirm' | 'sent';
 
 // Desktop-parity palette
 const C = {
@@ -15,11 +17,29 @@ const C = {
   textDim: 'rgba(232,238,251,0.42)',
   gold: '#FFD700',
   avaCyan: '#0BB5D6',
+  green: '#22C55E',
   red: '#EF4444',
 };
 
+const SUPABASE_URL = 'https://gejxisrqtvxavbrfcoxz.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdlanhpc3JxdHZ4YXZicmZjb3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1MDMxNzQsImV4cCI6MjA3NzA3OTE3NH0.kaO-GslE99OCNrZ4_AMnbzGqya2azqz_UMZR34zZvvo';
+
+const isEmail = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim());
+
+const mapAuthError = (raw: string): string => {
+  const m = (raw || '').toLowerCase();
+  if (m.includes('invalid_credentials') || m.includes('invalid login')) return 'Wrong email or password.';
+  if (m.includes('extension_not_found')) return 'Extension not found.';
+  if (m.includes('app_access_disabled') || m.includes('mobile_access_disabled')) return 'Mobile access has not been enabled for this extension. Contact your admin.';
+  if (m.includes('ambiguous_extension')) return 'Multiple extensions match — please enter the SIP domain.';
+  if (m.includes('rate') && m.includes('limit')) return 'Too many attempts. Please wait a moment and try again.';
+  if (m.includes('network') || m.includes('failed to fetch')) return 'Network error — check your connection.';
+  if (m.includes('session') || m.includes('jwt')) return 'Your session expired. Please sign in again.';
+  return raw || 'Something went wrong. Please try again.';
+};
+
 export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: Creds) => void }) {
-  const [screen, setScreen] = useState<'login' | 'sip'>('login');
+  const [screen, setScreen] = useState<Screen>('login');
   const [mode, setMode] = useState<Mode>('extension');
   const [extension, setExtension] = useState('');
   const [sipDomain, setSipDomain] = useState('lemtel.lemtel.tel');
@@ -28,22 +48,41 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
   const [portalUrl, setPortalUrl] = useState('https://avastatistic.ca');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   if (screen === 'sip') {
     return <SipConfigScreen onSaved={onAuthenticated} onCancel={() => setScreen('login')} />;
   }
+  if (screen === 'forgot') {
+    return <ForgotPasswordScreen initialEmail={email} onBack={() => setScreen('login')} />;
+  }
 
   const base = portalUrl.replace(/\/$/, '');
+
+  const validate = (): boolean => {
+    const errs: Record<string, string> = {};
+    if (mode === 'email') {
+      if (!email.trim()) errs.email = 'Email is required.';
+      else if (!isEmail(email)) errs.email = 'Enter a valid email address.';
+      if (!password) errs.password = 'Password is required.';
+      else if (password.length < 6) errs.password = 'Password must be at least 6 characters.';
+    } else {
+      if (!extension.trim()) errs.extension = 'Extension is required.';
+      if (!password) errs.password = 'SIP password is required.';
+    }
+    setFieldErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
 
   const submitEmail = async () => {
     const res = await fetch(`${base}/functions/v1/softphone-auth`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email: email.trim(), password }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data?.error || 'Sign-in failed');
-    onAuthenticated({ ...data, portalUrl, email });
+    onAuthenticated({ ...data, portalUrl, email: email.trim() });
   };
 
   const submitExtension = async () => {
@@ -59,14 +98,7 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
     });
     const data = await res.json();
     if (!res.ok || !data?.access_token) {
-      const friendly =
-        data?.error === 'invalid_credentials' ? 'Wrong extension or password.' :
-        data?.error === 'extension_not_found' ? 'Extension not found.' :
-        data?.error === 'app_access_disabled' || data?.error === 'mobile_access_disabled'
-          ? 'Mobile access has not been enabled for this extension. Contact your admin.' :
-        data?.error === 'ambiguous_extension' ? 'Multiple extensions match — please enter the SIP domain.' :
-        (data?.error || 'Sign-in failed');
-      throw new Error(friendly);
+      throw new Error(data?.error || 'Sign-in failed');
     }
     onAuthenticated({
       portalUrl,
@@ -85,12 +117,13 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    if (!validate()) return;
     setBusy(true);
     try {
       if (mode === 'email') await submitEmail();
       else await submitExtension();
     } catch (e: any) {
-      setError(e?.message || 'Unable to sign in');
+      setError(mapAuthError(e?.message));
     } finally {
       setBusy(false);
     }
@@ -100,104 +133,55 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
 
   return (
     <div style={wrap}>
-      {/* Gold radial glow */}
-      <div style={{
-        position: 'absolute',
-        top: '10%', left: '50%',
-        width: 420, height: 420, borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(255,215,0,0.22) 0%, rgba(255,215,0,0.05) 40%, transparent 70%)',
-        filter: 'blur(36px)',
-        animation: 'authGlow 6s ease-in-out infinite',
-        pointerEvents: 'none',
-        transform: 'translateX(-50%)',
-      }} />
+      <GoldGlow />
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 20px', position: 'relative', zIndex: 1 }}>
-        {/* Brand */}
-        <div style={{ textAlign: 'center', marginBottom: 24 }}>
-          <div style={logoStyle}>
-            <img src="/ava-logo.png" alt="Lemtel" width={72} height={72} style={{ display: 'block', borderRadius: 16 }} />
-          </div>
-          <div style={{ marginTop: 14, fontSize: 22, fontWeight: 800, color: C.textIce, letterSpacing: 0.2 }}>Lemtel</div>
-          <div style={{ marginTop: 4, fontSize: 11, color: C.textSub, letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 600 }}>AI Business Phone System</div>
-        </div>
+        <Brand />
 
-        {/* Card */}
-        <div style={{
-          width: '100%', maxWidth: 360,
-          background: C.bgCard,
-          border: `1px solid ${C.border}`,
-          borderRadius: 22, padding: 22,
-          boxShadow: '0 25px 60px rgba(0,0,0,0.55)',
-          backdropFilter: 'blur(18px)',
-          WebkitBackdropFilter: 'blur(18px)',
-          animation: 'fadeIn .4s ease-out',
-        }}>
+        <div style={cardStyle}>
           <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            {/* Mode toggle */}
-            <div style={{ display: 'flex', gap: 6, padding: 4, borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}` }}>
-              {(['extension', 'email'] as Mode[]).map((m) => {
-                const active = mode === m;
-                return (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() => { setMode(m); setError(null); }}
-                    style={{
-                      flex: 1, padding: '9px 10px', borderRadius: 9, cursor: 'pointer',
-                      fontSize: 11, fontWeight: 800, letterSpacing: 0.8, textTransform: 'uppercase',
-                      border: 'none',
-                      background: active ? `linear-gradient(135deg, ${C.gold}, ${C.avaCyan})` : 'transparent',
-                      color: active ? '#0b1530' : C.textSub,
-                    }}
-                  >
-                    {m === 'extension' ? 'Extension' : 'Email'}
-                  </button>
-                );
-              })}
-            </div>
+            <ModeToggle mode={mode} onChange={(m) => { setMode(m); setError(null); setFieldErrors({}); }} />
 
             <Field label="Portal URL" value={portalUrl} onChange={setPortalUrl} type="url" />
             {mode === 'email' ? (
               <>
-                <Field label="Email" value={email} onChange={setEmail} type="email" placeholder="you@company.com" autoFocus />
-                <Field label="Password" value={password} onChange={setPassword} type="password" placeholder="••••••••" />
+                <Field label="Email" value={email} onChange={(v) => { setEmail(v); setFieldErrors((f) => ({ ...f, email: '' })); }} type="email" placeholder="you@company.com" autoFocus error={fieldErrors.email} />
+                <Field label="Password" value={password} onChange={(v) => { setPassword(v); setFieldErrors((f) => ({ ...f, password: '' })); }} type="password" placeholder="••••••••" error={fieldErrors.password} />
               </>
             ) : (
               <>
-                <Field label="Extension" value={extension} onChange={setExtension} placeholder="e.g. 1001" autoFocus />
+                <Field label="Extension" value={extension} onChange={(v) => { setExtension(v); setFieldErrors((f) => ({ ...f, extension: '' })); }} placeholder="e.g. 1001" autoFocus error={fieldErrors.extension} />
                 <Field label="SIP Domain" value={sipDomain} onChange={setSipDomain} placeholder="lemtel.lemtel.tel" />
-                <Field label="SIP Password" value={password} onChange={setPassword} type="password" placeholder="••••••••" />
+                <Field label="SIP Password" value={password} onChange={(v) => { setPassword(v); setFieldErrors((f) => ({ ...f, password: '' })); }} type="password" placeholder="••••••••" error={fieldErrors.password} />
               </>
             )}
 
-            {error && (
-              <div style={{
-                fontSize: 12, color: C.red,
-                padding: '10px 14px', borderRadius: 10,
-                background: 'rgba(239,68,68,0.10)',
-                border: '1px solid rgba(239,68,68,0.22)',
-              }}>{error}</div>
-            )}
+            {error && <ErrorBanner>{error}</ErrorBanner>}
 
             <button
               type="submit"
               disabled={busy || !canSubmit}
               className="lemtel-btn-primary"
-              style={{ marginTop: 6, height: 50, borderRadius: 14, fontSize: 14, cursor: 'pointer' }}
+              style={{ marginTop: 6, height: 50, borderRadius: 14, fontSize: 14, cursor: busy ? 'wait' : 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
             >
+              {busy && <Spinner />}
               {busy ? 'Connecting…' : 'Sign in'}
             </button>
+
+            {mode === 'email' && (
+              <button
+                type="button"
+                onClick={() => setScreen('forgot')}
+                style={ghostLink}
+              >
+                Forgot your password?
+              </button>
+            )}
 
             <button
               type="button"
               onClick={() => setScreen('sip')}
-              style={{
-                marginTop: 2, height: 38, borderRadius: 12,
-                border: `1px solid ${C.border}`,
-                background: 'transparent', color: C.textSub,
-                fontSize: 12, fontWeight: 600, letterSpacing: 0.4, cursor: 'pointer',
-              }}
+              style={ghostBtn}
             >
               Manual SIP setup
             </button>
@@ -211,21 +195,223 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
         </div>
       </div>
 
-      {/* Footer */}
-      <div style={{
-        padding: '14px 16px calc(20px + var(--safe-bottom))', textAlign: 'center',
-        fontSize: 11, color: C.textDim, letterSpacing: 0.4,
-        position: 'relative', zIndex: 1,
-      }}>
-        Built by <span style={{ color: C.gold, fontWeight: 600 }}>AVA Statistic · assistantvirtualai.com</span>
-      </div>
+      <Footer />
     </div>
   );
 }
 
-function Field({ label, value, onChange, type = 'text', autoFocus, placeholder }: {
+/* ====== Forgot password screen ====== */
+function ForgotPasswordScreen({ initialEmail, onBack }: { initialEmail: string; onBack: () => void }) {
+  const [step, setStep] = useState<ForgotStep>('form');
+  const [email, setEmail] = useState(initialEmail);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [fieldErr, setFieldErr] = useState<string>('');
+
+  const goConfirm = () => {
+    setError(null);
+    if (!email.trim()) { setFieldErr('Email is required.'); return; }
+    if (!isEmail(email)) { setFieldErr('Enter a valid email address.'); return; }
+    setFieldErr('');
+    setStep('confirm');
+  };
+
+  const sendReset = async () => {
+    setBusy(true); setError(null);
+    try {
+      const redirectTo = 'https://avastatistic.ca/reset-password';
+      const res = await fetch(`${SUPABASE_URL}/auth/v1/recover`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: SUPABASE_ANON,
+          Authorization: `Bearer ${SUPABASE_ANON}`,
+        },
+        body: JSON.stringify({ email: email.trim(), redirect_to: redirectTo }),
+      });
+      if (!res.ok) {
+        let detail: any = null; try { detail = await res.json(); } catch {}
+        throw new Error(detail?.msg || detail?.error || `HTTP ${res.status}`);
+      }
+      setStep('sent');
+    } catch (e: any) {
+      setError(mapAuthError(e?.message));
+      setStep('form');
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <div style={wrap}>
+      <GoldGlow />
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 20px', position: 'relative', zIndex: 1 }}>
+        <Brand />
+        <div style={cardStyle}>
+          {step === 'form' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <h2 style={headingStyle}>Reset password</h2>
+                <p style={subheadingStyle}>Enter your account email and we’ll send you a reset link.</p>
+              </div>
+              <Field
+                label="Email"
+                value={email}
+                onChange={(v) => { setEmail(v); setFieldErr(''); }}
+                type="email"
+                placeholder="you@company.com"
+                autoFocus
+                error={fieldErr}
+              />
+              {error && <ErrorBanner>{error}</ErrorBanner>}
+              <button
+                type="button"
+                onClick={goConfirm}
+                disabled={!email}
+                className="lemtel-btn-primary"
+                style={{ height: 50, borderRadius: 14, fontSize: 14, cursor: 'pointer' }}
+              >
+                Continue
+              </button>
+              <button type="button" onClick={onBack} style={ghostBtn}>Back to sign in</button>
+            </div>
+          )}
+
+          {step === 'confirm' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <h2 style={headingStyle}>Send reset link?</h2>
+                <p style={subheadingStyle}>We’ll email a one-time password reset link to:</p>
+                <div style={{ marginTop: 8, padding: '10px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`, color: C.textIce, fontWeight: 600, fontSize: 14, wordBreak: 'break-all' }}>{email}</div>
+              </div>
+              {error && <ErrorBanner>{error}</ErrorBanner>}
+              <button
+                type="button"
+                onClick={sendReset}
+                disabled={busy}
+                className="lemtel-btn-primary"
+                style={{ height: 50, borderRadius: 14, fontSize: 14, cursor: busy ? 'wait' : 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+              >
+                {busy && <Spinner />}
+                {busy ? 'Sending…' : 'Send reset link'}
+              </button>
+              <button type="button" onClick={() => setStep('form')} style={ghostBtn} disabled={busy}>Cancel</button>
+            </div>
+          )}
+
+          {step === 'sent' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14, textAlign: 'center' }}>
+              <div style={{
+                width: 56, height: 56, borderRadius: '50%', margin: '4px auto 0',
+                background: 'rgba(34,197,94,0.14)', border: `1px solid rgba(34,197,94,0.35)`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: C.green, fontSize: 26, fontWeight: 800,
+              }}>✓</div>
+              <h2 style={{ ...headingStyle, textAlign: 'center' }}>Check your inbox</h2>
+              <p style={{ ...subheadingStyle, textAlign: 'center' }}>
+                If an account exists for <strong style={{ color: C.textIce }}>{email}</strong>, you’ll receive a reset link shortly. Open it on this device or a desktop browser to set a new password.
+              </p>
+              <button type="button" onClick={onBack} className="lemtel-btn-primary" style={{ height: 50, borderRadius: 14, fontSize: 14, cursor: 'pointer' }}>
+                Back to sign in
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+      <Footer />
+    </div>
+  );
+}
+
+/* ====== Reusable parts ====== */
+function GoldGlow() {
+  return (
+    <div style={{
+      position: 'absolute', top: '10%', left: '50%',
+      width: 420, height: 420, borderRadius: '50%',
+      background: 'radial-gradient(circle, rgba(255,215,0,0.22) 0%, rgba(255,215,0,0.05) 40%, transparent 70%)',
+      filter: 'blur(36px)', animation: 'authGlow 6s ease-in-out infinite',
+      pointerEvents: 'none', transform: 'translateX(-50%)',
+    }} />
+  );
+}
+
+function Brand() {
+  return (
+    <div style={{ textAlign: 'center', marginBottom: 24 }}>
+      <div style={logoStyle}>
+        <img src="/ava-logo.png" alt="Lemtel" width={72} height={72} style={{ display: 'block', borderRadius: 16 }} />
+      </div>
+      <div style={{ marginTop: 14, fontSize: 22, fontWeight: 800, color: C.textIce, letterSpacing: 0.2 }}>Lemtel</div>
+      <div style={{ marginTop: 4, fontSize: 11, color: C.textSub, letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 600 }}>AI Business Phone System</div>
+    </div>
+  );
+}
+
+function Footer() {
+  return (
+    <div style={{
+      padding: '14px 16px calc(20px + var(--safe-bottom))', textAlign: 'center',
+      fontSize: 11, color: C.textDim, letterSpacing: 0.4,
+      position: 'relative', zIndex: 1,
+    }}>
+      Built by <span style={{ color: C.gold, fontWeight: 600 }}>AVA Statistic · assistantvirtualai.com</span>
+    </div>
+  );
+}
+
+function ModeToggle({ mode, onChange }: { mode: Mode; onChange: (m: Mode) => void }) {
+  return (
+    <div style={{ display: 'flex', gap: 6, padding: 4, borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}` }}>
+      {(['extension', 'email'] as Mode[]).map((m) => {
+        const active = mode === m;
+        return (
+          <button
+            key={m}
+            type="button"
+            onClick={() => onChange(m)}
+            style={{
+              flex: 1, padding: '9px 10px', borderRadius: 9, cursor: 'pointer',
+              fontSize: 11, fontWeight: 800, letterSpacing: 0.8, textTransform: 'uppercase',
+              border: 'none',
+              background: active ? `linear-gradient(135deg, ${C.gold}, ${C.avaCyan})` : 'transparent',
+              color: active ? '#0b1530' : C.textSub,
+              transition: 'background .15s ease, color .15s ease',
+            }}
+          >
+            {m === 'extension' ? 'Extension' : 'Email'}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function ErrorBanner({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{
+      fontSize: 12, color: C.red,
+      padding: '10px 14px', borderRadius: 10,
+      background: 'rgba(239,68,68,0.10)',
+      border: '1px solid rgba(239,68,68,0.22)',
+    }}>{children}</div>
+  );
+}
+
+function Spinner() {
+  return (
+    <span
+      aria-hidden
+      style={{
+        width: 14, height: 14, borderRadius: '50%',
+        border: '2px solid rgba(11,21,48,0.25)', borderTopColor: '#0b1530',
+        animation: 'spin 0.7s linear infinite', display: 'inline-block',
+      }}
+    />
+  );
+}
+
+function Field({ label, value, onChange, type = 'text', autoFocus, placeholder, error }: {
   label: string; value: string; onChange: (v: string) => void;
-  type?: string; autoFocus?: boolean; placeholder?: string;
+  type?: string; autoFocus?: boolean; placeholder?: string; error?: string;
 }) {
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -239,7 +425,9 @@ function Field({ label, value, onChange, type = 'text', autoFocus, placeholder }
         autoCorrect="off"
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
+        style={error ? { borderColor: 'rgba(239,68,68,0.55)' } : undefined}
       />
+      {error && <span style={{ fontSize: 11, color: C.red, marginTop: 2 }}>{error}</span>}
     </label>
   );
 }
@@ -259,4 +447,36 @@ const logoStyle: React.CSSProperties = {
   boxShadow: '0 24px 60px -18px rgba(255,215,0,0.40), inset 0 1px 0 rgba(255,255,255,0.18)',
   border: '1px solid rgba(255,215,0,0.20)',
   padding: 6,
+};
+
+const cardStyle: React.CSSProperties = {
+  width: '100%', maxWidth: 360,
+  background: C.bgCard,
+  border: `1px solid ${C.border}`,
+  borderRadius: 22, padding: 22,
+  boxShadow: '0 25px 60px rgba(0,0,0,0.55)',
+  backdropFilter: 'blur(18px)',
+  WebkitBackdropFilter: 'blur(18px)',
+  animation: 'fadeIn .4s ease-out',
+};
+
+const ghostBtn: React.CSSProperties = {
+  marginTop: 2, height: 38, borderRadius: 12,
+  border: `1px solid ${C.border}`,
+  background: 'transparent', color: C.textSub,
+  fontSize: 12, fontWeight: 600, letterSpacing: 0.4, cursor: 'pointer',
+};
+
+const ghostLink: React.CSSProperties = {
+  height: 30, border: 'none', background: 'transparent',
+  color: C.avaCyan, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+  textDecoration: 'underline', textUnderlineOffset: 3,
+};
+
+const headingStyle: React.CSSProperties = {
+  margin: 0, fontSize: 18, fontWeight: 800, color: C.textIce, letterSpacing: 0.2,
+};
+
+const subheadingStyle: React.CSSProperties = {
+  margin: '6px 0 0', fontSize: 12.5, color: C.textSub, lineHeight: 1.5,
 };
