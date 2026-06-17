@@ -738,8 +738,9 @@ function IvrsTable() {
           if (match) setEditing(match);
         },
         submit: async ({ idempotencyKey: idk }) => {
+          const { organization_id: _oid, ...cleanForm } = form || {};
           const { error: err } = await supabase.functions.invoke('fusionpbx-proxy', {
-            body: { action: 'create-ivr', organization_id: orgId, idempotency_key: idk, params: { domain_uuid: LEMTEL_DOMAIN, ...form } },
+            body: { action: 'create-ivr', organization_id: orgId, idempotency_key: idk, params: { domain_uuid: LEMTEL_DOMAIN, ...cleanForm } },
           });
           if (err) throw err;
           setCreating(null);
