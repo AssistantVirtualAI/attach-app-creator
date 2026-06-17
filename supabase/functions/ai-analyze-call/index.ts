@@ -238,6 +238,22 @@ Deno.serve(async (req) => {
       },
     }).eq("id", call_record_id);
 
+    // Audit
+    try {
+      const auditStatus = aiModel === "stub"
+        ? (!anthropicKey && !lovableKey ? "missing-key" : "ai-error")
+        : "ok";
+      await admin.from("ai_request_audit_log").insert({
+        organization_id, user_id: user.id, call_record_id,
+        request_type: "analyze", status: auditStatus,
+        error_code: aiReason || null,
+        message: insights?.summary?.slice?.(0, 400) || null,
+        provider: aiModel.startsWith("claude") ? "anthropic" : aiModel.startsWith("google") ? "lovable-ai" : "stub",
+        model: aiModel,
+        metadata: { transcript_provider: transcriptProvider, transcript_is_stub: transcriptIsStub },
+      });
+    } catch (_) { /* ignore */ }
+
     return new Response(JSON.stringify({
       ok: true, stub: aiModel === "stub", reason: aiReason,
       ai_model: aiModel, transcript_provider: transcriptProvider,
@@ -248,6 +264,13 @@ Deno.serve(async (req) => {
 
   } catch (e: any) {
     console.error("ai-analyze-call fatal", e);
+    try {
+      const adm = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+      await adm.from("ai_request_audit_log").insert({
+        request_type: "analyze", status: "error",
+        error_code: "exception", message: String(e?.message || e).slice(0, 400),
+      });
+    } catch (_) {}
     return new Response(JSON.stringify({ ok: false, error: e?.message || "analysis failed" }), { status: 200, headers: corsHeaders });
   }
 });
