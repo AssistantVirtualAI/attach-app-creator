@@ -18,17 +18,22 @@ type Row = {
   queues: number;
 };
 
+type EditState =
+  | { mode: 'create' }
+  | { mode: 'edit'; row: Row }
+  | null;
+
 export default function CustomersView() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState<string | null>(null);
+  const [edit, setEdit] = useState<EditState>(null);
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
       const domains = await ava.domains();
-      // Pull org map + counts in one round-trip
       const [{ data: orgs }, { data: exts }, { data: nums }, { data: queues }] = await Promise.all([
         supabase.from('organizations').select('id,name,fusionpbx_domain_uuid'),
         supabase.from('pbx_extensions').select('organization_id'),
@@ -77,6 +82,17 @@ export default function CustomersView() {
     finally { setSyncing(null); }
   };
 
+  const removeDomain = async (r: Row) => {
+    if (!confirm(`Delete domain "${r.domain_name}"? This cannot be undone.`)) return;
+    try {
+      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
+        body: { action: 'delete-domain', domain_uuid: r.domain_uuid },
+      });
+      if (error || (data as any)?.ok === false) throw new Error(error?.message || (data as any)?.error || 'Delete failed');
+      await load();
+    } catch (e: any) { alert('Delete failed: ' + (e?.message || 'unknown')); }
+  };
+
   return (
     <div style={{ padding: '24px 28px', overflowY: 'auto', height: '100%' }}>
       <PageHeader
@@ -86,24 +102,25 @@ export default function CustomersView() {
         accent={c.signalGold}
         icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 7h18M3 12h18M3 17h18"/></svg>}
       />
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 12 }}>
+        <button onClick={() => setEdit({ mode: 'create' })} style={{ padding: '8px 14px', borderRadius: 9, background: 'linear-gradient(180deg, #0033ff, #001ea8)', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>+ New customer</button>
         <button onClick={load} style={{ padding: '8px 14px', borderRadius: 9, background: 'transparent', border: `1px solid ${c.border}`, color: c.textIce, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>↻ Refresh</button>
       </div>
 
       {error && <div style={{ padding: 14, color: c.danger, background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 10, marginBottom: 12 }}>{error}</div>}
       {loading && <ListSkeleton rows={6} />}
       {!loading && rows.length === 0 && (
-        <EmptyState icon="◉" title="No PBX domains" hint="FusionPBX returned no domains. Check your FUSIONPBX_API_URL credentials." accent={c.signalGold} />
+        <EmptyState icon="◉" title="No PBX domains" hint="FusionPBX returned no domains. Create one with + New customer or check your credentials." accent={c.signalGold} />
       )}
       {!loading && rows.length > 0 && (
         <div style={{ background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 12, overflow: 'hidden' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 80px 80px 80px 90px 120px', padding: '10px 14px', borderBottom: `1px solid ${c.border}`, background: c.deepPanel }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 70px 70px 70px 90px 200px', padding: '10px 14px', borderBottom: `1px solid ${c.border}`, background: c.deepPanel }}>
             {['Domain','Customer','Ext','Numbers','Queues','Status',''].map((col) => (
               <span key={col} style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: c.mutedSilver }}>{col}</span>
             ))}
           </div>
           {rows.map((r) => (
-            <div key={r.domain_uuid} style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 80px 80px 80px 90px 120px', padding: '12px 14px', borderBottom: `1px solid ${c.border}`, fontSize: 12.5, color: c.textIce, alignItems: 'center' }}>
+            <div key={r.domain_uuid} style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 70px 70px 70px 90px 200px', padding: '12px 14px', borderBottom: `1px solid ${c.border}`, fontSize: 12.5, color: c.textIce, alignItems: 'center' }}>
               <span style={{ fontFamily: 'JetBrains Mono, monospace' }}>{r.domain_name}</span>
               <span style={{ color: r.org_name ? c.textIce : c.mutedSilver }}>{r.org_name || '— not linked —'}</span>
               <span style={{ fontFamily: 'JetBrains Mono, monospace' }}>{r.extensions}</span>
@@ -112,17 +129,86 @@ export default function CustomersView() {
               <span style={{ color: r.domain_enabled === 'true' || r.domain_enabled === true ? c.success : c.mutedSilver, fontSize: 11 }}>
                 ● {r.domain_enabled === 'true' || r.domain_enabled === true ? 'Enabled' : 'Disabled'}
               </span>
-              <span>
-                <button
-                  onClick={() => syncDomain(r)}
-                  disabled={syncing === r.domain_uuid}
-                  style={{ padding: '5px 10px', borderRadius: 7, background: 'transparent', border: `1px solid ${c.border}`, color: c.textIce, fontSize: 11, cursor: 'pointer', opacity: syncing === r.domain_uuid ? 0.6 : 1 }}
-                >{syncing === r.domain_uuid ? 'Syncing…' : '↻ Sync'}</button>
+              <span style={{ display: 'flex', gap: 6 }}>
+                <button onClick={() => setEdit({ mode: 'edit', row: r })} style={btnGhost(c)}>Edit</button>
+                <button onClick={() => syncDomain(r)} disabled={syncing === r.domain_uuid} style={{ ...btnGhost(c), opacity: syncing === r.domain_uuid ? 0.6 : 1 }}>{syncing === r.domain_uuid ? '…' : '↻ Sync'}</button>
+                <button onClick={() => removeDomain(r)} style={{ ...btnGhost(c), color: c.danger, borderColor: c.danger }}>Delete</button>
               </span>
             </div>
           ))}
         </div>
       )}
+
+      {edit && <DomainModal state={edit} onClose={() => setEdit(null)} onSaved={() => { setEdit(null); load(); }} />}
     </div>
   );
+}
+
+function btnGhost(c: any): React.CSSProperties {
+  return { padding: '5px 10px', borderRadius: 7, background: 'transparent', border: `1px solid ${c.border}`, color: c.textIce, fontSize: 11, cursor: 'pointer' };
+}
+
+function DomainModal({ state, onClose, onSaved }: { state: Exclude<EditState, null>; onClose: () => void; onSaved: () => void }) {
+  const isEdit = state.mode === 'edit';
+  const initial = isEdit ? state.row : null;
+  const [name, setName] = useState(initial?.domain_name || '');
+  const [desc, setDesc] = useState(initial?.domain_description || '');
+  const [enabled, setEnabled] = useState<boolean>(initial ? (initial.domain_enabled === 'true' || initial.domain_enabled === true) : true);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const save = async () => {
+    setSaving(true); setErr(null);
+    try {
+      if (isEdit) {
+        const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
+          body: { action: 'update-domain', domain_uuid: initial!.domain_uuid, params: { domain_description: desc, domain_enabled: enabled ? 'true' : 'false' } },
+        });
+        if (error || (data as any)?.ok === false) throw new Error(error?.message || (data as any)?.error || 'Update failed');
+      } else {
+        if (!name.trim()) throw new Error('Domain name required');
+        const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
+          body: { action: 'create-domain', domain_name: name.trim(), domain_description: desc || `Customer ${name}` },
+        });
+        if (error || (data as any)?.ok === false) throw new Error(error?.message || (data as any)?.error || 'Create failed');
+      }
+      onSaved();
+    } catch (e: any) { setErr(e?.message || 'Failed'); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9000 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: 440, maxWidth: '92vw', background: c.deepPanel, border: `1px solid ${c.border}`, borderRadius: 14, padding: 22, color: c.text }}>
+        <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>{isEdit ? 'Edit customer' : 'New customer'}</h2>
+        <p style={{ margin: '4px 0 14px', fontSize: 12, color: c.textSub }}>{isEdit ? 'Update this FusionPBX domain.' : 'Create a new FusionPBX domain / tenant.'}</p>
+
+        <label style={lbl(c)}>Domain name</label>
+        <input value={name} onChange={(e) => setName(e.target.value)} disabled={isEdit} placeholder="customer.example.com" style={inp(c)} />
+
+        <label style={lbl(c)}>Description</label>
+        <input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Friendly name" style={inp(c)} />
+
+        {isEdit && (
+          <label style={{ ...lbl(c), display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 }}>
+            <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} /> Enabled
+          </label>
+        )}
+
+        {err && <p style={{ color: c.danger, fontSize: 12, margin: '10px 0 0' }}>{err}</p>}
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 18 }}>
+          <button onClick={onClose} style={btnGhost(c)}>Cancel</button>
+          <button onClick={save} disabled={saving} style={{ padding: '8px 16px', borderRadius: 9, background: 'linear-gradient(180deg, #0033ff, #001ea8)', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1 }}>{saving ? 'Saving…' : isEdit ? 'Save' : 'Create'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function lbl(c: any): React.CSSProperties {
+  return { display: 'block', fontSize: 11, fontWeight: 700, color: c.textSub, textTransform: 'uppercase', letterSpacing: 1, marginTop: 10, marginBottom: 4 };
+}
+function inp(c: any): React.CSSProperties {
+  return { width: '100%', padding: '8px 10px', borderRadius: 8, border: `1px solid ${c.border}`, background: c.bgCard, color: c.text, fontSize: 13, outline: 'none' };
 }
