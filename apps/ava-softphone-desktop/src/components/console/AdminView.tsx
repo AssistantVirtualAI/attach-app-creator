@@ -875,15 +875,18 @@ function QueuesTable() {
   const save = async (q: any, changes: any) => {
     setSaving(true);
     try {
+      const { _queue_agents: agents, ...rest } = changes || {};
       const { error: err } = await supabase.functions.invoke('fusionpbx-proxy', {
         body: {
           action: 'update-queue',
           organization_id: LEMTEL_ORG,
-          params: { call_center_queue_uuid: q.pbx_uuid, domain_uuid: LEMTEL_DOMAIN, ...changes },
+          params: { call_center_queue_uuid: q.pbx_uuid, domain_uuid: LEMTEL_DOMAIN, ...rest },
         },
       });
       if (err) throw err;
-      setData((prev) => prev.map((x) => (x.id === q.id ? { ...x, name: changes.queue_name ?? x.name, strategy: changes.queue_strategy ?? x.strategy, max_wait_time: changes.queue_max_wait_time !== undefined ? Number(changes.queue_max_wait_time) : x.max_wait_time, enabled: changes.queue_enabled !== undefined ? changes.queue_enabled === 'true' : x.enabled } : x)));
+      if (q.pbx_uuid) await syncQueueTiers(q.pbx_uuid, agents || []);
+      await reload(false);
+      setData((prev) => prev.map((x) => (x.id === q.id ? { ...x, name: rest.queue_name ?? x.name, strategy: rest.queue_strategy ?? x.strategy, max_wait_time: rest.queue_max_wait_time !== undefined ? Number(rest.queue_max_wait_time) : x.max_wait_time, enabled: rest.queue_enabled !== undefined ? rest.queue_enabled === 'true' : x.enabled } : x)));
       setEditing(null);
     } catch (e: any) {
       alert('Update failed: ' + (e?.message || 'unknown'));
