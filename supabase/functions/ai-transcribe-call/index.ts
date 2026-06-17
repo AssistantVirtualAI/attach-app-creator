@@ -210,16 +210,19 @@ Deno.serve(async (req) => {
     const lovableKey = Deno.env.get("LOVABLE_API_KEY");
     if (!lovableKey) {
       await writeTranscript(fallbackTranscript, "stub-no-key");
+      await audit("missing-key", { error_code: "LOVABLE_API_KEY", message: "Lovable AI key not configured", provider: "lovable-ai" });
       return json({ transcript_text: fallbackTranscript, stub: true, reason: "missing-ai-key", fetchErrors });
     }
     if (!audioBytes || audioBytes.length === 0) {
       await writeTranscript(fallbackTranscript, "stub-no-audio");
+      await audit("no-audio", { error_code: "no-audio", message: `fetch errors: ${fetchErrors.join("; ") || "none"}`, metadata: { fetchErrors } });
       return json({ transcript_text: fallbackTranscript, stub: true, reason: "no-audio", fetchErrors }, 200);
     }
 
     // Gemini supports inline audio up to ~20MB
     if (audioBytes.length > 20 * 1024 * 1024) {
       await writeTranscript(fallbackTranscript, "stub-too-large");
+      await audit("ai-error", { error_code: "audio-too-large", message: `${audioBytes.length} bytes` });
       return json({ transcript_text: fallbackTranscript, stub: true, reason: "audio-too-large", size: audioBytes.length });
     }
 
@@ -237,7 +240,7 @@ Deno.serve(async (req) => {
             { type: "text", text: "Transcribe this phone call verbatim in the original language spoken (French or English). Label speakers as Agent: and Caller: on separate lines. Include filler words. Return ONLY the transcript text, no preamble, no commentary, no markdown." },
             { type: "input_audio", input_audio: { data: b64, format: audioMime.split("/")[1] || "wav" } },
           ],
-        }],
+        }),
       }),
     });
     if (!aiRes.ok) {
@@ -245,9 +248,11 @@ Deno.serve(async (req) => {
       console.error("ai gateway error", aiRes.status, errTxt);
       // 429 / 402 are user-facing billing issues — surface them, don't silently stub
       if (aiRes.status === 429 || aiRes.status === 402) {
+        await audit("ai-error", { error_code: aiRes.status === 429 ? "rate-limited" : "credits-exhausted", http_status: aiRes.status, message: errTxt.slice(0, 400), provider: "lovable-ai", model: "google/gemini-2.5-pro" });
         return json({ error: aiRes.status === 429 ? "rate-limited" : "credits-exhausted", details: errTxt }, aiRes.status);
       }
       await writeTranscript(fallbackTranscript, `stub-ai-${aiRes.status}`);
+      await audit("ai-error", { error_code: `ai_gateway_${aiRes.status}`, http_status: aiRes.status, message: errTxt.slice(0, 400), provider: "lovable-ai", model: "google/gemini-2.5-pro" });
       return json({ transcript_text: fallbackTranscript, stub: true, error: `ai_gateway_${aiRes.status}` });
     }
     const data = await aiRes.json();
@@ -256,12 +261,15 @@ Deno.serve(async (req) => {
     console.log("ai-transcribe-call ai result", { finishReason, length: transcript_text.length, audioSource });
     if (!transcript_text) {
       await writeTranscript(fallbackTranscript, "stub-empty-ai");
+      await audit("ai-error", { error_code: "empty-ai-response", message: `finish_reason: ${finishReason}`, provider: "lovable-ai", model: "google/gemini-2.5-pro" });
       return json({ transcript_text: fallbackTranscript, stub: true, reason: "empty-ai-response", finishReason });
     }
     await writeTranscript(transcript_text, "lovable-ai/gemini-2.5-pro");
+    await audit("ok", { provider: "lovable-ai", model: "google/gemini-2.5-pro", metadata: { audioSource, length: transcript_text.length } });
     return json({ transcript_text, audioSource, finishReason });
   } catch (e: any) {
     console.error("ai-transcribe-call error", e);
+    await audit("error", { error_code: "exception", message: String(e?.message || e).slice(0, 400) });
     return json({ error: e?.message || "transcription failed" }, 500);
   }
 });
