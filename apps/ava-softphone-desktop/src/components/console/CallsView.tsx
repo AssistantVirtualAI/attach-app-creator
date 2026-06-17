@@ -41,9 +41,16 @@ export default function CallsView({ scope = 'mine' }: { scope?: 'mine' | 'org' }
   const [query, setQuery] = useState('');
   const [sel, setSel] = useState<CallRecord | null>(null);
   const [insight, setInsight] = useState<any>(null);
+  const [analyzing, setAnalyzing] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [audioLoading, setAudioLoading] = useState(false);
   const [audioError, setAudioError] = useState<string | null>(null);
+  const [narrow, setNarrow] = useState(typeof window !== 'undefined' && window.innerWidth < 820);
+  useEffect(() => {
+    const onResize = () => setNarrow(window.innerWidth < 820);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
