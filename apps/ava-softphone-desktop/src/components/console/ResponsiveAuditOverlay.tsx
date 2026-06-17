@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { theme } from '../../lib/theme';
+const { colors: c } = theme;
 
 interface Props {
   open: boolean;
