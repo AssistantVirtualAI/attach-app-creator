@@ -97,7 +97,13 @@ export default function RecordingsList({ onAnalyze, extension }: { onAnalyze?: (
         },
       });
       if (r1.error) throw r1.error;
-      transcript_text = transcript_text || String((r1.data as any)?.transcript_text || '').trim();
+      const d1 = (r1.data as any) || {};
+      // Surface stub responses as errors instead of silently succeeding.
+      if (d1.stub === true) {
+        const reason = d1.reason || d1.error || 'transcription unavailable';
+        throw new Error(`Transcription unavailable (${reason}).`);
+      }
+      transcript_text = transcript_text || String(d1.transcript_text || '').trim();
       if (!transcript_text) throw new Error('No transcript available for AI analysis yet');
       const r2 = await supabase.functions.invoke('ai-analyze-call', {
         body: {
@@ -111,7 +117,6 @@ export default function RecordingsList({ onAnalyze, extension }: { onAnalyze?: (
       });
       if (r2.error) throw r2.error;
       const ai = (r2.data as any)?.analysis || (r2.data as any) || null;
-      // Optimistic local update — avoid full reload that causes list flicker.
       setItems((all) => all.map((x) => x.id === r.id ? {
         ...x,
         transcript_text,
