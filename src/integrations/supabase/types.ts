@@ -564,6 +564,57 @@ export type Database = {
           },
         ]
       }
+      ai_request_audit_log: {
+        Row: {
+          call_record_id: string | null
+          created_at: string
+          error_code: string | null
+          http_status: number | null
+          id: string
+          latency_ms: number | null
+          message: string | null
+          metadata: Json | null
+          model: string | null
+          organization_id: string | null
+          provider: string | null
+          request_type: string
+          status: string
+          user_id: string | null
+        }
+        Insert: {
+          call_record_id?: string | null
+          created_at?: string
+          error_code?: string | null
+          http_status?: number | null
+          id?: string
+          latency_ms?: number | null
+          message?: string | null
+          metadata?: Json | null
+          model?: string | null
+          organization_id?: string | null
+          provider?: string | null
+          request_type: string
+          status: string
+          user_id?: string | null
+        }
+        Update: {
+          call_record_id?: string | null
+          created_at?: string
+          error_code?: string | null
+          http_status?: number | null
+          id?: string
+          latency_ms?: number | null
+          message?: string | null
+          metadata?: Json | null
+          model?: string | null
+          organization_id?: string | null
+          provider?: string | null
+          request_type?: string
+          status?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       alert_notifications: {
         Row: {
           agent_id: string | null
