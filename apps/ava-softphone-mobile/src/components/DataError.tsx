@@ -1,4 +1,5 @@
 import React from 'react';
+import { colors } from '../lib/theme';
 
 /**
  * Inline error state for failed data fetches in the mobile app.
@@ -15,9 +16,9 @@ export default function DataError({
     <div style={{
       display: 'flex', flexDirection: 'column', alignItems: 'center',
       justifyContent: 'center', gap: 10, padding: '32px 20px',
-      color: 'rgba(226,232,240,0.7)', fontSize: 14, textAlign: 'center',
+      color: colors.textSub, fontSize: 14, textAlign: 'center',
     }}>
-      <div style={{ fontSize: 15, color: '#e2e8f0' }}>
+      <div style={{ fontSize: 15, color: colors.textIce }}>
         {message || 'Impossible de charger les données.'}
       </div>
       {onRetry && (
@@ -25,8 +26,8 @@ export default function DataError({
           onClick={onRetry}
           style={{
             marginTop: 8, padding: '10px 18px', borderRadius: 20,
-            background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.18)',
-            color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+            background: colors.graphite, border: `1px solid ${colors.border}`,
+            color: colors.textIce, cursor: 'pointer', fontSize: 13, fontWeight: 600,
           }}
         >
           Réessayer
