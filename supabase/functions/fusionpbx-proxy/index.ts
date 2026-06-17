@@ -1163,9 +1163,17 @@ Deno.serve(async (req) => {
 
       for (const ep of ordered) {
         const isPhp = ep.endsWith(".php");
-        // NOTE: 'order' must NOT be passed — it conflicts with the PostgreSQL reserved word
-        // inside the FusionPBX API handler and causes "syntax error at order".
-        const qp = new URLSearchParams({ domain_uuid: FUSIONPBX_DOMAIN_UUID, limit: "100", ...extraQp });
+        // FusionPBX xml_cdr API expects BOTH `order_by` and `order` (asc|desc). When only
+        // one of them is omitted the handler injects a default `order` filter into the SQL
+        // WHERE clause and crashes with: syntax error at or near "order". We always send
+        // both so the handler treats them as ORDER BY metadata, not as filter columns.
+        const qp = new URLSearchParams({
+          domain_uuid: FUSIONPBX_DOMAIN_UUID,
+          limit: "100",
+          order_by: "start_stamp",
+          order: "desc",
+          ...extraQp,
+        });
         if (isPhp) {
           qp.set("key", FUSIONPBX_API_KEY);
           qp.set("username", FUSIONPBX_USERNAME);
