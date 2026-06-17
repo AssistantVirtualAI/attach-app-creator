@@ -13,10 +13,12 @@ const { colors: c } = theme;
 
 type HealthRow = {
   id: string;
-  job_type: string;
+  source: string;
   status: string;
   last_error: string | null;
-  created_at: string;
+  last_success_at: string | null;
+  last_error_at: string | null;
+  updated_at: string;
   metadata: any;
 };
 
@@ -50,14 +52,15 @@ export default function SyncStatusView() {
     if (!orgId) return;
     const { data } = await supabase
       .from('telecom_sync_health')
-      .select('id, job_type, status, last_error, created_at, metadata')
+      .select('id, source, status, last_error, last_success_at, last_error_at, updated_at, metadata')
       .eq('organization_id', orgId)
-      .order('created_at', { ascending: false })
+      .order('updated_at', { ascending: false })
       .limit(40);
     setHistory((data || []) as HealthRow[]);
   };
 
   useEffect(() => { loadHistory(); }, [orgId]);
+
 
   const runRetry = async () => {
     if (!orgId || running) return;
