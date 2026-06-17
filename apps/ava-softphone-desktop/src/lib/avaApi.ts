@@ -570,18 +570,18 @@ export const ava = {
     missed: 3, answered: 12, unreadSms: 5, voicemail: 2, aiActions: 4, pbxHealth: 'ok',
     brief: 'You have 3 missed calls and 2 unread voicemails requiring callbacks. One conversation flagged a renewal opportunity.',
   }),
-  calls: async (limit = 100, opts?: { scope?: 'mine' | 'org' }) => {
+  calls: async (limit = 100, opts?: { scope?: 'mine' | 'org'; extension?: string | null }) => {
     if (MOCK) return MOCK_CALLS;
     await bestEffortCdrSync(Math.max(limit, 200));
     return (await readCallRecordRows(limit, opts)).map(mapCdrToCall);
   },
-  refreshCalls: async (limit = 150, opts?: { scope?: 'mine' | 'org' }) => {
+  refreshCalls: async (limit = 150, opts?: { scope?: 'mine' | 'org'; extension?: string | null }) => {
     if (MOCK) return MOCK_CALLS;
     await bestEffortCdrSync(Math.max(limit, 250), 0, true);
     if (typeof window !== 'undefined') window.dispatchEvent(new Event('lemtel:phone-sync-complete'));
     return (await readCallRecordRows(limit, opts)).map(mapCdrToCall);
   },
-  scopedCallRecords: async (limit = 100, opts?: { scope?: 'mine' | 'org' }) => {
+  scopedCallRecords: async (limit = 100, opts?: { scope?: 'mine' | 'org'; extension?: string | null }) => {
     if (MOCK) return MOCK_CALLS as any[];
     await bestEffortCdrSync(Math.max(limit, 200));
     return readCallRecordRows(limit, opts);
