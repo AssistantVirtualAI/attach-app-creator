@@ -1,38 +1,43 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Apple, MonitorDown, Download } from "lucide-react";
-
-const REPO = "AssistantVirtualAI/attach-app-creator";
-const BASE = `https://github.com/${REPO}/releases/latest/download`;
-
-const downloads = [
-  {
-    platform: "Mac Apple Silicon",
-    icon: Apple,
-    label: "macOS (M1/M2/M3/M4)",
-    sublabel: ".dmg · Apple Silicon",
-    url: `${BASE}/Lemtel.Telecom-arm64.dmg`,
-  },
-  {
-    platform: "Mac Intel",
-    icon: Apple,
-    label: "macOS (Intel)",
-    sublabel: ".dmg · Intel chip",
-    url: `${BASE}/Lemtel.Telecom.dmg`,
-  },
-  {
-    platform: "Windows",
-    icon: MonitorDown,
-    label: "Windows 10/11",
-    sublabel: ".exe · Auto-installer",
-    url: `${BASE}/Lemtel.Telecom.Setup.exe`,
-  },
-];
+import { useQuery } from "@tanstack/react-query";
+import { fetchLatestRelease, resolveUrl } from "@/lib/githubRelease";
 
 export const LandingDownloadSection = () => {
+  const { data: release } = useQuery({
+    queryKey: ["gh-release-latest"],
+    queryFn: fetchLatestRelease,
+    staleTime: 30 * 60_000,
+    retry: false,
+  });
+
+  const downloads = [
+    {
+      platform: "Mac Apple Silicon",
+      icon: Apple,
+      label: "macOS (M1/M2/M3/M4)",
+      sublabel: ".dmg · Apple Silicon",
+      url: resolveUrl(release ?? null, "macArm"),
+    },
+    {
+      platform: "Mac Intel",
+      icon: Apple,
+      label: "macOS (Intel)",
+      sublabel: ".dmg · Intel chip",
+      url: resolveUrl(release ?? null, "macIntel"),
+    },
+    {
+      platform: "Windows",
+      icon: MonitorDown,
+      label: "Windows 10/11",
+      sublabel: ".exe · Auto-installer",
+      url: resolveUrl(release ?? null, "windows"),
+    },
+  ];
+
   return (
     <section className="py-24 relative overflow-hidden">
-      {/* Background glow */}
       <div className="absolute inset-0 bg-gradient-to-b from-background via-primary/5 to-background" />
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/10 rounded-full blur-[120px]" />
 
@@ -49,6 +54,9 @@ export const LandingDownloadSection = () => {
           </h2>
           <p className="text-muted-foreground">
             Native desktop softphone. HD audio, click-to-dial, and AI-powered call insights.
+            {release?.version && (
+              <span className="block text-xs mt-1 opacity-70">Latest: {release.version}</span>
+            )}
           </p>
         </motion.div>
 
