@@ -95,7 +95,7 @@ export async function runAllExtensionSync(
   const final: Record<SyncAction, SyncProgress> = {} as any;
 
   const tasks: Array<{ action: SyncAction; body: Record<string, unknown> }> = [
-    { action: 'sync-cdrs', body: { organization_id: orgId, limit, page_size: Math.max(limit, 500), max_pages: 2 } },
+    { action: 'sync-cdrs', body: { organization_id: orgId, limit, page_size: Math.max(limit, 500), max_pages: 2, from_beginning: true } },
     { action: 'sync-voicemail-messages', body: { organization_id: orgId, extension: extension || undefined } },
     { action: 'list-recordings', body: { organization_id: orgId, extension: extension || undefined, limit } },
   ];
@@ -155,7 +155,7 @@ export function useExtensionDataSync(
       supabase.rpc('update_platform_seen', { p_platform: 'desktop' }).then(() => null, () => null);
 
       await Promise.allSettled([
-        invokeWithRetry('sync-cdrs', { organization_id: orgId, limit, page_size: Math.max(limit, 500), max_pages: 2 }),
+        invokeWithRetry('sync-cdrs', { organization_id: orgId, limit, page_size: Math.max(limit, 500), max_pages: 2, from_beginning: true }),
         invokeWithRetry('sync-voicemail-messages', { organization_id: orgId, extension: extension || undefined }),
         invokeWithRetry('list-recordings', { organization_id: orgId, extension: extension || undefined, limit }),
       ]);
