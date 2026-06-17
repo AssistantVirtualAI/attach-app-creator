@@ -192,12 +192,28 @@ export default function LemtelPortalCalls({ scope = 'org' }: { scope?: 'org' | '
                     ) : '-'}
                   </td>
                   <td className="p-3">
-                    {c.analyzed ? <Badge variant="default">Analyzed</Badge> : (
-                      <Button size="sm" variant="outline" onClick={() => analyze(c)} disabled={analyzing === c.id}>
-                        {analyzing === c.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <><Sparkles className="w-3 h-3 mr-1" />Analyze</>}
-                      </Button>
-                    )}
+                    {(() => {
+                      const live = stages[c.id];
+                      const transcript = { provider: c.raw_data?.transcript_provider, transcript_text: c.raw_data?.transcript_text };
+                      const stubT = isStubTranscript(transcript);
+                      const stage: TranscriptStage = live?.stage
+                        ?? (analyzing === c.id ? 'transcribing'
+                          : c.analyzed && !stubT ? 'complete'
+                          : c.transcribed && stubT ? 'unavailable'
+                          : 'idle');
+                      return (
+                        <div className="flex items-center gap-2">
+                          <TranscriptStagePill stage={stage} detail={live?.detail} compact />
+                          {stage !== 'complete' && (
+                            <Button size="sm" variant="ghost" onClick={() => analyze(c)} disabled={analyzing === c.id}>
+                              {analyzing === c.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                            </Button>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </td>
+
                 </tr>
               ))}
             </tbody>
