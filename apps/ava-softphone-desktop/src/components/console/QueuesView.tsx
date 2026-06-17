@@ -62,16 +62,36 @@ export default function QueuesView({ isAdmin, isSuperAdmin, isSupervisor }: Prop
     setError(null);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      const [{ data: q }, { data: a }, { data: s }] = await Promise.all([
+      // Source of truth for agents = pbx_extensions (every SIP extension on the PBX),
+      // enriched with call-center state from pbx_softphone_users matched by extension.
+      const [{ data: q }, { data: ext }, { data: spu }, { data: s }] = await Promise.all([
         supabase.from('pbx_call_queues').select('id,pbx_uuid,name,extension,strategy').eq('organization_id', orgId).order('name'),
+        supabase.from('pbx_extensions')
+          .select('extension,effective_caller_id_name,effective_cid_number,enabled')
+          .eq('organization_id', orgId)
+          .eq('enabled', true)
+          .order('extension'),
         supabase.from('pbx_softphone_users')
-          .select('id,extension,display_name,cc_role,cc_status,cc_pause_reason,cc_queues')
+          .select('id,extension,display_name,cc_role,cc_status,cc_pause_reason,cc_queues,portal_user_id')
           .eq('organization_id', orgId),
         supabase.from('cc_queue_stats').select('*').eq('organization_id', orgId),
       ]);
+      const cc = new Map<string, any>();
+      (spu || []).forEach((u: any) => { if (u.extension) cc.set(String(u.extension), u); });
+      const merged: AgentRow[] = (ext || []).map((e: any) => {
+        const u = cc.get(String(e.extension)) || {};
+        return {
+          id: u.id || `ext:${e.extension}`,
+          extension: String(e.extension),
+          display_name: u.display_name || e.effective_caller_id_name || null,
+          cc_role: u.cc_role ?? null,
+          cc_status: u.cc_status ?? 'offline',
+          cc_pause_reason: u.cc_pause_reason ?? null,
+          cc_queues: u.cc_queues ?? null,
+        };
+      });
       setQueues((q || []) as any);
-      setAgents((a || []) as any);
-      if (user) setMeRow((a || []).find((row: any) => row.id && row.cc_role !== undefined && (row as any).portal_user_id === user.id) || (a || []).find((row: any) => (row as any).portal_user_id === user.id) || null);
+      setAgents(merged);
       const statsMap: Record<string, any> = {};
       (s || []).forEach((row: any) => { statsMap[row.queue_id || row.queue_name] = row; });
       setStats(statsMap);
@@ -91,14 +111,13 @@ export default function QueuesView({ isAdmin, isSuperAdmin, isSupervisor }: Prop
       });
       setWaiting(w);
 
-      // refetch "me" with portal_user_id filter
+      // resolve "me" from softphone_users by portal_user_id, then map to merged row by extension
       if (user) {
-        const { data: me } = await supabase
-          .from('pbx_softphone_users')
-          .select('id,extension,display_name,cc_role,cc_status,cc_pause_reason,cc_queues')
-          .eq('portal_user_id', user.id)
-          .maybeSingle();
-        if (me) setMeRow(me as any);
+        const mine = (spu || []).find((row: any) => row.portal_user_id === user.id) as any;
+        if (mine) {
+          const m = merged.find(r => r.extension === String(mine.extension));
+          setMeRow(m || (mine as any));
+        }
       }
     } catch (e: any) {
       setError(e?.message || 'Failed to load queues');
