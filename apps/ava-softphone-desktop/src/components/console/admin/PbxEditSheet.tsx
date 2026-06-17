@@ -102,6 +102,9 @@ function FieldRenderer({ f, value, onChange, fullForm }: {
   if (f.type === 'tts-greeting') {
     return <TtsGreetingField value={value} onChange={onChange} field={f} fullForm={fullForm} />;
   }
+  if (f.type === 'queue-agents') {
+    return <QueueAgentsField value={value} onChange={onChange} />;
+  }
   return (
     <input
       type={f.type === 'number' ? 'number' : f.type === 'password' ? 'password' : 'text'}
