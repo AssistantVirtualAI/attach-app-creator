@@ -33,6 +33,7 @@ export default function MoreScreen({
   if (sub === 'datasafety')  return <SubPage onBack={() => setSub(null)} title="Data safety"><DataSafetyScreen /></SubPage>;
   if (sub === 'permissions') return <SubPage onBack={() => setSub(null)} title="Permissions"><PermissionsScreen /></SubPage>;
   if (sub === 'support')     return <SubPage onBack={() => setSub(null)} title="Support"><SupportScreen /></SubPage>;
+  if (sub === 'aiaudit')     return <SubPage onBack={() => setSub(null)} title="AI requests"><AIAuditScreen /></SubPage>;
 
   return (
     <div style={{ height: '100%', overflowY: 'auto', padding: '14px 14px 20px' }}>
