@@ -59,11 +59,30 @@ export function DownloadCenter({ personalize = false }: { personalize?: boolean 
   const assetsList: any[] = Array.isArray((release as any)?.assets) ? (release as any).assets : [];
   const findAsset = (suffix: string) =>
     assetsList.find((a: any) => (a.name || '').toLowerCase().endsWith(suffix.toLowerCase()));
-  const macArm = platformUrls.mac_arm64 ? { name: 'macOS Apple Silicon', browser_download_url: platformUrls.mac_arm64, size: 0 } : findAsset('arm64.dmg');
-  const macX64 = platformUrls.mac_x64 ? { name: 'macOS Intel', browser_download_url: platformUrls.mac_x64, size: 0 } : findAsset('x64.dmg');
-  const win = platformUrls.windows ? { name: 'Windows', browser_download_url: platformUrls.windows, size: 0 } : findAsset('.exe');
-  const linux = platformUrls.linux ? { name: 'Linux', browser_download_url: platformUrls.linux, size: 0 } : findAsset('.AppImage');
+  const findAssetIntel = () =>
+    assetsList.find((a: any) => {
+      const n = (a.name || '').toLowerCase();
+      return n.endsWith('.dmg') && !n.includes('arm64');
+    });
+  const macArm = platformUrls.mac_arm64
+    ? { name: 'macOS Apple Silicon', browser_download_url: platformUrls.mac_arm64, size: 0 }
+    : findAsset('arm64.dmg');
+  const macX64 = platformUrls.mac_x64
+    ? { name: 'macOS Intel', browser_download_url: platformUrls.mac_x64, size: 0 }
+    : (findAsset('x64.dmg') || findAssetIntel());
+  const win = platformUrls.windows
+    ? { name: 'Windows', browser_download_url: platformUrls.windows, size: 0 }
+    : findAsset('.exe');
+  const linux = platformUrls.linux
+    ? { name: 'Linux', browser_download_url: platformUrls.linux, size: 0 }
+    : findAsset('.AppImage');
   const ver = (release as any)?.tag || (release as any)?.tag_name || '';
+
+  // Hardcoded fallback URLs from official release channel
+  const BASE_URL = `https://github.com/${GH_REPO}/releases/latest/download`;
+  const fallbackMacArm = `${BASE_URL}/Lemtel.Telecom-arm64.dmg`;
+  const fallbackMacIntel = `${BASE_URL}/Lemtel.Telecom.dmg`;
+  const fallbackWin = `${BASE_URL}/Lemtel.Telecom.Setup.exe`;
 
   const qrPayload = JSON.stringify({
     portal: 'avastatistic.ca',
