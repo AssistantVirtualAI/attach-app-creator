@@ -83,6 +83,7 @@ import DemoRequestPage from "./pages/DemoRequest";
 import ContactUs from "./pages/ContactUs";
 import AuditLogs from "./pages/AuditLogs";
 import Download from "./pages/Download";
+import MobilePreview from "./pages/MobilePreview";
 
 // Lemtel module
 import { LemtelGuard } from "./pages/lemtel/LemtelGuard";
@@ -288,6 +289,7 @@ const App = () => (
 
                 {/* Public download page */}
                 <Route path="/download" element={<Download />} />
+                <Route path="/mobile-preview" element={<MobilePreview />} />
                 
                 {/* Universal login - redirects based on user type */}
                 <Route path="/login" element={<UniversalLogin />} />

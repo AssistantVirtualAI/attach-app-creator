@@ -26,17 +26,32 @@ import { configureAudit, audit } from './lib/audit';
 
 export default function MobileApp() {
   const { creds, setCreds, clearCreds, loading } = useStoredCreds();
-  const [tab, setTab] = useState<Tab>('home');
+  const initialTab = (() => {
+    try {
+      const t = new URLSearchParams(window.location.search).get('tab');
+      if (t === 'home' || t === 'calls' || t === 'ava' || t === 'queues' || t === 'more') return t as Tab;
+    } catch {}
+    return 'home' as Tab;
+  })();
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [booting, setBooting] = useState(true);
 
   useEffect(() => {
     bootNative().finally(() => {
-      // Keep the AVA splash visible briefly for brand polish.
       setTimeout(() => setBooting(false), 700);
     });
-    // Register native background sync (no-op on web / when plugin missing).
     initBackgroundSync().catch(() => {});
+
+    // Accept navigation commands from /mobile-preview host.
+    const onMsg = (e: MessageEvent) => {
+      const d = e.data;
+      if (!d || d.source !== 'ava-preview') return;
+      if (d.type === 'set-tab' && typeof d.tab === 'string') setTab(d.tab as Tab);
+    };
+    window.addEventListener('message', onMsg);
+    return () => window.removeEventListener('message', onMsg);
   }, []);
+
 
   if (loading || booting) return <SplashAva />;
   if (!creds) return <AuthScreen onAuthenticated={setCreds} />;
