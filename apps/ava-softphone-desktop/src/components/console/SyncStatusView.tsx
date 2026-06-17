@@ -132,8 +132,9 @@ export default function SyncStatusView() {
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   <span style={{ fontSize: 13, fontWeight: 600, color: c.text }}>{SYNC_ACTION_LABELS[a]}</span>
                   <span style={{ fontSize: 11, color: c.textSub }}>
-                    Last success: {last ? new Date(last.created_at).toLocaleString() : '—'}
+                    Last success: {last?.last_success_at ? new Date(last.last_success_at).toLocaleString() : '—'}
                   </span>
+
                 </div>
                 <StatusBadge progress={p} />
               </div>
