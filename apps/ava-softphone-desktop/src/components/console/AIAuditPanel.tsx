@@ -40,8 +40,13 @@ export default function AIAuditPanel() {
   const [callIdSearch, setCallIdSearch] = useState('');
   const [selected, setSelected] = useState<AIRow | null>(null);
 
+  const [retrying, setRetrying] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const rowsRef = useRef<AIRow[]>([]);
+  useEffect(() => { rowsRef.current = rows; }, [rows]);
+
   const load = useCallback(async () => {
-    setLoading(true);
+    setLoading(prev => prev && rowsRef.current.length === 0);
     try {
       let q = supabase.from('ai_request_audit_log' as any).select('*').order('created_at', { ascending: false }).limit(300);
       if (filter !== 'all') q = q.eq('status', filter);
@@ -51,6 +56,38 @@ export default function AIAuditPanel() {
   }, [filter]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Live polling: 3s when an in-flight request is visible, else 10s.
+  useEffect(() => {
+    let stop = false;
+    let t: ReturnType<typeof setTimeout> | null = null;
+    const tick = async () => {
+      if (stop) return;
+      await load();
+      const anyActive = rowsRef.current.some(r => ['pending', 'running', 'queued'].includes(r.status as any));
+      t = setTimeout(tick, anyActive ? 3000 : 10000);
+    };
+    t = setTimeout(tick, 5000);
+    return () => { stop = true; if (t) clearTimeout(t); };
+  }, [load]);
+
+  const retry = useCallback(async (r: AIRow) => {
+    if (!r.call_record_id || !r.organization_id) {
+      setToast('Cannot retry — missing call id or workspace.');
+      return;
+    }
+    setRetrying(r.id); setToast(null);
+    const fn = r.request_type === 'analyze' ? 'ai-analyze-call' : 'ai-transcribe-call';
+    try {
+      const { error } = await supabase.functions.invoke(fn, {
+        body: { call_record_id: r.call_record_id, organization_id: r.organization_id, retry_of: r.id },
+      });
+      setToast(error ? `Retry failed: ${error.message}` : `Retry queued for ${r.request_type} · #${r.call_record_id.slice(0, 8)}`);
+      setTimeout(load, 700);
+    } catch (e: any) {
+      setToast(`Retry failed: ${e?.message || 'network error'}`);
+    } finally { setRetrying(null); }
+  }, [load]);
 
   const filtered = useMemo(() => rows.filter(r => {
     if (!callIdSearch.trim()) return true;
