@@ -21,6 +21,8 @@ import QueuesView from './QueuesView';
 import AuditView from './AuditView';
 import SyncStatusView from './SyncStatusView';
 import SoftphonePane from '../SoftphonePane';
+import CallControlGrid from '../CallControlGrid';
+import RecentsList from '../RecentsList';
 import SettingsPage from '../SettingsPage';
 import { AppErrorBoundary } from '../AppErrorBoundary';
 import IncomingCallToast from './IncomingCallToast';
@@ -72,6 +74,7 @@ export default function ConsoleLayout({
   const [syncing, setSyncing] = useState(false);
   const [syncNote, setSyncNote] = useState<string | null>(null);
   const [compact, setCompact] = useState(() => typeof window !== 'undefined' && window.innerWidth < 640);
+  const [isWide, setIsWide] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 1100);
   const [tourOpen, setTourOpen] = useState(false);
   const [auditOpen, setAuditOpen] = useState(false);
   const isAuditChild = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('audit') === 'child';
@@ -103,6 +106,7 @@ export default function ConsoleLayout({
   useEffect(() => {
     const onResize = () => {
       setCompact(window.innerWidth < 640);
+      setIsWide(window.innerWidth >= 1100);
     };
     onResize();
     window.addEventListener('resize', onResize);
@@ -209,9 +213,59 @@ export default function ConsoleLayout({
         <div className="lemtel-page-enter" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
           {view === 'home' && <HomeDashboard displayName={creds.displayName || creds.email} extension={creds.extension} onQuickDial={() => setView('dialer')} />}
           {view === 'dialer' && (
-            <div style={{ maxWidth: 460, margin: '0 auto', height: '100%' }}>
-              <SoftphonePane creds={creds} onOpenSettings={() => setView('settings')} hideTabs />
-            </div>
+            isWide ? (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'minmax(420px, 480px) 1fr',
+                gap: 24,
+                width: '100%', maxWidth: 1440, margin: '0 auto',
+                padding: '8px 24px 16px',
+                height: '100%', minHeight: 0,
+                alignItems: 'stretch',
+              }}>
+                <div style={{
+                  background: c.bgCard, border: `1px solid ${c.border}`,
+                  borderRadius: 22, padding: 8,
+                  boxShadow: '0 18px 48px -28px rgba(0,35,230,0.28)',
+                  minHeight: 0, display: 'flex', flexDirection: 'column',
+                }}>
+                  <SoftphonePane creds={creds} onOpenSettings={() => setView('settings')} hideTabs />
+                </div>
+                <div style={{
+                  display: 'grid', gridTemplateRows: '1fr 1fr', gap: 16, minHeight: 0,
+                }}>
+                  <div style={{
+                    background: c.bgCard, border: `1px solid ${c.border}`,
+                    borderRadius: 22, padding: 4, overflow: 'hidden',
+                    boxShadow: '0 18px 48px -28px rgba(0,35,230,0.20)',
+                    minHeight: 0,
+                  }}>
+                    <CallControlGrid
+                      organizationId={orgId || ''}
+                      onDial={(n) => window.dispatchEvent(new CustomEvent('lemtel:dial-number', { detail: { number: n } }))}
+                    />
+                  </div>
+                  <div style={{
+                    background: c.bgCard, border: `1px solid ${c.border}`,
+                    borderRadius: 22, padding: 14, overflow: 'auto',
+                    boxShadow: '0 18px 48px -28px rgba(0,35,230,0.20)',
+                    minHeight: 0,
+                  }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', color: c.textSub, marginBottom: 10 }}>
+                      Recent calls
+                    </div>
+                    <RecentsList
+                      extension={creds.extension}
+                      onCall={(n) => window.dispatchEvent(new CustomEvent('lemtel:dial-number', { detail: { number: n } }))}
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div style={{ maxWidth: 460, margin: '0 auto', height: '100%' }}>
+                <SoftphonePane creds={creds} onOpenSettings={() => setView('settings')} hideTabs />
+              </div>
+            )
           )}
           {view === 'calls' && <CallsView />}
           {view === 'messages' && <MessagesView />}
