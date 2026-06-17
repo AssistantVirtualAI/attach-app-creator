@@ -63,8 +63,10 @@ function mapInsightRow(callId: string, row: any): CallInsight {
     risks: Array.isArray(r.risks) ? r.risks : [],
     opportunities: Array.isArray(r.opportunities) ? r.opportunities : [],
     qualityScore: Number(r.quality_score ?? r.qualityScore ?? 0) || 0,
-  };
+    ai_model: cleanText(r.ai_model) || null,
+  } as any;
 }
+
 
 let authToken: string | null = null;
 export function setAuthToken(token: string | null) {
