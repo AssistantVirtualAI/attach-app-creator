@@ -163,7 +163,9 @@ Deno.serve(async (req) => {
       sentiment: "neutral", satisfaction_score: 3, intent: "unknown",
       topics: [], action_items: [], risks: [], sales_opportunities: [],
       quality_score: 5, escalation_needed: false, key_phrases: [],
-      summary: "AI analysis unavailable — showing call metadata only.",
+      summary: aiReason
+        ? `AI analysis unavailable (${aiReason}). Showing call metadata only — verify the recording was retrieved and that AI credits are available.`
+        : "AI analysis unavailable — showing call metadata only.",
     });
 
     const prompt = `Analyze this call transcript. Return ONLY valid JSON:\n{"sentiment":"positive|neutral|negative","satisfaction_score":1-5,"intent":"string","topics":["..."],"action_items":["..."],"risks":["..."],"sales_opportunities":["..."],"quality_score":1-10,"escalation_needed":true|false,"key_phrases":["..."],"summary":"2 sentences max"}\n\nTranscript:\n${transcript_text}`;
