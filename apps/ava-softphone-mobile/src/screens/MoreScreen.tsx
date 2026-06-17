@@ -66,6 +66,7 @@ export default function MoreScreen({
         <SettingsRow label="Permissions" icon="🔐" value="Mic, notifications, contacts" onPress={() => setSub('permissions')} />
         <SettingsRow label="Privacy" icon="🛡" value="How we use your data" onPress={() => setSub('privacy')} />
         <SettingsRow label="Data safety" icon="🗂" value="Store disclosures" onPress={() => setSub('datasafety')} />
+        <SettingsRow label="AI requests audit" icon="✨" value="Transcription & analysis log" onPress={() => setSub('aiaudit')} />
         <SettingsRow label="Terms of service" icon="📄" onPress={() => openExternal('https://avastatistic.ca/terms')} />
         <SettingsRow label="Support" icon="❔" value="support@avastatistic.ca" onPress={() => setSub('support')} />
       </Card>
