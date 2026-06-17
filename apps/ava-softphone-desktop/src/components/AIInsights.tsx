@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { ava } from '../lib/avaApi';
 import { theme } from '../lib/theme';
+import TranscriptionStatusPanel from './TranscriptionStatusPanel';
 
 const { colors: c, glow } = theme;
 const LEMTEL_ORG = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
@@ -200,6 +201,9 @@ export default function AIInsights() {
           {error}
         </div>
       )}
+
+      <TranscriptionStatusPanel />
+
 
       {/* AI-generated period narrative */}
       <div style={{ ...theme.glass.cardAI, padding: 14 }}>

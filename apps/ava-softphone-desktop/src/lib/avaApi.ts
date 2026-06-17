@@ -399,7 +399,7 @@ function mapCdrToCall(r: any): CallRecord {
     pbx_uuid:     r.pbx_uuid ?? null,
     domain_uuid:  r.domain_uuid ?? null,
     domain_name:  r.domain_name ?? null,
-    startedAt:    r.start_at ?? new Date().toISOString(),
+    startedAt:    r.start_at ?? r.start_stamp ?? r.created_at ?? r.received_at ?? new Date(0).toISOString(),
     durationSec:  billsec,
     hasRecording: !!(r.has_recording || r.recording_path || r.recording_name),
     hasTranscript: !!r.transcribed,

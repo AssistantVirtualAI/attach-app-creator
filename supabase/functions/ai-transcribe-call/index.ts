@@ -30,23 +30,46 @@ function detectMime(url: string, ct?: string | null): string {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  const startedAt = Date.now();
+  const admin0 = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  let auditOrg: string | null = null;
+  let auditUser: string | null = null;
+  let auditCall: string | null = null;
+  const audit = async (status: string, extras: Record<string, any> = {}) => {
+    try {
+      await admin0.from("ai_request_audit_log").insert({
+        organization_id: auditOrg, user_id: auditUser, call_record_id: auditCall,
+        request_type: "transcribe", status,
+        latency_ms: Date.now() - startedAt,
+        error_code: extras.error_code || null,
+        http_status: extras.http_status || null,
+        message: extras.message || null,
+        provider: extras.provider || null,
+        model: extras.model || null,
+        metadata: extras.metadata || {},
+      });
+    } catch (_) { /* fire-and-forget */ }
+  };
   try {
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) return json({ error: "Unauthorized" }, 401);
+    if (!authHeader) { await audit("forbidden", { error_code: "no-auth", http_status: 401 }); return json({ error: "Unauthorized" }, 401); }
 
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
       global: { headers: { Authorization: authHeader } },
     });
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return json({ error: "Unauthorized" }, 401);
+    if (!user) { await audit("forbidden", { error_code: "no-user", http_status: 401 }); return json({ error: "Unauthorized" }, 401); }
+    auditUser = user.id;
 
-    const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const admin = admin0;
     const body = await req.json().catch(() => ({}));
     let { call_record_id, recording_url, organization_id, recording_path, recording_name } = body || {};
     if (!call_record_id) call_record_id = body?.callId;
     if (!call_record_id || !organization_id) {
+      await audit("bad-request", { error_code: "missing-fields", http_status: 400 });
       return json({ error: "call_record_id and organization_id required" }, 400);
     }
+    auditOrg = organization_id; auditCall = call_record_id;
 
     // Membership check
     const checks = await Promise.all([
@@ -187,16 +210,19 @@ Deno.serve(async (req) => {
     const lovableKey = Deno.env.get("LOVABLE_API_KEY");
     if (!lovableKey) {
       await writeTranscript(fallbackTranscript, "stub-no-key");
+      await audit("missing-key", { error_code: "LOVABLE_API_KEY", message: "Lovable AI key not configured", provider: "lovable-ai" });
       return json({ transcript_text: fallbackTranscript, stub: true, reason: "missing-ai-key", fetchErrors });
     }
     if (!audioBytes || audioBytes.length === 0) {
       await writeTranscript(fallbackTranscript, "stub-no-audio");
+      await audit("no-audio", { error_code: "no-audio", message: `fetch errors: ${fetchErrors.join("; ") || "none"}`, metadata: { fetchErrors } });
       return json({ transcript_text: fallbackTranscript, stub: true, reason: "no-audio", fetchErrors }, 200);
     }
 
     // Gemini supports inline audio up to ~20MB
     if (audioBytes.length > 20 * 1024 * 1024) {
       await writeTranscript(fallbackTranscript, "stub-too-large");
+      await audit("ai-error", { error_code: "audio-too-large", message: `${audioBytes.length} bytes` });
       return json({ transcript_text: fallbackTranscript, stub: true, reason: "audio-too-large", size: audioBytes.length });
     }
 
@@ -222,9 +248,11 @@ Deno.serve(async (req) => {
       console.error("ai gateway error", aiRes.status, errTxt);
       // 429 / 402 are user-facing billing issues — surface them, don't silently stub
       if (aiRes.status === 429 || aiRes.status === 402) {
+        await audit("ai-error", { error_code: aiRes.status === 429 ? "rate-limited" : "credits-exhausted", http_status: aiRes.status, message: errTxt.slice(0, 400), provider: "lovable-ai", model: "google/gemini-2.5-pro" });
         return json({ error: aiRes.status === 429 ? "rate-limited" : "credits-exhausted", details: errTxt }, aiRes.status);
       }
       await writeTranscript(fallbackTranscript, `stub-ai-${aiRes.status}`);
+      await audit("ai-error", { error_code: `ai_gateway_${aiRes.status}`, http_status: aiRes.status, message: errTxt.slice(0, 400), provider: "lovable-ai", model: "google/gemini-2.5-pro" });
       return json({ transcript_text: fallbackTranscript, stub: true, error: `ai_gateway_${aiRes.status}` });
     }
     const data = await aiRes.json();
@@ -233,12 +261,15 @@ Deno.serve(async (req) => {
     console.log("ai-transcribe-call ai result", { finishReason, length: transcript_text.length, audioSource });
     if (!transcript_text) {
       await writeTranscript(fallbackTranscript, "stub-empty-ai");
+      await audit("ai-error", { error_code: "empty-ai-response", message: `finish_reason: ${finishReason}`, provider: "lovable-ai", model: "google/gemini-2.5-pro" });
       return json({ transcript_text: fallbackTranscript, stub: true, reason: "empty-ai-response", finishReason });
     }
     await writeTranscript(transcript_text, "lovable-ai/gemini-2.5-pro");
+    await audit("ok", { provider: "lovable-ai", model: "google/gemini-2.5-pro", metadata: { audioSource, length: transcript_text.length } });
     return json({ transcript_text, audioSource, finishReason });
   } catch (e: any) {
     console.error("ai-transcribe-call error", e);
+    await audit("error", { error_code: "exception", message: String(e?.message || e).slice(0, 400) });
     return json({ error: e?.message || "transcription failed" }, 500);
   }
 });
