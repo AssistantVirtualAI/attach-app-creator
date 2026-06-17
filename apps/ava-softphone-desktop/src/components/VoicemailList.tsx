@@ -34,7 +34,7 @@ export default function VoicemailList({ extension, onCall }: Props) {
     if (!silent) { setLoading(true); setErr(null); }
     if (force) setRefreshing(true);
     try {
-      const data = force ? await ava.refreshVoicemails(50) : await ava.voicemails(50);
+      const data = force ? await ava.refreshVoicemails(50, { extension }) : await ava.voicemails(50, { extension });
       setRows(Array.isArray(data) ? data : []);
     } catch (e: any) {
       if (!silent || force) {
