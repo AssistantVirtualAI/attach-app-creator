@@ -662,6 +662,7 @@ function IvrsTable() {
     try {
       const me = await getMeContext();
       const orgId = me.organization_id || LEMTEL_ORG;
+      setOrgId(orgId);
       if (forceSync) {
         setSyncing(true);
         await supabase.functions.invoke('fusionpbx-proxy', {
