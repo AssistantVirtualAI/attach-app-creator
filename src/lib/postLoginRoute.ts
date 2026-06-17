@@ -1,22 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
 
-export type ResellerRole =
-  | 'ava_admin'
-  | 'master_admin'
-  | 'reseller_admin'
-  | 'customer_admin'
-  | 'agent'
-  | 'user';
-
-const ROLE_PRIORITY: Record<ResellerRole, number> = {
-  ava_admin: 0,
-  master_admin: 1,
-  reseller_admin: 2,
-  customer_admin: 3,
-  agent: 4,
-  user: 5,
-};
-
 /**
  * Determine where to send a user after they log in.
  * Uses the three-portal architecture:
