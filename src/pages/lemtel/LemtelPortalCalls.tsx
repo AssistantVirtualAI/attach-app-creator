@@ -12,6 +12,9 @@ import { format } from 'date-fns';
 import { usePbxCallRecords, usePbxSync, usePbxTestCdrEndpoint, LEMTEL_ORG } from '@/hooks/usePbxData';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { loadPbxRecordingAudio } from '@/lib/pbxRecordingAudio';
+import { runTranscribeAndAnalyze, isStubTranscript, type TranscriptStage } from '@/lib/transcriptStatus';
+import { TranscriptStagePill } from '@/components/transcripts/TranscriptStagePill';
+
 
 function statusBadge(c: any) {
   if (c.missed_call) return <Badge className="bg-red-500/15 text-red-600 border-red-500/30 border">Missed</Badge>;
@@ -32,8 +35,10 @@ export default function LemtelPortalCalls({ scope = 'org' }: { scope?: 'org' | '
   const { toast } = useToast();
   const qc = useQueryClient();
   const [analyzing, setAnalyzing] = useState<string | null>(null);
+  const [stages, setStages] = useState<Record<string, { stage: TranscriptStage; detail?: string }>>({});
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+
   const sync = usePbxSync();
   const test = usePbxTestCdrEndpoint();
   const [diagOpen, setDiagOpen] = useState(false);
@@ -61,45 +66,21 @@ export default function LemtelPortalCalls({ scope = 'org' }: { scope?: 'org' | '
   const analyze = async (call: any) => {
     const call_record_id = call.id;
     setAnalyzing(call_record_id);
-    try {
-      let transcript_text = '';
-
-      if (call.recording_url) {
-        const t = await supabase.functions.invoke('ai-transcribe-call', {
-          body: { call_record_id, recording_url: call.recording_url, organization_id: LEMTEL_ORG },
-        });
-        transcript_text =
-          (t.data as any)?.transcript_text ||
-          (t.data as any)?.transcript ||
-          (t.data as any)?.text || '';
-      }
-
-      if (!transcript_text) {
-        transcript_text = [
-          `CDR only call record.`,
-          `Direction: ${call.direction || 'unknown'}.`,
-          `Status: ${call.call_status || (call.missed_call ? 'missed' : 'unknown')}.`,
-          `From: ${call.caller_number || call.source_number || 'unknown'}.`,
-          `To: ${call.destination_number || call.destination || 'unknown'}.`,
-          `Duration: ${call.duration_seconds || 0} seconds.`,
-          `Started: ${call.start_at || 'unknown'}.`,
-          `Hangup cause: ${call.hangup_cause || 'unknown'}.`,
-        ].join('\n');
-      }
-
-      const a = await supabase.functions.invoke('ai-analyze-call', {
-        body: { call_record_id, transcript_text, organization_id: LEMTEL_ORG },
-      });
-      if (a.error || (a.data as any)?.error) throw new Error((a.data as any)?.error || a.error?.message || 'Analysis failed');
-
-      toast({ title: 'Analyzed' });
-      qc.invalidateQueries({ queryKey: ['pbx', 'pbx_call_records'] });
-    } catch (e: any) {
-      toast({ title: 'Analysis failed', description: e?.message, variant: 'destructive' });
-    } finally {
-      setAnalyzing(null);
-    }
+    setStages((s) => ({ ...s, [call_record_id]: { stage: 'downloading' } }));
+    const result = await runTranscribeAndAnalyze({
+      invoke: async (name, body) => await supabase.functions.invoke(name, { body }),
+      callRecordId: call_record_id,
+      organizationId: LEMTEL_ORG,
+      recordingUrl: call.recording_url || null,
+      onStage: (stage, detail) => setStages((s) => ({ ...s, [call_record_id]: { stage, detail } })),
+    });
+    if (result.stage === 'failed') toast({ title: 'Analysis failed', description: result.reason, variant: 'destructive' });
+    else if (result.stage === 'unavailable') toast({ title: 'Recording unavailable', description: result.reason || 'Audio could not be retrieved' });
+    else toast({ title: 'Analyzed' });
+    qc.invalidateQueries({ queryKey: ['pbx', 'pbx_call_records'] });
+    setAnalyzing(null);
   };
+
 
   const playRecording = async (c: any) => {
     setPlayingId(c.id); setAudioUrl(null);
@@ -211,12 +192,28 @@ export default function LemtelPortalCalls({ scope = 'org' }: { scope?: 'org' | '
                     ) : '-'}
                   </td>
                   <td className="p-3">
-                    {c.analyzed ? <Badge variant="default">Analyzed</Badge> : (
-                      <Button size="sm" variant="outline" onClick={() => analyze(c)} disabled={analyzing === c.id}>
-                        {analyzing === c.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <><Sparkles className="w-3 h-3 mr-1" />Analyze</>}
-                      </Button>
-                    )}
+                    {(() => {
+                      const live = stages[c.id];
+                      const transcript = { provider: c.raw_data?.transcript_provider, transcript_text: c.raw_data?.transcript_text };
+                      const stubT = isStubTranscript(transcript);
+                      const stage: TranscriptStage = live?.stage
+                        ?? (analyzing === c.id ? 'transcribing'
+                          : c.analyzed && !stubT ? 'complete'
+                          : c.transcribed && stubT ? 'unavailable'
+                          : 'idle');
+                      return (
+                        <div className="flex items-center gap-2">
+                          <TranscriptStagePill stage={stage} detail={live?.detail} compact />
+                          {stage !== 'complete' && (
+                            <Button size="sm" variant="ghost" onClick={() => analyze(c)} disabled={analyzing === c.id}>
+                              {analyzing === c.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                            </Button>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </td>
+
                 </tr>
               ))}
             </tbody>
