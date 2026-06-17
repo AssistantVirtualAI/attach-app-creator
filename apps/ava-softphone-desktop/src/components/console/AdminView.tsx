@@ -785,12 +785,12 @@ function IvrsTable() {
         {!loading && !error && data.length === 0 && <div style={{ padding: 28, textAlign: 'center', color: c.mutedSilver, fontSize: 12 }}>No IVRs. Click "Sync from PBX".</div>}
         {!loading && error && <div style={{ padding: 28, textAlign: 'center', color: c.danger, fontSize: 12 }}>{error}</div>}
       </div>
-      {editing && <EditIvrModal ivr={editing} saving={saving} onClose={() => setEditing(null)} onSave={(changes) => save(editing, changes)} />}
+      {editing && <EditIvrModal ivr={editing} orgId={orgId} saving={saving} onClose={() => setEditing(null)} onSave={(changes) => save(editing, changes)} />}
       {creating && isAdmin && (
         <PbxEditSheet
           title="New Auto-Attendant"
           groups={IVR_GROUPS}
-          initial={{ ivr_menu_enabled: 'true', ivr_menu_timeout: 3000, ivr_menu_exit_action: 'hangup' }}
+          initial={{ ivr_menu_enabled: 'true', ivr_menu_timeout: 3000, ivr_menu_exit_action: 'hangup', organization_id: orgId }}
           rules={IVR_RULES}
           saving={saving}
           width={680}
