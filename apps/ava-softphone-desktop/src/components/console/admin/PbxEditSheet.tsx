@@ -21,6 +21,9 @@ export interface FieldDef {
   hint?: string;
   required?: boolean;
   cols?: 1 | 2;            // half / full width inside group grid
+  // Mark fields that live outside the main FusionPBX row (joined tables, settings, derived)
+  // so the parity check doesn't flag them as "missing from PBX response".
+  virtual?: boolean;
   // tts-greeting: when generation succeeds, sets this key with returned filename/path text
   ttsFilenameSuggestion?: (form: any) => string;
 }
@@ -344,7 +347,8 @@ export default function PbxEditSheet({
     if (!baseline || typeof baseline !== 'object') return [];
     const out: { key: string; label: string; section: string }[] = [];
     for (const g of groups) for (const f of g.fields) {
-      if (f.type === 'tts-greeting') continue;
+      if (f.type === 'tts-greeting' || f.type === 'queue-agents') continue;
+      if (f.virtual) continue;
       if (!(f.key in baseline)) out.push({ key: f.key, label: f.label, section: g.section });
     }
     return out;

@@ -181,7 +181,7 @@ export const RING_GROUP_GROUPS: FieldGroup[] = [
     section: 'Members',
     description: 'Comma-separated extensions (e.g. 1001,1002,1003). For advanced per-member delay/timeout, edit in the portal.',
     fields: [
-      { key: 'ring_group_destinations', label: 'Member Extensions' },
+      { key: 'ring_group_destinations', label: 'Member Extensions', virtual: true },
     ],
   },
   {
@@ -193,7 +193,7 @@ export const RING_GROUP_GROUPS: FieldGroup[] = [
       { key: 'ring_group_forward_destination', label: 'Forward Destination', cols: 1 },
       { key: 'ring_group_missed_call_app', label: 'Missed Call App', cols: 1, placeholder: 'email' },
       { key: 'ring_group_missed_call_data', label: 'Missed Call Email/Data', cols: 1, placeholder: 'alerts@example.com' },
-      { key: 'ring_group_moh_sound', label: 'Music on Hold', placeholder: 'local_stream://default' },
+      { key: 'ring_group_moh_sound', label: 'Music on Hold', placeholder: 'local_stream://default', virtual: true },
     ],
   },
 ];
