@@ -201,12 +201,23 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
 }
 
 /* ====== Forgot password screen ====== */
+const RESEND_COOLDOWN_SECONDS = 30;
+
 function ForgotPasswordScreen({ initialEmail, onBack }: { initialEmail: string; onBack: () => void }) {
   const [step, setStep] = useState<ForgotStep>('form');
   const [email, setEmail] = useState(initialEmail);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErr, setFieldErr] = useState<string>('');
+  const [cooldown, setCooldown] = useState(0);
+  const [resentInfo, setResentInfo] = useState<string | null>(null);
+
+  // Cooldown countdown timer
+  React.useEffect(() => {
+    if (cooldown <= 0) return;
+    const id = window.setInterval(() => setCooldown((s) => (s > 0 ? s - 1 : 0)), 1000);
+    return () => window.clearInterval(id);
+  }, [cooldown]);
 
   const goConfirm = () => {
     setError(null);
@@ -216,8 +227,9 @@ function ForgotPasswordScreen({ initialEmail, onBack }: { initialEmail: string; 
     setStep('confirm');
   };
 
-  const sendReset = async () => {
-    setBusy(true); setError(null);
+  const sendReset = async (opts?: { resend?: boolean }) => {
+    if (busy || cooldown > 0) return; // multi-click guard
+    setBusy(true); setError(null); setResentInfo(null);
     try {
       const redirectTo = 'https://avastatistic.ca/reset-password';
       const res = await fetch(`${SUPABASE_URL}/auth/v1/recover`, {
@@ -233,10 +245,12 @@ function ForgotPasswordScreen({ initialEmail, onBack }: { initialEmail: string; 
         let detail: any = null; try { detail = await res.json(); } catch {}
         throw new Error(detail?.msg || detail?.error || `HTTP ${res.status}`);
       }
+      setCooldown(RESEND_COOLDOWN_SECONDS);
+      if (opts?.resend) setResentInfo('Reset email sent again.');
       setStep('sent');
     } catch (e: any) {
       setError(mapAuthError(e?.message));
-      setStep('form');
+      if (!opts?.resend) setStep('form');
     } finally { setBusy(false); }
   };
 
@@ -285,7 +299,7 @@ function ForgotPasswordScreen({ initialEmail, onBack }: { initialEmail: string; 
               {error && <ErrorBanner>{error}</ErrorBanner>}
               <button
                 type="button"
-                onClick={sendReset}
+                onClick={() => sendReset()}
                 disabled={busy}
                 className="lemtel-btn-primary"
                 style={{ height: 50, borderRadius: 14, fontSize: 14, cursor: busy ? 'wait' : 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
@@ -309,6 +323,38 @@ function ForgotPasswordScreen({ initialEmail, onBack }: { initialEmail: string; 
               <p style={{ ...subheadingStyle, textAlign: 'center' }}>
                 If an account exists for <strong style={{ color: C.textIce }}>{email}</strong>, you’ll receive a reset link shortly. Open it on this device or a desktop browser to set a new password.
               </p>
+              {resentInfo && (
+                <div style={{
+                  fontSize: 12, color: C.green,
+                  padding: '8px 12px', borderRadius: 10,
+                  background: 'rgba(34,197,94,0.10)',
+                  border: '1px solid rgba(34,197,94,0.25)',
+                }}>{resentInfo}</div>
+              )}
+              {error && <ErrorBanner>{error}</ErrorBanner>}
+              <button
+                type="button"
+                onClick={() => sendReset({ resend: true })}
+                disabled={busy || cooldown > 0}
+                style={{
+                  height: 44, borderRadius: 12,
+                  border: `1px solid ${C.border}`,
+                  background: 'rgba(255,255,255,0.04)',
+                  color: cooldown > 0 ? C.textDim : C.textIce,
+                  fontSize: 13, fontWeight: 700, letterSpacing: 0.3,
+                  cursor: (busy || cooldown > 0) ? 'not-allowed' : 'pointer',
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  opacity: (busy || cooldown > 0) ? 0.7 : 1,
+                  transition: 'opacity .15s ease',
+                }}
+              >
+                {busy && <Spinner />}
+                {busy
+                  ? 'Sending…'
+                  : cooldown > 0
+                    ? `Resend email in ${cooldown}s`
+                    : 'Resend email'}
+              </button>
               <button type="button" onClick={onBack} className="lemtel-btn-primary" style={{ height: 50, borderRadius: 14, fontSize: 14, cursor: 'pointer' }}>
                 Back to sign in
               </button>
