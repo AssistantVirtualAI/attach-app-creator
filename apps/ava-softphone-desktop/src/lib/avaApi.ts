@@ -500,13 +500,14 @@ async function readCallRecordRows(limit = 100, opts?: { scope?: 'mine' | 'org' }
 let cdrSyncInFlight: Promise<void> | null = null;
 let lastCdrSyncAt = 0;
 
-async function bestEffortCdrSync(limit = 200, minIntervalMs = 120_000) {
+async function bestEffortCdrSync(limit = 200, minIntervalMs = 30_000) {
   const now = Date.now();
   if (cdrSyncInFlight) return cdrSyncInFlight;
   if (now - lastCdrSyncAt < minIntervalMs) return;
   lastCdrSyncAt = now;
   cdrSyncInFlight = (async () => {
     try {
+      const me = await getMeContext();
       await fetch(`${BACKEND.url}/functions/v1/fusionpbx-proxy`, {
       method: 'POST',
       headers: { 
@@ -514,7 +515,14 @@ async function bestEffortCdrSync(limit = 200, minIntervalMs = 120_000) {
         'apikey': BACKEND.anonKey,
         ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
       },
-      body: JSON.stringify({ action: 'sync-cdrs', limit }),
+      body: JSON.stringify({
+        action: 'sync-cdrs',
+        organization_id: me.organization_id || undefined,
+        limit,
+        page_size: Math.max(limit, 250),
+        max_pages: 2,
+        from_beginning: true,
+      }),
       });
     } catch (e) {
       console.warn('[AVA] CDR sync failed', e);
@@ -527,6 +535,11 @@ async function bestEffortCdrSync(limit = 200, minIntervalMs = 120_000) {
 
 async function bestEffortRecentTelephonySync(limit = 200) {
   try {
+    const me = await getMeContext();
+    const scope = {
+      organization_id: me.organization_id || undefined,
+      extension: me.extension || undefined,
+    };
     await Promise.allSettled([
       fetch(`${BACKEND.url}/functions/v1/fusionpbx-proxy`, {
         method: 'POST',
@@ -535,7 +548,7 @@ async function bestEffortRecentTelephonySync(limit = 200) {
           'apikey': BACKEND.anonKey,
           ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
         },
-        body: JSON.stringify({ action: 'sync-cdrs', limit }),
+        body: JSON.stringify({ action: 'sync-cdrs', organization_id: scope.organization_id, limit, page_size: Math.max(limit, 250), max_pages: 2, from_beginning: true }),
       }),
       fetch(`${BACKEND.url}/functions/v1/fusionpbx-proxy`, {
         method: 'POST',
@@ -544,7 +557,7 @@ async function bestEffortRecentTelephonySync(limit = 200) {
           'apikey': BACKEND.anonKey,
           ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
         },
-        body: JSON.stringify({ action: 'sync-voicemail-messages', params: { page_size: Math.max(limit, 200), max_pages: 1 } }),
+        body: JSON.stringify({ action: 'sync-voicemail-messages', ...scope, params: { extension: scope.extension, page_size: Math.max(limit, 200), max_pages: 1 } }),
       }),
     ]);
   } catch (e) {
@@ -936,9 +949,10 @@ export const ava = {
   syncPhoneSystemFull: async () => {
     if (MOCK) return { ok: true, success: true, stats: { cdrs: MOCK_CALLS.length }, errors: [], syncedAt: new Date().toISOString() };
     try {
+      const me = await getMeContext();
       const data = await call<any>(`/fn/${FN.fusionpbxProxy}`, {
         method: 'POST',
-        body: JSON.stringify({ action: 'sync-all', resources: ['cdrs', 'extensions', 'queues', 'ivrs', 'ring_groups'] }),
+        body: JSON.stringify({ action: 'sync-all', organization_id: me.organization_id || undefined, resources: ['cdrs', 'extensions', 'queues', 'ivrs', 'ring_groups'] }),
       });
       return { ok: data?.success !== false && !data?.error, success: data?.success !== false, stats: data?.stats || {}, errors: data?.errors || (data?.error ? [data.error] : []), syncedAt: new Date().toISOString(), raw: data };
     } catch (err: any) {

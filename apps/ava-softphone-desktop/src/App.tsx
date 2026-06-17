@@ -15,6 +15,9 @@ import { setAuthToken } from './lib/avaApi';
 import { audit } from './lib/audit';
 import { sipProvider } from './lib/sip/jssipProvider';
 import { useSoftphone } from './hooks/useSoftphone';
+import { useTenant } from './hooks/useTenant';
+import { useRealtimeSync } from './hooks/useRealtimeSync';
+import { useExtensionDataSync } from './hooks/useExtensionDataSync';
 
 const LEMTEL_ORG_ID = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
 
@@ -41,7 +44,7 @@ async function triggerCdrSync() {
   try {
     const organizationId = await resolveCurrentOrganizationId();
     const { data } = await supabase.functions.invoke('fusionpbx-proxy', {
-      body: { action: 'sync-cdrs', organization_id: organizationId, limit: 200 },
+      body: { action: 'sync-cdrs', organization_id: organizationId, limit: 500, page_size: 500, max_pages: 2, from_beginning: true },
     });
     console.log('CDR sync triggered:', data);
   } catch (err) {
@@ -92,6 +95,13 @@ function SipKeepAlive({ creds }: { creds: ActiveCreds }) {
     window.dispatchEvent(new CustomEvent('lemtel:sip-status', { detail: sp.snap.status }));
   }, [sp.snap.status]);
 
+  return null;
+}
+
+function DesktopBackgroundSync({ fallbackExtension }: { fallbackExtension?: string | null }) {
+  const { orgId, extension } = useTenant();
+  useRealtimeSync(orgId);
+  useExtensionDataSync(orgId, extension || fallbackExtension, { intervalMs: 60_000, firstRunDeepLimit: 2000 });
   return null;
 }
 
@@ -273,6 +283,7 @@ function DesktopApp() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: t.bg, position: 'relative' }}>
       <SipKeepAlive creds={creds} />
+      <DesktopBackgroundSync fallbackExtension={creds.extension} />
       <BrightnessOverlay />
       {!IS_EMBED && <TitleBar />}
       <div style={{ flex: 1, overflow: 'hidden', position: 'relative', zIndex: 1 }}>

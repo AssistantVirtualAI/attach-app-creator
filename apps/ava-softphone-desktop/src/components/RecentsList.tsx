@@ -30,12 +30,14 @@ export default function RecentsList({ extension, onCall }: Props) {
   const [rows, setRows] = useState<CallRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) { setLoading(true); setErr(null); }
     try {
       const data = await ava.calls(50);
       setRows(Array.isArray(data) ? data : []);
+      setLastUpdated(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
     } catch (e: any) {
       if (!silent) {
         setErr(e?.message || 'Unable to load live call records.');
@@ -50,6 +52,19 @@ export default function RecentsList({ extension, onCall }: Props) {
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
+    const onWake = () => { void load(true); };
+    const timer = window.setInterval(onWake, 30_000);
+    window.addEventListener('focus', onWake);
+    window.addEventListener('online', onWake);
+    document.addEventListener('visibilitychange', onWake);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', onWake);
+      window.removeEventListener('online', onWake);
+      document.removeEventListener('visibilitychange', onWake);
+    };
+  }, [load]);
+  useEffect(() => {
     const onSync = () => { void load(true); };
     window.addEventListener('lemtel:phone-sync-complete', onSync);
     return () => window.removeEventListener('lemtel:phone-sync-complete', onSync);
@@ -57,7 +72,13 @@ export default function RecentsList({ extension, onCall }: Props) {
 
   // Realtime: refresh on new CDR rows
   const orgId = useOrgId();
-  useRealtimeRefresh({ table: 'pbx_call_records', organizationId: orgId, events: ['INSERT'] }, silentLoad);
+  useRealtimeRefresh({
+    table: 'pbx_call_records', organizationId: orgId, events: ['INSERT', 'UPDATE', 'DELETE'], debounceMs: 300, throttleMs: 1_000,
+    shouldRefresh: (payload: any) => {
+      const row = payload?.new || payload?.old || {};
+      return !extension || row.extension === extension || row.caller_number === extension || row.destination_number === extension || row.source_number === extension;
+    },
+  }, silentLoad);
 
   if (loading) return <div style={center}>Loading recents…</div>;
   if (err) return <div style={{ ...center, color: '#ff8a8a' }}>{err}<br /><button onClick={() => load()} style={refreshBtn}>Retry</button></div>;
@@ -67,7 +88,7 @@ export default function RecentsList({ extension, onCall }: Props) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, padding: '0 2px' }}>
         <span style={{ fontSize: 10, opacity: 0.5, letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 600 }}>
-          {rows.length} call{rows.length > 1 ? 's' : ''}
+          {rows.length} call{rows.length > 1 ? 's' : ''}{lastUpdated ? ` · ${lastUpdated}` : ''}
         </span>
         <button onClick={() => load()} style={refreshBtn} title="Refresh">↻</button>
       </div>

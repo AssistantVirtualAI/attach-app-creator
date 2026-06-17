@@ -27,7 +27,7 @@ export default function PageHeader({
         padding: 'var(--ava-space-5) var(--ava-space-6) var(--ava-space-6)',
         marginBottom: 'var(--ava-space-5)',
         borderRadius: 'var(--ava-radius)',
-        background: 'rgba(255,255,255,0.78)',
+        background: c.bgCard,
         border: `1px solid ${c.border}`,
         overflow: 'hidden',
       }}>
@@ -106,7 +106,7 @@ export function EmptyState({
         textAlign: 'center',
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
         borderRadius: 20,
-        background: `radial-gradient(circle at 50% 0%, ${accent}1a, transparent 70%), rgba(255,255,255,0.78)`,
+        background: c.bgCard,
         border: `1px solid ${accent}33`,
         overflow: 'hidden',
       }}>
