@@ -26,8 +26,8 @@ Deno.serve(async (req) => {
     const { data: sp } = await sb.from("pbx_softphone_users")
       .select("organization_id, extension")
       .eq("portal_user_id", u.user.id).maybeSingle();
-    if (!sp) return json({ error: "NO_SOFTPHONE_ACCOUNT" }, 404);
-    if (!sp.extension) return json({ error: "NO_EXTENSION_ASSIGNED" }, 403);
+    if (!sp) return json({ items: [], noSoftphone: true });
+    if (!sp.extension) return json({ items: [], noExtension: true });
 
     let q = sb.from("pbx_call_records")
       .select(`
