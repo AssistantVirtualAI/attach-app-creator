@@ -70,7 +70,7 @@ function ModalShell({ title, onClose, width = 460, children }: { title: string; 
         onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%', maxWidth: width, maxHeight: '88vh', overflowY: 'auto',
-          background: '#0c1733',
+          background: c.bgCard,
           backgroundImage: 'linear-gradient(160deg, rgba(35,214,255,0.06), rgba(122,76,255,0.05))',
           border: `1px solid ${(c as any).borderAI || c.border}`,
           borderRadius: 16, padding: 22,
