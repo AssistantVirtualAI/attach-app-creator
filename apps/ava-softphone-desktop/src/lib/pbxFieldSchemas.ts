@@ -104,6 +104,13 @@ export const QUEUE_GROUPS: FieldGroup[] = [
       { key: 'queue_announce_frequency', label: 'Frequency (s)', type: 'number', cols: 1 },
     ],
   },
+  {
+    section: 'Agents & Supervisors',
+    description: 'Pick the extensions that should receive calls from this queue. Agent = level 1, Supervisor = level 2 (priority).',
+    fields: [
+      { key: '_queue_agents', label: 'Members', type: 'queue-agents' as any },
+    ],
+  },
 ];
 
 export const IVR_GROUPS: FieldGroup[] = [

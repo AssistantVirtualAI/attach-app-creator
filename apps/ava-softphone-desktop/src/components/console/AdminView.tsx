@@ -875,15 +875,18 @@ function QueuesTable() {
   const save = async (q: any, changes: any) => {
     setSaving(true);
     try {
+      const { _queue_agents: agents, ...rest } = changes || {};
       const { error: err } = await supabase.functions.invoke('fusionpbx-proxy', {
         body: {
           action: 'update-queue',
           organization_id: LEMTEL_ORG,
-          params: { call_center_queue_uuid: q.pbx_uuid, domain_uuid: LEMTEL_DOMAIN, ...changes },
+          params: { call_center_queue_uuid: q.pbx_uuid, domain_uuid: LEMTEL_DOMAIN, ...rest },
         },
       });
       if (err) throw err;
-      setData((prev) => prev.map((x) => (x.id === q.id ? { ...x, name: changes.queue_name ?? x.name, strategy: changes.queue_strategy ?? x.strategy, max_wait_time: changes.queue_max_wait_time !== undefined ? Number(changes.queue_max_wait_time) : x.max_wait_time, enabled: changes.queue_enabled !== undefined ? changes.queue_enabled === 'true' : x.enabled } : x)));
+      if (q.pbx_uuid) await syncQueueTiers(q.pbx_uuid, agents || []);
+      await reload(false);
+      setData((prev) => prev.map((x) => (x.id === q.id ? { ...x, name: rest.queue_name ?? x.name, strategy: rest.queue_strategy ?? x.strategy, max_wait_time: rest.queue_max_wait_time !== undefined ? Number(rest.queue_max_wait_time) : x.max_wait_time, enabled: rest.queue_enabled !== undefined ? rest.queue_enabled === 'true' : x.enabled } : x)));
       setEditing(null);
     } catch (e: any) {
       alert('Update failed: ' + (e?.message || 'unknown'));
@@ -899,7 +902,8 @@ function QueuesTable() {
       const orgId = me.organization_id || LEMTEL_ORG;
       const name = String(form.queue_name || '').trim();
       const ext = String(form.queue_extension || '').trim();
-      const out: any = { ...form };
+      const { _queue_agents: agents, ...rest } = form || {};
+      const out: any = { ...rest };
       if (out.queue_max_wait_time !== undefined) out.queue_max_wait_time = String(out.queue_max_wait_time);
 
       const idempotencyKey = creating?.key || generateIdempotencyKey();
@@ -930,6 +934,19 @@ function QueuesTable() {
             body: { action: 'create-queue', organization_id: orgId, idempotency_key: idk, params: { domain_uuid: LEMTEL_DOMAIN, ...out } },
           });
           if (err) throw err;
+          // Best-effort: persist queue tiers right after the queue itself.
+          if (agents && agents.length) {
+            try {
+              await reload(true);
+              const { data: created } = await supabase
+                .from('pbx_call_queues')
+                .select('pbx_uuid')
+                .eq('organization_id', orgId)
+                .eq('name', name)
+                .maybeSingle();
+              if ((created as any)?.pbx_uuid) await syncQueueTiers((created as any).pbx_uuid, agents);
+            } catch { /* tier assignment is non-blocking */ }
+          }
           setCreating(null);
         },
         reload: (force) => reload(force),
@@ -991,14 +1008,75 @@ function QueuesTable() {
   );
 }
 
+/** Reconcile queue tiers in FusionPBX so the live list matches the picker. */
+async function syncQueueTiers(
+  queueUuid: string,
+  desired: { extension: string; role: 'agent' | 'supervisor' }[],
+) {
+  if (!queueUuid) return;
+  const { data: listed } = await supabase.functions.invoke('fusionpbx-proxy', {
+    body: { action: 'list-queue-tiers', organization_id: LEMTEL_ORG, params: { domain_uuid: LEMTEL_DOMAIN } },
+  });
+  const current = ((listed as any)?.data || []).filter((t: any) => t.call_center_queue_uuid === queueUuid);
+  const desiredMap = new Map(desired.map((d) => [d.extension, d.role]));
+  // Remove tiers no longer wanted (or where role changed).
+  for (const t of current) {
+    const ext = String(t.tier_agent || t.agent_extension || '').split('@')[0];
+    const wantedRole = desiredMap.get(ext);
+    const curLevel = Number(t.tier_level || 1);
+    if (!wantedRole || (wantedRole === 'supervisor' ? curLevel !== 2 : curLevel !== 1)) {
+      await supabase.functions.invoke('fusionpbx-proxy', {
+        body: { action: 'remove-queue-tier', organization_id: LEMTEL_ORG, params: { call_center_tier_uuid: t.call_center_tier_uuid, domain_uuid: LEMTEL_DOMAIN } },
+      });
+    } else {
+      desiredMap.delete(ext); // already present at correct level
+    }
+  }
+  // Add anything still missing.
+  for (const [ext, role] of desiredMap.entries()) {
+    await supabase.functions.invoke('fusionpbx-proxy', {
+      body: {
+        action: 'add-queue-tier',
+        organization_id: LEMTEL_ORG,
+        params: {
+          domain_uuid: LEMTEL_DOMAIN,
+          call_center_queue_uuid: queueUuid,
+          tier_agent: ext,
+          tier_level: role === 'supervisor' ? 2 : 1,
+          tier_position: 1,
+        },
+      },
+    });
+  }
+}
+
 function EditQueueModal({ queue, saving, onClose, onSave }: { queue: any; saving: boolean; onClose: () => void; onSave: (changes: any) => void }) {
+  const [tiers, setTiers] = useState<{ extension: string; role: 'agent' | 'supervisor' }[] | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await supabase.functions.invoke('fusionpbx-proxy', {
+          body: { action: 'list-queue-tiers', organization_id: LEMTEL_ORG, params: { domain_uuid: LEMTEL_DOMAIN } },
+        });
+        const mine = ((data as any)?.data || []).filter((t: any) => t.call_center_queue_uuid === queue.pbx_uuid);
+        setTiers(mine.map((t: any) => ({
+          extension: String(t.tier_agent || t.agent_extension || '').split('@')[0],
+          role: Number(t.tier_level || 1) === 2 ? 'supervisor' as const : 'agent' as const,
+        })).filter((x: any) => x.extension));
+      } catch { setTiers([]); }
+    })();
+  }, [queue.pbx_uuid]);
+
   const initial = {
     queue_name: queue.name || '',
     queue_extension: queue.extension || '',
     queue_strategy: queue.strategy || 'ring-all',
     queue_max_wait_time: queue.max_wait_time || 60,
     queue_enabled: queue.enabled !== false ? 'true' : 'false',
+    _queue_agents: tiers || [],
   };
+  if (tiers === null) return null;
   return (
     <PbxEditSheet
       title={`Edit Queue · ${queue.name}`}

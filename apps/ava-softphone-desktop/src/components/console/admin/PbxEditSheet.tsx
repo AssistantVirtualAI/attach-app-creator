@@ -10,7 +10,7 @@ const { colors: c } = theme;
 
 export type FieldType =
   | 'text' | 'number' | 'textarea' | 'select' | 'checkbox'
-  | 'password' | 'tts-greeting';
+  | 'password' | 'tts-greeting' | 'queue-agents';
 
 export interface FieldDef {
   key: string;
@@ -101,6 +101,9 @@ function FieldRenderer({ f, value, onChange, fullForm }: {
   }
   if (f.type === 'tts-greeting') {
     return <TtsGreetingField value={value} onChange={onChange} field={f} fullForm={fullForm} />;
+  }
+  if (f.type === 'queue-agents') {
+    return <QueueAgentsField value={value} onChange={onChange} />;
   }
   return (
     <input
@@ -244,6 +247,84 @@ function TtsGreetingField({ value, onChange, field, fullForm }: {
 
       <div style={{ fontSize: 10, color: c.mutedSilver, lineHeight: 1.5 }}>
         One-click: Generate → Upload to PBX. Filename is saved on the resource above.
+      </div>
+    </div>
+  );
+}
+
+export type QueueAgentAssignment = { extension: string; display_name?: string; role: 'agent' | 'supervisor' };
+
+function QueueAgentsField({ value, onChange }: { value: any; onChange: (v: QueueAgentAssignment[]) => void }) {
+  const [pool, setPool] = useState<{ extension: string; display_name: string | null }[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+  const selected: QueueAgentAssignment[] = Array.isArray(value) ? value : [];
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data: orgRow } = await supabase.rpc('get_my_organization_id' as any).maybeSingle?.() || { data: null } as any;
+        let orgId: string | null = (orgRow as any) || null;
+        if (!orgId) {
+          const { data: u } = await supabase.auth.getUser();
+          const { data: m } = await supabase.from('org_members').select('organization_id').eq('user_id', u.user?.id || '').maybeSingle();
+          orgId = (m as any)?.organization_id || null;
+        }
+        const q = supabase.from('pbx_softphone_users').select('extension, display_name').not('extension', 'is', null).order('extension');
+        const { data, error } = orgId ? await q.eq('organization_id', orgId) : await q;
+        if (error) throw error;
+        setPool((data || []).filter((r: any) => r.extension) as any);
+      } catch (e: any) {
+        setErr(e?.message || 'Failed to load extensions');
+      } finally { setLoading(false); }
+    })();
+  }, []);
+
+  const toggle = (ext: string, name: string | null, role: 'agent' | 'supervisor') => {
+    const exists = selected.find((s) => s.extension === ext);
+    let next: QueueAgentAssignment[];
+    if (exists && exists.role === role) {
+      next = selected.filter((s) => s.extension !== ext);
+    } else if (exists) {
+      next = selected.map((s) => s.extension === ext ? { ...s, role } : s);
+    } else {
+      next = [...selected, { extension: ext, display_name: name || undefined, role }];
+    }
+    onChange(next);
+  };
+
+  return (
+    <div style={{ border: `1px solid ${c.borderStrong}`, borderRadius: 10, background: c.bgElev, padding: 10, maxHeight: 280, overflow: 'auto' }}>
+      {loading && <div style={{ fontSize: 11, color: c.textSub }}>Loading extensions…</div>}
+      {err && <div style={{ fontSize: 11, color: c.danger }}>{err}</div>}
+      {!loading && pool.length === 0 && !err && (
+        <div style={{ fontSize: 11, color: c.textSub }}>No extensions found. Sync from PBX first.</div>
+      )}
+      <div style={{ display: 'grid', gap: 4 }}>
+        {pool.map((p) => {
+          const cur = selected.find((s) => s.extension === p.extension);
+          return (
+            <div key={p.extension} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 6px', borderRadius: 6, background: cur ? 'rgba(255,230,0,0.06)' : 'transparent' }}>
+              <span style={{ flex: 1, fontSize: 12, color: c.text }}>
+                <span style={{ fontFamily: 'monospace', color: c.text }}>{p.extension}</span>
+                {p.display_name && <span style={{ color: c.textSub, marginLeft: 8 }}>{p.display_name}</span>}
+              </span>
+              <button type="button" onClick={() => toggle(p.extension, p.display_name, 'agent')}
+                style={{ padding: '3px 8px', fontSize: 10, borderRadius: 6, cursor: 'pointer',
+                  border: `1px solid ${cur?.role === 'agent' ? c.signalGold : c.border}`,
+                  background: cur?.role === 'agent' ? c.signalGold : 'transparent',
+                  color: cur?.role === 'agent' ? '#0c1733' : c.text, fontWeight: 700 }}>Agent</button>
+              <button type="button" onClick={() => toggle(p.extension, p.display_name, 'supervisor')}
+                style={{ padding: '3px 8px', fontSize: 10, borderRadius: 6, cursor: 'pointer',
+                  border: `1px solid ${cur?.role === 'supervisor' ? c.avaCyan : c.border}`,
+                  background: cur?.role === 'supervisor' ? c.avaCyan : 'transparent',
+                  color: cur?.role === 'supervisor' ? '#0c1733' : c.text, fontWeight: 700 }}>Supervisor</button>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ marginTop: 8, fontSize: 10, color: c.textSub }}>
+        {selected.length} assigned · Agent = level 1 / Supervisor = level 2
       </div>
     </div>
   );

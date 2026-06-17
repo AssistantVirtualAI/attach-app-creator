@@ -1071,7 +1071,62 @@ Deno.serve(async (req) => {
       return json(await pbxWrite(`call_center_agents/${id}`, "DELETE"));
     }
     if (action === "create-ring-group" || action === "update-ring-group") {
-      return json(await writeCollection("ring_groups", "ring_groups", params));
+      // FusionPBX rejects unknown columns and expects ring_group_destinations
+      // as a separate subcollection, not a column on ring_groups.
+      const rawDest = params.ring_group_destinations;
+      const main: Record<string, unknown> = { ...params };
+      delete (main as any).ring_group_destinations;
+
+      // Strip empty strings — FusionPBX 422s on numeric fields with "".
+      for (const k of Object.keys(main)) {
+        if (main[k] === "" || main[k] === undefined) delete main[k];
+      }
+
+      const w = await writeCollection("ring_groups", "ring_groups", main);
+      if (!w.ok) return json(w, w.status || 500);
+
+      // Resolve ring_group_uuid (existing or newly created).
+      let ringUuid: string | null = (main as any).ring_group_uuid || null;
+      if (!ringUuid && main.ring_group_name) {
+        const lookup = await pbxFetch(`ring_groups?domain_uuid=${(main as any).domain_uuid}&ring_group_name=${encodeURIComponent(String(main.ring_group_name))}`);
+        const arr = collection(lookup.data, "ring_groups");
+        ringUuid = (arr.find((r: any) => r.ring_group_name === main.ring_group_name) || arr[0])?.ring_group_uuid || null;
+      }
+
+      // Persist member destinations (comma-separated string OR array).
+      if (ringUuid && rawDest != null && rawDest !== "") {
+        const list: string[] = Array.isArray(rawDest)
+          ? rawDest.map((x: any) => String(x).trim()).filter(Boolean)
+          : String(rawDest).split(/[,\s]+/).map((s) => s.trim()).filter(Boolean);
+        if (list.length) {
+          // Clear existing destinations first so the list mirrors what the user typed.
+          if (action === "update-ring-group") {
+            const cur = await pbxFetch(`ring_group_destinations?ring_group_uuid=${ringUuid}`);
+            const curArr = collection(cur.data, "ring_group_destinations");
+            for (const d of curArr) {
+              if (d.ring_group_destination_uuid) {
+                await pbxWrite(`ring_group_destinations/${d.ring_group_destination_uuid}`, "DELETE");
+              }
+            }
+          }
+          let order = 1;
+          for (const ext of list) {
+            await pbxWrite("ring_group_destinations", "POST", {
+              ring_group_destinations: [{
+                ring_group_uuid: ringUuid,
+                domain_uuid: (main as any).domain_uuid,
+                destination_number: ext,
+                destination_delay: 0,
+                destination_timeout: Number((main as any).ring_group_call_timeout) || 30,
+                destination_prompt: 0,
+                destination_order: order++,
+                destination_enabled: "true",
+              }],
+            });
+          }
+        }
+      }
+      return json({ ok: true, ring_group_uuid: ringUuid, data: w.data });
     }
     if (action === "delete-ring-group") {
       const id = params.ring_group_uuid;
