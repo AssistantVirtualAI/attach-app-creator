@@ -85,16 +85,22 @@ export default function OrgChatView() {
     let presence: Record<string, any> = {};
     if (ids.length) {
       const { data: pres } = await supabase.from('user_presence')
-        .select('user_id,status,call_state').in('user_id', ids);
+        .select('user_id,status,call_state,last_seen_at').in('user_id', ids);
       (pres ?? []).forEach((p: any) => { presence[p.user_id] = p; });
     }
-    setMembers((spus ?? []).map((s: any) => ({
-      user_id: s.portal_user_id,
-      display_name: s.display_name || `Ext ${s.extension}`,
-      extension: s.extension,
-      status: presence[s.portal_user_id]?.status || 'offline',
-      call_state: presence[s.portal_user_id]?.call_state || null,
-    })));
+    const fiveMinAgo = Date.now() - 5 * 60 * 1000;
+    setMembers((spus ?? []).map((s: any) => {
+      const p = presence[s.portal_user_id];
+      const seen = p?.last_seen_at ? new Date(p.last_seen_at).getTime() : 0;
+      const isActive = seen >= fiveMinAgo;
+      return {
+        user_id: s.portal_user_id,
+        display_name: s.display_name || `Ext ${s.extension}`,
+        extension: s.extension,
+        status: isActive ? (p?.status && p.status !== 'offline' ? p.status : 'online') : 'offline',
+        call_state: p?.call_state || null,
+      };
+    }));
   };
 
   useEffect(() => {
