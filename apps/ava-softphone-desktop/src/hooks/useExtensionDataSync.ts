@@ -43,13 +43,14 @@ async function withRetry<T>(label: SyncAction, fn: () => Promise<T>, onAttempt?:
 
 async function reportFailure(orgId: string, extension: string | null | undefined, action: SyncAction, error: string) {
   try {
-    await supabase.from('telecom_sync_health').insert({
+    await supabase.from('telecom_sync_health').upsert({
       organization_id: orgId,
-      job_type: action,
+      source: action,
       status: 'failed',
       last_error: error,
-      metadata: { extension: extension || null, source: 'useExtensionDataSync' },
-    });
+      last_error_at: new Date().toISOString(),
+      metadata: { extension: extension || null, origin: 'useExtensionDataSync' },
+    }, { onConflict: 'organization_id,source' });
   } catch (e) {
     console.warn('[sync] failed to record telecom_sync_health row', e);
   }
@@ -60,15 +61,18 @@ async function reportFailure(orgId: string, extension: string | null | undefined
 
 async function reportSuccess(orgId: string, extension: string | null | undefined, action: SyncAction) {
   try {
-    await supabase.from('telecom_sync_health').insert({
+    await supabase.from('telecom_sync_health').upsert({
       organization_id: orgId,
-      job_type: action,
+      source: action,
       status: 'ok',
       last_error: null,
-      metadata: { extension: extension || null, source: 'useExtensionDataSync' },
-    });
+      last_success_at: new Date().toISOString(),
+      consecutive_failures: 0,
+      metadata: { extension: extension || null, origin: 'useExtensionDataSync' },
+    }, { onConflict: 'organization_id,source' });
   } catch {}
 }
+
 
 export type SyncProgress = {
   action: SyncAction;

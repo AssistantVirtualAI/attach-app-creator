@@ -13,10 +13,12 @@ const { colors: c } = theme;
 
 type HealthRow = {
   id: string;
-  job_type: string;
+  source: string;
   status: string;
   last_error: string | null;
-  created_at: string;
+  last_success_at: string | null;
+  last_error_at: string | null;
+  updated_at: string;
   metadata: any;
 };
 
@@ -50,14 +52,15 @@ export default function SyncStatusView() {
     if (!orgId) return;
     const { data } = await supabase
       .from('telecom_sync_health')
-      .select('id, job_type, status, last_error, created_at, metadata')
+      .select('id, source, status, last_error, last_success_at, last_error_at, updated_at, metadata')
       .eq('organization_id', orgId)
-      .order('created_at', { ascending: false })
+      .order('updated_at', { ascending: false })
       .limit(40);
     setHistory((data || []) as HealthRow[]);
   };
 
   useEffect(() => { loadHistory(); }, [orgId]);
+
 
   const runRetry = async () => {
     if (!orgId || running) return;
@@ -90,9 +93,10 @@ export default function SyncStatusView() {
   // Derived: last successful sync per action.
   const lastOkByAction: Partial<Record<string, HealthRow>> = {};
   history.forEach((row) => {
-    if (row.status === 'ok' && !lastOkByAction[row.job_type]) lastOkByAction[row.job_type] = row;
+    if (row.status === 'ok' && row.last_success_at && !lastOkByAction[row.source]) lastOkByAction[row.source] = row;
   });
   const recentFailures = history.filter((r) => r.status !== 'ok').slice(0, 8);
+
 
   return (
     <div style={{ padding: 24, maxWidth: 980, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -128,8 +132,9 @@ export default function SyncStatusView() {
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   <span style={{ fontSize: 13, fontWeight: 600, color: c.text }}>{SYNC_ACTION_LABELS[a]}</span>
                   <span style={{ fontSize: 11, color: c.textSub }}>
-                    Last success: {last ? new Date(last.created_at).toLocaleString() : '—'}
+                    Last success: {last?.last_success_at ? new Date(last.last_success_at).toLocaleString() : '—'}
                   </span>
+
                 </div>
                 <StatusBadge progress={p} />
               </div>
@@ -147,12 +152,13 @@ export default function SyncStatusView() {
             {recentFailures.map((row) => (
               <div key={row.id} style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 12 }}>
-                  <strong style={{ color: '#ef4444' }}>{SYNC_ACTION_LABELS[row.job_type as SyncAction] || row.job_type}</strong>
-                  <span style={{ color: c.textSub }}>{new Date(row.created_at).toLocaleString()}</span>
+                  <strong style={{ color: '#ef4444' }}>{SYNC_ACTION_LABELS[row.source as SyncAction] || row.source}</strong>
+                  <span style={{ color: c.textSub }}>{new Date(row.last_error_at || row.updated_at).toLocaleString()}</span>
                 </div>
                 {row.last_error && <p style={{ margin: '4px 0 0', fontSize: 12, color: c.text, opacity: 0.85 }}>{row.last_error}</p>}
                 {row.metadata?.extension && <p style={{ margin: '2px 0 0', fontSize: 11, color: c.textSub }}>ext {row.metadata.extension}</p>}
               </div>
+
             ))}
           </div>
         )}
