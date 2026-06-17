@@ -803,7 +803,7 @@ function IvrsTable() {
   );
 }
 
-function EditIvrModal({ ivr, saving, onClose, onSave }: { ivr: any; saving: boolean; onClose: () => void; onSave: (changes: any) => void }) {
+function EditIvrModal({ ivr, orgId, saving, onClose, onSave }: { ivr: any; orgId: string; saving: boolean; onClose: () => void; onSave: (changes: any) => void }) {
   const initial = {
     ivr_menu_name: ivr.name || '',
     ivr_menu_extension: ivr.extension || '',
@@ -812,6 +812,7 @@ function EditIvrModal({ ivr, saving, onClose, onSave }: { ivr: any; saving: bool
     ivr_menu_timeout: ivr.timeout_ms || 3000,
     ivr_menu_enabled: ivr.enabled !== false ? 'true' : 'false',
     ivr_menu_exit_action: ivr.exit_action || 'hangup',
+    organization_id: orgId,
   };
   return (
     <PbxEditSheet
