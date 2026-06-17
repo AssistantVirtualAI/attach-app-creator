@@ -2,13 +2,16 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Disc, Loader2, Play, Pause, ChevronDown, Sparkles } from 'lucide-react';
+import { Disc, Loader2, ChevronDown, Sparkles } from 'lucide-react';
 import { usePbxCallRecords, LEMTEL_ORG } from '@/hooks/usePbxData';
 import { usePbxRealtime } from '@/hooks/usePbxRealtime';
 import { SyncEverythingButton } from '@/components/lemtel/SyncEverythingButton';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { runTranscribeAndAnalyze, estimateQuality, isStubTranscript, type TranscriptStage } from '@/lib/transcriptStatus';
+import { TranscriptStagePill } from '@/components/transcripts/TranscriptStagePill';
+
 
 const isRecordingListChange = (payload: any) => {
   if (payload.eventType === 'INSERT' || payload.eventType === 'DELETE') return true;
