@@ -125,56 +125,90 @@ Deno.serve(async (req) => {
     }
 
     const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
-    let insights: any;
+    const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+    let insights: any = null;
+    let aiModel = "stub";
+    let aiReason: string | null = null;
 
-    if (!anthropicKey) {
-      insights = {
-        sentiment: "neutral", satisfaction_score: 4, intent: "appointment_booking",
-        topics: ["scheduling"], action_items: ["Call back tomorrow"], risks: [],
-        sales_opportunities: [], quality_score: 7, escalation_needed: false,
-        key_phrases: ["rendez-vous"], summary: "Caller requested an appointment.",
-      };
-    } else {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "x-api-key": anthropicKey, "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514", max_tokens: 1000,
-          messages: [{ role: "user", content:
-`Analyze this call transcript. Return ONLY valid JSON:
-{"sentiment":"positive|neutral|negative","satisfaction_score":1-5,"intent":"string","topics":["..."],"action_items":["..."],"risks":["..."],"sales_opportunities":["..."],"quality_score":1-10,"escalation_needed":true|false,"key_phrases":["..."],"summary":"2 sentences max"}
+    const stubInsights = () => ({
+      sentiment: "neutral", satisfaction_score: 3, intent: "unknown",
+      topics: [], action_items: [], risks: [], sales_opportunities: [],
+      quality_score: 5, escalation_needed: false, key_phrases: [],
+      summary: "AI analysis unavailable — showing call metadata only.",
+    });
 
-Transcript:
-${transcript_text}` }],
-        }),
-      });
-      if (!res.ok) {
-        const details = await res.text();
-        console.error("Anthropic analyze error", res.status, details);
-        throw new Error("AI analysis service error");
+    const prompt = `Analyze this call transcript. Return ONLY valid JSON:\n{"sentiment":"positive|neutral|negative","satisfaction_score":1-5,"intent":"string","topics":["..."],"action_items":["..."],"risks":["..."],"sales_opportunities":["..."],"quality_score":1-10,"escalation_needed":true|false,"key_phrases":["..."],"summary":"2 sentences max"}\n\nTranscript:\n${transcript_text}`;
+
+    try {
+      if (anthropicKey) {
+        const res = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: { "x-api-key": anthropicKey, "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
+          body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1000, messages: [{ role: "user", content: prompt }] }),
+        });
+        if (!res.ok) {
+          aiReason = `anthropic_${res.status}`;
+          console.error("Anthropic error", res.status, await res.text());
+        } else {
+          const data = await res.json();
+          const raw = data.content?.[0]?.text?.match(/\{[\s\S]*\}/)?.[0];
+          if (raw) { insights = JSON.parse(raw); aiModel = "claude-sonnet-4-20250514"; }
+          else aiReason = "anthropic_no_json";
+        }
       }
-      const data = await res.json();
-      const raw = data.content?.[0]?.text?.match(/\{[\s\S]*\}/)?.[0];
-      if (!raw) throw new Error("AI analysis returned no structured result");
-      insights = JSON.parse(raw);
+      if (!insights && lovableKey) {
+        const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: { "Lovable-API-Key": lovableKey, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash",
+            messages: [{ role: "user", content: prompt }],
+            response_format: { type: "json_object" },
+          }),
+        });
+        if (!res.ok) {
+          aiReason = `lovable_${res.status}`;
+          console.error("Lovable AI error", res.status, await res.text());
+        } else {
+          const data = await res.json();
+          const raw = String(data?.choices?.[0]?.message?.content || "").match(/\{[\s\S]*\}/)?.[0];
+          if (raw) { insights = JSON.parse(raw); aiModel = "google/gemini-2.5-flash"; }
+          else aiReason = "lovable_no_json";
+        }
+      }
+    } catch (e: any) {
+      aiReason = `ai_exception:${e?.message || "unknown"}`;
+      console.error("AI invoke exception", e);
+    }
+
+    if (!insights) {
+      insights = stubInsights();
+      aiModel = "stub";
     }
 
     await admin.from("pbx_ai_insights").delete().eq("call_record_id", call_record_id);
     const { error: insightError } = await admin.from("pbx_ai_insights").insert({
       organization_id, call_record_id, ...insights,
-      prompt_version: "v1", ai_model: "claude-sonnet-4-20250514",
+      prompt_version: "v1", ai_model: aiModel,
     });
-    if (insightError) throw new Error(insightError.message);
+    if (insightError) console.error("insight insert failed", insightError.message);
     const { data: existingCall } = await admin.from("pbx_call_records")
       .select("raw_data").eq("id", call_record_id).maybeSingle();
     await admin.from("pbx_call_records").update({
-      analyzed: true,
+      analyzed: aiModel !== "stub",
       ai_processing: false,
-      raw_data: { ...((existingCall?.raw_data as Record<string, unknown>) || {}), ai: insights },
+      raw_data: { ...((existingCall?.raw_data as Record<string, unknown>) || {}), ai: insights, ai_reason: aiReason },
     }).eq("id", call_record_id);
 
-    return new Response(JSON.stringify({ ...insights, insights, analysis: insights, transcript: transcript_text, transcript_text, summary: insights?.summary, sentiment: insights?.sentiment, topics: insights?.topics, action_items: insights?.action_items, jobId: crypto.randomUUID() }), { headers: corsHeaders });
+    return new Response(JSON.stringify({
+      ok: true, stub: aiModel === "stub", reason: aiReason,
+      ...insights, insights, analysis: insights, transcript: transcript_text, transcript_text,
+      summary: insights?.summary, sentiment: insights?.sentiment, topics: insights?.topics,
+      action_items: insights?.action_items, jobId: crypto.randomUUID(),
+    }), { headers: corsHeaders });
   } catch (e: any) {
-    return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: corsHeaders });
+    console.error("ai-analyze-call fatal", e);
+    return new Response(JSON.stringify({ ok: false, error: e?.message || "analysis failed" }), { status: 200, headers: corsHeaders });
   }
 });
+

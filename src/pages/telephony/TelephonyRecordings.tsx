@@ -62,28 +62,36 @@ export default function TelephonyRecordings({ scope = 'org' }: { scope?: 'org' |
   const transcribeAndAnalyze = async (id: string) => {
     setWorking(id);
     try {
-      const { error: e1 } = await supabase.functions.invoke('ai-transcribe-call', {
+      const t = await supabase.functions.invoke('ai-transcribe-call', {
         body: { call_record_id: id, organization_id: LEMTEL_ORG },
       });
-      if (e1) throw e1;
-      const { data: analysis, error: e2 } = await supabase.functions.invoke('ai-analyze-call', {
+      if (t.error) throw new Error(`Transcription: ${t.error.message}`);
+      const tData: any = t.data || {};
+      if (tData.stub) toast.message('Transcript unavailable', { description: tData.reason || 'Using metadata fallback' });
+
+      const a = await supabase.functions.invoke('ai-analyze-call', {
         body: { call_record_id: id, organization_id: LEMTEL_ORG },
       });
-      if (e2) throw e2;
-      toast.success('Transcribed and analyzed');
+      if (a.error) throw new Error(`Analysis: ${a.error.message}`);
+      const aData: any = a.data || {};
+      if (aData.ok === false) throw new Error(aData.error || 'Analysis returned no result');
+      if (aData.stub) toast.message('AI analysis unavailable', { description: aData.reason || 'Showing metadata only' });
+      else toast.success('Transcribed and analyzed');
+
       qc.setQueriesData({ queryKey: ['pbx'] }, (old: any) => {
         if (!Array.isArray(old)) return old;
         return old.map((row) => row?.id === id ? {
           ...row,
           transcribed: true,
-          analyzed: true,
-          raw_data: { ...(row.raw_data || {}), ai: (analysis as any)?.insights || analysis },
+          analyzed: !aData.stub,
+          raw_data: { ...(row.raw_data || {}), ai: aData.insights || aData },
         } : row);
       });
     } catch (e: any) {
       toast.error(e?.message || 'Failed');
     } finally { setWorking(null); }
   };
+
 
   if (isLoading) return <div className="flex justify-center py-8"><Loader2 className="animate-spin" /></div>;
 
@@ -120,10 +128,15 @@ export default function TelephonyRecordings({ scope = 'org' }: { scope?: 'org' |
                 )}
                 <div className="flex items-center justify-between">
                   {sentimentBadge(c.raw_data?.sentiment) || <Badge variant="outline">Not analyzed</Badge>}
-                  {!c.transcribed && (
+                  {!c.transcribed ? (
                     <Button size="sm" variant="outline" onClick={() => transcribeAndAnalyze(c.id)} disabled={working === c.id}>
                       {working === c.id ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Sparkles className="w-3 h-3 mr-1" />}
                       Transcribe & Analyze
+                    </Button>
+                  ) : (
+                    <Button size="sm" variant="ghost" onClick={() => transcribeAndAnalyze(c.id)} disabled={working === c.id}>
+                      {working === c.id ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Sparkles className="w-3 h-3 mr-1" />}
+                      Retry
                     </Button>
                   )}
                 </div>
