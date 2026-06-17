@@ -152,12 +152,13 @@ export default function SyncStatusView() {
             {recentFailures.map((row) => (
               <div key={row.id} style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 12 }}>
-                  <strong style={{ color: '#ef4444' }}>{SYNC_ACTION_LABELS[row.job_type as SyncAction] || row.job_type}</strong>
-                  <span style={{ color: c.textSub }}>{new Date(row.created_at).toLocaleString()}</span>
+                  <strong style={{ color: '#ef4444' }}>{SYNC_ACTION_LABELS[row.source as SyncAction] || row.source}</strong>
+                  <span style={{ color: c.textSub }}>{new Date(row.last_error_at || row.updated_at).toLocaleString()}</span>
                 </div>
                 {row.last_error && <p style={{ margin: '4px 0 0', fontSize: 12, color: c.text, opacity: 0.85 }}>{row.last_error}</p>}
                 {row.metadata?.extension && <p style={{ margin: '2px 0 0', fontSize: 11, color: c.textSub }}>ext {row.metadata.extension}</p>}
               </div>
+
             ))}
           </div>
         )}
