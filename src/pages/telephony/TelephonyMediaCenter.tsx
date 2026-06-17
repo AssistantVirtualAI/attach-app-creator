@@ -208,22 +208,28 @@ function RecordingsTab({ orgId, extension, search }: { orgId: string; extension:
   };
   const transcribe = async (id: string) => {
     setWorking(id);
-    try {
-      await supabase.functions.invoke("ai-transcribe-call", { body: { call_record_id: id, organization_id: orgId } });
-      const { data } = await supabase.functions.invoke("ai-analyze-call", { body: { call_record_id: id, organization_id: orgId } });
-      toast.success("Transcription terminée");
-      qc.setQueriesData({ queryKey: ["media", "recordings"] }, (old: any) => {
-        if (!Array.isArray(old)) return old;
-        return old.map((row) => row?.id === id ? {
-          ...row,
-          transcribed: true,
-          ai_summary: (data as any)?.summary ?? row.ai_summary,
-          ai_sentiment: (data as any)?.sentiment ?? row.ai_sentiment,
-        } : row);
-      });
-    } catch (e: any) { toast.error(e?.message || "Échec"); }
-    finally { setWorking(null); }
+    setStages((s) => ({ ...s, [id]: { stage: 'downloading' } }));
+    const result = await runTranscribeAndAnalyze({
+      invoke: async (name, body) => await supabase.functions.invoke(name, { body }),
+      callRecordId: id,
+      organizationId: orgId,
+      onStage: (stage, detail) => setStages((s) => ({ ...s, [id]: { stage, detail } })),
+    });
+    if (result.stage === 'failed') toast.error(result.reason || 'Échec');
+    else if (result.stage === 'unavailable') toast.message('Enregistrement indisponible', { description: result.reason || 'Audio non récupérable' });
+    else toast.success('Transcription terminée');
+    qc.setQueriesData({ queryKey: ['media', 'recordings'] }, (old: any) => {
+      if (!Array.isArray(old)) return old;
+      return old.map((row) => row?.id === id ? {
+        ...row,
+        transcribed: result.stage === 'complete',
+        ai_summary: result.data?.summary ?? row.ai_summary,
+        ai_sentiment: result.data?.sentiment ?? row.ai_sentiment,
+      } : row);
+    });
+    setWorking(null);
   };
+
   const remove = async (r: any) => {
     if (!confirm("Supprimer cet enregistrement ?")) return;
     await write.mutateAsync({
