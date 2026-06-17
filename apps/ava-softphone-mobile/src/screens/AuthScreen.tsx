@@ -1,10 +1,24 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import type { Creds } from '../lib/creds';
 import SipConfigScreen from './SipConfigScreen';
 
 type Mode = 'extension' | 'email';
 type Screen = 'login' | 'sip' | 'forgot';
 type ForgotStep = 'form' | 'confirm' | 'sent';
+type Accent = 'gold-cyan' | 'cyan-gold';
+
+const ACCENT_KEY = 'lemtel-auth-accent';
+const loadAccent = (): Accent => {
+  try {
+    const v = localStorage.getItem(ACCENT_KEY);
+    return v === 'cyan-gold' ? 'cyan-gold' : 'gold-cyan';
+  } catch { return 'gold-cyan'; }
+};
+const saveAccent = (a: Accent) => { try { localStorage.setItem(ACCENT_KEY, a); } catch {} };
+const accentGradient = (a: Accent) =>
+  a === 'cyan-gold'
+    ? 'linear-gradient(135deg, #0BB5D6 0%, #FFD700 100%)'
+    : 'linear-gradient(135deg, #FFD700 0%, #0BB5D6 100%)';
 
 // Desktop-parity palette
 const C = {
