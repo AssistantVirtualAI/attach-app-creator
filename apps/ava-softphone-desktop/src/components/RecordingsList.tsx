@@ -56,7 +56,7 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
       const data = force ? await ava.refreshRecordings() : await ava.recordings();
       setItems(Array.isArray(data) ? data : []);
     } catch (e: any) {
-      if (!silent) {
+      if (!silent || force) {
         setError(e?.message || 'Unable to load recordings.');
         setItems([]);
       }
