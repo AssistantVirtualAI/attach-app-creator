@@ -24,6 +24,11 @@ import { bootNative, onAppStateChange } from './lib/nativeBoot';
 import { configureMobileApi } from './lib/mobileApi';
 import { configureAudit, audit } from './lib/audit';
 
+const isPreviewMode = (() => {
+  try { return new URLSearchParams(window.location.search).get('preview') === '1'; }
+  catch { return false; }
+})();
+
 export default function MobileApp() {
   const { creds, setCreds, clearCreds, loading } = useStoredCreds();
   const initialTab = (() => {
@@ -34,7 +39,7 @@ export default function MobileApp() {
     return 'home' as Tab;
   })();
   const [tab, setTab] = useState<Tab>(initialTab);
-  const [booting, setBooting] = useState(true);
+  const [booting, setBooting] = useState(!isPreviewMode);
 
   useEffect(() => {
     bootNative().finally(() => {
