@@ -102,14 +102,14 @@ export function DownloadCenter({ personalize = false }: { personalize?: boolean 
       <Card>
         <CardHeader><CardTitle className="flex items-center gap-2"><MonitorDown className="h-4 w-4" /> Desktop</CardTitle></CardHeader>
         <CardContent className="grid gap-3 sm:grid-cols-2">
-          <Button asChild variant="outline" disabled={!macArm}>
-            <a href={macArm?.browser_download_url ?? '#'}><Apple className="h-4 w-4 mr-2" /> macOS Apple Silicon {macArm && <span className="ml-2 text-xs text-muted-foreground">{fmtSize(macArm.size)}</span>}</a>
+          <Button asChild variant="outline" disabled={!macArm && !fallbackMacArm}>
+            <a href={macArm?.browser_download_url ?? fallbackMacArm}><Apple className="h-4 w-4 mr-2" /> macOS Apple Silicon {macArm && <span className="ml-2 text-xs text-muted-foreground">{fmtSize(macArm.size)}</span>}</a>
           </Button>
-          <Button asChild variant="outline" disabled={!macX64}>
-            <a href={macX64?.browser_download_url ?? '#'}><Apple className="h-4 w-4 mr-2" /> macOS Intel {macX64 && <span className="ml-2 text-xs text-muted-foreground">{fmtSize(macX64.size)}</span>}</a>
+          <Button asChild variant="outline" disabled={!macX64 && !fallbackMacIntel}>
+            <a href={macX64?.browser_download_url ?? fallbackMacIntel}><Apple className="h-4 w-4 mr-2" /> macOS Intel {macX64 && <span className="ml-2 text-xs text-muted-foreground">{fmtSize(macX64.size)}</span>}</a>
           </Button>
-          <Button asChild variant="outline" disabled={!win}>
-            <a href={win?.browser_download_url ?? '#'}><MonitorDown className="h-4 w-4 mr-2" /> Windows 10/11 {win && <span className="ml-2 text-xs text-muted-foreground">{fmtSize(win.size)}</span>}</a>
+          <Button asChild variant="outline" disabled={!win && !fallbackWin}>
+            <a href={win?.browser_download_url ?? fallbackWin}><MonitorDown className="h-4 w-4 mr-2" /> Windows 10/11 {win && <span className="ml-2 text-xs text-muted-foreground">{fmtSize(win.size)}</span>}</a>
           </Button>
           <Button asChild variant="outline" disabled={!linux}>
             <a href={linux?.browser_download_url ?? '#'}><MonitorDown className="h-4 w-4 mr-2" /> Linux AppImage {linux && <span className="ml-2 text-xs text-muted-foreground">{fmtSize(linux.size)}</span>}</a>
