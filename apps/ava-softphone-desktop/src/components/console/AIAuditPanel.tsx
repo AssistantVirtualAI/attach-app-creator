@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { theme } from '../../lib/theme';
 import { ListSkeleton, EmptyState } from './PageHeader';
