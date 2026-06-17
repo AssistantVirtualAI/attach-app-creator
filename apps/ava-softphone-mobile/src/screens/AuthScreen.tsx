@@ -40,6 +40,14 @@ const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 
 const isEmail = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim());
 
+type AuthStep = 'network' | 'edge-function' | 'supabase-auth' | 'token' | 'validation';
+type AuthFailure = { step: AuthStep; code: string; message: string; detail?: string };
+
+class AuthError extends Error {
+  step: AuthStep; code: string; detail?: string;
+  constructor(f: AuthFailure) { super(f.message); this.step = f.step; this.code = f.code; this.detail = f.detail; }
+}
+
 const mapAuthError = (raw: string): string => {
   const m = (raw || '').toLowerCase();
   if (m.includes('invalid_credentials') || m.includes('invalid login')) return 'Wrong email or password.';
@@ -47,7 +55,7 @@ const mapAuthError = (raw: string): string => {
   if (m.includes('app_access_disabled') || m.includes('mobile_access_disabled')) return 'Mobile access has not been enabled for this extension. Contact your admin.';
   if (m.includes('ambiguous_extension')) return 'Multiple extensions match — please enter the SIP domain.';
   if (m.includes('rate') && m.includes('limit')) return 'Too many attempts. Please wait a moment and try again.';
-  if (m.includes('network') || m.includes('failed to fetch')) return 'Network error — check your connection.';
+  if (m.includes('network') || m.includes('failed to fetch') || m.includes('load failed')) return 'Network error — check your connection.';
   if (m.includes('session') || m.includes('jwt')) return 'Your session expired. Please sign in again.';
   return raw || 'Something went wrong. Please try again.';
 };
@@ -62,6 +70,7 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
   const [portalUrl, setPortalUrl] = useState('https://avastatistic.ca');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [failure, setFailure] = useState<AuthFailure | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [accent, setAccent] = useState<Accent>(loadAccent);
 
@@ -96,17 +105,28 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
   };
 
   const submitEmail = async () => {
-    // Use Supabase Auth REST directly — there is no `softphone-auth` edge function.
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        apikey: SUPABASE_ANON,
-      },
-      body: JSON.stringify({ email: email.trim(), password }),
-    }).catch((e) => { throw new Error('network: ' + (e?.message || 'failed to fetch')); });
+    let res: Response;
+    try {
+      res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON },
+        body: JSON.stringify({ email: email.trim(), password }),
+      });
+    } catch (e: any) {
+      throw new AuthError({ step: 'network', code: 'fetch_failed', message: 'Cannot reach Supabase Auth', detail: e?.message || String(e) });
+    }
     const data = await res.json().catch(() => ({} as any));
-    if (!res.ok) throw new Error(data?.error_description || data?.msg || data?.error || `auth_${res.status}`);
+    if (!res.ok) {
+      throw new AuthError({
+        step: 'supabase-auth',
+        code: data?.error_code || data?.error || `http_${res.status}`,
+        message: data?.error_description || data?.msg || 'Sign-in rejected by Supabase Auth',
+        detail: JSON.stringify(data).slice(0, 300),
+      });
+    }
+    if (!data?.access_token) {
+      throw new AuthError({ step: 'token', code: 'no_token', message: 'Auth succeeded but no access_token returned' });
+    }
     onAuthenticated({
       portalUrl,
       email: data?.user?.email || email.trim(),
@@ -118,24 +138,36 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
   };
 
   const submitExtension = async () => {
-    // Edge functions are hosted on the Supabase project, not the portal domain.
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/extension-signin`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        apikey: SUPABASE_ANON,
-        Authorization: `Bearer ${SUPABASE_ANON}`,
-      },
-      body: JSON.stringify({
-        extension: extension.trim(),
-        password,
-        sip_domain: sipDomain.trim() || undefined,
-        platform: 'mobile',
-      }),
-    }).catch((e) => { throw new Error('network: ' + (e?.message || 'failed to fetch')); });
+    let res: Response;
+    try {
+      res = await fetch(`${SUPABASE_URL}/functions/v1/extension-signin`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: SUPABASE_ANON,
+          Authorization: `Bearer ${SUPABASE_ANON}`,
+        },
+        body: JSON.stringify({
+          extension: extension.trim(),
+          password,
+          sip_domain: sipDomain.trim() || undefined,
+          platform: 'mobile',
+        }),
+      });
+    } catch (e: any) {
+      throw new AuthError({ step: 'network', code: 'fetch_failed', message: 'Cannot reach extension-signin edge function', detail: e?.message || String(e) });
+    }
     const data = await res.json().catch(() => ({} as any));
-    if (!res.ok || !data?.access_token) {
-      throw new Error(data?.error || `signin_${res.status}`);
+    if (!res.ok) {
+      throw new AuthError({
+        step: 'edge-function',
+        code: data?.error || `http_${res.status}`,
+        message: data?.detail || data?.hint || 'extension-signin returned an error',
+        detail: JSON.stringify(data).slice(0, 300),
+      });
+    }
+    if (!data?.access_token) {
+      throw new AuthError({ step: 'token', code: 'no_token', message: 'Edge function returned no access_token', detail: JSON.stringify(data).slice(0, 300) });
     }
     onAuthenticated({
       portalUrl,
@@ -153,14 +185,22 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-    if (!validate()) return;
+    setError(null); setFailure(null);
+    if (!validate()) { setFailure({ step: 'validation', code: 'invalid_input', message: 'Please fix the highlighted fields.' }); return; }
     setBusy(true);
     try {
       if (mode === 'email') await submitEmail();
       else await submitExtension();
     } catch (e: any) {
-      setError(mapAuthError(e?.message));
+      if (e instanceof AuthError) {
+        setFailure({ step: e.step, code: e.code, message: e.message, detail: e.detail });
+        setError(mapAuthError(e.code + ' ' + e.message));
+      } else {
+        setFailure({ step: 'network', code: 'unknown', message: e?.message || 'Unknown error' });
+        setError(mapAuthError(e?.message));
+      }
+      // eslint-disable-next-line no-console
+      console.error('[AuthScreen] sign-in failed', { step: (e as any)?.step, code: (e as any)?.code, message: e?.message, detail: (e as any)?.detail });
     } finally {
       setBusy(false);
     }
@@ -195,7 +235,7 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
               </>
             )}
 
-            {error && <ErrorBanner>{error}</ErrorBanner>}
+            {error && <ErrorBanner failure={failure}>{error}</ErrorBanner>}
 
             <button
               type="submit"
@@ -511,15 +551,49 @@ function AccentSwitch({ accent, onChange, readOnly }: { accent: Accent; onChange
   );
 }
 
-function ErrorBanner({ children }: { children: React.ReactNode }) {
+function ErrorBanner({ children, failure }: { children: React.ReactNode; failure?: AuthFailure | null }) {
+  const [open, setOpen] = useState(false);
   return (
-    <div style={{
+    <div role="alert" style={{
       fontSize: 12, color: C.red,
       padding: '10px 14px', borderRadius: 10,
       background: 'rgba(239,68,68,0.10)',
       border: '1px solid rgba(239,68,68,0.22)',
-    }}>{children}</div>
+      display: 'flex', flexDirection: 'column', gap: 8,
+    }}>
+      <div>{children}</div>
+      {failure && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+          <span style={chipStyle('step')}>step: {failure.step}</span>
+          <span style={chipStyle('code')}>code: {failure.code}</span>
+          {failure.detail && (
+            <button type="button" onClick={() => setOpen((o) => !o)}
+              style={{ ...chipStyle('toggle'), cursor: 'pointer' }}>
+              {open ? 'hide details' : 'details'}
+            </button>
+          )}
+        </div>
+      )}
+      {open && failure?.detail && (
+        <pre style={{
+          margin: 0, padding: 8, borderRadius: 8,
+          background: 'rgba(0,0,0,0.35)', color: '#FCA5A5',
+          fontSize: 10.5, lineHeight: 1.4, maxHeight: 140, overflow: 'auto',
+          whiteSpace: 'pre-wrap', wordBreak: 'break-all',
+        }}>{failure.detail}</pre>
+      )}
+    </div>
   );
+}
+
+function chipStyle(_kind: 'step' | 'code' | 'toggle'): React.CSSProperties {
+  return {
+    fontSize: 10, fontFamily: 'Fira Code, monospace',
+    padding: '2px 8px', borderRadius: 999,
+    background: 'rgba(255,255,255,0.06)',
+    border: '1px solid rgba(255,255,255,0.12)',
+    color: C.textIce,
+  };
 }
 
 function Spinner() {
