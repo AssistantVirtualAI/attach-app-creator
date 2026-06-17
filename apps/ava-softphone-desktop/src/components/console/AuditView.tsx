@@ -74,13 +74,29 @@ export default function AuditView() {
     <div style={{ padding: '14px 18px 24px', overflowY: 'auto', height: '100%' }}>
       <PageHeader
         eyebrow="Phase 5 · Audit"
-        title="Admin Actions"
-        subtitle="Every write to the PBX is recorded here with before/after payloads. Filter, inspect, and roll back when needed."
+        title={tab === 'admin' ? 'Admin Actions' : 'AI Requests'}
+        subtitle={tab === 'admin'
+          ? 'Every write to the PBX is recorded here with before/after payloads. Filter, inspect, and roll back when needed.'
+          : 'Internal log of every AI transcription and analysis request — timestamps, status, error codes, and latency.'}
         icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>}
-        right={<button onClick={load} style={btnPrimary}>Refresh</button>}
+        right={tab === 'admin' ? <button onClick={load} style={btnPrimary}>Refresh</button> : null}
       />
 
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+        {(['admin', 'ai'] as const).map(t => (
+          <button key={t} onClick={() => setTab(t)} style={{
+            padding: '8px 14px', borderRadius: 10, fontSize: 11, fontWeight: 800,
+            letterSpacing: 0.5, textTransform: 'uppercase', cursor: 'pointer',
+            border: `1px solid ${tab === t ? c.borderGold : c.border}`,
+            background: tab === t ? 'rgba(255,215,0,0.10)' : 'transparent',
+            color: tab === t ? c.signalGold : c.mutedSilver,
+          }}>{t === 'admin' ? 'Admin Actions' : '✨ AI Requests'}</button>
+        ))}
+      </div>
+
+      {tab === 'ai' ? <AIAuditPanel /> : (
+      <>
+
         {ACTION_FILTERS.map(f => (
           <button key={f} onClick={() => setFilter(f)} style={{
             padding: '6px 12px', borderRadius: 8,
