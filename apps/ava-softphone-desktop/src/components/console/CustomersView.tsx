@@ -30,6 +30,10 @@ export default function CustomersView() {
   const [syncing, setSyncing] = useState<string | null>(null);
   const [edit, setEdit] = useState<EditState>(null);
 
+  const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'enabled' | 'disabled'>('all');
+  const [linkFilter, setLinkFilter] = useState<'all' | 'linked' | 'unlinked'>('all');
+
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
@@ -93,6 +97,19 @@ export default function CustomersView() {
     } catch (e: any) { alert('Delete failed: ' + (e?.message || 'unknown')); }
   };
 
+  const filtered = rows.filter((r) => {
+    const q = query.trim().toLowerCase();
+    const matchesQuery = !q ||
+      r.domain_name.toLowerCase().includes(q) ||
+      (r.domain_description || '').toLowerCase().includes(q) ||
+      (r.org_name || '').toLowerCase().includes(q);
+    const isEnabled = r.domain_enabled === 'true' || r.domain_enabled === true;
+    const matchesStatus = statusFilter === 'all' || (statusFilter === 'enabled' ? isEnabled : !isEnabled);
+    const isLinked = !!r.org_id;
+    const matchesLink = linkFilter === 'all' || (linkFilter === 'linked' ? isLinked : !isLinked);
+    return matchesQuery && matchesStatus && matchesLink;
+  });
+
   return (
     <div style={{ padding: '24px 28px', overflowY: 'auto', height: '100%' }}>
       <PageHeader
@@ -102,9 +119,33 @@ export default function CustomersView() {
         accent={c.signalGold}
         icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 7h18M3 12h18M3 17h18"/></svg>}
       />
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 12 }}>
-        <button onClick={() => setEdit({ mode: 'create' })} style={{ padding: '8px 14px', borderRadius: 9, background: 'linear-gradient(180deg, #0033ff, #001ea8)', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>+ New customer</button>
-        <button onClick={load} style={{ padding: '8px 14px', borderRadius: 9, background: 'transparent', border: `1px solid ${c.border}`, color: c.textIce, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>↻ Refresh</button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={c.mutedSilver} strokeWidth="2" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search domains, customers…"
+              style={{ padding: '7px 10px 7px 32px', borderRadius: 8, border: `1px solid ${c.border}`, background: c.bgCard, color: c.text, fontSize: 12.5, outline: 'none', width: 240 }}
+            />
+          </div>
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)} style={{ padding: '7px 10px', borderRadius: 8, border: `1px solid ${c.border}`, background: c.bgCard, color: c.text, fontSize: 12.5, outline: 'none' }}>
+            <option value="all">All statuses</option>
+            <option value="enabled">Enabled</option>
+            <option value="disabled">Disabled</option>
+          </select>
+          <select value={linkFilter} onChange={(e) => setLinkFilter(e.target.value as any)} style={{ padding: '7px 10px', borderRadius: 8, border: `1px solid ${c.border}`, background: c.bgCard, color: c.text, fontSize: 12.5, outline: 'none' }}>
+            <option value="all">All links</option>
+            <option value="linked">Linked</option>
+            <option value="unlinked">Unlinked</option>
+          </select>
+          <span style={{ fontSize: 11, color: c.mutedSilver }}>{filtered.length} / {rows.length}</span>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => setEdit({ mode: 'create' })} style={{ padding: '8px 14px', borderRadius: 9, background: 'linear-gradient(180deg, #0033ff, #001ea8)', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>+ New customer</button>
+          <button onClick={load} style={{ padding: '8px 14px', borderRadius: 9, background: 'transparent', border: `1px solid ${c.border}`, color: c.textIce, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>↻ Refresh</button>
+        </div>
       </div>
 
       {error && <div style={{ padding: 14, color: c.danger, background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 10, marginBottom: 12 }}>{error}</div>}
@@ -112,14 +153,17 @@ export default function CustomersView() {
       {!loading && rows.length === 0 && (
         <EmptyState icon="◉" title="No PBX domains" hint="FusionPBX returned no domains. Create one with + New customer or check your credentials." accent={c.signalGold} />
       )}
-      {!loading && rows.length > 0 && (
+      {!loading && filtered.length === 0 && rows.length > 0 && (
+        <EmptyState icon="◉" title="No matches" hint="Adjust your search or filters to find customers." accent={c.mutedSilver} />
+      )}
+      {!loading && filtered.length > 0 && (
         <div style={{ background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 12, overflow: 'hidden' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 70px 70px 70px 90px 200px', padding: '10px 14px', borderBottom: `1px solid ${c.border}`, background: c.deepPanel }}>
             {['Domain','Customer','Ext','Numbers','Queues','Status',''].map((col) => (
               <span key={col} style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: c.mutedSilver }}>{col}</span>
             ))}
           </div>
-          {rows.map((r) => (
+          {filtered.map((r) => (
             <div key={r.domain_uuid} style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 70px 70px 70px 90px 200px', padding: '12px 14px', borderBottom: `1px solid ${c.border}`, fontSize: 12.5, color: c.textIce, alignItems: 'center' }}>
               <span style={{ fontFamily: 'JetBrains Mono, monospace' }}>{r.domain_name}</span>
               <span style={{ color: r.org_name ? c.textIce : c.mutedSilver }}>{r.org_name || '— not linked —'}</span>
