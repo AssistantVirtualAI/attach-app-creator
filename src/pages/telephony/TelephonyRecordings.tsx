@@ -61,39 +61,33 @@ export default function TelephonyRecordings({ scope = 'org' }: { scope?: 'org' |
   const [expanded, setExpanded] = useState<string | null>(null);
   const [playing, setPlaying] = useState<string | null>(null);
   const [working, setWorking] = useState<string | null>(null);
+  const [stages, setStages] = useState<Record<string, { stage: TranscriptStage; detail?: string }>>({});
 
   const transcribeAndAnalyze = async (id: string) => {
     setWorking(id);
-    try {
-      const t = await supabase.functions.invoke('ai-transcribe-call', {
-        body: { call_record_id: id, organization_id: LEMTEL_ORG },
-      });
-      if (t.error) throw new Error(`Transcription: ${t.error.message}`);
-      const tData: any = t.data || {};
-      if (tData.stub) toast.message('Transcript unavailable', { description: tData.reason || 'Using metadata fallback' });
+    setStages((s) => ({ ...s, [id]: { stage: 'downloading' } }));
+    const result = await runTranscribeAndAnalyze({
+      invoke: async (name, body) => await supabase.functions.invoke(name, { body }),
+      callRecordId: id,
+      organizationId: LEMTEL_ORG,
+      onStage: (stage, detail) => setStages((s) => ({ ...s, [id]: { stage, detail } })),
+    });
+    if (result.stage === 'failed') toast.error(result.reason || 'Échec de la transcription');
+    else if (result.stage === 'unavailable') toast.message('Enregistrement indisponible', { description: result.reason || 'Audio non récupérable' });
+    else toast.success('Transcrit et analysé');
 
-      const a = await supabase.functions.invoke('ai-analyze-call', {
-        body: { call_record_id: id, organization_id: LEMTEL_ORG },
-      });
-      if (a.error) throw new Error(`Analysis: ${a.error.message}`);
-      const aData: any = a.data || {};
-      if (aData.ok === false) throw new Error(aData.error || 'Analysis returned no result');
-      if (aData.stub) toast.message('AI analysis unavailable', { description: aData.reason || 'Showing metadata only' });
-      else toast.success('Transcribed and analyzed');
-
-      qc.setQueriesData({ queryKey: ['pbx'] }, (old: any) => {
-        if (!Array.isArray(old)) return old;
-        return old.map((row) => row?.id === id ? {
-          ...row,
-          transcribed: true,
-          analyzed: !aData.stub,
-          raw_data: { ...(row.raw_data || {}), ai: aData.insights || aData },
-        } : row);
-      });
-    } catch (e: any) {
-      toast.error(e?.message || 'Failed');
-    } finally { setWorking(null); }
+    qc.setQueriesData({ queryKey: ['pbx'] }, (old: any) => {
+      if (!Array.isArray(old)) return old;
+      return old.map((row) => row?.id === id ? {
+        ...row,
+        transcribed: result.stage === 'complete',
+        analyzed: result.stage === 'complete' && !result.insightStub,
+        raw_data: { ...(row.raw_data || {}), ai: result.data?.insights || result.data },
+      } : row);
+    });
+    setWorking(null);
   };
+
 
 
   if (isLoading) return <div className="flex justify-center py-8"><Loader2 className="animate-spin" /></div>;
