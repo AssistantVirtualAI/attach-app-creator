@@ -1,14 +1,9 @@
 import React, { useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
 import { theme } from '../lib/theme';
 import { setAuthToken } from '../lib/avaApi';
+import { supabase } from '../lib/supabaseClient';
 import LemtelLogo from './LemtelLogo';
 import BrandTagline from './BrandTagline';
-
-const SUPABASE_URL = 'https://gejxisrqtvxavbrfcoxz.supabase.co';
-const SUPABASE_ANON_KEY =
-  (import.meta as any).env?.VITE_SUPABASE_ANON_KEY ||
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdlanhpc3JxdHZ4YXZicmZjb3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1MDMxNzQsImV4cCI6MjA3NzA3OTE3NH0.kaO-GslE99OCNrZ4_AMnbzGqya2azqz_UMZR34zZvvo';
 
 type Creds = {
   portalUrl: string;
@@ -34,8 +29,6 @@ export default function SetupWizard({ onComplete }: { onComplete: (creds: Creds)
   const [sipDomain, setSipDomain] = useState('lemtel.lemtel.tel');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
-  const supabase = React.useMemo(() => createClient(SUPABASE_URL, SUPABASE_ANON_KEY), []);
 
   const finalize = async (
     authUserId: string,
