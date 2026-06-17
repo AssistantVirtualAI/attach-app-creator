@@ -734,22 +734,22 @@ export const ava = {
   ringGroups: () => call<any>(`/db/pbx_ring_groups?select=*&order=name.asc`, {}, MOCK_RG)
     .then((raw: any) => MOCK ? raw as RingGroup[] : asArray(raw).map((r: any) => ({ id: r.id, name: r.name || 'Ring Group', members: 0, strategy: r.strategy || '—' }))),
   /* Phase 3 */
-  voicemails: async (limit = 50) => {
+  voicemails: async (limit = 50, opts?: { extension?: string | null }) => {
     if (MOCK) return SAMPLE_VOICEMAIL_EMPTY;
     await bestEffortCdrSync(Math.max(limit, 200));
     try {
-      const rows = await readCallRecordRows(Math.max(limit, 200));
+      const rows = await readCallRecordRows(Math.max(limit, 200), opts);
       return rows.filter(isVoicemailLike).map(mapCdrToVoicemail).slice(0, limit);
     } catch (err) {
       console.warn('[avaApi] voicemail mapping failed:', err);
       return [] as VoicemailItem[];
     }
   },
-  refreshVoicemails: async (limit = 50) => {
+  refreshVoicemails: async (limit = 50, opts?: { extension?: string | null }) => {
     if (MOCK) return SAMPLE_VOICEMAIL_EMPTY;
     await bestEffortRecentTelephonySync(Math.max(limit, 250));
     if (typeof window !== 'undefined') window.dispatchEvent(new Event('lemtel:phone-sync-complete'));
-    const rows = await readCallRecordRows(Math.max(limit, 200));
+    const rows = await readCallRecordRows(Math.max(limit, 200), opts);
     return rows.filter(isVoicemailLike).map(mapCdrToVoicemail).slice(0, limit);
   },
   markVoicemailRead: (id: string) =>
