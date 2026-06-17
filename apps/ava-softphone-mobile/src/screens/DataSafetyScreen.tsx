@@ -163,6 +163,7 @@ function RetentionControlsCard() {
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<null | 'delete'>(null);
 
   useEffect(() => {
     try {
