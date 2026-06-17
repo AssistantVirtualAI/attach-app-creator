@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { colors, font, radius } from '../lib/theme';
 import { Card, SectionTitle } from '../components/ui/Primitives';
+import { supabase } from '../lib/supabaseClient';
 
 type Row = {
   type: string;
