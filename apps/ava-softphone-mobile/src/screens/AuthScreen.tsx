@@ -551,15 +551,49 @@ function AccentSwitch({ accent, onChange, readOnly }: { accent: Accent; onChange
   );
 }
 
-function ErrorBanner({ children }: { children: React.ReactNode }) {
+function ErrorBanner({ children, failure }: { children: React.ReactNode; failure?: AuthFailure | null }) {
+  const [open, setOpen] = useState(false);
   return (
-    <div style={{
+    <div role="alert" style={{
       fontSize: 12, color: C.red,
       padding: '10px 14px', borderRadius: 10,
       background: 'rgba(239,68,68,0.10)',
       border: '1px solid rgba(239,68,68,0.22)',
-    }}>{children}</div>
+      display: 'flex', flexDirection: 'column', gap: 8,
+    }}>
+      <div>{children}</div>
+      {failure && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+          <span style={chipStyle('step')}>step: {failure.step}</span>
+          <span style={chipStyle('code')}>code: {failure.code}</span>
+          {failure.detail && (
+            <button type="button" onClick={() => setOpen((o) => !o)}
+              style={{ ...chipStyle('toggle'), cursor: 'pointer' }}>
+              {open ? 'hide details' : 'details'}
+            </button>
+          )}
+        </div>
+      )}
+      {open && failure?.detail && (
+        <pre style={{
+          margin: 0, padding: 8, borderRadius: 8,
+          background: 'rgba(0,0,0,0.35)', color: '#FCA5A5',
+          fontSize: 10.5, lineHeight: 1.4, maxHeight: 140, overflow: 'auto',
+          whiteSpace: 'pre-wrap', wordBreak: 'break-all',
+        }}>{failure.detail}</pre>
+      )}
+    </div>
   );
+}
+
+function chipStyle(_kind: 'step' | 'code' | 'toggle'): React.CSSProperties {
+  return {
+    fontSize: 10, fontFamily: 'Fira Code, monospace',
+    padding: '2px 8px', borderRadius: 999,
+    background: 'rgba(255,255,255,0.06)',
+    border: '1px solid rgba(255,255,255,0.12)',
+    color: C.textIce,
+  };
 }
 
 function Spinner() {
