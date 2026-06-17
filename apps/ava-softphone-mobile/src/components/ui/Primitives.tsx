@@ -115,17 +115,52 @@ export function PrimaryButton({
   children, onClick, disabled, style,
 }: { children: React.ReactNode; onClick?: () => void; disabled?: boolean; style?: React.CSSProperties }) {
   return (
-    <button onClick={onClick} disabled={disabled} style={{
-      minHeight: 46,
-      padding: '12px 18px', borderRadius: radius.lg, border: 'none',
-      background: disabled ? 'rgba(255,255,255,0.06)' : gradients.call,
-      color: disabled ? colors.mutedSilver : '#fff',
-      fontSize: font.base, fontWeight: 700, letterSpacing: 0.2,
-      cursor: disabled ? 'not-allowed' : 'pointer',
-      boxShadow: disabled ? 'none' : '0 14px 36px -16px rgba(7,22,168,0.7)',
-      ...style,
-    }}>
-      {children}
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      onMouseDown={(e) => !disabled && ((e.currentTarget as HTMLButtonElement).style.transform = 'scale(0.97)')}
+      onMouseUp={(e) => ((e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)')}
+      onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)')}
+      style={{
+        position: 'relative',
+        minHeight: 48,
+        padding: '13px 22px',
+        borderRadius: radius.xl,
+        border: '1px solid rgba(255,255,255,0.25)',
+        background: disabled
+          ? 'rgba(255,255,255,0.06)'
+          : `linear-gradient(135deg, ${colors.lemtelBlue} 0%, #2247ff 55%, ${colors.avaCyan} 130%)`,
+        color: disabled ? colors.mutedSilver : '#fff',
+        fontSize: font.base,
+        fontWeight: 700,
+        letterSpacing: 0.3,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        boxShadow: disabled
+          ? 'none'
+          : '0 18px 40px -18px rgba(7,22,168,0.75), 0 1px 0 rgba(255,255,255,0.4) inset, 0 -2px 8px rgba(0,0,0,0.15) inset',
+        transition: 'transform .15s ease, box-shadow .2s ease, filter .2s ease',
+        overflow: 'hidden',
+        ...style,
+      }}
+    >
+      {!disabled && (
+        <span
+          aria-hidden
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background:
+              'linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.35) 50%, transparent 70%)',
+            transform: 'translateX(-100%)',
+            animation: 'ava-shimmer 2.6s ease-in-out infinite',
+            pointerEvents: 'none',
+          }}
+        />
+      )}
+      <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+        {children}
+      </span>
+      <style>{`@keyframes ava-shimmer { 0%{transform:translateX(-100%)} 60%,100%{transform:translateX(100%)} }`}</style>
     </button>
   );
 }
@@ -134,16 +169,33 @@ export function PrimaryButton({
 export function GhostButton({
   children, onClick, tone = 'neutral', style,
 }: { children: React.ReactNode; onClick?: () => void; tone?: 'neutral' | 'cyan' | 'violet' | 'gold'; style?: React.CSSProperties }) {
-  const c = tone === 'cyan' ? colors.avaCyan : tone === 'violet' ? colors.avaViolet : tone === 'gold' ? colors.signalGold : colors.textIce;
+  const c = tone === 'cyan' ? colors.avaCyan : tone === 'violet' ? colors.avaViolet : tone === 'gold' ? colors.signalGold : colors.lemtelBlue;
   return (
-    <button onClick={onClick} style={{
-      minHeight: 42,
-      padding: '10px 14px', borderRadius: radius.lg,
-      background: 'rgba(255,255,255,0.66)',
-      border: `1px solid ${c}55`,
-      color: c, fontSize: font.sm, fontWeight: 700, cursor: 'pointer',
-      ...style,
-    }}>
+    <button
+      onClick={onClick}
+      onMouseDown={(e) => ((e.currentTarget as HTMLButtonElement).style.transform = 'scale(0.97)')}
+      onMouseUp={(e) => ((e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)')}
+      onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)')}
+      style={{
+        minHeight: 44,
+        padding: '11px 16px',
+        borderRadius: radius.xl,
+        background: `linear-gradient(180deg, rgba(255,255,255,0.95) 0%, ${c}10 100%)`,
+        border: `1px solid ${c}40`,
+        color: c,
+        fontSize: font.sm,
+        fontWeight: 700,
+        letterSpacing: 0.2,
+        cursor: 'pointer',
+        boxShadow: `0 6px 16px -8px ${c}55, 0 1px 0 rgba(255,255,255,0.8) inset`,
+        transition: 'transform .15s ease, box-shadow .2s ease, background .2s ease',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 8,
+        justifyContent: 'center',
+        ...style,
+      }}
+    >
       {children}
     </button>
   );
