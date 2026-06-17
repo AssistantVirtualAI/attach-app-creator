@@ -39,7 +39,7 @@ export default function RecentsList({ extension, onCall }: Props) {
     if (!silent) { setLoading(true); setErr(null); }
     if (force) setRefreshing(true);
     try {
-      const data = force ? await ava.refreshCalls(50) : await ava.calls(50);
+      const data = force ? await ava.refreshCalls(50, { extension }) : await ava.calls(50, { extension });
       setRows(Array.isArray(data) ? data : []);
       setLastUpdated(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
     } catch (e: any) {
