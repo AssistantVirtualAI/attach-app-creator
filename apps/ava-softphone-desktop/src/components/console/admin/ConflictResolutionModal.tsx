@@ -52,7 +52,7 @@ export default function ConflictResolutionModal({
         onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%', maxWidth: 480,
-          background: '#0c1733',
+          background: c.bgCard,
           border: `1px solid ${(c as any).borderAI || c.border}`,
           borderRadius: 14, padding: 22, color: c.textIce,
           boxShadow: '0 30px 80px -20px rgba(0,0,0,0.85)',

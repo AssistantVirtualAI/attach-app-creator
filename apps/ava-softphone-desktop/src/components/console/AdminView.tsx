@@ -70,7 +70,7 @@ function ModalShell({ title, onClose, width = 460, children }: { title: string; 
         onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%', maxWidth: width, maxHeight: '88vh', overflowY: 'auto',
-          background: '#0c1733',
+          background: c.bgCard,
           backgroundImage: 'linear-gradient(160deg, rgba(35,214,255,0.06), rgba(122,76,255,0.05))',
           border: `1px solid ${(c as any).borderAI || c.border}`,
           borderRadius: 16, padding: 22,
@@ -655,12 +655,14 @@ function IvrsTable() {
   const [creating, setCreating] = useState<{ key: string } | null>(null);
   const { confirmConflict: confirmIvrConflict, modalNode: ivrConflictModal } = useConflictModal('ivr');
   const [saving, setSaving] = useState(false);
+  const [orgId, setOrgId] = useState<string>(LEMTEL_ORG);
 
   const reload = useCallback(async (forceSync = false) => {
     setLoading(true); setError(null);
     try {
       const me = await getMeContext();
       const orgId = me.organization_id || LEMTEL_ORG;
+      setOrgId(orgId);
       if (forceSync) {
         setSyncing(true);
         await supabase.functions.invoke('fusionpbx-proxy', {
@@ -686,11 +688,12 @@ function IvrsTable() {
   const save = async (ivr: any, changes: any) => {
     setSaving(true);
     try {
+      const { organization_id: _oid, ...cleanChanges } = changes || {};
       const { error: err } = await supabase.functions.invoke('fusionpbx-proxy', {
         body: {
           action: 'update-ivr',
-          organization_id: LEMTEL_ORG,
-          params: { ivr_menu_uuid: ivr.pbx_uuid, domain_uuid: LEMTEL_DOMAIN, ...changes },
+          organization_id: orgId,
+          params: { ivr_menu_uuid: ivr.pbx_uuid, domain_uuid: LEMTEL_DOMAIN, ...cleanChanges },
         },
       });
       if (err) throw err;
@@ -735,8 +738,9 @@ function IvrsTable() {
           if (match) setEditing(match);
         },
         submit: async ({ idempotencyKey: idk }) => {
+          const { organization_id: _oid, ...cleanForm } = form || {};
           const { error: err } = await supabase.functions.invoke('fusionpbx-proxy', {
-            body: { action: 'create-ivr', organization_id: orgId, idempotency_key: idk, params: { domain_uuid: LEMTEL_DOMAIN, ...form } },
+            body: { action: 'create-ivr', organization_id: orgId, idempotency_key: idk, params: { domain_uuid: LEMTEL_DOMAIN, ...cleanForm } },
           });
           if (err) throw err;
           setCreating(null);
@@ -781,12 +785,12 @@ function IvrsTable() {
         {!loading && !error && data.length === 0 && <div style={{ padding: 28, textAlign: 'center', color: c.mutedSilver, fontSize: 12 }}>No IVRs. Click "Sync from PBX".</div>}
         {!loading && error && <div style={{ padding: 28, textAlign: 'center', color: c.danger, fontSize: 12 }}>{error}</div>}
       </div>
-      {editing && <EditIvrModal ivr={editing} saving={saving} onClose={() => setEditing(null)} onSave={(changes) => save(editing, changes)} />}
+      {editing && <EditIvrModal ivr={editing} orgId={orgId} saving={saving} onClose={() => setEditing(null)} onSave={(changes) => save(editing, changes)} />}
       {creating && isAdmin && (
         <PbxEditSheet
           title="New Auto-Attendant"
           groups={IVR_GROUPS}
-          initial={{ ivr_menu_enabled: 'true', ivr_menu_timeout: 3000, ivr_menu_exit_action: 'hangup' }}
+          initial={{ ivr_menu_enabled: 'true', ivr_menu_timeout: 3000, ivr_menu_exit_action: 'hangup', organization_id: orgId }}
           rules={IVR_RULES}
           saving={saving}
           width={680}
@@ -799,7 +803,7 @@ function IvrsTable() {
   );
 }
 
-function EditIvrModal({ ivr, saving, onClose, onSave }: { ivr: any; saving: boolean; onClose: () => void; onSave: (changes: any) => void }) {
+function EditIvrModal({ ivr, orgId, saving, onClose, onSave }: { ivr: any; orgId: string; saving: boolean; onClose: () => void; onSave: (changes: any) => void }) {
   const initial = {
     ivr_menu_name: ivr.name || '',
     ivr_menu_extension: ivr.extension || '',
@@ -808,6 +812,7 @@ function EditIvrModal({ ivr, saving, onClose, onSave }: { ivr: any; saving: bool
     ivr_menu_timeout: ivr.timeout_ms || 3000,
     ivr_menu_enabled: ivr.enabled !== false ? 'true' : 'false',
     ivr_menu_exit_action: ivr.exit_action || 'hangup',
+    organization_id: orgId,
   };
   return (
     <PbxEditSheet

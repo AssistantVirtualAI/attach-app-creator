@@ -143,7 +143,7 @@ export default function CustomersView() {
           <span style={{ fontSize: 11, color: c.mutedSilver }}>{filtered.length} / {rows.length}</span>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={() => setEdit({ mode: 'create' })} style={{ padding: '8px 14px', borderRadius: 9, background: 'linear-gradient(180deg, #0033ff, #001ea8)', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>+ New customer</button>
+          <button onClick={() => setEdit({ mode: 'create' })} style={{ padding: '8px 14px', borderRadius: 9, background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`, border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>+ New customer</button>
           <button onClick={load} style={{ padding: '8px 14px', borderRadius: 9, background: 'transparent', border: `1px solid ${c.border}`, color: c.textIce, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>↻ Refresh</button>
         </div>
       </div>
@@ -243,7 +243,7 @@ function DomainModal({ state, onClose, onSaved }: { state: Exclude<EditState, nu
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 18 }}>
           <button onClick={onClose} style={btnGhost(c)}>Cancel</button>
-          <button onClick={save} disabled={saving} style={{ padding: '8px 16px', borderRadius: 9, background: 'linear-gradient(180deg, #0033ff, #001ea8)', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1 }}>{saving ? 'Saving…' : isEdit ? 'Save' : 'Create'}</button>
+          <button onClick={save} disabled={saving} style={{ padding: '8px 16px', borderRadius: 9, background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`, border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1 }}>{saving ? 'Saving…' : isEdit ? 'Save' : 'Create'}</button>
         </div>
       </div>
     </div>
