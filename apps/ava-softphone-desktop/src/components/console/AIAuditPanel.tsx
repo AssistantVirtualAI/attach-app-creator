@@ -193,7 +193,17 @@ export default function AIAuditPanel() {
               <h3 style={{ margin: 0, fontSize: 14 }}>AI request · {selected.request_type}</h3>
               <button onClick={() => setSelected(null)} style={{ background: 'transparent', border: 'none', color: c.mutedSilver, fontSize: 20, cursor: 'pointer' }}>✕</button>
             </div>
-            <pre style={{ background: 'rgba(0,0,0,0.35)', padding: 12, borderRadius: 8, fontSize: 11, overflow: 'auto', maxHeight: '60vh' }}>{JSON.stringify(selected, null, 2)}</pre>
+            <pre style={{ background: 'rgba(0,0,0,0.35)', padding: 12, borderRadius: 8, fontSize: 11, overflow: 'auto', maxHeight: '55vh' }}>{JSON.stringify(selected, null, 2)}</pre>
+            <button
+              onClick={() => retry(selected)}
+              disabled={retrying === selected.id || !selected.call_record_id || !selected.organization_id}
+              style={{
+                marginTop: 14, width: '100%', padding: '10px 12px', borderRadius: 8,
+                border: `1px solid ${c.border}`, background: 'rgba(80,140,255,0.18)',
+                color: c.textIce, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                opacity: retrying === selected.id ? 0.5 : 1,
+              }}
+            >{retrying === selected.id ? 'Retrying…' : '↻ Retry this request'}</button>
           </div>
         </div>
       )}
