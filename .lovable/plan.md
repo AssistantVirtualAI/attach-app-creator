@@ -1,48 +1,78 @@
-# Mobile Auth — Land on Auth + Mirror Desktop Look
+# Phase 2 — Chat sync + transcription fixes
 
-## Goal
-When opening the mobile app (especially in `/mobile-preview`), it must land **directly on the sign-in screen**, and that screen must visually match the desktop softphone's `SetupWizard` adapted to a phone width.
+## Reality check vs your spec
 
-## Part 1 — Land on Auth immediately in preview
+Your snippets reference a few things that don't exist in this codebase. I'll adapt to the real schema rather than introducing parallel tables.
 
-Today the mobile flow is: `SplashAva` (≈700 ms) → `PermissionGate` (if mic not granted) → `AuthScreen`. Inside the preview iframe this means we see the splash and the permission card first.
+- There is no `messages` table. Chat lives in `org_chat_messages` (per-channel) + `org_chat_channels` (per-org), mediated by the `org-chat` edge function.
+- There is no `call_transcripts` table or `pbx_call_records.transcription` column. Transcripts live in `pbx_call_transcripts`; `pbx_call_records.transcribed` is a boolean flag.
+- The desktop transcribe path uses the **Lovable AI Gateway (Gemini 2.5 Pro inline-audio)** today, not OpenAI Whisper / ElevenLabs. It's the recommended path on Lovable Cloud and is already wired through `fusionpbx-proxy` + `twilio-recording-proxy`. I'll keep it.
+- Mobile has only the AVA AI chat (no group chat screen), so "sync across mobile" applies only when/if a mobile group-chat screen is added — out of scope for this phase.
 
-Change in `apps/ava-softphone-mobile/src/MobileApp.tsx`:
-- Detect preview mode from `window.location.search` (`?preview=1`, already forwarded by `MobileIframe`).
-- When in preview:
-  - Skip the 700 ms splash delay (set `booting=false` immediately, still render `AuthScreen` if no creds).
-  - Skip `PermissionGate` (mic prompts don't work cleanly inside an iframe anyway) — treat `permsGateDone` as `true` by default.
-- No change to native/standalone behavior — splash and gate still run there.
+If you want me to actually rip out `org_chat_*` and replace it with a flat `messages` table, say so explicitly — that's a much bigger migration and will break the existing desktop + web chat.
 
-No backend or auth logic changes.
+## Bug 1 — OrgChatView messages get erased
 
-## Part 2 — Redesign mobile `AuthScreen` to match desktop
+File: `apps/ava-softphone-desktop/src/components/console/OrgChatView.tsx`
 
-Rewrite `apps/ava-softphone-mobile/src/screens/AuthScreen.tsx` to mirror desktop `SetupWizard.tsx`, adapted for narrow widths:
+- Replace the on-channel-switch effect so it: (a) keeps `messages` mounted while loading the next channel, (b) writes results through a **dedupe-by-id UPSERT merge** instead of `setMessages(data ?? [])`, (c) never clears `messages` on errors.
+- Realtime INSERT handler already appends; harden it with the same id-dedupe so optimistic local sends + realtime echoes don't double-render or get overwritten.
+- Realtime UPDATE handler keeps its id-map replacement (edits/reactions still work).
+- Audit the file for any `setMessages([])` and remove them (search confirms there are currently a couple of reset paths on channel switch + error).
 
-- **Theme**: dark navy background (`colors.bg` equivalent), ice-white text — replace today's light/blue gradient.
-- **Backdrop**: soft gold radial glow behind the logo (same `authGlow` animation hook used on desktop; add the keyframe to `apps/ava-softphone-mobile/src/styles.css` if missing).
-- **Brand block**: square Lemtel-style logo (reuse the existing `/ava-logo.png`, square 84 px with glow shadow) → "Lemtel" wordmark (22 px, weight 800) → small tagline line ("AI Business Phone System").
-- **Card**: centered, max-width 360, dark `bgCard`, 1 px border, 24 px radius, large drop shadow, `fadeIn` entry.
-- **Mode toggle**: same two-pill `Extension | Email` toggle; active pill uses the gold→cyan gradient with dark text, identical to desktop.
-- **Fields**: uppercase 10-px labels with 1.6 letter-spacing, dark inputs (`lemtel-input` style), 48 px height, rounded 12.
-- **Primary button**: gold/cyan gradient pill ("Sign in" / "Connecting…"), 50 px tall, identical to desktop primary.
-- **Helper copy**: same hint text as desktop ("Use the same SIP password…" / "Sign in with the email and password…").
-- **Manual SIP setup**: keep as a small ghost button below the primary (functionality unchanged).
-- **Footer**: "Built by AVA Statistic · assistantvirtualai.com" with gold accent — same as desktop.
+## Bug 2 — Realtime channel naming consistency
 
-All existing logic stays:
-- `submitEmail` → `softphone-auth` edge function.
-- `submitExtension` → `extension-signin` edge function.
-- Same `onAuthenticated(creds)` payload shape and error messages.
-- `SipConfigScreen` route still reachable via the ghost button.
+Today:
+- Web `src/hooks/useOrgChat.ts` → `org-chat-${channelId}`
+- Desktop `OrgChatView.tsx` → `chat:${activeId}`
 
-## Out of scope
-- No changes to desktop app, edge functions, RLS, or landing page.
-- No new design tokens beyond what's needed to reuse the desktop palette inside the mobile app's `styles.css`.
-- No splash redesign — only its timing is bypassed in preview mode.
+This is the real source of "not synced". Fix:
 
-## Files touched
-- `apps/ava-softphone-mobile/src/MobileApp.tsx` — preview-mode skip for splash + permission gate.
-- `apps/ava-softphone-mobile/src/screens/AuthScreen.tsx` — full visual rewrite (logic preserved).
-- `apps/ava-softphone-mobile/src/styles.css` — add `authGlow` keyframe and any missing `.lemtel-input` / `.lemtel-btn-primary` styles used by the new screen.
+- Standardize both clients on **`org-chat-${channelId}`** (per-channel — keeps the postgres_changes filter cheap and matches the existing web hook). A pure `org-chat-${organization_id}` channel would force every client to receive every other channel's traffic; I'm pushing back on the literal spec here.
+- Add presence to `OrgChatView`:
+  - Subscribe to `user_presence` with channel `org-chat-presence-${orgId}` (already partially there as `presence:${orgId}` — rename for consistency).
+  - Render a green dot next to any member whose `last_seen_at` is within 5 minutes.
+  - Pull the full member roster from `org_members` for the active org (currently the directory list only contains people who've messaged).
+- Message send already goes through `org-chat` edge function with the correct `channel_id` (channel rows carry `organization_id`); no insert-payload change needed.
+
+## Bug 3 — Call transcription end-to-end
+
+Edge function `supabase/functions/ai-transcribe-call/index.ts` already:
+- pulls audio via direct URL → Supabase Storage → `fusionpbx-proxy get-recording` → `twilio-recording-proxy`,
+- sends inline audio to Lovable AI Gateway (Gemini 2.5 Pro),
+- writes `pbx_call_transcripts` and flips `pbx_call_records.transcribed`.
+
+So no edge-function rewrite. The fixes are on the client:
+
+`apps/ava-softphone-desktop/src/components/RecordingsList.tsx`
+- "Transcribe & Analyze" button shows an inline spinner while the function runs.
+- On success, render the transcript text under the audio player (read from `pbx_call_transcripts.transcript_text`).
+- On error (including 402 credits-exhausted / 429 rate-limited / `no-audio`), show a clear inline error chip and a **Retry** button. No silent stub fallback in the UI.
+- Stop treating `{ stub: true }` responses as success — surface them with the `reason` so the user knows why no real transcript came back.
+
+## Bug 4 — Admin recordings page
+
+File: `src/pages/lemtel/admin/AdminRecordings.tsx`
+- Filter the recordings query by the selected org's `domain_uuid` (resolve via `pbx_domains.organization_id`).
+- Render rows with: caller, destination, date, duration, audio player, Transcribe button.
+- Audio loads via the `fusionpbx-proxy` `get-recording` action through a signed/base64 source already used elsewhere.
+- On audio load failure, show "Audio not available" with a Retry button that re-invokes `get-recording` (max 3 retries w/ backoff), instead of a dead `<audio>` element.
+
+## Out of scope / not changing
+- `supabase/config.toml`, `vite.config.ts`, `electron-builder.yml`, `.github/workflows/**` (per your instruction).
+- Replacing `org_chat_*` schema with a flat `messages` table.
+- Swapping the Lovable AI gateway transcriber for raw OpenAI/ElevenLabs.
+
+## Technical notes
+
+- Channel rename in `useOrgChat.ts` is already `org-chat-${channelId}` — only the desktop file changes name.
+- Dedupe merge helper:
+  ```ts
+  const merge = (prev: Message[], incoming: Message[]) => {
+    const seen = new Set(prev.map(m => m.id));
+    return [...prev, ...incoming.filter(m => !seen.has(m.id))];
+  };
+  ```
+- Presence query: `select user_id,last_seen_at from user_presence where organization_id = $org`; green when `now() - last_seen_at < interval '5 minutes'`.
+- Member roster: `select user_id, profile.full_name from org_members join profiles on profiles.id = user_id where org_id = $org`.
+- Recordings retry: wrap the `<audio>` `onError` to bump a per-row retry counter and re-request a fresh signed URL from `fusionpbx-proxy`.

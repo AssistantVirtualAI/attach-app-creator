@@ -85,16 +85,22 @@ export default function OrgChatView() {
     let presence: Record<string, any> = {};
     if (ids.length) {
       const { data: pres } = await supabase.from('user_presence')
-        .select('user_id,status,call_state').in('user_id', ids);
+        .select('user_id,status,call_state,last_seen_at').in('user_id', ids);
       (pres ?? []).forEach((p: any) => { presence[p.user_id] = p; });
     }
-    setMembers((spus ?? []).map((s: any) => ({
-      user_id: s.portal_user_id,
-      display_name: s.display_name || `Ext ${s.extension}`,
-      extension: s.extension,
-      status: presence[s.portal_user_id]?.status || 'offline',
-      call_state: presence[s.portal_user_id]?.call_state || null,
-    })));
+    const fiveMinAgo = Date.now() - 5 * 60 * 1000;
+    setMembers((spus ?? []).map((s: any) => {
+      const p = presence[s.portal_user_id];
+      const seen = p?.last_seen_at ? new Date(p.last_seen_at).getTime() : 0;
+      const isActive = seen >= fiveMinAgo;
+      return {
+        user_id: s.portal_user_id,
+        display_name: s.display_name || `Ext ${s.extension}`,
+        extension: s.extension,
+        status: isActive ? (p?.status && p.status !== 'offline' ? p.status : 'online') : 'offline',
+        call_state: p?.call_state || null,
+      };
+    }));
   };
 
   useEffect(() => {
@@ -155,7 +161,7 @@ export default function OrgChatView() {
   // Realtime presence
   useEffect(() => {
     if (!orgId) return;
-    const ch = supabase.channel(`presence:${orgId}`)
+    const ch = supabase.channel(`org-chat-presence-${orgId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'user_presence' }, () => {
         loadMembers(orgId);
       })
@@ -168,17 +174,37 @@ export default function OrgChatView() {
     if (!activeId) return;
     let cancelled = false;
     setTypingNames([]);
+    const mergeById = (prev: Message[], incoming: Message[]) => {
+      const seen = new Set(prev.map((m) => m.id));
+      const additions = incoming.filter((m) => m.channel_id === activeId && !seen.has(m.id));
+      if (additions.length === 0) return prev;
+      return [...prev, ...additions].sort((a, b) => a.created_at.localeCompare(b.created_at));
+    };
     (async () => {
-      const { data } = await supabase.from('org_chat_messages')
+      const { data, error } = await supabase.from('org_chat_messages')
         .select('id,channel_id,sender_id,sender_name,content,created_at,reactions,attachments,message_type,edited_at')
         .eq('channel_id', activeId).is('deleted_at', null)
-        .order('created_at', { ascending: true }).limit(200);
-      if (!cancelled) setMessages(data ?? []);
+        .order('created_at', { ascending: true }).limit(100);
+      if (cancelled) return;
+      if (error) {
+        // Do NOT clear messages on a fetch error — keep what we already have.
+        setErrMsg(`Messages error: ${error.message}`);
+        return;
+      }
+      // Merge by id so realtime inserts received during the fetch are preserved.
+      setMessages((prev) => {
+        const incoming = (data ?? []) as Message[];
+        const byId = new Map<string, Message>();
+        for (const m of prev) if (m.channel_id === activeId) byId.set(m.id, m);
+        for (const m of incoming) byId.set(m.id, m);
+        return Array.from(byId.values()).sort((a, b) => a.created_at.localeCompare(b.created_at));
+      });
     })();
 
-    const ch = supabase.channel(`chat:${activeId}`)
+    // Standardized realtime channel name (matches src/hooks/useOrgChat.ts).
+    const ch = supabase.channel(`org-chat-${activeId}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'org_chat_messages', filter: `channel_id=eq.${activeId}` },
-        (payload) => setMessages((m) => [...m, payload.new as Message]))
+        (payload) => setMessages((m) => mergeById(m, [payload.new as Message])))
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'org_chat_messages', filter: `channel_id=eq.${activeId}` },
         (payload) => setMessages((m) => m.map((x) => x.id === (payload.new as any).id ? (payload.new as Message) : x)))
       .subscribe();
