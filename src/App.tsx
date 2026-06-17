@@ -794,7 +794,9 @@ const App = () => (
                     </ClientProvider>
                   }
                 />
+                <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/client/:clientId" element={<ClientPortal />}>
+
                   <Route path="conversations" element={<ClientConversations />} />
                   <Route path="analytics" element={<ClientAnalytics />} />
                 </Route>
