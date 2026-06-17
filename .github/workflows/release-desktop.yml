@@ -13,22 +13,21 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Install & Build
+      - name: Install dependencies
         working-directory: apps/ava-softphone-desktop
-        run: |
-          npm install
-          npx electron-builder --mac --arm64 --x64 --publish never
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_IDENTITY_AUTO_DISCOVERY: false
-          EP_DRAFT: false
-          PUBLISH: never
-      - name: Upload to Release
+        run: npm install
+      - name: Build Vite + TypeScript
+        working-directory: apps/ava-softphone-desktop
+        run: npx vite build && npx tsc -p electron/tsconfig.json
+      - name: Package Mac
+        working-directory: apps/ava-softphone-desktop
+        run: npx electron-builder --mac --arm64 --x64 --publish never
+      - name: Create GitHub Release
         working-directory: apps/ava-softphone-desktop
         run: |
           gh release create ${{ github.ref_name }} \
             --title "Lemtel Telecom ${{ github.ref_name }}" \
-            --notes "Auto-release ${{ github.ref_name }}" \
+            --notes "Release ${{ github.ref_name }}" \
             --latest 2>/dev/null || true
           gh release upload ${{ github.ref_name }} \
             dist-electron/*.dmg \
@@ -36,5 +35,3 @@ jobs:
             --clobber 2>/dev/null || true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  build-env:
-    GH_TOKEN: ""
