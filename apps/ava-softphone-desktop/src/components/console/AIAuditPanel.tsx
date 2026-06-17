@@ -128,32 +128,37 @@ export default function AIAuditPanel() {
         <button onClick={load} style={{ padding: '7px 12px', borderRadius: 8, border: `1px solid ${c.border}`, background: 'transparent', color: c.textIce, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>↻</button>
       </div>
 
+      {toast && (
+        <div style={{
+          fontSize: 11.5, color: c.textIce, background: 'rgba(80,140,255,0.12)',
+          border: `1px solid ${c.border}`, borderRadius: 8, padding: '8px 12px',
+        }}>{toast}</div>
+      )}
+
       {loading ? <ListSkeleton rows={8} /> : filtered.length === 0 ? (
         <EmptyState icon="✨" title="No AI requests logged" hint="Every transcription and analysis request will appear here with its status and error code." />
       ) : (
         <div style={{ background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 12, overflow: 'hidden' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '150px 100px 1fr 100px 110px 70px 80px', padding: '10px 14px', fontSize: 10, color: c.mutedSilver, textTransform: 'uppercase', letterSpacing: 0.7, background: 'rgba(255,255,255,0.03)', borderBottom: `1px solid ${c.border}` }}>
-            <span>When</span><span>Type</span><span>Call / message</span><span>Error code</span><span>Provider</span><span>Latency</span><span>Status</span>
+          <div style={{ display: 'grid', gridTemplateColumns: '150px 90px 1fr 100px 110px 70px 80px 80px', padding: '10px 14px', fontSize: 10, color: c.mutedSilver, textTransform: 'uppercase', letterSpacing: 0.7, background: 'rgba(255,255,255,0.03)', borderBottom: `1px solid ${c.border}` }}>
+            <span>When</span><span>Type</span><span>Call / message</span><span>Error code</span><span>Provider</span><span>Latency</span><span>Status</span><span>Action</span>
           </div>
           {filtered.map((r, i) => (
-            <button
+            <div
               key={r.id}
-              onClick={() => setSelected(r)}
               style={{
                 width: '100%', display: 'grid',
-                gridTemplateColumns: '150px 100px 1fr 100px 110px 70px 80px',
+                gridTemplateColumns: '150px 90px 1fr 100px 110px 70px 80px 80px',
                 alignItems: 'center', gap: 8,
-                padding: '10px 14px', textAlign: 'left',
-                background: 'transparent', border: 'none',
-                color: c.textIce, fontSize: 11.5, cursor: 'pointer',
+                padding: '10px 14px',
+                color: c.textIce, fontSize: 11.5,
                 borderBottom: i === filtered.length - 1 ? 'none' : `1px solid ${c.border}`,
               }}
               onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(140,180,255,0.05)'; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
             >
-              <span style={{ color: c.mutedSilver, fontSize: 10.5 }}>{new Date(r.created_at).toLocaleString()}</span>
-              <span style={{ color: c.aiLight || c.textIce, fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.6 }}>{r.request_type}</span>
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <span onClick={() => setSelected(r)} style={{ color: c.mutedSilver, fontSize: 10.5, cursor: 'pointer' }}>{new Date(r.created_at).toLocaleString()}</span>
+              <span onClick={() => setSelected(r)} style={{ color: (c as any).aiLight || c.textIce, fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.6, cursor: 'pointer' }}>{r.request_type}</span>
+              <span onClick={() => setSelected(r)} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }}>
                 <span style={{ color: c.mutedSilver, fontSize: 10.5 }}>{r.call_record_id ? `#${r.call_record_id.slice(0, 10)}` : '—'}</span>
                 {r.message && <span style={{ color: c.textSub, marginLeft: 8 }}>{r.message}</span>}
               </span>
@@ -166,7 +171,17 @@ export default function AIAuditPanel() {
                 background: `${statusColor(r.status)}1f`, border: `1px solid ${statusColor(r.status)}55`,
                 textAlign: 'center',
               }}>{r.status}</span>
-            </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); retry(r); }}
+                disabled={retrying === r.id || !r.call_record_id || !r.organization_id}
+                title={!r.call_record_id ? 'No call id' : 'Re-queue this request'}
+                style={{
+                  padding: '5px 9px', borderRadius: 6, fontSize: 10, fontWeight: 700,
+                  border: `1px solid ${c.border}`, background: retrying === r.id ? 'rgba(80,140,255,0.25)' : 'rgba(80,140,255,0.12)',
+                  color: c.textIce, cursor: 'pointer',
+                  opacity: !r.call_record_id || !r.organization_id ? 0.4 : 1,
+                }}>{retrying === r.id ? '…' : '↻ Retry'}</button>
+            </div>
           ))}
         </div>
       )}
