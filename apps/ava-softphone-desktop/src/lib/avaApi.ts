@@ -521,6 +521,7 @@ async function bestEffortCdrSync(limit = 200, minIntervalMs = 30_000) {
         limit,
         page_size: Math.max(limit, 250),
         max_pages: 2,
+        from_beginning: true,
       }),
       });
     } catch (e) {
@@ -547,7 +548,7 @@ async function bestEffortRecentTelephonySync(limit = 200) {
           'apikey': BACKEND.anonKey,
           ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
         },
-        body: JSON.stringify({ action: 'sync-cdrs', organization_id: scope.organization_id, limit, page_size: Math.max(limit, 250), max_pages: 2 }),
+        body: JSON.stringify({ action: 'sync-cdrs', organization_id: scope.organization_id, limit, page_size: Math.max(limit, 250), max_pages: 2, from_beginning: true }),
       }),
       fetch(`${BACKEND.url}/functions/v1/fusionpbx-proxy`, {
         method: 'POST',
