@@ -105,17 +105,28 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
   };
 
   const submitEmail = async () => {
-    // Use Supabase Auth REST directly — there is no `softphone-auth` edge function.
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        apikey: SUPABASE_ANON,
-      },
-      body: JSON.stringify({ email: email.trim(), password }),
-    }).catch((e) => { throw new Error('network: ' + (e?.message || 'failed to fetch')); });
+    let res: Response;
+    try {
+      res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON },
+        body: JSON.stringify({ email: email.trim(), password }),
+      });
+    } catch (e: any) {
+      throw new AuthError({ step: 'network', code: 'fetch_failed', message: 'Cannot reach Supabase Auth', detail: e?.message || String(e) });
+    }
     const data = await res.json().catch(() => ({} as any));
-    if (!res.ok) throw new Error(data?.error_description || data?.msg || data?.error || `auth_${res.status}`);
+    if (!res.ok) {
+      throw new AuthError({
+        step: 'supabase-auth',
+        code: data?.error_code || data?.error || `http_${res.status}`,
+        message: data?.error_description || data?.msg || 'Sign-in rejected by Supabase Auth',
+        detail: JSON.stringify(data).slice(0, 300),
+      });
+    }
+    if (!data?.access_token) {
+      throw new AuthError({ step: 'token', code: 'no_token', message: 'Auth succeeded but no access_token returned' });
+    }
     onAuthenticated({
       portalUrl,
       email: data?.user?.email || email.trim(),
@@ -127,24 +138,36 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
   };
 
   const submitExtension = async () => {
-    // Edge functions are hosted on the Supabase project, not the portal domain.
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/extension-signin`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        apikey: SUPABASE_ANON,
-        Authorization: `Bearer ${SUPABASE_ANON}`,
-      },
-      body: JSON.stringify({
-        extension: extension.trim(),
-        password,
-        sip_domain: sipDomain.trim() || undefined,
-        platform: 'mobile',
-      }),
-    }).catch((e) => { throw new Error('network: ' + (e?.message || 'failed to fetch')); });
+    let res: Response;
+    try {
+      res = await fetch(`${SUPABASE_URL}/functions/v1/extension-signin`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: SUPABASE_ANON,
+          Authorization: `Bearer ${SUPABASE_ANON}`,
+        },
+        body: JSON.stringify({
+          extension: extension.trim(),
+          password,
+          sip_domain: sipDomain.trim() || undefined,
+          platform: 'mobile',
+        }),
+      });
+    } catch (e: any) {
+      throw new AuthError({ step: 'network', code: 'fetch_failed', message: 'Cannot reach extension-signin edge function', detail: e?.message || String(e) });
+    }
     const data = await res.json().catch(() => ({} as any));
-    if (!res.ok || !data?.access_token) {
-      throw new Error(data?.error || `signin_${res.status}`);
+    if (!res.ok) {
+      throw new AuthError({
+        step: 'edge-function',
+        code: data?.error || `http_${res.status}`,
+        message: data?.detail || data?.hint || 'extension-signin returned an error',
+        detail: JSON.stringify(data).slice(0, 300),
+      });
+    }
+    if (!data?.access_token) {
+      throw new AuthError({ step: 'token', code: 'no_token', message: 'Edge function returned no access_token', detail: JSON.stringify(data).slice(0, 300) });
     }
     onAuthenticated({
       portalUrl,
@@ -162,14 +185,22 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-    if (!validate()) return;
+    setError(null); setFailure(null);
+    if (!validate()) { setFailure({ step: 'validation', code: 'invalid_input', message: 'Please fix the highlighted fields.' }); return; }
     setBusy(true);
     try {
       if (mode === 'email') await submitEmail();
       else await submitExtension();
     } catch (e: any) {
-      setError(mapAuthError(e?.message));
+      if (e instanceof AuthError) {
+        setFailure({ step: e.step, code: e.code, message: e.message, detail: e.detail });
+        setError(mapAuthError(e.code + ' ' + e.message));
+      } else {
+        setFailure({ step: 'network', code: 'unknown', message: e?.message || 'Unknown error' });
+        setError(mapAuthError(e?.message));
+      }
+      // eslint-disable-next-line no-console
+      console.error('[AuthScreen] sign-in failed', { step: (e as any)?.step, code: (e as any)?.code, message: e?.message, detail: (e as any)?.detail });
     } finally {
       setBusy(false);
     }
