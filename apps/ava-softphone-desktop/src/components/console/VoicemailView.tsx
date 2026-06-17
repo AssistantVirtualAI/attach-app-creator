@@ -29,6 +29,7 @@ const SPEEDS = [1, 1.25, 1.5, 2] as const;
 export default function VoicemailView() {
   const [items, setItems] = useState<VoicemailItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>('all');
   const [sel, setSel] = useState<VoicemailItem | null>(null);
@@ -43,18 +44,20 @@ export default function VoicemailView() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const load = useCallback(async (silent = false) => {
+  const load = useCallback(async (silent = false, force = false) => {
     if (!silent) { setLoading(true); setError(null); }
+    if (force) setRefreshing(true);
     try {
-      const d = await ava.voicemails();
+      const d = force ? await ava.refreshVoicemails() : await ava.voicemails();
       setItems(Array.isArray(d) ? d : []);
     } catch (err: any) {
-      if (!silent) {
+      if (!silent || force) {
         setItems([]);
         setError(err?.message || 'Unable to load voicemail from the phone system.');
       }
     } finally {
       if (!silent) setLoading(false);
+      if (force) setRefreshing(false);
     }
   }, []);
 
@@ -181,6 +184,7 @@ export default function VoicemailView() {
           subtitle="Playback, AVA transcription, priority, and one-click handled state."
           accent={c.signalGold}
           icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="5.5" cy="12.5" r="4.5"/><circle cx="18.5" cy="12.5" r="4.5"/><line x1="5.5" y1="17" x2="18.5" y2="17"/></svg>}
+          right={<button onClick={() => load(true, true)} disabled={refreshing} style={{ ...chip(false), opacity: refreshing ? 0.55 : 1 }}>{refreshing ? 'SYNCING…' : 'SYNC NOW'}</button>}
         />
 
         <VoicemailGreetingCard />
