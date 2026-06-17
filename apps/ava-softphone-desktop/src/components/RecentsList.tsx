@@ -42,7 +42,7 @@ export default function RecentsList({ extension, onCall }: Props) {
       setRows(Array.isArray(data) ? data : []);
       setLastUpdated(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
     } catch (e: any) {
-      if (!silent) {
+      if (!silent || force) {
         setErr(e?.message || 'Unable to load live call records.');
         setRows([]);
       }
