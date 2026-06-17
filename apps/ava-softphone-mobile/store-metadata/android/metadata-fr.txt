@@ -1,0 +1,48 @@
+Titre de l'application
+AVA Softphone
+
+Description courte (80 caractères)
+Softphone d'entreprise léger : appels, files, enregistrements, IA, chat.
+
+Description complète
+AVA Softphone est le compagnon mobile léger de votre système téléphonique d'entreprise. Il se synchronise automatiquement avec votre PBX pour afficher en temps réel l'historique d'appels, les enregistrements transcrits par l'IA, l'activité des files d'attente, la messagerie vocale et un tableau de bord à l'échelle du domaine.
+
+Fonctionnalités clés :
+• Historique d'appels de l'entreprise en direct, rappel en un clic.
+• Tableau de bord du domaine avec total d'appels, répondus, manqués, top extensions et tendance 7 jours.
+• Files d'attente (lecture seule) : appels en attente, agents en ligne, SLA, attente moyenne.
+• Enregistrements d'appels avec transcription IA, sentiment et résumé.
+• Boîte vocale avec transcriptions.
+• Assistant IA AVA — posez n'importe quelle question sur votre téléphonie.
+• Notifications push pour appels entrants, appels manqués et messages vocaux.
+• Conçu pour les utilisateurs d'extension — sans surcharge d'admin.
+
+Confidentialité et sécurité :
+• Toutes les données téléphoniques sont limitées à votre organisation et votre extension.
+• Les enregistrements transitent via des URL signées à courte durée — aucun secret PBX sur l'appareil.
+• Vous pouvez supprimer votre compte directement dans l'app (Plus → Supprimer mon compte).
+
+Catégorie
+Affaires
+
+Tags
+softphone, téléphonie, voip, sip, enregistrement, transcription, ia, file, messagerie, telecom
+
+Contact
+help@avastatistic.ca
+
+Site web
+https://avastatistic.ca
+
+Politique de confidentialité
+https://avastatistic.ca/privacy
+
+Conditions d'utilisation
+https://avastatistic.ca/terms
+
+Sécurité des données (Play Console)
+• Microphone — Fonctionnalité d'appel (obligatoire)
+• Contacts — Fonctionnalité de l'application (facultatif, contrôlé par l'utilisateur)
+• Infos de compte — Gestion du compte
+• Activité téléphonique — Fonctionnalité d'appel
+• Aucune publicité / aucun pistage tiers

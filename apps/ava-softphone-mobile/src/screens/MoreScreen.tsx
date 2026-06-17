@@ -1,0 +1,98 @@
+import React, { useState } from 'react';
+import type { ImpactStyle } from '@capacitor/haptics';
+import { colors, font, radius, gradients } from '../lib/theme';
+import type { Creds } from '../lib/creds';
+import { Card, SectionTitle, SettingsRow } from '../components/ui/Primitives';
+import { LemtelMark, AvaBadge } from '../components/Brand';
+import RecordingsScreen from './RecordingsScreen';
+import VoicemailScreen from './VoicemailScreen';
+import MessagesScreen from './MessagesScreen';
+import ContactsScreen from './ContactsScreen';
+import SettingsScreen from './SettingsScreen';
+import DeleteAccountScreen from './DeleteAccountScreen';
+
+type Sub = null | 'recordings' | 'voicemail' | 'messages' | 'contacts' | 'settings' | 'delete';
+
+export default function MoreScreen({
+  creds, sp, onSignOut, haptic,
+}: { creds: Creds; sp: any; onSignOut: () => void; haptic: (s?: ImpactStyle) => Promise<void> }) {
+  const [sub, setSub] = useState<Sub>(null);
+
+  if (sub === 'recordings') return <SubPage onBack={() => setSub(null)} title="Recordings"><RecordingsScreen /></SubPage>;
+  if (sub === 'voicemail')  return <SubPage onBack={() => setSub(null)} title="Voicemail"><VoicemailScreen haptic={haptic} /></SubPage>;
+  if (sub === 'messages')   return <SubPage onBack={() => setSub(null)} title="Messages"><MessagesScreen haptic={haptic} /></SubPage>;
+  if (sub === 'contacts')   return <SubPage onBack={() => setSub(null)} title="Contacts"><ContactsScreen sp={sp} /></SubPage>;
+  if (sub === 'settings')   return <SubPage onBack={() => setSub(null)} title="Settings"><SettingsScreen creds={creds} sp={sp} onSignOut={onSignOut} /></SubPage>;
+  if (sub === 'delete')     return <SubPage onBack={() => setSub(null)} title="Delete account"><DeleteAccountScreen onDone={onSignOut} /></SubPage>;
+
+  return (
+    <div style={{ height: '100%', overflowY: 'auto', padding: '14px 14px 20px' }}>
+      <Card padded={true} accent="gold" style={{ marginBottom: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <LemtelMark size={42} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: font.md, fontWeight: 800, color: colors.textIce }}>{creds.displayName || creds.email}</span>
+              <AvaBadge compact />
+            </div>
+            <div style={{ fontSize: font.xs, color: colors.mutedSilver, marginTop: 3, fontFamily: 'JetBrains Mono, monospace' }}>
+              Ext {creds.extension} · {creds.sipDomain || 'AVA'}
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      <SectionTitle eyebrow="Communications" title="More features" />
+      <Card padded={false}>
+        <SettingsRow label="Call recordings" icon="◉" value="With AI transcribe" onPress={() => setSub('recordings')} />
+        <SettingsRow label="Voicemail" icon="✉" value="Inbox & greetings" onPress={() => setSub('voicemail')} />
+        <SettingsRow label="Messages" icon="💬" value="SMS conversations" onPress={() => setSub('messages')} />
+        <SettingsRow label="Contacts" icon="👥" value="Directory" onPress={() => setSub('contacts')} />
+      </Card>
+
+      <SectionTitle eyebrow="Account" title="Settings & privacy" />
+      <Card padded={false}>
+        <SettingsRow label="Settings" icon="⚙" onPress={() => setSub('settings')} />
+        <SettingsRow label="Privacy policy" icon="🛡" onPress={() => openExternal('https://avastatistic.ca/privacy')} />
+        <SettingsRow label="Terms of service" icon="📄" onPress={() => openExternal('https://avastatistic.ca/terms')} />
+        <SettingsRow label="Support" icon="❔" value="help@avastatistic.ca" onPress={() => openExternal('mailto:help@avastatistic.ca')} />
+      </Card>
+
+      <SectionTitle eyebrow="Danger zone" title="Account control" />
+      <Card padded={false}>
+        <SettingsRow label="Sign out" icon="⎋" onPress={onSignOut} />
+        <SettingsRow label="Delete my account" icon="🗑" onPress={() => setSub('delete')} />
+      </Card>
+
+      <div style={{ textAlign: 'center', marginTop: 18, fontSize: 10, color: colors.mutedSilver }}>
+        AVA Softphone · v1.0.0
+      </div>
+      <div style={{ height: 80 }} />
+    </div>
+  );
+}
+
+function openExternal(url: string) {
+  try { window.open(url, '_blank'); } catch {}
+}
+
+function SubPage({ onBack, title, children }: { onBack: () => void; title: string; children: React.ReactNode }) {
+  return (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10,
+        padding: '10px 14px 6px', borderBottom: `1px solid ${colors.border}`,
+        background: 'rgba(255,255,255,0.78)', backdropFilter: 'blur(14px)',
+      }}>
+        <button onClick={onBack} style={{
+          background: 'transparent', border: 'none', color: colors.lemtelBlue,
+          fontSize: 18, fontWeight: 800, cursor: 'pointer', padding: '6px 8px',
+        }}>‹</button>
+        <span style={{ fontSize: font.md, fontWeight: 800, color: colors.textIce }}>{title}</span>
+      </div>
+      <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        {children}
+      </div>
+    </div>
+  );
+}

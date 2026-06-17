@@ -120,6 +120,42 @@ export interface VoicemailEntry {
   organization_id?: string;
 }
 
+export interface QueueRow {
+  id: string;
+  name: string;
+  extension: string;
+  strategy: string;
+  waiting: number;
+  agentsOnline: number;
+  callsToday: number;
+  avgWaitSec: number;
+  slaPct: number;
+}
+
+export interface RecordingEntry {
+  id: string;
+  from: string;
+  to: string;
+  customer?: string;
+  startedAt: string;
+  durationSec: number;
+  hasTranscript: boolean;
+  summary?: string;
+}
+
+export interface DomainStats {
+  callsToday: number;
+  answeredToday: number;
+  missedToday: number;
+  voicemailsToday: number;
+  avgDurationSec: number;
+  activeExtensions: number;
+  last7Days: number[];
+  topExtensions: { extension: string; name?: string; calls: number }[];
+}
+
+export interface ChatReply { answer: string }
+
 /* ─── Mock data (fallback) ────────────────────────────────────── */
 
 const meMock: MeResponse = {
@@ -300,5 +336,43 @@ export const mobileApi = {
   ),
   setDnd: (enabled: boolean) => call<{ ok: true }>(
     '/mobile-settings-dnd', { method: 'POST', body: JSON.stringify({ enabled }) }, { ok: true },
+  ),
+
+  // Domain-wide stats for the mobile dashboard (read-only).
+  domainStats: () => call<DomainStats>('/mobile-domain-stats', undefined, {
+    callsToday: 24, answeredToday: 18, missedToday: 6, voicemailsToday: 3,
+    avgDurationSec: 142, activeExtensions: 8,
+    last7Days: [12, 18, 9, 22, 30, 14, 24],
+    topExtensions: [
+      { extension: '101', name: 'Marie T.',  calls: 12 },
+      { extension: '102', name: 'Alex M.',   calls: 9  },
+      { extension: '110', name: 'Reception', calls: 7  },
+    ],
+  }),
+
+  // Call queues — read-only list with live stats.
+  queues: () => call<QueueRow[]>('/mobile-queues', undefined, [
+    { id: 'q1', name: 'Sales',       extension: '600', strategy: 'ring-all',     waiting: 2, agentsOnline: 4, callsToday: 38, avgWaitSec: 42, slaPct: 88 },
+    { id: 'q2', name: 'Support',     extension: '601', strategy: 'longest-idle', waiting: 5, agentsOnline: 3, callsToday: 51, avgWaitSec: 78, slaPct: 71 },
+    { id: 'q3', name: 'After-hours', extension: '602', strategy: 'fewest-calls', waiting: 0, agentsOnline: 0, callsToday: 4,  avgWaitSec: 0,  slaPct: 0 },
+  ]),
+
+  // Recordings — calls with audio available.
+  recordings: () => call<RecordingEntry[]>('/mobile-recordings', undefined, [
+    { id: 'c1', from: '+1 514 555 0123', to: '+1 514 555 0100', customer: 'Marie Tremblay', startedAt: new Date(Date.now() - 36e5).toISOString(),    durationSec: 245, hasTranscript: true, summary: 'Renewal call, positive sentiment.' },
+    { id: 'c2', from: '+1 514 555 0100', to: '+1 438 555 9988', customer: 'Acme Corp',      startedAt: new Date(Date.now() - 5*36e5).toISOString(),  durationSec: 412, hasTranscript: true, summary: 'Demo reschedule discussion.' },
+  ]),
+
+  // Chatbot endpoint (Lovable AI Gateway via edge function).
+  chat: (message: string, history: { role: 'user' | 'assistant'; content: string }[] = []) =>
+    call<ChatReply>(
+      '/mobile-chat',
+      { method: 'POST', body: JSON.stringify({ message, history }) },
+      { answer: "I'm running in mock mode — connect to your AVA workspace to ask live questions about your PBX." },
+    ),
+
+  // GDPR / store-compliance: delete the signed-in user's account.
+  deleteAccount: () => call<{ ok: true }>(
+    '/mobile-delete-account', { method: 'POST', body: '{}' }, { ok: true },
   ),
 };

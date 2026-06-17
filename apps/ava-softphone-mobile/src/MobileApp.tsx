@@ -4,11 +4,11 @@ import { Capacitor } from '@capacitor/core';
 // Re-use battle-tested SIP hook from the desktop app
 import { useSoftphone } from './hooks/useSoftphone';
 import AuthScreen from './screens/AuthScreen';
-import HomeScreen from './screens/HomeScreen';
+import DashboardScreen from './screens/DashboardScreen';
 import CallsScreen from './screens/CallsScreen';
-import MessagesScreen from './screens/MessagesScreen';
-import AIScreen from './screens/AIScreen';
-import SettingsScreen from './screens/SettingsScreen';
+import AVAChatScreen from './screens/AVAChatScreen';
+import QueuesScreen from './screens/QueuesScreen';
+import MoreScreen from './screens/MoreScreen';
 import BottomTabs, { Tab } from './components/BottomTabs';
 import ActiveCallSheet from './components/ActiveCallSheet';
 import SplashAva from './components/SplashAva';
@@ -142,8 +142,8 @@ function AuthenticatedShell({
         onAction: (p) => {
           // Deep-link: tap a push to open the right tab.
           const kind = p.data?.kind;
-          if (kind === 'sms') setTab('messages');
-          else if (kind === 'voicemail' || kind === 'missed') setTab('calls');
+          if (kind === 'voicemail' || kind === 'missed' || kind === 'call') setTab('calls');
+          else if (kind === 'ava') setTab('ava');
         },
       });
 
@@ -195,11 +195,11 @@ function AuthenticatedShell({
       <audio ref={audioRef} autoPlay playsInline />
 
       <div key={tab} className="lemtel-page-enter" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        {tab === 'home'     && <HomeScreen onNavigate={setTab} haptic={haptic} />}
-        {tab === 'calls'    && <CallsScreen sp={sp} haptic={haptic} />}
-        {tab === 'messages' && <MessagesScreen haptic={haptic} />}
-        {tab === 'ai'       && <AIScreen />}
-        {tab === 'settings' && <SettingsScreen creds={creds} sp={sp} onSignOut={onSignOut} />}
+        {tab === 'home'   && <DashboardScreen onNavigate={setTab} haptic={haptic} />}
+        {tab === 'calls'  && <CallsScreen sp={sp} haptic={haptic} />}
+        {tab === 'ava'    && <AVAChatScreen />}
+        {tab === 'queues' && <QueuesScreen />}
+        {tab === 'more'   && <MoreScreen creds={creds} sp={sp} onSignOut={onSignOut} haptic={haptic} />}
       </div>
 
       <BottomTabs active={tab} onChange={(t) => { haptic(ImpactStyle.Light); setTab(t); }} />

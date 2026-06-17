@@ -57,6 +57,7 @@ import ClientAgentWidget from "./pages/ClientAgentWidget";
 import WidgetPrototype from "./pages/WidgetPrototype";
 import WidgetIframe from "./pages/WidgetIframe";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
+import Terms from "./pages/Terms";
 import BAAgreement from "./pages/BAAgreement";
 import Legal from "./pages/Legal";
 import Support from "./pages/Support";
@@ -581,6 +582,7 @@ const App = () => (
                   }
                 />
                 <Route path="/privacy" element={<PrivacyPolicy />} />
+                <Route path="/terms" element={<Terms />} />
                 <Route path="/support" element={<Support />} />
                 <Route path="/legal" element={<Legal />} />
                 <Route path="/docs" element={<Docs />} />

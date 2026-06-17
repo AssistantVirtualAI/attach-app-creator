@@ -1,30 +1,25 @@
 <!--
   Merge these keys into ios/App/App/Info.plist after running `npx cap add ios`.
-  Covers microphone, speaker (audio session), camera, contacts, push, and
-  background audio for VoIP. iOS doesn't require an explicit "speaker"
-  permission — the microphone permission unlocks the WebRTC audio session.
+  Required by Apple App Store for VoIP/softphone apps.
 -->
 
 <key>NSMicrophoneUsageDescription</key>
-<string>Lemtel AI Phone needs microphone access to make and receive calls.</string>
-
-<key>NSCameraUsageDescription</key>
-<string>Lemtel AI Phone uses the camera for video calls and profile photos.</string>
+<string>AVA Softphone needs microphone access to make and receive voice calls.</string>
 
 <key>NSContactsUsageDescription</key>
-<string>Lemtel AI Phone reads your contacts so you can dial them faster and see caller names.</string>
+<string>AVA Softphone reads your contacts so you can dial them faster and see caller names.</string>
 
 <key>NSSpeechRecognitionUsageDescription</key>
-<string>Lemtel AI Phone uses speech recognition to power AVA live transcription and assist.</string>
+<string>AVA Softphone uses speech recognition to power AI transcription of your call recordings.</string>
 
 <key>NSUserNotificationsUsageDescription</key>
-<string>Lemtel AI Phone uses notifications for incoming calls, missed calls, voicemails and messages.</string>
+<string>AVA Softphone uses notifications to alert you about incoming calls, missed calls and voicemails.</string>
 
 <key>NSLocalNetworkUsageDescription</key>
-<string>Lemtel AI Phone uses your local network to connect to the SIP server.</string>
+<string>AVA Softphone uses your local network to register with your SIP server for voice calls.</string>
 
 <key>NSFaceIDUsageDescription</key>
-<string>Use Face ID to quickly and securely unlock Lemtel AI Phone.</string>
+<string>Use Face ID to quickly and securely unlock AVA Softphone.</string>
 
 <key>UIBackgroundModes</key>
 <array>
@@ -37,6 +32,9 @@
 
 <key>UIRequiresPersistentWiFi</key>
 <true/>
+
+<key>ITSAppUsesNonExemptEncryption</key>
+<false/>
 
 <key>NSAppTransportSecurity</key>
 <dict>
