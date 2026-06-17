@@ -240,7 +240,7 @@ Deno.serve(async (req) => {
             { type: "text", text: "Transcribe this phone call verbatim in the original language spoken (French or English). Label speakers as Agent: and Caller: on separate lines. Include filler words. Return ONLY the transcript text, no preamble, no commentary, no markdown." },
             { type: "input_audio", input_audio: { data: b64, format: audioMime.split("/")[1] || "wav" } },
           ],
-        }),
+        }],
       }),
     });
     if (!aiRes.ok) {
