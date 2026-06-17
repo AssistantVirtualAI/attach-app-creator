@@ -140,7 +140,7 @@ function Stat({
         <Sparkline data={series || []} loading={loading} error={error || null} />
       </div>
       {error
-        ? <span style={{ fontSize: 11, color: '#ffe4e4', position: 'relative', fontWeight: 600 }}>Could not load · click to retry</span>
+        ? <span style={{ fontSize: 11, color: c.danger, position: 'relative', fontWeight: 600 }}>Could not load · click to retry</span>
         : hint && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.92)', position: 'relative' }}>{hint}</span>}
     </button>
   );

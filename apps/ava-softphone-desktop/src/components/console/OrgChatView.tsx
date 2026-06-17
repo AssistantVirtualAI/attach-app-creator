@@ -328,7 +328,7 @@ export default function OrgChatView() {
       }}>
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{icon} {label}</span>
         {unreadN > 0 && !active && (
-          <span style={{ background: '#ff5a5f', color: '#fff', fontSize: 10, padding: '1px 6px', borderRadius: 10, fontWeight: 700 }}>{unreadN}</span>
+          <span style={{ background: c.danger, color: '#fff', fontSize: 10, padding: '1px 6px', borderRadius: 10, fontWeight: 700 }}>{unreadN}</span>
         )}
       </button>
     );
@@ -398,7 +398,7 @@ export default function OrgChatView() {
               }
             }} style={{
               padding: '5px 12px', borderRadius: 8, border: `1px solid ${c.border}`,
-              background: 'rgba(34,211,154,0.15)', color: '#22d39a', cursor: 'pointer', fontSize: 11.5, fontWeight: 700,
+              background: 'rgba(34,211,154,0.15)', color: c.success, cursor: 'pointer', fontSize: 11.5, fontWeight: 700,
             }}>📞 {isActiveGroup ? 'Call group' : 'Call'}</button>
           )}
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('orgchat.searchPlaceholder')}
