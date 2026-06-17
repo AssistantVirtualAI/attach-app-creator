@@ -226,15 +226,24 @@ Deno.serve(async (req) => {
     await admin.from("pbx_call_records").update({
       analyzed: aiModel !== "stub",
       ai_processing: false,
-      raw_data: { ...((existingCall?.raw_data as Record<string, unknown>) || {}), ai: insights, ai_reason: aiReason },
+      raw_data: {
+        ...((existingCall?.raw_data as Record<string, unknown>) || {}),
+        ai: insights,
+        ai_model: aiModel,
+        transcript_provider: transcriptProvider,
+        transcript_text,
+        ai_reason: aiReason,
+      },
     }).eq("id", call_record_id);
 
     return new Response(JSON.stringify({
       ok: true, stub: aiModel === "stub", reason: aiReason,
+      ai_model: aiModel, transcript_provider: transcriptProvider,
       ...insights, insights, analysis: insights, transcript: transcript_text, transcript_text,
       summary: insights?.summary, sentiment: insights?.sentiment, topics: insights?.topics,
       action_items: insights?.action_items, jobId: crypto.randomUUID(),
     }), { headers: corsHeaders });
+
   } catch (e: any) {
     console.error("ai-analyze-call fatal", e);
     return new Response(JSON.stringify({ ok: false, error: e?.message || "analysis failed" }), { status: 200, headers: corsHeaders });
