@@ -94,6 +94,9 @@ export default function DataSafetyScreen() {
         </div>
       </Card>
 
+      {/* Retention controls */}
+      <RetentionControlsCard />
+
       {/* Security practices */}
       <Card padded={true}>
         <h3 style={{ fontSize: font.md, fontWeight: 800, color: colors.textIce, margin: '0 0 8px' }}>
