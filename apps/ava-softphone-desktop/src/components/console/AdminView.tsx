@@ -688,11 +688,12 @@ function IvrsTable() {
   const save = async (ivr: any, changes: any) => {
     setSaving(true);
     try {
+      const { organization_id: _oid, ...cleanChanges } = changes || {};
       const { error: err } = await supabase.functions.invoke('fusionpbx-proxy', {
         body: {
           action: 'update-ivr',
-          organization_id: LEMTEL_ORG,
-          params: { ivr_menu_uuid: ivr.pbx_uuid, domain_uuid: LEMTEL_DOMAIN, ...changes },
+          organization_id: orgId,
+          params: { ivr_menu_uuid: ivr.pbx_uuid, domain_uuid: LEMTEL_DOMAIN, ...cleanChanges },
         },
       });
       if (err) throw err;
