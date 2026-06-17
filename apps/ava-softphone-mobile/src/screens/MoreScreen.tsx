@@ -14,8 +14,9 @@ import PrivacyScreen from './PrivacyScreen';
 import DataSafetyScreen from './DataSafetyScreen';
 import PermissionsScreen from './PermissionsScreen';
 import SupportScreen from './SupportScreen';
+import AIAuditScreen from './AIAuditScreen';
 
-type Sub = null | 'recordings' | 'voicemail' | 'messages' | 'contacts' | 'settings' | 'delete' | 'privacy' | 'datasafety' | 'permissions' | 'support';
+type Sub = null | 'recordings' | 'voicemail' | 'messages' | 'contacts' | 'settings' | 'delete' | 'privacy' | 'datasafety' | 'permissions' | 'support' | 'aiaudit';
 
 export default function MoreScreen({
   creds, sp, onSignOut, haptic,
@@ -32,6 +33,7 @@ export default function MoreScreen({
   if (sub === 'datasafety')  return <SubPage onBack={() => setSub(null)} title="Data safety"><DataSafetyScreen /></SubPage>;
   if (sub === 'permissions') return <SubPage onBack={() => setSub(null)} title="Permissions"><PermissionsScreen /></SubPage>;
   if (sub === 'support')     return <SubPage onBack={() => setSub(null)} title="Support"><SupportScreen /></SubPage>;
+  if (sub === 'aiaudit')     return <SubPage onBack={() => setSub(null)} title="AI requests"><AIAuditScreen /></SubPage>;
 
   return (
     <div style={{ height: '100%', overflowY: 'auto', padding: '14px 14px 20px' }}>
@@ -64,6 +66,7 @@ export default function MoreScreen({
         <SettingsRow label="Permissions" icon="🔐" value="Mic, notifications, contacts" onPress={() => setSub('permissions')} />
         <SettingsRow label="Privacy" icon="🛡" value="How we use your data" onPress={() => setSub('privacy')} />
         <SettingsRow label="Data safety" icon="🗂" value="Store disclosures" onPress={() => setSub('datasafety')} />
+        <SettingsRow label="AI requests audit" icon="✨" value="Transcription & analysis log" onPress={() => setSub('aiaudit')} />
         <SettingsRow label="Terms of service" icon="📄" onPress={() => openExternal('https://avastatistic.ca/terms')} />
         <SettingsRow label="Support" icon="❔" value="support@avastatistic.ca" onPress={() => setSub('support')} />
       </Card>
