@@ -754,17 +754,18 @@ export const ava = {
   },
   markVoicemailRead: (id: string) =>
     call<{ ok: true }>(`/fn/${FN.fusionpbxProxy}`, { method: 'POST', body: JSON.stringify({ action: 'voicemail-read', id }) }, { ok: true }).catch(() => ({ ok: true as const })),
-  recordings: async (limit = 100, opts?: { scope?: 'mine' | 'org' }) => {
+  recordings: async (limit = 100, opts?: { scope?: 'mine' | 'org'; extension?: string | null }) => {
     if (MOCK) return SAMPLE_RECORDING_EMPTY;
     await bestEffortCdrSync(Math.max(limit, 200));
     try {
       const me = await getMeContext();
       const orgFilter = me.organization_id ? `&organization_id=eq.${me.organization_id}` : '';
       const scopeOrg = opts?.scope === 'org';
+      const scopedExtension = cleanText(opts?.extension || me.extension);
       const extFilter = scopeOrg
         ? ''
-        : me.extension
-          ? `&or=(extension.eq.${me.extension},caller_number.eq.${me.extension},destination_number.eq.${me.extension},source_number.eq.${me.extension})`
+        : scopedExtension
+          ? `&or=(extension.eq.${encodeURIComponent(scopedExtension)},caller_number.eq.${encodeURIComponent(scopedExtension)},destination_number.eq.${encodeURIComponent(scopedExtension)},source_number.eq.${encodeURIComponent(scopedExtension)})`
           : '&id=is.null';
       const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,organization_id,extension,extension_uuid,pbx_uuid,domain_uuid,domain_name,caller_name,caller_number,destination,destination_number,source_number,start_at,billsec,duration_seconds,has_recording,recording_path,recording_name,mos&has_recording=eq.true${orgFilter}${extFilter}&order=start_at.desc&limit=${limit}`;
       const res = await fetch(url, {
@@ -782,7 +783,7 @@ export const ava = {
       return [] as RecordingItem[];
     }
   },
-  refreshRecordings: async (limit = 100, opts?: { scope?: 'mine' | 'org' }) => {
+  refreshRecordings: async (limit = 100, opts?: { scope?: 'mine' | 'org'; extension?: string | null }) => {
     if (MOCK) return SAMPLE_RECORDING_EMPTY;
     await bestEffortRecentTelephonySync(Math.max(limit, 250));
     if (typeof window !== 'undefined') window.dispatchEvent(new Event('lemtel:recordings-updated'));
