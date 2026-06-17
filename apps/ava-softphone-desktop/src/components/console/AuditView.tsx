@@ -167,9 +167,12 @@ export default function AuditView() {
       )}
 
       {selected && <DetailDrawer row={selected} onClose={() => setSelected(null)} onRollback={async () => { await rollback(selected); setSelected(null); load(); }} />}
+      </>
+      )}
     </div>
   );
 }
+
 
 function actionColor(a: string) {
   if (a === 'create') return '#3fce8c';
