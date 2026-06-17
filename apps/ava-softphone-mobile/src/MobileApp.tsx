@@ -13,6 +13,8 @@ import BottomTabs, { Tab } from './components/BottomTabs';
 import ActiveCallSheet from './components/ActiveCallSheet';
 import SplashAva from './components/SplashAva';
 import PermissionGate from './components/PermissionGate';
+import DialerFab from './components/DialerFab';
+import { initBackgroundSync } from './lib/backgroundSync';
 import { useStoredCreds, Creds } from './lib/creds';
 import { gradients, colors } from './lib/theme';
 import { requestAllPermissions, checkAllPermissions } from './lib/permissions';
@@ -32,6 +34,8 @@ export default function MobileApp() {
       // Keep the AVA splash visible briefly for brand polish.
       setTimeout(() => setBooting(false), 700);
     });
+    // Register native background sync (no-op on web / when plugin missing).
+    initBackgroundSync().catch(() => {});
   }, []);
 
   if (loading || booting) return <SplashAva />;
@@ -204,6 +208,7 @@ function AuthenticatedShell({
 
       <BottomTabs active={tab} onChange={(t) => { haptic(ImpactStyle.Light); setTab(t); }} />
 
+      {!inCall && <DialerFab sp={sp} haptic={haptic} />}
       {inCall && <ActiveCallSheet sp={sp} haptic={haptic} />}
     </div>
   );
