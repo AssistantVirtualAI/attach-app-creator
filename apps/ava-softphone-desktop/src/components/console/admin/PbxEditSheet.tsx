@@ -10,7 +10,7 @@ const { colors: c } = theme;
 
 export type FieldType =
   | 'text' | 'number' | 'textarea' | 'select' | 'checkbox'
-  | 'password' | 'tts-greeting';
+  | 'password' | 'tts-greeting' | 'queue-agents';
 
 export interface FieldDef {
   key: string;
