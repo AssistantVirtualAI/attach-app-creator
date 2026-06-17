@@ -35,8 +35,10 @@ export default function LemtelPortalCalls({ scope = 'org' }: { scope?: 'org' | '
   const { toast } = useToast();
   const qc = useQueryClient();
   const [analyzing, setAnalyzing] = useState<string | null>(null);
+  const [stages, setStages] = useState<Record<string, { stage: TranscriptStage; detail?: string }>>({});
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+
   const sync = usePbxSync();
   const test = usePbxTestCdrEndpoint();
   const [diagOpen, setDiagOpen] = useState(false);
