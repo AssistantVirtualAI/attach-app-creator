@@ -251,11 +251,6 @@ function DesktopDownloadButtons() {
   );
 }
 
-function _unused_close() {
-  return null;
-    </div>
-  );
-}
 
 function Kpi({ label, value, Icon, color, loading }: { label: string; value: number; Icon: any; color: string; loading?: boolean }) {
   return (
