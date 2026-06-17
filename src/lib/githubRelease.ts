@@ -24,10 +24,12 @@ const BASE = `https://github.com/${REPO}/releases/latest/download`;
 
 // Hard-coded fallback URLs (used if API fails); these may 404 if the release
 // uses different filenames — the API path is preferred.
+// Hard-coded fallback URLs (used if API fails). Pin to the exact 2.3.14
+// asset filenames the publisher confirmed are live on GitHub Releases.
 export const FALLBACK_URLS = {
-  macArm: `${BASE}/Lemtel.Telecom-arm64.dmg`,
-  macIntel: `${BASE}/Lemtel.Telecom.dmg`,
-  windows: `${BASE}/Lemtel.Telecom.Setup.exe`,
+  macArm: `${BASE}/Lemtel.Telecom-2.3.14-arm64.dmg`,
+  macIntel: `${BASE}/Lemtel.Telecom-2.3.14.dmg`,
+  windows: `${BASE}/Lemtel.Telecom.Setup.2.3.14.exe`,
   linuxAppImage: `${BASE}/Lemtel.Telecom.AppImage`,
   linuxDeb: `${BASE}/Lemtel.Telecom.deb`,
 };
