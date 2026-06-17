@@ -154,6 +154,7 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
 
   return (
     <div style={wrap}>
+      <AccentSwitch accent={accent} onChange={setAccent} />
       <GoldGlow />
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 20px', position: 'relative', zIndex: 1 }}>
@@ -161,7 +162,8 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
 
         <div style={cardStyle}>
           <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <ModeToggle mode={mode} onChange={(m) => { setMode(m); setError(null); setFieldErrors({}); }} />
+            <ModeToggle mode={mode} accent={accent} onChange={(m) => { setMode(m); setError(null); setFieldErrors({}); }} />
+
 
             <Field label="Portal URL" value={portalUrl} onChange={setPortalUrl} type="url" />
             {mode === 'email' ? (
