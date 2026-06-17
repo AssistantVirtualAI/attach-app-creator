@@ -37,7 +37,7 @@ function displayError(e: any) {
 // so users don't have to re-download the same PBX audio every time they revisit.
 const audioCache = new Map<string, string>();
 
-export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string) => void }) {
+export default function RecordingsList({ onAnalyze, extension }: { onAnalyze?: (id: string) => void; extension?: string | null }) {
   const [items, setItems] = useState<RecordingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -53,7 +53,7 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
     if (!silent) { setLoading(true); setError(null); }
     if (force) setRefreshing(true);
     try {
-      const data = force ? await ava.refreshRecordings() : await ava.recordings();
+      const data = force ? await ava.refreshRecordings(100, { extension }) : await ava.recordings(100, { extension });
       setItems(Array.isArray(data) ? data : []);
     } catch (e: any) {
       if (!silent || force) {
@@ -64,7 +64,7 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
       if (!silent) setLoading(false);
       if (force) setRefreshing(false);
     }
-  }, []);
+  }, [extension]);
 
   const silentLoad = useCallback(() => { void load(true); }, [load]);
 
