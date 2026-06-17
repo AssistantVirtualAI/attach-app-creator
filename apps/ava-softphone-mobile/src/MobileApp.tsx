@@ -7,7 +7,7 @@ import AuthScreen from './screens/AuthScreen';
 import DashboardScreen from './screens/DashboardScreen';
 import CallsScreen from './screens/CallsScreen';
 import AVAChatScreen from './screens/AVAChatScreen';
-import QueuesScreen from './screens/QueuesScreen';
+import InboxScreen from './screens/InboxScreen';
 import MoreScreen from './screens/MoreScreen';
 import BottomTabs, { Tab } from './components/BottomTabs';
 import ActiveCallSheet from './components/ActiveCallSheet';
@@ -34,7 +34,7 @@ export default function MobileApp() {
   const initialTab = (() => {
     try {
       const t = new URLSearchParams(window.location.search).get('tab');
-      if (t === 'home' || t === 'calls' || t === 'ava' || t === 'queues' || t === 'more') return t as Tab;
+      if (t === 'home' || t === 'calls' || t === 'ava' || t === 'messages' || t === 'more') return t as Tab;
     } catch {}
     return 'home' as Tab;
   })();
@@ -220,11 +220,11 @@ function AuthenticatedShell({
       <audio ref={audioRef} autoPlay playsInline />
 
       <div key={tab} className="lemtel-page-enter" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        {tab === 'home'   && <DashboardScreen onNavigate={setTab} haptic={haptic} />}
-        {tab === 'calls'  && <CallsScreen sp={sp} haptic={haptic} />}
-        {tab === 'ava'    && <AVAChatScreen />}
-        {tab === 'queues' && <QueuesScreen />}
-        {tab === 'more'   && <MoreScreen creds={creds} sp={sp} onSignOut={onSignOut} haptic={haptic} />}
+        {tab === 'home'     && <DashboardScreen onNavigate={setTab as any} haptic={haptic} />}
+        {tab === 'calls'    && <CallsScreen sp={sp} haptic={haptic} />}
+        {tab === 'ava'      && <AVAChatScreen />}
+        {tab === 'messages' && <InboxScreen haptic={haptic} />}
+        {tab === 'more'     && <MoreScreen creds={creds} sp={sp} onSignOut={onSignOut} haptic={haptic} />}
       </div>
 
       <BottomTabs active={tab} onChange={(t) => { haptic(ImpactStyle.Light); setTab(t); }} />
