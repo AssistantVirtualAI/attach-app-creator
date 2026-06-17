@@ -63,12 +63,19 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [accent, setAccent] = useState<Accent>(loadAccent);
+
+  // Persist + cascade accent gradient as a CSS variable.
+  useEffect(() => {
+    saveAccent(accent);
+    document.documentElement.style.setProperty('--auth-accent', accentGradient(accent));
+  }, [accent]);
 
   if (screen === 'sip') {
     return <SipConfigScreen onSaved={onAuthenticated} onCancel={() => setScreen('login')} />;
   }
   if (screen === 'forgot') {
-    return <ForgotPasswordScreen initialEmail={email} onBack={() => setScreen('login')} />;
+    return <ForgotPasswordScreen initialEmail={email} accent={accent} onBack={() => setScreen('login')} />;
   }
 
   const base = portalUrl.replace(/\/$/, '');
