@@ -28,7 +28,7 @@ Deno.serve(async (req) => {
 
     const { data: sp } = await sb.from("pbx_softphone_users")
       .select("organization_id").eq("portal_user_id", u.user.id).maybeSingle();
-    if (!sp) return json({ error: "NO_SOFTPHONE_ACCOUNT" }, 404);
+    if (!sp) return json({ threads: [], items: [], noSoftphone: true });
     const orgId = sp.organization_id;
     const url = new URL(req.url);
 
