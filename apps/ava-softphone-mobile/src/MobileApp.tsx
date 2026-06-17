@@ -24,6 +24,11 @@ import { bootNative, onAppStateChange } from './lib/nativeBoot';
 import { configureMobileApi } from './lib/mobileApi';
 import { configureAudit, audit } from './lib/audit';
 
+const isPreviewMode = (() => {
+  try { return new URLSearchParams(window.location.search).get('preview') === '1'; }
+  catch { return false; }
+})();
+
 export default function MobileApp() {
   const { creds, setCreds, clearCreds, loading } = useStoredCreds();
   const initialTab = (() => {
@@ -34,7 +39,7 @@ export default function MobileApp() {
     return 'home' as Tab;
   })();
   const [tab, setTab] = useState<Tab>(initialTab);
-  const [booting, setBooting] = useState(true);
+  const [booting, setBooting] = useState(!isPreviewMode);
 
   useEffect(() => {
     bootNative().finally(() => {
@@ -62,10 +67,11 @@ export default function MobileApp() {
 function AuthenticatedShell({
   creds, tab, setTab, onSignOut,
 }: { creds: Creds; tab: Tab; setTab: (t: Tab) => void; onSignOut: () => void }) {
-  const [permsGateDone, setPermsGateDone] = useState<boolean | null>(null);
+  const [permsGateDone, setPermsGateDone] = useState<boolean | null>(isPreviewMode ? true : null);
 
   // Decide whether to show the onboarding permission gate.
   useEffect(() => {
+    if (isPreviewMode) return;
     let cancelled = false;
     (async () => {
       try {
