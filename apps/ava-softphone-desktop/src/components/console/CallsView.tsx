@@ -89,8 +89,8 @@ export default function CallsView({ scope = 'mine' }: { scope?: 'mine' | 'org' }
       table: 'pbx_call_records',
       organizationId: orgId,
       events: ['INSERT', 'UPDATE'],
-      debounceMs: 1800,
-      throttleMs: 10_000,
+      debounceMs: 400,
+      throttleMs: 2_000,
       shouldRefresh: (payload: any) => {
         if (scope === 'org') return true;
         const row = payload?.new || payload?.old || {};
