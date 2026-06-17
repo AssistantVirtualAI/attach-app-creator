@@ -85,6 +85,7 @@ import ContactUs from "./pages/ContactUs";
 import AuditLogs from "./pages/AuditLogs";
 import Download from "./pages/Download";
 import MobilePreview from "./pages/MobilePreview";
+import MobileEmbed from "./pages/MobileEmbed";
 
 // Lemtel module
 import { LemtelGuard } from "./pages/lemtel/LemtelGuard";
