@@ -285,8 +285,13 @@ autoPlay
                 )}
               </div>
               {itemErrors[r.id] && (
-                <div style={{ fontSize: 10, color: c.red, lineHeight: 1.35, padding: '4px 6px', background: 'rgba(239,68,68,0.08)', borderRadius: 6 }}>
-                  {itemErrors[r.id]}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: c.red, lineHeight: 1.35, padding: '4px 6px', background: 'rgba(239,68,68,0.08)', borderRadius: 6 }}>
+                  <span style={{ flex: 1 }}>{itemErrors[r.id]}</span>
+                  <button
+                    onClick={() => analyze(r)}
+                    disabled={working === r.id}
+                    style={{ background: 'transparent', border: `1px solid ${c.red}`, color: c.red, fontSize: 10, padding: '2px 8px', borderRadius: 6, cursor: working === r.id ? 'wait' : 'pointer' }}
+                  >Retry</button>
                 </div>
               )}
               {itemSuccess[r.id] && !itemErrors[r.id] && (
