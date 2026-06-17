@@ -136,11 +136,20 @@ function AuthenticatedShell({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   useEffect(() => { sp.setAudioEl(audioRef.current); }, [sp]);
 
-  // Configure the mobile API client with the signed-in portal + access token.
+  // Configure the mobile API client with the Supabase Edge Functions host
+  // (NOT the marketing portal URL — edge functions live on supabase.co).
   useEffect(() => {
+    const SUPABASE_URL =
+      (import.meta as any).env?.VITE_SUPABASE_URL ||
+      'https://gejxisrqtvxavbrfcoxz.supabase.co';
+    const SUPABASE_ANON =
+      (import.meta as any).env?.VITE_SUPABASE_PUBLISHABLE_KEY ||
+      (import.meta as any).env?.VITE_SUPABASE_ANON_KEY ||
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdlanhpc3JxdHZ4YXZicmZjb3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1MDMxNzQsImV4cCI6MjA3NzA3OTE3NH0.kaO-GslE99OCNrZ4_AMnbzGqya2azqz_UMZR34zZvvo';
     configureMobileApi({
-      portalUrl: (creds as any).portalUrl || 'https://avastatistic.ca',
+      portalUrl: SUPABASE_URL,
       accessToken: creds.accessToken || null,
+      anonKey: SUPABASE_ANON,
     });
     configureAudit(async () => creds.accessToken || null);
     if (creds.accessToken) audit('softphone.signed_in', creds.userId, { extension: creds.extension });
