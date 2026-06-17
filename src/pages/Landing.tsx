@@ -77,6 +77,7 @@ const Landing = () => {
         <div id="apps-showcase">
           <AppsShowcaseSection />
         </div>
+        <LandingDownloadSection />
         <div id="lemtel-demo">
           <LemtelInteractiveDemo />
         </div>
