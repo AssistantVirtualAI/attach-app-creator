@@ -248,10 +248,7 @@ function RetentionControlsCard() {
           label="Delete call history & recordings now"
           tone="danger"
           busy={busy === 'Delete call history & recordings now'}
-          onClick={() => {
-            if (!confirm('Permanently delete your call history and recordings from your workspace? This cannot be undone.')) return;
-            runAction('Delete call history & recordings now', async () => mobileApi.deleteAccount());
-          }}
+          onClick={() => setConfirm('delete')}
           help="Removes CDRs, recordings, transcripts, voicemails. Your account stays active."
         />
         <ActionBtn
@@ -266,7 +263,109 @@ function RetentionControlsCard() {
         />
         {msg && <div style={{ fontSize: 11, color: colors.textSub, lineHeight: 1.5 }}>{msg}</div>}
       </div>
+
+      {confirm === 'delete' && (
+        <RetentionConfirm
+          prefs={prefs}
+          onCancel={() => setConfirm(null)}
+          onExport={async () => {
+            await runAction('Export my data', () => fetch(`${(window as any).__AVA_PORTAL__ || ''}/functions/v1/export-user-data`, { method: 'POST' }).catch(() => null) as any);
+          }}
+          onConfirm={async () => {
+            setConfirm(null);
+            await runAction('Delete call history & recordings now', async () => mobileApi.deleteAccount());
+          }}
+        />
+      )}
     </Card>
+  );
+}
+
+function RetentionConfirm({ prefs, onCancel, onExport, onConfirm }: {
+  prefs: RetentionPrefs;
+  onCancel: () => void;
+  onExport: () => Promise<void>;
+  onConfirm: () => Promise<void>;
+}) {
+  const [ack, setAck] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const items = [
+    { label: 'Call history (CDRs)',  detail: `older than ${prefs.callHistoryDays} days` },
+    { label: 'Call recordings (audio)', detail: `older than ${prefs.recordingsDays} days` },
+    { label: 'AI transcripts',        detail: prefs.transcriptsEnabled ? `older than ${prefs.recordingsDays} days` : 'all transcripts (feature off)' },
+    { label: 'AI analysis (sentiment, topics)', detail: prefs.aiAnalysisEnabled ? `older than ${prefs.recordingsDays} days` : 'all analysis (feature off)' },
+    { label: 'Voicemail audio & transcripts',   detail: `older than ${prefs.voicemailDays} days` },
+  ];
+  return (
+    <div onClick={onCancel} style={{
+      position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(2,6,20,0.75)',
+      backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end',
+    }}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        background: '#0a1024', width: '100%', maxHeight: '88vh', overflowY: 'auto',
+        borderTopLeftRadius: 18, borderTopRightRadius: 18, padding: 18,
+        borderTop: `1px solid ${colors.border}`,
+      }}>
+        <h3 style={{ margin: 0, fontSize: font.md, color: colors.textIce }}>Confirm data deletion</h3>
+        <p style={{ fontSize: font.sm, color: colors.textSub, lineHeight: 1.5, marginTop: 6 }}>
+          The following data will be <strong style={{ color: colors.danger }}>permanently removed</strong> from your
+          workspace. This action cannot be undone. We recommend exporting first.
+        </p>
+
+        <div style={{ border: `1px solid ${colors.border}`, borderRadius: radius.md, overflow: 'hidden', marginTop: 10 }}>
+          {items.map((it, i) => (
+            <div key={it.label} style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10,
+              padding: '10px 12px', borderTop: i === 0 ? 'none' : `1px solid ${colors.border}`,
+              background: 'rgba(255,255,255,0.02)',
+            }}>
+              <div>
+                <div style={{ fontSize: font.sm, color: colors.textIce, fontWeight: 700 }}>{it.label}</div>
+                <div style={{ fontSize: 10.5, color: colors.mutedSilver, marginTop: 2 }}>Scope: {it.detail}</div>
+              </div>
+              <span style={{
+                fontSize: 9, fontWeight: 800, letterSpacing: 0.5, textTransform: 'uppercase',
+                padding: '2px 6px', borderRadius: 6,
+                color: colors.danger, background: 'rgba(220,38,38,0.15)', border: `1px solid ${colors.danger}55`,
+              }}>Delete</span>
+            </div>
+          ))}
+        </div>
+
+        <label style={{
+          display: 'flex', alignItems: 'center', gap: 8, marginTop: 14,
+          fontSize: font.sm, color: colors.textIce, cursor: 'pointer',
+        }}>
+          <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} />
+          I understand this is permanent and cannot be undone.
+        </label>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 14 }}>
+          <button onClick={async () => { setExporting(true); try { await onExport(); } finally { setExporting(false); } }}
+            disabled={exporting}
+            style={{
+              padding: '11px 12px', borderRadius: radius.md, border: `1px solid ${colors.lemtelBlue}`,
+              background: 'rgba(0,35,230,0.12)', color: colors.textIce, fontSize: font.sm, fontWeight: 700,
+              cursor: 'pointer', opacity: exporting ? 0.5 : 1,
+            }}>
+            {exporting ? 'Preparing export…' : '⬇ Export my data first'}
+          </button>
+          <button onClick={onConfirm} disabled={!ack} style={{
+            padding: '11px 12px', borderRadius: radius.md, border: 'none',
+            background: ack ? colors.danger : 'rgba(220,38,38,0.4)', color: '#fff',
+            fontSize: font.sm, fontWeight: 700, cursor: ack ? 'pointer' : 'not-allowed',
+          }}>
+            Delete everything now
+          </button>
+          <button onClick={onCancel} style={{
+            padding: '11px 12px', borderRadius: radius.md, border: `1px solid ${colors.border}`,
+            background: 'transparent', color: colors.textIce, fontSize: font.sm, fontWeight: 700, cursor: 'pointer',
+          }}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
