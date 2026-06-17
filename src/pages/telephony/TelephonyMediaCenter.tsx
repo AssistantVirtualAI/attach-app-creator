@@ -258,14 +258,24 @@ function RecordingsTab({ orgId, extension, search }: { orgId: string; extension:
                   <span className="font-mono">{r.caller_number ?? "—"} → {r.destination_number ?? "—"}</span>
                   <span className="text-muted-foreground ml-2">ext {r.extension ?? "—"} · {r.duration_seconds ?? 0}s · {r.start_at ? formatDistanceToNow(new Date(r.start_at), { addSuffix: true }) : ""}</span>
                 </div>
-                <div className="flex gap-1">
+                <div className="flex gap-1 items-center">
+                  {(() => {
+                    const live = stages[r.id];
+                    const transcript = { provider: r.transcript_provider, transcript_text: r.transcript };
+                    const stubT = isStubTranscript(transcript);
+                    const stage: TranscriptStage = live?.stage
+                      ?? (working === r.id ? 'transcribing'
+                        : r.transcribed && !stubT ? 'complete'
+                        : r.transcribed && stubT ? 'unavailable'
+                        : 'idle');
+                    return <TranscriptStagePill stage={stage} detail={live?.detail} compact />;
+                  })()}
                   {r.ai_sentiment && <Badge variant="outline">{r.ai_sentiment}</Badge>}
-                  {!r.transcribed && (
-                    <Button size="sm" variant="outline" onClick={() => transcribe(r.id)} disabled={working === r.id}>
-                      {working === r.id ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Sparkles className="h-3 w-3 mr-1" />}
-                      Transcrire
-                    </Button>
-                  )}
+                  <Button size="sm" variant="outline" onClick={() => transcribe(r.id)} disabled={working === r.id}>
+                    {working === r.id ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Sparkles className="h-3 w-3 mr-1" />}
+                    {r.transcribed ? 'Réessayer' : 'Transcrire'}
+                  </Button>
+
                   {r.recording_path && (
                     <>
                       <Button size="sm" variant="outline" onClick={() => sign(r)} disabled={working === r.id}>{working === r.id ? 'Chargement…' : 'Charger'}</Button>
