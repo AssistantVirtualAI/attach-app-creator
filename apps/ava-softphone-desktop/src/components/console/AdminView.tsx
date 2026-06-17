@@ -655,6 +655,7 @@ function IvrsTable() {
   const [creating, setCreating] = useState<{ key: string } | null>(null);
   const { confirmConflict: confirmIvrConflict, modalNode: ivrConflictModal } = useConflictModal('ivr');
   const [saving, setSaving] = useState(false);
+  const [orgId, setOrgId] = useState<string>(LEMTEL_ORG);
 
   const reload = useCallback(async (forceSync = false) => {
     setLoading(true); setError(null);
