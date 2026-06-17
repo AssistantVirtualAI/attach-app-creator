@@ -306,26 +306,41 @@ export default function CallsView({ scope = 'mine' }: { scope?: 'mine' | 'org' }
             )}
 
             {!insight && <div style={{ fontSize: 12, color: c.mutedSilver }}>Loading AVA insight…</div>}
-            {insight && (
+            {insight && (() => {
+              const transcript = { provider: insight?.transcript_provider, transcript_text: sel.transcript_text };
+              const stubT = isStubTranscript(transcript);
+              const q = estimateQuality(transcript, { ai_model: insight?.ai_model, summary: insight?.summary, quality_score: insight?.qualityScore }, sel.durationSec);
+              const stageView: TranscriptStage = analyzing ? stage.stage : stubT ? 'unavailable' : insight?.summary ? 'complete' : 'idle';
+              return (
               <>
+                <Panel title="Status" accent={c.avaCyan}>
+                  <div style={{ fontSize: 12, color: c.textIce, marginBottom: 6 }}>{STAGE_LABEL[stageView]}{stage.detail ? ` · ${stage.detail}` : ''}</div>
+                  {stubT && (
+                    <div style={{ fontSize: 11, color: c.warning, marginBottom: 6 }}>
+                      Le fichier audio n'a pas pu être récupéré — l'analyse n'est qu'une métadonnée. Cliquez « Retry transcription » une fois l'enregistrement synchronisé.
+                    </div>
+                  )}
+                </Panel>
                 <Panel title="AI Summary" accent={c.avaViolet}>
-                  <p style={{ fontSize: 12, lineHeight: 1.55, color: c.textIce, margin: '0 0 10px' }}>{insight.summary}</p>
+                  <p style={{ fontSize: 12, lineHeight: 1.55, color: c.textIce, margin: '0 0 10px' }}>{stubT ? 'Transcript not yet available.' : insight.summary}</p>
                   {(sel.hasRecording || sel.transcript_text) && (
                     <button
                       onClick={async () => {
                         setAnalyzing(true);
+                        setStage({ stage: 'downloading' });
                         try {
                           const { supabase } = await import('../../lib/supabaseClient');
-                          const { data, error } = await supabase.functions.invoke('ai-analyze-call', {
-                            body: { call_record_id: sel.id, organization_id: orgId },
+                          const result = await runTranscribeAndAnalyze({
+                            invoke: async (name, body) => await supabase.functions.invoke(name, { body }),
+                            callRecordId: sel.id,
+                            organizationId: orgId,
+                            onStage: (s, detail) => setStage({ stage: s, detail }),
                           });
-                          if (error) throw error;
-                          if ((data as any)?.insight) setInsight((data as any).insight);
-                          else {
-                            const fresh = await ava.callDetail(sel.id).catch(() => null);
-                            if (fresh) setInsight(fresh);
-                          }
+                          const fresh = await ava.callDetail(sel.id).catch(() => null);
+                          if (fresh) setInsight(fresh);
+                          if (result.stage === 'failed') setInsight((prev: any) => ({ ...(prev || {}), summary: `Échec: ${result.reason || 'inconnu'}` }));
                         } catch (e: any) {
+                          setStage({ stage: 'failed', detail: e?.message });
                           setInsight((prev: any) => ({ ...(prev || {}), summary: `Analysis failed: ${e?.message || 'unknown error'}` }));
                         } finally { setAnalyzing(false); }
                       }}
@@ -334,11 +349,22 @@ export default function CallsView({ scope = 'mine' }: { scope?: 'mine' | 'org' }
                         padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700,
                         background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`,
                         border: 'none', color: '#fff', cursor: 'pointer', opacity: analyzing ? 0.6 : 1,
-                      }}>{analyzing ? 'Analyzing…' : '🧠 Run AI analysis'}</button>
+                      }}>{analyzing ? STAGE_LABEL[stage.stage] : stubT ? '↻ Retry transcription' : '🧠 Re-analyze'}</button>
                   )}
                 </Panel>
                 <Panel title="Quality" accent={c.signalGold}>
-                  <div style={{ fontSize: 22, fontWeight: 700, color: c.signalGold, fontFamily: 'JetBrains Mono, monospace' }}>{insight.qualityScore}<span style={{ fontSize: 11, color: c.mutedSilver }}> /100</span></div>
+                  <div style={{ fontSize: 22, fontWeight: 700, color: c.signalGold, fontFamily: 'JetBrains Mono, monospace' }}>
+                    {q.total}<span style={{ fontSize: 11, color: c.mutedSilver }}> /100</span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginTop: 8, fontSize: 10.5, color: c.mutedSilver }}>
+                    <div>Transcript {q.parts.transcriptLength}/40</div>
+                    <div>Segments {q.parts.speakerSegments}/25</div>
+                    <div>Silence {q.parts.silenceRatio}/15</div>
+                    <div>Summary {q.parts.aiSummary}/20</div>
+                  </div>
+                  {q.reasons.length > 0 && (
+                    <div style={{ fontSize: 10.5, color: c.warning, marginTop: 6 }}>{q.reasons.join(' · ')}</div>
+                  )}
                 </Panel>
                 <Panel title="Topics" accent={c.avaCyan}>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -353,7 +379,9 @@ export default function CallsView({ scope = 'mine' }: { scope?: 'mine' | 'org' }
                   {(!insight.actionItems || insight.actionItems.length === 0) && <span style={{ fontSize: 12, color: c.mutedSilver }}>No action items detected.</span>}
                 </Panel>
               </>
-            )}
+              );
+            })()}
+
           </div>
         </aside>
       )}
