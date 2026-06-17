@@ -547,20 +547,23 @@ async function bestEffortCdrSync(limit = 200, minIntervalMs = 30_000, force = fa
   return cdrSyncInFlight;
 }
 
-async function bestEffortRecentTelephonySync(limit = 200) {
+async function bestEffortRecentTelephonySync(limit = 200, throwOnFailure = false) {
   try {
     const me = await getMeContext();
     const scope = {
       organization_id: me.organization_id || undefined,
       extension: me.extension || undefined,
     };
-    await Promise.allSettled([
+    const results = await Promise.allSettled([
       invokeFusionSync({ action: 'sync-cdrs', organization_id: scope.organization_id, limit, page_size: Math.max(limit, 250), max_pages: 2, from_beginning: true }),
       invokeFusionSync({ action: 'sync-voicemail-messages', ...scope, params: { extension: scope.extension, page_size: Math.max(limit, 200), max_pages: 1 } }),
       invokeFusionSync({ action: 'list-recordings', ...scope, limit, params: { extension: scope.extension, limit } }),
     ]);
+    const failed = results.find((r) => r.status === 'rejected') as PromiseRejectedResult | undefined;
+    if (throwOnFailure && failed) throw failed.reason;
   } catch (e) {
     console.warn('[AVA] recent telephony sync failed', e);
+    if (throwOnFailure) throw e;
   }
 }
 
@@ -747,7 +750,7 @@ export const ava = {
   },
   refreshVoicemails: async (limit = 50, opts?: { extension?: string | null }) => {
     if (MOCK) return SAMPLE_VOICEMAIL_EMPTY;
-    await bestEffortRecentTelephonySync(Math.max(limit, 250));
+    await bestEffortRecentTelephonySync(Math.max(limit, 250), true);
     if (typeof window !== 'undefined') window.dispatchEvent(new Event('lemtel:phone-sync-complete'));
     const rows = await readCallRecordRows(Math.max(limit, 200), opts);
     return rows.filter(isVoicemailLike).map(mapCdrToVoicemail).slice(0, limit);
@@ -785,7 +788,7 @@ export const ava = {
   },
   refreshRecordings: async (limit = 100, opts?: { scope?: 'mine' | 'org'; extension?: string | null }) => {
     if (MOCK) return SAMPLE_RECORDING_EMPTY;
-    await bestEffortRecentTelephonySync(Math.max(limit, 250));
+    await bestEffortRecentTelephonySync(Math.max(limit, 250), true);
     if (typeof window !== 'undefined') window.dispatchEvent(new Event('lemtel:recordings-updated'));
     const rows = await readCallRecordRows(Math.max(limit, 300), opts);
     return rows
