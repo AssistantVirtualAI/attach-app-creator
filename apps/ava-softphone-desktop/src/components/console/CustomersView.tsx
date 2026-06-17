@@ -30,6 +30,10 @@ export default function CustomersView() {
   const [syncing, setSyncing] = useState<string | null>(null);
   const [edit, setEdit] = useState<EditState>(null);
 
+  const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'enabled' | 'disabled'>('all');
+  const [linkFilter, setLinkFilter] = useState<'all' | 'linked' | 'unlinked'>('all');
+
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
