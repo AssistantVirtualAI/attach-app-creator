@@ -41,9 +41,16 @@ export default function CallsView({ scope = 'mine' }: { scope?: 'mine' | 'org' }
   const [query, setQuery] = useState('');
   const [sel, setSel] = useState<CallRecord | null>(null);
   const [insight, setInsight] = useState<any>(null);
+  const [analyzing, setAnalyzing] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [audioLoading, setAudioLoading] = useState(false);
   const [audioError, setAudioError] = useState<string | null>(null);
+  const [narrow, setNarrow] = useState(typeof window !== 'undefined' && window.innerWidth < 820);
+  useEffect(() => {
+    const onResize = () => setNarrow(window.innerWidth < 820);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -82,8 +89,8 @@ export default function CallsView({ scope = 'mine' }: { scope?: 'mine' | 'org' }
       table: 'pbx_call_records',
       organizationId: orgId,
       events: ['INSERT', 'UPDATE'],
-      debounceMs: 1800,
-      throttleMs: 10_000,
+      debounceMs: 400,
+      throttleMs: 2_000,
       shouldRefresh: (payload: any) => {
         if (scope === 'org') return true;
         const row = payload?.new || payload?.old || {};
@@ -213,19 +220,32 @@ export default function CallsView({ scope = 'mine' }: { scope?: 'mine' | 'org' }
         </div>}
       </div>
 
-      <aside style={{ width: 390, flexShrink: 0, borderLeft: `1px solid ${c.border}`, background: c.deepPanel, padding: '24px 22px', overflowY: 'auto' }}>
-        {!sel && (
-          <EmptyState
-            icon="CDR"
-            title="Pick a call"
-            hint="Select a call to view recording playback, transcript, and AVA insights."
-            accent={c.avaCyan}
-          />
-        )}
-        {sel && (
-          <>
-            <div style={{ fontSize: 11, color: c.signalGold, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 6 }}>
-              Call Detail
+      {sel && (
+        <aside
+          onClick={(e) => { if (narrow && e.target === e.currentTarget) setSel(null); }}
+          style={narrow ? {
+            position: 'fixed', inset: 0, zIndex: 9000,
+            background: 'rgba(2,6,20,0.65)', backdropFilter: 'blur(6px)',
+            display: 'flex', justifyContent: 'flex-end',
+          } : {
+            width: 390, flexShrink: 0, borderLeft: `1px solid ${c.border}`,
+            background: c.deepPanel, padding: '24px 22px', overflowY: 'auto',
+          }}
+        >
+          <div style={narrow ? {
+            width: 'min(420px, 100%)', height: '100%', background: c.deepPanel,
+            padding: '20px 18px', overflowY: 'auto', boxShadow: '-20px 0 60px rgba(0,0,0,0.5)',
+          } : { width: '100%' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <div style={{ fontSize: 11, color: c.signalGold, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase' }}>
+                Call Detail
+              </div>
+              <button onClick={() => setSel(null)} aria-label="Close" style={{
+                width: 28, height: 28, borderRadius: 8, border: `1px solid ${c.border}`,
+                background: 'transparent', color: c.textSub, cursor: 'pointer', fontSize: 13,
+              }}>✕</button>
             </div>
             <h2 style={{ fontSize: 18, color: c.textIce, margin: '0 0 4px' }}>{sel.customer || sel.from || sel.to || 'Unknown caller'}</h2>
             <div style={{ fontSize: 11, color: c.mutedSilver, marginBottom: 18 }}>
@@ -261,7 +281,33 @@ export default function CallsView({ scope = 'mine' }: { scope?: 'mine' | 'org' }
             {insight && (
               <>
                 <Panel title="AI Summary" accent={c.avaViolet}>
-                  <p style={{ fontSize: 12, lineHeight: 1.55, color: c.textIce, margin: 0 }}>{insight.summary}</p>
+                  <p style={{ fontSize: 12, lineHeight: 1.55, color: c.textIce, margin: '0 0 10px' }}>{insight.summary}</p>
+                  {(sel.hasRecording || sel.transcript_text) && (
+                    <button
+                      onClick={async () => {
+                        setAnalyzing(true);
+                        try {
+                          const { supabase } = await import('../../lib/supabaseClient');
+                          const { data, error } = await supabase.functions.invoke('ai-analyze-call', {
+                            body: { call_record_id: sel.id, organization_id: orgId },
+                          });
+                          if (error) throw error;
+                          if ((data as any)?.insight) setInsight((data as any).insight);
+                          else {
+                            const fresh = await ava.callDetail(sel.id).catch(() => null);
+                            if (fresh) setInsight(fresh);
+                          }
+                        } catch (e: any) {
+                          setInsight((prev: any) => ({ ...(prev || {}), summary: `Analysis failed: ${e?.message || 'unknown error'}` }));
+                        } finally { setAnalyzing(false); }
+                      }}
+                      disabled={analyzing}
+                      style={{
+                        padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700,
+                        background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`,
+                        border: 'none', color: '#fff', cursor: 'pointer', opacity: analyzing ? 0.6 : 1,
+                      }}>{analyzing ? 'Analyzing…' : '🧠 Run AI analysis'}</button>
+                  )}
                 </Panel>
                 <Panel title="Quality" accent={c.signalGold}>
                   <div style={{ fontSize: 22, fontWeight: 700, color: c.signalGold, fontFamily: 'JetBrains Mono, monospace' }}>{insight.qualityScore}<span style={{ fontSize: 11, color: c.mutedSilver }}> /100</span></div>
@@ -280,9 +326,9 @@ export default function CallsView({ scope = 'mine' }: { scope?: 'mine' | 'org' }
                 </Panel>
               </>
             )}
-          </>
-        )}
-      </aside>
+          </div>
+        </aside>
+      )}
     </div>
   );
 }
