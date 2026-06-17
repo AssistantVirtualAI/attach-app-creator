@@ -6,7 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { QRCodeSVG } from 'qrcode.react';
 import { supabase } from '@/integrations/supabase/client';
 
-const GH_REPO = 'lemtel-telecom/desktop-releases';
+const GH_REPO = 'AssistantVirtualAI/attach-app-creator';
 
 function fmtSize(b?: number) {
   if (!b) return '';
