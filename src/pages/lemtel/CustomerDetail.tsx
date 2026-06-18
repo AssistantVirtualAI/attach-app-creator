@@ -43,9 +43,16 @@ export default function CustomerDetail() {
   const [importing, setImporting] = useState(false);
   const [importReport, setImportReport] = useState<any>(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [ivrOpen, setIvrOpen] = useState(false);
+  const [rgOpen, setRgOpen] = useState(false);
+  const [queueOpen, setQueueOpen] = useState(false);
+  const [createdCreds, setCreatedCreds] = useState<any>(null);
+  const genPass = (len = 14) => Array.from(crypto.getRandomValues(new Uint8Array(len))).map(b => 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'[b % 54]).join('');
+  const genPin = () => String(Math.floor(1000 + Math.random() * 9000));
   const [addForm, setAddForm] = useState({
-    extension: '', name: '', email: '',
-    sip_password: '', assign_phone_number: '', send_welcome_email: true,
+    extension: '', firstName: '', lastName: '', email: '', phone: '',
+    sip_password: '', caller_id_number: '', vm_enabled: true, vm_pin: '',
+    assign_phone_number: '', send_welcome_email: true,
   });
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
