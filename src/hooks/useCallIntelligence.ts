@@ -1,8 +1,27 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
+export interface AuditEntry {
+  id: string;
+  run_id: string;
+  event: string;
+  status: string;
+  pipeline: string | null;
+  ai_model: string | null;
+  prompt_version: string | null;
+  forced: boolean;
+  triggered_by: string | null;
+  duration_ms: number | null;
+  error: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export type AnalysisStatus = "queued" | "processing" | "analyzed" | "pending_sync" | "missing" | "failed";
+
 export interface CallIntelligence {
-  status: "cached" | "created" | "regenerated" | "pending_sync" | "missing";
+  status: "cached" | "created" | "regenerated" | "pending_sync" | "missing" | "processing";
+  analysisStatus: AnalysisStatus;
   transcript: string | null;
   summary: string | null;
   sentiment: string | null;
@@ -17,10 +36,15 @@ export interface CallIntelligence {
   risks: string[];
   sales_opportunities: string[];
   escalation_needed: boolean;
+  skipped_reason: string | null;
+  outputs_present: { transcript: boolean; insight: boolean };
+  last_processed_at: string | null;
+  audit: AuditEntry[];
 }
 
 const EMPTY: CallIntelligence = {
   status: "missing",
+  analysisStatus: "missing",
   transcript: null,
   summary: null,
   sentiment: null,
@@ -35,10 +59,24 @@ const EMPTY: CallIntelligence = {
   risks: [],
   sales_opportunities: [],
   escalation_needed: false,
+  skipped_reason: null,
+  outputs_present: { transcript: false, insight: false },
+  last_processed_at: null,
+  audit: [],
 };
 
+async function fetchAudit(callId: string): Promise<AuditEntry[]> {
+  const { data } = await supabase
+    .from("call_intelligence_audit" as any)
+    .select("*")
+    .eq("call_record_id", callId)
+    .order("created_at", { ascending: false })
+    .limit(20);
+  return (data as any[]) ?? [];
+}
+
 async function loadCached(callId: string): Promise<CallIntelligence | null> {
-  const [{ data: insight }, { data: tr }] = await Promise.all([
+  const [{ data: insight }, { data: tr }, audit] = await Promise.all([
     supabase.from("pbx_ai_insights").select("*").eq("call_record_id", callId).maybeSingle(),
     supabase
       .from("pbx_call_transcripts")
@@ -47,24 +85,32 @@ async function loadCached(callId: string): Promise<CallIntelligence | null> {
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    fetchAudit(callId),
   ]);
   if (!insight || !tr?.transcript_text) return null;
+  const i = insight as any;
   return {
+    ...EMPTY,
     status: "cached",
+    analysisStatus: "analyzed",
     transcript: tr.transcript_text,
-    summary: (insight as any).summary ?? null,
-    sentiment: (insight as any).sentiment ?? null,
-    satisfaction_score: (insight as any).satisfaction_score ?? null,
-    quality_score: (insight as any).quality_score ?? null,
-    coaching_score: (insight as any).coaching_score ?? null,
-    coaching_notes: (insight as any).coaching_notes ?? [],
-    action_items: (insight as any).action_items ?? [],
-    topics: (insight as any).topics ?? [],
-    key_phrases: (insight as any).key_phrases ?? [],
-    intent: (insight as any).intent ?? null,
-    risks: (insight as any).risks ?? [],
-    sales_opportunities: (insight as any).sales_opportunities ?? [],
-    escalation_needed: (insight as any).escalation_needed ?? false,
+    summary: i.summary ?? null,
+    sentiment: i.sentiment ?? null,
+    satisfaction_score: i.satisfaction_score ?? null,
+    quality_score: i.quality_score ?? null,
+    coaching_score: i.coaching_score ?? null,
+    coaching_notes: i.coaching_notes ?? [],
+    action_items: i.action_items ?? [],
+    topics: i.topics ?? [],
+    key_phrases: i.key_phrases ?? [],
+    intent: i.intent ?? null,
+    risks: i.risks ?? [],
+    sales_opportunities: i.sales_opportunities ?? [],
+    escalation_needed: i.escalation_needed ?? false,
+    outputs_present: { transcript: true, insight: true },
+    last_processed_at: i.created_at ?? null,
+    skipped_reason: "Cached — transcript and AI insight already exist for this recording.",
+    audit,
   };
 }
 
@@ -73,7 +119,21 @@ async function process(callId: string, force = false): Promise<CallIntelligence>
     body: { callId, force },
   });
   if (error) throw error;
-  return { ...EMPTY, ...(data as Partial<CallIntelligence>) };
+  const audit = await fetchAudit(callId);
+  const payload = (data as any) ?? {};
+  const s = payload.status as CallIntelligence["status"];
+  const analysisStatus: AnalysisStatus =
+    s === "pending_sync" ? "pending_sync"
+    : s === "processing" ? "processing"
+    : s === "cached" || s === "created" || s === "regenerated" ? "analyzed"
+    : "missing";
+  return {
+    ...EMPTY,
+    ...payload,
+    analysisStatus,
+    outputs_present: payload.outputs_present ?? { transcript: !!payload.transcript, insight: !!payload.summary },
+    audit,
+  };
 }
 
 export function useCallIntelligence(callId: string | null | undefined) {
