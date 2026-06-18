@@ -364,6 +364,12 @@ class JsSipProvider {
 
   private kickReconnect(why: string) {
     if (!this.ua) return;
+    if (this.snap.authBlocked) {
+      // Auth-rejected by PBX (401/403/407). Re-registering with the same
+      // bad credentials would just spam the server — wait for a manual
+      // restart or a password sync that bumps the config.
+      return;
+    }
     try {
       const connected = this.ua.isConnected?.() ?? false;
       const registered = this.ua.isRegistered?.() ?? false;
@@ -383,6 +389,7 @@ class JsSipProvider {
     if (this.keepAliveTimer) clearInterval(this.keepAliveTimer);
     this.keepAliveTimer = setInterval(() => {
       if (!this.ua) return;
+      if (this.snap.authBlocked) return;
       try {
         const connected = this.ua.isConnected?.() ?? false;
         const registered = this.ua.isRegistered?.() ?? false;
