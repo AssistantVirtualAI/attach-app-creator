@@ -97,6 +97,7 @@ import LemtelMessages from "./pages/lemtel/LemtelMessages";
 import LemtelPortalCalls from "./pages/lemtel/LemtelPortalCalls";
 import LemtelStub from "./pages/lemtel/LemtelStub";
 import LemtelCustomers from "./pages/lemtel/LemtelCustomers";
+import PortingQueue from "./pages/lemtel/admin/PortingQueue";
 import CustomerDetail from "./pages/lemtel/CustomerDetail";
 import CustomerPortalGate from "./pages/CustomerPortalGate";
 import LemtelGateways from "./pages/lemtel/LemtelGateways";
@@ -705,6 +706,7 @@ const App = () => (
                 <Route path="/org/lemtel/admin/conversations" element={<LemtelAdminPage><Conversations /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/customers" element={<LemtelAdminPage><LemtelCustomers /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/customers/:domainUuid" element={<LemtelAdminPage><CustomerDetail /></LemtelAdminPage>} />
+                <Route path="/org/lemtel/admin/porting" element={<LemtelAdminPage><PortingQueue /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/gateways" element={<LemtelAdminPage><LemtelGateways /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/voice-gateways" element={<LemtelAdminPage><LemtelVoiceGateways /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/calls" element={<LemtelAdminPage><TelephonyMediaCenter scope="org" /></LemtelAdminPage>} />

@@ -2875,6 +2875,54 @@ export type Database = {
         }
         Relationships: []
       }
+      number_porting_requests: {
+        Row: {
+          account_number: string
+          attachments: Json
+          created_at: string
+          current_carrier: string
+          id: string
+          notes: string | null
+          numbers: string[]
+          organization_id: string
+          pin: string | null
+          requested_by: string | null
+          service_address: Json
+          status: Database["public"]["Enums"]["porting_status"]
+          updated_at: string
+        }
+        Insert: {
+          account_number: string
+          attachments?: Json
+          created_at?: string
+          current_carrier: string
+          id?: string
+          notes?: string | null
+          numbers?: string[]
+          organization_id: string
+          pin?: string | null
+          requested_by?: string | null
+          service_address?: Json
+          status?: Database["public"]["Enums"]["porting_status"]
+          updated_at?: string
+        }
+        Update: {
+          account_number?: string
+          attachments?: Json
+          created_at?: string
+          current_carrier?: string
+          id?: string
+          notes?: string | null
+          numbers?: string[]
+          organization_id?: string
+          pin?: string | null
+          requested_by?: string | null
+          service_address?: Json
+          status?: Database["public"]["Enums"]["porting_status"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       org_business_hours: {
         Row: {
           closed_destination: string | null
@@ -10750,6 +10798,7 @@ export type Database = {
       is_lemtel_admin: { Args: { _user_id: string }; Returns: boolean }
       is_lemtel_member: { Args: { _user_id: string }; Returns: boolean }
       is_master_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_member_of_org: { Args: { _org: string }; Returns: boolean }
       is_my_extension_call:
         | {
             Args: {
@@ -10903,6 +10952,12 @@ export type Database = {
         | "forward_external"
         | "follow_org_default"
       app_role: "super_admin" | "org_admin" | "manager" | "agent" | "viewer"
+      porting_status:
+        | "submitted"
+        | "in_review"
+        | "approved"
+        | "rejected"
+        | "completed"
       telecom_sync_status: "pending" | "synced" | "failed"
       user_availability: "available" | "busy" | "dnd" | "away" | "vacation"
       voice_agent_binding_type:
@@ -11044,6 +11099,13 @@ export const Constants = {
         "follow_org_default",
       ],
       app_role: ["super_admin", "org_admin", "manager", "agent", "viewer"],
+      porting_status: [
+        "submitted",
+        "in_review",
+        "approved",
+        "rejected",
+        "completed",
+      ],
       telecom_sync_status: ["pending", "synced", "failed"],
       user_availability: ["available", "busy", "dnd", "away", "vacation"],
       voice_agent_binding_type: [

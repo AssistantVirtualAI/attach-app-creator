@@ -2185,6 +2185,30 @@ Deno.serve(async (req) => {
       return json(r, r?.ok ? 200 : 500);
     }
 
+    if (action === "test-ivr") {
+      // Originate a call from a test extension to an IVR menu's extension
+      const ivrExtension = body.ivr_extension || params.ivr_extension;
+      const fromExtension = body.from_extension || params.from_extension;
+      const domainName = body.domain_name || params.domain_name;
+      if (!ivrExtension || !fromExtension || !domainName) {
+        return json({ error: "ivr_extension, from_extension, domain_name required" }, 400);
+      }
+      const args = `{origination_caller_id_name='IVR Test',origination_caller_id_number=${fromExtension}}user/${fromExtension}@${domainName} ${ivrExtension} XML ${domainName}`;
+      const r = await pbxWrite(`commands`, "POST", {
+        commands: [{ command: "originate", arguments: args }],
+      });
+      if (organization_id) {
+        await admin.from("audit_logs").insert({
+          organization_id, user_id: userId, action: "pbx.test_ivr",
+          resource_type: "ivr", resource_id: String(ivrExtension),
+          metadata: { ivr_extension: ivrExtension, from_extension: fromExtension, ok: r?.ok },
+        });
+      }
+      return json(r, r?.ok ? 200 : 500);
+    }
+
+
+
     if (action === "eavesdrop-call") {
       const uuid = body.uuid || params.uuid;
       const extension = body.extension || params.extension;
