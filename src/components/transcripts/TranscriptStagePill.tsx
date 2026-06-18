@@ -27,7 +27,7 @@ const STAGE_TONE: Record<TranscriptStage, string> = {
 
 export function TranscriptStagePill({ stage, detail, compact }: { stage: TranscriptStage; detail?: string; compact?: boolean }) {
   const Icon = STAGE_ICON[stage];
-  const isLoading = stage === 'downloading' || stage === 'transcribing' || stage === 'analyzing';
+  const isLoading = stage === 'downloading' || stage === 'transcribing' || stage === 'analyzing' || stage === 'pending_sync';
   const label = STAGE_LABEL[stage];
   return (
     <Badge variant="outline" className={`inline-flex items-center gap-1.5 border ${STAGE_TONE[stage]}`}>
