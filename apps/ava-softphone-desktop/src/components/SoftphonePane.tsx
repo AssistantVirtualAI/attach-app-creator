@@ -165,7 +165,7 @@ export default function SoftphonePane({
       // Incoming ring → Enter answers, Esc declines (already wired globally,
       // but we keep a local fallback so the pane works in isolation).
       if (sp.snap.callState === 'ringing-in') {
-        if (e.key === 'Enter') { e.preventDefault(); sp.answer(); }
+        if (e.key === 'Enter') { e.preventDefault(); setTimeout(() => sp.answer(), 0); }
         else if (e.key === 'Escape') { e.preventDefault(); sp.hangup(); }
         return;
       }
