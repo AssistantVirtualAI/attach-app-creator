@@ -317,27 +317,46 @@ autoPlay
             {audioErrors[r.id] && <div style={{ marginTop: 6, fontSize: 10, color: c.textSub, lineHeight: 1.35 }}>{audioErrors[r.id]}</div>}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
-              <div style={{ display: 'flex', gap: 6 }}>
-                {!(r as any).analyzed ? (
-                  <button
-                    onClick={() => analyze(r)}
-                    disabled={working === r.id}
-                    style={{
-                      flex: 1, padding: '6px 10px', borderRadius: 8,
-                      border: `1px solid ${c.borderAI}`, background: 'rgba(124,58,237,0.15)',
-                      color: c.aiLight, fontSize: 11, fontWeight: 600, cursor: 'pointer',
-                      boxShadow: working === r.id ? glow.ai : 'none',
-                    }}
-                  >
-                    {working === r.id ? '✨ Analyzing…' : '✨ Transcribe & Analyze'}
-                  </button>
-                ) : (
-                  <span style={{
-                    fontSize: 10, padding: '4px 8px', borderRadius: 6,
-                    background: 'rgba(16,185,129,0.15)', color: c.green, fontWeight: 600,
-                  }}>✓ Analyzed</span>
-                )}
-              </div>
+              {(() => {
+                const st: JobStatus = statuses[r.id] || ((r as any).analyzed ? 'succeeded' : 'idle');
+                const isBusy = st === 'queued' || st === 'running' || working === r.id;
+                const pillMap: Record<JobStatus, { bg: string; color: string; label: string }> = {
+                  idle: { bg: 'transparent', color: c.textSub, label: '' },
+                  queued: { bg: 'rgba(234,179,8,0.15)', color: c.yellow, label: 'Queued' },
+                  running: { bg: 'rgba(59,130,246,0.18)', color: c.text, label: 'Transcribing…' },
+                  succeeded: { bg: 'rgba(16,185,129,0.15)', color: c.green, label: '✓ Succeeded' },
+                  failed: { bg: 'rgba(239,68,68,0.15)', color: c.red, label: '⚠ Failed' },
+                };
+                const pill = pillMap[st];
+                return (
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    {!(r as any).analyzed ? (
+                      <button
+                        onClick={() => analyze(r)}
+                        disabled={isBusy}
+                        style={{
+                          flex: 1, padding: '6px 10px', borderRadius: 8,
+                          border: `1px solid ${c.borderAI}`, background: 'rgba(124,58,237,0.15)',
+                          color: c.aiLight, fontSize: 11, fontWeight: 600,
+                          cursor: isBusy ? 'wait' : 'pointer',
+                          opacity: isBusy ? 0.6 : 1,
+                          boxShadow: isBusy ? glow.ai : 'none',
+                        }}
+                      >
+                        {isBusy ? '✨ Analyzing…' : '✨ Transcribe & Analyze'}
+                      </button>
+                    ) : (
+                      <span style={{
+                        fontSize: 10, padding: '4px 8px', borderRadius: 6,
+                        background: 'rgba(16,185,129,0.15)', color: c.green, fontWeight: 600,
+                      }}>✓ Analyzed</span>
+                    )}
+                    {pill.label && (
+                      <span style={{ fontSize: 9, padding: '3px 7px', borderRadius: 6, background: pill.bg, color: pill.color, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 700 }}>{pill.label}</span>
+                    )}
+                  </div>
+                );
+              })()}
               {itemErrors[r.id] && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: c.red, lineHeight: 1.35, padding: '4px 6px', background: 'rgba(239,68,68,0.08)', borderRadius: 6 }}>
                   <span style={{ flex: 1 }}>{itemErrors[r.id]}</span>
