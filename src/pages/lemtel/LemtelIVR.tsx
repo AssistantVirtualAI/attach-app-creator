@@ -210,6 +210,24 @@ function IvrDetail({ ivr, orgId, options, audios, extensions, queues, ringGroups
     } catch (e: any) { toast.error(errorText(e, 'Delete failed')); }
   };
 
+  const testIvr = async () => {
+    const from = prompt('Test from which extension? (your phone)');
+    if (!from) return;
+    const { data: dom } = await (supabase as any).from('pbx_domains')
+      .select('domain_name').eq('organization_id', orgId).maybeSingle();
+    const domain_name = dom?.domain_name;
+    if (!domain_name) return toast.error('No domain configured');
+    const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
+      body: {
+        organization_id: orgId, action: 'test-ivr',
+        params: { ivr_extension: ivr.extension, from_extension: from, domain_name },
+      },
+    });
+    if (error) return toast.error(error.message);
+    if ((data as any)?.ok === false) return toast.error('Test call could not be placed');
+    toast.success(`Calling ext ${from} to test IVR ${ivr.extension}`);
+  };
+
   return (
     <>
       <CardHeader>
@@ -218,11 +236,15 @@ function IvrDetail({ ivr, orgId, options, audios, extensions, queues, ringGroups
             <CardTitle>{ivr.name}</CardTitle>
             <p className="text-sm text-muted-foreground mt-1">Extension {ivr.extension || '—'} · {options.length} option{options.length !== 1 ? 's' : ''} · {audios.length} audio file{audios.length !== 1 ? 's' : ''}</p>
           </div>
-          <Button variant="ghost" size="sm" onClick={deleteIvr} className="text-destructive">
-            <Trash2 className="w-4 h-4 mr-1" /> Delete
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={testIvr}>Test call</Button>
+            <Button variant="ghost" size="sm" onClick={deleteIvr} className="text-destructive">
+              <Trash2 className="w-4 h-4 mr-1" /> Delete
+            </Button>
+          </div>
         </div>
       </CardHeader>
+
       <CardContent>
         <Tabs defaultValue="options">
           <TabsList>
