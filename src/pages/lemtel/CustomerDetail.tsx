@@ -316,10 +316,10 @@ export default function CustomerDetail() {
             <Table>
               <TableHeader><TableRow>
                 <TableHead>Ext</TableHead><TableHead>Name</TableHead><TableHead>SIP Domain</TableHead>
-                <TableHead>Status</TableHead><TableHead className="text-right">App</TableHead><TableHead className="text-right">Desktop</TableHead><TableHead className="text-right">Mobile</TableHead>
+                <TableHead>Status</TableHead><TableHead className="text-right">App</TableHead><TableHead className="text-right">Desktop</TableHead><TableHead className="text-right">Mobile</TableHead><TableHead className="text-right">Invite</TableHead>
               </TableRow></TableHeader>
               <TableBody>
-                {spUsers.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">No users. Run Sync.</TableCell></TableRow>}
+                {spUsers.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">No users. Run Sync.</TableCell></TableRow>}
                 {spUsers.map((u: any) => (
                   <TableRow key={u.id}>
                     <TableCell className="font-mono">{u.extension}</TableCell>
@@ -334,6 +334,9 @@ export default function CustomerDetail() {
                     </TableCell>
                     <TableCell className="text-right">
                       <Switch checked={u.mobile_access_enabled !== false} disabled={u.app_access_enabled === false} onCheckedChange={(v) => togglePlatformAccess(u.id, 'mobile', v)} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <SendAppInviteButtons portalUserId={u.portal_user_id} organizationId={org?.id} />
                     </TableCell>
                   </TableRow>
                 ))}
