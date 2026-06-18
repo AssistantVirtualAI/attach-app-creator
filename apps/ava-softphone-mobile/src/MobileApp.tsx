@@ -57,7 +57,10 @@ export default function MobileApp() {
       if (d.type === 'set-tab' && typeof d.tab === 'string') setTab(d.tab as Tab);
     };
     window.addEventListener('message', onMsg);
-    return () => window.removeEventListener('message', onMsg);
+    return () => {
+      window.removeEventListener('message', onMsg);
+      unsubDeepLink?.();
+    };
   }, []);
 
 
