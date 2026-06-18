@@ -13,36 +13,36 @@ Deno.serve(async (req) => {
   // Parse body up-front so we can short-circuit on test action
   const body = await req.json().catch(() => ({} as any));
 
-  // ---- TEST action: connectivity probe ----
+  // ---- TEST action: connectivity probe (Lovable AI Gateway) ----
   if (body?.action === "test") {
-    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-    if (!ANTHROPIC_API_KEY) {
-      return new Response(JSON.stringify({ status: "error", error: "MISSING_SECRET", secret: "ANTHROPIC_API_KEY" }),
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) {
+      return new Response(JSON.stringify({ status: "error", error: "MISSING_SECRET", secret: "LOVABLE_API_KEY" }),
         { status: 200, headers: corsHeaders });
     }
     const start = Date.now();
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
+      const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
-        headers: { "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+        headers: { "Lovable-API-Key": LOVABLE_API_KEY, "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 10,
+          model: "google/gemini-2.5-flash",
           messages: [{ role: "user", content: "Reply OK" }],
+          max_tokens: 10,
         }),
       });
       const latency = Date.now() - start;
       if (res.ok) {
         return new Response(JSON.stringify({
-          status: "ok", message: "Claude API connected", latency_ms: latency, model: "claude-sonnet-4-20250514",
+          status: "ok", message: "Lovable AI Gateway connected", latency_ms: latency, model: "google/gemini-2.5-flash",
         }), { status: 200, headers: corsHeaders });
       }
       const errText = await res.text();
       return new Response(JSON.stringify({
-        status: "error", error: "CLAUDE_API_ERROR", http_status: res.status, details: errText,
+        status: "error", error: "AI_GATEWAY_ERROR", http_status: res.status, details: errText,
       }), { status: 200, headers: corsHeaders });
     } catch (e: any) {
-      return new Response(JSON.stringify({ status: "error", error: "CLAUDE_UNREACHABLE", message: e.message }),
+      return new Response(JSON.stringify({ status: "error", error: "AI_GATEWAY_UNREACHABLE", message: e.message }),
         { status: 200, headers: corsHeaders });
     }
   }
