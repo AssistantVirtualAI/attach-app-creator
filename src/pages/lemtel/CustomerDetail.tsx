@@ -126,7 +126,7 @@ export default function CustomerDetail() {
         .limit(200);
       return data || [];
     },
-    enabled: tab === 'recordings',
+    enabled: tab === 'recordings' && !!domainUuid,
   });
 
   const { data: callHistory = [] } = useQuery({
@@ -139,8 +139,29 @@ export default function CustomerDetail() {
         .limit(200);
       return data || [];
     },
-    enabled: tab === 'history',
+    enabled: tab === 'history' && !!domainUuid,
   });
+
+  // Per-tenant sync status: latest pbx_sync_jobs per resource for this domain.
+  const { data: syncStatus = [] } = useQuery({
+    queryKey: ['pbx-sync-jobs', domainUuid],
+    queryFn: async () => {
+      const { data } = await (supabase as any).from('pbx_sync_jobs')
+        .select('resource,status,completed_at,started_at,error_message')
+        .eq('domain_uuid', domainUuid)
+        .order('started_at', { ascending: false })
+        .limit(40);
+      return data || [];
+    },
+    enabled: !!domainUuid,
+    refetchInterval: syncing ? 3000 : false,
+  });
+  const latestPerResource = useMemo(() => {
+    const out: Record<string, any> = {};
+    for (const j of syncStatus as any[]) if (!out[j.resource]) out[j.resource] = j;
+    return out;
+  }, [syncStatus]);
+
 
   // Search / filter state for Call History & Recordings
   const [histQ, setHistQ] = useState('');
