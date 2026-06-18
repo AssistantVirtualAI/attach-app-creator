@@ -299,6 +299,18 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
               </Link>
             )}
 
+            {/* Per-domain cockpit shortcut for org_admin / manager of a customer domain */}
+            {!isSuperAdmin && (role === 'org_admin' || role === 'manager') && selectedOrg?.slug && selectedOrgId !== '71755d33-ed64-4ad5-a828-61c9d2029eb7' && (
+              <Link
+                to={`/domain/${selectedOrg.slug}/admin/dashboard`}
+                onClick={() => setIsSidebarOpen(false)}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 mt-3 text-foreground bg-primary/10 hover:bg-primary/15 border border-primary/30"
+              >
+                <Globe className="w-4 h-4 text-primary" />
+                <span className="font-medium text-sm">My Domain Cockpit →</span>
+              </Link>
+            )}
+
             {/* Settings link - always visible */}
             <Link
               to={settingsLink.href}
