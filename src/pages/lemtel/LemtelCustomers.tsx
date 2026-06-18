@@ -39,7 +39,10 @@ export default function LemtelCustomers() {
   const impersonation = useImpersonation();
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ name: '', domain: '', adminEmail: '' });
+  const [form, setForm] = useState({
+    name: '', domain: '', adminEmail: '', adminPassword: '',
+    companyName: '', address: '', phoneNumbersText: '',
+  });
   const [domainTouched, setDomainTouched] = useState(false);
   const [saving, setSaving] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
