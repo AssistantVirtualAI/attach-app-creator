@@ -177,6 +177,8 @@ import MyDevices from "./pages/lemtel/my/MyDevices";
 import MyGreetings from "./pages/lemtel/my/MyGreetings";
 import { DownloadCenter } from "./components/portal/DownloadCenter";
 import { AppLayout } from "./components/layout/AppLayout";
+import CustomerDomainGate from "./components/portal/CustomerDomainGate";
+import DomainDashboard from "./pages/lemtel/admin/DomainDashboard";
 
 // v4.0.0 — Multi-tenant reseller architecture
 import { WhitelabelProvider } from "./contexts/WhitelabelContext";
