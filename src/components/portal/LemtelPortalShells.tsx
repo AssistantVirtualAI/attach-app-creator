@@ -26,7 +26,7 @@ export function AdminPortalLayout({ children }: { children: ReactNode }) {
     <>
       <ImpersonationBanner />
       <div className="space-y-5 w-full max-w-none min-w-0">
-        <ShellHeader label="Lemtel Communications · Admin Portal" />
+        <ShellHeader label="Lemtel Communications · Admin Portal" withSwitcher />
         <div className="w-full min-w-0">{children}</div>
       </div>
     </>
