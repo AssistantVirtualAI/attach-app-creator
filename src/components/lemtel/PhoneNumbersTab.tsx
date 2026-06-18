@@ -121,25 +121,65 @@ export function PhoneNumbersTab({
     } catch (e: any) { toast.error(e?.message || 'Failed'); }
   };
 
+  // Lookup labels for destinations
+  const destLabel = (t?: string, v?: string) => {
+    if (!t || !v) return null;
+    if (t === 'extension') {
+      const e = extensions.find((x: any) => x.extension === v);
+      return e?.effective_caller_id_name ? `${v} · ${e.effective_caller_id_name}` : v;
+    }
+    if (t === 'ivr') {
+      const i = ivrs.find((x: any) => x.ivr_menu_extension === v);
+      return i?.ivr_menu_name ? `${v} · ${i.ivr_menu_name}` : v;
+    }
+    if (t === 'ringgroup') {
+      const r = ringGroups.find((x: any) => x.ring_group_extension === v);
+      return r?.ring_group_name ? `${v} · ${r.ring_group_name}` : v;
+    }
+    return v;
+  };
+
+  const selectedPool = pool.find((p: any) => p.id === poolId);
+  const destOk = !!destValue;
+  const numOk = !!poolId;
+
   return (
     <div className="space-y-3">
-      <div className="flex gap-2 justify-end">
-        <Button size="sm" variant="outline" onClick={() => setPortOpen(true)}><FileText className="w-3 h-3 mr-1" />Request Port</Button>
-        <Button size="sm" onClick={() => setAssignOpen(true)}><Plus className="w-3 h-3 mr-1" />Assign Number</Button>
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex gap-3 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1"><PhoneCall className="w-3 h-3 text-emerald-600" /> {assigned.length} assigned</span>
+          <span className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> {pool.length} available in pool</span>
+        </div>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => setPortOpen(true)}><FileText className="w-3 h-3 mr-1" />Request Port</Button>
+          <Button size="sm" onClick={() => setAssignOpen(true)} disabled={pool.length === 0}><Plus className="w-3 h-3 mr-1" />Assign Number</Button>
+        </div>
       </div>
       <Card><CardContent className="p-0">
         {assigned.length === 0 ? (
-          <div className="py-8 text-center text-sm text-muted-foreground">No numbers assigned.</div>
+          <div className="py-8 text-center text-sm text-muted-foreground">No numbers assigned to this customer.</div>
         ) : (
           <Table>
-            <TableHeader><TableRow><TableHead>Number</TableHead><TableHead>Routes to</TableHead><TableHead>Status</TableHead><TableHead></TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow>
+              <TableHead>Number</TableHead><TableHead>Routes to</TableHead><TableHead>Status</TableHead><TableHead></TableHead>
+            </TableRow></TableHeader>
             <TableBody>
               {assigned.map((n: any) => (
                 <TableRow key={n.id}>
-                  <TableCell className="font-mono">{n.phone_number}</TableCell>
-                  <TableCell className="text-xs">{n.metadata?.destination_type ? `${n.metadata.destination_type} · ${n.metadata.destination_value}` : '—'}</TableCell>
-                  <TableCell><Badge variant="outline">{n.status || 'active'}</Badge></TableCell>
-                  <TableCell><Button size="sm" variant="ghost" onClick={() => release(n)}><Trash2 className="w-3 h-3" /></Button></TableCell>
+                  <TableCell className="font-mono">{fmtE164(n.phone_number)}</TableCell>
+                  <TableCell>
+                    {n.metadata?.destination_type ? (
+                      <span className="inline-flex items-center gap-1.5 text-xs">
+                        {destIcon(n.metadata.destination_type)}
+                        <span className="text-muted-foreground capitalize">{n.metadata.destination_type}:</span>
+                        <span className="font-mono">{destLabel(n.metadata.destination_type, n.metadata.destination_value)}</span>
+                      </span>
+                    ) : <span className="text-xs text-muted-foreground">Unrouted</span>}
+                  </TableCell>
+                  <TableCell>{statusBadge(n.status)}</TableCell>
+                  <TableCell className="text-right">
+                    <Button size="sm" variant="ghost" onClick={() => release(n)} title="Release number"><Trash2 className="w-3 h-3" /></Button>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -150,30 +190,51 @@ export function PhoneNumbersTab({
       <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Assign phone number</DialogTitle></DialogHeader>
-          <div className="space-y-3">
+          <div className="space-y-4">
+            <div className="rounded-lg border bg-muted/30 p-3 text-xs flex items-center gap-3">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              <div>
+                <div className="font-medium text-foreground">{pool.length} number{pool.length === 1 ? '' : 's'} available</div>
+                <div className="text-muted-foreground">{assigned.length} already assigned to this customer</div>
+              </div>
+            </div>
+
             <div>
-              <Label>Available number</Label>
+              <Label>Step 1 — Choose number {numOk && <CheckCircle2 className="inline w-3 h-3 text-emerald-600 ml-1" />}</Label>
               <Select value={poolId} onValueChange={setPoolId}>
                 <SelectTrigger><SelectValue placeholder={pool.length === 0 ? 'No numbers in pool' : 'Select…'} /></SelectTrigger>
-                <SelectContent>{pool.map((p: any) => <SelectItem key={p.id} value={p.id}>{p.phone_number}</SelectItem>)}</SelectContent>
+                <SelectContent>{pool.map((p: any) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    <span className="font-mono">{fmtE164(p.phone_number)}</span>
+                  </SelectItem>
+                ))}</SelectContent>
               </Select>
+              {selectedPool && (
+                <div className="mt-2 text-xs flex items-center gap-2">
+                  <span className="font-mono">{fmtE164(selectedPool.phone_number)}</span>
+                  {statusBadge('available')}
+                </div>
+              )}
             </div>
+
             <div>
-              <Label>Routes to</Label>
+              <Label>Step 2 — Route incoming calls to {destOk && <CheckCircle2 className="inline w-3 h-3 text-emerald-600 ml-1" />}</Label>
               <div className="grid grid-cols-2 gap-2">
                 <Select value={destType} onValueChange={(v: any) => { setDestType(v); setDestValue(''); }}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="extension">Extension</SelectItem>
-                    <SelectItem value="ivr">IVR</SelectItem>
-                    <SelectItem value="ringgroup">Ring Group</SelectItem>
+                    <SelectItem value="extension">Extension ({extensions.length})</SelectItem>
+                    <SelectItem value="ivr">IVR menu ({ivrs.length})</SelectItem>
+                    <SelectItem value="ringgroup">Ring Group ({ringGroups.length})</SelectItem>
                   </SelectContent>
                 </Select>
                 <Select value={destValue} onValueChange={setDestValue}>
                   <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
                   <SelectContent>
                     {destType === 'extension' && extensions.map((e: any) => (
-                      <SelectItem key={e.extension_uuid || e.extension} value={e.extension}>{e.extension}</SelectItem>
+                      <SelectItem key={e.extension_uuid || e.extension} value={e.extension}>
+                        {e.extension}{e.effective_caller_id_name ? ` · ${e.effective_caller_id_name}` : ''}
+                      </SelectItem>
                     ))}
                     {destType === 'ivr' && ivrs.map((i: any) => (
                       <SelectItem key={i.ivr_menu_uuid} value={i.ivr_menu_extension}>{i.ivr_menu_extension} · {i.ivr_menu_name}</SelectItem>
@@ -184,11 +245,27 @@ export function PhoneNumbersTab({
                   </SelectContent>
                 </Select>
               </div>
+              {(destType === 'extension' && extensions.length === 0) && <p className="text-xs text-amber-600 mt-1">No extensions yet — create one in the Users tab first.</p>}
+              {(destType === 'ivr' && ivrs.length === 0) && <p className="text-xs text-amber-600 mt-1">No IVRs yet — create one in the IVR tab first.</p>}
+              {(destType === 'ringgroup' && ringGroups.length === 0) && <p className="text-xs text-amber-600 mt-1">No ring groups yet — create one in the Ring Groups tab first.</p>}
             </div>
+
+            {numOk && destOk && (
+              <div className="rounded-lg border-2 border-primary/30 bg-primary/5 p-3 text-sm">
+                <div className="text-xs text-muted-foreground mb-1">Preview</div>
+                <div className="flex items-center gap-2 font-mono">
+                  <PhoneCall className="w-4 h-4 text-emerald-600" />
+                  <span>{fmtE164(selectedPool!.phone_number)}</span>
+                  <PhoneForwarded className="w-4 h-4 text-muted-foreground" />
+                  {destIcon(destType)}
+                  <span>{destLabel(destType, destValue)}</span>
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAssignOpen(false)}>Cancel</Button>
-            <Button onClick={doAssign} disabled={assigning}>{assigning && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}Assign</Button>
+            <Button onClick={doAssign} disabled={assigning || !numOk || !destOk}>{assigning && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}Confirm assignment</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
