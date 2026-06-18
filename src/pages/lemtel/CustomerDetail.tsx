@@ -34,7 +34,7 @@ async function pbxList(action: string, domain_uuid: string) {
   return data?.data || data?.[Object.keys(data || {})[0]] || [];
 }
 
-const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+
 
 export default function CustomerDetail() {
   const { domainUuid = '' } = useParams();
