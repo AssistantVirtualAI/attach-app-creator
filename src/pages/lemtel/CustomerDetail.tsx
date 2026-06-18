@@ -299,11 +299,8 @@ export default function CustomerDetail() {
             <Globe className="w-6 h-6" /> {domain?.domain_name || domainUuid}
           </h1>
           <p className="text-sm text-muted-foreground flex items-center gap-2 mt-0.5">
-            {org ? (
-              <Badge variant="default" className="text-[10px]">Linked · {org.name}</Badge>
-            ) : (
-              <Badge variant="secondary" className="text-[10px] bg-amber-500/20 text-amber-700 dark:text-amber-300">No tenant org — click Link tenant</Badge>
-            )}
+            <Badge variant="outline" className="text-[10px]">Domain · {domain?.domain_name || domainUuid}</Badge>
+            {org && <Badge variant="default" className="text-[10px]">Ava org · {org.name}</Badge>}
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -311,18 +308,15 @@ export default function CustomerDetail() {
           <Button variant="outline" size="sm" onClick={syncAll} disabled={syncing}>
             {syncing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />} Full sync from PBX
           </Button>
-          {org ? (
-            <>
-              <Button variant="outline" size="sm" onClick={() => setInviteOpen(true)}><Mail className="w-4 h-4 mr-2" /> Invite admin</Button>
-              <Button size="sm" onClick={impersonate}><LogIn className="w-4 h-4 mr-2" /> Manage as this tenant</Button>
-            </>
-          ) : (
-            <Button size="sm" onClick={() => { setLinkName(domain?.domain_description || (domain?.domain_name || '').split('.')[0] || ''); setLinkOpen(true); }}>
-              <LinkIcon className="w-4 h-4 mr-2" /> Link tenant org
-            </Button>
+          {org && (
+            <Button variant="outline" size="sm" onClick={() => setInviteOpen(true)}><Mail className="w-4 h-4 mr-2" /> Invite admin</Button>
           )}
+          <Button size="sm" onClick={openTenantPortal}>
+            <LogIn className="w-4 h-4 mr-2" /> Open tenant portal
+          </Button>
         </div>
       </div>
+
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="flex flex-wrap">
