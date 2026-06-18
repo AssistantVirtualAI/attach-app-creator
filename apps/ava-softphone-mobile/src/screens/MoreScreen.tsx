@@ -16,8 +16,9 @@ import PermissionsScreen from './PermissionsScreen';
 import SupportScreen from './SupportScreen';
 import AIAuditScreen from './AIAuditScreen';
 import QueuesScreen from './QueuesScreen';
+import FeaturesScreen from './FeaturesScreen';
 
-type Sub = null | 'recordings' | 'voicemail' | 'messages' | 'contacts' | 'settings' | 'delete' | 'privacy' | 'datasafety' | 'permissions' | 'support' | 'aiaudit' | 'queues';
+type Sub = null | 'recordings' | 'voicemail' | 'messages' | 'contacts' | 'settings' | 'delete' | 'privacy' | 'datasafety' | 'permissions' | 'support' | 'aiaudit' | 'queues' | 'features';
 
 export default function MoreScreen({
   creds, sp, onSignOut, haptic,
@@ -36,6 +37,7 @@ export default function MoreScreen({
   if (sub === 'support')     return <SubPage onBack={() => setSub(null)} title="Support"><SupportScreen /></SubPage>;
   if (sub === 'aiaudit')     return <SubPage onBack={() => setSub(null)} title="AI requests"><AIAuditScreen /></SubPage>;
   if (sub === 'queues')      return <SubPage onBack={() => setSub(null)} title="Queues"><QueuesScreen /></SubPage>;
+  if (sub === 'features')    return <SubPage onBack={() => setSub(null)} title="Calling features"><FeaturesScreen sp={sp} /></SubPage>;
 
   return (
     <div style={{ height: '100%', overflowY: 'auto', padding: '14px 14px 20px' }}>
@@ -56,6 +58,7 @@ export default function MoreScreen({
 
       <SectionTitle eyebrow="Communications" title="More features" />
       <Card padded={false}>
+        <SettingsRow label="Calling features" icon="☎" value="Hold, transfer, record, DND…" onPress={() => setSub('features')} />
         <SettingsRow label="Call recordings" icon="◉" value="With AI transcribe" onPress={() => setSub('recordings')} />
         <SettingsRow label="Voicemail" icon="✉" value="Inbox & greetings" onPress={() => setSub('voicemail')} />
         <SettingsRow label="Messages" icon="💬" value="SMS conversations" onPress={() => setSub('messages')} />

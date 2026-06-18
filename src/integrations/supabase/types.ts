@@ -2455,6 +2455,8 @@ export type Database = {
       lemtel_config: {
         Row: {
           created_at: string
+          encrypted: boolean
+          encryption_version: number | null
           id: string
           is_secret: boolean
           key: string
@@ -2463,6 +2465,8 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          encrypted?: boolean
+          encryption_version?: number | null
           id?: string
           is_secret?: boolean
           key: string
@@ -2471,6 +2475,8 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          encrypted?: boolean
+          encryption_version?: number | null
           id?: string
           is_secret?: boolean
           key?: string
@@ -7609,6 +7615,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      provider_credentials_audit: {
+        Row: {
+          action: string
+          actor_email: string | null
+          actor_user_id: string | null
+          created_at: string
+          field_changed: string | null
+          id: string
+          ip: string | null
+          metadata: Json | null
+          organization_id: string | null
+          provider: string
+          user_agent: string | null
+        }
+        Insert: {
+          action: string
+          actor_email?: string | null
+          actor_user_id?: string | null
+          created_at?: string
+          field_changed?: string | null
+          id?: string
+          ip?: string | null
+          metadata?: Json | null
+          organization_id?: string | null
+          provider: string
+          user_agent?: string | null
+        }
+        Update: {
+          action?: string
+          actor_email?: string | null
+          actor_user_id?: string | null
+          created_at?: string
+          field_changed?: string | null
+          id?: string
+          ip?: string | null
+          metadata?: Json | null
+          organization_id?: string | null
+          provider?: string
+          user_agent?: string | null
+        }
+        Relationships: []
       }
       security_audit_runs: {
         Row: {

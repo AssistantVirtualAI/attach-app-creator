@@ -236,7 +236,7 @@ function AuthenticatedShell({
 
       <div key={tab} className="lemtel-page-enter" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         {tab === 'home'     && <DashboardScreen onNavigate={setTab as any} haptic={haptic} />}
-        {tab === 'calls'    && <CallsScreen sp={sp} haptic={haptic} />}
+        {tab === 'calls'    && <CallsScreen sp={sp} haptic={haptic} creds={creds} />}
         {tab === 'ava'      && <AVAChatScreen />}
         {tab === 'messages' && <InboxScreen haptic={haptic} />}
         {tab === 'more'     && <MoreScreen creds={creds} sp={sp} onSignOut={onSignOut} haptic={haptic} />}

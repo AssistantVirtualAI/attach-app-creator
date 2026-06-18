@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { ImpactStyle } from '@capacitor/haptics';
 import { colors, font, radius, gradients } from '../lib/theme';
 import { mobileApi, CallRecord } from '../lib/mobileApi';
@@ -6,30 +6,20 @@ import { Card, Chip, SectionTitle, Skeleton, EmptyState, PrimaryButton, GhostBut
 import CallDetailScreen from './CallDetailScreen';
 import Dialpad from '../components/Dialpad';
 import VoicemailScreen from './VoicemailScreen';
+import { useRealtimeCDR } from '../hooks/useRealtimeCDR';
+import type { Creds } from '../lib/creds';
 
 type SubTab = 'recents' | 'dial' | 'voicemail';
 
-export default function CallsScreen({ sp, haptic }: { sp: any; haptic: (s?: ImpactStyle) => Promise<void> }) {
+export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s?: ImpactStyle) => Promise<void>; creds?: Creds | null }) {
   const [sub, setSub] = useState<SubTab>('recents');
-  const [calls, setCalls] = useState<CallRecord[] | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'missed' | 'recorded'>('all');
   const [number, setNumber] = useState('');
 
-  // Real-time CDR: refresh on mount + every 15s while visible + on tab focus.
-  useEffect(() => {
-    let cancelled = false;
-    let timer: ReturnType<typeof setInterval> | null = null;
-    const load = () => { mobileApi.calls().then((d) => { if (!cancelled) setCalls(d); }).catch(() => {}); };
-    load();
-    const start = () => { if (!timer) timer = setInterval(load, 15_000); };
-    const stop = () => { if (timer) { clearInterval(timer); timer = null; } };
-    start();
-    const onVis = () => (document.visibilityState === 'visible' ? (load(), start()) : stop());
-    document.addEventListener('visibilitychange', onVis);
-    window.addEventListener('focus', load);
-    return () => { cancelled = true; stop(); document.removeEventListener('visibilitychange', onVis); window.removeEventListener('focus', load); };
-  }, []);
+  // Real-time CDR via Supabase Realtime (postgres_changes), with fallback polling
+  // when no auth/extension is available.
+  const { calls } = useRealtimeCDR(creds || null);
 
   if (selected) return <CallDetailScreen id={selected} onBack={() => setSelected(null)} />;
 
