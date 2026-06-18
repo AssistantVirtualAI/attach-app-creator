@@ -22,6 +22,7 @@ import { IvrCreateDialog } from '@/components/lemtel/IvrCreateDialog';
 import { RingGroupCreateDialog } from '@/components/lemtel/RingGroupCreateDialog';
 import { QueueCreateDialog } from '@/components/lemtel/QueueCreateDialog';
 import { PhoneNumbersTab } from '@/components/lemtel/PhoneNumbersTab';
+import { IvrOptionsDialog } from '@/components/lemtel/IvrOptionsDialog';
 
 async function pbxList(action: string, domain_uuid: string) {
   const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
@@ -44,6 +45,7 @@ export default function CustomerDetail() {
   const [importReport, setImportReport] = useState<any>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [ivrOpen, setIvrOpen] = useState(false);
+  const [manageIvr, setManageIvr] = useState<any | null>(null);
   const [rgOpen, setRgOpen] = useState(false);
   const [queueOpen, setQueueOpen] = useState(false);
   const [createdCreds, setCreatedCreds] = useState<any>(null);
@@ -381,7 +383,27 @@ export default function CustomerDetail() {
         </TabsContent>
         <TabsContent value="ivr" className="space-y-2">
           <div className="flex justify-end"><Button size="sm" onClick={() => setIvrOpen(true)}>+ New IVR</Button></div>
-          <SimpleList rows={ivrs} fields={['ivr_menu_name', 'ivr_menu_extension', 'ivr_menu_enabled']} />
+          <Card><CardContent className="p-0">
+            {(!ivrs || (ivrs as any[]).length === 0) ? (
+              <div className="py-8 text-center text-sm text-muted-foreground">No IVR menus.</div>
+            ) : (
+              <Table>
+                <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Extension</TableHead><TableHead>Enabled</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {(ivrs as any[]).map((r: any) => (
+                    <TableRow key={r.ivr_menu_uuid}>
+                      <TableCell>{r.ivr_menu_name}</TableCell>
+                      <TableCell className="font-mono">{r.ivr_menu_extension}</TableCell>
+                      <TableCell><Badge variant={String(r.ivr_menu_enabled) === 'true' ? 'default' : 'secondary'}>{String(r.ivr_menu_enabled)}</Badge></TableCell>
+                      <TableCell className="text-right">
+                        <Button size="sm" variant="outline" onClick={() => setManageIvr(r)}>Manage options</Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent></Card>
         </TabsContent>
         <TabsContent value="queues" className="space-y-2">
           <div className="flex justify-end"><Button size="sm" onClick={() => setQueueOpen(true)}>+ New Queue</Button></div>
@@ -516,6 +538,9 @@ export default function CustomerDetail() {
           <QueueCreateDialog open={queueOpen} onOpenChange={setQueueOpen}
             domainUuid={domainUuid} extensions={extensions as any[]}
             onCreated={() => qc.invalidateQueries({ queryKey: ['fpbx', 'queues', domainUuid] })} />
+          <IvrOptionsDialog open={!!manageIvr} onOpenChange={(o) => !o && setManageIvr(null)}
+            ivr={manageIvr} domainUuid={domainUuid} domainName={domain.domain_name}
+            extensions={extensions as any[]} ringGroups={ringGroups as any[]} queues={queues as any[]} />
         </>
       )}
 

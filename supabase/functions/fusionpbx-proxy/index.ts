@@ -1022,6 +1022,13 @@ Deno.serve(async (req) => {
       if (!id) return json({ error: "ivr_menu_uuid required" }, 400);
       return json(await pbxWrite(`ivr_menus/${id}`, "DELETE"));
     }
+    if (action === "list-ivr-options-for-menu") {
+      const id = params.ivr_menu_uuid;
+      if (!id) return json({ error: "ivr_menu_uuid required" }, 400);
+      const r = await pbxFetch(`ivr_menu_options?ivr_menu_uuid=${id}&limit=2000`);
+      if (!r.ok) return json(r, r.status || 500);
+      return json({ ok: true, data: collection(r.data, "ivr_menu_options") });
+    }
     if (action === "create-ivr-option") {
       const payload = { ...params, domain_uuid: FUSIONPBX_DOMAIN_UUID };
       return json(await pbxWrite("ivr_menu_options", "POST", { ivr_menu_options: [payload] }));
