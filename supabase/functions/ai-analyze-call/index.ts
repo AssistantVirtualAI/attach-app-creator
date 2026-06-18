@@ -228,14 +228,14 @@ Deno.serve(async (req) => {
     // Audit
     try {
       const auditStatus = aiModel === "stub"
-        ? (!anthropicKey && !lovableKey ? "missing-key" : "ai-error")
+        ? (!lovableKey ? "missing-key" : "ai-error")
         : "ok";
       await admin.from("ai_request_audit_log").insert({
         organization_id, user_id: user.id, call_record_id,
         request_type: "analyze", status: auditStatus,
         error_code: aiReason || null,
         message: insights?.summary?.slice?.(0, 400) || null,
-        provider: aiModel.startsWith("claude") ? "anthropic" : aiModel.startsWith("google") ? "lovable-ai" : "stub",
+        provider: aiModel.startsWith("google") ? "lovable-ai" : "stub",
         model: aiModel,
         metadata: { transcript_provider: transcriptProvider, transcript_is_stub: transcriptIsStub },
       });
