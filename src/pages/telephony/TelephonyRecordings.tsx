@@ -144,7 +144,15 @@ export default function TelephonyRecordings({ scope = 'org' }: { scope?: 'org' |
                   return (
                     <>
                       <div className="flex items-center justify-between gap-2 flex-wrap">
-                        <TranscriptStagePill stage={stage} detail={live?.detail} compact />
+                        <TranscriptStagePill
+                          stage={stage}
+                          detail={live?.detail}
+                          compact
+                          pendingAttempt={pendingSync[c.id]?.attempt}
+                          pendingTotal={pendingSync[c.id]?.total}
+                          pendingNextRetryAt={pendingSync[c.id]?.nextRetryAt}
+                          onRetryNow={() => retryNowRefs[c.id]?.current?.()}
+                        />
                         {sentimentBadge(c.raw_data?.sentiment)}
                         {!stubT && c.transcribed && (
                           <Badge variant="outline" className="text-[10px]">Quality {q.total}/100</Badge>
