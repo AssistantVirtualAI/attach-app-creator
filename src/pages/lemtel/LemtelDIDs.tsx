@@ -54,10 +54,21 @@ export default function LemtelDIDs() {
         <div className="flex gap-2">
           <PbxRefreshButton kind="config" />
           <SyncEverythingButton />
+          <Button variant="outline" onClick={() => setPortingOpen(true)} disabled={!activeDomain?.org_id}>
+            <ArrowRightLeft className="w-4 h-4 mr-2" /> Request porting
+          </Button>
           <Button onClick={() => setOrderOpen(true)}><Plus className="w-4 h-4 mr-2" /> {txt.order}</Button>
         </div>
       </div>
       <OrderDIDModal open={orderOpen} onOpenChange={setOrderOpen} />
+      {activeDomain?.org_id && (
+        <PortingRequestDialog
+          open={portingOpen}
+          onOpenChange={setPortingOpen}
+          organizationId={activeDomain.org_id}
+        />
+      )}
+
       <Card>
         <CardHeader><CardTitle>{numbers.length} DIDs</CardTitle><CardDescription><CheckCircle2 className="inline w-3.5 h-3.5 mr-1 text-primary" />{txt.subtitle}</CardDescription></CardHeader>
         <CardContent>
