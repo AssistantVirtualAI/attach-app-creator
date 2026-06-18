@@ -182,11 +182,21 @@ export function CallIntelligencePanel({ callId, canRegenerate = false }: Props) 
 
         {/* Audit trail */}
         <div className="border-t pt-3">
-          <Button variant="ghost" size="sm" onClick={() => setShowAudit((s) => !s)} className="px-0">
-            <History className="h-3.5 w-3.5 mr-1" />
-            Audit trail ({data.audit.length})
-            {showAudit ? <ChevronUp className="h-4 w-4 ml-1" /> : <ChevronDown className="h-4 w-4 ml-1" />}
-          </Button>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <Button variant="ghost" size="sm" onClick={() => setShowAudit((s) => !s)} className="px-0">
+              <History className="h-3.5 w-3.5 mr-1" />
+              Audit trail ({data.audit.length})
+              {showAudit ? <ChevronUp className="h-4 w-4 ml-1" /> : <ChevronDown className="h-4 w-4 ml-1" />}
+            </Button>
+            <div className="flex gap-1">
+              <Button variant="outline" size="sm" disabled={data.audit.length === 0} onClick={() => exportAuditCsv(callId, data.audit)}>
+                <Download className="h-3.5 w-3.5 mr-1" /> CSV
+              </Button>
+              <Button variant="outline" size="sm" disabled={data.audit.length === 0} onClick={() => exportAuditPdf(callId, data.audit)}>
+                <FileText className="h-3.5 w-3.5 mr-1" /> PDF
+              </Button>
+            </div>
+          </div>
           {showAudit && (
             <div className="mt-2 space-y-1 max-h-72 overflow-auto">
               {data.audit.length === 0 && <p className="text-xs text-muted-foreground">No processing runs recorded yet.</p>}
