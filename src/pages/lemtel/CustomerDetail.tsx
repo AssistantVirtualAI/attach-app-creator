@@ -310,6 +310,7 @@ export default function CustomerDetail() {
           <TabsTrigger value="ivr">IVR</TabsTrigger>
           <TabsTrigger value="queues">Queues</TabsTrigger>
           <TabsTrigger value="ringgroups">Ring Groups</TabsTrigger>
+          <TabsTrigger value="numbers">Phone Numbers</TabsTrigger>
           <TabsTrigger value="recordings">Recordings</TabsTrigger>
           <TabsTrigger value="moh">Music on Hold</TabsTrigger>
         </TabsList>
