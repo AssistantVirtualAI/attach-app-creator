@@ -189,6 +189,7 @@ export default function TelephonyRecordings({ scope = 'org' }: { scope?: 'org' |
                               </div>
                             </>
                           )}
+                          <CallIntelligencePanel callId={c.id} canRegenerate />
                         </div>
                       )}
                     </>
