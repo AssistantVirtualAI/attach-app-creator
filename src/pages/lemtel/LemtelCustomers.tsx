@@ -128,27 +128,29 @@ export default function LemtelCustomers() {
     return m;
   }, [extensions]);
 
-  // Live extension counts per domain (fans out list-extensions in parallel)
-  const { data: liveExtCounts = {}, isLoading: loadingCounts } = useQuery<Record<string, number>>({
-    queryKey: ['fusionpbx', 'ext-counts', (domains as Domain[]).map(d => d.domain_uuid).sort().join(',')],
+  // Live extensions per domain (fans out list-extensions in parallel)
+  const { data: liveExtMap = {}, isLoading: loadingCounts, refetch: refetchLive } = useQuery<Record<string, LiveState>>({
+    queryKey: ['fusionpbx', 'ext-live', (domains as Domain[]).map(d => d.domain_uuid).sort().join(',')],
     enabled: (domains as Domain[]).length > 0,
     staleTime: 60_000,
     queryFn: async () => {
-      const out: Record<string, number> = {};
+      const out: Record<string, LiveState> = {};
       await Promise.all((domains as Domain[]).map(async (d) => {
         try {
-          const { data } = await supabase.functions.invoke('fusionpbx-proxy', {
+          const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
             body: { action: 'list-extensions', domain_uuid: d.domain_uuid },
           });
-          const arr = (data?.extensions || data?.data?.extensions || data?.data || []) as any[];
-          out[d.domain_uuid] = Array.isArray(arr) ? arr.length : 0;
-        } catch {
-          out[d.domain_uuid] = -1;
+          if (error) throw error;
+          const arr = (data?.extensions || data?.data?.extensions || data?.data || []) as LiveExt[];
+          out[d.domain_uuid] = { exts: Array.isArray(arr) ? arr : [] };
+        } catch (e: any) {
+          out[d.domain_uuid] = { exts: [], error: e?.message || 'PBX unreachable' };
         }
       }));
       return out;
     },
   });
+
 
   const filtered = useMemo(() => {
     const s = search.toLowerCase();
@@ -520,23 +522,33 @@ export default function LemtelCustomers() {
               <TableBody>
                 {filtered.length === 0 ? (
                   <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No PBX domains returned. Check FusionPBX credentials.</TableCell></TableRow>
-                ) : filtered.map((d) => {
+                ) : filtered.flatMap((d) => {
                   const org = orgByDomain.get(d.domain_uuid);
                   const exts = extsByDomain.get(d.domain_uuid) || [];
-                  const liveCount = (liveExtCounts as Record<string, number>)[d.domain_uuid];
-                  const hasLive = typeof liveCount === 'number' && liveCount >= 0;
-                  const displayCount = hasLive ? liveCount : exts.length;
+                  const live = (liveExtMap as Record<string, LiveState>)[d.domain_uuid];
+                  const hasLive = !!live && !live.error;
+                  const liveErr = live?.error;
+                  const displayCount = hasLive ? live!.exts.length : exts.length;
 
                   const enabled = d.domain_enabled === true || d.domain_enabled === 'true';
                   const clickable = !!org;
-                  return (
+                  const isOpen = expanded.has(d.domain_uuid);
+                  return [
                     <TableRow
                       key={d.domain_uuid}
                       className={clickable ? "cursor-pointer hover:bg-muted/40" : "opacity-80"}
-                      title={clickable ? "Click to open this customer's portal" : "No tenant org linked"}
+                      title={clickable ? "Click row to open customer portal — chevron to view extensions" : "No tenant org linked"}
                       onClick={() => { if (clickable) manageAs(d); else toast.error('No tenant org linked. Edit the customer to link or recreate.'); }}
                     >
-                      <TableCell><ChevronRight className="w-4 h-4 text-muted-foreground" /></TableCell>
+                      <TableCell>
+                        <button
+                          aria-label={isOpen ? 'Collapse extensions' : 'Expand extensions'}
+                          onClick={(e) => { e.stopPropagation(); toggleExpand(d.domain_uuid); }}
+                          className="p-0.5 hover:bg-muted rounded"
+                        >
+                          <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+                        </button>
+                      </TableCell>
                       <TableCell className="font-mono text-sm">
                         <div className="flex items-center gap-2"><Globe className="w-3.5 h-3.5 text-muted-foreground" />{d.domain_name}</div>
                         {d.domain_description && <div className="text-xs text-muted-foreground mt-0.5">{d.domain_description}</div>}
@@ -545,8 +557,12 @@ export default function LemtelCustomers() {
                         {org ? <span className="font-medium">{org.name}</span> : <span className="text-xs text-muted-foreground">— not linked —</span>}
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        {loadingCounts && !hasLive ? (
+                        {loadingCounts && !live ? (
                           <Loader2 className="w-3 h-3 animate-spin inline" />
+                        ) : liveErr ? (
+                          <span className="inline-flex items-center gap-1.5 text-destructive text-xs" title={liveErr}>
+                            <span className="w-1.5 h-1.5 rounded-full bg-destructive" /> error
+                          </span>
                         ) : (
                           <span className="inline-flex items-center gap-1.5">
                             {hasLive && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" title="Live from PBX" />}
@@ -572,7 +588,7 @@ export default function LemtelCustomers() {
                         </Button>
                         <Button
                           variant="ghost" size="sm" title="Sync from PBX"
-                          onClick={(e) => { e.stopPropagation(); syncDomain(d); }}
+                          onClick={(e) => { e.stopPropagation(); syncDomain(d); refetchLive(); }}
                           disabled={syncing === d.domain_uuid}
                         >
                           {syncing === d.domain_uuid ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
@@ -595,10 +611,22 @@ export default function LemtelCustomers() {
                             <Link to={`/domain/${orgByDomain.get(d.domain_uuid)!.slug}/admin/dashboard`}>Cockpit</Link>
                           </Button>
                         )}
-
                       </TableCell>
-                    </TableRow>
-                  );
+                    </TableRow>,
+                    isOpen ? (
+                      <TableRow key={d.domain_uuid + '-exp'} className="bg-muted/20 hover:bg-muted/20">
+                        <TableCell />
+                        <TableCell colSpan={5} className="py-3">
+                          <ExtensionsPanel
+                            domain={d}
+                            live={live}
+                            loading={loadingCounts && !live}
+                            onChanged={() => refetchLive()}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ) : null,
+                  ].filter(Boolean) as any;
                 })}
               </TableBody>
             </Table>
@@ -690,3 +718,141 @@ export default function LemtelCustomers() {
     </div>
   );
 }
+
+type LiveExt = { extension_uuid?: string; extension: string; effective_caller_id_name?: string; enabled?: string | boolean; description?: string; voicemail_enabled?: string | boolean };
+type LiveState = { exts: LiveExt[]; error?: string };
+
+function ExtensionsPanel({
+  domain,
+  live,
+  loading,
+  onChanged,
+}: {
+  domain: Domain;
+  live: LiveState | undefined;
+  loading: boolean;
+  onChanged: () => void;
+}) {
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [editing, setEditing] = useState<LiveExt | null>(null);
+  const [editDesc, setEditDesc] = useState('');
+  const [editCid, setEditCid] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
+
+  if (loading) {
+    return <div className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="w-3 h-3 animate-spin" /> Loading extensions from PBX…</div>;
+  }
+  if (live?.error) {
+    return (
+      <div className="text-xs text-destructive flex items-center gap-2">
+        <span>⚠ Could not fetch extensions: {live.error}</span>
+        <Button size="sm" variant="outline" onClick={onChanged}>Retry</Button>
+      </div>
+    );
+  }
+  const exts = live?.exts || [];
+  if (!exts.length) {
+    return <div className="text-xs text-muted-foreground">No extensions on this domain.</div>;
+  }
+
+  const doAction = async (ext: LiveExt, action: 'toggle' | 'reset-vm') => {
+    if (!ext.extension_uuid) { toast.error('Missing extension UUID'); return; }
+    setBusyId(ext.extension_uuid);
+    try {
+      const params: any = { extension_uuid: ext.extension_uuid, domain_uuid: domain.domain_uuid };
+      if (action === 'toggle') {
+        const isEn = ext.enabled === true || ext.enabled === 'true';
+        params.enabled = isEn ? 'false' : 'true';
+      } else if (action === 'reset-vm') {
+        params.voicemail_password = String(ext.extension);
+        params.voicemail_enabled = 'true';
+      }
+      const { error } = await supabase.functions.invoke('pbx-write', {
+        body: { organizationId: LEMTEL_ORG, action: 'update-extension', params },
+      });
+      if (error) throw error;
+      toast.success(action === 'toggle' ? 'Extension updated' : `Voicemail reset (PIN = ${ext.extension})`);
+      onChanged();
+    } catch (e: any) {
+      toast.error(e?.message || 'Action failed');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const saveEdit = async () => {
+    if (!editing?.extension_uuid) return;
+    setEditSaving(true);
+    try {
+      const { error } = await supabase.functions.invoke('pbx-write', {
+        body: {
+          organizationId: LEMTEL_ORG,
+          action: 'update-extension',
+          params: {
+            extension_uuid: editing.extension_uuid,
+            domain_uuid: domain.domain_uuid,
+            description: editDesc,
+            effective_caller_id_name: editCid,
+          },
+        },
+      });
+      if (error) throw error;
+      toast.success('Extension saved');
+      setEditing(null);
+      onChanged();
+    } catch (e: any) {
+      toast.error(e?.message || 'Save failed');
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  return (
+    <>
+      <div className="text-xs text-muted-foreground mb-2">{exts.length} extension{exts.length === 1 ? '' : 's'} on <code>{domain.domain_name}</code></div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+        {exts.map((e) => {
+          const isEn = e.enabled === true || e.enabled === 'true';
+          const busy = busyId === e.extension_uuid;
+          return (
+            <div key={e.extension_uuid || e.extension} className="flex items-center justify-between gap-2 rounded-md border bg-background px-2 py-1.5">
+              <div className="min-w-0">
+                <div className="font-mono text-sm">{e.extension}</div>
+                <div className="text-xs text-muted-foreground truncate">{e.effective_caller_id_name || e.description || '—'}</div>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <Badge variant={isEn ? 'default' : 'secondary'} className="text-[10px]">{isEn ? 'on' : 'off'}</Badge>
+                <Button size="sm" variant="ghost" title="Edit" onClick={() => { setEditing(e); setEditDesc(e.description || ''); setEditCid(e.effective_caller_id_name || ''); }}>
+                  <Pencil className="w-3 h-3" />
+                </Button>
+                <Button size="sm" variant="ghost" title={isEn ? 'Disable' : 'Enable'} disabled={busy} onClick={() => doAction(e, 'toggle')}>
+                  {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : isEn ? '⏻' : '✓'}
+                </Button>
+                <Button size="sm" variant="ghost" title="Reset voicemail PIN to extension number" disabled={busy} onClick={() => doAction(e, 'reset-vm')}>
+                  VM
+                </Button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Edit extension {editing?.extension}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Caller ID name</Label><Input value={editCid} onChange={(e) => setEditCid(e.target.value)} /></div>
+            <div><Label>Description</Label><Input value={editDesc} onChange={(e) => setEditDesc(e.target.value)} /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditing(null)}>Cancel</Button>
+            <Button onClick={saveEdit} disabled={editSaving}>
+              {editSaving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />} Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
