@@ -176,9 +176,7 @@ export default function OrgChatView() {
     if (!activeId) return;
     let cancelled = false;
     setTypingNames([]);
-    // Use shared helpers (see orgChatMerge.ts) — covered by Vitest tests.
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { mergeIncoming, mergeOnFetch } = require('./orgChatMerge') as typeof import('./orgChatMerge');
+
 
     (async () => {
       const { data, error } = await supabase.from('org_chat_messages')
