@@ -353,39 +353,31 @@ export default function CustomerDetail() {
 
         <TabsContent value="ivr" className="space-y-2">
           <div className="flex justify-end"><Button size="sm" onClick={() => setIvrOpen(true)}>+ New IVR</Button></div>
-          <Card><CardContent className="p-0">
-            {(!ivrs || (ivrs as any[]).length === 0) ? (
-              <div className="py-8 text-center text-sm text-muted-foreground">No IVR menus.</div>
-            ) : (
-              <Table>
-                <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Extension</TableHead><TableHead>Enabled</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
-                <TableBody>
-                  {(ivrs as any[]).map((r: any) => {
-                    const en = String(r.ivr_menu_enabled) === 'true';
-                    return (
-                      <TableRow key={r.ivr_menu_uuid}>
-                        <TableCell>{r.ivr_menu_name}</TableCell>
-                        <TableCell className="font-mono">{r.ivr_menu_extension}</TableCell>
-                        <TableCell><Badge variant={en ? 'default' : 'secondary'}>{en ? 'on' : 'off'}</Badge></TableCell>
-                        <TableCell className="text-right space-x-1">
-                          <Button size="sm" variant="outline" onClick={() => setManageIvr(r)}>Options</Button>
-                          <Button size="sm" variant="ghost" title={en ? 'Disable' : 'Enable'}
-                            onClick={async () => { if (await pbxWrite('update-ivr', { ivr_menu_uuid: r.ivr_menu_uuid, ivr_menu_enabled: en ? 'false' : 'true' }, 'IVR updated')) refetchIvrs(); }}>
-                            <Power className="w-3 h-3" />
-                          </Button>
-                          <Button size="sm" variant="ghost" title="Delete"
-                            onClick={async () => { if (confirm(`Delete IVR ${r.ivr_menu_name}?`) && await pbxWrite('delete-ivr', { ivr_menu_uuid: r.ivr_menu_uuid }, 'IVR deleted')) refetchIvrs(); }}>
-                            <Trash2 className="w-3 h-3 text-destructive" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent></Card>
+          {(!ivrs || (ivrs as any[]).length === 0) ? (
+            <Card><CardContent className="py-8 text-center text-sm text-muted-foreground">No IVR menus.</CardContent></Card>
+          ) : (
+            <>
+              <EditableList
+                rows={ivrs as any[]}
+                idKey="ivr_menu_uuid"
+                fields={['ivr_menu_name', 'ivr_menu_extension', 'ivr_menu_greet_long']}
+                editableFields={['ivr_menu_name', 'ivr_menu_extension', 'ivr_menu_greet_long']}
+                enabledKey="ivr_menu_enabled"
+                onToggle={async (r, en) => { if (await pbxWrite('update-ivr', { ivr_menu_uuid: r.ivr_menu_uuid, ivr_menu_enabled: en ? 'true' : 'false' }, 'IVR updated')) refetchIvrs(); }}
+                onSave={async (r, patch) => { const ok = await pbxWrite('update-ivr', { ivr_menu_uuid: r.ivr_menu_uuid, ...patch }, 'IVR saved'); if (ok) refetchIvrs(); return ok; }}
+                onDelete={async (r) => { if (confirm(`Delete IVR ${r.ivr_menu_name}?`) && await pbxWrite('delete-ivr', { ivr_menu_uuid: r.ivr_menu_uuid }, 'IVR deleted')) refetchIvrs(); }}
+              />
+              <div className="flex flex-wrap gap-2 pt-2">
+                {(ivrs as any[]).map((r: any) => (
+                  <Button key={r.ivr_menu_uuid} size="sm" variant="outline" onClick={() => setManageIvr(r)}>
+                    Options · {pretty(r.ivr_menu_name)}
+                  </Button>
+                ))}
+              </div>
+            </>
+          )}
         </TabsContent>
+
 
         <TabsContent value="queues" className="space-y-2">
           <div className="flex justify-end"><Button size="sm" onClick={() => setQueueOpen(true)}>+ New Queue</Button></div>
@@ -393,8 +385,10 @@ export default function CustomerDetail() {
             rows={queues as any[]}
             idKey="queue_uuid"
             fields={['queue_name', 'queue_extension', 'queue_strategy']}
+            editableFields={['queue_name', 'queue_extension', 'queue_strategy']}
             enabledKey="queue_enabled"
             onToggle={async (r, en) => { if (await pbxWrite('update-queue', { queue_uuid: r.queue_uuid, queue_enabled: en ? 'true' : 'false' }, 'Queue updated')) refetchQueues(); }}
+            onSave={async (r, patch) => { const ok = await pbxWrite('update-queue', { queue_uuid: r.queue_uuid, ...patch }, 'Queue saved'); if (ok) refetchQueues(); return ok; }}
             onDelete={async (r) => { if (confirm(`Delete queue ${r.queue_name}?`) && await pbxWrite('delete-queue', { queue_uuid: r.queue_uuid }, 'Queue deleted')) refetchQueues(); }}
           />
         </TabsContent>
@@ -405,8 +399,10 @@ export default function CustomerDetail() {
             rows={ringGroups as any[]}
             idKey="ring_group_uuid"
             fields={['ring_group_name', 'ring_group_extension']}
+            editableFields={['ring_group_name', 'ring_group_extension']}
             enabledKey="ring_group_enabled"
             onToggle={async (r, en) => { if (await pbxWrite('update-ring-group', { ring_group_uuid: r.ring_group_uuid, ring_group_enabled: en ? 'true' : 'false' }, 'Ring group updated')) refetchRG(); }}
+            onSave={async (r, patch) => { const ok = await pbxWrite('update-ring-group', { ring_group_uuid: r.ring_group_uuid, ...patch }, 'Ring group saved'); if (ok) refetchRG(); return ok; }}
             onDelete={async (r) => { if (confirm(`Delete ring group ${r.ring_group_name}?`) && await pbxWrite('delete-ring-group', { ring_group_uuid: r.ring_group_uuid }, 'Ring group deleted')) refetchRG(); }}
           />
         </TabsContent>
@@ -416,8 +412,10 @@ export default function CustomerDetail() {
             rows={devices as any[]}
             idKey="device_uuid"
             fields={['device_mac_address', 'device_template', 'device_label']}
+            editableFields={['device_template', 'device_label']}
             enabledKey="device_enabled"
             onToggle={async (r, en) => { if (await pbxWrite('update-device', { device_uuid: r.device_uuid, device_enabled: en ? 'true' : 'false' }, 'Device updated')) refetchDevices(); }}
+            onSave={async (r, patch) => { const ok = await pbxWrite('update-device', { device_uuid: r.device_uuid, ...patch }, 'Device saved'); if (ok) refetchDevices(); return ok; }}
             onDelete={async (r) => { if (confirm(`Delete device ${r.device_mac_address || r.device_uuid}?`) && await pbxWrite('delete-device', { device_uuid: r.device_uuid }, 'Device deleted')) refetchDevices(); }}
           />
         </TabsContent>
@@ -427,11 +425,14 @@ export default function CustomerDetail() {
             rows={destinations as any[]}
             idKey="destination_uuid"
             fields={['destination_number', 'destination_context', 'destination_actions']}
+            editableFields={['destination_number', 'destination_context', 'destination_actions']}
             enabledKey="destination_enabled"
             onToggle={async (r, en) => { if (await pbxWrite('update-destination', { destination_uuid: r.destination_uuid, destination_enabled: en ? 'true' : 'false' }, 'Destination updated')) refetchDest(); }}
+            onSave={async (r, patch) => { const ok = await pbxWrite('update-destination', { destination_uuid: r.destination_uuid, ...patch }, 'Destination saved'); if (ok) refetchDest(); return ok; }}
             onDelete={async (r) => { if (confirm(`Delete destination ${r.destination_number}?`) && await pbxWrite('delete-destination', { destination_uuid: r.destination_uuid }, 'Destination deleted')) refetchDest(); }}
           />
         </TabsContent>
+
 
         <TabsContent value="numbers">
           <PhoneNumbersTab domainUuid={domainUuid} domainName={domain?.domain_name || ''} organizationId={org?.id}
@@ -450,19 +451,13 @@ export default function CustomerDetail() {
               <Table>
                 <TableHeader><TableRow>
                   <TableHead>When</TableHead><TableHead>Dir</TableHead><TableHead>From</TableHead><TableHead>To</TableHead>
-                  <TableHead>Ext</TableHead><TableHead className="text-right">Sec</TableHead><TableHead>Status</TableHead>
+                  <TableHead>Ext</TableHead><TableHead>Caller name</TableHead>
+                  <TableHead className="text-right">Sec</TableHead><TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow></TableHeader>
                 <TableBody>
                   {filteredHistory.map((c: any) => (
-                    <TableRow key={c.id}>
-                      <TableCell className="text-xs">{formatDistanceToNow(new Date(c.start_at), { addSuffix: true })}</TableCell>
-                      <TableCell className="text-xs">{c.direction || '—'}</TableCell>
-                      <TableCell className="font-mono text-xs">{c.caller_number || '—'}</TableCell>
-                      <TableCell className="font-mono text-xs">{c.destination_number || '—'}</TableCell>
-                      <TableCell className="font-mono text-xs">{c.extension || '—'}</TableCell>
-                      <TableCell className="text-right font-mono text-xs">{Math.round(c.duration_seconds ?? 0)}</TableCell>
-                      <TableCell className="text-xs">{c.hangup_cause || '—'}</TableCell>
-                    </TableRow>
+                    <CdrRow key={c.id} row={c} onChanged={() => qc.invalidateQueries({ queryKey: ['cdr', 'history', domainUuid] })} />
                   ))}
                 </TableBody>
               </Table>
@@ -480,28 +475,44 @@ export default function CustomerDetail() {
               </p>
             )}
             {filteredRecordings.map((r: any) => (
-              <div key={r.id} className="border rounded-lg p-3 space-y-2">
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <div className="text-sm">
-                    <span className="font-medium">{r.caller_number ?? '—'} → {r.destination_number ?? '—'}</span>
-                    <span className="text-muted-foreground ml-2">Ext {r.extension ?? '—'} · {Math.round(r.duration_seconds ?? 0)}s · {formatDistanceToNow(new Date(r.start_at), { addSuffix: true })}</span>
-                  </div>
-                  <Button size="sm" variant="outline" disabled={recLoading === r.id} onClick={async () => {
-                    const u = await fetchRecording(r);
-                    if (u) setExpandedRec(expandedRec === r.id ? null : r.id);
-                  }}>{recLoading === r.id ? <Loader2 className="w-3 h-3 animate-spin" /> : expandedRec === r.id ? 'Hide' : 'Play'}</Button>
-                </div>
-                {expandedRec === r.id && recUrls[r.id] && <RecordingWavePlayer key={r.id} url={recUrls[r.id]} autoPlay />}
-              </div>
+              <RecordingRow
+                key={r.id} row={r}
+                expanded={expandedRec === r.id} url={recUrls[r.id]} loading={recLoading === r.id}
+                onPlay={async () => { const u = await fetchRecording(r); if (u) setExpandedRec(expandedRec === r.id ? null : r.id); }}
+                onChanged={() => qc.invalidateQueries({ queryKey: ['cdr', 'recordings', domainUuid] })}
+              />
             ))}
           </CardContent></Card>
         </TabsContent>
 
 
         <TabsContent value="moh">
-          <ReadOnlyList rows={moh as any[]} fields={['music_on_hold_name', 'music_on_hold_rate', 'music_on_hold_enabled']} />
+          <Card><CardContent className="p-4 space-y-2">
+            <p className="text-xs text-muted-foreground">MOH audio files are managed on the PBX server. Values shown are read-only.</p>
+            {(!moh || (moh as any[]).length === 0) ? (
+              <div className="py-6 text-center text-sm text-muted-foreground">No MOH entries.</div>
+            ) : (
+              <Table>
+                <TableHeader><TableRow>
+                  <TableHead>Name</TableHead><TableHead>Rate</TableHead><TableHead>Shuffle</TableHead><TableHead>Enabled</TableHead><TableHead>Path</TableHead>
+                </TableRow></TableHeader>
+                <TableBody>
+                  {(moh as any[]).map((m: any) => (
+                    <TableRow key={m.music_on_hold_uuid}>
+                      <TableCell className="font-medium">{pretty(m.music_on_hold_name)}</TableCell>
+                      <TableCell className="font-mono text-xs">{pretty(m.music_on_hold_rate)}</TableCell>
+                      <TableCell className="text-xs">{pretty(m.music_on_hold_shuffle)}</TableCell>
+                      <TableCell><Badge variant={normalize(m.music_on_hold_enabled) === 'true' ? 'default' : 'secondary'} className="text-[10px]">{normalize(m.music_on_hold_enabled) === 'true' ? 'on' : 'off'}</Badge></TableCell>
+                      <TableCell className="font-mono text-xs truncate max-w-[280px]">{pretty(m.music_on_hold_path)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent></Card>
         </TabsContent>
       </Tabs>
+
 
       {domain && (
         <>
@@ -564,17 +575,57 @@ export default function CustomerDetail() {
   );
 }
 
+function normalize(v: any): string {
+  if (v === null || v === undefined || v === '') return '';
+  if (v === true || v === 'true') return 'true';
+  if (v === false || v === 'false') return 'false';
+  return String(v);
+}
+function pretty(v: any): string {
+  const n = normalize(v);
+  return n === '' ? '—' : n;
+}
+
 function EditableList({
-  rows, idKey, fields, enabledKey, onToggle, onDelete,
+  rows, idKey, fields, enabledKey, editableFields, onToggle, onDelete, onSave,
 }: {
   rows: any[]; idKey: string; fields: string[]; enabledKey: string;
+  editableFields?: string[];
   onToggle: (row: any, enabled: boolean) => Promise<void>;
   onDelete: (row: any) => Promise<void>;
+  onSave?: (row: any, patch: Record<string, string>) => Promise<boolean>;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const editable = editableFields ?? [];
+
   if (!rows || rows.length === 0) {
     return <Card><CardContent className="py-8 text-center text-muted-foreground text-sm">Empty — try Full sync from PBX.</CardContent></Card>;
   }
+
+  const startEdit = (r: any) => {
+    setEditing(r[idKey]);
+    const d: Record<string, string> = {};
+    editable.forEach(f => { d[f] = normalize(r[f]); });
+    setDraft(d);
+  };
+  const cancel = () => { setEditing(null); setDraft({}); };
+  const save = async (r: any) => {
+    if (!onSave) return;
+    setBusy(r[idKey]);
+    try {
+      const patch: Record<string, string> = {};
+      editable.forEach(f => {
+        const next = (draft[f] ?? '').trim();
+        if (next !== normalize(r[f])) patch[f] = next;
+      });
+      if (Object.keys(patch).length === 0) { cancel(); return; }
+      const ok = await onSave(r, patch);
+      if (ok) cancel();
+    } finally { setBusy(null); }
+  };
+
   return (
     <Card><CardContent className="p-0">
       <Table>
@@ -586,21 +637,42 @@ function EditableList({
         <TableBody>
           {rows.map((r) => {
             const id = r[idKey];
-            const en = String(r[enabledKey]) === 'true' || r[enabledKey] === true;
+            const en = normalize(r[enabledKey]) === 'true';
             const isBusy = busy === id;
+            const isEditing = editing === id;
             return (
               <TableRow key={id}>
-                {fields.map(f => <TableCell key={f} className="font-mono text-xs">{String(r[f] ?? '—').slice(0, 80)}</TableCell>)}
+                {fields.map(f => (
+                  <TableCell key={f} className="font-mono text-xs">
+                    {isEditing && editable.includes(f) ? (
+                      <Input value={draft[f] ?? ''} onChange={(e) => setDraft(d => ({ ...d, [f]: e.target.value }))} className="h-7 text-xs" />
+                    ) : pretty(r[f]).slice(0, 80)}
+                  </TableCell>
+                ))}
                 <TableCell><Badge variant={en ? 'default' : 'secondary'} className="text-[10px]">{en ? 'on' : 'off'}</Badge></TableCell>
-                <TableCell className="text-right space-x-1">
-                  <Button size="sm" variant="ghost" title={en ? 'Disable' : 'Enable'} disabled={isBusy}
-                    onClick={async () => { setBusy(id); try { await onToggle(r, !en); } finally { setBusy(null); } }}>
-                    {isBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Power className="w-3 h-3" />}
-                  </Button>
-                  <Button size="sm" variant="ghost" title="Delete" disabled={isBusy}
-                    onClick={async () => { setBusy(id); try { await onDelete(r); } finally { setBusy(null); } }}>
-                    <Trash2 className="w-3 h-3 text-destructive" />
-                  </Button>
+                <TableCell className="text-right space-x-1 whitespace-nowrap">
+                  {isEditing ? (
+                    <>
+                      <Button size="sm" variant="default" disabled={isBusy} onClick={() => save(r)}>
+                        {isBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Save'}
+                      </Button>
+                      <Button size="sm" variant="ghost" disabled={isBusy} onClick={cancel}>Cancel</Button>
+                    </>
+                  ) : (
+                    <>
+                      {onSave && editable.length > 0 && (
+                        <Button size="sm" variant="ghost" title="Edit" onClick={() => startEdit(r)}>Edit</Button>
+                      )}
+                      <Button size="sm" variant="ghost" title={en ? 'Disable' : 'Enable'} disabled={isBusy}
+                        onClick={async () => { setBusy(id); try { await onToggle(r, !en); } finally { setBusy(null); } }}>
+                        {isBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Power className="w-3 h-3" />}
+                      </Button>
+                      <Button size="sm" variant="ghost" title="Delete" disabled={isBusy}
+                        onClick={async () => { setBusy(id); try { await onDelete(r); } finally { setBusy(null); } }}>
+                        <Trash2 className="w-3 h-3 text-destructive" />
+                      </Button>
+                    </>
+                  )}
                 </TableCell>
               </TableRow>
             );
@@ -610,6 +682,7 @@ function EditableList({
     </CardContent></Card>
   );
 }
+
 
 function ReadOnlyList({ rows, fields }: { rows: any[]; fields: string[] }) {
   if (!rows || rows.length === 0) return <Card><CardContent className="py-8 text-center text-muted-foreground text-sm">Empty — try Full sync from PBX.</CardContent></Card>;
@@ -674,6 +747,121 @@ function FilterBar(props: {
       <div className="ml-auto text-xs text-muted-foreground self-center">
         {count} / {total}
       </div>
+    </div>
+  );
+}
+
+function CdrRow({ row, onChanged }: { row: any; onChanged: () => void }) {
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(normalize(row.caller_name));
+  const [notes, setNotes] = useState(normalize(row.notes));
+  const [busy, setBusy] = useState(false);
+
+  const save = async () => {
+    setBusy(true);
+    const { error } = await (supabase as any).from('pbx_call_records')
+      .update({ caller_name: name || null, notes: notes || null }).eq('id', row.id);
+    setBusy(false);
+    if (error) return toast.error(error.message);
+    toast.success('Saved'); setEditing(false); onChanged();
+  };
+  const del = async () => {
+    if (!confirm('Delete this record locally?')) return;
+    setBusy(true);
+    const { error } = await (supabase as any).from('pbx_call_records').delete().eq('id', row.id);
+    setBusy(false);
+    if (error) return toast.error(error.message);
+    toast.success('Deleted'); onChanged();
+  };
+
+  return (
+    <TableRow>
+      <TableCell className="text-xs">{row.start_at ? formatDistanceToNow(new Date(row.start_at), { addSuffix: true }) : '—'}</TableCell>
+      <TableCell className="text-xs">{pretty(row.direction)}</TableCell>
+      <TableCell className="font-mono text-xs">{pretty(row.caller_number)}</TableCell>
+      <TableCell className="font-mono text-xs">{pretty(row.destination_number)}</TableCell>
+      <TableCell className="font-mono text-xs">{pretty(row.extension)}</TableCell>
+      <TableCell className="text-xs">
+        {editing ? <Input value={name} onChange={(e) => setName(e.target.value)} className="h-7 text-xs" />
+          : pretty(row.caller_name)}
+      </TableCell>
+      <TableCell className="text-right font-mono text-xs">{Math.round(row.duration_seconds ?? 0)}</TableCell>
+      <TableCell className="text-xs">{pretty(row.hangup_cause)}</TableCell>
+      <TableCell className="text-right space-x-1 whitespace-nowrap">
+        {editing ? (
+          <>
+            <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes" className="h-7 text-xs inline-block w-32" />
+            <Button size="sm" variant="default" disabled={busy} onClick={save}>{busy ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Save'}</Button>
+            <Button size="sm" variant="ghost" disabled={busy} onClick={() => setEditing(false)}>Cancel</Button>
+          </>
+        ) : (
+          <>
+            <Button size="sm" variant="ghost" onClick={() => setEditing(true)}>Edit</Button>
+            <Button size="sm" variant="ghost" disabled={busy} onClick={del}><Trash2 className="w-3 h-3 text-destructive" /></Button>
+          </>
+        )}
+      </TableCell>
+    </TableRow>
+  );
+}
+
+function RecordingRow({ row, expanded, url, loading, onPlay, onChanged }: {
+  row: any; expanded: boolean; url?: string; loading: boolean;
+  onPlay: () => void; onChanged: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(normalize(row.caller_name));
+  const [notes, setNotes] = useState(normalize(row.notes));
+  const [busy, setBusy] = useState(false);
+
+  const save = async () => {
+    setBusy(true);
+    const { error } = await (supabase as any).from('pbx_call_records')
+      .update({ caller_name: name || null, notes: notes || null }).eq('id', row.id);
+    setBusy(false);
+    if (error) return toast.error(error.message);
+    toast.success('Saved'); setEditing(false); onChanged();
+  };
+  const hide = async () => {
+    if (!confirm('Hide this recording locally? (PBX file is kept)')) return;
+    setBusy(true);
+    const { error } = await (supabase as any).from('pbx_call_records')
+      .update({ has_recording: false, recording_url: null }).eq('id', row.id);
+    setBusy(false);
+    if (error) return toast.error(error.message);
+    toast.success('Hidden'); onChanged();
+  };
+
+  return (
+    <div className="border rounded-lg p-3 space-y-2">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="text-sm">
+          <span className="font-medium">{pretty(row.caller_number)} → {pretty(row.destination_number)}</span>
+          <span className="text-muted-foreground ml-2">
+            {pretty(row.caller_name) !== '—' && `· ${pretty(row.caller_name)} `}
+            Ext {pretty(row.extension)} · {Math.round(row.duration_seconds ?? 0)}s · {row.start_at ? formatDistanceToNow(new Date(row.start_at), { addSuffix: true }) : '—'}
+          </span>
+        </div>
+        <div className="flex gap-1">
+          <Button size="sm" variant="outline" disabled={loading} onClick={onPlay}>
+            {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : expanded ? 'Hide' : 'Play'}
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setEditing((e) => !e)}>{editing ? 'Close' : 'Edit'}</Button>
+          <Button size="sm" variant="ghost" disabled={busy} onClick={hide}><Trash2 className="w-3 h-3 text-destructive" /></Button>
+        </div>
+      </div>
+      {editing && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div><Label className="text-xs">Caller name</Label><Input value={name} onChange={(e) => setName(e.target.value)} className="h-8 text-xs" /></div>
+          <div><Label className="text-xs">Notes</Label><Input value={notes} onChange={(e) => setNotes(e.target.value)} className="h-8 text-xs" /></div>
+          <div className="col-span-full flex justify-end gap-2">
+            <Button size="sm" variant="ghost" onClick={() => setEditing(false)} disabled={busy}>Cancel</Button>
+            <Button size="sm" onClick={save} disabled={busy}>{busy ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Save'}</Button>
+          </div>
+        </div>
+      )}
+      {pretty(row.notes) !== '—' && !editing && <p className="text-xs text-muted-foreground italic">📝 {row.notes}</p>}
+      {expanded && url && <RecordingWavePlayer key={row.id} url={url} autoPlay />}
     </div>
   );
 }
