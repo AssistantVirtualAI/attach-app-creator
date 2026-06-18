@@ -28,7 +28,10 @@ const label = {
 
 export default function LemtelDIDs() {
   const [orderOpen, setOrderOpen] = useState(false);
+  const [portingOpen, setPortingOpen] = useState(false);
+  const activeDomain = useActiveDomain();
   const { data: numbers = [], isLoading } = usePbxPhoneNumbers();
+
   const { data: assignments = [] } = usePbxPhoneNumberAssignments();
   const { data: clients = [] } = usePbxClients();
   const { data: extensions = [] } = usePbxExtensions();
