@@ -89,13 +89,25 @@ export default function LemtelCustomers() {
     },
   });
 
+  // Slugs for cockpit deep-link (RLS-safe — anyone who can see customers can see slugs)
+  const { data: orgSlugs = [] } = useQuery({
+    queryKey: ['organizations', 'slugs'],
+    queryFn: async () => {
+      const { data } = await (supabase as any).from('organizations').select('id,slug');
+      return data || [];
+    },
+  });
+
   const orgByDomain = useMemo(() => {
-    const m = new Map<string, { id: string; name: string }>();
+    const slugById = new Map<string, string>();
+    for (const s of orgSlugs as any[]) slugById.set(s.id, s.slug);
+    const m = new Map<string, { id: string; name: string; slug?: string }>();
     for (const o of orgs as any[]) {
-      if (o.fusionpbx_domain_uuid) m.set(o.fusionpbx_domain_uuid, { id: o.id, name: o.name });
+      if (o.fusionpbx_domain_uuid) m.set(o.fusionpbx_domain_uuid, { id: o.id, name: o.name, slug: slugById.get(o.id) });
     }
     return m;
-  }, [orgs]);
+  }, [orgs, orgSlugs]);
+
 
   const extsByDomain = useMemo(() => {
     const m = new Map<string, Ext[]>();
