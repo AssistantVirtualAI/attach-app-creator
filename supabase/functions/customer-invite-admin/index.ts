@@ -18,12 +18,13 @@ Deno.serve(async (req) => {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const { organizationId, email, fullName } = await req.json();
+    const { organizationId, email, fullName, role: roleInput } = await req.json();
     if (!organizationId || !email) {
       return new Response(JSON.stringify({ error: "organizationId and email required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    const role = roleInput === 'manager' ? 'manager' : 'org_admin';
 
     const url = Deno.env.get("SUPABASE_URL")!;
     const service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -52,6 +53,7 @@ Deno.serve(async (req) => {
 
     // ensure auth user exists; invite if missing
     let targetId: string | null = null;
+    let inviteUrl: string | null = null;
     const { data: existing } = await admin.from("profiles").select("id").eq("email", String(email).toLowerCase()).maybeSingle();
     if (existing?.id) {
       targetId = existing.id;
@@ -67,6 +69,7 @@ Deno.serve(async (req) => {
         });
       }
       targetId = invited?.user?.id ?? null;
+      inviteUrl = (invited as any)?.properties?.action_link ?? null;
     }
     if (!targetId) {
       return new Response(JSON.stringify({ error: "could not resolve user" }), {
@@ -79,11 +82,11 @@ Deno.serve(async (req) => {
       { onConflict: "user_id,organization_id" },
     );
     await admin.from("user_roles").upsert(
-      { user_id: targetId, organization_id: organizationId, role: "org_admin" },
+      { user_id: targetId, organization_id: organizationId, role },
       { onConflict: "user_id,organization_id,role" },
     );
 
-    return new Response(JSON.stringify({ ok: true, user_id: targetId }), {
+    return new Response(JSON.stringify({ ok: true, user_id: targetId, role, invite_url: inviteUrl }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {

@@ -25,9 +25,12 @@ function routeFromDeepLink(url) {
   try {
     const u = new URL(url);
     if (u.protocol !== `${PROTOCOL}:`) return null;
-    // avastatistic://lemtel/admin/sync-health  -> /lemtel/admin/sync-health
+    // avastatistic://login?ava_token=XYZ  -> /login?ava_token=XYZ (auto-login)
+    // avastatistic://lemtel/admin/sync-health -> /lemtel/admin/sync-health
     const pathPart = (u.host ? '/' + u.host : '') + (u.pathname || '');
-    return pathPart.replace(/\/+/g, '/');
+    const cleanPath = pathPart.replace(/\/+/g, '/') || '/';
+    const qs = u.search || '';
+    return cleanPath + qs;
   } catch { return null; }
 }
 
@@ -125,6 +128,12 @@ if (!gotLock) {
   app.whenReady().then(() => {
     Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate));
     createWindow();
+    // First-launch deep link (Windows/Linux pass URL via argv)
+    const initialDeepLink = process.argv.find((a) => a.startsWith(`${PROTOCOL}://`));
+    if (initialDeepLink) {
+      const route = routeFromDeepLink(initialDeepLink);
+      if (route) setTimeout(() => navigateTo(route), 300);
+    }
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();
     });
