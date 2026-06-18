@@ -28,6 +28,10 @@ const ALLOWED_ACTIONS: Record<string, string> = {
   "pbx.create_conflict_resolved": "pbx_create_flow",
   "pbx.create_idempotent_replay": "pbx_create_flow",
   "pbx.create_succeeded": "pbx_create_flow",
+  // Lemtel tenant access events
+  "lemtel.open_tenant_portal": "pbx_domain",
+  "lemtel.impersonate_tenant": "organization",
+  "lemtel.exit_impersonation": "organization",
 };
 
 function json(body: unknown, status = 200) {
