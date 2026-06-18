@@ -86,7 +86,73 @@ Deno.serve(async (req) => {
       { onConflict: "user_id,organization_id,role" },
     );
 
-    return new Response(JSON.stringify({ ok: true, user_id: targetId, role, invite_url: inviteUrl }), {
+    // ---------- Welcome email via Resend ----------
+    let emailSent = false;
+    let emailError: string | null = null;
+    try {
+      const resendKey = Deno.env.get("RESEND_API_KEY");
+      if (resendKey) {
+        const { data: org } = await admin
+          .from("organizations")
+          .select("name, slug")
+          .eq("id", organizationId)
+          .maybeSingle();
+        const slug = (org as any)?.slug || organizationId;
+        const orgName = (org as any)?.name || "your workspace";
+        const firstName = (fullName || String(email).split("@")[0] || "").split(" ")[0];
+        const portalUrl = `https://avastatistic.ca/domain/${slug}/admin`;
+        const html = `
+          <div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:600px;margin:0 auto;color:#0f172a">
+            <h1 style="color:#0023e6;margin-bottom:8px">Bonjour ${firstName || ""},</h1>
+            <p>Votre portail téléphonique <strong>${orgName}</strong> est maintenant activé.</p>
+            <p><strong>Accès portail :</strong> <a href="${portalUrl}" style="color:#0023e6">${portalUrl}</a></p>
+            <p><strong>Email :</strong> ${email}</p>
+            ${inviteUrl ? `<p><strong>Premier accès :</strong> <a href="${inviteUrl}" style="color:#0023e6">Confirmer mon compte et définir mon mot de passe</a></p>` : ""}
+            <h3 style="margin-top:24px">Prochaines étapes</h3>
+            <ol>
+              <li>Connectez-vous au portail</li>
+              <li>Ajoutez vos extensions téléphoniques</li>
+              <li>Configurez votre IVR (menu téléphonique)</li>
+              <li>Téléchargez l'application softphone</li>
+            </ol>
+            <p style="color:#64748b;font-size:13px;margin-top:24px">
+              Support : <a href="mailto:support@ava-telecom.ca" style="color:#0023e6">support@ava-telecom.ca</a>
+            </p>
+            <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0"/>
+            <p style="color:#94a3b8;font-size:12px">Lemtel Communications — Propulsé par AVA Statistic</p>
+          </div>
+        `;
+        const sendFrom = async (from: string) =>
+          fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              from, to: [email],
+              subject: "Votre portail téléphonique Lemtel est prêt 🎉",
+              html,
+            }),
+          });
+        let r = await sendFrom("Lemtel Communications <noreply@ava-telecom.ca>");
+        if (!r.ok && (r.status === 403 || r.status === 422)) {
+          // Fallback domain if ava-telecom.ca isn't verified yet
+          r = await sendFrom("Lemtel Communications <noreply@assistantvirtualai.com>");
+        }
+        if (r.ok) {
+          emailSent = true;
+        } else {
+          emailError = `resend_${r.status}:${(await r.text()).slice(0, 200)}`;
+        }
+      } else {
+        emailError = "RESEND_API_KEY not configured";
+      }
+    } catch (e) {
+      emailError = (e as Error).message;
+    }
+
+    return new Response(JSON.stringify({
+      ok: true, user_id: targetId, role, invite_url: inviteUrl,
+      email_sent: emailSent, email_error: emailError,
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
