@@ -229,27 +229,8 @@ export default function CustomerDetail() {
   };
 
 
-  const linkTenantOrg = async () => {
-    if (!domain || !linkName) { toast.error('Name required'); return; }
-    setLinking(true);
-    try {
-      const { error } = await (supabase as any).rpc('setup_customer_organization', {
-        _name: linkName,
-        _slug: slugify(linkName),
-        _domain_uuid: domainUuid,
-        _domain_name: domain.domain_name,
-        _admin_email: linkEmail || null,
-      });
-      if (error) throw error;
-      toast.success('Tenant organization linked');
-      setLinkOpen(false);
-      refetchOrg();
-    } catch (e: any) {
-      toast.error(e?.message || 'Link failed');
-    } finally {
-      setLinking(false);
-    }
-  };
+
+
 
   const copyPortalLink = () => {
     if (!domain) return;
