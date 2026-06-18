@@ -91,25 +91,6 @@ Deno.serve(async (req) => {
     const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null;
     const ua = req.headers.get('user-agent') || null;
 
-    // Authorization: only super_admin or org_admin/manager of the org may
-    // mutate or reveal provider credentials. `get` without reveal is allowed
-    // for any authenticated org member (returns masked values only).
-    const isPrivileged = async (): Promise<boolean> => {
-      const [{ data: sa }, { data: roles }] = await Promise.all([
-        admin.rpc('is_super_admin', { _user_id: user.id }).then((r: any) => ({ data: !!r.data })).catch(() => ({ data: false })),
-        orgId
-          ? admin.from('user_roles').select('role').eq('user_id', user.id).eq('organization_id', orgId)
-              .in('role', ['org_admin', 'manager'])
-          : Promise.resolve({ data: [] }),
-      ]);
-      return !!sa || ((roles as any[])?.length ?? 0) > 0;
-    };
-    const needsPrivilege = action === 'set' || (action === 'get' && reveal);
-    if (needsPrivilege && !(await isPrivileged())) {
-      await audit('denied', null, { action, reveal });
-      return j({ error: 'forbidden' }, 403);
-    }
-
     const audit = (act: string, field: string | null = null, meta: any = {}) =>
       admin.from('provider_credentials_audit').insert({
         organization_id: orgId,
@@ -122,6 +103,27 @@ Deno.serve(async (req) => {
         user_agent: ua,
         metadata: meta,
       });
+
+    // Authorization: only super_admin or org_admin/manager of the org may
+    // mutate or reveal provider credentials. `get` without reveal is allowed
+    // for any authenticated org member (returns masked values only).
+    const isPrivileged = async (): Promise<boolean> => {
+      try {
+        const sa = await admin.rpc('is_super_admin', { _user_id: user.id });
+        if (sa.data === true) return true;
+      } catch {}
+      if (!orgId) return false;
+      const { data: roles } = await admin
+        .from('user_roles').select('role')
+        .eq('user_id', user.id).eq('organization_id', orgId)
+        .in('role', ['org_admin', 'manager']);
+      return ((roles as any[])?.length ?? 0) > 0;
+    };
+    const needsPrivilege = action === 'set' || (action === 'get' && reveal);
+    if (needsPrivilege && !(await isPrivileged())) {
+      await audit('denied', null, { action, reveal });
+      return j({ error: 'forbidden' }, 403);
+    }
 
     const keyFor = (f: string) => `PROVIDER_${provider.toUpperCase()}_${f.toUpperCase()}`;
 
