@@ -1,124 +1,82 @@
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Brain, Sparkles, RefreshCw, ChevronDown, ChevronUp, Clock, AlertCircle } from "lucide-react";
-import { useCallIntelligence } from "@/hooks/useCallIntelligence";
+import { useEffect, useState } from "react";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
-interface Props {
-  callId: string;
-  canRegenerate?: boolean;
+interface Intel {
+  status: string;
+  transcript: string | null;
+  summary: string | null;
+  sentiment: string | null;
+  satisfaction_score: number | null;
+  coaching_score: number | null;
+  coaching_notes: string[];
+  action_items: string[];
+  topics: string[];
 }
 
-export function CallIntelligencePanel({ callId, canRegenerate = false }: Props) {
-  const { data, isLoading, isPending, regenerate, isRegenerating } = useCallIntelligence(callId);
-  const [showTranscript, setShowTranscript] = useState(false);
+const EMPTY: Intel = {
+  status: "missing", transcript: null, summary: null, sentiment: null,
+  satisfaction_score: null, coaching_score: null,
+  coaching_notes: [], action_items: [], topics: [],
+};
 
-  if (isLoading) {
-    return (
-      <Card>
-        <CardHeader><CardTitle className="text-base flex items-center gap-2"><Brain className="h-4 w-4" /> AI Call Intelligence</CardTitle></CardHeader>
-        <CardContent className="space-y-2"><Skeleton className="h-4 w-3/4" /><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-2/3" /></CardContent>
-      </Card>
-    );
-  }
+export function CallIntelligencePanel({
+  callId, supabase, canRegenerate = false,
+}: { callId: string; supabase: SupabaseClient; canRegenerate?: boolean }) {
+  const [data, setData] = useState<Intel>(EMPTY);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
 
-  if (isPending || data.status === "pending_sync") {
-    return (
-      <Card>
-        <CardHeader><CardTitle className="text-base flex items-center gap-2"><Brain className="h-4 w-4" /> AI Call Intelligence</CardTitle></CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-2 text-sm text-amber-500">
-            <Clock className="h-4 w-4" /> Recording is syncing from the PBX. Analysis will run automatically.
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
+  const loadCached = async (): Promise<Intel | null> => {
+    const [{ data: i }, { data: tr }] = await Promise.all([
+      supabase.from("pbx_ai_insights").select("*").eq("call_record_id", callId).maybeSingle(),
+      supabase.from("pbx_call_transcripts").select("transcript_text").eq("call_record_id", callId)
+        .order("created_at", { ascending: false }).limit(1).maybeSingle(),
+    ]);
+    if (!i || !(tr as any)?.transcript_text) return null;
+    const x: any = i;
+    return {
+      status: "cached", transcript: (tr as any).transcript_text,
+      summary: x.summary, sentiment: x.sentiment,
+      satisfaction_score: x.satisfaction_score, coaching_score: x.coaching_score,
+      coaching_notes: x.coaching_notes ?? [], action_items: x.action_items ?? [], topics: x.topics ?? [],
+    };
+  };
 
-  if (!data.summary && data.status !== "cached") {
-    return (
-      <Card>
-        <CardHeader><CardTitle className="text-base flex items-center gap-2"><Brain className="h-4 w-4" /> AI Call Intelligence</CardTitle></CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <AlertCircle className="h-4 w-4" /> No analysis yet for this call.
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
+  const run = async (force = false) => {
+    setBusy(true);
+    try {
+      if (!force) { const c = await loadCached(); if (c) { setData(c); return; } }
+      const { data: res, error } = await supabase.functions.invoke("process-call-recording", { body: { callId, force } });
+      if (!error && res) setData({ ...EMPTY, ...(res as any) });
+    } finally { setBusy(false); setLoading(false); }
+  };
 
-  const sentimentColor =
-    data.sentiment === "positive" ? "text-emerald-500" :
-    data.sentiment === "negative" ? "text-red-500" : "text-muted-foreground";
+  useEffect(() => { setLoading(true); run(false); /* eslint-disable-next-line */ }, [callId]);
+
+  if (loading) return <div style={{ padding: 12, opacity: 0.7 }}>Loading AI analysis…</div>;
+  if (data.status === "pending_sync") return <div style={{ padding: 12, color: "#f59e0b" }}>⏳ Recording syncing — analysis will run automatically.</div>;
+  if (!data.summary) return <div style={{ padding: 12, opacity: 0.7 }}>No analysis yet.</div>;
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <CardTitle className="text-base flex items-center gap-2">
-          <Brain className="h-4 w-4" /> AI Call Intelligence
-          {data.status === "cached" && <Badge variant="outline" className="text-xs">Cached</Badge>}
-        </CardTitle>
-        {canRegenerate && (
-          <Button variant="ghost" size="sm" onClick={() => regenerate()} disabled={isRegenerating}>
-            <RefreshCw className={`h-3.5 w-3.5 mr-1 ${isRegenerating ? "animate-spin" : ""}`} /> Re-analyze
-          </Button>
-        )}
-      </CardHeader>
-      <CardContent className="space-y-4 text-sm">
-        {data.summary && (
-          <div>
-            <div className="text-xs font-medium uppercase text-muted-foreground mb-1">Summary</div>
-            <p>{data.summary}</p>
-          </div>
-        )}
-
-        <div className="flex flex-wrap gap-2">
-          {data.sentiment && <Badge variant="outline" className={sentimentColor}>Sentiment: {data.sentiment}</Badge>}
-          {data.satisfaction_score != null && <Badge variant="outline">Satisfaction: {data.satisfaction_score}/5</Badge>}
-          {data.quality_score != null && <Badge variant="outline">Quality: {data.quality_score}/5</Badge>}
-          {data.coaching_score != null && <Badge variant="outline">Coaching: {data.coaching_score}/5</Badge>}
-          {data.escalation_needed && <Badge variant="destructive">Escalation needed</Badge>}
-        </div>
-
-        {data.action_items.length > 0 && (
-          <div>
-            <div className="text-xs font-medium uppercase text-muted-foreground mb-1">Action items</div>
-            <ul className="list-disc pl-5 space-y-1">{data.action_items.map((a, i) => <li key={i}>{a}</li>)}</ul>
-          </div>
-        )}
-
-        {data.coaching_notes.length > 0 && (
-          <div>
-            <div className="text-xs font-medium uppercase text-muted-foreground mb-1 flex items-center gap-1">
-              <Sparkles className="h-3 w-3" /> Coaching notes
-            </div>
-            <ul className="list-disc pl-5 space-y-1">{data.coaching_notes.map((c, i) => <li key={i}>{c}</li>)}</ul>
-          </div>
-        )}
-
-        {data.topics.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {data.topics.map((t, i) => <Badge key={i} variant="secondary" className="text-xs">{t}</Badge>)}
-          </div>
-        )}
-
-        {data.transcript && (
-          <div>
-            <Button variant="ghost" size="sm" onClick={() => setShowTranscript((s) => !s)} className="px-0">
-              {showTranscript ? <ChevronUp className="h-4 w-4 mr-1" /> : <ChevronDown className="h-4 w-4 mr-1" />}
-              Transcript
-            </Button>
-            {showTranscript && (
-              <pre className="mt-2 whitespace-pre-wrap text-xs bg-muted/50 p-3 rounded-md max-h-80 overflow-auto">
-                {data.transcript}
-              </pre>
-            )}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+    <div style={{ padding: 12, border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, display: "flex", flexDirection: "column", gap: 10, fontSize: 14 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <strong>🧠 AI Call Intelligence</strong>
+        {canRegenerate && <button onClick={() => run(true)} disabled={busy} style={{ fontSize: 12 }}>{busy ? "…" : "Re-analyze"}</button>}
+      </div>
+      <p style={{ margin: 0 }}>{data.summary}</p>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", fontSize: 12 }}>
+        {data.sentiment && <span>Sentiment: {data.sentiment}</span>}
+        {data.satisfaction_score != null && <span>· Satisfaction: {data.satisfaction_score}/5</span>}
+        {data.coaching_score != null && <span>· Coaching: {data.coaching_score}/5</span>}
+      </div>
+      {data.action_items.length > 0 && (
+        <div><div style={{ fontSize: 11, opacity: 0.6, textTransform: "uppercase" }}>Action items</div>
+          <ul style={{ paddingLeft: 18, margin: 4 }}>{data.action_items.map((a, i) => <li key={i}>{a}</li>)}</ul></div>
+      )}
+      {data.coaching_notes.length > 0 && (
+        <div><div style={{ fontSize: 11, opacity: 0.6, textTransform: "uppercase" }}>✨ Coaching</div>
+          <ul style={{ paddingLeft: 18, margin: 4 }}>{data.coaching_notes.map((c, i) => <li key={i}>{c}</li>)}</ul></div>
+      )}
+    </div>
   );
 }
