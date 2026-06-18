@@ -587,7 +587,7 @@ export default function CustomerDetail() {
       <PbxRowEditDialog
         open={!!editRow}
         onOpenChange={(o) => { if (!o) setEditRow(null); }}
-        title={editRow ? `Edit ${editRow.kind} — all FusionPBX fields` : ''}
+        title={editRow ? `${domain?.domain_name || 'Tenant'} › ${editRow.kind} — all FusionPBX fields` : ''}
         row={editRow?.row}
         idKey={editRow ? ({
           queue: 'queue_uuid', ringgroup: 'ring_group_uuid',
@@ -601,6 +601,10 @@ export default function CustomerDetail() {
           queue: 'update-queue', ringgroup: 'update-ring-group',
           device: 'update-device', destination: 'update-destination',
         } as const)[editRow.kind] : ''}
+        resourceKind={editRow ? ({
+          queue: 'queue', ringgroup: 'ring_group',
+          device: 'device', destination: 'destination',
+        } as const)[editRow.kind] : undefined}
         organizationId={orgId}
         domainUuid={domainUuid}
         onSaved={() => {
@@ -611,15 +615,25 @@ export default function CustomerDetail() {
         }}
       />
 
-      {/* New Device dialog */}
+      {/* New Device dialog — scoped strictly to current tenant domain */}
       <DeviceCreateDialog
         open={deviceCreateOpen}
         onOpenChange={setDeviceCreateOpen}
         organizationId={orgId}
         domainUuid={domainUuid}
         extensions={extensions as any[]}
-        onCreated={() => refetchDevices()}
+        onCreated={async () => {
+          // Trigger a devices-only PBX sync for this tenant, then refetch.
+          try {
+            await supabase.functions.invoke('fusionpbx-proxy', {
+              body: { action: 'sync-all', resources: ['devices'], organization_id: orgId, domain_uuid: domainUuid },
+            });
+          } catch { /* non-fatal */ }
+          qc.invalidateQueries({ queryKey: ['fpbx', 'devices', domainUuid] });
+          refetchDevices();
+        }}
       />
+
 
 
       {/* Invite admin dialog */}
