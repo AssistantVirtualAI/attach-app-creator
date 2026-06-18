@@ -116,13 +116,17 @@ export default function RecordingsList({ onAnalyze, extension }: { onAnalyze?: (
 
 
 
+  const setStatus = (id: string, s: JobStatus) => setStatuses(prev => ({ ...prev, [id]: s }));
+
   const analyze = async (r: RecordingItem) => {
     setWorking(r.id); setError(null);
+    setStatus(r.id, 'queued');
     setItemErrors((all) => { const n = { ...all }; delete n[r.id]; return n; });
     setItemSuccess((all) => { const n = { ...all }; delete n[r.id]; return n; });
     try {
       const organization_id = r.organization_id || '71755d33-ed64-4ad5-a828-61c9d2029eb7';
       let transcript_text = String(r.transcript_text || '').trim();
+      setStatus(r.id, 'running');
       const r1 = await supabase.functions.invoke('ai-transcribe-call', {
         body: {
           callId: r.callId || r.id,
@@ -134,7 +138,6 @@ export default function RecordingsList({ onAnalyze, extension }: { onAnalyze?: (
       });
       if (r1.error) throw r1.error;
       const d1 = (r1.data as any) || {};
-      // Surface stub responses as errors instead of silently succeeding.
       if (d1.stub === true) {
         const reason = d1.reason || d1.error || 'transcription unavailable';
         throw new Error(`Transcription unavailable (${reason}).`);
@@ -153,20 +156,35 @@ export default function RecordingsList({ onAnalyze, extension }: { onAnalyze?: (
       });
       if (r2.error) throw r2.error;
       const ai = (r2.data as any)?.analysis || (r2.data as any) || null;
+
+      // Re-fetch the persisted transcript so a page reload shows it.
+      const callRecId = r.callId || r.id;
+      const { data: persisted } = await supabase
+        .from('pbx_call_transcripts')
+        .select('transcript_text, provider')
+        .eq('call_record_id', callRecId)
+        .maybeSingle();
+      const finalTranscript = (persisted?.transcript_text as string) || transcript_text;
+      if (!finalTranscript || !finalTranscript.trim()) {
+        throw new Error('Transcript was not persisted — please retry.');
+      }
+
       setItems((all) => all.map((x) => x.id === r.id ? {
         ...x,
-        transcript_text,
+        transcript_text: finalTranscript,
         summary: ai?.summary || x.summary,
         topics: ai?.topics || x.topics,
         sentiment: ai?.sentiment || x.sentiment,
         analyzed: true,
       } as RecordingItem : x));
+      setStatus(r.id, 'succeeded');
       setItemSuccess((all) => ({ ...all, [r.id]: 'Analyzed ✓' }));
       onAnalyze?.(r.id);
     } catch (e: any) {
       const msg = displayError(e);
       setError(msg);
       setItemErrors((all) => ({ ...all, [r.id]: msg }));
+      setStatus(r.id, 'failed');
     } finally {
       setWorking(null);
     }
