@@ -517,23 +517,8 @@ export default function CustomerDetail() {
         </>
       )}
 
-      {/* Link tenant org dialog */}
-      <Dialog open={linkOpen} onOpenChange={setLinkOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Link tenant organization</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <div><Label>Organization name</Label><Input value={linkName} onChange={e => setLinkName(e.target.value)} /></div>
-            <div><Label>Admin email (optional)</Label><Input type="email" value={linkEmail} onChange={e => setLinkEmail(e.target.value.toLowerCase())} /></div>
-            <p className="text-xs text-muted-foreground">Creates a tenant organization linked to PBX domain <code>{domain?.domain_name}</code>. After linking, "Manage as this tenant" becomes active.</p>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setLinkOpen(false)}>Cancel</Button>
-            <Button onClick={linkTenantOrg} disabled={linking}>
-              {linking && <Loader2 className="w-4 h-4 mr-2 animate-spin" />} Link
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+
+
 
       {/* Invite admin dialog */}
       <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
