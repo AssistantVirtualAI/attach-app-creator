@@ -52,12 +52,45 @@ export default function RecordingsList({ onAnalyze, extension }: { onAnalyze?: (
   const [audioErrors, setAudioErrors] = useState<Record<string, string>>({});
   const [audioLoading, setAudioLoading] = useState<string | null>(null);
 
+  const hydrateTranscripts = useCallback(async (rows: RecordingItem[]) => {
+    const ids = rows.map(r => r.callId || r.id).filter(Boolean);
+    if (!ids.length) return;
+    const { data } = await supabase
+      .from('pbx_call_transcripts')
+      .select('call_record_id, transcript_text, provider')
+      .in('call_record_id', ids);
+    if (!data?.length) return;
+    const byId = new Map(data.map((t: any) => [t.call_record_id, t]));
+    setItems(prev => prev.map(r => {
+      const t = byId.get(r.callId || r.id);
+      if (!t) return r;
+      const isStub = String(t.provider || '').startsWith('stub');
+      return {
+        ...r,
+        transcript_text: r.transcript_text || t.transcript_text,
+        analyzed: (r as any).analyzed || (!isStub && Boolean(t.transcript_text)),
+      } as RecordingItem;
+    }));
+    setStatuses(prev => {
+      const next = { ...prev };
+      for (const [cid, t] of byId.entries()) {
+        const isStub = String((t as any).provider || '').startsWith('stub');
+        const row = rows.find(r => (r.callId || r.id) === cid);
+        if (row && !next[row.id]) next[row.id] = isStub ? 'failed' : 'succeeded';
+      }
+      return next;
+    });
+  }, []);
+
   const load = useCallback(async (silent = false, force = false) => {
     if (!silent) { setLoading(true); setError(null); }
     if (force) setRefreshing(true);
     try {
       const data = force ? await ava.refreshRecordings(100, { extension }) : await ava.recordings(100, { extension });
-      setItems(Array.isArray(data) ? data : []);
+      const list = Array.isArray(data) ? data : [];
+      setItems(list);
+      // Hydrate persisted transcripts so reload shows them.
+      void hydrateTranscripts(list);
     } catch (e: any) {
       if (!silent || force) {
         setError(e?.message || 'Unable to load recordings.');
@@ -67,7 +100,7 @@ export default function RecordingsList({ onAnalyze, extension }: { onAnalyze?: (
       if (!silent) setLoading(false);
       if (force) setRefreshing(false);
     }
-  }, [extension]);
+  }, [extension, hydrateTranscripts]);
 
   const silentLoad = useCallback(() => { void load(true); }, [load]);
 
