@@ -144,24 +144,45 @@ export async function runTranscribeAndAnalyze(opts: {
   organizationId: string;
   recordingUrl?: string | null;
   onStage: (stage: TranscriptStage, detail?: string) => void;
+  /** Max auto-retries when the recording is pending PBX sync (default 4). */
+  maxPendingSyncRetries?: number;
 }): Promise<{ stage: TranscriptStage; transcriptStub: boolean; insightStub: boolean; reason?: string; data: any }> {
   const { invoke, callRecordId, organizationId, recordingUrl, onStage } = opts;
+  const maxRetries = opts.maxPendingSyncRetries ?? 4;
+  const PENDING_REASONS = new Set(['recording-pending-sync', 'recording-not-synced']);
   try {
     onStage('downloading', 'Connexion à la source audio');
     onStage('transcribing');
-    const t = await invoke('ai-transcribe-call', {
-      call_record_id: callRecordId,
-      organization_id: organizationId,
-      ...(recordingUrl ? { recording_url: recordingUrl } : {}),
-    });
-    if (t.error) {
-      onStage('failed', t.error.message);
-      return { stage: 'failed', transcriptStub: true, insightStub: true, reason: t.error.message, data: t };
+
+    let t: { data: any; error: any } | null = null;
+    let tData: any = {};
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      t = await invoke('ai-transcribe-call', {
+        call_record_id: callRecordId,
+        organization_id: organizationId,
+        ...(recordingUrl ? { recording_url: recordingUrl } : {}),
+      });
+      if (t.error) {
+        onStage('failed', t.error.message);
+        return { stage: 'failed', transcriptStub: true, insightStub: true, reason: t.error.message, data: t };
+      }
+      tData = t.data || {};
+      const reason = tData.reason as string | undefined;
+      const isPending = tData.stub && reason && PENDING_REASONS.has(reason);
+      if (!isPending || attempt === maxRetries) break;
+      // Exponential backoff: 5s, 15s, 45s, 120s (capped). Honor server hint when larger.
+      const base = [5000, 15000, 45000, 120000][Math.min(attempt, 3)];
+      const serverHint = Number(tData.retry_after_ms) || 0;
+      const wait = Math.max(base, serverHint);
+      onStage('pending_sync', `Retry ${attempt + 1}/${maxRetries} dans ${Math.round(wait / 1000)}s`);
+      await new Promise((r) => setTimeout(r, wait));
+      onStage('transcribing');
     }
-    const tData: any = t.data || {};
+
     const transcriptStub = !!tData.stub;
     if (transcriptStub) {
-      onStage('unavailable', tData.reason || 'no-audio');
+      const stage: TranscriptStage = PENDING_REASONS.has(tData.reason) ? 'pending_sync' : 'unavailable';
+      onStage(stage, tData.reason || 'no-audio');
     }
 
     onStage('analyzing');
@@ -176,8 +197,9 @@ export async function runTranscribeAndAnalyze(opts: {
     const aData: any = a.data || {};
     const insightStub = !!aData.stub;
     if (transcriptStub) {
-      onStage('unavailable', tData.reason);
-      return { stage: 'unavailable', transcriptStub, insightStub, reason: tData.reason, data: aData };
+      const stage: TranscriptStage = PENDING_REASONS.has(tData.reason) ? 'pending_sync' : 'unavailable';
+      onStage(stage, tData.reason);
+      return { stage, transcriptStub, insightStub, reason: tData.reason, data: aData };
     }
     onStage('complete');
     return { stage: 'complete', transcriptStub, insightStub, data: aData };
