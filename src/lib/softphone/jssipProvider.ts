@@ -284,14 +284,22 @@ class JsSipProvider {
         this.log("warn", "sip", "WebSocket disconnected", { code: e?.code, reason: e?.reason });
         this.update({ status: "disconnected" });
         if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+        // Don't auto-reconnect if PBX rejected our credentials — would just spam 403s.
+        if ((this.snap as any).authBlocked) return;
         this.reconnectTimer = setTimeout(() => { try { ua.start(); } catch {} }, 5000);
       });
-      ua.on("registered", () => { this.log("info", "sip", "Registered"); this.update({ status: "registered", errorCause: undefined, wssReachable: true, lastRegistrationAt: Date.now() }); });
+      ua.on("registered", () => { this.log("info", "sip", "Registered"); this.update({ status: "registered", errorCause: undefined, wssReachable: true, lastRegistrationAt: Date.now(), ...( { authBlocked: null } as any) }); });
       ua.on("unregistered", (e: any) => this.log("warn", "sip", "Unregistered", { cause: e?.cause }));
       ua.on("registrationFailed", (e: any) => {
         const cause = e?.cause || e?.response?.reason_phrase || "registration failed";
-        this.log("error", "sip", `Registration failed: ${cause}`, { status: e?.response?.status_code });
-        this.update({ status: "error", errorCause: cause });
+        const code = e?.response?.status_code;
+        this.log("error", "sip", `Registration failed: ${cause}`, { status: code });
+        const patch: any = { status: "error", errorCause: cause };
+        if (code === 401 || code === 403 || code === 407) {
+          patch.authBlocked = { code, reason: cause, since: Date.now() };
+          this.log("warn", "sip", `Auth blocked (${code}) — auto-reconnect disabled until credentials refresh`);
+        }
+        this.update(patch);
       });
       ua.on("newRTCSession", (e: any) => this.attachSession(e.session, e.originator));
 
