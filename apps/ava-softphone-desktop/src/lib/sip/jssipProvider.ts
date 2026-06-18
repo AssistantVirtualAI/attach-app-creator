@@ -442,6 +442,8 @@ class JsSipProvider {
     }
     if (this.ua) this.stop();
     this.config = cfg;
+    // Fresh init with (potentially) new credentials — clear any prior auth block.
+    if (this.snap.authBlocked) this.update({ authBlocked: null, errorCause: undefined });
 
     if (cfg.mock || !cfg.password) {
       this.logEvent('warn', cfg.mock ? 'Mock mode — skipping JsSIP init' : 'No SIP password — skipping JsSIP init');
