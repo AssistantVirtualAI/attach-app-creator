@@ -38,7 +38,10 @@ export default function CustomerDetail() {
   const [importing, setImporting] = useState(false);
   const [importReport, setImportReport] = useState<any>(null);
   const [addOpen, setAddOpen] = useState(false);
-  const [addForm, setAddForm] = useState({ extension: '', name: '', email: '' });
+  const [addForm, setAddForm] = useState({
+    extension: '', name: '', email: '',
+    sip_password: '', assign_phone_number: '', send_welcome_email: true,
+  });
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
 
