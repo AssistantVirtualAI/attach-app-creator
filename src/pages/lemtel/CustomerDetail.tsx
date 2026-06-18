@@ -634,8 +634,11 @@ function EditableList({
                     </>
                   ) : (
                     <>
+                      {onEditFull && (
+                        <Button size="sm" variant="outline" title="All FusionPBX fields" onClick={() => onEditFull(r)}>All fields</Button>
+                      )}
                       {onSave && editable.length > 0 && (
-                        <Button size="sm" variant="ghost" title="Edit" onClick={() => startEdit(r)}>Edit</Button>
+                        <Button size="sm" variant="ghost" title="Quick edit" onClick={() => startEdit(r)}>Edit</Button>
                       )}
                       <Button size="sm" variant="ghost" title={en ? 'Disable' : 'Enable'} disabled={isBusy}
                         onClick={async () => { setBusy(id); try { await onToggle(r, !en); } finally { setBusy(null); } }}>
