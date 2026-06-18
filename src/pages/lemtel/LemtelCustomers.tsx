@@ -128,27 +128,31 @@ export default function LemtelCustomers() {
     return m;
   }, [extensions]);
 
-  // Live extension counts per domain (fans out list-extensions in parallel)
-  const { data: liveExtCounts = {}, isLoading: loadingCounts } = useQuery<Record<string, number>>({
-    queryKey: ['fusionpbx', 'ext-counts', (domains as Domain[]).map(d => d.domain_uuid).sort().join(',')],
+  // Live extensions per domain (fans out list-extensions in parallel)
+  type LiveExt = { extension_uuid?: string; extension: string; effective_caller_id_name?: string; enabled?: string | boolean; description?: string; voicemail_enabled?: string | boolean };
+  type LiveState = { exts: LiveExt[]; error?: string };
+  const { data: liveExtMap = {}, isLoading: loadingCounts, refetch: refetchLive } = useQuery<Record<string, LiveState>>({
+    queryKey: ['fusionpbx', 'ext-live', (domains as Domain[]).map(d => d.domain_uuid).sort().join(',')],
     enabled: (domains as Domain[]).length > 0,
     staleTime: 60_000,
     queryFn: async () => {
-      const out: Record<string, number> = {};
+      const out: Record<string, LiveState> = {};
       await Promise.all((domains as Domain[]).map(async (d) => {
         try {
-          const { data } = await supabase.functions.invoke('fusionpbx-proxy', {
+          const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
             body: { action: 'list-extensions', domain_uuid: d.domain_uuid },
           });
-          const arr = (data?.extensions || data?.data?.extensions || data?.data || []) as any[];
-          out[d.domain_uuid] = Array.isArray(arr) ? arr.length : 0;
-        } catch {
-          out[d.domain_uuid] = -1;
+          if (error) throw error;
+          const arr = (data?.extensions || data?.data?.extensions || data?.data || []) as LiveExt[];
+          out[d.domain_uuid] = { exts: Array.isArray(arr) ? arr : [] };
+        } catch (e: any) {
+          out[d.domain_uuid] = { exts: [], error: e?.message || 'PBX unreachable' };
         }
       }));
       return out;
     },
   });
+
 
   const filtered = useMemo(() => {
     const s = search.toLowerCase();
