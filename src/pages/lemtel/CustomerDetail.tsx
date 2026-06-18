@@ -538,6 +538,9 @@ export default function CustomerDetail() {
           <QueueCreateDialog open={queueOpen} onOpenChange={setQueueOpen}
             domainUuid={domainUuid} extensions={extensions as any[]}
             onCreated={() => qc.invalidateQueries({ queryKey: ['fpbx', 'queues', domainUuid] })} />
+          <IvrOptionsDialog open={!!manageIvr} onOpenChange={(o) => !o && setManageIvr(null)}
+            ivr={manageIvr} domainUuid={domainUuid} domainName={domain.domain_name}
+            extensions={extensions as any[]} ringGroups={ringGroups as any[]} queues={queues as any[]} />
         </>
       )}
 
