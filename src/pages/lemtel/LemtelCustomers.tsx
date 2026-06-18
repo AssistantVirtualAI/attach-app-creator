@@ -41,7 +41,9 @@ export default function LemtelCustomers() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
     name: '', domain: '', adminEmail: '', adminPassword: '',
-    companyName: '', address: '', phoneNumbersText: '',
+    adminFirstName: '', adminLastName: '', adminPhone: '',
+    companyName: '', address: '', city: '', province: '', postal: '',
+    phoneNumbersText: '', notes: '',
   });
   const [domainTouched, setDomainTouched] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -52,6 +54,13 @@ export default function LemtelCustomers() {
   const [editEnabled, setEditEnabled] = useState(true);
   const [editSaving, setEditSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [success, setSuccess] = useState<null | {
+    orgId: string; orgName: string; slug?: string;
+    domainName: string; adminEmail: string;
+    adminUserId?: string | null; inviteUrl?: string | null;
+  }>(null);
+  const [mintLoading, setMintLoading] = useState<'desktop' | 'mobile' | null>(null);
+  const [mintedLinks, setMintedLinks] = useState<{ desktop?: string; mobile?: string }>({});
 
   // 1) FusionPBX domains (live, via proxy)
   const { data: domains = [], isLoading: loadingDomains, refetch: refetchDomains } = useQuery({
@@ -172,12 +181,19 @@ export default function LemtelCustomers() {
       }
 
       // 3) Optionally invite the admin (sends email + assigns role)
+      let adminUserId: string | null = null;
+      let inviteUrl: string | null = null;
       if (form.adminEmail && tenantOrgId) {
-        const { error: invErr } = await supabase.functions.invoke('customer-invite-admin', {
-          body: { organizationId: tenantOrgId, email: form.adminEmail },
+        const fullName = `${form.adminFirstName} ${form.adminLastName}`.trim() || undefined;
+        const { data: invData, error: invErr } = await supabase.functions.invoke('customer-invite-admin', {
+          body: { organizationId: tenantOrgId, email: form.adminEmail, fullName },
         });
         if (invErr) toast.error('Invite failed: ' + invErr.message);
-        else toast.success(`Invite sent to ${form.adminEmail}`);
+        else {
+          toast.success(`Invite sent to ${form.adminEmail}`);
+          adminUserId = (invData as any)?.user_id || null;
+          inviteUrl = (invData as any)?.invite_url || null;
+        }
       }
 
 
@@ -185,10 +201,12 @@ export default function LemtelCustomers() {
       if (domainUuid) {
         const phones = form.phoneNumbersText
           .split(/[,\n]/).map(s => s.trim()).filter(Boolean);
+        const addressLine = [form.address, form.city, form.province, form.postal]
+          .map(s => (s || '').trim()).filter(Boolean).join(', ');
         const { error: custErr } = await (supabase as any).from('lemtel_customers').insert({
           name: form.name,
           company_name: form.companyName || form.name,
-          address: form.address || null,
+          address: addressLine || null,
           phone_numbers: phones,
           domain_uuid: domainUuid,
           domain_name: form.domain,
@@ -202,14 +220,28 @@ export default function LemtelCustomers() {
 
         // Best-effort DID provisioning
         for (const n of phones) {
-          const { error: didErr } = await (supabase as any).from('lemtel_dids').insert({
-            number: n,
-          });
+          const { error: didErr } = await (supabase as any).from('lemtel_dids').insert({ number: n });
           if (didErr) toast.warning(`DID ${n}: ${didErr.message}`);
         }
       }
 
-      setForm({ name: '', domain: '', adminEmail: '', adminPassword: '', companyName: '', address: '', phoneNumbersText: '' });
+      // 5) Show success screen with portal + app invite generators
+      if (tenantOrgId) {
+        const slug = slugify(form.name);
+        setSuccess({
+          orgId: tenantOrgId, orgName: form.name, slug,
+          domainName: form.domain, adminEmail: form.adminEmail,
+          adminUserId, inviteUrl,
+        });
+        setMintedLinks({});
+      }
+
+      setForm({
+        name: '', domain: '', adminEmail: '', adminPassword: '',
+        adminFirstName: '', adminLastName: '', adminPhone: '',
+        companyName: '', address: '', city: '', province: '', postal: '',
+        phoneNumbersText: '', notes: '',
+      });
       setDomainTouched(false);
       setOpen(false);
       qc.invalidateQueries({ queryKey: ['fusionpbx', 'list-domains'] });
@@ -217,6 +249,31 @@ export default function LemtelCustomers() {
     } catch (e: any) {
       toast.error(e.message || 'Failed to create customer');
     } finally { setSaving(false); }
+  };
+
+  const mintAppInvite = async (app: 'desktop' | 'mobile') => {
+    if (!success?.adminUserId) {
+      toast.error('Admin user not provisioned yet. They must accept the email invite first.');
+      return;
+    }
+    setMintLoading(app);
+    try {
+      const { data, error } = await supabase.functions.invoke('mint-app-login-token', {
+        body: { target_user_id: success.adminUserId, organization_id: success.orgId, app },
+      });
+      if (error) throw error;
+      const token = (data as any)?.token;
+      if (!token) throw new Error('No token returned');
+      const scheme = app === 'desktop' ? 'ava-desktop' : 'ava-mobile';
+      const httpsFallback = `https://avastatistic.ca/app-login?token=${token}&app=${app}`;
+      const deepLink = `${scheme}://invite?token=${token}`;
+      const url = `${deepLink}\n\nFallback: ${httpsFallback}`;
+      setMintedLinks(s => ({ ...s, [app]: httpsFallback }));
+      await navigator.clipboard.writeText(httpsFallback);
+      toast.success(`${app === 'desktop' ? 'Desktop' : 'Mobile'} invite link copied`);
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to mint invite token');
+    } finally { setMintLoading(null); }
   };
 
   const manageAs = async (d: Domain) => {
@@ -351,21 +408,46 @@ export default function LemtelCustomers() {
                   />
                 </div>
                 <div>
-                  <Label>Address</Label>
-                  <textarea
-                    className="w-full min-h-[50px] rounded-md border bg-background px-3 py-2 text-sm"
+                  <Label>Address (street)</Label>
+                  <Input
                     value={form.address}
                     onChange={e => setForm({ ...form, address: e.target.value })}
-                    placeholder="Street, City, Province, Postal"
+                    placeholder="123 Rue Principale"
                   />
                 </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div><Label>City</Label><Input value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} /></div>
+                  <div><Label>Province</Label><Input value={form.province} onChange={e => setForm({ ...form, province: e.target.value })} placeholder="QC" /></div>
+                  <div><Label>Postal</Label><Input value={form.postal} onChange={e => setForm({ ...form, postal: e.target.value })} placeholder="H1A 1A1" /></div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div><Label>Admin first name *</Label><Input value={form.adminFirstName} onChange={e => setForm({ ...form, adminFirstName: e.target.value })} /></div>
+                  <div><Label>Admin last name *</Label><Input value={form.adminLastName} onChange={e => setForm({ ...form, adminLastName: e.target.value })} /></div>
+                </div>
                 <div>
-                  <Label>Admin email (optional — they get an invite + org_admin role)</Label>
+                  <Label>Admin email *</Label>
                   <Input
                     type="email"
                     value={form.adminEmail}
                     placeholder="admin@customer.com"
                     onChange={e => setForm({ ...form, adminEmail: e.target.value.trim().toLowerCase() })}
+                  />
+                </div>
+                <div>
+                  <Label>Admin phone</Label>
+                  <Input
+                    type="tel"
+                    value={form.adminPhone}
+                    placeholder="+1 514 555 1234"
+                    onChange={e => setForm({ ...form, adminPhone: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label>Notes (internal)</Label>
+                  <textarea
+                    className="w-full min-h-[50px] rounded-md border bg-background px-3 py-2 text-sm"
+                    value={form.notes}
+                    onChange={e => setForm({ ...form, notes: e.target.value })}
                   />
                 </div>
                 <div>
@@ -509,6 +591,63 @@ export default function LemtelCustomers() {
               {editSaving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Save
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!success} onOpenChange={(o) => !o && setSuccess(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>🎉 Customer provisioned</DialogTitle>
+          </DialogHeader>
+          {success && (
+            <div className="space-y-3 text-sm">
+              <div className="rounded-md border bg-muted/40 p-3 space-y-1">
+                <div><strong>Tenant:</strong> {success.orgName}</div>
+                <div><strong>SIP domain:</strong> <code className="text-xs">{success.domainName}</code></div>
+                <div><strong>Admin:</strong> {success.adminEmail}</div>
+              </div>
+              <div className="space-y-2">
+                <Label>Customer portal link</Label>
+                <div className="flex gap-2">
+                  <Input readOnly value={`${window.location.origin}/c/${encodeURIComponent(success.domainName)}`} />
+                  <Button variant="outline" size="sm" onClick={() => {
+                    navigator.clipboard.writeText(`${window.location.origin}/c/${encodeURIComponent(success.domainName)}`);
+                    toast.success('Portal link copied');
+                  }}>Copy</Button>
+                </div>
+              </div>
+              {success.inviteUrl && (
+                <div className="space-y-2">
+                  <Label>Email confirmation link (one-time)</Label>
+                  <div className="flex gap-2">
+                    <Input readOnly value={success.inviteUrl} />
+                    <Button variant="outline" size="sm" onClick={() => { navigator.clipboard.writeText(success.inviteUrl!); toast.success('Copied'); }}>Copy</Button>
+                  </div>
+                </div>
+              )}
+              <div className="space-y-2">
+                <Label>App invite links</Label>
+                <div className="flex gap-2 flex-wrap">
+                  <Button variant="outline" size="sm" onClick={() => mintAppInvite('desktop')} disabled={mintLoading === 'desktop' || !success.adminUserId}>
+                    {mintLoading === 'desktop' ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : null}
+                    Copy desktop invite
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => mintAppInvite('mobile')} disabled={mintLoading === 'mobile' || !success.adminUserId}>
+                    {mintLoading === 'mobile' ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : null}
+                    Copy mobile invite
+                  </Button>
+                </div>
+                {mintedLinks.desktop && <p className="text-xs text-muted-foreground break-all">🖥️ {mintedLinks.desktop}</p>}
+                {mintedLinks.mobile && <p className="text-xs text-muted-foreground break-all">📱 {mintedLinks.mobile}</p>}
+                {!success.adminUserId && (
+                  <p className="text-xs text-amber-600">App invite tokens require the admin user to be provisioned. If the email invite was queued but the user record isn't ready yet, ask them to accept the email first.</p>
+                )}
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={() => setSuccess(null)}>Done</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

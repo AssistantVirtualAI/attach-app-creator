@@ -1,11 +1,37 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { theme, useTheme } from '../../lib/theme';
 import LemtelLogo from '../LemtelLogo';
 import { useTranslation, type I18nKey } from '../../lib/i18n';
 import LanguageSwitcher from '../ui/LanguageSwitcher';
 import { useSyncStatus, formatAge } from '../../hooks/useSyncStatus';
 import { useTenant } from '../../hooks/useTenant';
+import { supabase } from '../../lib/supabaseClient';
 import avaStatisticLogo from '../../assets/ava-statistic-logo.png';
+
+function useOrgChatUnread(currentView: string) {
+  const [total, setTotal] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    let timer: ReturnType<typeof setInterval> | null = null;
+    const load = async () => {
+      try {
+        const { data } = await supabase.functions.invoke('org-chat', { body: { action: 'unread_counts' } });
+        if (!alive) return;
+        const rows = (data as any)?.counts || (data as any)?.data || [];
+        const sum = Array.isArray(rows)
+          ? rows.reduce((acc: number, r: any) => acc + Number(r?.unread_count || 0), 0)
+          : 0;
+        setTotal(sum);
+      } catch { /* ignore */ }
+    };
+    load();
+    timer = setInterval(load, 30000);
+    return () => { alive = false; if (timer) clearInterval(timer); };
+  }, []);
+  // Clear locally when user is viewing chat
+  useEffect(() => { if (currentView === 'orgchat') setTotal(0); }, [currentView]);
+  return total;
+}
 
 
 
@@ -80,6 +106,7 @@ export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch,
   const isDark = mode === 'dark' || mode === 'midnight';
   const { pbx, syncConnected, lastEvent, ageMs, healthy } = useSyncStatus();
   const { extension: myExtension, loading: tenantLoading } = useTenant();
+  const chatUnread = useOrgChatUnread(view);
 
   // Super admins see admin items in the Platform group below, not duplicated above
   const ITEMS: ConsoleView[] = isSuperAdmin ? USER_ITEMS : isAdmin ? [...USER_ITEMS, ...ADMIN_ITEMS] : USER_ITEMS;
@@ -206,7 +233,7 @@ export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch,
       </button>
 
       <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2, WebkitAppRegion: 'no-drag' as any, overflowY: 'auto' }}>
-        {ITEMS.map((v) => <RailItem key={v} v={v} active={view === v} onClick={() => onChange(v)} label={t(NAV_KEY[v])} />)}
+        {ITEMS.map((v) => <RailItem key={v} v={v} active={view === v} onClick={() => onChange(v)} label={t(NAV_KEY[v])} badge={v === 'orgchat' ? chatUnread : 0} />)}
 
         {isSuperAdmin && (
           <>
@@ -293,7 +320,7 @@ export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch,
   );
 }
 
-function RailItem({ v, active, onClick, label }: { v: ConsoleView; active: boolean; onClick: () => void; label?: string }) {
+function RailItem({ v, active, onClick, label, badge }: { v: ConsoleView; active: boolean; onClick: () => void; label?: string; badge?: number }) {
   const { mode } = useTheme();
   const isDark = mode === 'dark' || mode === 'midnight';
   const isAI = v === 'ai';
@@ -351,7 +378,15 @@ function RailItem({ v, active, onClick, label }: { v: ConsoleView; active: boole
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={active ? (isAI ? '#7a4cff' : '#0023e6') : 'currentColor'} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
         <path d={ICON[v]} />
       </svg>
-      {label ?? LABEL[v]}
+      <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label ?? LABEL[v]}</span>
+      {!!badge && badge > 0 && (
+        <span style={{
+          background: '#ef4444', color: '#fff',
+          fontSize: 10, fontWeight: 800, lineHeight: 1,
+          padding: '3px 6px', borderRadius: 999, minWidth: 18,
+          textAlign: 'center', boxShadow: '0 0 0 2px rgba(239,68,68,0.25)',
+        }}>{badge > 99 ? '99+' : badge}</span>
+      )}
     </button>
   );
 }
