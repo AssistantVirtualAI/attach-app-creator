@@ -93,6 +93,7 @@ import LemtelDashboard from "./pages/lemtel/LemtelDashboard";
 import PortalDiagnostic from "./pages/lemtel/PortalDiagnostic";
 import LemtelPortalDashboard from "./pages/lemtel/PortalDashboard";
 import LemtelSettings from "./pages/lemtel/LemtelSettings";
+import ProviderCredentials from "./pages/lemtel/ProviderCredentials";
 import LemtelMessages from "./pages/lemtel/LemtelMessages";
 import LemtelPortalCalls from "./pages/lemtel/LemtelPortalCalls";
 import LemtelStub from "./pages/lemtel/LemtelStub";
@@ -638,6 +639,7 @@ const App = () => (
                 {/* Lemtel Telecom Module — gated to Lemtel org members */}
                 <Route path="/lemtel/dashboard" element={<ProtectedRoute><LemtelGuard><LemtelDashboard /></LemtelGuard></ProtectedRoute>} />
                 <Route path="/lemtel/settings" element={<ProtectedRoute><LemtelGuard><LemtelSettings /></LemtelGuard></ProtectedRoute>} />
+                <Route path="/lemtel/integrations/providers" element={<ProtectedRoute><LemtelGuard><ProviderCredentials /></LemtelGuard></ProtectedRoute>} />
                 <Route path="/lemtel/messages" element={<ProtectedRoute><LemtelGuard><LemtelMessages /></LemtelGuard></ProtectedRoute>} />
                 <Route path="/lemtel/customers" element={<ProtectedRoute><LemtelGuard><LemtelCustomers /></LemtelGuard></ProtectedRoute>} />
                 <Route path="/lemtel/dids" element={<ProtectedRoute><LemtelGuard><LemtelDIDs /></LemtelGuard></ProtectedRoute>} />

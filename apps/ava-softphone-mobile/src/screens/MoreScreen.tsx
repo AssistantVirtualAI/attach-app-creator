@@ -98,7 +98,7 @@ function SubPage({ onBack, title, children }: { onBack: () => void; title: strin
       <div style={{
         display: 'flex', alignItems: 'center', gap: 10,
         padding: '10px 14px 6px', borderBottom: `1px solid ${colors.border}`,
-        background: 'rgba(255,255,255,0.78)', backdropFilter: 'blur(14px)',
+        background: 'rgba(14,27,61,0.78)', backdropFilter: 'blur(14px)',
       }}>
         <button onClick={onBack} style={{
           background: 'transparent', border: 'none', color: colors.lemtelBlue,

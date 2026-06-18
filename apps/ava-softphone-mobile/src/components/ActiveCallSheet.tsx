@@ -53,7 +53,7 @@ export default function ActiveCallSheet({
   return (
     <div style={sheetStyle}>
       {/* Top brand strip */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 16px 8px', padding: '10px 12px', borderRadius: radius.lg, background: 'rgba(255,255,255,0.72)', border: `1px solid ${colors.border}`, boxShadow: shadow.glass }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 16px 8px', padding: '10px 12px', borderRadius: radius.lg, background: 'rgba(255,255,255,0.04)', border: `1px solid ${colors.border}`, boxShadow: shadow.glass }}>
         <span style={{ fontSize: 10, letterSpacing: 1.6, fontWeight: 800, color: colors.signalGold, textTransform: 'uppercase' }}>
           {isIncoming ? 'Incoming · Lemtel' : isOutgoing ? 'Outgoing · Lemtel' : onHold ? 'On hold' : 'In call'}
         </span>
@@ -94,7 +94,7 @@ export default function ActiveCallSheet({
       {aiOpen && (
         <div style={{
           margin: '0 16px 12px', padding: 14, borderRadius: radius.lg,
-          background: `linear-gradient(135deg, rgba(122,76,255,0.16), rgba(35,214,255,0.10), rgba(255,255,255,0.72))`,
+          background: `linear-gradient(135deg, rgba(122,76,255,0.20), rgba(35,214,255,0.14), rgba(255,255,255,0.04))`,
           border: `1px solid ${colors.borderAI}`,
           boxShadow: shadow.glass,
         }}>
@@ -143,14 +143,14 @@ export default function ActiveCallSheet({
         <div style={{
           position: 'absolute', left: 0, right: 0, bottom: 'calc(120px + var(--safe-bottom))',
           padding: '12px 16px',
-          background: 'rgba(255,255,255,0.88)', backdropFilter: 'blur(18px) saturate(170%)',
+          background: 'rgba(14,27,61,0.92)', backdropFilter: 'blur(18px) saturate(170%)',
           borderTop: `1px solid ${colors.border}`,
-          boxShadow: '0 -18px 46px -24px rgba(0,35,230,0.32)',
+          boxShadow: '0 -18px 46px -24px rgba(0,0,0,0.6)',
         }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
             {['1','2','3','4','5','6','7','8','9','*','0','#'].map((d) => (
-              <button key={d} onClick={() => { haptic(); sp.sendDtmf?.(d); }} style={{
-                padding: '14px 0', borderRadius: radius.md, background: colors.graphite,
+              <button key={d} onClick={() => { haptic(); sp.sendDtmf?.(d) ?? sp.sendDTMF?.(d); }} style={{
+                padding: '14px 0', borderRadius: radius.md, background: colors.graphite2,
                 border: `1px solid ${colors.border}`, color: colors.textIce,
                 fontSize: 20, fontWeight: 500, cursor: 'pointer',
               }}>{d}</button>
@@ -174,7 +174,7 @@ function Ctrl({ label, icon, onClick, active, tone = 'default' }: {
     }}>
       <span style={{
         width: 60, height: 60, borderRadius: '50%',
-        background: active ? `${accent}24` : 'rgba(255,255,255,0.76)',
+        background: active ? `${accent}24` : 'rgba(255,255,255,0.06)',
         border: `1px solid ${active ? accent : colors.border}`,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         fontSize: 22, color: active ? accent : colors.textIce,
@@ -206,7 +206,7 @@ function BigButton({ color, onClick, label, icon }: { color: string; onClick: ()
 
 const sheetStyle: React.CSSProperties = {
   position: 'fixed', inset: 0, zIndex: 100,
-  background: `radial-gradient(900px 600px at 50% -12%, rgba(0,35,230,0.18), transparent 66%), radial-gradient(720px 520px at 100% 100%, rgba(224,168,0,0.16), transparent 60%), linear-gradient(180deg, #F9FBFF 0%, #E8F0FA 100%)`,
+  background: `radial-gradient(900px 600px at 50% -12%, rgba(0,35,230,0.32), transparent 66%), radial-gradient(720px 520px at 100% 100%, rgba(224,168,0,0.20), transparent 60%), linear-gradient(180deg, #060C1C 0%, #0A1429 50%, #0E1B3D 100%)`,
   paddingTop: 'calc(36px + var(--safe-top))',
   display: 'flex', flexDirection: 'column',
   color: colors.textIce,

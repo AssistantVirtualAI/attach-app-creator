@@ -5,7 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Eye, EyeOff, Loader2, FlaskConical, Activity } from 'lucide-react';
+import { Eye, EyeOff, Loader2, FlaskConical, Activity, Plug } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { usePbxIntegration, usePbxMockModeToggle } from '@/hooks/usePbxData';
@@ -62,6 +63,20 @@ export default function LemtelSettings() {
         <h1 className="text-3xl font-bold">Lemtel Settings</h1>
         <p className="text-muted-foreground">Configure telecom integrations</p>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Plug className="w-5 h-5" /> Carrier Integrations</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground mb-3">
+            Connect your own Twilio, Telnyx, Skyetel or VoIP.ms credentials. Step-by-step guides included.
+          </p>
+          <Button asChild>
+            <Link to="/lemtel/integrations/providers">Open Provider Credentials</Link>
+          </Button>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
