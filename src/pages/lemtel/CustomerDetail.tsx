@@ -212,13 +212,22 @@ export default function CustomerDetail() {
     }
   };
 
-  const impersonate = async () => {
-    if (!domain || !org) { toast.error('No tenant org linked'); return; }
-    sessionStorage.setItem('lemtel.activeDomain', JSON.stringify({ uuid: domainUuid, name: domain.domain_name, org_id: org.id }));
-    await impersonation.enter(org.id, org.name);
-    toast.success(`Now managing ${domain.domain_name}`);
-    window.location.href = org.slug ? `/domain/${org.slug}/admin/dashboard` : '/console';
+  const openTenantPortal = async () => {
+    if (!domain) { toast.error('Domain not loaded'); return; }
+    // Set Lemtel active-domain scope so child pages know which PBX domain to query.
+    sessionStorage.setItem('lemtel.activeDomain', JSON.stringify({
+      uuid: domainUuid, name: domain.domain_name, org_id: org?.id || null,
+    }));
+    if (org) {
+      await impersonation.enter(org.id, org.name);
+      toast.success(`Now managing ${domain.domain_name}`);
+      window.location.href = org.slug ? `/domain/${org.slug}/admin/dashboard` : '/console';
+    } else {
+      // No Ava org for this domain — open the public tenant portal scoped to the domain.
+      window.open(`/c/${encodeURIComponent(domain.domain_name)}`, '_blank', 'noopener');
+    }
   };
+
 
   const linkTenantOrg = async () => {
     if (!domain || !linkName) { toast.error('Name required'); return; }
