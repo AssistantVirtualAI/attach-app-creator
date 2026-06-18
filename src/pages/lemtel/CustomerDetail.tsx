@@ -45,6 +45,7 @@ export default function CustomerDetail() {
   const [importReport, setImportReport] = useState<any>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [ivrOpen, setIvrOpen] = useState(false);
+  const [manageIvr, setManageIvr] = useState<any | null>(null);
   const [rgOpen, setRgOpen] = useState(false);
   const [queueOpen, setQueueOpen] = useState(false);
   const [createdCreds, setCreatedCreds] = useState<any>(null);
