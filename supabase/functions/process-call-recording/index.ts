@@ -1,5 +1,6 @@
 // process-call-recording: single idempotent pipeline that transcribes + analyzes + coaches a call recording.
 // Short-circuits when results already exist so we never bill or run twice for the same recording.
+// Writes an audit trail of every run to public.call_intelligence_audit.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -17,7 +18,7 @@ const ELEVENLABS_KEY = Deno.env.get("ELEVENLABS_API_KEY");
 const json = (b: unknown, s = 200) =>
   new Response(JSON.stringify(b), { status: s, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-function buildResult(insight: any, transcript: string | null, status: string) {
+function buildResult(insight: any, transcript: string | null, status: string, extras: Record<string, unknown> = {}) {
   return {
     status,
     insight,
@@ -35,11 +36,16 @@ function buildResult(insight: any, transcript: string | null, status: string) {
     risks: insight?.risks ?? [],
     sales_opportunities: insight?.sales_opportunities ?? [],
     escalation_needed: insight?.escalation_needed ?? false,
+    last_processed_at: insight?.created_at ?? null,
+    ...extras,
   };
 }
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  const runId = crypto.randomUUID();
+  const startedAt = Date.now();
+
   try {
     const auth = req.headers.get("Authorization");
     if (!auth?.startsWith("Bearer ")) return json({ error: "Unauthorized" }, 401);
@@ -62,6 +68,20 @@ Deno.serve(async (req) => {
       .single();
     if (callErr || !call) return json({ error: "Call not found" }, 404);
 
+    const audit = async (event: string, status: string, extra: Record<string, unknown> = {}) => {
+      await admin.from("call_intelligence_audit").insert({
+        run_id: runId,
+        organization_id: call.organization_id,
+        call_record_id: call.id,
+        event,
+        status,
+        forced: !!force,
+        triggered_by: userId,
+        duration_ms: Date.now() - startedAt,
+        ...extra,
+      });
+    };
+
     // Membership / super admin check
     const { data: member } = await admin
       .from("organization_members")
@@ -82,34 +102,56 @@ Deno.serve(async (req) => {
       .maybeSingle();
     const { data: existingTr } = await admin
       .from("pbx_call_transcripts")
-      .select("transcript_text")
+      .select("transcript_text, created_at")
       .eq("call_record_id", callId)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
     if (!force && existingInsight && existingTr?.transcript_text) {
-      return json(buildResult(existingInsight, existingTr.transcript_text, "cached"));
+      await audit("skipped_cached", "skipped", {
+        pipeline: "full",
+        metadata: {
+          reason: "transcript_and_insight_present",
+          outputs: { transcript: true, insight: true },
+          insight_created_at: (existingInsight as any).created_at,
+          transcript_created_at: (existingTr as any).created_at,
+        },
+      });
+      return json(buildResult(existingInsight, existingTr.transcript_text, "cached", {
+        skipped_reason: "Transcript and AI insight already exist for this recording — no new run was executed.",
+        outputs_present: { transcript: true, insight: true },
+      }));
     }
 
-    // Advisory lock to prevent concurrent duplicate work
-    const lockKey = `call-intel:${callId}`;
-    const { data: lockRes } = await admin.rpc("pg_try_advisory_lock", { key: lockKey } as any).catch(() => ({ data: null }));
-    // (best-effort; if rpc not available we proceed — short-circuit above is the main guard)
+    // Concurrency guard via Postgres advisory lock (works across all apps/regions)
+    const { data: lockOk } = await admin.rpc("try_lock_call_intel", { _call_id: callId });
+    if (!lockOk) {
+      await audit("locked_busy", "processing", { metadata: { reason: "another_run_in_progress" } });
+      return json({
+        status: "processing",
+        message: "Another analysis run is already in progress for this recording.",
+      }, 409);
+    }
 
     try {
+      await audit("queued", "queued", { pipeline: "full" });
+
       // Step 1: ensure transcript
       let transcript = existingTr?.transcript_text ?? "";
       if (!transcript) {
         if (!call.recording_url) {
+          await audit("failed", "failed", { pipeline: "transcribe", error: "recording_not_available" });
           return json({ status: "pending_sync", message: "Recording not yet available from PBX" }, 202);
         }
         if (!ELEVENLABS_KEY) {
+          await audit("failed", "failed", { pipeline: "transcribe", error: "stt_provider_missing" });
           return json({ error: "Transcription provider not configured" }, 500);
         }
         try {
           const audioRes = await fetch(call.recording_url);
           if (!audioRes.ok) {
+            await audit("failed", "failed", { pipeline: "transcribe", error: `audio_fetch_${audioRes.status}` });
             return json({ status: "pending_sync", message: "Recording not yet retrievable", retry_after_ms: 5000 }, 202);
           }
           const audioBlob = await audioRes.blob();
@@ -125,6 +167,7 @@ Deno.serve(async (req) => {
           if (!sttRes.ok) {
             const t = await sttRes.text();
             console.error("STT failed", sttRes.status, t);
+            await audit("failed", "failed", { pipeline: "transcribe", error: t.slice(0, 500) });
             return json({ error: "Transcription failed", details: t }, 502);
           }
           const sttJson = await sttRes.json();
@@ -138,20 +181,30 @@ Deno.serve(async (req) => {
               language: sttJson.language_code ?? "fr",
             });
             await admin.from("pbx_call_records").update({ transcribed: true }).eq("id", call.id);
+            await audit("transcribed", "processing", { pipeline: "transcribe", metadata: { chars: transcript.length } });
           }
         } catch (e) {
           console.error("STT error", e);
+          await audit("failed", "failed", { pipeline: "transcribe", error: String(e).slice(0, 500) });
           return json({ status: "pending_sync", message: "Transcription temporarily unavailable", retry_after_ms: 5000 }, 202);
         }
       }
 
       if (!transcript) {
+        await audit("failed", "failed", { pipeline: "transcribe", error: "empty_transcript" });
         return json({ status: "pending_sync", message: "Empty transcript", retry_after_ms: 5000 }, 202);
       }
 
       // Step 2: analyze + coach (skip if cached and not force)
       if (existingInsight && !force) {
-        return json(buildResult(existingInsight, transcript, "cached"));
+        await audit("skipped_cached", "skipped", {
+          pipeline: "analyze",
+          metadata: { reason: "insight_present_after_transcribe" },
+        });
+        return json(buildResult(existingInsight, transcript, "cached", {
+          skipped_reason: "Insight already exists — skipped re-analysis.",
+          outputs_present: { transcript: true, insight: true },
+        }));
       }
 
       const destination = call.destination ?? call.destination_number ?? "unknown";
@@ -208,11 +261,18 @@ Deno.serve(async (req) => {
         }),
       });
 
-      if (aiRes.status === 429) return json({ error: "Rate limited, please retry shortly." }, 429);
-      if (aiRes.status === 402) return json({ error: "AI credits exhausted." }, 402);
+      if (aiRes.status === 429) {
+        await audit("failed", "failed", { pipeline: "analyze", error: "rate_limited" });
+        return json({ error: "Rate limited, please retry shortly." }, 429);
+      }
+      if (aiRes.status === 402) {
+        await audit("failed", "failed", { pipeline: "analyze", error: "credits_exhausted" });
+        return json({ error: "AI credits exhausted." }, 402);
+      }
       if (!aiRes.ok) {
         const t = await aiRes.text();
         console.error("AI gateway", aiRes.status, t);
+        await audit("failed", "failed", { pipeline: "analyze", error: t.slice(0, 500) });
         return json({ error: "AI gateway error", details: t }, 500);
       }
       const aiJson = await aiRes.json();
@@ -247,15 +307,23 @@ Deno.serve(async (req) => {
         .single();
       if (insErr) {
         console.error(insErr);
+        await audit("failed", "failed", { pipeline: "analyze", error: insErr.message });
         return json({ error: "Failed to save insight" }, 500);
       }
       await admin.from("pbx_call_records").update({ analyzed: true, transcribed: true }).eq("id", call.id);
+      await audit("analyzed", "analyzed", {
+        pipeline: "analyze",
+        ai_model: row.ai_model,
+        prompt_version: row.prompt_version,
+        metadata: { insight_id: (inserted as any)?.id },
+      });
 
-      return json(buildResult(inserted, transcript, force ? "regenerated" : "created"));
+      return json(buildResult(inserted, transcript, force ? "regenerated" : "created", {
+        run_id: runId,
+        outputs_present: { transcript: true, insight: true },
+      }));
     } finally {
-      if (lockRes) {
-        await admin.rpc("pg_advisory_unlock", { key: lockKey } as any).catch(() => {});
-      }
+      await admin.rpc("unlock_call_intel", { _call_id: callId }).catch(() => {});
     }
   } catch (e) {
     console.error(e);
