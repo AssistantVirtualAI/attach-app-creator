@@ -379,14 +379,21 @@ export default function CustomerDetail() {
         <TabsContent value="extensions">
           <SimpleList loading={loadingExt} rows={extensions} fields={['extension', 'effective_caller_id_name', 'enabled']} />
         </TabsContent>
-        <TabsContent value="ivr">
+        <TabsContent value="ivr" className="space-y-2">
+          <div className="flex justify-end"><Button size="sm" onClick={() => setIvrOpen(true)}>+ New IVR</Button></div>
           <SimpleList rows={ivrs} fields={['ivr_menu_name', 'ivr_menu_extension', 'ivr_menu_enabled']} />
         </TabsContent>
-        <TabsContent value="queues">
+        <TabsContent value="queues" className="space-y-2">
+          <div className="flex justify-end"><Button size="sm" onClick={() => setQueueOpen(true)}>+ New Queue</Button></div>
           <SimpleList rows={queues} fields={['queue_name', 'queue_extension', 'queue_strategy', 'queue_enabled']} />
         </TabsContent>
-        <TabsContent value="ringgroups">
+        <TabsContent value="ringgroups" className="space-y-2">
+          <div className="flex justify-end"><Button size="sm" onClick={() => setRgOpen(true)}>+ New Ring Group</Button></div>
           <SimpleList rows={ringGroups} fields={['ring_group_name', 'ring_group_extension', 'ring_group_enabled']} />
+        </TabsContent>
+        <TabsContent value="numbers">
+          <PhoneNumbersTab domainUuid={domainUuid} domainName={domain?.domain_name || ''} organizationId={org?.id}
+            extensions={extensions as any[]} ivrs={ivrs as any[]} ringGroups={ringGroups as any[]} />
         </TabsContent>
         <TabsContent value="moh">
           <SimpleList rows={moh} fields={['music_on_hold_name', 'music_on_hold_rate', 'music_on_hold_enabled']} />
