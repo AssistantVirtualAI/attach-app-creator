@@ -560,13 +560,14 @@ function pretty(v: any): string {
 }
 
 function EditableList({
-  rows, idKey, fields, enabledKey, editableFields, onToggle, onDelete, onSave,
+  rows, idKey, fields, enabledKey, editableFields, onToggle, onDelete, onSave, onEditFull,
 }: {
   rows: any[]; idKey: string; fields: string[]; enabledKey: string;
   editableFields?: string[];
   onToggle: (row: any, enabled: boolean) => Promise<void>;
   onDelete: (row: any) => Promise<void>;
   onSave?: (row: any, patch: Record<string, string>) => Promise<boolean>;
+  onEditFull?: (row: any) => void;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
