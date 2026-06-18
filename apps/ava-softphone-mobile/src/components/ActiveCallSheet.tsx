@@ -30,6 +30,24 @@ export default function ActiveCallSheet({
   const isOutgoing = sp.snap.callState === 'ringing-out';
   const inCall = sp.snap.callState === 'active' || sp.snap.callState === 'held';
   const onHold = sp.snap.callState === 'held';
+  const isTransfer = !!sp.snap.transferring;
+  const isEnded = sp.snap.callState === 'ended' || sp.snap.callState === 'idle';
+
+  // State-aware accent: ringing=cyan, active=blue, hold=amber, transfer=violet, ended=muted.
+  const stateAccent =
+    isTransfer ? colors.avaViolet :
+    onHold     ? colors.warning :
+    isIncoming || isOutgoing ? colors.avaCyan :
+    inCall     ? colors.lemtelBlue :
+    colors.mutedSilver;
+
+  const stateLabel =
+    isTransfer ? 'Transferring' :
+    isIncoming ? 'Incoming · Lemtel' :
+    isOutgoing ? 'Outgoing · Lemtel' :
+    onHold     ? 'On hold' :
+    inCall     ? 'In call' :
+    isEnded    ? 'Call ended' : 'Lemtel';
 
   const safeCall = (name: string, fn?: () => void) => {
     if (typeof fn !== 'function') {
@@ -50,12 +68,18 @@ export default function ActiveCallSheet({
   };
   const record = () => safeCall('record', () => sp.snap.recording ? sp.stopRecord?.() : sp.startRecord?.());
 
+  const avatarGradient =
+    isTransfer ? `linear-gradient(135deg, ${colors.avaViolet} 0%, ${colors.avaCyan} 100%)` :
+    onHold     ? `linear-gradient(135deg, ${colors.warning} 0%, ${colors.signalGold} 100%)` :
+    isEnded    ? `linear-gradient(135deg, ${colors.graphite2} 0%, ${colors.midnight2} 100%)` :
+    gradients.call;
+
   return (
     <div style={sheetStyle}>
       {/* Top brand strip */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 16px 8px', padding: '10px 12px', borderRadius: radius.lg, background: 'rgba(255,255,255,0.04)', border: `1px solid ${colors.border}`, boxShadow: shadow.glass }}>
-        <span style={{ fontSize: 10, letterSpacing: 1.6, fontWeight: 800, color: colors.signalGold, textTransform: 'uppercase' }}>
-          {isIncoming ? 'Incoming · Lemtel' : isOutgoing ? 'Outgoing · Lemtel' : onHold ? 'On hold' : 'In call'}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 16px 8px', padding: '10px 12px', borderRadius: radius.lg, background: 'rgba(255,255,255,0.04)', border: `1px solid ${stateAccent}55`, boxShadow: shadow.glass }}>
+        <span style={{ fontSize: 10, letterSpacing: 1.6, fontWeight: 800, color: stateAccent, textTransform: 'uppercase' }}>
+          {stateLabel}
         </span>
         <span style={{ fontSize: 10, fontWeight: 700, color: colors.avaCyan, letterSpacing: 1.2 }}>HD · Encrypted</span>
       </div>
@@ -64,17 +88,19 @@ export default function ActiveCallSheet({
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14 }}>
         <div style={{
           width: 132, height: 132, borderRadius: '50%',
-          background: gradients.call,
+          background: avatarGradient,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 54, fontWeight: 300, color: colors.textIce,
-          boxShadow: '0 30px 80px rgba(0,35,230,0.28), inset 0 1px 0 rgba(255,255,255,0.32)',
+          boxShadow: `0 30px 80px ${stateAccent}33, inset 0 1px 0 rgba(255,255,255,0.32)`,
           position: 'relative',
+          opacity: isEnded ? 0.6 : 1,
+          transition: 'background .3s ease, opacity .3s ease',
         }}>
           {String(remote).charAt(0).toUpperCase()}
           {(isIncoming || isOutgoing) && (
             <span style={{
               position: 'absolute', inset: -6, borderRadius: '50%',
-              border: `2px solid ${colors.signalGold}`,
+              border: `2px solid ${stateAccent}`,
               animation: 'pulse-ring 1.4s ease-out infinite',
             }} />
           )}
@@ -84,6 +110,8 @@ export default function ActiveCallSheet({
           {isIncoming && 'Incoming call…'}
           {isOutgoing && 'Calling…'}
           {inCall && fmt(timer)}
+          {isTransfer && 'Transferring call…'}
+          {isEnded && 'Call has ended'}
         </div>
         {sp.snap.muted && inCall && (
           <div style={{ fontSize: 11, color: colors.warning, letterSpacing: 1.2, fontWeight: 700, textTransform: 'uppercase' }}>Microphone muted</div>
