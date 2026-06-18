@@ -37,11 +37,14 @@ function displayError(e: any) {
 // so users don't have to re-download the same PBX audio every time they revisit.
 const audioCache = new Map<string, string>();
 
+type JobStatus = 'idle' | 'queued' | 'running' | 'succeeded' | 'failed';
+
 export default function RecordingsList({ onAnalyze, extension }: { onAnalyze?: (id: string) => void; extension?: string | null }) {
   const [items, setItems] = useState<RecordingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [working, setWorking] = useState<string | null>(null);
+  const [statuses, setStatuses] = useState<Record<string, JobStatus>>({});
   const [error, setError] = useState<string | null>(null);
   const [itemErrors, setItemErrors] = useState<Record<string, string>>({});
   const [itemSuccess, setItemSuccess] = useState<Record<string, string>>({});
@@ -49,12 +52,45 @@ export default function RecordingsList({ onAnalyze, extension }: { onAnalyze?: (
   const [audioErrors, setAudioErrors] = useState<Record<string, string>>({});
   const [audioLoading, setAudioLoading] = useState<string | null>(null);
 
+  const hydrateTranscripts = useCallback(async (rows: RecordingItem[]) => {
+    const ids = rows.map(r => r.callId || r.id).filter(Boolean);
+    if (!ids.length) return;
+    const { data } = await supabase
+      .from('pbx_call_transcripts')
+      .select('call_record_id, transcript_text, provider')
+      .in('call_record_id', ids);
+    if (!data?.length) return;
+    const byId = new Map(data.map((t: any) => [t.call_record_id, t]));
+    setItems(prev => prev.map(r => {
+      const t = byId.get(r.callId || r.id);
+      if (!t) return r;
+      const isStub = String(t.provider || '').startsWith('stub');
+      return {
+        ...r,
+        transcript_text: r.transcript_text || t.transcript_text,
+        analyzed: (r as any).analyzed || (!isStub && Boolean(t.transcript_text)),
+      } as RecordingItem;
+    }));
+    setStatuses(prev => {
+      const next = { ...prev };
+      for (const [cid, t] of byId.entries()) {
+        const isStub = String((t as any).provider || '').startsWith('stub');
+        const row = rows.find(r => (r.callId || r.id) === cid);
+        if (row && !next[row.id]) next[row.id] = isStub ? 'failed' : 'succeeded';
+      }
+      return next;
+    });
+  }, []);
+
   const load = useCallback(async (silent = false, force = false) => {
     if (!silent) { setLoading(true); setError(null); }
     if (force) setRefreshing(true);
     try {
       const data = force ? await ava.refreshRecordings(100, { extension }) : await ava.recordings(100, { extension });
-      setItems(Array.isArray(data) ? data : []);
+      const list = Array.isArray(data) ? data : [];
+      setItems(list);
+      // Hydrate persisted transcripts so reload shows them.
+      void hydrateTranscripts(list);
     } catch (e: any) {
       if (!silent || force) {
         setError(e?.message || 'Unable to load recordings.');
@@ -64,7 +100,7 @@ export default function RecordingsList({ onAnalyze, extension }: { onAnalyze?: (
       if (!silent) setLoading(false);
       if (force) setRefreshing(false);
     }
-  }, [extension]);
+  }, [extension, hydrateTranscripts]);
 
   const silentLoad = useCallback(() => { void load(true); }, [load]);
 
@@ -80,13 +116,17 @@ export default function RecordingsList({ onAnalyze, extension }: { onAnalyze?: (
 
 
 
+  const setStatus = (id: string, s: JobStatus) => setStatuses(prev => ({ ...prev, [id]: s }));
+
   const analyze = async (r: RecordingItem) => {
     setWorking(r.id); setError(null);
+    setStatus(r.id, 'queued');
     setItemErrors((all) => { const n = { ...all }; delete n[r.id]; return n; });
     setItemSuccess((all) => { const n = { ...all }; delete n[r.id]; return n; });
     try {
       const organization_id = r.organization_id || '71755d33-ed64-4ad5-a828-61c9d2029eb7';
       let transcript_text = String(r.transcript_text || '').trim();
+      setStatus(r.id, 'running');
       const r1 = await supabase.functions.invoke('ai-transcribe-call', {
         body: {
           callId: r.callId || r.id,
@@ -98,7 +138,6 @@ export default function RecordingsList({ onAnalyze, extension }: { onAnalyze?: (
       });
       if (r1.error) throw r1.error;
       const d1 = (r1.data as any) || {};
-      // Surface stub responses as errors instead of silently succeeding.
       if (d1.stub === true) {
         const reason = d1.reason || d1.error || 'transcription unavailable';
         throw new Error(`Transcription unavailable (${reason}).`);
@@ -117,20 +156,35 @@ export default function RecordingsList({ onAnalyze, extension }: { onAnalyze?: (
       });
       if (r2.error) throw r2.error;
       const ai = (r2.data as any)?.analysis || (r2.data as any) || null;
+
+      // Re-fetch the persisted transcript so a page reload shows it.
+      const callRecId = r.callId || r.id;
+      const { data: persisted } = await supabase
+        .from('pbx_call_transcripts')
+        .select('transcript_text, provider')
+        .eq('call_record_id', callRecId)
+        .maybeSingle();
+      const finalTranscript = (persisted?.transcript_text as string) || transcript_text;
+      if (!finalTranscript || !finalTranscript.trim()) {
+        throw new Error('Transcript was not persisted — please retry.');
+      }
+
       setItems((all) => all.map((x) => x.id === r.id ? {
         ...x,
-        transcript_text,
+        transcript_text: finalTranscript,
         summary: ai?.summary || x.summary,
         topics: ai?.topics || x.topics,
         sentiment: ai?.sentiment || x.sentiment,
         analyzed: true,
       } as RecordingItem : x));
+      setStatus(r.id, 'succeeded');
       setItemSuccess((all) => ({ ...all, [r.id]: 'Analyzed ✓' }));
       onAnalyze?.(r.id);
     } catch (e: any) {
       const msg = displayError(e);
       setError(msg);
       setItemErrors((all) => ({ ...all, [r.id]: msg }));
+      setStatus(r.id, 'failed');
     } finally {
       setWorking(null);
     }
@@ -263,27 +317,46 @@ autoPlay
             {audioErrors[r.id] && <div style={{ marginTop: 6, fontSize: 10, color: c.textSub, lineHeight: 1.35 }}>{audioErrors[r.id]}</div>}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
-              <div style={{ display: 'flex', gap: 6 }}>
-                {!(r as any).analyzed ? (
-                  <button
-                    onClick={() => analyze(r)}
-                    disabled={working === r.id}
-                    style={{
-                      flex: 1, padding: '6px 10px', borderRadius: 8,
-                      border: `1px solid ${c.borderAI}`, background: 'rgba(124,58,237,0.15)',
-                      color: c.aiLight, fontSize: 11, fontWeight: 600, cursor: 'pointer',
-                      boxShadow: working === r.id ? glow.ai : 'none',
-                    }}
-                  >
-                    {working === r.id ? '✨ Analyzing…' : '✨ Transcribe & Analyze'}
-                  </button>
-                ) : (
-                  <span style={{
-                    fontSize: 10, padding: '4px 8px', borderRadius: 6,
-                    background: 'rgba(16,185,129,0.15)', color: c.green, fontWeight: 600,
-                  }}>✓ Analyzed</span>
-                )}
-              </div>
+              {(() => {
+                const st: JobStatus = statuses[r.id] || ((r as any).analyzed ? 'succeeded' : 'idle');
+                const isBusy = st === 'queued' || st === 'running' || working === r.id;
+                const pillMap: Record<JobStatus, { bg: string; color: string; label: string }> = {
+                  idle: { bg: 'transparent', color: c.textSub, label: '' },
+                  queued: { bg: 'rgba(234,179,8,0.15)', color: c.yellow, label: 'Queued' },
+                  running: { bg: 'rgba(59,130,246,0.18)', color: c.text, label: 'Transcribing…' },
+                  succeeded: { bg: 'rgba(16,185,129,0.15)', color: c.green, label: '✓ Succeeded' },
+                  failed: { bg: 'rgba(239,68,68,0.15)', color: c.red, label: '⚠ Failed' },
+                };
+                const pill = pillMap[st];
+                return (
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    {!(r as any).analyzed ? (
+                      <button
+                        onClick={() => analyze(r)}
+                        disabled={isBusy}
+                        style={{
+                          flex: 1, padding: '6px 10px', borderRadius: 8,
+                          border: `1px solid ${c.borderAI}`, background: 'rgba(124,58,237,0.15)',
+                          color: c.aiLight, fontSize: 11, fontWeight: 600,
+                          cursor: isBusy ? 'wait' : 'pointer',
+                          opacity: isBusy ? 0.6 : 1,
+                          boxShadow: isBusy ? glow.ai : 'none',
+                        }}
+                      >
+                        {isBusy ? '✨ Analyzing…' : '✨ Transcribe & Analyze'}
+                      </button>
+                    ) : (
+                      <span style={{
+                        fontSize: 10, padding: '4px 8px', borderRadius: 6,
+                        background: 'rgba(16,185,129,0.15)', color: c.green, fontWeight: 600,
+                      }}>✓ Analyzed</span>
+                    )}
+                    {pill.label && (
+                      <span style={{ fontSize: 9, padding: '3px 7px', borderRadius: 6, background: pill.bg, color: pill.color, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 700 }}>{pill.label}</span>
+                    )}
+                  </div>
+                );
+              })()}
               {itemErrors[r.id] && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: c.red, lineHeight: 1.35, padding: '4px 6px', background: 'rgba(239,68,68,0.08)', borderRadius: 6 }}>
                   <span style={{ flex: 1 }}>{itemErrors[r.id]}</span>
