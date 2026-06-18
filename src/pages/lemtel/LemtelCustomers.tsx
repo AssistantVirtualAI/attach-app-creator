@@ -408,21 +408,46 @@ export default function LemtelCustomers() {
                   />
                 </div>
                 <div>
-                  <Label>Address</Label>
-                  <textarea
-                    className="w-full min-h-[50px] rounded-md border bg-background px-3 py-2 text-sm"
+                  <Label>Address (street)</Label>
+                  <Input
                     value={form.address}
                     onChange={e => setForm({ ...form, address: e.target.value })}
-                    placeholder="Street, City, Province, Postal"
+                    placeholder="123 Rue Principale"
                   />
                 </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div><Label>City</Label><Input value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} /></div>
+                  <div><Label>Province</Label><Input value={form.province} onChange={e => setForm({ ...form, province: e.target.value })} placeholder="QC" /></div>
+                  <div><Label>Postal</Label><Input value={form.postal} onChange={e => setForm({ ...form, postal: e.target.value })} placeholder="H1A 1A1" /></div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div><Label>Admin first name *</Label><Input value={form.adminFirstName} onChange={e => setForm({ ...form, adminFirstName: e.target.value })} /></div>
+                  <div><Label>Admin last name *</Label><Input value={form.adminLastName} onChange={e => setForm({ ...form, adminLastName: e.target.value })} /></div>
+                </div>
                 <div>
-                  <Label>Admin email (optional — they get an invite + org_admin role)</Label>
+                  <Label>Admin email *</Label>
                   <Input
                     type="email"
                     value={form.adminEmail}
                     placeholder="admin@customer.com"
                     onChange={e => setForm({ ...form, adminEmail: e.target.value.trim().toLowerCase() })}
+                  />
+                </div>
+                <div>
+                  <Label>Admin phone</Label>
+                  <Input
+                    type="tel"
+                    value={form.adminPhone}
+                    placeholder="+1 514 555 1234"
+                    onChange={e => setForm({ ...form, adminPhone: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label>Notes (internal)</Label>
+                  <textarea
+                    className="w-full min-h-[50px] rounded-md border bg-background px-3 py-2 text-sm"
+                    value={form.notes}
+                    onChange={e => setForm({ ...form, notes: e.target.value })}
                   />
                 </div>
                 <div>
