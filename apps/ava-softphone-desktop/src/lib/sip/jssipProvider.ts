@@ -211,6 +211,12 @@ export interface SipEvent {
   message: string;
 }
 
+export interface AuthBlock {
+  code: number;
+  reason: string;
+  since: number;
+}
+
 export interface SoftphoneSnapshot {
   status: SipStatus;
   callState: CallState;
@@ -222,6 +228,7 @@ export interface SoftphoneSnapshot {
   direction: 'in' | 'out' | null;
   startedAt: number | null;
   events: SipEvent[];
+  authBlocked?: AuthBlock | null;
 }
 
 export interface SoftphoneConfig {
