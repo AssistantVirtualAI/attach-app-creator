@@ -234,21 +234,32 @@ export default function CustomerDetail() {
     }
   };
 
+  const auditTenant = async (action: 'lemtel.open_tenant_portal' | 'lemtel.impersonate_tenant', metadata: Record<string, any>) => {
+    try {
+      await supabase.functions.invoke('audit-log', {
+        body: { action, resource_id: domainUuid, metadata },
+      });
+    } catch { /* non-blocking */ }
+  };
+
   const openTenantPortal = async () => {
     if (!domain) { toast.error('Domain not loaded'); return; }
-    // Set Lemtel active-domain scope so child pages know which PBX domain to query.
     sessionStorage.setItem('lemtel.activeDomain', JSON.stringify({
       uuid: domainUuid, name: domain.domain_name, org_id: org?.id || null,
     }));
+    await auditTenant('lemtel.open_tenant_portal', {
+      domain_uuid: domainUuid, domain_name: domain.domain_name, target_org_id: org?.id || null,
+    });
     if (org) {
+      await auditTenant('lemtel.impersonate_tenant', { domain_uuid: domainUuid, target_org_id: org.id });
       await impersonation.enter(org.id, org.name);
       toast.success(`Now managing ${domain.domain_name}`);
       window.location.href = org.slug ? `/domain/${org.slug}/admin/dashboard` : '/console';
     } else {
-      // No Ava org for this domain — open the public tenant portal scoped to the domain.
       window.open(`/c/${encodeURIComponent(domain.domain_name)}`, '_blank', 'noopener');
     }
   };
+
 
 
 
