@@ -2,7 +2,29 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-export const LEMTEL_ORG = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
+const DEFAULT_LEMTEL_ORG = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
+
+/** Read the super-admin's active customer domain (set via DomainSwitcher) */
+function readActiveDomainOrg(): string | null {
+  if (typeof sessionStorage === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem('lemtel.activeDomain');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed?.org_id || null;
+  } catch { return null; }
+}
+
+/**
+ * Effective tenant org id.
+ * - Resolved once at module load (DomainSwitcher triggers full reload on change).
+ * - Falls back to the Lemtel ops org for customers without a pinned domain.
+ */
+export const LEMTEL_ORG: string = readActiveDomainOrg() || DEFAULT_LEMTEL_ORG;
+
+export function getEffectiveOrgId(): string {
+  return readActiveDomainOrg() || DEFAULT_LEMTEL_ORG;
+}
 
 function usePbxTable<T = any>(table: string, opts?: { order?: string; ascending?: boolean; limit?: number; filters?: Record<string, string | number | boolean>; orFilter?: string; enabled?: boolean }) {
   return useQuery({
