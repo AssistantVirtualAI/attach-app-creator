@@ -17,6 +17,7 @@ import { RecordingWavePlayer } from '@/components/portal/RecordingWavePlayer';
 import { formatDistanceToNow } from 'date-fns';
 import { loadPbxRecordingAudio } from '@/lib/pbxRecordingAudio';
 import { useImpersonation } from '@/contexts/ImpersonationContext';
+import SendAppInviteButtons from '@/components/lemtel/SendAppInviteButtons';
 
 async function pbxList(action: string, domain_uuid: string) {
   const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
