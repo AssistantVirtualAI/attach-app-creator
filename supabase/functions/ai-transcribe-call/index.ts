@@ -141,20 +141,27 @@ Deno.serve(async (req) => {
         } catch (e: any) { fetchErrors.push(`direct:${e?.message || "err"}`); }
       }
 
-      // 2. Supabase Storage
+      // 2. Supabase Storage — verify bucket exists first so a stale path
+      //    doesn't surface a scary "Bucket not found" error to the UI.
       const storagePath = recording_path || call?.recording_path;
       if (!audioBytes && storagePath && typeof storagePath === "string" && !storagePath.startsWith("http")) {
         try {
           const parts = storagePath.split("/");
           const bucket = parts.shift()!;
           const path = parts.join("/");
-          const dl = await admin.storage.from(bucket).download(path);
-          if (dl.data) {
-            audioBytes = new Uint8Array(await dl.data.arrayBuffer());
-            audioMime = detectMime(storagePath, dl.data.type);
-            audioSource = "storage";
-          } else if (dl.error) {
-            fetchErrors.push(`storage:${dl.error.message}`);
+          const { data: bucketInfo } = await admin.storage.getBucket(bucket);
+          if (!bucketInfo) {
+            // Bucket missing — silently skip; the proxy fallback below will run.
+            console.log("ai-transcribe-call storage bucket missing, skipping", { bucket });
+          } else {
+            const dl = await admin.storage.from(bucket).download(path);
+            if (dl.data) {
+              audioBytes = new Uint8Array(await dl.data.arrayBuffer());
+              audioMime = detectMime(storagePath, dl.data.type);
+              audioSource = "storage";
+            } else if (dl.error) {
+              fetchErrors.push(`storage:${dl.error.message}`);
+            }
           }
         } catch (e: any) { fetchErrors.push(`storage:${e?.message || "err"}`); }
       }
