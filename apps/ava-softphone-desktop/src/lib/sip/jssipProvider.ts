@@ -526,7 +526,9 @@ class JsSipProvider {
       });
       ua.on('unregistered', () => {
         this.logEvent('warn', 'Unregistered — keep-alive will re-register');
-        // Don't downgrade status; keep-alive will re-register on the next tick.
+        // Don't auto re-register if we're auth-blocked — that's the bug that
+        // produced the 403 storm. kickReconnect() short-circuits when blocked.
+        if (this.snap.authBlocked) return;
         try { ua.register(); } catch { /* noop */ }
       });
       ua.on('registrationFailed', (e: any) => {
@@ -535,6 +537,12 @@ class JsSipProvider {
         const detail = code ? `${code} ${reason}` : reason;
         this.logEvent('error', `Registration failed: ${detail}`);
         this.setStatus('error', detail);
+        if (code === 401 || code === 403 || code === 407) {
+          // Stop the keep-alive/re-register loop until manual restart or new password.
+          if (this.keepAliveTimer) { clearInterval(this.keepAliveTimer); this.keepAliveTimer = null; }
+          this.update({ authBlocked: { code, reason, since: Date.now() } });
+          this.logEvent('warn', `Auth blocked (${code}) — keep-alive disabled. Refresh SIP credentials to retry.`);
+        }
       });
       ua.on('newRTCSession', (e: any) => this.attachSession(e.session, e.originator));
 
