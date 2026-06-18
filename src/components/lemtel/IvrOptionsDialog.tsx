@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,16 +23,27 @@ export function IvrOptionsDialog({
   const menuUuid = ivr?.ivr_menu_uuid;
   const queryKey = ['fpbx', 'ivr-options', menuUuid];
 
-  const { data: options = [], isLoading, refetch } = useQuery({
+  const { data: options = [], isLoading, isFetching, refetch } = useQuery({
     queryKey,
     enabled: open && !!menuUuid,
+    staleTime: 0,
+    refetchOnMount: 'always',
     queryFn: async () => {
-      const { data } = await supabase.functions.invoke('fusionpbx-proxy', {
+      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
         body: { action: 'list-ivr-options-for-menu', ivr_menu_uuid: menuUuid, domain_uuid: domainUuid },
       });
+      if (error) throw error;
       return (data as any)?.data || [];
     },
   });
+
+  // Refetch whenever the dialog opens or the targeted menu changes
+  useEffect(() => {
+    if (open && menuUuid) {
+      qc.invalidateQueries({ queryKey });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, menuUuid]);
 
   const [editId, setEditId] = useState<string | null>(null);
   const [draft, setDraft] = useState<{ digit: string; label: string; destType: DestType; destValue: string }>({ digit: '', label: '', destType: 'extension', destValue: '' });
@@ -94,6 +105,7 @@ export function IvrOptionsDialog({
       if (error) throw error;
       toast.success(editId ? 'Option updated' : 'Option added');
       cancel();
+      await qc.invalidateQueries({ queryKey });
       await refetch();
       qc.invalidateQueries({ queryKey: ['fpbx', 'ivrs'] });
     } catch (e: any) { toast.error(e?.message || 'Failed'); }
@@ -109,7 +121,9 @@ export function IvrOptionsDialog({
       });
       if (error) throw error;
       toast.success('Option deleted');
+      await qc.invalidateQueries({ queryKey });
       await refetch();
+      qc.invalidateQueries({ queryKey: ['fpbx', 'ivrs'] });
     } catch (e: any) { toast.error(e?.message || 'Failed'); }
     finally { setBusy(false); }
   };
@@ -190,7 +204,11 @@ export function IvrOptionsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Options · {ivr?.ivr_menu_name || ''} <span className="text-muted-foreground font-normal text-sm">(ext {ivr?.ivr_menu_extension})</span></DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <span>Options · {ivr?.ivr_menu_name || ''}</span>
+            <span className="text-muted-foreground font-normal text-sm">(ext {ivr?.ivr_menu_extension})</span>
+            {isFetching && !isLoading && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
+          </DialogTitle>
         </DialogHeader>
         <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
           {isLoading ? (
