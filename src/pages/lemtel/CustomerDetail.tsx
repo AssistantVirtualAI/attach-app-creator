@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { ArrowLeft, Globe, Loader2, RefreshCw, LogIn, Link2, Trash2, Power, Mail, Link as LinkIcon } from 'lucide-react';
+import { ArrowLeft, Globe, Loader2, RefreshCw, LogIn, Link2, Trash2, Power, Mail, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { RecordingWavePlayer } from '@/components/portal/RecordingWavePlayer';
 import { formatDistanceToNow } from 'date-fns';
@@ -24,6 +24,8 @@ import { QueueCreateDialog } from '@/components/lemtel/QueueCreateDialog';
 import { PhoneNumbersTab } from '@/components/lemtel/PhoneNumbersTab';
 import { IvrOptionsDialog } from '@/components/lemtel/IvrOptionsDialog';
 import { ExtensionsPanel, type LiveState } from '@/components/lemtel/ExtensionsPanel';
+import { PbxRowEditDialog } from '@/components/lemtel/PbxRowEditDialog';
+import { DeviceCreateDialog } from '@/components/lemtel/DeviceCreateDialog';
 import { LEMTEL_ORG_ID } from '@/hooks/useLemtelAccess';
 
 async function pbxList(action: string, domain_uuid: string) {
@@ -34,7 +36,7 @@ async function pbxList(action: string, domain_uuid: string) {
   return data?.data || data?.[Object.keys(data || {})[0]] || [];
 }
 
-const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+
 
 export default function CustomerDetail() {
   const { domainUuid = '' } = useParams();
@@ -49,10 +51,9 @@ export default function CustomerDetail() {
   const [rgOpen, setRgOpen] = useState(false);
   const [queueOpen, setQueueOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  const [linkOpen, setLinkOpen] = useState(false);
-  const [linkName, setLinkName] = useState('');
-  const [linkEmail, setLinkEmail] = useState('');
-  const [linking, setLinking] = useState(false);
+  const [deviceCreateOpen, setDeviceCreateOpen] = useState(false);
+  const [editRow, setEditRow] = useState<{ kind: 'queue' | 'ringgroup' | 'device' | 'destination'; row: any } | null>(null);
+
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<'org_admin' | 'manager'>('org_admin');
@@ -65,7 +66,7 @@ export default function CustomerDetail() {
     },
   });
 
-  const { data: org, refetch: refetchOrg } = useQuery({
+  const { data: org } = useQuery({
     queryKey: ['org', 'by-domain', domainUuid],
     queryFn: async () => {
       const { data } = await (supabase as any).rpc('get_org_by_fusionpbx_domain', { _domain_uuid: domainUuid });
@@ -212,35 +213,25 @@ export default function CustomerDetail() {
     }
   };
 
-  const impersonate = async () => {
-    if (!domain || !org) { toast.error('No tenant org linked'); return; }
-    sessionStorage.setItem('lemtel.activeDomain', JSON.stringify({ uuid: domainUuid, name: domain.domain_name, org_id: org.id }));
-    await impersonation.enter(org.id, org.name);
-    toast.success(`Now managing ${domain.domain_name}`);
-    window.location.href = org.slug ? `/domain/${org.slug}/admin/dashboard` : '/console';
-  };
-
-  const linkTenantOrg = async () => {
-    if (!domain || !linkName) { toast.error('Name required'); return; }
-    setLinking(true);
-    try {
-      const { error } = await (supabase as any).rpc('setup_customer_organization', {
-        _name: linkName,
-        _slug: slugify(linkName),
-        _domain_uuid: domainUuid,
-        _domain_name: domain.domain_name,
-        _admin_email: linkEmail || null,
-      });
-      if (error) throw error;
-      toast.success('Tenant organization linked');
-      setLinkOpen(false);
-      refetchOrg();
-    } catch (e: any) {
-      toast.error(e?.message || 'Link failed');
-    } finally {
-      setLinking(false);
+  const openTenantPortal = async () => {
+    if (!domain) { toast.error('Domain not loaded'); return; }
+    // Set Lemtel active-domain scope so child pages know which PBX domain to query.
+    sessionStorage.setItem('lemtel.activeDomain', JSON.stringify({
+      uuid: domainUuid, name: domain.domain_name, org_id: org?.id || null,
+    }));
+    if (org) {
+      await impersonation.enter(org.id, org.name);
+      toast.success(`Now managing ${domain.domain_name}`);
+      window.location.href = org.slug ? `/domain/${org.slug}/admin/dashboard` : '/console';
+    } else {
+      // No Ava org for this domain — open the public tenant portal scoped to the domain.
+      window.open(`/c/${encodeURIComponent(domain.domain_name)}`, '_blank', 'noopener');
     }
   };
+
+
+
+
 
   const copyPortalLink = () => {
     if (!domain) return;
@@ -299,11 +290,8 @@ export default function CustomerDetail() {
             <Globe className="w-6 h-6" /> {domain?.domain_name || domainUuid}
           </h1>
           <p className="text-sm text-muted-foreground flex items-center gap-2 mt-0.5">
-            {org ? (
-              <Badge variant="default" className="text-[10px]">Linked · {org.name}</Badge>
-            ) : (
-              <Badge variant="secondary" className="text-[10px] bg-amber-500/20 text-amber-700 dark:text-amber-300">No tenant org — click Link tenant</Badge>
-            )}
+            <Badge variant="outline" className="text-[10px]">Domain · {domain?.domain_name || domainUuid}</Badge>
+            {org && <Badge variant="default" className="text-[10px]">Ava org · {org.name}</Badge>}
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -311,32 +299,32 @@ export default function CustomerDetail() {
           <Button variant="outline" size="sm" onClick={syncAll} disabled={syncing}>
             {syncing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />} Full sync from PBX
           </Button>
-          {org ? (
-            <>
-              <Button variant="outline" size="sm" onClick={() => setInviteOpen(true)}><Mail className="w-4 h-4 mr-2" /> Invite admin</Button>
-              <Button size="sm" onClick={impersonate}><LogIn className="w-4 h-4 mr-2" /> Manage as this tenant</Button>
-            </>
-          ) : (
-            <Button size="sm" onClick={() => { setLinkName(domain?.domain_description || (domain?.domain_name || '').split('.')[0] || ''); setLinkOpen(true); }}>
-              <LinkIcon className="w-4 h-4 mr-2" /> Link tenant org
-            </Button>
+          {org && (
+            <Button variant="outline" size="sm" onClick={() => setInviteOpen(true)}><Mail className="w-4 h-4 mr-2" /> Invite admin</Button>
           )}
+          <Button size="sm" onClick={openTenantPortal}>
+            <LogIn className="w-4 h-4 mr-2" /> Open tenant portal
+          </Button>
         </div>
       </div>
 
+
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="flex flex-wrap">
-          <TabsTrigger value="extensions">Extensions ({(extensions as any[]).length})</TabsTrigger>
-          <TabsTrigger value="ivr">IVR ({(ivrs as any[]).length})</TabsTrigger>
-          <TabsTrigger value="queues">Queues ({(queues as any[]).length})</TabsTrigger>
-          <TabsTrigger value="ringgroups">Ring Groups ({(ringGroups as any[]).length})</TabsTrigger>
-          <TabsTrigger value="devices">Devices</TabsTrigger>
-          <TabsTrigger value="destinations">Destinations</TabsTrigger>
-          <TabsTrigger value="numbers">Phone Numbers</TabsTrigger>
-          <TabsTrigger value="history">Call History</TabsTrigger>
-          <TabsTrigger value="recordings">Recordings</TabsTrigger>
-          <TabsTrigger value="moh">Music on Hold</TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto -mx-1 px-1">
+          <TabsList className="inline-flex w-max min-w-full whitespace-nowrap">
+            <TabsTrigger value="extensions">Extensions ({(extensions as any[]).length})</TabsTrigger>
+            <TabsTrigger value="ivr">IVR ({(ivrs as any[]).length})</TabsTrigger>
+            <TabsTrigger value="queues">Queues ({(queues as any[]).length})</TabsTrigger>
+            <TabsTrigger value="ringgroups">Ring Groups ({(ringGroups as any[]).length})</TabsTrigger>
+            <TabsTrigger value="devices">Devices ({(devices as any[]).length})</TabsTrigger>
+            <TabsTrigger value="destinations">Destinations ({(destinations as any[]).length})</TabsTrigger>
+            <TabsTrigger value="numbers">Phone Numbers</TabsTrigger>
+            <TabsTrigger value="history">Call History</TabsTrigger>
+            <TabsTrigger value="recordings">Recordings</TabsTrigger>
+            <TabsTrigger value="moh">Music on Hold</TabsTrigger>
+          </TabsList>
+        </div>
+
 
         <TabsContent value="extensions">
           <Card><CardContent className="p-4">
@@ -365,6 +353,8 @@ export default function CustomerDetail() {
                 enabledKey="ivr_menu_enabled"
                 onToggle={async (r, en) => { if (await pbxWrite('update-ivr', { ivr_menu_uuid: r.ivr_menu_uuid, ivr_menu_enabled: en ? 'true' : 'false' }, 'IVR updated')) refetchIvrs(); }}
                 onSave={async (r, patch) => { const ok = await pbxWrite('update-ivr', { ivr_menu_uuid: r.ivr_menu_uuid, ...patch }, 'IVR saved'); if (ok) refetchIvrs(); return ok; }}
+
+
                 onDelete={async (r) => { if (confirm(`Delete IVR ${r.ivr_menu_name}?`) && await pbxWrite('delete-ivr', { ivr_menu_uuid: r.ivr_menu_uuid }, 'IVR deleted')) refetchIvrs(); }}
               />
               <div className="flex flex-wrap gap-2 pt-2">
@@ -389,6 +379,7 @@ export default function CustomerDetail() {
             enabledKey="queue_enabled"
             onToggle={async (r, en) => { if (await pbxWrite('update-queue', { queue_uuid: r.queue_uuid, queue_enabled: en ? 'true' : 'false' }, 'Queue updated')) refetchQueues(); }}
             onSave={async (r, patch) => { const ok = await pbxWrite('update-queue', { queue_uuid: r.queue_uuid, ...patch }, 'Queue saved'); if (ok) refetchQueues(); return ok; }}
+            onEditFull={(r) => setEditRow({ kind: 'queue', row: r })}
             onDelete={async (r) => { if (confirm(`Delete queue ${r.queue_name}?`) && await pbxWrite('delete-queue', { queue_uuid: r.queue_uuid }, 'Queue deleted')) refetchQueues(); }}
           />
         </TabsContent>
@@ -403,11 +394,13 @@ export default function CustomerDetail() {
             enabledKey="ring_group_enabled"
             onToggle={async (r, en) => { if (await pbxWrite('update-ring-group', { ring_group_uuid: r.ring_group_uuid, ring_group_enabled: en ? 'true' : 'false' }, 'Ring group updated')) refetchRG(); }}
             onSave={async (r, patch) => { const ok = await pbxWrite('update-ring-group', { ring_group_uuid: r.ring_group_uuid, ...patch }, 'Ring group saved'); if (ok) refetchRG(); return ok; }}
+            onEditFull={(r) => setEditRow({ kind: 'ringgroup', row: r })}
             onDelete={async (r) => { if (confirm(`Delete ring group ${r.ring_group_name}?`) && await pbxWrite('delete-ring-group', { ring_group_uuid: r.ring_group_uuid }, 'Ring group deleted')) refetchRG(); }}
           />
         </TabsContent>
 
-        <TabsContent value="devices">
+        <TabsContent value="devices" className="space-y-2">
+          <div className="flex justify-end"><Button size="sm" onClick={() => setDeviceCreateOpen(true)}><Plus className="w-3 h-3 mr-1" /> New Device</Button></div>
           <EditableList
             rows={devices as any[]}
             idKey="device_uuid"
@@ -416,6 +409,7 @@ export default function CustomerDetail() {
             enabledKey="device_enabled"
             onToggle={async (r, en) => { if (await pbxWrite('update-device', { device_uuid: r.device_uuid, device_enabled: en ? 'true' : 'false' }, 'Device updated')) refetchDevices(); }}
             onSave={async (r, patch) => { const ok = await pbxWrite('update-device', { device_uuid: r.device_uuid, ...patch }, 'Device saved'); if (ok) refetchDevices(); return ok; }}
+            onEditFull={(r) => setEditRow({ kind: 'device', row: r })}
             onDelete={async (r) => { if (confirm(`Delete device ${r.device_mac_address || r.device_uuid}?`) && await pbxWrite('delete-device', { device_uuid: r.device_uuid }, 'Device deleted')) refetchDevices(); }}
           />
         </TabsContent>
@@ -429,9 +423,12 @@ export default function CustomerDetail() {
             enabledKey="destination_enabled"
             onToggle={async (r, en) => { if (await pbxWrite('update-destination', { destination_uuid: r.destination_uuid, destination_enabled: en ? 'true' : 'false' }, 'Destination updated')) refetchDest(); }}
             onSave={async (r, patch) => { const ok = await pbxWrite('update-destination', { destination_uuid: r.destination_uuid, ...patch }, 'Destination saved'); if (ok) refetchDest(); return ok; }}
+            onEditFull={(r) => setEditRow({ kind: 'destination', row: r })}
             onDelete={async (r) => { if (confirm(`Delete destination ${r.destination_number}?`) && await pbxWrite('delete-destination', { destination_uuid: r.destination_uuid }, 'Destination deleted')) refetchDest(); }}
           />
         </TabsContent>
+
+
 
 
         <TabsContent value="numbers">
@@ -533,23 +530,44 @@ export default function CustomerDetail() {
         </>
       )}
 
-      {/* Link tenant org dialog */}
-      <Dialog open={linkOpen} onOpenChange={setLinkOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Link tenant organization</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <div><Label>Organization name</Label><Input value={linkName} onChange={e => setLinkName(e.target.value)} /></div>
-            <div><Label>Admin email (optional)</Label><Input type="email" value={linkEmail} onChange={e => setLinkEmail(e.target.value.toLowerCase())} /></div>
-            <p className="text-xs text-muted-foreground">Creates a tenant organization linked to PBX domain <code>{domain?.domain_name}</code>. After linking, "Manage as this tenant" becomes active.</p>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setLinkOpen(false)}>Cancel</Button>
-            <Button onClick={linkTenantOrg} disabled={linking}>
-              {linking && <Loader2 className="w-4 h-4 mr-2 animate-spin" />} Link
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Generic full-fields editor for queues, ring groups, devices, destinations */}
+      <PbxRowEditDialog
+        open={!!editRow}
+        onOpenChange={(o) => { if (!o) setEditRow(null); }}
+        title={editRow ? `Edit ${editRow.kind} — all FusionPBX fields` : ''}
+        row={editRow?.row}
+        idKey={editRow ? ({
+          queue: 'queue_uuid', ringgroup: 'ring_group_uuid',
+          device: 'device_uuid', destination: 'destination_uuid',
+        } as const)[editRow.kind] : 'id'}
+        idValue={editRow ? editRow.row?.[({
+          queue: 'queue_uuid', ringgroup: 'ring_group_uuid',
+          device: 'device_uuid', destination: 'destination_uuid',
+        } as const)[editRow.kind]] : undefined}
+        updateAction={editRow ? ({
+          queue: 'update-queue', ringgroup: 'update-ring-group',
+          device: 'update-device', destination: 'update-destination',
+        } as const)[editRow.kind] : ''}
+        organizationId={orgId}
+        domainUuid={domainUuid}
+        onSaved={() => {
+          if (editRow?.kind === 'queue') refetchQueues();
+          else if (editRow?.kind === 'ringgroup') refetchRG();
+          else if (editRow?.kind === 'device') refetchDevices();
+          else if (editRow?.kind === 'destination') refetchDest();
+        }}
+      />
+
+      {/* New Device dialog */}
+      <DeviceCreateDialog
+        open={deviceCreateOpen}
+        onOpenChange={setDeviceCreateOpen}
+        organizationId={orgId}
+        domainUuid={domainUuid}
+        extensions={extensions as any[]}
+        onCreated={() => refetchDevices()}
+      />
+
 
       {/* Invite admin dialog */}
       <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
@@ -587,13 +605,14 @@ function pretty(v: any): string {
 }
 
 function EditableList({
-  rows, idKey, fields, enabledKey, editableFields, onToggle, onDelete, onSave,
+  rows, idKey, fields, enabledKey, editableFields, onToggle, onDelete, onSave, onEditFull,
 }: {
   rows: any[]; idKey: string; fields: string[]; enabledKey: string;
   editableFields?: string[];
   onToggle: (row: any, enabled: boolean) => Promise<void>;
   onDelete: (row: any) => Promise<void>;
   onSave?: (row: any, patch: Record<string, string>) => Promise<boolean>;
+  onEditFull?: (row: any) => void;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
@@ -660,8 +679,11 @@ function EditableList({
                     </>
                   ) : (
                     <>
+                      {onEditFull && (
+                        <Button size="sm" variant="outline" title="All FusionPBX fields" onClick={() => onEditFull(r)}>All fields</Button>
+                      )}
                       {onSave && editable.length > 0 && (
-                        <Button size="sm" variant="ghost" title="Edit" onClick={() => startEdit(r)}>Edit</Button>
+                        <Button size="sm" variant="ghost" title="Quick edit" onClick={() => startEdit(r)}>Edit</Button>
                       )}
                       <Button size="sm" variant="ghost" title={en ? 'Disable' : 'Enable'} disabled={isBusy}
                         onClick={async () => { setBusy(id); try { await onToggle(r, !en); } finally { setBusy(null); } }}>

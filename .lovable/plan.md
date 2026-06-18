@@ -1,56 +1,88 @@
 ## Scope
 
-Rework `src/pages/lemtel/CustomerDetail.tsx` (the per-domain admin page reached from the Customers list) so each domain is fully readable, syncable and editable against FusionPBX, and fix the "Manage as this tenant" button.
+Fix the per-domain tenant page (`src/pages/lemtel/CustomerDetail.tsx` + related dialogs) so every PBX area is visible, editable end-to-end against FusionPBX, and the tenant-access actions work as intended. No new orgs created from this page.
 
-## Changes
+## 1. Tab visibility / layout
 
-### 1. Remove the Users tab
+Problem (screenshot): `TabsList` uses `flex flex-wrap` inside a fixed card; the second row of tabs (Phone Numbers, Call History, Recordings, Music on Hold) is clipped behind the content card.
 
-- Drop the `users` tab and all of its UI (CSV import, Add user dialog, invite-admin section, `spUsers` table, related state). The remaining tabs already cover what's needed.
-- Set the default `tab` to `extensions` (current default is `users`).
-- Keep `customer-invite-admin` reachable from the top header as a small "Invite admin" button (so admin promotion isn't lost) — it has no dependency on the Users tab.
+- Replace `TabsList flex flex-wrap` with a single-row horizontally scrollable bar: `overflow-x-auto whitespace-nowrap` + a `min-w-max` inner flex, plus chevron-style fade. Keep all 10 tabs reachable.
+- Make the active tab visually obvious (gradient underline matching the cyberpunk theme).
+- Add a sticky sub-toolbar inside each tab card so action buttons (`+ New`, `Sync now`, filters) don't shift content.
 
-### 2. Complete domain sync (one-click, all resources)
+## 2. Replace inline "Edit" with the full FusionPBX form (extensions)
 
-- Rewrite `syncAll` to call `fusionpbx-proxy` `sync-all` with **all** supported resources: `['extensions','devices','ivrs','queues','ring_groups','gateways','destinations','users','cdrs']`, followed by `sync-ivr-options` and `sync-voicemail-messages` for the same domain. Sequential so the toast can show progress per phase.
-- The "Sync" button in the header becomes "Full sync from PBX" with a small spinner + stats toast (`X extensions, Y queues, …` from the `stats` object the function returns).
-- Invalidate every `['fpbx', …, domainUuid]` query plus DB-backed queries (`pbx_extensions`, `pbx_call_records`, `pbx_voicemails`) after sync.
+The pencil/Edit in `ExtensionsPanel` currently opens a 2-field popup (description, caller ID). It must open the existing rich `src/components/lemtel/ExtensionEditDialog.tsx` (already loads `get-extension` and saves via `update-extension` with all FusionPBX fields: caller ID name/number, SIP password, voicemail password/enabled, DND, forward-all, call timeout, description, enabled, etc.).
 
-### 3. Editable / manageable tabs
+- In `ExtensionsPanel`, delete the inline edit dialog and state (`editing`, `editDesc`, `editCid`, `saveEdit`).
+- Mount `<ExtensionEditDialog>` instead; pass the live extension row mapped to the shape it expects (`pbx_uuid` = `extension_uuid`, `effective_cid_name`, `effective_cid_number`, etc.). After save, call `onChanged()` to refetch.
+- Keep the bulk Enable/Disable/Reset VM/Delete toolbar and the per-row VM/Power/Delete quick actions.
 
-Replace the read-only `SimpleList` usages with real management tables. All write actions go through `pbx-write` `update-*` / `delete-*` and refetch on success.
+## 3. Fix "Reset VM" creating a phantom extension
 
-- **Extensions tab**: reuse the new `ExtensionsPanel`-style UI (checkbox multi-select, inline Edit / Enable-Disable / Reset-VM, bulk actions, retry + Sync now) that already exists in `LemtelCustomers.tsx`. Extract it to `src/components/lemtel/ExtensionsPanel.tsx` so both pages share it.
-- **IVR tab**: keep current table; add Enable/Disable toggle (`update-ivr` with `ivr_menu_enabled`) and Delete (`delete-ivr`) per row, alongside the existing "Manage options".
-- **Queues tab**: editable table with columns Name / Extension / Strategy / Enabled / Actions (toggle enabled, delete). Wired to `update-queue` / `delete-queue`.
-- **Ring Groups tab**: editable table (toggle enabled, delete) → `update-ring-group` / `delete-ring-group`.
-- **Devices tab (new)**: list `list-devices`; columns MAC / template / extension / enabled; actions edit description + toggle enabled + delete via `update-device` / `delete-device`.
-- **Destinations tab (new)**: list `list-destinations`; columns Number / Context / Destination action / Enabled; inline edit destination target + enable/disable.
-- **Recordings tab**: keep current Play/Hide UI; add a Delete button (DB delete on `pbx_call_records.recording_path` cleared) — non-destructive on PBX, just hides locally.
-- **Music on Hold tab**: keep read-only list (no PBX write action available); add an upload button stub that calls existing `lemtel_ivr_audio`-style storage helper if present, otherwise hide if no helper exists.
-- **Phone Numbers tab**: already managed by `PhoneNumbersTab` — no change.
+Current `callUpdate` posts `voicemail_password` + `voicemail_enabled=true` via `pbx-write update-extension`. Symptom suggests `extension_uuid` is being dropped on some rows, so FusionPBX inserts a new row.
 
-### 4. Fix "Manage as this tenant"
+- In `ExtensionsPanel.callUpdate`, hard-fail when `ext.extension_uuid` is falsy (toast + abort) and never send the row without it.
+- Switch to the same payload shape `ExtensionEditDialog` uses (`{action:'update-extension', extension_uuid, extension, fields:{voicemail_password, voicemail_enabled:true}}` via `fusionpbx-proxy` directly) so the proxy path that worked for the dialog is the single source of truth.
+- After reset, refetch and toast `PIN set to {extension}`.
 
-The button is disabled because `org` is null when the FusionPBX domain has no matching `organizations` row.
+## 4. IVR Edit = full FusionPBX form, fully synced
 
-- Detect that case and replace the disabled button with a **"Link tenant org"** action. It opens a small dialog with one field (org name, prefilled from `domain_description` or domain prefix) and calls the existing `setup_customer_organization(_name, _slug, _domain_uuid, _domain_name, _admin_email)` RPC. On success it refetches the org query so the button enables.
-- When `org` exists, keep the current `impersonate()` flow but: (a) navigate to `/domain/${org.slug}/admin/dashboard` when a slug exists (matches the LemtelCustomers row click), falling back to `/console`; (b) await both `sessionStorage.setItem` and `impersonation.enter` before navigating so the next page boots with the right tenant context.
-- Add an inline status pill near the title: green "Linked: {org.name}" or amber "No tenant org — click Link tenant org".
+Replace the inline 3-column `EditableList` for IVR with a dedicated `IvrEditDialog` modeled on `IvrCreateDialog`:
+- Loads the live row from `fusionpbx-proxy list-ivrs` (already cached) + fetches `ivr_menu_options` via `sync-ivr-options` / direct list.
+- Fields: name, extension, greet long/short (text + audio file selector reusing `lemtel_ivr_audio`), exit action, direct-dial, timeout, invalid action, max failures/timeouts, enabled, description — i.e. parity with the FusionPBX `ivr_menus` table columns the proxy accepts (the proxy `update-ivr` forwards arbitrary fields via `writeCollection`).
+- Save calls `update-ivr` with the full diff; cancel discards. Re-uses the existing `IvrOptionsDialog` for per-digit options.
+- Keep create flow via existing `IvrCreateDialog`; add Edit button next to Options.
 
-### 5. Code hygiene
+## 5. Devices — full management & "Add device"
 
-- Remove now-unused imports (`Upload`, `UserPlus`, `Mail`, `SendAppInviteButtons`, `customer-users-import` calls, CSV parsing helpers) after deleting the Users tab.
-- Extract repetitive `pbx-write` toggle/delete helpers into a small local `usePbxAction(domainUuid)` hook inside the file.
+Devices tab currently has no create button and only edits 2 fields.
+
+- Add `+ New Device` button opening a new `DeviceCreateDialog` (POST `create-device` via pbx-write). Fields: MAC, template (dropdown from `pbxDeviceModels` data file already in repo), label/description, assigned extension (`device_user_uuid`), enabled.
+- Replace `EditableList` row for devices with a `DeviceEditDialog` (parity with FusionPBX `devices` columns: mac, label, vendor, model, template, profile, enabled, description, plus device line: user_uuid/extension assignment, server, register name, register password, sip authorize, sip transport, sip port). Reuses `update-device`.
+- Keep toggle enable/disable + delete inline.
+
+## 6. Other tabs get the same "full-form Edit" pattern
+
+For Queues, Ring Groups, Destinations, MOH: add a per-row `Edit` button that opens a dialog rendering every field the corresponding FusionPBX endpoint returns (auto-generated from the row keys so we don't miss columns), with typed widgets for known booleans/enums. Save via existing `update-queue` / `update-ring-group` / `update-destination` (MOH stays read-only — the proxy has no `update-moh`).
+
+Cancel reverts unsaved changes. Save invalidates the matching `['fpbx', …]` query.
+
+## 7. Call History & Recordings — make them appear
+
+Both tabs already exist but are gated by `tab === 'history' | 'recordings'`. After fix #1 the tabs become reachable. Additional fixes:
+
+- Show a clear empty state with `Sync now` (calls `sync-all` with `resources:['cdrs']` + `sync-voicemail-messages`) when zero rows; spinner while syncing.
+- Default page size 50 with "Load more" up to 1000.
+- Keep the search/date/extension filters already added.
+
+## 8. "Link tenant org" → "Open tenant portal" (no org creation)
+
+Rename and rework: the action must NOT create an `organizations` row inside Ava.
+
+- Always show one primary button: **Open tenant portal** (works for every domain).
+- Click sets `sessionStorage.lemtel.activeDomain = { uuid, name }` and navigates to `/c/{domain_name}` (the existing public-facing tenant portal route) inside a new tab, scoped to that domain. Logged-in Lemtel admins see the portal in admin view via the existing `useImpersonation` domain scope (no `organizations.id` required — pass the domain UUID).
+- Drop the `setup_customer_organization` dialog (`linkOpen`, `linkName`, `linkEmail`) and the "No tenant org" amber pill. Replace the pill with a small "Domain: {domain_name}" chip.
+- Keep "Invite admin" only when an `org` exists from the existing `get_org_by_fusionpbx_domain` lookup (real Ava org membership for that domain).
+
+## 9. Data normalization (already partly done)
+
+Extend the `normalize/pretty` helpers to coerce all imported PBX fields:
+- Booleans: `'true'/'false'/0/1/null` → `on/off`.
+- Phone numbers: E.164 best-effort via existing `lib/pbx/sources.ts` helpers if present, else raw.
+- Empty/missing → `—`.
+- Timestamps: localized `formatDistanceToNow` with fallback when null.
+
+All edit inputs accept these normalized strings and round-trip them through the FusionPBX update payload unchanged when the user doesn't touch the field.
+
+## Files
+
+- `src/pages/lemtel/CustomerDetail.tsx` — tabs layout, Open tenant portal flow, wire new dialogs, remove Link/Linking state.
+- `src/components/lemtel/ExtensionsPanel.tsx` — drop inline edit dialog, mount `ExtensionEditDialog`, harden `callUpdate` to require `extension_uuid`, route VM reset through proxy.
+- New: `src/components/lemtel/IvrEditDialog.tsx`, `src/components/lemtel/DeviceCreateDialog.tsx`, `src/components/lemtel/DeviceEditDialog.tsx`, `src/components/lemtel/PbxRowEditDialog.tsx` (generic full-fields editor used for Queues / Ring Groups / Destinations).
+- Minor: re-use `src/data/pbxDeviceModels.ts` for the device template dropdown.
 
 ## Out of scope
 
-- Backend / edge-function changes. `sync-all`, `update-*`, `delete-*` actions already exist in `fusionpbx-proxy` / `pbx-write`.
-- The other Lemtel admin pages (Customers list etc.) — already handled in the previous turn.
-- Auth/RLS changes.
-
-## Files touched
-
-- `src/pages/lemtel/CustomerDetail.tsx` (main rewrite)
-- New: `src/components/lemtel/ExtensionsPanel.tsx` (extracted from `LemtelCustomers.tsx`)
-- `src/pages/lemtel/LemtelCustomers.tsx` (swap inline `ExtensionsPanel` → import the shared component)
+- Backend / edge-function changes. `fusionpbx-proxy` already supports `update-*` / `create-device` / `create-ivr`. MOH has no PBX write endpoint and stays read-only.
+- Public tenant portal page itself (already exists at `/c/:domain`).
