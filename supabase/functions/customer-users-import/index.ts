@@ -141,9 +141,9 @@ Deno.serve(async (req) => {
       // Best-effort DID assignment
       if (raw.assign_phone_number) {
         await supabase.from("lemtel_dids").update({
-          assigned_extension: ext,
-          domain_uuid,
-        }).eq("phone_number", raw.assign_phone_number).then(() => {}, () => {});
+          assigned_type: "extension",
+          assigned_id: ext,
+        }).eq("number", raw.assign_phone_number).then(() => {}, () => {});
       }
 
       // Welcome email (best-effort)
