@@ -1,18 +1,18 @@
 :root {
-  --bg-0: #EEF3FB;
-  --bg-1: #F5F8FD;
-  --bg-2: rgba(255,255,255,0.78);
-  --brand-blue: #0052CC;
-  --brand-blue-2: #2D7BE5;
+  --bg-0: #0A1429;
+  --bg-1: #0E1B3D;
+  --bg-2: rgba(255,255,255,0.06);
+  --brand-blue: #0023e6;
+  --brand-blue-2: #2a4dff;
   --brand-yellow: #E0A800;
-  --ava-cyan: #0BB5D6;
+  --ava-cyan: #23d6ff;
   --ava-violet: #7A4CFF;
-  --text: #0E1B3D;
-  --text-muted: #5A6B8C;
-  --border: rgba(0,61,166,0.10);
-  --success: #0FA471;
-  --warning: #D97706;
-  --danger: #DC2626;
+  --text: #E8EEFB;
+  --text-muted: #7C8AA8;
+  --border: rgba(255,255,255,0.08);
+  --success: #10B981;
+  --warning: #F59E0B;
+  --danger: #EF4444;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
@@ -22,9 +22,9 @@ html, body, #root { height: 100%; margin: 0; padding: 0; overscroll-behavior: no
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
   background:
-    radial-gradient(1100px 700px at 12% -10%, rgba(0,82,204,0.16), transparent 60%),
-    radial-gradient(900px 600px at 100% 110%, rgba(255,196,0,0.14), transparent 55%),
-    linear-gradient(180deg, #F7FAFE 0%, #E8F0FA 100%);
+    radial-gradient(1100px 700px at 12% -10%, rgba(0,35,230,0.32), transparent 60%),
+    radial-gradient(900px 600px at 100% 110%, rgba(224,168,0,0.16), transparent 55%),
+    linear-gradient(180deg, #060C1C 0%, #0A1429 50%, #0E1B3D 100%);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   user-select: none;
@@ -53,11 +53,11 @@ body {
 }
 
 .lemtel-glass {
-  background: linear-gradient(155deg, rgba(255,255,255,0.78) 0%, rgba(255,255,255,0.62) 100%);
-  border: 1px solid rgba(0,61,166,0.10);
+  background: linear-gradient(155deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.03) 100%);
+  border: 1px solid rgba(255,255,255,0.08);
   backdrop-filter: blur(18px) saturate(160%);
   -webkit-backdrop-filter: blur(18px) saturate(160%);
-  box-shadow: 0 10px 32px -16px rgba(0,61,166,0.22);
+  box-shadow: 0 10px 32px -16px rgba(0,0,0,0.5);
   border-radius: 16px;
 }
 
