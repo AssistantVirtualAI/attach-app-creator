@@ -9,6 +9,7 @@ export type TranscriptStage =
   | 'downloading'   // pulling audio from PBX / Twilio / storage
   | 'transcribing'  // sending audio to AI
   | 'analyzing'     // analyzing transcript text
+  | 'pending_sync'  // recording not yet available in storage; will auto-retry
   | 'complete'
   | 'unavailable'   // recording could not be retrieved
   | 'failed';
