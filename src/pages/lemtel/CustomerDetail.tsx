@@ -201,7 +201,19 @@ export default function CustomerDetail() {
     });
     if (error) return toast.error(error.message);
     const r = (data as any)?.results?.[0];
-    if (r?.ok) { toast.success(`Extension ${addForm.extension} added`); setAddOpen(false); setAddForm({ extension: '', name: '', email: '' }); refetchSP(); }
+    if (r?.ok) {
+      const genPass = (data as any)?.results?.[0]?.password;
+      toast.success(`Extension ${addForm.extension} added`);
+      if (genPass) {
+        toast.message('SIP password (one-time view)', {
+          description: genPass,
+          action: { label: 'Copy', onClick: () => navigator.clipboard.writeText(genPass) },
+        });
+      }
+      setAddOpen(false);
+      setAddForm({ extension: '', name: '', email: '', sip_password: '', assign_phone_number: '', send_welcome_email: true });
+      refetchSP();
+    }
     else toast.error(r?.error || 'Add failed');
   };
 
