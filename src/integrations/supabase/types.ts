@@ -714,6 +714,42 @@ export type Database = {
           },
         ]
       }
+      app_login_tokens: {
+        Row: {
+          app: string
+          consumed_at: string | null
+          created_at: string
+          created_by: string | null
+          expires_at: string
+          id: string
+          organization_id: string
+          token_hash: string
+          user_id: string
+        }
+        Insert: {
+          app: string
+          consumed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string
+          id?: string
+          organization_id: string
+          token_hash: string
+          user_id: string
+        }
+        Update: {
+          app?: string
+          consumed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string
+          id?: string
+          organization_id?: string
+          token_hash?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       app_releases: {
         Row: {
           assets: Json | null
