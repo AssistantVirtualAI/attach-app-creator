@@ -267,12 +267,13 @@ class JsSipProvider {
     callState: 'idle',
     remoteIdentity: '',
     remoteNumber: '',
-    snap_listeners: undefined as any, // placeholder so structure stays stable
+    muted: false,
+    onHold: false,
     direction: null,
     startedAt: null,
     events: [],
     authBlocked: null,
-  } as SoftphoneSnapshot;
+  };
   audioEl: HTMLAudioElement | null = null;
   outputDeviceId: string | null = null;
   inputDeviceId: string | null = null;
