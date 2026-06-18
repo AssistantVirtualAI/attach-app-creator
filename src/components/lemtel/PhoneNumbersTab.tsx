@@ -8,10 +8,32 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Trash2, Loader2, PhoneForwarded, FileText } from 'lucide-react';
+import { Plus, Trash2, Loader2, PhoneForwarded, FileText, CheckCircle2, AlertCircle, Phone, PhoneCall, Hash, ListTree, Users } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+
+const fmtE164 = (n: string) => {
+  if (!n) return n;
+  const d = n.replace(/[^\d+]/g, '');
+  if (d.startsWith('+1') && d.length === 12) return `+1 (${d.slice(2, 5)}) ${d.slice(5, 8)}-${d.slice(8)}`;
+  return d;
+};
+
+const statusBadge = (status?: string) => {
+  const s = (status || 'active').toLowerCase();
+  if (s === 'available') return <Badge variant="secondary" className="gap-1"><CheckCircle2 className="w-3 h-3" />Available</Badge>;
+  if (s === 'active' || s === 'assigned') return <Badge className="gap-1 bg-emerald-600 hover:bg-emerald-600/90"><PhoneCall className="w-3 h-3" />Assigned</Badge>;
+  if (s === 'porting' || s === 'pending') return <Badge variant="outline" className="gap-1 text-amber-600 border-amber-600"><AlertCircle className="w-3 h-3" />{s}</Badge>;
+  return <Badge variant="outline">{s}</Badge>;
+};
+
+const destIcon = (t?: string) => {
+  if (t === 'extension') return <Phone className="w-3 h-3" />;
+  if (t === 'ivr') return <ListTree className="w-3 h-3" />;
+  if (t === 'ringgroup') return <Users className="w-3 h-3" />;
+  return <Hash className="w-3 h-3" />;
+};
 
 export function PhoneNumbersTab({
   domainUuid, domainName, organizationId, extensions, ivrs, ringGroups,
