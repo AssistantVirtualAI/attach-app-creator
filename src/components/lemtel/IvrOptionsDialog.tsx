@@ -23,16 +23,27 @@ export function IvrOptionsDialog({
   const menuUuid = ivr?.ivr_menu_uuid;
   const queryKey = ['fpbx', 'ivr-options', menuUuid];
 
-  const { data: options = [], isLoading, refetch } = useQuery({
+  const { data: options = [], isLoading, isFetching, refetch } = useQuery({
     queryKey,
     enabled: open && !!menuUuid,
+    staleTime: 0,
+    refetchOnMount: 'always',
     queryFn: async () => {
-      const { data } = await supabase.functions.invoke('fusionpbx-proxy', {
+      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
         body: { action: 'list-ivr-options-for-menu', ivr_menu_uuid: menuUuid, domain_uuid: domainUuid },
       });
+      if (error) throw error;
       return (data as any)?.data || [];
     },
   });
+
+  // Refetch whenever the dialog opens or the targeted menu changes
+  useEffect(() => {
+    if (open && menuUuid) {
+      qc.invalidateQueries({ queryKey });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, menuUuid]);
 
   const [editId, setEditId] = useState<string | null>(null);
   const [draft, setDraft] = useState<{ digit: string; label: string; destType: DestType; destValue: string }>({ digit: '', label: '', destType: 'extension', destValue: '' });
