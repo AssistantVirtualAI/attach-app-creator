@@ -129,8 +129,6 @@ export default function LemtelCustomers() {
   }, [extensions]);
 
   // Live extensions per domain (fans out list-extensions in parallel)
-  type LiveExt = { extension_uuid?: string; extension: string; effective_caller_id_name?: string; enabled?: string | boolean; description?: string; voicemail_enabled?: string | boolean };
-  type LiveState = { exts: LiveExt[]; error?: string };
   const { data: liveExtMap = {}, isLoading: loadingCounts, refetch: refetchLive } = useQuery<Record<string, LiveState>>({
     queryKey: ['fusionpbx', 'ext-live', (domains as Domain[]).map(d => d.domain_uuid).sort().join(',')],
     enabled: (domains as Domain[]).length > 0,
