@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
 
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
 
-    // Atomically claim the token
+    // Atomically claim the token (single-use + expiration enforced here)
     const { data: row, error } = await admin.from('app_login_tokens')
       .update({ consumed_at: new Date().toISOString() })
       .eq('token_hash', hash)
@@ -33,6 +33,14 @@ Deno.serve(async (req) => {
       .maybeSingle();
     if (error) return json({ error: error.message }, 500);
     if (!row) return json({ error: 'invalid_or_expired' }, 401);
+
+    // Domain-scoping check: target user must still belong to that org
+    // (or be super_admin). Tokens cannot grant access to other domains.
+    const { data: roles } = await admin.from('user_roles')
+      .select('role,organization_id').eq('user_id', row.user_id);
+    const isSuper = (roles || []).some((r: any) => r.role === 'super_admin');
+    const inOrg = (roles || []).some((r: any) => r.organization_id === row.organization_id);
+    if (!isSuper && !inOrg) return json({ error: 'not_in_domain' }, 403);
 
     // Fetch user email to generate a magic-link
     const { data: usr } = await admin.auth.admin.getUserById(row.user_id);
