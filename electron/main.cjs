@@ -25,9 +25,12 @@ function routeFromDeepLink(url) {
   try {
     const u = new URL(url);
     if (u.protocol !== `${PROTOCOL}:`) return null;
-    // avastatistic://lemtel/admin/sync-health  -> /lemtel/admin/sync-health
+    // avastatistic://login?ava_token=XYZ  -> /login?ava_token=XYZ (auto-login)
+    // avastatistic://lemtel/admin/sync-health -> /lemtel/admin/sync-health
     const pathPart = (u.host ? '/' + u.host : '') + (u.pathname || '');
-    return pathPart.replace(/\/+/g, '/');
+    const cleanPath = pathPart.replace(/\/+/g, '/') || '/';
+    const qs = u.search || '';
+    return cleanPath + qs;
   } catch { return null; }
 }
 
