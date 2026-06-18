@@ -3,8 +3,35 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Brain, Sparkles, RefreshCw, ChevronDown, ChevronUp, Clock, AlertCircle, ShieldCheck, History, CheckCircle2, XCircle, Loader2 } from "lucide-react";
-import { useCallIntelligence, type AnalysisStatus } from "@/hooks/useCallIntelligence";
+import { Brain, Sparkles, RefreshCw, ChevronDown, ChevronUp, Clock, AlertCircle, ShieldCheck, History, CheckCircle2, XCircle, Loader2, Download, FileText } from "lucide-react";
+import { useCallIntelligence, type AnalysisStatus, type AuditEntry } from "@/hooks/useCallIntelligence";
+import jsPDF from "jspdf";
+
+function exportAuditCsv(callId: string, rows: AuditEntry[]) {
+  const headers = ["created_at","event","status","pipeline","ai_model","forced","duration_ms","run_id","idempotency_key","error"];
+  const esc = (v: any) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const body = rows.map(r => headers.map(h => esc((r as any)[h])).join(",")).join("\n");
+  const blob = new Blob([headers.join(",") + "\n" + body], { type: "text/csv" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `call-intel-audit-${callId}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function exportAuditPdf(callId: string, rows: AuditEntry[]) {
+  const doc = new jsPDF();
+  doc.setFontSize(14); doc.text(`Call Intelligence Audit — ${callId}`, 14, 16);
+  doc.setFontSize(9);
+  let y = 26;
+  rows.forEach((r) => {
+    if (y > 280) { doc.addPage(); y = 16; }
+    const line = `${new Date(r.created_at).toLocaleString()}  [${r.event}/${r.status}]  ${r.pipeline ?? ""}  ${r.ai_model ?? ""}  ${r.duration_ms ?? ""}ms  run=${r.run_id.slice(0,8)}`;
+    doc.text(line, 14, y); y += 5;
+    if (r.error) { doc.setTextColor(200,0,0); doc.text(`  error: ${r.error}`, 14, y); doc.setTextColor(0,0,0); y += 5; }
+  });
+  doc.save(`call-intel-audit-${callId}.pdf`);
+}
 
 interface Props {
   callId: string;
