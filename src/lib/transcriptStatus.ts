@@ -133,6 +133,19 @@ export const STAGE_LABEL_EN: Record<TranscriptStage, string> = {
   failed: 'Failed',
 };
 
+export interface PendingSyncProgress {
+  attempt: number;       // 1-based index of the retry that will run next
+  total: number;         // total max attempts
+  nextRetryAt: number;   // epoch ms when the next call will be invoked
+  waitMs: number;
+  reason: string;
+}
+
+export interface RetryNowRef {
+  /** Set by the orchestrator while sleeping; call to skip backoff and retry now. */
+  current: (() => void) | null;
+}
+
 /**
  * Orchestrate a multi-stage transcribe+analyze run with progress callbacks.
  * Caller provides Supabase functions.invoke; this just wires the stages and
@@ -144,12 +157,28 @@ export async function runTranscribeAndAnalyze(opts: {
   organizationId: string;
   recordingUrl?: string | null;
   onStage: (stage: TranscriptStage, detail?: string) => void;
+  onPendingSync?: (p: PendingSyncProgress | null) => void;
+  retryNowRef?: RetryNowRef;
   /** Max auto-retries when the recording is pending PBX sync (default 4). */
   maxPendingSyncRetries?: number;
-}): Promise<{ stage: TranscriptStage; transcriptStub: boolean; insightStub: boolean; reason?: string; data: any }> {
-  const { invoke, callRecordId, organizationId, recordingUrl, onStage } = opts;
+}): Promise<{ stage: TranscriptStage; transcriptStub: boolean; insightStub: boolean; reason?: string; data: any; pendingSyncAttempts?: number }> {
+  const { invoke, callRecordId, organizationId, recordingUrl, onStage, onPendingSync, retryNowRef } = opts;
   const maxRetries = opts.maxPendingSyncRetries ?? 4;
   const PENDING_REASONS = new Set(['recording-pending-sync', 'recording-not-synced']);
+  const runStartedAt = Date.now();
+  let pendingAttempts = 0;
+  const logMetric = async (event: string, extras: Record<string, any> = {}) => {
+    try {
+      await invoke('pending-sync-metrics', {
+        event,
+        call_record_id: callRecordId,
+        organization_id: organizationId,
+        latency_ms: Date.now() - runStartedAt,
+        attempts: pendingAttempts,
+        ...extras,
+      });
+    } catch { /* fire-and-forget */ }
+  };
   try {
     onStage('downloading', 'Connexion à la source audio');
     onStage('transcribing');
@@ -164,18 +193,40 @@ export async function runTranscribeAndAnalyze(opts: {
       });
       if (t.error) {
         onStage('failed', t.error.message);
-        return { stage: 'failed', transcriptStub: true, insightStub: true, reason: t.error.message, data: t };
+        await logMetric('failed', { reason: t.error.message });
+        return { stage: 'failed', transcriptStub: true, insightStub: true, reason: t.error.message, data: t, pendingSyncAttempts: pendingAttempts };
       }
       tData = t.data || {};
       const reason = tData.reason as string | undefined;
       const isPending = tData.stub && reason && PENDING_REASONS.has(reason);
-      if (!isPending || attempt === maxRetries) break;
+      if (!isPending) {
+        if (pendingAttempts > 0) await logMetric('retry_success', { reason });
+        break;
+      }
+      if (attempt === maxRetries) {
+        await logMetric('max_retries_exhausted', { reason });
+        break;
+      }
+      pendingAttempts++;
       // Exponential backoff: 5s, 15s, 45s, 120s (capped). Honor server hint when larger.
       const base = [5000, 15000, 45000, 120000][Math.min(attempt, 3)];
       const serverHint = Number(tData.retry_after_ms) || 0;
       const wait = Math.max(base, serverHint);
-      onStage('pending_sync', `Retry ${attempt + 1}/${maxRetries} dans ${Math.round(wait / 1000)}s`);
-      await new Promise((r) => setTimeout(r, wait));
+      const nextRetryAt = Date.now() + wait;
+      const progress: PendingSyncProgress = {
+        attempt: attempt + 1, total: maxRetries, nextRetryAt, waitMs: wait, reason: reason || 'recording-pending-sync',
+      };
+      onStage('pending_sync', `Retry ${progress.attempt}/${maxRetries} dans ${Math.round(wait / 1000)}s`);
+      onPendingSync?.(progress);
+      await logMetric('retry_scheduled', { reason, wait_ms: wait });
+      // Interruptible sleep — manual "Retry now" resolves immediately.
+      await new Promise<void>((resolve) => {
+        const timer: ReturnType<typeof setTimeout> = setTimeout(() => { if (retryNowRef) retryNowRef.current = null; resolve(); }, wait);
+        if (retryNowRef) {
+          retryNowRef.current = () => { clearTimeout(timer); retryNowRef.current = null; resolve(); };
+        }
+      });
+      onPendingSync?.(null);
       onStage('transcribing');
     }
 
@@ -192,19 +243,20 @@ export async function runTranscribeAndAnalyze(opts: {
     });
     if (a.error) {
       onStage('failed', a.error.message);
-      return { stage: 'failed', transcriptStub, insightStub: true, reason: a.error.message, data: { t, a } };
+      return { stage: 'failed', transcriptStub, insightStub: true, reason: a.error.message, data: { t, a }, pendingSyncAttempts: pendingAttempts };
     }
     const aData: any = a.data || {};
     const insightStub = !!aData.stub;
     if (transcriptStub) {
       const stage: TranscriptStage = PENDING_REASONS.has(tData.reason) ? 'pending_sync' : 'unavailable';
       onStage(stage, tData.reason);
-      return { stage, transcriptStub, insightStub, reason: tData.reason, data: aData };
+      return { stage, transcriptStub, insightStub, reason: tData.reason, data: aData, pendingSyncAttempts: pendingAttempts };
     }
     onStage('complete');
-    return { stage: 'complete', transcriptStub, insightStub, data: aData };
+    if (pendingAttempts > 0) await logMetric('completed_after_retries');
+    return { stage: 'complete', transcriptStub, insightStub, data: aData, pendingSyncAttempts: pendingAttempts };
   } catch (e: any) {
     onStage('failed', e?.message || 'unknown');
-    return { stage: 'failed', transcriptStub: true, insightStub: true, reason: e?.message, data: null };
+    return { stage: 'failed', transcriptStub: true, insightStub: true, reason: e?.message, data: null, pendingSyncAttempts: pendingAttempts };
   }
 }
