@@ -191,7 +191,7 @@ export default function LemtelCustomers() {
         // Best-effort DID provisioning
         for (const n of phones) {
           const { error: didErr } = await (supabase as any).from('lemtel_dids').insert({
-            phone_number: n, domain_uuid: domainUuid,
+            number: n,
           });
           if (didErr) toast.warning(`DID ${n}: ${didErr.message}`);
         }
