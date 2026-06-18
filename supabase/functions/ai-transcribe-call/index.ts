@@ -141,29 +141,46 @@ Deno.serve(async (req) => {
         } catch (e: any) { fetchErrors.push(`direct:${e?.message || "err"}`); }
       }
 
-      // 2. Supabase Storage — verify bucket exists first so a stale path
-      //    doesn't surface a scary "Bucket not found" error to the UI.
+      // 2. Supabase Storage — verify bucket exists, then retry with
+      //    exponential backoff so a recording that's still syncing from the
+      //    PBX doesn't immediately fall through to "no audio".
       const storagePath = recording_path || call?.recording_path;
+      var storagePendingSync = false;
       if (!audioBytes && storagePath && typeof storagePath === "string" && !storagePath.startsWith("http")) {
-        try {
-          const parts = storagePath.split("/");
-          const bucket = parts.shift()!;
-          const path = parts.join("/");
-          const { data: bucketInfo } = await admin.storage.getBucket(bucket);
-          if (!bucketInfo) {
-            // Bucket missing — silently skip; the proxy fallback below will run.
-            console.log("ai-transcribe-call storage bucket missing, skipping", { bucket });
-          } else {
+        const parts = storagePath.split("/");
+        const bucket = parts.shift()!;
+        const path = parts.join("/");
+        const delays = [0, 750, 2000, 4000]; // ~7s upper bound total
+        for (let attempt = 0; attempt < delays.length && !audioBytes; attempt++) {
+          if (delays[attempt]) await new Promise((r) => setTimeout(r, delays[attempt]));
+          try {
+            const { data: bucketInfo } = await admin.storage.getBucket(bucket);
+            if (!bucketInfo) {
+              storagePendingSync = true;
+              fetchErrors.push(`storage:bucket-missing:${bucket}:try${attempt + 1}`);
+              continue;
+            }
             const dl = await admin.storage.from(bucket).download(path);
             if (dl.data) {
               audioBytes = new Uint8Array(await dl.data.arrayBuffer());
               audioMime = detectMime(storagePath, dl.data.type);
               audioSource = "storage";
-            } else if (dl.error) {
-              fetchErrors.push(`storage:${dl.error.message}`);
+              storagePendingSync = false;
+              break;
             }
+            if (dl.error) {
+              const msg = dl.error.message || "";
+              const transient = /not.?found|temporar|timeout|fetch|network/i.test(msg);
+              fetchErrors.push(`storage:${msg}:try${attempt + 1}`);
+              storagePendingSync = transient;
+              if (!transient) break;
+            }
+          } catch (e: any) {
+            const msg = e?.message || "err";
+            fetchErrors.push(`storage:${msg}:try${attempt + 1}`);
+            storagePendingSync = /not.?found|temporar|timeout|fetch|network/i.test(msg);
           }
-        } catch (e: any) { fetchErrors.push(`storage:${e?.message || "err"}`); }
+        }
       }
 
       // 3. FusionPBX proxy
@@ -223,10 +240,18 @@ Deno.serve(async (req) => {
     if (!audioBytes || audioBytes.length === 0) {
       // Friendlier reason when there's no recording metadata at all yet.
       const hasAnyPath = !!(recording_path || call?.recording_path || recording_name || call?.recording_name || sourceUrl);
-      const reason = hasAnyPath ? "no-audio" : "recording-not-synced";
+      let reason: string;
+      let retryAfterMs = 0;
+      if (storagePendingSync) {
+        reason = "recording-pending-sync";
+        retryAfterMs = 15000; // client should auto-retry with backoff
+      } else {
+        reason = hasAnyPath ? "no-audio" : "recording-not-synced";
+        if (reason === "recording-not-synced") retryAfterMs = 20000;
+      }
       await writeTranscript(fallbackTranscript, `stub-${reason}`);
-      await audit(reason, { error_code: reason, message: `fetch errors: ${fetchErrors.join("; ") || "none"}`, metadata: { fetchErrors } });
-      return json({ transcript_text: fallbackTranscript, stub: true, reason, fetchErrors }, 200);
+      await audit(reason, { error_code: reason, message: `fetch errors: ${fetchErrors.join("; ") || "none"}`, metadata: { fetchErrors, retryAfterMs } });
+      return json({ transcript_text: fallbackTranscript, stub: true, reason, fetchErrors, retry_after_ms: retryAfterMs, pending_sync: storagePendingSync || reason === "recording-not-synced" }, 200);
     }
 
     // Gemini supports inline audio up to ~20MB
