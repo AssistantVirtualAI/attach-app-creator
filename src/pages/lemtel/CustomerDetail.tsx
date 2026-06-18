@@ -38,7 +38,10 @@ export default function CustomerDetail() {
   const [importing, setImporting] = useState(false);
   const [importReport, setImportReport] = useState<any>(null);
   const [addOpen, setAddOpen] = useState(false);
-  const [addForm, setAddForm] = useState({ extension: '', name: '', email: '' });
+  const [addForm, setAddForm] = useState({
+    extension: '', name: '', email: '',
+    sip_password: '', assign_phone_number: '', send_welcome_email: true,
+  });
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
 
@@ -188,17 +191,37 @@ export default function CustomerDetail() {
 
   const handleAddUser = async () => {
     if (!org || !domain || !addForm.extension) { toast.error('Extension required'); return; }
+    const userPayload = {
+      extension: addForm.extension,
+      name: addForm.name || undefined,
+      email: addForm.email || undefined,
+      password: addForm.sip_password || undefined,
+      assign_phone_number: addForm.assign_phone_number || undefined,
+    };
     const { data, error } = await supabase.functions.invoke('customer-users-import', {
       body: {
         organizationId: org.id,
         domain_uuid: domainUuid,
         domain_name: domain.domain_name,
-        users: [addForm],
+        send_welcome_email: addForm.send_welcome_email,
+        users: [userPayload],
       },
     });
     if (error) return toast.error(error.message);
     const r = (data as any)?.results?.[0];
-    if (r?.ok) { toast.success(`Extension ${addForm.extension} added`); setAddOpen(false); setAddForm({ extension: '', name: '', email: '' }); refetchSP(); }
+    if (r?.ok) {
+      const genPass = (data as any)?.results?.[0]?.password;
+      toast.success(`Extension ${addForm.extension} added`);
+      if (genPass) {
+        toast.message('SIP password (one-time view)', {
+          description: genPass,
+          action: { label: 'Copy', onClick: () => navigator.clipboard.writeText(genPass) },
+        });
+      }
+      setAddOpen(false);
+      setAddForm({ extension: '', name: '', email: '', sip_password: '', assign_phone_number: '', send_welcome_email: true });
+      refetchSP();
+    }
     else toast.error(r?.error || 'Add failed');
   };
 
@@ -360,10 +383,26 @@ export default function CustomerDetail() {
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Add user / extension</DialogTitle></DialogHeader>
-          <div className="space-y-3">
+          <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
             <div><Label>Extension *</Label><Input value={addForm.extension} onChange={e => setAddForm({ ...addForm, extension: e.target.value })} placeholder="1001" /></div>
             <div><Label>Display name</Label><Input value={addForm.name} onChange={e => setAddForm({ ...addForm, name: e.target.value })} /></div>
-            <div><Label>Email (optional — links portal user)</Label><Input type="email" value={addForm.email} onChange={e => setAddForm({ ...addForm, email: e.target.value.toLowerCase() })} /></div>
+            <div><Label>Email (optional — links portal user + receives welcome)</Label><Input type="email" value={addForm.email} onChange={e => setAddForm({ ...addForm, email: e.target.value.toLowerCase() })} /></div>
+            <div>
+              <Label>SIP password (leave blank to auto-generate)</Label>
+              <Input value={addForm.sip_password} onChange={e => setAddForm({ ...addForm, sip_password: e.target.value })} placeholder="min 12 chars" />
+            </div>
+            <div>
+              <Label>Assign phone number (optional, sets outbound CID)</Label>
+              <Input value={addForm.assign_phone_number} onChange={e => setAddForm({ ...addForm, assign_phone_number: e.target.value.trim() })} placeholder="+15145551234" />
+            </div>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={addForm.send_welcome_email}
+                onChange={e => setAddForm({ ...addForm, send_welcome_email: e.target.checked })}
+              />
+              Send welcome email with credentials (requires email)
+            </label>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>

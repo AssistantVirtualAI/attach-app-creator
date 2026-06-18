@@ -2445,12 +2445,18 @@ export type Database = {
       }
       lemtel_customers: {
         Row: {
+          address: string | null
+          admin_email: string | null
+          company_name: string | null
           created_at: string
+          domain_name: string | null
+          domain_uuid: string | null
           email: string | null
           id: string
           name: string
           notes: string | null
           phone: string | null
+          phone_numbers: string[]
           plan: string
           portal_enabled: boolean
           portal_user_id: string | null
@@ -2458,12 +2464,18 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          address?: string | null
+          admin_email?: string | null
+          company_name?: string | null
           created_at?: string
+          domain_name?: string | null
+          domain_uuid?: string | null
           email?: string | null
           id?: string
           name: string
           notes?: string | null
           phone?: string | null
+          phone_numbers?: string[]
           plan?: string
           portal_enabled?: boolean
           portal_user_id?: string | null
@@ -2471,12 +2483,18 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          address?: string | null
+          admin_email?: string | null
+          company_name?: string | null
           created_at?: string
+          domain_name?: string | null
+          domain_uuid?: string | null
           email?: string | null
           id?: string
           name?: string
           notes?: string | null
           phone?: string | null
+          phone_numbers?: string[]
           plan?: string
           portal_enabled?: boolean
           portal_user_id?: string | null
@@ -3248,6 +3266,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      org_contacts: {
+        Row: {
+          company: string | null
+          created_at: string
+          email: string | null
+          external_id: string | null
+          favorite: boolean
+          id: string
+          name: string
+          notes: string | null
+          organization_id: string
+          owner_user_id: string | null
+          phone: string | null
+          source: string
+          updated_at: string
+        }
+        Insert: {
+          company?: string | null
+          created_at?: string
+          email?: string | null
+          external_id?: string | null
+          favorite?: boolean
+          id?: string
+          name: string
+          notes?: string | null
+          organization_id: string
+          owner_user_id?: string | null
+          phone?: string | null
+          source?: string
+          updated_at?: string
+        }
+        Update: {
+          company?: string | null
+          created_at?: string
+          email?: string | null
+          external_id?: string | null
+          favorite?: boolean
+          id?: string
+          name?: string
+          notes?: string | null
+          organization_id?: string
+          owner_user_id?: string | null
+          phone?: string | null
+          source?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       org_exports: {
         Row: {
