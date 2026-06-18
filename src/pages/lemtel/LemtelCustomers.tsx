@@ -738,15 +738,58 @@ function ExtensionsPanel({
   const [editDesc, setEditDesc] = useState('');
   const [editCid, setEditCid] = useState('');
   const [editSaving, setEditSaving] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState<null | 'enable' | 'disable' | 'reset-vm'>(null);
+  const [retrying, setRetrying] = useState(false);
+  const [retryAttempt, setRetryAttempt] = useState(0);
+  const [syncingNow, setSyncingNow] = useState(false);
+  const retryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Auto-retry with backoff on transient errors (max 3 attempts)
+  useEffect(() => {
+    if (!live?.error || retryAttempt >= 3) return;
+    const delay = Math.min(2000 * Math.pow(2, retryAttempt), 15000);
+    setRetrying(true);
+    retryRef.current = setTimeout(() => {
+      setRetryAttempt(a => a + 1);
+      onChanged();
+      setRetrying(false);
+    }, delay);
+    return () => { if (retryRef.current) clearTimeout(retryRef.current); };
+  }, [live?.error, retryAttempt]);
+
+  // Reset retry counter when error clears
+  useEffect(() => { if (live && !live.error) setRetryAttempt(0); }, [live]);
+
+  const syncNow = async () => {
+    setSyncingNow(true);
+    try {
+      const { error } = await supabase.functions.invoke('fusionpbx-proxy', {
+        body: { action: 'sync-all', resources: ['extensions'], organization_id: LEMTEL_ORG, domain_uuid: domain.domain_uuid },
+      });
+      if (error) throw error;
+      toast.success(`Synced ${domain.domain_name}`);
+      setRetryAttempt(0);
+      onChanged();
+    } catch (e: any) {
+      toast.error(e?.message || 'Sync failed');
+    } finally {
+      setSyncingNow(false);
+    }
+  };
 
   if (loading) {
     return <div className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="w-3 h-3 animate-spin" /> Loading extensions from PBX…</div>;
   }
   if (live?.error) {
     return (
-      <div className="text-xs text-destructive flex items-center gap-2">
+      <div className="text-xs text-destructive flex items-center gap-2 flex-wrap">
         <span>⚠ Could not fetch extensions: {live.error}</span>
-        <Button size="sm" variant="outline" onClick={onChanged}>Retry</Button>
+        {retrying && <span className="text-muted-foreground">retrying… (attempt {retryAttempt + 1}/3)</span>}
+        <Button size="sm" variant="outline" onClick={() => { setRetryAttempt(0); onChanged(); }}>Retry now</Button>
+        <Button size="sm" variant="default" onClick={syncNow} disabled={syncingNow}>
+          {syncingNow ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <RefreshCw className="w-3 h-3 mr-1" />} Sync now
+        </Button>
       </div>
     );
   }
@@ -755,22 +798,27 @@ function ExtensionsPanel({
     return <div className="text-xs text-muted-foreground">No extensions on this domain.</div>;
   }
 
+  const callUpdate = async (ext: LiveExt, params: any) => {
+    const { error } = await supabase.functions.invoke('pbx-write', {
+      body: {
+        organizationId: LEMTEL_ORG,
+        action: 'update-extension',
+        params: { extension_uuid: ext.extension_uuid, domain_uuid: domain.domain_uuid, ...params },
+      },
+    });
+    if (error) throw error;
+  };
+
   const doAction = async (ext: LiveExt, action: 'toggle' | 'reset-vm') => {
     if (!ext.extension_uuid) { toast.error('Missing extension UUID'); return; }
     setBusyId(ext.extension_uuid);
     try {
-      const params: any = { extension_uuid: ext.extension_uuid, domain_uuid: domain.domain_uuid };
       if (action === 'toggle') {
         const isEn = ext.enabled === true || ext.enabled === 'true';
-        params.enabled = isEn ? 'false' : 'true';
-      } else if (action === 'reset-vm') {
-        params.voicemail_password = String(ext.extension);
-        params.voicemail_enabled = 'true';
+        await callUpdate(ext, { enabled: isEn ? 'false' : 'true' });
+      } else {
+        await callUpdate(ext, { voicemail_password: String(ext.extension), voicemail_enabled: 'true' });
       }
-      const { error } = await supabase.functions.invoke('pbx-write', {
-        body: { organizationId: LEMTEL_ORG, action: 'update-extension', params },
-      });
-      if (error) throw error;
       toast.success(action === 'toggle' ? 'Extension updated' : `Voicemail reset (PIN = ${ext.extension})`);
       onChanged();
     } catch (e: any) {
@@ -780,23 +828,31 @@ function ExtensionsPanel({
     }
   };
 
+  const runBulk = async (action: 'enable' | 'disable' | 'reset-vm') => {
+    const targets = exts.filter(e => e.extension_uuid && selected.has(e.extension_uuid));
+    if (!targets.length) return;
+    if (action === 'reset-vm' && !confirm(`Reset voicemail PIN to extension number for ${targets.length} extension(s)?`)) return;
+    setBulkBusy(action);
+    let ok = 0, fail = 0;
+    for (const ext of targets) {
+      try {
+        if (action === 'reset-vm') await callUpdate(ext, { voicemail_password: String(ext.extension), voicemail_enabled: 'true' });
+        else await callUpdate(ext, { enabled: action === 'enable' ? 'true' : 'false' });
+        ok++;
+      } catch { fail++; }
+    }
+    setBulkBusy(null);
+    if (ok) toast.success(`${ok} extension(s) updated`);
+    if (fail) toast.error(`${fail} extension(s) failed`);
+    setSelected(new Set());
+    onChanged();
+  };
+
   const saveEdit = async () => {
     if (!editing?.extension_uuid) return;
     setEditSaving(true);
     try {
-      const { error } = await supabase.functions.invoke('pbx-write', {
-        body: {
-          organizationId: LEMTEL_ORG,
-          action: 'update-extension',
-          params: {
-            extension_uuid: editing.extension_uuid,
-            domain_uuid: domain.domain_uuid,
-            description: editDesc,
-            effective_caller_id_name: editCid,
-          },
-        },
-      });
-      if (error) throw error;
+      await callUpdate(editing, { description: editDesc, effective_caller_id_name: editCid });
       toast.success('Extension saved');
       setEditing(null);
       onChanged();
@@ -807,18 +863,46 @@ function ExtensionsPanel({
     }
   };
 
+  const allIds = exts.map(e => e.extension_uuid).filter(Boolean) as string[];
+  const allSelected = allIds.length > 0 && allIds.every(id => selected.has(id));
+  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(allIds));
+  const toggleOne = (id?: string) => { if (!id) return; setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; }); };
+
   return (
     <>
-      <div className="text-xs text-muted-foreground mb-2">{exts.length} extension{exts.length === 1 ? '' : 's'} on <code>{domain.domain_name}</code></div>
+      <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+        <div className="text-xs text-muted-foreground flex items-center gap-2">
+          <Checkbox checked={allSelected} onCheckedChange={toggleAll} aria-label="Select all" />
+          <span>{exts.length} extension{exts.length === 1 ? '' : 's'} on <code>{domain.domain_name}</code>{selected.size > 0 ? ` — ${selected.size} selected` : ''}</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <Button size="sm" variant="outline" disabled={selected.size === 0 || !!bulkBusy} onClick={() => runBulk('enable')}>
+            {bulkBusy === 'enable' && <Loader2 className="w-3 h-3 mr-1 animate-spin" />} Enable
+          </Button>
+          <Button size="sm" variant="outline" disabled={selected.size === 0 || !!bulkBusy} onClick={() => runBulk('disable')}>
+            {bulkBusy === 'disable' && <Loader2 className="w-3 h-3 mr-1 animate-spin" />} Disable
+          </Button>
+          <Button size="sm" variant="outline" disabled={selected.size === 0 || !!bulkBusy} onClick={() => runBulk('reset-vm')}>
+            {bulkBusy === 'reset-vm' && <Loader2 className="w-3 h-3 mr-1 animate-spin" />} Reset VM
+          </Button>
+          <Button size="sm" variant="ghost" onClick={syncNow} disabled={syncingNow} title="Force PBX sync">
+            {syncingNow ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+          </Button>
+        </div>
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
         {exts.map((e) => {
           const isEn = e.enabled === true || e.enabled === 'true';
           const busy = busyId === e.extension_uuid;
+          const isSel = e.extension_uuid ? selected.has(e.extension_uuid) : false;
           return (
-            <div key={e.extension_uuid || e.extension} className="flex items-center justify-between gap-2 rounded-md border bg-background px-2 py-1.5">
-              <div className="min-w-0">
-                <div className="font-mono text-sm">{e.extension}</div>
-                <div className="text-xs text-muted-foreground truncate">{e.effective_caller_id_name || e.description || '—'}</div>
+            <div key={e.extension_uuid || e.extension} className={`flex items-center justify-between gap-2 rounded-md border bg-background px-2 py-1.5 ${isSel ? 'ring-1 ring-primary' : ''}`}>
+              <div className="flex items-center gap-2 min-w-0">
+                <Checkbox checked={isSel} onCheckedChange={() => toggleOne(e.extension_uuid)} aria-label={`Select ${e.extension}`} />
+                <div className="min-w-0">
+                  <div className="font-mono text-sm">{e.extension}</div>
+                  <div className="text-xs text-muted-foreground truncate">{e.effective_caller_id_name || e.description || '—'}</div>
+                </div>
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 <Badge variant={isEn ? 'default' : 'secondary'} className="text-[10px]">{isEn ? 'on' : 'off'}</Badge>
@@ -855,4 +939,5 @@ function ExtensionsPanel({
     </>
   );
 }
+
 
