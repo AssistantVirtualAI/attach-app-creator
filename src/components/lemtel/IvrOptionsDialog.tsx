@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Trash2, Loader2, Pencil, X, Check } from 'lucide-react';
+import { Plus, Trash2, Loader2, Pencil, X, Check, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -49,6 +49,9 @@ export function IvrOptionsDialog({
   const [draft, setDraft] = useState<{ digit: string; label: string; destType: DestType; destValue: string }>({ digit: '', label: '', destType: 'extension', destValue: '' });
   const [busy, setBusy] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 10;
 
   const paramFor = (t: DestType, v: string) => {
     if (t === 'voicemail') return `transfer *99${v} XML ${domainName}`;
@@ -84,49 +87,98 @@ export function IvrOptionsDialog({
 
   const cancel = () => { setEditId(null); setAdding(false); };
 
+  // Optimistic helpers
+  const snapshot = () => qc.getQueryData<any[]>(queryKey) || [];
+  const writeCache = (next: any[]) => qc.setQueryData(queryKey, next);
+  const revert = (prev: any[]) => writeCache(prev);
+
+  const runWithRetry = (label: string, fn: () => Promise<void>, prev: any[]) => {
+    toast.error(label, {
+      description: 'Changes reverted to last sync.',
+      action: { label: 'Retry', onClick: () => { writeCache(prev); fn(); } },
+    });
+  };
+
   const save = async () => {
     if (!draft.digit || (draft.destType !== 'menu-top' && !draft.destValue)) {
       toast.error('Digit + destination required'); return;
     }
-    setBusy(true);
-    try {
-      const body: any = {
-        action: editId ? 'update-ivr-option' : 'create-ivr-option',
-        domain_uuid: domainUuid,
-        ivr_menu_uuid: menuUuid,
-        ivr_menu_option_digits: draft.digit,
-        ivr_menu_option_action: actionFor(draft.destType),
-        ivr_menu_option_param: paramFor(draft.destType, draft.destValue),
-        ivr_menu_option_description: draft.label,
-        ivr_menu_option_enabled: 'true',
-      };
-      if (editId) body.ivr_menu_option_uuid = editId;
-      const { error } = await supabase.functions.invoke('fusionpbx-proxy', { body });
-      if (error) throw error;
-      toast.success(editId ? 'Option updated' : 'Option added');
-      cancel();
-      await qc.invalidateQueries({ queryKey });
-      await refetch();
-      qc.invalidateQueries({ queryKey: ['fpbx', 'ivrs'] });
-    } catch (e: any) { toast.error(e?.message || 'Failed'); }
-    finally { setBusy(false); }
+    const prev = snapshot();
+    const optimistic = {
+      ivr_menu_option_uuid: editId || `tmp-${Date.now()}`,
+      ivr_menu_option_digits: draft.digit,
+      ivr_menu_option_description: draft.label,
+      ivr_menu_option_action: actionFor(draft.destType),
+      ivr_menu_option_param: paramFor(draft.destType, draft.destValue),
+      ivr_menu_option_enabled: 'true',
+      _pending: true,
+    };
+    writeCache(editId ? prev.map(o => o.ivr_menu_option_uuid === editId ? { ...o, ...optimistic } : o) : [...prev, optimistic]);
+    cancel();
+
+    const attempt = async () => {
+      setBusy(true);
+      try {
+        const body: any = {
+          action: editId ? 'update-ivr-option' : 'create-ivr-option',
+          domain_uuid: domainUuid,
+          ivr_menu_uuid: menuUuid,
+          ivr_menu_option_digits: draft.digit,
+          ivr_menu_option_action: actionFor(draft.destType),
+          ivr_menu_option_param: paramFor(draft.destType, draft.destValue),
+          ivr_menu_option_description: draft.label,
+          ivr_menu_option_enabled: 'true',
+        };
+        if (editId) body.ivr_menu_option_uuid = editId;
+        const { error } = await supabase.functions.invoke('fusionpbx-proxy', { body });
+        if (error) throw error;
+        toast.success(editId ? 'Option updated' : 'Option added');
+        await qc.invalidateQueries({ queryKey });
+        await refetch();
+        qc.invalidateQueries({ queryKey: ['fpbx', 'ivrs'] });
+      } catch (e: any) {
+        revert(prev);
+        runWithRetry(e?.message || 'Failed to save option', attempt, prev);
+      } finally { setBusy(false); }
+    };
+    attempt();
   };
 
   const del = async (o: any) => {
     if (!confirm(`Delete option "${o.ivr_menu_option_digits}"?`)) return;
-    setBusy(true);
-    try {
-      const { error } = await supabase.functions.invoke('fusionpbx-proxy', {
-        body: { action: 'delete-ivr-option', domain_uuid: domainUuid, ivr_menu_option_uuid: o.ivr_menu_option_uuid },
-      });
-      if (error) throw error;
-      toast.success('Option deleted');
-      await qc.invalidateQueries({ queryKey });
-      await refetch();
-      qc.invalidateQueries({ queryKey: ['fpbx', 'ivrs'] });
-    } catch (e: any) { toast.error(e?.message || 'Failed'); }
-    finally { setBusy(false); }
+    const prev = snapshot();
+    writeCache(prev.filter(x => x.ivr_menu_option_uuid !== o.ivr_menu_option_uuid));
+
+    const attempt = async () => {
+      setBusy(true);
+      try {
+        const { error } = await supabase.functions.invoke('fusionpbx-proxy', {
+          body: { action: 'delete-ivr-option', domain_uuid: domainUuid, ivr_menu_option_uuid: o.ivr_menu_option_uuid },
+        });
+        if (error) throw error;
+        toast.success('Option deleted');
+        await qc.invalidateQueries({ queryKey });
+        await refetch();
+        qc.invalidateQueries({ queryKey: ['fpbx', 'ivrs'] });
+      } catch (e: any) {
+        revert(prev);
+        runWithRetry(e?.message || 'Failed to delete option', attempt, prev);
+      } finally { setBusy(false); }
+    };
+    attempt();
   };
+
+  // Filtered + paginated view
+  const q = search.trim().toLowerCase();
+  const filtered = q
+    ? options.filter((o: any) =>
+        String(o.ivr_menu_option_digits || '').toLowerCase().includes(q) ||
+        String(o.ivr_menu_option_description || '').toLowerCase().includes(q))
+    : options;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  useEffect(() => { setPage(1); }, [search, menuUuid]);
 
   const DestSelect = ({ t, v, onT, onV }: any) => (
     <div className="grid grid-cols-2 gap-1">
@@ -188,14 +240,14 @@ export function IvrOptionsDialog({
       );
     }
     return (
-      <div key={o.ivr_menu_option_uuid} className="flex items-center gap-3 border rounded p-2">
+      <div key={o.ivr_menu_option_uuid} className={`flex items-center gap-3 border rounded p-2 ${o._pending ? 'opacity-60 animate-pulse' : ''}`}>
         <Badge variant="outline" className="font-mono text-base px-3">{o.ivr_menu_option_digits}</Badge>
         <div className="flex-1 min-w-0">
           <div className="text-sm truncate">{o.ivr_menu_option_description || <span className="text-muted-foreground italic">No label</span>}</div>
-          <div className="text-xs text-muted-foreground capitalize">{destType}{destValue ? ` · ${destValue}` : ''}</div>
+          <div className="text-xs text-muted-foreground capitalize">{destType}{destValue ? ` · ${destValue}` : ''}{o._pending ? ' · saving…' : ''}</div>
         </div>
-        <Button size="icon" variant="ghost" onClick={() => startEdit(o)} disabled={busy}><Pencil className="w-3 h-3" /></Button>
-        <Button size="icon" variant="ghost" onClick={() => del(o)} disabled={busy}><Trash2 className="w-3 h-3" /></Button>
+        <Button size="icon" variant="ghost" onClick={() => startEdit(o)} disabled={busy || o._pending}><Pencil className="w-3 h-3" /></Button>
+        <Button size="icon" variant="ghost" onClick={() => del(o)} disabled={busy || o._pending}><Trash2 className="w-3 h-3" /></Button>
       </div>
     );
   };
@@ -210,7 +262,18 @@ export function IvrOptionsDialog({
             {isFetching && !isLoading && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
           </DialogTitle>
         </DialogHeader>
-        <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
+        {options.length > 0 && (
+          <div className="relative">
+            <Search className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              className="h-8 pl-7"
+              placeholder="Search by digit or label…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+          </div>
+        )}
+        <div className="space-y-2 max-h-[55vh] overflow-y-auto pr-1">
           {isLoading ? (
             <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin" /></div>
           ) : (
@@ -218,7 +281,10 @@ export function IvrOptionsDialog({
               {options.length === 0 && !adding && (
                 <p className="text-sm text-muted-foreground text-center py-4">No options yet.</p>
               )}
-              {options.map(renderRow)}
+              {options.length > 0 && filtered.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-4">No matches for "{search}".</p>
+              )}
+              {paged.map(renderRow)}
               {adding && (
                 <div className="border rounded p-2 space-y-2 bg-muted/30 border-primary/40">
                   <div className="grid grid-cols-[60px_1fr_auto] gap-2 items-end">
@@ -237,6 +303,16 @@ export function IvrOptionsDialog({
             </>
           )}
         </div>
+        {filtered.length > PAGE_SIZE && (
+          <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
+            <span>{(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, filtered.length)} of {filtered.length}</span>
+            <div className="flex items-center gap-1">
+              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={safePage <= 1}><ChevronLeft className="w-3 h-3" /></Button>
+              <span>Page {safePage} / {totalPages}</span>
+              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={safePage >= totalPages}><ChevronRight className="w-3 h-3" /></Button>
+            </div>
+          </div>
+        )}
         <DialogFooter className="flex items-center justify-between sm:justify-between">
           <Button size="sm" variant="outline" onClick={startAdd} disabled={adding || !!editId}>
             <Plus className="w-3 h-3 mr-1" /> Add option
