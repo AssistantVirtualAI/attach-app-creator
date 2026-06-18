@@ -218,7 +218,7 @@ class JsSipProvider {
     if (this.ua) this.stop();
     (this as any).lastInitSig = sig;
     this.config = cfg;
-    this.update({ events: [], callEvents: [], wssReachable: null, errorCause: undefined });
+    this.update({ events: [], callEvents: [], wssReachable: null, errorCause: undefined, ...( { authBlocked: null } as any) });
     this.log("info", "config", `Initializing SIP for ext ${cfg.extension}@${cfg.sipDomain}`);
 
     if (cfg.mock || !cfg.password) {
