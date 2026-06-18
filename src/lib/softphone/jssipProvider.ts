@@ -2,6 +2,38 @@
 // Used by useSoftphone hook; do not import directly into components.
 import JsSIP from "jssip";
 
+// SDP rewriter — forces audio-only PCMU/PCMA, removes DTLS/SRTP, drops video.
+// Mirrors the desktop app fix that resolves FusionPBX 488 Not Acceptable Here.
+function rewriteSdpForFusionPBX(sdp: string): string {
+  let out = sdp;
+  out = out.replace(/m=video[\s\S]*?(?=\r\nm=|$)/g, '');
+  out = out.replace(/m=audio (\d+) [A-Z\/]+ [^\r\n]+/g, 'm=audio $1 RTP/AVP 0 8 101');
+  out = out.replace(/^a=fingerprint:.*$/gm, '');
+  out = out.replace(/^a=setup:.*$/gm, '');
+  out = out.replace(/^a=dtls[-a-z]*:.*$/gm, '');
+  out = out.replace(/^a=crypto:.*$/gm, '');
+  out = out.replace(/^a=ice-options:.*$/gm, '');
+  out = out.replace(/^a=rtpmap:(\d+) [^\r\n]+$/gm, (line, pt) =>
+    (pt === '0' || pt === '8' || pt === '101') ? line : ''
+  );
+  out = out.replace(/^a=fmtp:(\d+) [^\r\n]+$/gm, (line, pt) =>
+    (pt === '0' || pt === '8' || pt === '101') ? line : ''
+  );
+  out = out.replace(/^a=rtcp-fb:.*$/gm, '');
+  out = out.replace(/^a=extmap:.*$/gm, '');
+  out = out.replace(/\r?\n\r?\n+/g, '\r\n');
+  return out;
+}
+
+const sdpModifier = (description: any) => {
+  if (description?.sdp) {
+    try { description.sdp = rewriteSdpForFusionPBX(description.sdp); }
+    catch (e) { console.error('[SIP][SDP] rewrite error', e); }
+  }
+  return Promise.resolve(description);
+};
+
+
 export type SipStatus =
   | "idle"
   | "connecting"
@@ -383,6 +415,7 @@ class JsSipProvider {
         mediaStream,
         mediaConstraints: { audio: true, video: false },
         rtcOfferConstraints: { offerToReceiveAudio: true, offerToReceiveVideo: false },
+        sessionDescriptionHandlerModifiers: [sdpModifier],
         pcConfig: {
           iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
@@ -402,7 +435,11 @@ class JsSipProvider {
 
   answer() {
     if (this.session) {
-      this.session.answer({ mediaConstraints: { audio: true, video: false } });
+      this.session.answer({
+        mediaConstraints: { audio: true, video: false },
+        rtcAnswerConstraints: { offerToReceiveAudio: true, offerToReceiveVideo: false },
+        sessionDescriptionHandlerModifiers: [sdpModifier],
+      });
     } else if (this.config?.mock) {
       this.clearMockTimers();
       this.update({ callState: "active", startedAt: Date.now() });
