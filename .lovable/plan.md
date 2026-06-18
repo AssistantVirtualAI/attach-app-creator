@@ -1,60 +1,79 @@
-# Phase 5 — Final Closeout Plan
+# Plan: Desktop Dialer Freeze + Mobile Parity + Provider Credentials Page
 
-## Audit of the 10 priorities
+## 1. P3 — Desktop Dialer Freeze (wide window)
 
-| # | Priority | Status | Evidence |
-|---|---|---|---|
-| 1 | Inbound SDP rewrite | Done | `sdpModifier` applied at `answer()`, `invite()`, and initial UA in `apps/ava-softphone-desktop/src/lib/sip/jssipProvider.ts` (lines 764, 839, 871) |
-| 2 | Dark-theme `ControlBtn` | Done | White text on translucent surface in `SoftphonePane.tsx` (lines 1128-1175) |
-| 3 | Wide-dialer freeze | Done | `MemoKeypad = React.memo(DialerKeypad)` + `useCallback` stable handlers in `SoftphonePane.tsx` |
-| 4 | Chat persistence | Done | Module-level `CHANNEL_CACHE` + `mergeIncoming` / `mergeOnFetch` in `OrgChatView.tsx` |
-| 5 | Cross-platform chat sync | Done | Standard `org-chat-${channelId}` postgres-changes channel scoped by `organization_id`; presence channel `org-chat-presence-${orgId}` |
-| 6 | Call transcription | Done | `ai-transcribe-call` resolves audio (storage / FusionPBX proxy / Twilio proxy) and calls Lovable AI Gateway (`google/gemini-2.5-pro`); writes to `pbx_call_transcripts`; full audit log |
-| 7 | Admin recordings portal | Done | `src/pages/lemtel/admin/AdminRecordings.tsx` (414 lines) |
-| 8 | Contacts view | Done | `apps/ava-softphone-desktop/src/components/console/ContactsView.tsx` (609 lines) |
-| 9 | Domain-admin promotion | Done | `customer-invite-admin` accepts `role: 'org_admin' \| 'manager'`, returns `invite_url`; `CustomerDetail.tsx` shows role picker + invite link |
-| 10 | Customer welcome email | **Not done** | No `_shared/transactional-email-templates/` directory, no call to `send-transactional-email` from `customer-invite-admin` |
+**Target:** `apps/ava-softphone-desktop/src/components/SoftphonePane.tsx` (the main dialer pane — what's mounted in the desktop window's "Dialer" tab). The freeze reproduces at wide widths when pressing Call.
 
-## What this plan ships
+**Root cause hypothesis:** at ≥1024px the pane renders a 3-column layout (keypad + recents + contacts). Pressing Call re-renders the parent on every SIP session event (`progress`, `accepted`, `confirmed`, `peerconnection`, `icecandidate`), and the heavy side panels (`RecentsList`, `ContactsList`) re-render synchronously with the parent — blocking the main thread for several seconds on big lists.
 
-Only **P10** remains. Steps:
+**Fix:**
+- Memoize `RecentsList` and `ContactsList` with `React.memo` and stable prop refs (already done for `DialerKeypad`).
+- Move active-call state (`session`, `callState`, `remoteIdentity`, timers) into a dedicated context/store so the side panels don't re-render on SIP events.
+- Throttle the call-duration ticker to 1Hz via `useRef` + single `setInterval`, not state updates per event.
+- Wrap the call button handler in `startTransition` so `session.connect()` doesn't block paint.
+- Add a `useDeferredValue` on the search/filter input fed to `ContactsList`.
 
-### 1. Email infrastructure
-- Use the project's custom domain `avastatistic.ca` (already verified via `get_project_custom_domain`).
-- Run `email_domain--setup_email_infra` to create the pgmq queue, RPCs, send log, suppression list, unsubscribe tokens, `process-email-queue` worker, and cron job.
-- Run `email_domain--scaffold_transactional_email` to create `send-transactional-email`, `handle-email-unsubscribe`, `handle-email-suppression`, and the template registry.
+**Verify:** open desktop preview at 1440px, dial, click Call → UI stays responsive, no >100ms long task in Performance profile.
 
-### 2. Welcome email template
-- New file `supabase/functions/_shared/transactional-email-templates/customer-welcome.tsx` (React Email, brand-aligned: glass/cyberpunk accent `#0023e6`, Inter, `Body` background `#ffffff`).
-- Props: `customerName`, `portalUrl` (`https://avastatistic.ca/domain/{slug}/admin`), `loginEmail`, `temporaryPassword`, `role` (`org_admin` | `manager`).
-- Content: greeting, what their portal does, credentials block, quick-start links (Add extension, Configure IVR, Business hours, Recordings), CTA button to portal.
-- Register in `_shared/transactional-email-templates/registry.ts` as `customer-welcome`.
+## 2. Mobile (/m) Dark Theme
 
-### 3. Unsubscribe page
-- New route `src/pages/EmailUnsubscribe.tsx` at the path returned by `scaffold_transactional_email`; GET-validates the `token`, POSTs to confirm, shows success / already-unsubscribed / invalid states with brand styling.
-- Register the route in `src/App.tsx`.
+**Target:** `apps/ava-softphone-mobile/src/styles.css` + screen inline styles.
 
-### 4. Wire the trigger
-- In `supabase/functions/customer-invite-admin/index.ts`, after successfully creating the admin user, invoke `send-transactional-email` with:
-  - `templateName: 'customer-welcome'`
-  - `recipientEmail: <admin email>`
-  - `idempotencyKey: welcome-${user_id}-${organization_id}`
-  - `templateData: { customerName, portalUrl, loginEmail, temporaryPassword, role }`
-- Failure to enqueue must NOT fail the admin-creation response; log and continue.
+- Add CSS variables for dark + light in `:root` and `[data-theme="light"]`; default to dark to match the existing `#0A1429` background already used in `MobileEmbed.tsx`.
+- Replace remaining hardcoded `white` / `var(--text-muted)` with semantic tokens (`--surface`, `--surface-2`, `--text`, `--text-muted`, `--border`, `--primary`, `--success`, `--warning`, `--danger`).
+- Add a theme toggle in `SettingsScreen.tsx` (persist to `localStorage` key `ava.theme`).
+- Apply token to status bar in `index.tsx` based on saved theme.
 
-### 5. Deploy
-- `deploy_edge_functions` for `send-transactional-email`, `handle-email-unsubscribe`, `handle-email-suppression`, `process-email-queue`, `customer-invite-admin`.
+## 3. Mobile Real-Time CDR per Extension
 
-### 6. Smoke test
-- Use `curl_edge_functions` to call `send-transactional-email` with `previewData` to verify the template renders and enqueues, then check `email_send_log`.
+**Target:** `apps/ava-softphone-mobile/src/screens/CallsScreen.tsx` + `RecentsScreen.tsx` + a new hook `useExtensionCDR.ts`.
 
-## Out of scope
-- No changes to `vite.config.ts`, `electron-builder.yml`, `.github/workflows/`.
-- No re-work of P1-P9 (already verified).
-- No marketing/newsletter emails.
+- Edge function `mobile-domain-stats` already returns aggregates; add a new edge function `mobile-extension-cdr` that returns `pbx_call_records` filtered to the signed-in user's extension (resolved via `pbx_softphone_users.extension_id`), ordered desc, paginated.
+- Enable Realtime on `pbx_call_records` (migration: `ALTER PUBLICATION supabase_realtime ADD TABLE public.pbx_call_records;` — only if not already added).
+- Hook subscribes to `postgres_changes` filtered by `extension = <my_ext>` and prepends new rows; teardown on unmount.
+- Wire into `CallsScreen` and `HomeScreen` (today counter).
 
-## Files to add / edit
-- add `supabase/functions/_shared/transactional-email-templates/customer-welcome.tsx`
-- edit `supabase/functions/_shared/transactional-email-templates/registry.ts` (created by scaffold)
-- edit `supabase/functions/customer-invite-admin/index.ts` (trigger send + pass `portalUrl`)
-- add `src/pages/EmailUnsubscribe.tsx` and route in `src/App.tsx`
+## 4. Mobile — Surface All Calling Features
+
+Currently mobile shows dial / answer / hangup / mute / hold. Bring it up to parity with desktop `CallControlGrid`:
+
+- Add to `ActiveCallSheet.tsx`: **DTMF keypad, Transfer (blind + attended), Conference (3-way), Hold, Mute, Speaker, Record toggle, Add call**.
+- Add to `MoreScreen.tsx` entries: **Call Forwarding** (existing hook `useCallForwarding`), **Do Not Disturb**, **Voicemail Greetings**, **Pause Reasons** (queue agents), **Queues login/logout**, **Presence status picker**.
+- Wire each to the existing edge functions (`pbx-call-transfer`, `pbx-call-conference`, `pbx-call-record-toggle`, `pbx-set-forwarding`, `pbx-queue-agent-state`). Create thin wrappers in `useSoftphone.ts`.
+
+## 5. Provider Credentials Integration Page (Lemtel Portal)
+
+New page `src/pages/lemtel/ProviderCredentials.tsx` accessible to Lemtel admins under `/lemtel/integrations/providers`.
+
+**Providers:** Twilio, Telnyx, Skyetel, VoIP.ms.
+
+**UI per provider card:**
+- Form fields (all secret values masked, show/hide toggle):
+  - **Twilio:** Account SID, Auth Token, API Key SID, API Key Secret, Default From Number.
+  - **Telnyx:** API Key (v2), Messaging Profile ID, Connection ID, Default From Number.
+  - **Skyetel:** SID, Secret, Tenant ID, Outbound Trunk Group.
+  - **VoIP.ms:** API Username, API Password, Sub-account, Allowed IP note.
+- "Test Connection" button → edge function `provider-credentials-test` runs a cheap auth probe per provider.
+- "Save" → upserts into existing `lemtel_config` (rows tagged `is_secret=true`, keys prefixed `TWILIO_`, `TELNYX_`, `SKYETEL_`, `VOIPMS_`).
+- Status badge: Not configured / Configured / Verified / Error (last test result + timestamp).
+- Collapsible **"How to get these credentials"** guide per provider with step-by-step + deep links:
+  - Twilio: console.twilio.com → Account → API keys & tokens.
+  - Telnyx: portal.telnyx.com → API Keys + Messaging → Messaging Profiles.
+  - Skyetel: my.skyetel.com → Settings → API + SIP → Endpoint Groups.
+  - VoIP.ms: voip.ms → SOAP/REST API → Enable + set IP allowlist.
+
+**Backend:**
+- New edge function `provider-credentials-test/index.ts` with per-provider verify routine (Twilio `/Accounts.json`, Telnyx `/whoami`, Skyetel `/sip/endpoint_groups`, VoIP.ms `getServerInfo`).
+- Stored values readable only via `lemtel_config` RLS (admin-only, already in place).
+- Add nav entry in Lemtel sidebar.
+
+## Out of Scope
+
+- No changes to `vite.config.ts`, `electron-builder.yml`, `.github/workflows/*`.
+- No P10 welcome email work (blocked on `notify.avastatistic.ca` sender subdomain setup).
+
+## Technical Notes
+
+- New files: `apps/ava-softphone-mobile/src/hooks/useExtensionCDR.ts`, `apps/ava-softphone-mobile/src/hooks/useTheme.ts`, `src/pages/lemtel/ProviderCredentials.tsx`, `src/components/lemtel/ProviderCredentialCard.tsx`, `supabase/functions/mobile-extension-cdr/index.ts`, `supabase/functions/provider-credentials-test/index.ts`.
+- Edits: `SoftphonePane.tsx`, `ActiveCallSheet.tsx`, `MoreScreen.tsx`, `SettingsScreen.tsx`, `CallsScreen.tsx`, `RecentsScreen.tsx`, mobile `styles.css`, mobile `index.tsx`, Lemtel sidebar/router.
+- Migration: enable Realtime on `pbx_call_records` if needed; no schema changes required (reuse `lemtel_config`).
