@@ -1,124 +1,110 @@
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Brain, Sparkles, RefreshCw, ChevronDown, ChevronUp, Clock, AlertCircle } from "lucide-react";
-import { useCallIntelligence } from "@/hooks/useCallIntelligence";
+import { useEffect, useState } from "react";
+import { supabase } from "../lib/supabaseClient";
 
-interface Props {
-  callId: string;
-  canRegenerate?: boolean;
+interface Intel {
+  status: string;
+  transcript: string | null;
+  summary: string | null;
+  sentiment: string | null;
+  satisfaction_score: number | null;
+  quality_score: number | null;
+  coaching_score: number | null;
+  coaching_notes: string[];
+  action_items: string[];
+  topics: string[];
+  intent: string | null;
+  escalation_needed: boolean;
 }
 
-export function CallIntelligencePanel({ callId, canRegenerate = false }: Props) {
-  const { data, isLoading, isPending, regenerate, isRegenerating } = useCallIntelligence(callId);
+const EMPTY: Intel = {
+  status: "missing", transcript: null, summary: null, sentiment: null,
+  satisfaction_score: null, quality_score: null, coaching_score: null,
+  coaching_notes: [], action_items: [], topics: [], intent: null, escalation_needed: false,
+};
+
+async function loadCached(callId: string): Promise<Intel | null> {
+  const [{ data: insight }, { data: tr }] = await Promise.all([
+    supabase.from("pbx_ai_insights").select("*").eq("call_record_id", callId).maybeSingle(),
+    supabase.from("pbx_call_transcripts").select("transcript_text").eq("call_record_id", callId)
+      .order("created_at", { ascending: false }).limit(1).maybeSingle(),
+  ]);
+  if (!insight || !(tr as any)?.transcript_text) return null;
+  const i: any = insight;
+  return {
+    status: "cached", transcript: (tr as any).transcript_text,
+    summary: i.summary, sentiment: i.sentiment,
+    satisfaction_score: i.satisfaction_score, quality_score: i.quality_score,
+    coaching_score: i.coaching_score, coaching_notes: i.coaching_notes ?? [],
+    action_items: i.action_items ?? [], topics: i.topics ?? [],
+    intent: i.intent, escalation_needed: i.escalation_needed ?? false,
+  };
+}
+
+export function CallIntelligencePanel({ callId, canRegenerate = false }: { callId: string; canRegenerate?: boolean }) {
+  const [data, setData] = useState<Intel>(EMPTY);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
 
-  if (isLoading) {
-    return (
-      <Card>
-        <CardHeader><CardTitle className="text-base flex items-center gap-2"><Brain className="h-4 w-4" /> AI Call Intelligence</CardTitle></CardHeader>
-        <CardContent className="space-y-2"><Skeleton className="h-4 w-3/4" /><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-2/3" /></CardContent>
-      </Card>
-    );
-  }
+  const run = async (force = false) => {
+    setBusy(true);
+    try {
+      if (!force) {
+        const cached = await loadCached(callId);
+        if (cached) { setData(cached); return; }
+      }
+      const { data: res, error } = await supabase.functions.invoke("process-call-recording", { body: { callId, force } });
+      if (!error && res) setData({ ...EMPTY, ...(res as any) });
+    } finally { setBusy(false); setLoading(false); }
+  };
 
-  if (isPending || data.status === "pending_sync") {
-    return (
-      <Card>
-        <CardHeader><CardTitle className="text-base flex items-center gap-2"><Brain className="h-4 w-4" /> AI Call Intelligence</CardTitle></CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-2 text-sm text-amber-500">
-            <Clock className="h-4 w-4" /> Recording is syncing from the PBX. Analysis will run automatically.
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
+  useEffect(() => { setLoading(true); run(false); /* eslint-disable-next-line */ }, [callId]);
 
-  if (!data.summary && data.status !== "cached") {
-    return (
-      <Card>
-        <CardHeader><CardTitle className="text-base flex items-center gap-2"><Brain className="h-4 w-4" /> AI Call Intelligence</CardTitle></CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <AlertCircle className="h-4 w-4" /> No analysis yet for this call.
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
+  if (loading) return <div className="rounded-md border p-3 text-sm opacity-70">Loading AI analysis…</div>;
+  if (data.status === "pending_sync") return <div className="rounded-md border p-3 text-sm text-amber-500">⏳ Recording syncing from PBX — analysis will run automatically.</div>;
+  if (!data.summary) return <div className="rounded-md border p-3 text-sm opacity-70">No analysis yet.</div>;
 
-  const sentimentColor =
-    data.sentiment === "positive" ? "text-emerald-500" :
-    data.sentiment === "negative" ? "text-red-500" : "text-muted-foreground";
+  const sColor = data.sentiment === "positive" ? "text-emerald-500" : data.sentiment === "negative" ? "text-red-500" : "opacity-70";
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <CardTitle className="text-base flex items-center gap-2">
-          <Brain className="h-4 w-4" /> AI Call Intelligence
-          {data.status === "cached" && <Badge variant="outline" className="text-xs">Cached</Badge>}
-        </CardTitle>
-        {canRegenerate && (
-          <Button variant="ghost" size="sm" onClick={() => regenerate()} disabled={isRegenerating}>
-            <RefreshCw className={`h-3.5 w-3.5 mr-1 ${isRegenerating ? "animate-spin" : ""}`} /> Re-analyze
-          </Button>
-        )}
-      </CardHeader>
-      <CardContent className="space-y-4 text-sm">
-        {data.summary && (
-          <div>
-            <div className="text-xs font-medium uppercase text-muted-foreground mb-1">Summary</div>
-            <p>{data.summary}</p>
-          </div>
-        )}
-
-        <div className="flex flex-wrap gap-2">
-          {data.sentiment && <Badge variant="outline" className={sentimentColor}>Sentiment: {data.sentiment}</Badge>}
-          {data.satisfaction_score != null && <Badge variant="outline">Satisfaction: {data.satisfaction_score}/5</Badge>}
-          {data.quality_score != null && <Badge variant="outline">Quality: {data.quality_score}/5</Badge>}
-          {data.coaching_score != null && <Badge variant="outline">Coaching: {data.coaching_score}/5</Badge>}
-          {data.escalation_needed && <Badge variant="destructive">Escalation needed</Badge>}
+    <div className="rounded-md border p-3 space-y-3 text-sm">
+      <div className="flex items-center justify-between">
+        <div className="font-semibold flex items-center gap-2">🧠 AI Call Intelligence
+          {data.status === "cached" && <span className="text-xs px-1.5 py-0.5 border rounded">cached</span>}
         </div>
-
-        {data.action_items.length > 0 && (
-          <div>
-            <div className="text-xs font-medium uppercase text-muted-foreground mb-1">Action items</div>
-            <ul className="list-disc pl-5 space-y-1">{data.action_items.map((a, i) => <li key={i}>{a}</li>)}</ul>
-          </div>
+        {canRegenerate && (
+          <button className="text-xs underline" onClick={() => run(true)} disabled={busy}>
+            {busy ? "…" : "Re-analyze"}
+          </button>
         )}
-
-        {data.coaching_notes.length > 0 && (
-          <div>
-            <div className="text-xs font-medium uppercase text-muted-foreground mb-1 flex items-center gap-1">
-              <Sparkles className="h-3 w-3" /> Coaching notes
-            </div>
-            <ul className="list-disc pl-5 space-y-1">{data.coaching_notes.map((c, i) => <li key={i}>{c}</li>)}</ul>
-          </div>
-        )}
-
-        {data.topics.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {data.topics.map((t, i) => <Badge key={i} variant="secondary" className="text-xs">{t}</Badge>)}
-          </div>
-        )}
-
-        {data.transcript && (
-          <div>
-            <Button variant="ghost" size="sm" onClick={() => setShowTranscript((s) => !s)} className="px-0">
-              {showTranscript ? <ChevronUp className="h-4 w-4 mr-1" /> : <ChevronDown className="h-4 w-4 mr-1" />}
-              Transcript
-            </Button>
-            {showTranscript && (
-              <pre className="mt-2 whitespace-pre-wrap text-xs bg-muted/50 p-3 rounded-md max-h-80 overflow-auto">
-                {data.transcript}
-              </pre>
-            )}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      </div>
+      <p>{data.summary}</p>
+      <div className="flex flex-wrap gap-2 text-xs">
+        {data.sentiment && <span className={`px-2 py-0.5 border rounded ${sColor}`}>Sentiment: {data.sentiment}</span>}
+        {data.satisfaction_score != null && <span className="px-2 py-0.5 border rounded">Satisfaction: {data.satisfaction_score}/5</span>}
+        {data.quality_score != null && <span className="px-2 py-0.5 border rounded">Quality: {data.quality_score}/5</span>}
+        {data.coaching_score != null && <span className="px-2 py-0.5 border rounded">Coaching: {data.coaching_score}/5</span>}
+        {data.escalation_needed && <span className="px-2 py-0.5 border rounded text-red-500">Escalation needed</span>}
+      </div>
+      {data.action_items.length > 0 && (
+        <div><div className="text-xs uppercase opacity-60 mb-1">Action items</div>
+          <ul className="list-disc pl-5">{data.action_items.map((a, i) => <li key={i}>{a}</li>)}</ul></div>
+      )}
+      {data.coaching_notes.length > 0 && (
+        <div><div className="text-xs uppercase opacity-60 mb-1">✨ Coaching</div>
+          <ul className="list-disc pl-5">{data.coaching_notes.map((c, i) => <li key={i}>{c}</li>)}</ul></div>
+      )}
+      {data.topics.length > 0 && (
+        <div className="flex flex-wrap gap-1">{data.topics.map((t, i) => <span key={i} className="text-xs px-1.5 py-0.5 border rounded">{t}</span>)}</div>
+      )}
+      {data.transcript && (
+        <div>
+          <button className="text-xs underline" onClick={() => setShowTranscript(s => !s)}>
+            {showTranscript ? "Hide" : "Show"} transcript
+          </button>
+          {showTranscript && <pre className="mt-2 whitespace-pre-wrap text-xs bg-black/20 p-2 rounded max-h-72 overflow-auto">{data.transcript}</pre>}
+        </div>
+      )}
+    </div>
   );
 }
