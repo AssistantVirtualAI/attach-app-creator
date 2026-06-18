@@ -169,7 +169,35 @@ export default function LemtelCustomers() {
       }
 
 
-      setForm({ name: '', domain: '', adminEmail: '' });
+      // 4) Persist customer record with company/address/phones/admin
+      if (domainUuid) {
+        const phones = form.phoneNumbersText
+          .split(/[,\n]/).map(s => s.trim()).filter(Boolean);
+        const { error: custErr } = await (supabase as any).from('lemtel_customers').insert({
+          name: form.name,
+          company_name: form.companyName || form.name,
+          address: form.address || null,
+          phone_numbers: phones,
+          domain_uuid: domainUuid,
+          domain_name: form.domain,
+          admin_email: form.adminEmail || null,
+          email: form.adminEmail || null,
+          status: 'active',
+          plan: 'basic',
+          portal_enabled: !!tenantOrgId,
+        });
+        if (custErr) toast.error('Customer record save failed: ' + custErr.message);
+
+        // Best-effort DID provisioning
+        for (const n of phones) {
+          const { error: didErr } = await (supabase as any).from('lemtel_dids').insert({
+            phone_number: n, domain_uuid: domainUuid,
+          });
+          if (didErr) toast.warning(`DID ${n}: ${didErr.message}`);
+        }
+      }
+
+      setForm({ name: '', domain: '', adminEmail: '', adminPassword: '', companyName: '', address: '', phoneNumbersText: '' });
       setDomainTouched(false);
       setOpen(false);
       qc.invalidateQueries({ queryKey: ['fusionpbx', 'list-domains'] });
