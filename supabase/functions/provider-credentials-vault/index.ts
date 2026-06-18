@@ -178,7 +178,14 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'audit') {
-      await audit(body.event || 'test', body.field || null, body.metadata || {});
+      // Only privileged users may write arbitrary audit entries (prevents log poisoning).
+      if (!(await isPrivileged())) {
+        return j({ error: 'forbidden' }, 403);
+      }
+      const allowed = new Set(['test', 'view', 'reveal', 'update', 'denied']);
+      const evt = String(body.event || 'test');
+      if (!allowed.has(evt)) return j({ error: 'invalid_event' }, 400);
+      await audit(evt, body.field || null, body.metadata || {});
       return j({ ok: true });
     }
 
