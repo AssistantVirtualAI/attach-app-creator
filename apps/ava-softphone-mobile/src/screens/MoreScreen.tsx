@@ -37,6 +37,7 @@ export default function MoreScreen({
   if (sub === 'support')     return <SubPage onBack={() => setSub(null)} title="Support"><SupportScreen /></SubPage>;
   if (sub === 'aiaudit')     return <SubPage onBack={() => setSub(null)} title="AI requests"><AIAuditScreen /></SubPage>;
   if (sub === 'queues')      return <SubPage onBack={() => setSub(null)} title="Queues"><QueuesScreen /></SubPage>;
+  if (sub === 'features')    return <SubPage onBack={() => setSub(null)} title="Calling features"><FeaturesScreen sp={sp} /></SubPage>;
 
   return (
     <div style={{ height: '100%', overflowY: 'auto', padding: '14px 14px 20px' }}>
