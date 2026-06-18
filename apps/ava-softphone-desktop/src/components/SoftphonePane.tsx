@@ -1131,16 +1131,16 @@ export function ControlBtn({
   icon: string; label: string; ariaLabel?: string; onClick: () => void;
   active?: boolean; danger?: boolean; warning?: boolean; disabled?: boolean; iconOnly?: boolean;
 }) {
-  // Theme-aware bg/border so buttons stay visible in dark + midnight modes.
-  // Active uses a tinted accent surface; inactive uses the themed elevated surface.
+  // Force high-contrast white text on a translucent surface so buttons stay
+  // readable on every theme (light, dark, midnight) and never blend in.
   const accent = danger ? c.red : warning ? c.yellow : c.gold;
   const bg = active
-    ? `color-mix(in srgb, ${accent} 22%, ${c.bgElev})`
-    : c.bgElev;
+    ? `color-mix(in srgb, ${accent} 38%, rgba(0,200,200,0.18))`
+    : 'rgba(255,255,255,0.10)';
   const bd = active
-    ? `color-mix(in srgb, ${accent} 65%, transparent)`
-    : c.borderStrong;
-  const col = active ? accent : c.text;
+    ? `color-mix(in srgb, ${accent} 70%, rgba(255,255,255,0.35))`
+    : 'rgba(255,255,255,0.25)';
+  const col = '#ffffff';
   return (
     <button
       onClick={onClick}
@@ -1156,20 +1156,20 @@ export function ControlBtn({
         minWidth: iconOnly ? 48 : undefined,
         borderRadius: iconOnly ? 14 : 12,
         background: bg, border: `1px solid ${bd}`, color: col,
-        cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.7 : 1,
+        cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1,
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         gap: iconOnly ? 0 : 6,
         fontSize: iconOnly ? 0 : 11, fontWeight: 800, letterSpacing: 0.3,
         transition: 'all .15s ease',
         boxShadow: active
-          ? `0 8px 18px -10px ${accent}, inset 0 0 0 1px rgba(255,255,255,0.10)`
-          : '0 6px 18px -12px rgba(0,35,230,0.35), inset 0 0 0 1px rgba(255,255,255,0.08)',
+          ? `0 8px 18px -10px ${accent}, inset 0 0 0 1px rgba(255,255,255,0.18)`
+          : '0 6px 18px -12px rgba(0,0,0,0.45), inset 0 0 0 1px rgba(255,255,255,0.12)',
         whiteSpace: 'nowrap',
-        textShadow: '0 1px 0 rgba(0,0,0,0.15)',
+        textShadow: '0 1px 2px rgba(0,0,0,0.55)',
       }}
     >
-      <span aria-hidden="true" style={{ fontSize: iconOnly ? 20 : 14 }}>{icon}</span>
-      {!iconOnly && label}
+      <span aria-hidden="true" style={{ fontSize: iconOnly ? 20 : 14, color: '#fff' }}>{icon}</span>
+      {!iconOnly && <span style={{ color: '#fff' }}>{label}</span>}
     </button>
   );
 }

@@ -11,7 +11,18 @@ type Channel = { id: string; name: string; channel_type: string; organization_id
 type Message = { id: string; channel_id: string; sender_id: string; sender_name: string | null; content: string; created_at: string; reactions?: Record<string, string[]> | null; attachments?: any[] | null; message_type?: string; edited_at?: string | null };
 type Member = { user_id: string; display_name: string; extension: string | null; status: string; call_state: string | null };
 
+// Module-level cache: survives component unmount/remount so navigating away
+// and back never appears to "erase" the chat. Bounded to 500 msgs per channel.
+const CHANNEL_CACHE = new Map<string, Message[]>();
+const CACHE_MAX = 500;
+const cacheGet = (id: string): Message[] => CHANNEL_CACHE.get(id) || [];
+const cacheSet = (id: string, msgs: Message[]) => {
+  const trimmed = msgs.length > CACHE_MAX ? msgs.slice(-CACHE_MAX) : msgs;
+  CHANNEL_CACHE.set(id, trimmed);
+};
+
 const EMOJIS = ['👍','❤️','😂','🎉','🚀','👀'];
+
 
 const STATUS_COLOR: Record<string, string> = {
   online: '#22d39a', available: '#22d39a',
