@@ -10195,6 +10195,21 @@ export type Database = {
           },
         ]
       }
+      pending_sync_retry_metrics: {
+        Row: {
+          avg_attempts: number | null
+          avg_success_latency_ms: number | null
+          bucket_hour: string | null
+          completed_after_retries: number | null
+          failed_runs: number | null
+          max_attempts_observed: number | null
+          max_retries_exhausted: number | null
+          organization_id: string | null
+          retries_scheduled: number | null
+          retries_succeeded: number | null
+        }
+        Relationships: []
+      }
       phone_numbers_unified: {
         Row: {
           capabilities: Json | null
