@@ -536,7 +536,7 @@ export default function SoftphonePane({
           <IncomingCall
             who={sp.snap.remoteIdentity || sp.snap.remoteNumber || 'Unknown'}
             number={sp.snap.remoteNumber}
-            onAnswer={sp.answer}
+            onAnswer={() => { setTimeout(() => { try { sp.answer(); } catch (e) { console.warn('[softphone] answer failed', e); } }, 0); }}
             onDecline={sp.hangup}
           />
         )}
