@@ -521,3 +521,89 @@ function Panel({ title, accent, children, right }: { title: string; accent: stri
     </div>
   );
 }
+
+function VirtualContactList({
+  items, sel, setSel, toggleFav, callContact,
+}: {
+  items: ContactItem[];
+  sel: ContactItem | null;
+  setSel: (i: ContactItem) => void;
+  toggleFav: (i: ContactItem) => void;
+  callContact: (i: ContactItem) => void;
+}) {
+  const parentRef = useRef<HTMLDivElement>(null);
+  const ROW = 56;
+  const virtualizer = useVirtualizer({
+    count: items.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => ROW,
+    overscan: 10,
+  });
+
+  if (items.length === 0) {
+    return (
+      <div style={{ background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 12, padding: 28, textAlign: 'center', color: c.mutedSilver, fontSize: 12 }}>
+        No contacts match.
+      </div>
+    );
+  }
+
+  // For small lists, skip virtualization overhead
+  const useVirtual = items.length > 50;
+  const virtualItems = useVirtual ? virtualizer.getVirtualItems() : items.map((_, i) => ({ index: i, start: i * ROW, key: i, size: ROW }));
+  const totalSize = useVirtual ? virtualizer.getTotalSize() : items.length * ROW;
+
+  return (
+    <div
+      ref={parentRef}
+      style={{
+        background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 12,
+        overflow: 'auto', maxHeight: useVirtual ? 600 : undefined,
+        position: 'relative',
+      }}
+    >
+      <div style={{ height: totalSize, width: '100%', position: 'relative' }}>
+        {virtualItems.map((v: any) => {
+          const k = items[v.index];
+          if (!k) return null;
+          const online = k.tags.includes('online');
+          return (
+            <div
+              key={k.id}
+              style={{
+                position: 'absolute', top: 0, left: 0, right: 0,
+                transform: `translateY(${v.start}px)`,
+                display: 'grid', gridTemplateColumns: '32px 1fr 80px 90px 90px',
+                alignItems: 'center', gap: 12, width: '100%', height: ROW,
+                padding: '10px 14px', boxSizing: 'border-box',
+                background: sel?.id === k.id ? 'rgba(122,76,255,0.06)' : 'transparent',
+                borderBottom: `1px solid ${c.border}`, color: c.textIce,
+              }}
+            >
+              <button onClick={() => setSel(k)} style={{ ...avatar, border: 'none', cursor: 'pointer', position: 'relative' }}>
+                {initials(k.name)}
+                {k.tags.includes('internal') && (
+                  <span style={{
+                    position: 'absolute', bottom: -2, right: -2, width: 10, height: 10, borderRadius: '50%',
+                    background: online ? c.success : c.mutedSilver, border: `2px solid ${c.bgCard}`,
+                  }} />
+                )}
+              </button>
+              <button onClick={() => setSel(k)} style={{ background: 'transparent', border: 'none', textAlign: 'left', cursor: 'pointer', minWidth: 0, color: c.textIce }}>
+                <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {k.name}{k.favorite && <span style={{ color: c.signalGold, marginLeft: 6 }}>★</span>}
+                </div>
+                <div style={{ fontSize: 10.5, color: c.mutedSilver, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {k.company || k.phone}
+                </div>
+              </button>
+              <span style={{ fontSize: 11, color: c.mutedSilver, fontFamily: 'JetBrains Mono, monospace', textAlign: 'right' }}>{k.phone}</span>
+              <button onClick={() => toggleFav(k)} title="Favorite" style={{ background: 'transparent', border: `1px solid ${c.border}`, borderRadius: 8, padding: '4px 8px', color: k.favorite ? c.signalGold : c.mutedSilver, cursor: 'pointer', fontSize: 14 }}>{k.favorite ? '★' : '☆'}</button>
+              <button onClick={() => callContact(k)} disabled={!k.phone} style={{ background: c.signalGold, border: 'none', borderRadius: 8, padding: '6px 10px', color: c.midnight, fontSize: 11, fontWeight: 700, cursor: k.phone ? 'pointer' : 'not-allowed', opacity: k.phone ? 1 : 0.4 }}>📞 Call</button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
