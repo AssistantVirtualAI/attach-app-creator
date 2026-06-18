@@ -153,7 +153,6 @@ Deno.serve(async (req) => {
       }), { headers: corsHeaders });
     }
 
-    const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
     const lovableKey = Deno.env.get("LOVABLE_API_KEY");
     let insights: any = null;
     let aiModel = "stub";
@@ -168,26 +167,12 @@ Deno.serve(async (req) => {
         : "AI analysis unavailable — showing call metadata only.",
     });
 
-    const prompt = `Analyze this call transcript. Return ONLY valid JSON:\n{"sentiment":"positive|neutral|negative","satisfaction_score":1-5,"intent":"string","topics":["..."],"action_items":["..."],"risks":["..."],"sales_opportunities":["..."],"quality_score":1-10,"escalation_needed":true|false,"key_phrases":["..."],"summary":"2 sentences max"}\n\nTranscript:\n${transcript_text}`;
+    const prompt = `Analyze this call transcript. Return ONLY valid JSON:\n{"sentiment":"positive|neutral|negative","satisfaction_score":1-5,"intent":"string","topics":["..."],"action_items":["..."],"risks":["..."],"sales_opportunities":["..."],"quality_score":1-10,"escalation_needed":true|false,"key_phrases":["..."],"summary":"2 sentences max","coaching":"1-2 sentences of agent coaching feedback"}\n\nTranscript:\n${transcript_text}`;
 
     try {
-      if (anthropicKey) {
-        const res = await fetch("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          headers: { "x-api-key": anthropicKey, "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
-          body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1000, messages: [{ role: "user", content: prompt }] }),
-        });
-        if (!res.ok) {
-          aiReason = `anthropic_${res.status}`;
-          console.error("Anthropic error", res.status, await res.text());
-        } else {
-          const data = await res.json();
-          const raw = data.content?.[0]?.text?.match(/\{[\s\S]*\}/)?.[0];
-          if (raw) { insights = JSON.parse(raw); aiModel = "claude-sonnet-4-20250514"; }
-          else aiReason = "anthropic_no_json";
-        }
-      }
-      if (!insights && lovableKey) {
+      // Always route through Lovable AI Gateway — no upstream Anthropic call
+      // (the previous claude-sonnet-4-20250514 model id 404'd reliably).
+      if (lovableKey) {
         const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
           method: "POST",
           headers: { "Lovable-API-Key": lovableKey, "Content-Type": "application/json" },
@@ -206,6 +191,8 @@ Deno.serve(async (req) => {
           if (raw) { insights = JSON.parse(raw); aiModel = "google/gemini-2.5-flash"; }
           else aiReason = "lovable_no_json";
         }
+      } else {
+        aiReason = "missing_lovable_key";
       }
     } catch (e: any) {
       aiReason = `ai_exception:${e?.message || "unknown"}`;
