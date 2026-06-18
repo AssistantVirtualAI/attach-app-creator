@@ -45,6 +45,8 @@ export default function CustomerDetail() {
   });
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState<'org_admin' | 'manager'>('org_admin');
+  const [inviteResult, setInviteResult] = useState<{ link?: string; email?: string } | null>(null);
 
   // Domain info + tenant org
   const { data: domain } = useQuery({
@@ -228,12 +230,14 @@ export default function CustomerDetail() {
 
   const handleInvite = async () => {
     if (!org || !inviteEmail) { toast.error('Email + linked tenant required'); return; }
-    const { error } = await supabase.functions.invoke('customer-invite-admin', {
-      body: { organizationId: org.id, email: inviteEmail },
+    setInviteResult(null);
+    const { data, error } = await supabase.functions.invoke('customer-invite-admin', {
+      body: { organizationId: org.id, email: inviteEmail, role: inviteRole },
     });
     if (error) return toast.error(error.message);
-    toast.success('Invite sent + org_admin role assigned');
-    setInviteOpen(false); setInviteEmail('');
+    toast.success(`Invite sent · ${inviteRole} assigned to ${org.name}`);
+    const link = (data as any)?.invite_url || (data as any)?.action_link;
+    setInviteResult({ link, email: inviteEmail });
   };
 
 
@@ -415,16 +419,41 @@ export default function CustomerDetail() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+      <Dialog open={inviteOpen} onOpenChange={(o) => { setInviteOpen(o); if (!o) { setInviteResult(null); setInviteEmail(''); } }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Invite admin to {org?.name || 'tenant'}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Promote admin for {org?.name || 'tenant'}</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <div><Label>Email</Label><Input type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value.toLowerCase())} placeholder="admin@customer.com" /></div>
-            <p className="text-xs text-muted-foreground">User receives a signup invite (or is linked if already registered) and gets <code>org_admin</code> on this tenant.</p>
+            <div>
+              <Label>Email</Label>
+              <Input type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value.toLowerCase())} placeholder="admin@customer.com" />
+            </div>
+            <div>
+              <Label>Role for this domain</Label>
+              <div className="grid grid-cols-2 gap-2 mt-1">
+                <Button type="button" variant={inviteRole === 'org_admin' ? 'default' : 'outline'} size="sm" onClick={() => setInviteRole('org_admin')}>
+                  org_admin <span className="ml-1 text-[10px] opacity-70">(full)</span>
+                </Button>
+                <Button type="button" variant={inviteRole === 'manager' ? 'default' : 'outline'} size="sm" onClick={() => setInviteRole('manager')}>
+                  manager <span className="ml-1 text-[10px] opacity-70">(ops only)</span>
+                </Button>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              User is invited (or linked if registered) and granted <code>{inviteRole}</code> on this domain only. They'll see the "My Domain Cockpit" link in their sidebar.
+            </p>
+            {inviteResult?.link && (
+              <div className="space-y-2 p-2 rounded border bg-muted/40">
+                <div className="text-xs font-medium">Invite link (valid until accepted)</div>
+                <div className="flex gap-2">
+                  <Input readOnly value={inviteResult.link} className="font-mono text-xs" />
+                  <Button size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(inviteResult.link!); toast.success('Copied'); }}>Copy</Button>
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setInviteOpen(false)}>Cancel</Button>
-            <Button onClick={handleInvite}>Send invite</Button>
+            <Button variant="outline" onClick={() => setInviteOpen(false)}>Close</Button>
+            <Button onClick={handleInvite}>{inviteResult ? 'Resend' : 'Send invite'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
