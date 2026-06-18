@@ -523,13 +523,18 @@ export default function LemtelCustomers() {
                 ) : filtered.map((d) => {
                   const org = orgByDomain.get(d.domain_uuid);
                   const exts = extsByDomain.get(d.domain_uuid) || [];
-                  
+                  const liveCount = (liveExtCounts as Record<string, number>)[d.domain_uuid];
+                  const hasLive = typeof liveCount === 'number' && liveCount >= 0;
+                  const displayCount = hasLive ? liveCount : exts.length;
+
                   const enabled = d.domain_enabled === true || d.domain_enabled === 'true';
+                  const clickable = !!org;
                   return (
                     <TableRow
                       key={d.domain_uuid}
-                      className="cursor-pointer hover:bg-muted/40"
-                      onClick={() => (window.location.href = `/org/lemtel/admin/customers/${d.domain_uuid}`)}
+                      className={clickable ? "cursor-pointer hover:bg-muted/40" : "opacity-80"}
+                      title={clickable ? "Click to open this customer's portal" : "No tenant org linked"}
+                      onClick={() => { if (clickable) manageAs(d); else toast.error('No tenant org linked. Edit the customer to link or recreate.'); }}
                     >
                       <TableCell><ChevronRight className="w-4 h-4 text-muted-foreground" /></TableCell>
                       <TableCell className="font-mono text-sm">
@@ -539,13 +544,22 @@ export default function LemtelCustomers() {
                       <TableCell>
                         {org ? <span className="font-medium">{org.name}</span> : <span className="text-xs text-muted-foreground">— not linked —</span>}
                       </TableCell>
-                      <TableCell className="text-right font-mono">{exts.length}</TableCell>
+                      <TableCell className="text-right font-mono">
+                        {loadingCounts && !hasLive ? (
+                          <Loader2 className="w-3 h-3 animate-spin inline" />
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5">
+                            {hasLive && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" title="Live from PBX" />}
+                            {displayCount}
+                          </span>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <Badge variant={enabled ? 'default' : 'secondary'}>{enabled ? 'Enabled' : 'Disabled'}</Badge>
                       </TableCell>
                       <TableCell className="text-right">
                         <Button
-                          variant="ghost" size="sm" title="Manage as this customer"
+                          variant="ghost" size="sm" title="Open customer portal"
                           onClick={(e) => { e.stopPropagation(); manageAs(d); }}
                         >
                           <LogIn className="w-3.5 h-3.5" />
