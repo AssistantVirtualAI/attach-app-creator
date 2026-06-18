@@ -30,7 +30,7 @@ export function PendingSyncMetricsCard({ organizationId }: { organizationId: str
         .gte('bucket_hour', since)
         .order('bucket_hour', { ascending: false });
       if (!cancelled) {
-        setRows((data as Row[]) || []);
+        setRows(((data as unknown) as Row[]) || []);
         setLoading(false);
       }
     })();
