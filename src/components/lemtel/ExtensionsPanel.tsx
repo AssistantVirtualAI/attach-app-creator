@@ -1,22 +1,23 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Loader2, Pencil, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { LEMTEL_ORG_ID } from '@/hooks/useLemtelAccess';
+import { ExtensionEditDialog } from '@/components/lemtel/ExtensionEditDialog';
 
 export type LiveExt = {
   extension_uuid?: string;
   extension: string;
   effective_caller_id_name?: string;
+  effective_caller_id_number?: string;
   enabled?: string | boolean;
   description?: string;
   voicemail_enabled?: string | boolean;
+  voicemail_password?: string;
+  password?: string;
 };
 export type LiveState = { exts: LiveExt[]; error?: string };
 
@@ -37,10 +38,7 @@ export function ExtensionsPanel({
 }) {
   const orgId = organizationId || LEMTEL_ORG_ID;
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [editing, setEditing] = useState<LiveExt | null>(null);
-  const [editDesc, setEditDesc] = useState('');
-  const [editCid, setEditCid] = useState('');
-  const [editSaving, setEditSaving] = useState(false);
+  const [editing, setEditing] = useState<any | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState<null | 'enable' | 'disable' | 'reset-vm' | 'delete'>(null);
   const [retrying, setRetrying] = useState(false);
@@ -106,18 +104,23 @@ export function ExtensionsPanel({
     );
   }
 
-  const callUpdate = async (ext: LiveExt, params: any) => {
-    const { error } = await supabase.functions.invoke('pbx-write', {
+  // Always update via fusionpbx-proxy update-extension using the fields wrapper,
+  // matching ExtensionEditDialog's payload shape (avoids the path that was creating duplicates).
+  const updateExt = async (ext: LiveExt, fields: Record<string, any>) => {
+    if (!ext.extension_uuid) throw new Error(`Missing extension_uuid for ${ext.extension}`);
+    const { error } = await supabase.functions.invoke('fusionpbx-proxy', {
       body: {
-        organizationId: orgId,
         action: 'update-extension',
-        params: { extension_uuid: ext.extension_uuid, domain_uuid: domainUuid, ...params },
+        extension_uuid: ext.extension_uuid,
+        extension: ext.extension,
+        fields,
       },
     });
     if (error) throw error;
   };
 
-  const callDelete = async (ext: LiveExt) => {
+  const deleteExt = async (ext: LiveExt) => {
+    if (!ext.extension_uuid) throw new Error(`Missing extension_uuid for ${ext.extension}`);
     const { error } = await supabase.functions.invoke('pbx-write', {
       body: {
         organizationId: orgId,
@@ -129,19 +132,20 @@ export function ExtensionsPanel({
   };
 
   const doAction = async (ext: LiveExt, action: 'toggle' | 'reset-vm' | 'delete') => {
-    if (!ext.extension_uuid) { toast.error('Missing extension UUID'); return; }
+    if (!ext.extension_uuid) { toast.error(`Extension ${ext.extension} is missing its PBX UUID — re-sync first.`); return; }
     if (action === 'delete' && !confirm(`Delete extension ${ext.extension}? This is permanent on the PBX.`)) return;
+    if (action === 'reset-vm' && !confirm(`Reset voicemail PIN for ext ${ext.extension} to ${ext.extension}?`)) return;
     setBusyId(ext.extension_uuid);
     try {
       if (action === 'toggle') {
         const isEn = ext.enabled === true || ext.enabled === 'true';
-        await callUpdate(ext, { enabled: isEn ? 'false' : 'true' });
+        await updateExt(ext, { enabled: !isEn });
         toast.success('Extension updated');
       } else if (action === 'reset-vm') {
-        await callUpdate(ext, { voicemail_password: String(ext.extension), voicemail_enabled: 'true' });
-        toast.success(`Voicemail reset (PIN = ${ext.extension})`);
+        await updateExt(ext, { voicemail_password: String(ext.extension), voicemail_enabled: true });
+        toast.success(`Voicemail PIN reset to ${ext.extension}`);
       } else {
-        await callDelete(ext);
+        await deleteExt(ext);
         toast.success(`Extension ${ext.extension} deleted`);
       }
       onChanged();
@@ -155,15 +159,15 @@ export function ExtensionsPanel({
   const runBulk = async (action: 'enable' | 'disable' | 'reset-vm' | 'delete') => {
     const targets = exts.filter(e => e.extension_uuid && selected.has(e.extension_uuid));
     if (!targets.length) return;
-    if (action === 'reset-vm' && !confirm(`Reset voicemail PIN to extension number for ${targets.length} extension(s)?`)) return;
+    if (action === 'reset-vm' && !confirm(`Reset voicemail PIN for ${targets.length} extension(s)?`)) return;
     if (action === 'delete' && !confirm(`Delete ${targets.length} extension(s)? This is permanent on the PBX.`)) return;
     setBulkBusy(action);
     let ok = 0, fail = 0;
     for (const ext of targets) {
       try {
-        if (action === 'reset-vm') await callUpdate(ext, { voicemail_password: String(ext.extension), voicemail_enabled: 'true' });
-        else if (action === 'delete') await callDelete(ext);
-        else await callUpdate(ext, { enabled: action === 'enable' ? 'true' : 'false' });
+        if (action === 'reset-vm') await updateExt(ext, { voicemail_password: String(ext.extension), voicemail_enabled: true });
+        else if (action === 'delete') await deleteExt(ext);
+        else await updateExt(ext, { enabled: action === 'enable' });
         ok++;
       } catch { fail++; }
     }
@@ -174,19 +178,22 @@ export function ExtensionsPanel({
     onChanged();
   };
 
-  const saveEdit = async () => {
-    if (!editing?.extension_uuid) return;
-    setEditSaving(true);
-    try {
-      await callUpdate(editing, { description: editDesc, effective_caller_id_name: editCid });
-      toast.success('Extension saved');
-      setEditing(null);
-      onChanged();
-    } catch (e: any) {
-      toast.error(e?.message || 'Save failed');
-    } finally {
-      setEditSaving(false);
-    }
+  const openEdit = (e: LiveExt) => {
+    if (!e.extension_uuid) { toast.error('Missing PBX UUID — re-sync first.'); return; }
+    // Map LiveExt → shape expected by ExtensionEditDialog
+    setEditing({
+      pbx_uuid: e.extension_uuid,
+      extension: e.extension,
+      organization_id: orgId,
+      effective_cid_name: e.effective_caller_id_name,
+      effective_cid_number: e.effective_caller_id_number,
+      description: e.description,
+      enabled: e.enabled === true || e.enabled === 'true',
+      voicemail_enabled: e.voicemail_enabled === true || e.voicemail_enabled === 'true',
+      password: e.password,
+      voicemail_password: e.voicemail_password,
+      sip_domain: domainName,
+    });
   };
 
   const allIds = exts.map(e => e.extension_uuid).filter(Boolean) as string[];
@@ -229,19 +236,19 @@ export function ExtensionsPanel({
               <div className="flex items-center gap-2 min-w-0">
                 <Checkbox checked={isSel} onCheckedChange={() => toggleOne(e.extension_uuid)} aria-label={`Select ${e.extension}`} />
                 <div className="min-w-0">
-                  <div className="font-mono text-sm">{e.extension}</div>
+                  <div className="font-mono text-sm">{e.extension || '—'}</div>
                   <div className="text-xs text-muted-foreground truncate">{e.effective_caller_id_name || e.description || '—'}</div>
                 </div>
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 <Badge variant={isEn ? 'default' : 'secondary'} className="text-[10px]">{isEn ? 'on' : 'off'}</Badge>
-                <Button size="sm" variant="ghost" title="Edit" onClick={() => { setEditing(e); setEditDesc(e.description || ''); setEditCid(e.effective_caller_id_name || ''); }}>
+                <Button size="sm" variant="ghost" title="Edit (full PBX form)" onClick={() => openEdit(e)}>
                   <Pencil className="w-3 h-3" />
                 </Button>
                 <Button size="sm" variant="ghost" title={isEn ? 'Disable' : 'Enable'} disabled={busy} onClick={() => doAction(e, 'toggle')}>
                   {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : isEn ? '⏻' : '✓'}
                 </Button>
-                <Button size="sm" variant="ghost" title="Reset voicemail PIN to extension number" disabled={busy} onClick={() => doAction(e, 'reset-vm')}>
+                <Button size="sm" variant="ghost" title="Reset voicemail PIN" disabled={busy} onClick={() => doAction(e, 'reset-vm')}>
                   VM
                 </Button>
               </div>
@@ -250,21 +257,7 @@ export function ExtensionsPanel({
         })}
       </div>
 
-      <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Edit extension {editing?.extension}</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <div><Label>Caller ID name</Label><Input value={editCid} onChange={(e) => setEditCid(e.target.value)} /></div>
-            <div><Label>Description</Label><Input value={editDesc} onChange={(e) => setEditDesc(e.target.value)} /></div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditing(null)}>Cancel</Button>
-            <Button onClick={saveEdit} disabled={editSaving}>
-              {editSaving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />} Save
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ExtensionEditDialog open={!!editing} onOpenChange={(o) => { if (!o) { setEditing(null); onChanged(); } }} extension={editing} />
     </>
   );
 }
