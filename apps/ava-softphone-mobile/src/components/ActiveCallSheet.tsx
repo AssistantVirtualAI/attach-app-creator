@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ImpactStyle } from '@capacitor/haptics';
 import { colors, font, gradients, radius, shadow } from '../lib/theme';
+import { getCallStateVisual } from '../lib/callStateAccent';
 
 export default function ActiveCallSheet({
   sp,
@@ -33,21 +34,10 @@ export default function ActiveCallSheet({
   const isTransfer = !!sp.snap.transferring;
   const isEnded = sp.snap.callState === 'ended' || sp.snap.callState === 'idle';
 
-  // State-aware accent: ringing=cyan, active=blue, hold=amber, transfer=violet, ended=muted.
-  const stateAccent =
-    isTransfer ? colors.avaViolet :
-    onHold     ? colors.warning :
-    isIncoming || isOutgoing ? colors.avaCyan :
-    inCall     ? colors.lemtelBlue :
-    colors.mutedSilver;
-
-  const stateLabel =
-    isTransfer ? 'Transferring' :
-    isIncoming ? 'Incoming · Lemtel' :
-    isOutgoing ? 'Outgoing · Lemtel' :
-    onHold     ? 'On hold' :
-    inCall     ? 'In call' :
-    isEnded    ? 'Call ended' : 'Lemtel';
+  // State-aware accent — see lib/callStateAccent.ts (single source of truth, snapshot-tested).
+  const visual = getCallStateVisual(sp.snap.callState, { transferring: isTransfer });
+  const stateAccent = visual.accent;
+  const stateLabel = visual.label;
 
   const safeCall = (name: string, fn?: () => void) => {
     if (typeof fn !== 'function') {
