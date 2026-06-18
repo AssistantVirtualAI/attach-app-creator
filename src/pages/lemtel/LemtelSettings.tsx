@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Eye, EyeOff, Loader2, FlaskConical, Activity, Plug } from 'lucide-react';
+import { Eye, EyeOff, Loader2, FlaskConical, Activity, Plug, Mail, CheckCircle2, AlertTriangle, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -63,6 +63,8 @@ export default function LemtelSettings() {
         <h1 className="text-3xl font-bold">Lemtel Settings</h1>
         <p className="text-muted-foreground">Configure telecom integrations</p>
       </div>
+
+      <ResendDomainStatus />
 
       <Card>
         <CardHeader>
@@ -144,5 +146,64 @@ export default function LemtelSettings() {
         Save All
       </Button>
     </div>
+  );
+}
+
+function ResendDomainStatus() {
+  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState<{ name: string; status: string; verified: boolean } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = async () => {
+    setLoading(true); setError(null);
+    try {
+      const { data, error: e } = await supabase.functions.invoke('resend-domain-status');
+      if (e) throw e;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      setStatus((data as any)?.target || null);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to load Resend status');
+    } finally { setLoading(false); }
+  };
+  useEffect(() => { load(); }, []);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2"><Mail className="w-5 h-5" /> Email Sending (Resend)</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <p className="text-sm text-muted-foreground">
+          Welcome emails and notifications are sent via Resend. The sender domain <code>ava-telecom.ca</code> must be verified in your Resend account for emails to deliver from your brand.
+        </p>
+        {loading ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="w-4 h-4 animate-spin" /> Checking status…</div>
+        ) : error ? (
+          <div className="flex items-start gap-2 p-3 rounded-md border border-destructive/30 bg-destructive/5 text-sm">
+            <AlertTriangle className="w-4 h-4 mt-0.5 text-destructive" />
+            <div><strong>Status check failed:</strong> {error}</div>
+          </div>
+        ) : status?.verified ? (
+          <div className="flex items-center gap-2 p-3 rounded-md border border-green-500/30 bg-green-500/5">
+            <CheckCircle2 className="w-5 h-5 text-green-600" />
+            <div className="text-sm"><strong>{status.name}</strong> is <strong>verified</strong>. Emails will deliver from this domain.</div>
+          </div>
+        ) : (
+          <div className="flex items-start gap-2 p-3 rounded-md border border-amber-500/40 bg-amber-500/10">
+            <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />
+            <div className="text-sm space-y-1">
+              <div><strong>{status?.name || 'ava-telecom.ca'}</strong> is <strong>{status?.status || 'not configured'}</strong>.</div>
+              <div className="text-muted-foreground">Add and verify the domain at resend.com/domains. Until verified, emails fall back to <code>noreply@assistantvirtualai.com</code>.</div>
+            </div>
+          </div>
+        )}
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={load} disabled={loading}>Re-check</Button>
+          <Button variant="outline" size="sm" asChild>
+            <a href="https://resend.com/domains" target="_blank" rel="noreferrer">Open Resend <ExternalLink className="w-3.5 h-3.5 ml-1" /></a>
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
