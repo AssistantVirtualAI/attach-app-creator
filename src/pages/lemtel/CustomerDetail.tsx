@@ -126,7 +126,7 @@ export default function CustomerDetail() {
         .limit(200);
       return data || [];
     },
-    enabled: tab === 'recordings',
+    enabled: tab === 'recordings' && !!domainUuid,
   });
 
   const { data: callHistory = [] } = useQuery({
@@ -139,8 +139,30 @@ export default function CustomerDetail() {
         .limit(200);
       return data || [];
     },
-    enabled: tab === 'history',
+    enabled: tab === 'history' && !!domainUuid,
   });
+
+  // Per-tenant sync status: latest pbx_sync_jobs per job_type for this org.
+  const { data: syncStatus = [] } = useQuery({
+    queryKey: ['pbx-sync-jobs', orgId, domainUuid],
+    queryFn: async () => {
+      const { data } = await (supabase as any).from('pbx_sync_jobs')
+        .select('job_type,status,completed_at,started_at,error,stats')
+        .eq('organization_id', orgId)
+        .order('started_at', { ascending: false })
+        .limit(80);
+      return data || [];
+    },
+    enabled: !!orgId,
+    refetchInterval: syncing ? 3000 : false,
+  });
+  const latestPerResource = useMemo(() => {
+    const out: Record<string, any> = {};
+    for (const j of syncStatus as any[]) if (!out[j.job_type]) out[j.job_type] = j;
+    return out;
+  }, [syncStatus]);
+
+
 
   // Search / filter state for Call History & Recordings
   const [histQ, setHistQ] = useState('');
@@ -213,21 +235,32 @@ export default function CustomerDetail() {
     }
   };
 
+  const auditTenant = async (action: 'lemtel.open_tenant_portal' | 'lemtel.impersonate_tenant', metadata: Record<string, any>) => {
+    try {
+      await supabase.functions.invoke('audit-log', {
+        body: { action, resource_id: domainUuid, metadata },
+      });
+    } catch { /* non-blocking */ }
+  };
+
   const openTenantPortal = async () => {
     if (!domain) { toast.error('Domain not loaded'); return; }
-    // Set Lemtel active-domain scope so child pages know which PBX domain to query.
     sessionStorage.setItem('lemtel.activeDomain', JSON.stringify({
       uuid: domainUuid, name: domain.domain_name, org_id: org?.id || null,
     }));
+    await auditTenant('lemtel.open_tenant_portal', {
+      domain_uuid: domainUuid, domain_name: domain.domain_name, target_org_id: org?.id || null,
+    });
     if (org) {
+      await auditTenant('lemtel.impersonate_tenant', { domain_uuid: domainUuid, target_org_id: org.id });
       await impersonation.enter(org.id, org.name);
       toast.success(`Now managing ${domain.domain_name}`);
       window.location.href = org.slug ? `/domain/${org.slug}/admin/dashboard` : '/console';
     } else {
-      // No Ava org for this domain — open the public tenant portal scoped to the domain.
       window.open(`/c/${encodeURIComponent(domain.domain_name)}`, '_blank', 'noopener');
     }
   };
+
 
 
 
@@ -308,8 +341,29 @@ export default function CustomerDetail() {
         </div>
       </div>
 
+      {/* Per-tenant sync status strip */}
+      {Object.keys(latestPerResource).length > 0 && (
+        <div className="flex items-center flex-wrap gap-1.5 text-[10px]">
+          <span className="text-muted-foreground mr-1">Sync status:</span>
+          {['extensions', 'devices', 'ivrs', 'queues', 'ring_groups', 'destinations', 'cdrs', 'recordings', 'moh'].map((r) => {
+            const j = latestPerResource[r];
+            const ok = j?.status === 'completed' || j?.status === 'success';
+            const fail = j?.status === 'error' || j?.status === 'failed';
+            return (
+              <Badge
+                key={r}
+                variant={ok ? 'default' : fail ? 'destructive' : 'secondary'}
+                title={j ? `${j.status}${j.error ? ' · ' + j.error : ''} · ${j.completed_at || j.started_at}` : 'never synced'}
+              >
+                {r}: {j ? j.status : '—'}
+              </Badge>
+            );
+          })}
+        </div>
+      )}
 
       <Tabs value={tab} onValueChange={setTab}>
+
         <div className="overflow-x-auto -mx-1 px-1">
           <TabsList className="inline-flex w-max min-w-full whitespace-nowrap">
             <TabsTrigger value="extensions">Extensions ({(extensions as any[]).length})</TabsTrigger>
@@ -534,7 +588,7 @@ export default function CustomerDetail() {
       <PbxRowEditDialog
         open={!!editRow}
         onOpenChange={(o) => { if (!o) setEditRow(null); }}
-        title={editRow ? `Edit ${editRow.kind} — all FusionPBX fields` : ''}
+        title={editRow ? `${domain?.domain_name || 'Tenant'} › ${editRow.kind} — all FusionPBX fields` : ''}
         row={editRow?.row}
         idKey={editRow ? ({
           queue: 'queue_uuid', ringgroup: 'ring_group_uuid',
@@ -548,6 +602,10 @@ export default function CustomerDetail() {
           queue: 'update-queue', ringgroup: 'update-ring-group',
           device: 'update-device', destination: 'update-destination',
         } as const)[editRow.kind] : ''}
+        resourceKind={editRow ? ({
+          queue: 'queue', ringgroup: 'ring_group',
+          device: 'device', destination: 'destination',
+        } as const)[editRow.kind] : undefined}
         organizationId={orgId}
         domainUuid={domainUuid}
         onSaved={() => {
@@ -558,15 +616,25 @@ export default function CustomerDetail() {
         }}
       />
 
-      {/* New Device dialog */}
+      {/* New Device dialog — scoped strictly to current tenant domain */}
       <DeviceCreateDialog
         open={deviceCreateOpen}
         onOpenChange={setDeviceCreateOpen}
         organizationId={orgId}
         domainUuid={domainUuid}
         extensions={extensions as any[]}
-        onCreated={() => refetchDevices()}
+        onCreated={async () => {
+          // Trigger a devices-only PBX sync for this tenant, then refetch.
+          try {
+            await supabase.functions.invoke('fusionpbx-proxy', {
+              body: { action: 'sync-all', resources: ['devices'], organization_id: orgId, domain_uuid: domainUuid },
+            });
+          } catch { /* non-fatal */ }
+          qc.invalidateQueries({ queryKey: ['fpbx', 'devices', domainUuid] });
+          refetchDevices();
+        }}
       />
+
 
 
       {/* Invite admin dialog */}
