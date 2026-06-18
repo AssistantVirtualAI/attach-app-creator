@@ -62,18 +62,24 @@ export default function TelephonyRecordings({ scope = 'org' }: { scope?: 'org' |
   const [playing, setPlaying] = useState<string | null>(null);
   const [working, setWorking] = useState<string | null>(null);
   const [stages, setStages] = useState<Record<string, { stage: TranscriptStage; detail?: string }>>({});
+  const [pendingSync, setPendingSync] = useState<Record<string, { attempt: number; total: number; nextRetryAt: number } | null>>({});
+  const retryNowRefs = (window as any).__retryRefs ||= {} as Record<string, { current: (() => void) | null }>;
 
   const transcribeAndAnalyze = async (id: string) => {
     setWorking(id);
     setStages((s) => ({ ...s, [id]: { stage: 'downloading' } }));
+    retryNowRefs[id] = { current: null };
     const result = await runTranscribeAndAnalyze({
       invoke: async (name, body) => await supabase.functions.invoke(name, { body }),
       callRecordId: id,
       organizationId: LEMTEL_ORG,
+      retryNowRef: retryNowRefs[id],
       onStage: (stage, detail) => setStages((s) => ({ ...s, [id]: { stage, detail } })),
+      onPendingSync: (p) => setPendingSync((m) => ({ ...m, [id]: p ? { attempt: p.attempt, total: p.total, nextRetryAt: p.nextRetryAt } : null })),
     });
     if (result.stage === 'failed') toast.error(result.reason || 'Échec de la transcription');
     else if (result.stage === 'unavailable') toast.message('Enregistrement indisponible', { description: result.reason || 'Audio non récupérable' });
+    else if (result.stage === 'pending_sync') toast.message('En attente de la synchro PBX', { description: `Abandonné après ${result.pendingSyncAttempts} tentatives` });
     else toast.success('Transcrit et analysé');
 
     qc.setQueriesData({ queryKey: ['pbx'] }, (old: any) => {
@@ -86,6 +92,7 @@ export default function TelephonyRecordings({ scope = 'org' }: { scope?: 'org' |
       } : row);
     });
     setWorking(null);
+    setPendingSync((m) => ({ ...m, [id]: null }));
   };
 
 
