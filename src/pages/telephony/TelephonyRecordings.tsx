@@ -110,6 +110,8 @@ export default function TelephonyRecordings({ scope = 'org' }: { scope?: 'org' |
         <SyncEverythingButton />
       </div>
 
+      <PendingSyncMetricsCard organizationId={LEMTEL_ORG} />
+
       {recordings.length === 0 ? (
         <Card><CardContent className="py-16 text-center text-muted-foreground">No recordings yet.</CardContent></Card>
       ) : (
