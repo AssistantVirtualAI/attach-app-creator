@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { theme } from '../../lib/theme';
 import { ava, ContactItem, ContactInteraction } from '../../lib/avaApi';
 import { supabase } from '../../lib/supabaseClient';
