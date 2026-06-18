@@ -191,12 +191,20 @@ export default function CustomerDetail() {
 
   const handleAddUser = async () => {
     if (!org || !domain || !addForm.extension) { toast.error('Extension required'); return; }
+    const userPayload = {
+      extension: addForm.extension,
+      name: addForm.name || undefined,
+      email: addForm.email || undefined,
+      password: addForm.sip_password || undefined,
+      assign_phone_number: addForm.assign_phone_number || undefined,
+    };
     const { data, error } = await supabase.functions.invoke('customer-users-import', {
       body: {
         organizationId: org.id,
         domain_uuid: domainUuid,
         domain_name: domain.domain_name,
-        users: [addForm],
+        send_welcome_email: addForm.send_welcome_email,
+        users: [userPayload],
       },
     });
     if (error) return toast.error(error.message);
