@@ -1,5 +1,7 @@
-import { Loader2, CheckCircle2, AlertTriangle, XCircle, Mic2, Brain, Download, Clock } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Loader2, CheckCircle2, AlertTriangle, XCircle, Mic2, Brain, Download, Clock, RotateCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import type { TranscriptStage } from '@/lib/transcriptStatus';
 import { STAGE_LABEL } from '@/lib/transcriptStatus';
 
@@ -25,15 +27,50 @@ const STAGE_TONE: Record<TranscriptStage, string> = {
   failed: 'bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/40',
 };
 
-export function TranscriptStagePill({ stage, detail, compact }: { stage: TranscriptStage; detail?: string; compact?: boolean }) {
+interface Props {
+  stage: TranscriptStage;
+  detail?: string;
+  compact?: boolean;
+  /** When stage='pending_sync', current retry attempt (1-based). */
+  pendingAttempt?: number;
+  pendingTotal?: number;
+  pendingNextRetryAt?: number; // epoch ms
+  onRetryNow?: () => void;
+}
+
+export function TranscriptStagePill({ stage, detail, compact, pendingAttempt, pendingTotal, pendingNextRetryAt, onRetryNow }: Props) {
   const Icon = STAGE_ICON[stage];
   const isLoading = stage === 'downloading' || stage === 'transcribing' || stage === 'analyzing' || stage === 'pending_sync';
   const label = STAGE_LABEL[stage];
+  const showPending = stage === 'pending_sync' && (pendingAttempt || pendingNextRetryAt);
+
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!showPending) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [showPending]);
+
+  const secondsLeft = pendingNextRetryAt ? Math.max(0, Math.ceil((pendingNextRetryAt - now) / 1000)) : null;
+
   return (
-    <Badge variant="outline" className={`inline-flex items-center gap-1.5 border ${STAGE_TONE[stage]}`}>
-      {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Icon className="w-3 h-3" />}
-      <span className={compact ? 'text-[10px]' : 'text-xs'}>{label}</span>
-      {detail && !compact && <span className="opacity-70">· {detail}</span>}
-    </Badge>
+    <span className="inline-flex items-center gap-1.5 flex-wrap">
+      <Badge variant="outline" className={`inline-flex items-center gap-1.5 border ${STAGE_TONE[stage]}`}>
+        {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Icon className="w-3 h-3" />}
+        <span className={compact ? 'text-[10px]' : 'text-xs'}>{label}</span>
+        {showPending && pendingAttempt && pendingTotal && (
+          <span className="opacity-80 text-[10px]">· {pendingAttempt}/{pendingTotal}</span>
+        )}
+        {showPending && secondsLeft !== null && (
+          <span className="opacity-80 text-[10px] tabular-nums">· {secondsLeft}s</span>
+        )}
+        {detail && !compact && !showPending && <span className="opacity-70">· {detail}</span>}
+      </Badge>
+      {stage === 'pending_sync' && onRetryNow && (
+        <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]" onClick={onRetryNow}>
+          <RotateCw className="w-3 h-3 mr-1" /> Retry now
+        </Button>
+      )}
+    </span>
   );
 }
