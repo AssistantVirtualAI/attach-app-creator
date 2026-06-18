@@ -564,17 +564,57 @@ export default function CustomerDetail() {
   );
 }
 
+function normalize(v: any): string {
+  if (v === null || v === undefined || v === '') return '';
+  if (v === true || v === 'true') return 'true';
+  if (v === false || v === 'false') return 'false';
+  return String(v);
+}
+function pretty(v: any): string {
+  const n = normalize(v);
+  return n === '' ? '—' : n;
+}
+
 function EditableList({
-  rows, idKey, fields, enabledKey, onToggle, onDelete,
+  rows, idKey, fields, enabledKey, editableFields, onToggle, onDelete, onSave,
 }: {
   rows: any[]; idKey: string; fields: string[]; enabledKey: string;
+  editableFields?: string[];
   onToggle: (row: any, enabled: boolean) => Promise<void>;
   onDelete: (row: any) => Promise<void>;
+  onSave?: (row: any, patch: Record<string, string>) => Promise<boolean>;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const editable = editableFields ?? [];
+
   if (!rows || rows.length === 0) {
     return <Card><CardContent className="py-8 text-center text-muted-foreground text-sm">Empty — try Full sync from PBX.</CardContent></Card>;
   }
+
+  const startEdit = (r: any) => {
+    setEditing(r[idKey]);
+    const d: Record<string, string> = {};
+    editable.forEach(f => { d[f] = normalize(r[f]); });
+    setDraft(d);
+  };
+  const cancel = () => { setEditing(null); setDraft({}); };
+  const save = async (r: any) => {
+    if (!onSave) return;
+    setBusy(r[idKey]);
+    try {
+      const patch: Record<string, string> = {};
+      editable.forEach(f => {
+        const next = (draft[f] ?? '').trim();
+        if (next !== normalize(r[f])) patch[f] = next;
+      });
+      if (Object.keys(patch).length === 0) { cancel(); return; }
+      const ok = await onSave(r, patch);
+      if (ok) cancel();
+    } finally { setBusy(null); }
+  };
+
   return (
     <Card><CardContent className="p-0">
       <Table>
@@ -586,21 +626,42 @@ function EditableList({
         <TableBody>
           {rows.map((r) => {
             const id = r[idKey];
-            const en = String(r[enabledKey]) === 'true' || r[enabledKey] === true;
+            const en = normalize(r[enabledKey]) === 'true';
             const isBusy = busy === id;
+            const isEditing = editing === id;
             return (
               <TableRow key={id}>
-                {fields.map(f => <TableCell key={f} className="font-mono text-xs">{String(r[f] ?? '—').slice(0, 80)}</TableCell>)}
+                {fields.map(f => (
+                  <TableCell key={f} className="font-mono text-xs">
+                    {isEditing && editable.includes(f) ? (
+                      <Input value={draft[f] ?? ''} onChange={(e) => setDraft(d => ({ ...d, [f]: e.target.value }))} className="h-7 text-xs" />
+                    ) : pretty(r[f]).slice(0, 80)}
+                  </TableCell>
+                ))}
                 <TableCell><Badge variant={en ? 'default' : 'secondary'} className="text-[10px]">{en ? 'on' : 'off'}</Badge></TableCell>
-                <TableCell className="text-right space-x-1">
-                  <Button size="sm" variant="ghost" title={en ? 'Disable' : 'Enable'} disabled={isBusy}
-                    onClick={async () => { setBusy(id); try { await onToggle(r, !en); } finally { setBusy(null); } }}>
-                    {isBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Power className="w-3 h-3" />}
-                  </Button>
-                  <Button size="sm" variant="ghost" title="Delete" disabled={isBusy}
-                    onClick={async () => { setBusy(id); try { await onDelete(r); } finally { setBusy(null); } }}>
-                    <Trash2 className="w-3 h-3 text-destructive" />
-                  </Button>
+                <TableCell className="text-right space-x-1 whitespace-nowrap">
+                  {isEditing ? (
+                    <>
+                      <Button size="sm" variant="default" disabled={isBusy} onClick={() => save(r)}>
+                        {isBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Save'}
+                      </Button>
+                      <Button size="sm" variant="ghost" disabled={isBusy} onClick={cancel}>Cancel</Button>
+                    </>
+                  ) : (
+                    <>
+                      {onSave && editable.length > 0 && (
+                        <Button size="sm" variant="ghost" title="Edit" onClick={() => startEdit(r)}>Edit</Button>
+                      )}
+                      <Button size="sm" variant="ghost" title={en ? 'Disable' : 'Enable'} disabled={isBusy}
+                        onClick={async () => { setBusy(id); try { await onToggle(r, !en); } finally { setBusy(null); } }}>
+                        {isBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Power className="w-3 h-3" />}
+                      </Button>
+                      <Button size="sm" variant="ghost" title="Delete" disabled={isBusy}
+                        onClick={async () => { setBusy(id); try { await onDelete(r); } finally { setBusy(null); } }}>
+                        <Trash2 className="w-3 h-3 text-destructive" />
+                      </Button>
+                    </>
+                  )}
                 </TableCell>
               </TableRow>
             );
@@ -610,6 +671,7 @@ function EditableList({
     </CardContent></Card>
   );
 }
+
 
 function ReadOnlyList({ rows, fields }: { rows: any[]; fields: string[] }) {
   if (!rows || rows.length === 0) return <Card><CardContent className="py-8 text-center text-muted-foreground text-sm">Empty — try Full sync from PBX.</CardContent></Card>;
