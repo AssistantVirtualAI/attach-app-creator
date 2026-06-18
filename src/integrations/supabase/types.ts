@@ -1225,6 +1225,60 @@ export type Database = {
           },
         ]
       }
+      call_intelligence_audit: {
+        Row: {
+          ai_model: string | null
+          call_record_id: string
+          created_at: string
+          duration_ms: number | null
+          error: string | null
+          event: string
+          forced: boolean
+          id: string
+          metadata: Json
+          organization_id: string
+          pipeline: string | null
+          prompt_version: string | null
+          run_id: string
+          status: string
+          triggered_by: string | null
+        }
+        Insert: {
+          ai_model?: string | null
+          call_record_id: string
+          created_at?: string
+          duration_ms?: number | null
+          error?: string | null
+          event: string
+          forced?: boolean
+          id?: string
+          metadata?: Json
+          organization_id: string
+          pipeline?: string | null
+          prompt_version?: string | null
+          run_id: string
+          status: string
+          triggered_by?: string | null
+        }
+        Update: {
+          ai_model?: string | null
+          call_record_id?: string
+          created_at?: string
+          duration_ms?: number | null
+          error?: string | null
+          event?: string
+          forced?: boolean
+          id?: string
+          metadata?: Json
+          organization_id?: string
+          pipeline?: string | null
+          prompt_version?: string | null
+          run_id?: string
+          status?: string
+          triggered_by?: string | null
+        }
+        Relationships: []
+      }
       campaign_calls: {
         Row: {
           called_at: string | null
@@ -11035,7 +11089,9 @@ export type Database = {
         Args: { _paused: boolean; _queue_id: string }
         Returns: undefined
       }
+      try_lock_call_intel: { Args: { _call_id: string }; Returns: boolean }
       unhide_chat_message: { Args: { _message_id: string }; Returns: undefined }
+      unlock_call_intel: { Args: { _call_id: string }; Returns: boolean }
       unpin_chat_message: { Args: { _message_id: string }; Returns: undefined }
       update_platform_seen: { Args: { p_platform: string }; Returns: undefined }
       upsert_user_presence: {
