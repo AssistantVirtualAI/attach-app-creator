@@ -393,8 +393,10 @@ export default function CustomerDetail() {
             rows={queues as any[]}
             idKey="queue_uuid"
             fields={['queue_name', 'queue_extension', 'queue_strategy']}
+            editableFields={['queue_name', 'queue_extension', 'queue_strategy']}
             enabledKey="queue_enabled"
             onToggle={async (r, en) => { if (await pbxWrite('update-queue', { queue_uuid: r.queue_uuid, queue_enabled: en ? 'true' : 'false' }, 'Queue updated')) refetchQueues(); }}
+            onSave={async (r, patch) => { const ok = await pbxWrite('update-queue', { queue_uuid: r.queue_uuid, ...patch }, 'Queue saved'); if (ok) refetchQueues(); return ok; }}
             onDelete={async (r) => { if (confirm(`Delete queue ${r.queue_name}?`) && await pbxWrite('delete-queue', { queue_uuid: r.queue_uuid }, 'Queue deleted')) refetchQueues(); }}
           />
         </TabsContent>
@@ -405,8 +407,10 @@ export default function CustomerDetail() {
             rows={ringGroups as any[]}
             idKey="ring_group_uuid"
             fields={['ring_group_name', 'ring_group_extension']}
+            editableFields={['ring_group_name', 'ring_group_extension']}
             enabledKey="ring_group_enabled"
             onToggle={async (r, en) => { if (await pbxWrite('update-ring-group', { ring_group_uuid: r.ring_group_uuid, ring_group_enabled: en ? 'true' : 'false' }, 'Ring group updated')) refetchRG(); }}
+            onSave={async (r, patch) => { const ok = await pbxWrite('update-ring-group', { ring_group_uuid: r.ring_group_uuid, ...patch }, 'Ring group saved'); if (ok) refetchRG(); return ok; }}
             onDelete={async (r) => { if (confirm(`Delete ring group ${r.ring_group_name}?`) && await pbxWrite('delete-ring-group', { ring_group_uuid: r.ring_group_uuid }, 'Ring group deleted')) refetchRG(); }}
           />
         </TabsContent>
@@ -416,8 +420,10 @@ export default function CustomerDetail() {
             rows={devices as any[]}
             idKey="device_uuid"
             fields={['device_mac_address', 'device_template', 'device_label']}
+            editableFields={['device_template', 'device_label']}
             enabledKey="device_enabled"
             onToggle={async (r, en) => { if (await pbxWrite('update-device', { device_uuid: r.device_uuid, device_enabled: en ? 'true' : 'false' }, 'Device updated')) refetchDevices(); }}
+            onSave={async (r, patch) => { const ok = await pbxWrite('update-device', { device_uuid: r.device_uuid, ...patch }, 'Device saved'); if (ok) refetchDevices(); return ok; }}
             onDelete={async (r) => { if (confirm(`Delete device ${r.device_mac_address || r.device_uuid}?`) && await pbxWrite('delete-device', { device_uuid: r.device_uuid }, 'Device deleted')) refetchDevices(); }}
           />
         </TabsContent>
@@ -427,11 +433,14 @@ export default function CustomerDetail() {
             rows={destinations as any[]}
             idKey="destination_uuid"
             fields={['destination_number', 'destination_context', 'destination_actions']}
+            editableFields={['destination_number', 'destination_context', 'destination_actions']}
             enabledKey="destination_enabled"
             onToggle={async (r, en) => { if (await pbxWrite('update-destination', { destination_uuid: r.destination_uuid, destination_enabled: en ? 'true' : 'false' }, 'Destination updated')) refetchDest(); }}
+            onSave={async (r, patch) => { const ok = await pbxWrite('update-destination', { destination_uuid: r.destination_uuid, ...patch }, 'Destination saved'); if (ok) refetchDest(); return ok; }}
             onDelete={async (r) => { if (confirm(`Delete destination ${r.destination_number}?`) && await pbxWrite('delete-destination', { destination_uuid: r.destination_uuid }, 'Destination deleted')) refetchDest(); }}
           />
         </TabsContent>
+
 
         <TabsContent value="numbers">
           <PhoneNumbersTab domainUuid={domainUuid} domainName={domain?.domain_name || ''} organizationId={org?.id}
