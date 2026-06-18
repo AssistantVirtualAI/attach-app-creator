@@ -316,16 +316,35 @@ export default function LemtelCustomers() {
             <DialogTrigger asChild>
               <Button><Plus className="w-4 h-4 mr-2" /> New Customer</Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-lg">
               <DialogHeader><DialogTitle>Add Customer (provisions FusionPBX domain)</DialogTitle></DialogHeader>
-              <div className="space-y-3">
-                <div><Label>Business Name</Label><Input value={form.name} onChange={e => onNameChange(e.target.value)} /></div>
+              <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+                <div><Label>Business Name *</Label><Input value={form.name} onChange={e => onNameChange(e.target.value)} /></div>
+                <div><Label>Company / Legal Name</Label><Input value={form.companyName} onChange={e => setForm({ ...form, companyName: e.target.value })} placeholder="Defaults to business name" /></div>
                 <div>
-                  <Label className="flex items-center gap-1"><Globe className="w-3.5 h-3.5" /> SIP Domain</Label>
+                  <Label className="flex items-center gap-1"><Globe className="w-3.5 h-3.5" /> SIP Domain *</Label>
                   <Input
                     value={form.domain}
                     placeholder={`customer.${BASE_DOMAIN}`}
                     onChange={e => { setDomainTouched(true); setForm({ ...form, domain: e.target.value.trim().toLowerCase() }); }}
+                  />
+                </div>
+                <div>
+                  <Label>Phone numbers to port (comma or newline separated)</Label>
+                  <textarea
+                    className="w-full min-h-[60px] rounded-md border bg-background px-3 py-2 text-sm"
+                    value={form.phoneNumbersText}
+                    onChange={e => setForm({ ...form, phoneNumbersText: e.target.value })}
+                    placeholder="+15145551234, +15145559876"
+                  />
+                </div>
+                <div>
+                  <Label>Address</Label>
+                  <textarea
+                    className="w-full min-h-[50px] rounded-md border bg-background px-3 py-2 text-sm"
+                    value={form.address}
+                    onChange={e => setForm({ ...form, address: e.target.value })}
+                    placeholder="Street, City, Province, Postal"
                   />
                 </div>
                 <div>
@@ -335,6 +354,15 @@ export default function LemtelCustomers() {
                     value={form.adminEmail}
                     placeholder="admin@customer.com"
                     onChange={e => setForm({ ...form, adminEmail: e.target.value.trim().toLowerCase() })}
+                  />
+                </div>
+                <div>
+                  <Label>Admin password (optional — leave blank to send magic-link invite)</Label>
+                  <Input
+                    type="password"
+                    value={form.adminPassword}
+                    placeholder="min 12 chars"
+                    onChange={e => setForm({ ...form, adminPassword: e.target.value })}
                   />
                 </div>
               </div>
