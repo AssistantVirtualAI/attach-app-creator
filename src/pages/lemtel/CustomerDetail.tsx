@@ -353,7 +353,7 @@ export default function CustomerDetail() {
                 enabledKey="ivr_menu_enabled"
                 onToggle={async (r, en) => { if (await pbxWrite('update-ivr', { ivr_menu_uuid: r.ivr_menu_uuid, ivr_menu_enabled: en ? 'true' : 'false' }, 'IVR updated')) refetchIvrs(); }}
                 onSave={async (r, patch) => { const ok = await pbxWrite('update-ivr', { ivr_menu_uuid: r.ivr_menu_uuid, ...patch }, 'IVR saved'); if (ok) refetchIvrs(); return ok; }}
-                onEditFull={(r) => setEditRow({ kind: 'queue' /* reused dialog */, row: { ...r, __ivr: true } } as any)}
+
 
                 onDelete={async (r) => { if (confirm(`Delete IVR ${r.ivr_menu_name}?`) && await pbxWrite('delete-ivr', { ivr_menu_uuid: r.ivr_menu_uuid }, 'IVR deleted')) refetchIvrs(); }}
               />
