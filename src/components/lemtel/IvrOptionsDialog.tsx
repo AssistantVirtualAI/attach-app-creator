@@ -49,6 +49,9 @@ export function IvrOptionsDialog({
   const [draft, setDraft] = useState<{ digit: string; label: string; destType: DestType; destValue: string }>({ digit: '', label: '', destType: 'extension', destValue: '' });
   const [busy, setBusy] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 10;
 
   const paramFor = (t: DestType, v: string) => {
     if (t === 'voicemail') return `transfer *99${v} XML ${domainName}`;
@@ -84,49 +87,98 @@ export function IvrOptionsDialog({
 
   const cancel = () => { setEditId(null); setAdding(false); };
 
+  // Optimistic helpers
+  const snapshot = () => qc.getQueryData<any[]>(queryKey) || [];
+  const writeCache = (next: any[]) => qc.setQueryData(queryKey, next);
+  const revert = (prev: any[]) => writeCache(prev);
+
+  const runWithRetry = (label: string, fn: () => Promise<void>, prev: any[]) => {
+    toast.error(label, {
+      description: 'Changes reverted to last sync.',
+      action: { label: 'Retry', onClick: () => { writeCache(prev); fn(); } },
+    });
+  };
+
   const save = async () => {
     if (!draft.digit || (draft.destType !== 'menu-top' && !draft.destValue)) {
       toast.error('Digit + destination required'); return;
     }
-    setBusy(true);
-    try {
-      const body: any = {
-        action: editId ? 'update-ivr-option' : 'create-ivr-option',
-        domain_uuid: domainUuid,
-        ivr_menu_uuid: menuUuid,
-        ivr_menu_option_digits: draft.digit,
-        ivr_menu_option_action: actionFor(draft.destType),
-        ivr_menu_option_param: paramFor(draft.destType, draft.destValue),
-        ivr_menu_option_description: draft.label,
-        ivr_menu_option_enabled: 'true',
-      };
-      if (editId) body.ivr_menu_option_uuid = editId;
-      const { error } = await supabase.functions.invoke('fusionpbx-proxy', { body });
-      if (error) throw error;
-      toast.success(editId ? 'Option updated' : 'Option added');
-      cancel();
-      await qc.invalidateQueries({ queryKey });
-      await refetch();
-      qc.invalidateQueries({ queryKey: ['fpbx', 'ivrs'] });
-    } catch (e: any) { toast.error(e?.message || 'Failed'); }
-    finally { setBusy(false); }
+    const prev = snapshot();
+    const optimistic = {
+      ivr_menu_option_uuid: editId || `tmp-${Date.now()}`,
+      ivr_menu_option_digits: draft.digit,
+      ivr_menu_option_description: draft.label,
+      ivr_menu_option_action: actionFor(draft.destType),
+      ivr_menu_option_param: paramFor(draft.destType, draft.destValue),
+      ivr_menu_option_enabled: 'true',
+      _pending: true,
+    };
+    writeCache(editId ? prev.map(o => o.ivr_menu_option_uuid === editId ? { ...o, ...optimistic } : o) : [...prev, optimistic]);
+    cancel();
+
+    const attempt = async () => {
+      setBusy(true);
+      try {
+        const body: any = {
+          action: editId ? 'update-ivr-option' : 'create-ivr-option',
+          domain_uuid: domainUuid,
+          ivr_menu_uuid: menuUuid,
+          ivr_menu_option_digits: draft.digit,
+          ivr_menu_option_action: actionFor(draft.destType),
+          ivr_menu_option_param: paramFor(draft.destType, draft.destValue),
+          ivr_menu_option_description: draft.label,
+          ivr_menu_option_enabled: 'true',
+        };
+        if (editId) body.ivr_menu_option_uuid = editId;
+        const { error } = await supabase.functions.invoke('fusionpbx-proxy', { body });
+        if (error) throw error;
+        toast.success(editId ? 'Option updated' : 'Option added');
+        await qc.invalidateQueries({ queryKey });
+        await refetch();
+        qc.invalidateQueries({ queryKey: ['fpbx', 'ivrs'] });
+      } catch (e: any) {
+        revert(prev);
+        runWithRetry(e?.message || 'Failed to save option', attempt, prev);
+      } finally { setBusy(false); }
+    };
+    attempt();
   };
 
   const del = async (o: any) => {
     if (!confirm(`Delete option "${o.ivr_menu_option_digits}"?`)) return;
-    setBusy(true);
-    try {
-      const { error } = await supabase.functions.invoke('fusionpbx-proxy', {
-        body: { action: 'delete-ivr-option', domain_uuid: domainUuid, ivr_menu_option_uuid: o.ivr_menu_option_uuid },
-      });
-      if (error) throw error;
-      toast.success('Option deleted');
-      await qc.invalidateQueries({ queryKey });
-      await refetch();
-      qc.invalidateQueries({ queryKey: ['fpbx', 'ivrs'] });
-    } catch (e: any) { toast.error(e?.message || 'Failed'); }
-    finally { setBusy(false); }
+    const prev = snapshot();
+    writeCache(prev.filter(x => x.ivr_menu_option_uuid !== o.ivr_menu_option_uuid));
+
+    const attempt = async () => {
+      setBusy(true);
+      try {
+        const { error } = await supabase.functions.invoke('fusionpbx-proxy', {
+          body: { action: 'delete-ivr-option', domain_uuid: domainUuid, ivr_menu_option_uuid: o.ivr_menu_option_uuid },
+        });
+        if (error) throw error;
+        toast.success('Option deleted');
+        await qc.invalidateQueries({ queryKey });
+        await refetch();
+        qc.invalidateQueries({ queryKey: ['fpbx', 'ivrs'] });
+      } catch (e: any) {
+        revert(prev);
+        runWithRetry(e?.message || 'Failed to delete option', attempt, prev);
+      } finally { setBusy(false); }
+    };
+    attempt();
   };
+
+  // Filtered + paginated view
+  const q = search.trim().toLowerCase();
+  const filtered = q
+    ? options.filter((o: any) =>
+        String(o.ivr_menu_option_digits || '').toLowerCase().includes(q) ||
+        String(o.ivr_menu_option_description || '').toLowerCase().includes(q))
+    : options;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  useEffect(() => { setPage(1); }, [search, menuUuid]);
 
   const DestSelect = ({ t, v, onT, onV }: any) => (
     <div className="grid grid-cols-2 gap-1">
