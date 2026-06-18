@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { ArrowLeft, Globe, Loader2, RefreshCw, LogIn, Link2, Trash2, Power, Mail, Link as LinkIcon } from 'lucide-react';
+import { ArrowLeft, Globe, Loader2, RefreshCw, LogIn, Link2, Trash2, Power, Mail, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { RecordingWavePlayer } from '@/components/portal/RecordingWavePlayer';
 import { formatDistanceToNow } from 'date-fns';
