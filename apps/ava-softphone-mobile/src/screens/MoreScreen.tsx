@@ -16,8 +16,9 @@ import PermissionsScreen from './PermissionsScreen';
 import SupportScreen from './SupportScreen';
 import AIAuditScreen from './AIAuditScreen';
 import QueuesScreen from './QueuesScreen';
+import FeaturesScreen from './FeaturesScreen';
 
-type Sub = null | 'recordings' | 'voicemail' | 'messages' | 'contacts' | 'settings' | 'delete' | 'privacy' | 'datasafety' | 'permissions' | 'support' | 'aiaudit' | 'queues';
+type Sub = null | 'recordings' | 'voicemail' | 'messages' | 'contacts' | 'settings' | 'delete' | 'privacy' | 'datasafety' | 'permissions' | 'support' | 'aiaudit' | 'queues' | 'features';
 
 export default function MoreScreen({
   creds, sp, onSignOut, haptic,
