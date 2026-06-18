@@ -205,11 +205,18 @@ export default function CustomerDetail() {
 
   const handleAddUser = async () => {
     if (!org || !domain || !addForm.extension) { toast.error('Extension required'); return; }
+    const displayName = `${addForm.firstName} ${addForm.lastName}`.trim();
+    const password = addForm.sip_password || genPass();
+    const vmPin = addForm.vm_pin || genPin();
     const userPayload = {
       extension: addForm.extension,
-      name: addForm.name || undefined,
+      name: displayName || undefined,
       email: addForm.email || undefined,
-      password: addForm.sip_password || undefined,
+      password,
+      caller_id_name: displayName || undefined,
+      caller_id_number: addForm.caller_id_number || undefined,
+      voicemail_enabled: addForm.vm_enabled,
+      voicemail_pin: vmPin,
       assign_phone_number: addForm.assign_phone_number || undefined,
     };
     const { data, error } = await supabase.functions.invoke('customer-users-import', {
@@ -224,19 +231,26 @@ export default function CustomerDetail() {
     if (error) return toast.error(error.message);
     const r = (data as any)?.results?.[0];
     if (r?.ok) {
-      const genPass = (data as any)?.results?.[0]?.password;
       toast.success(`Extension ${addForm.extension} added`);
-      if (genPass) {
-        toast.message('SIP password (one-time view)', {
-          description: genPass,
-          action: { label: 'Copy', onClick: () => navigator.clipboard.writeText(genPass) },
-        });
-      }
+      setCreatedCreds({
+        sip_domain: domain.domain_name,
+        extension: addForm.extension,
+        password,
+        wss: 'wss://node.lemtelcloud.net:7443',
+        vm_pin: addForm.vm_enabled ? vmPin : null,
+        email: addForm.email,
+      });
       setAddOpen(false);
-      setAddForm({ extension: '', name: '', email: '', sip_password: '', assign_phone_number: '', send_welcome_email: true });
+      setAddForm({ extension: '', firstName: '', lastName: '', email: '', phone: '', sip_password: '', caller_id_number: '', vm_enabled: true, vm_pin: '', assign_phone_number: '', send_welcome_email: true });
       refetchSP();
     }
     else toast.error(r?.error || 'Add failed');
+  };
+
+  const suggestExtension = () => {
+    const nums = (spUsers as any[]).map(u => parseInt(u.extension, 10)).filter(Number.isFinite);
+    const next = nums.length ? Math.max(...nums) + 1 : 1001;
+    setAddForm(f => ({ ...f, extension: String(next), sip_password: f.sip_password || genPass(), vm_pin: f.vm_pin || genPin() }));
   };
 
   const handleInvite = async () => {
