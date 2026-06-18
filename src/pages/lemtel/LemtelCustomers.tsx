@@ -524,23 +524,33 @@ export default function LemtelCustomers() {
               <TableBody>
                 {filtered.length === 0 ? (
                   <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No PBX domains returned. Check FusionPBX credentials.</TableCell></TableRow>
-                ) : filtered.map((d) => {
+                ) : filtered.flatMap((d) => {
                   const org = orgByDomain.get(d.domain_uuid);
                   const exts = extsByDomain.get(d.domain_uuid) || [];
-                  const liveCount = (liveExtCounts as Record<string, number>)[d.domain_uuid];
-                  const hasLive = typeof liveCount === 'number' && liveCount >= 0;
-                  const displayCount = hasLive ? liveCount : exts.length;
+                  const live = (liveExtMap as Record<string, LiveState>)[d.domain_uuid];
+                  const hasLive = !!live && !live.error;
+                  const liveErr = live?.error;
+                  const displayCount = hasLive ? live!.exts.length : exts.length;
 
                   const enabled = d.domain_enabled === true || d.domain_enabled === 'true';
                   const clickable = !!org;
-                  return (
+                  const isOpen = expanded.has(d.domain_uuid);
+                  return [
                     <TableRow
                       key={d.domain_uuid}
                       className={clickable ? "cursor-pointer hover:bg-muted/40" : "opacity-80"}
-                      title={clickable ? "Click to open this customer's portal" : "No tenant org linked"}
+                      title={clickable ? "Click row to open customer portal — chevron to view extensions" : "No tenant org linked"}
                       onClick={() => { if (clickable) manageAs(d); else toast.error('No tenant org linked. Edit the customer to link or recreate.'); }}
                     >
-                      <TableCell><ChevronRight className="w-4 h-4 text-muted-foreground" /></TableCell>
+                      <TableCell>
+                        <button
+                          aria-label={isOpen ? 'Collapse extensions' : 'Expand extensions'}
+                          onClick={(e) => { e.stopPropagation(); toggleExpand(d.domain_uuid); }}
+                          className="p-0.5 hover:bg-muted rounded"
+                        >
+                          <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+                        </button>
+                      </TableCell>
                       <TableCell className="font-mono text-sm">
                         <div className="flex items-center gap-2"><Globe className="w-3.5 h-3.5 text-muted-foreground" />{d.domain_name}</div>
                         {d.domain_description && <div className="text-xs text-muted-foreground mt-0.5">{d.domain_description}</div>}
@@ -549,8 +559,12 @@ export default function LemtelCustomers() {
                         {org ? <span className="font-medium">{org.name}</span> : <span className="text-xs text-muted-foreground">— not linked —</span>}
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        {loadingCounts && !hasLive ? (
+                        {loadingCounts && !live ? (
                           <Loader2 className="w-3 h-3 animate-spin inline" />
+                        ) : liveErr ? (
+                          <span className="inline-flex items-center gap-1.5 text-destructive text-xs" title={liveErr}>
+                            <span className="w-1.5 h-1.5 rounded-full bg-destructive" /> error
+                          </span>
                         ) : (
                           <span className="inline-flex items-center gap-1.5">
                             {hasLive && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" title="Live from PBX" />}
@@ -576,7 +590,7 @@ export default function LemtelCustomers() {
                         </Button>
                         <Button
                           variant="ghost" size="sm" title="Sync from PBX"
-                          onClick={(e) => { e.stopPropagation(); syncDomain(d); }}
+                          onClick={(e) => { e.stopPropagation(); syncDomain(d); refetchLive(); }}
                           disabled={syncing === d.domain_uuid}
                         >
                           {syncing === d.domain_uuid ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
@@ -599,10 +613,22 @@ export default function LemtelCustomers() {
                             <Link to={`/domain/${orgByDomain.get(d.domain_uuid)!.slug}/admin/dashboard`}>Cockpit</Link>
                           </Button>
                         )}
-
                       </TableCell>
-                    </TableRow>
-                  );
+                    </TableRow>,
+                    isOpen ? (
+                      <TableRow key={d.domain_uuid + '-exp'} className="bg-muted/20 hover:bg-muted/20">
+                        <TableCell />
+                        <TableCell colSpan={5} className="py-3">
+                          <ExtensionsPanel
+                            domain={d}
+                            live={live}
+                            loading={loadingCounts && !live}
+                            onChanged={() => refetchLive()}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ) : null,
+                  ].filter(Boolean) as any;
                 })}
               </TableBody>
             </Table>
