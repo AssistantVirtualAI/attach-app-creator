@@ -204,7 +204,11 @@ export function IvrOptionsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Options · {ivr?.ivr_menu_name || ''} <span className="text-muted-foreground font-normal text-sm">(ext {ivr?.ivr_menu_extension})</span></DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <span>Options · {ivr?.ivr_menu_name || ''}</span>
+            <span className="text-muted-foreground font-normal text-sm">(ext {ivr?.ivr_menu_extension})</span>
+            {isFetching && !isLoading && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
+          </DialogTitle>
         </DialogHeader>
         <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
           {isLoading ? (
