@@ -340,8 +340,29 @@ export default function CustomerDetail() {
         </div>
       </div>
 
+      {/* Per-tenant sync status strip */}
+      {Object.keys(latestPerResource).length > 0 && (
+        <div className="flex items-center flex-wrap gap-1.5 text-[10px]">
+          <span className="text-muted-foreground mr-1">Sync status:</span>
+          {['extensions', 'devices', 'ivrs', 'queues', 'ring_groups', 'destinations', 'cdrs', 'recordings', 'moh'].map((r) => {
+            const j = latestPerResource[r];
+            const ok = j?.status === 'completed' || j?.status === 'success';
+            const fail = j?.status === 'error' || j?.status === 'failed';
+            return (
+              <Badge
+                key={r}
+                variant={ok ? 'default' : fail ? 'destructive' : 'secondary'}
+                title={j ? `${j.status}${j.error_message ? ' · ' + j.error_message : ''} · ${j.completed_at || j.started_at}` : 'never synced'}
+              >
+                {r}: {j ? j.status : '—'}
+              </Badge>
+            );
+          })}
+        </div>
+      )}
 
       <Tabs value={tab} onValueChange={setTab}>
+
         <div className="overflow-x-auto -mx-1 px-1">
           <TabsList className="inline-flex w-max min-w-full whitespace-nowrap">
             <TabsTrigger value="extensions">Extensions ({(extensions as any[]).length})</TabsTrigger>
