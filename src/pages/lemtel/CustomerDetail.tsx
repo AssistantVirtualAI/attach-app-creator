@@ -439,9 +439,13 @@ export default function CustomerDetail() {
         </TabsContent>
 
         <TabsContent value="history">
-          <Card><CardContent className="p-0">
-            {callHistory.length === 0 ? (
-              <div className="py-8 text-center text-sm text-muted-foreground">No call history. Run Full sync to pull CDRs.</div>
+          <Card><CardContent className="p-4 space-y-3">
+            <FilterBar q={histQ} setQ={setHistQ} from={histFrom} setFrom={setHistFrom} to={histTo} setTo={setHistTo}
+              ext={histExt} setExt={setHistExt} extOptions={extOptions} count={filteredHistory.length} total={callHistory.length} />
+            {filteredHistory.length === 0 ? (
+              <div className="py-8 text-center text-sm text-muted-foreground">
+                {callHistory.length === 0 ? 'No call history. Run Full sync to pull CDRs.' : 'No records match the filters.'}
+              </div>
             ) : (
               <Table>
                 <TableHeader><TableRow>
@@ -449,7 +453,7 @@ export default function CustomerDetail() {
                   <TableHead>Ext</TableHead><TableHead className="text-right">Sec</TableHead><TableHead>Status</TableHead>
                 </TableRow></TableHeader>
                 <TableBody>
-                  {callHistory.map((c: any) => (
+                  {filteredHistory.map((c: any) => (
                     <TableRow key={c.id}>
                       <TableCell className="text-xs">{formatDistanceToNow(new Date(c.start_at), { addSuffix: true })}</TableCell>
                       <TableCell className="text-xs">{c.direction || '—'}</TableCell>
@@ -468,8 +472,14 @@ export default function CustomerDetail() {
 
         <TabsContent value="recordings">
           <Card><CardContent className="space-y-2 p-4">
-            {recordings.length === 0 && <p className="text-sm text-muted-foreground">No recordings.</p>}
-            {recordings.map((r: any) => (
+            <FilterBar q={recQ} setQ={setRecQ} from={recFrom} setFrom={setRecFrom} to={recTo} setTo={setRecTo}
+              ext={recExt} setExt={setRecExt} extOptions={extOptions} count={filteredRecordings.length} total={recordings.length} />
+            {filteredRecordings.length === 0 && (
+              <p className="text-sm text-muted-foreground py-4 text-center">
+                {recordings.length === 0 ? 'No recordings.' : 'No recordings match the filters.'}
+              </p>
+            )}
+            {filteredRecordings.map((r: any) => (
               <div key={r.id} className="border rounded-lg p-3 space-y-2">
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div className="text-sm">
@@ -486,6 +496,7 @@ export default function CustomerDetail() {
             ))}
           </CardContent></Card>
         </TabsContent>
+
 
         <TabsContent value="moh">
           <ReadOnlyList rows={moh as any[]} fields={['music_on_hold_name', 'music_on_hold_rate', 'music_on_hold_enabled']} />
