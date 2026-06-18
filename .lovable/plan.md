@@ -1,154 +1,101 @@
-# Recap — Phases 1 to 4
+# Next Phase — Critical Fixes + Domain Admin + Pending Features
 
-## Phase 1 — SIP + UI fixes (softphone desktop)
-- Fixed "Bad Media Description" on incoming calls (jsSIP `answer()` SDP).
-- Stabilised conversation widgets, presence pills, and call control UI in `apps/ava-softphone-desktop`.
+Scope guard: never touch `vite.config.ts`, `electron-builder.yml`, or `.github/workflows/`. Work limited to `apps/ava-softphone-desktop/**`, `apps/ava-softphone-mobile/**`, `src/**`, and `supabase/functions/**`.
 
-## Phase 2 — Group chat + call transcription
-- `OrgChatView` no longer wipes messages: introduced `orgChatMerge.ts` + tests to merge incoming realtime payloads with the local cache.
-- Hardened transcription pipeline (recording → STT → conversation linkage).
+## Priority 1 — Inbound SDP rewrite (CRITICAL audio bug)
 
-## Phase 3 — Contacts + customer management
-- `ContactsView` now merges FusionPBX extensions, `pbx_softphone_users`, and Zoho CRM contacts; virtualised list for large datasets.
-- `CustomerDetail` gained a Users tab: create SIP extensions, assign phone numbers, send welcome emails through `customer-users-import` → `send-transactional-email`.
-- Generated SIP password shown once with copy-to-clipboard toast.
-- Migration: `customer-users-import` edge function + supporting columns.
+- Extract a shared helper `rewriteSdpForFusionPBX(sdp)` into `apps/ava-softphone-desktop/src/lib/sip/sdp.ts` (and mirror in `src/lib/softphone/` for portal).
+- Strips DTLS/fingerprint/setup lines, removes `m=video` block + related a-lines, keeps only PCMU(0)/PCMA(8) in `m=audio`, rewrites payload list, preserves ICE ufrag/pwd/candidates.
+- Apply via `sessionDescriptionHandlerModifiers` on BOTH `session.answer()` and outbound `invite()` paths in `apps/ava-softphone-desktop/src/lib/sip/*` and `src/hooks/useSoftphone.ts` / `jssipProvider`.
+- Add unit test covering SDP transform (codecs filtered, ICE intact, no `a=fingerprint`).
 
-## Phase 4 — Customer domain management (started)
-- `useActiveDomain` hook + `DomainSwitcher` (super-admin only, in `AdminPortalLayout` header).
-- `LEMTEL_ORG` is now resolved at module load from the active domain → all 40+ pages re-scope automatically when the super-admin switches domain (page reloads to apply).
-- **IVR**: greeting upload (`AudioTab`), AI script generator, ElevenLabs TTS Studio, and `test-ivr` action wired into `fusionpbx-proxy`.
-- **Porting**: `number_porting_requests` table + RLS, `PortingRequestDialog` for customers, admin queue at `/org/lemtel/admin/porting`.
+## Priority 2 — Dark theme button visibility
 
-## What is still missing
-- Each customer domain does **not** yet have its own scoped dashboard mirroring the Lemtel admin cockpit.
-- No per-domain admin role: today only Lemtel super-admins can manage; customer users have no management UI.
-- Mobile/desktop softphone apps don't authenticate domain users yet.
-- Devices, business hours, MOH, inventory (numbers + devices), recordings, and call history are not surfaced inside the customer's own portal.
-- Domain admin invitation + onboarding flow is missing.
+- In `apps/ava-softphone-desktop/src/components/SoftphonePane.tsx`, refactor `ControlBtn` to a single styled component using tokens:
+  - inactive: `bg: rgba(255,255,255,0.10)`, `border: 1px solid rgba(255,255,255,0.25)`, `color: #fff`
+  - active: `bg: rgba(0,200,200,0.30)`, `color: #fff`
+  - disabled: opacity 0.5
+- Apply to Hold, Mute, Transfer, Record, Hangup-secondary actions; force `color:#fff` on inner label `<span>`.
 
----
+## Priority 3 — Wide dialer freeze
 
-# Plan — Phase 5: Full per-domain phone system management
+- Identify wide dialer (`apps/ava-softphone-desktop/src/components/console/DialerView.tsx` or similar).
+- Move dial input to local `useState`; remove zustand/global writes per keystroke.
+- `React.memo` the `Keypad` component, `useCallback` for `onDigit`, `onBackspace`.
+- Debounce side effects (number lookup, formatting, presence query) with 300 ms via small `useDebouncedValue` hook.
+- Verify no parent re-renders the whole console tree on each keystroke (profile with React DevTools commit highlight).
 
-Goal: every domain (customer) has the same cockpit as the Lemtel master, scoped to its own data. Lemtel super-admin can enter any domain via the switcher; a designated "domain admin" can manage their own domain only. End-users get softphone access.
+## Priority 4 — Chat persistence in OrgChatView
 
-## 1. Roles & access
+- In `apps/ava-softphone-desktop/src/components/console/OrgChatView.tsx`:
+  - Remove all `setMessages([])`.
+  - Introduce module-level `Map<orgId, ChatMessage[]>` cache (reuse helpers in `orgChatMerge.ts`).
+  - On mount: hydrate from cache → render → fetch fresh → `mergeOnFetch`.
+  - Realtime inserts go through `mergeIncoming`; persist back to cache on every update.
+  - Keep cache bounded (e.g. last 500 per org).
 
-Extend `app_role` with:
-- `domain_admin` — full management inside one domain.
-- `domain_user` — extension owner, softphone-only access.
+## Priority 5 — Cross-platform group chat sync
 
-`user_roles` rows already carry `organization_id`; we keep using it as the domain scope. Add a helper:
-- `public.has_domain_role(_user_id uuid, _org_id uuid, _role app_role) returns boolean` (SECURITY DEFINER).
+- Standardize channel name `org-chat-${organization_id}` in desktop OrgChatView, `apps/ava-softphone-mobile/src/screens/Chat*.tsx`, and portal `src/pages/.../OrgChat*.tsx`.
+- Ensure every INSERT includes `organization_id`, `sender_id`, `content`, `created_at`.
+- Migration: confirm/repair RLS on `org_chat_messages` so SELECT requires same-org membership via `public.is_org_member(auth.uid(), organization_id)` security-definer helper (avoid recursion). Add GRANTs if missing.
+- Presence sidebar:
+  - Query `org_members` for full roster.
+  - Join with `user_presence` (last_seen_at within 5 min ⇒ green).
+  - Subscribe to `user_presence` realtime to update dots live.
+  - Show avatar, display name, status.
 
-Update RLS on every `pbx_*` table to allow `domain_admin` to read/write rows where `organization_id = their org`, in addition to existing super-admin policies.
+## Priority 6 — Call transcription edge function
 
-## 2. Customer portal routes (`/portal/:domainSlug/*`)
+- `supabase/functions/ai-transcribe-call/index.ts`:
+  1. Authenticated PHP session login to `https://pbxnode.lemtel.tel/login.php` (fetch CSRF token from GET first, POST creds, keep cookies).
+  2. GET `/app/xml_cdr/download.php?id={xml_cdr_uuid}` → audio buffer.
+  3. POST multipart to OpenAI `audio/transcriptions` (model `whisper-1`, language `fr`).
+  4. `UPDATE pbx_call_records SET transcription, analyzed=true WHERE xml_cdr_uuid=$1`.
+  5. Return `{text, durationMs}`.
+- Secret needed: `OPENAI_API_KEY` (request via add_secret). PBX login creds reuse existing `FUSIONPBX_*` secrets.
+- `src/components/.../RecordingsList.tsx`: spinner while pending, expandable transcript panel, Retry on error.
 
-New layout `CustomerPortalLayout` (mirrors `AdminPortalLayout` but pinned to the user's org, no DomainSwitcher unless super-admin):
+## Priority 7 — Admin recordings portal
 
-```
-/portal/:slug/dashboard          → live KPIs (active calls, registrations, today's volume)
-/portal/:slug/extensions         → CRUD extensions (reuse LemtelExtensions)
-/portal/:slug/devices            → SIP devices (reuse LemtelDevices)
-/portal/:slug/ivr                → IVR menus + greetings (reuse LemtelIVR)
-/portal/:slug/queues             → Call queues (reuse LemtelQueues)
-/portal/:slug/ring-groups        → Ring groups (reuse TelephonyRingGroups)
-/portal/:slug/moh                → Music on hold uploads + assignment
-/portal/:slug/numbers            → DIDs, routing, porting (reuse LemtelDIDs)
-/portal/:slug/business-hours     → Time conditions per domain
-/portal/:slug/recordings         → Call recordings player + download
-/portal/:slug/history            → Unified call history (CDRs + recordings)
-/portal/:slug/stats              → Analytics: volumes, ASR, handle time, queue SLA
-/portal/:slug/users              → Domain users + softphone provisioning
-/portal/:slug/settings           → Branding, voicemail defaults, caller-id rules
-```
+- `src/pages/lemtel/admin/AdminRecordings.tsx`:
+  - Query `pbx_call_records` filtered by active `domain_uuid` (from `useActiveDomain`), 20/page.
+  - Columns: caller → destination, datetime, duration, audio (via `fusionpbx-proxy` `get-recording`), Transcribe button, sentiment badge.
+  - Graceful "Audio processing…" state + Retry, no terminal error.
 
-All pages reuse existing Lemtel components but receive a `scopeOrgId` prop. The `useEffectiveOrgId()` helper (already in place) auto-resolves to the route's slug for domain users; super-admins keep using DomainSwitcher.
+## Priority 8 — Contacts view
 
-## 3. Dashboard cockpit (per domain)
+- `apps/ava-softphone-desktop/src/components/console/ContactsView.tsx`:
+  - Source A: `fusionpbx-proxy` `list-extensions` for current domain.
+  - Source B: `org_contacts` table for current org.
+  - Merge + dedupe by E.164 number.
+  - Row: name, number, extension badge, presence dot, click-to-call (`sipProvider.call`), favorite toggle (`org_contacts.is_favorite`).
+  - "+ New Contact" dialog → insert into `org_contacts`.
 
-`CustomerDashboard.tsx` mirrors `LemtelDashboard.tsx` with cards:
-- Live calls, registered devices, today's CDR count, queue waiters.
-- Inventory rollup: phone numbers, extensions, devices.
-- Recent recordings (last 10) + call history (last 25).
-- Health pill (FusionPBX ping + sync status for that domain).
+## Priority 9 — Domain admin promotion UI (finalize)
 
-## 4. Inventory unification
+- Confirm existing `CustomerDetail` promote dialog covers role selector; if any user row in Users tab still lacks a "Promote to Admin" inline button, add it (calls existing `customer-invite-admin` with `role: 'org_admin'`).
 
-New page `/portal/:slug/inventory` combining:
-- Phone numbers (from `phone_numbers` + `pbx_phone_number_assignments`).
-- Devices (from `pbx_devices`).
-- Extensions count + free range suggestion.
+## Priority 10 — Customer welcome email
 
-Single search + export to CSV.
+- New transactional template `customer-welcome.tsx` under `supabase/functions/_shared/transactional-email-templates/`.
+- Subject: "Your Lemtel Communications portal is ready".
+- Variables: `portalUrl`, `loginEmail`, `tempPassword`, `domainSlug`, quick-start links.
+- Trigger from `customer-invite-admin` (and from customer-creation flow) via `send-transactional-email` with idempotency key `welcome-${user_id}-${org_id}`.
+- Use Lovable Emails (scaffold transactional infra if not already present).
 
-## 5. Call history + recordings
+## Technical Notes
 
-`/portal/:slug/history` page joins `pbx_call_records` ↔ `pbx_call_recordings` by `call_uuid`. Columns: time, direction, from, to, extension, duration, disposition, recording (inline player + download).
+- New SQL migrations:
+  - `org_contacts` table if missing (id, organization_id, name, number, extension, is_favorite, created_by, timestamps) + GRANTs + RLS via `is_org_member`.
+  - `is_org_member(user_id, org_id)` SECURITY DEFINER helper if not present.
+  - RLS audit on `org_chat_messages` for same-org SELECT.
+- New secrets: `OPENAI_API_KEY` (if not set).
+- New/edited edge functions to deploy: `ai-transcribe-call`, `customer-invite-admin` (welcome trigger), `send-transactional-email` (templates registry).
+- No changes to protected CI/build files.
 
-Permissions: `domain_admin` sees all rows for org; `domain_user` sees only their own extension.
+## Out of Scope
 
-## 6. Music on hold per domain
-
-`/portal/:slug/moh`:
-- List `pbx_hold_music` rows for org.
-- Upload .mp3/.wav → Supabase Storage bucket `lemtel-moh` (new, RLS by org).
-- Add `set-default-moh` action in `fusionpbx-proxy` to update domain settings.
-
-## 7. Business hours
-
-`/portal/:slug/business-hours` wraps `pbx_time_conditions` for the org with a weekly grid editor (start/end per day, holidays). Persists via `fusionpbx-proxy` `create/update-time-condition`.
-
-## 8. Stats
-
-`/portal/:slug/stats` uses `cc_queue_stats` + `pbx_call_records` aggregates. Charts: calls per hour (6h–23h business window), avg handle time, abandon rate, top extensions.
-
-## 9. Mobile + desktop softphone access for domain users
-
-- Auth: domain user logs into desktop/mobile app with their Lemtel email + password. After login, app reads `user_roles` and pins `activeDomain` to their org.
-- New edge function `provision-softphone-credentials` returns SIP creds (extension, password, SIP server, WS URL) scoped to the user's `pbx_extensions` row.
-- Mobile app already supports SIP login; we just inject the provisioned credentials at session bootstrap.
-- Add "Send mobile app invite" button in `CustomerDetail → Users`: sends app download link + auto-login token email.
-
-## 10. Domain admin invitation flow
-
-In `CustomerDetail`, "Promote to Domain Admin" button:
-- Inserts `user_roles` row with `role='domain_admin'` and the customer's `organization_id`.
-- Sends `domain-admin-welcome` transactional email with portal link `/portal/:slug/dashboard`.
-
-## 11. Files to create
-
-**New pages** (under `src/pages/portal/`):
-`CustomerPortalLayout.tsx`, `CustomerDashboard.tsx`, `CustomerInventory.tsx`, `CustomerHistory.tsx`, `CustomerRecordings.tsx`, `CustomerMOH.tsx`, `CustomerBusinessHours.tsx`, `CustomerStats.tsx`, `CustomerUsers.tsx`, `CustomerSettings.tsx`.
-
-**New components**: `DomainGuard.tsx` (RLS-aware route guard), `InventoryTable.tsx`, `CallHistoryWithRecording.tsx`.
-
-**New edge functions**: `provision-softphone-credentials`, `customer-portal-stats`.
-
-**New email template**: `domain-admin-welcome.tsx`.
-
-**Migrations**:
-- Add `domain_admin`, `domain_user` to `app_role` enum.
-- `has_domain_role()` security-definer function.
-- Per-table RLS additions for `domain_admin` on every `pbx_*` table.
-- Storage bucket `lemtel-moh` + RLS.
-
-**Edited**:
-- `src/App.tsx` (new portal routes).
-- `fusionpbx-proxy/index.ts` (add `set-default-moh`, time-condition CRUD if missing).
-- `DomainSwitcher.tsx` (also reachable to `domain_admin` if they manage multiple orgs).
-
-**Not touched**: `vite.config.ts`, `electron-builder.yml`, `.github/workflows/**`, auto-generated Supabase files.
-
-## 12. Rollout order
-
-1. Roles + RLS migration.
-2. `CustomerPortalLayout` + routing + `DomainGuard`.
-3. Dashboard + Extensions + Devices (reuse).
-4. Numbers + Inventory + Call History + Recordings.
-5. IVR / Queues / Ring Groups / MOH / Business Hours wired into portal.
-6. Stats page.
-7. Softphone provisioning + mobile/desktop login wiring.
-8. Domain admin invitation + welcome email.
+- Mobile UI parity for contacts/recordings (chat sync only).
+- Replacing Whisper with another provider.
+- Marketing email content.

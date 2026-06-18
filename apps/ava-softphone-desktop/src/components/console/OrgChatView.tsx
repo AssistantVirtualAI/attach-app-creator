@@ -11,7 +11,18 @@ type Channel = { id: string; name: string; channel_type: string; organization_id
 type Message = { id: string; channel_id: string; sender_id: string; sender_name: string | null; content: string; created_at: string; reactions?: Record<string, string[]> | null; attachments?: any[] | null; message_type?: string; edited_at?: string | null };
 type Member = { user_id: string; display_name: string; extension: string | null; status: string; call_state: string | null };
 
+// Module-level cache: survives component unmount/remount so navigating away
+// and back never appears to "erase" the chat. Bounded to 500 msgs per channel.
+const CHANNEL_CACHE = new Map<string, Message[]>();
+const CACHE_MAX = 500;
+const cacheGet = (id: string): Message[] => CHANNEL_CACHE.get(id) || [];
+const cacheSet = (id: string, msgs: Message[]) => {
+  const trimmed = msgs.length > CACHE_MAX ? msgs.slice(-CACHE_MAX) : msgs;
+  CHANNEL_CACHE.set(id, trimmed);
+};
+
 const EMOJIS = ['👍','❤️','😂','🎉','🚀','👀'];
+
 
 const STATUS_COLOR: Record<string, string> = {
   online: '#22d39a', available: '#22d39a',
@@ -178,6 +189,16 @@ export default function OrgChatView() {
     setTypingNames([]);
 
 
+  // Messages
+  useEffect(() => {
+    if (!activeId) return;
+    let cancelled = false;
+    setTypingNames([]);
+
+    // Hydrate immediately from module-level cache so the UI never appears empty.
+    const cached = cacheGet(activeId);
+    if (cached.length) setMessages(cached);
+
     (async () => {
       const { data, error } = await supabase.from('org_chat_messages')
         .select('id,channel_id,sender_id,sender_name,content,created_at,reactions,attachments,message_type,edited_at')
@@ -189,15 +210,27 @@ export default function OrgChatView() {
         setErrMsg(`Messages error: ${error.message}`);
         return;
       }
-      setMessages((prev) => mergeOnFetch(prev as any, (data ?? []) as any, activeId) as any);
+      setMessages((prev) => {
+        const next = mergeOnFetch(prev as any, (data ?? []) as any, activeId) as Message[];
+        cacheSet(activeId, next);
+        return next;
+      });
     })();
 
     // Standardized realtime channel name (matches src/hooks/useOrgChat.ts).
     const ch = supabase.channel(`org-chat-${activeId}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'org_chat_messages', filter: `channel_id=eq.${activeId}` },
-        (payload) => setMessages((m) => mergeIncoming(m as any, [payload.new as any], activeId) as any))
+        (payload) => setMessages((m) => {
+          const next = mergeIncoming(m as any, [payload.new as any], activeId) as Message[];
+          cacheSet(activeId, next);
+          return next;
+        }))
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'org_chat_messages', filter: `channel_id=eq.${activeId}` },
-        (payload) => setMessages((m) => m.map((x) => x.id === (payload.new as any).id ? (payload.new as Message) : x)))
+        (payload) => setMessages((m) => {
+          const next = m.map((x) => x.id === (payload.new as any).id ? (payload.new as Message) : x);
+          cacheSet(activeId, next);
+          return next;
+        }))
       .subscribe();
 
 
