@@ -240,10 +240,18 @@ Deno.serve(async (req) => {
     if (!audioBytes || audioBytes.length === 0) {
       // Friendlier reason when there's no recording metadata at all yet.
       const hasAnyPath = !!(recording_path || call?.recording_path || recording_name || call?.recording_name || sourceUrl);
-      const reason = hasAnyPath ? "no-audio" : "recording-not-synced";
+      let reason: string;
+      let retryAfterMs = 0;
+      if (storagePendingSync) {
+        reason = "recording-pending-sync";
+        retryAfterMs = 15000; // client should auto-retry with backoff
+      } else {
+        reason = hasAnyPath ? "no-audio" : "recording-not-synced";
+        if (reason === "recording-not-synced") retryAfterMs = 20000;
+      }
       await writeTranscript(fallbackTranscript, `stub-${reason}`);
-      await audit(reason, { error_code: reason, message: `fetch errors: ${fetchErrors.join("; ") || "none"}`, metadata: { fetchErrors } });
-      return json({ transcript_text: fallbackTranscript, stub: true, reason, fetchErrors }, 200);
+      await audit(reason, { error_code: reason, message: `fetch errors: ${fetchErrors.join("; ") || "none"}`, metadata: { fetchErrors, retryAfterMs } });
+      return json({ transcript_text: fallbackTranscript, stub: true, reason, fetchErrors, retry_after_ms: retryAfterMs, pending_sync: storagePendingSync || reason === "recording-not-synced" }, 200);
     }
 
     // Gemini supports inline audio up to ~20MB
