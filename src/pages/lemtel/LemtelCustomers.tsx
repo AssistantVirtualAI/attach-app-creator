@@ -720,3 +720,141 @@ export default function LemtelCustomers() {
     </div>
   );
 }
+
+type LiveExt = { extension_uuid?: string; extension: string; effective_caller_id_name?: string; enabled?: string | boolean; description?: string; voicemail_enabled?: string | boolean };
+type LiveState = { exts: LiveExt[]; error?: string };
+
+function ExtensionsPanel({
+  domain,
+  live,
+  loading,
+  onChanged,
+}: {
+  domain: Domain;
+  live: LiveState | undefined;
+  loading: boolean;
+  onChanged: () => void;
+}) {
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [editing, setEditing] = useState<LiveExt | null>(null);
+  const [editDesc, setEditDesc] = useState('');
+  const [editCid, setEditCid] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
+
+  if (loading) {
+    return <div className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="w-3 h-3 animate-spin" /> Loading extensions from PBX…</div>;
+  }
+  if (live?.error) {
+    return (
+      <div className="text-xs text-destructive flex items-center gap-2">
+        <span>⚠ Could not fetch extensions: {live.error}</span>
+        <Button size="sm" variant="outline" onClick={onChanged}>Retry</Button>
+      </div>
+    );
+  }
+  const exts = live?.exts || [];
+  if (!exts.length) {
+    return <div className="text-xs text-muted-foreground">No extensions on this domain.</div>;
+  }
+
+  const doAction = async (ext: LiveExt, action: 'toggle' | 'reset-vm') => {
+    if (!ext.extension_uuid) { toast.error('Missing extension UUID'); return; }
+    setBusyId(ext.extension_uuid);
+    try {
+      const params: any = { extension_uuid: ext.extension_uuid, domain_uuid: domain.domain_uuid };
+      if (action === 'toggle') {
+        const isEn = ext.enabled === true || ext.enabled === 'true';
+        params.enabled = isEn ? 'false' : 'true';
+      } else if (action === 'reset-vm') {
+        params.voicemail_password = String(ext.extension);
+        params.voicemail_enabled = 'true';
+      }
+      const { error } = await supabase.functions.invoke('pbx-write', {
+        body: { organizationId: LEMTEL_ORG, action: 'update-extension', params },
+      });
+      if (error) throw error;
+      toast.success(action === 'toggle' ? 'Extension updated' : `Voicemail reset (PIN = ${ext.extension})`);
+      onChanged();
+    } catch (e: any) {
+      toast.error(e?.message || 'Action failed');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const saveEdit = async () => {
+    if (!editing?.extension_uuid) return;
+    setEditSaving(true);
+    try {
+      const { error } = await supabase.functions.invoke('pbx-write', {
+        body: {
+          organizationId: LEMTEL_ORG,
+          action: 'update-extension',
+          params: {
+            extension_uuid: editing.extension_uuid,
+            domain_uuid: domain.domain_uuid,
+            description: editDesc,
+            effective_caller_id_name: editCid,
+          },
+        },
+      });
+      if (error) throw error;
+      toast.success('Extension saved');
+      setEditing(null);
+      onChanged();
+    } catch (e: any) {
+      toast.error(e?.message || 'Save failed');
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  return (
+    <>
+      <div className="text-xs text-muted-foreground mb-2">{exts.length} extension{exts.length === 1 ? '' : 's'} on <code>{domain.domain_name}</code></div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+        {exts.map((e) => {
+          const isEn = e.enabled === true || e.enabled === 'true';
+          const busy = busyId === e.extension_uuid;
+          return (
+            <div key={e.extension_uuid || e.extension} className="flex items-center justify-between gap-2 rounded-md border bg-background px-2 py-1.5">
+              <div className="min-w-0">
+                <div className="font-mono text-sm">{e.extension}</div>
+                <div className="text-xs text-muted-foreground truncate">{e.effective_caller_id_name || e.description || '—'}</div>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <Badge variant={isEn ? 'default' : 'secondary'} className="text-[10px]">{isEn ? 'on' : 'off'}</Badge>
+                <Button size="sm" variant="ghost" title="Edit" onClick={() => { setEditing(e); setEditDesc(e.description || ''); setEditCid(e.effective_caller_id_name || ''); }}>
+                  <Pencil className="w-3 h-3" />
+                </Button>
+                <Button size="sm" variant="ghost" title={isEn ? 'Disable' : 'Enable'} disabled={busy} onClick={() => doAction(e, 'toggle')}>
+                  {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : isEn ? '⏻' : '✓'}
+                </Button>
+                <Button size="sm" variant="ghost" title="Reset voicemail PIN to extension number" disabled={busy} onClick={() => doAction(e, 'reset-vm')}>
+                  VM
+                </Button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Edit extension {editing?.extension}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Caller ID name</Label><Input value={editCid} onChange={(e) => setEditCid(e.target.value)} /></div>
+            <div><Label>Description</Label><Input value={editDesc} onChange={(e) => setEditDesc(e.target.value)} /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditing(null)}>Cancel</Button>
+            <Button onClick={saveEdit} disabled={editSaving}>
+              {editSaving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />} Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
