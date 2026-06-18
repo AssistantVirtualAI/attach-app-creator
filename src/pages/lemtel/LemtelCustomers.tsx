@@ -620,7 +620,9 @@ export default function LemtelCustomers() {
                         <TableCell />
                         <TableCell colSpan={5} className="py-3">
                           <ExtensionsPanel
-                            domain={d}
+                            domainUuid={d.domain_uuid}
+                            domainName={d.domain_name}
+                            organizationId={org?.id}
                             live={live}
                             loading={loadingCounts && !live}
                             onChanged={() => refetchLive()}
