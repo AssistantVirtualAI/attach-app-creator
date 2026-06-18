@@ -128,6 +128,12 @@ if (!gotLock) {
   app.whenReady().then(() => {
     Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate));
     createWindow();
+    // First-launch deep link (Windows/Linux pass URL via argv)
+    const initialDeepLink = process.argv.find((a) => a.startsWith(`${PROTOCOL}://`));
+    if (initialDeepLink) {
+      const route = routeFromDeepLink(initialDeepLink);
+      if (route) setTimeout(() => navigateTo(route), 300);
+    }
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();
     });
