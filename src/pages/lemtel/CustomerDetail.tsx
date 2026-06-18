@@ -64,7 +64,7 @@ export default function CustomerDetail() {
     },
   });
 
-  const { data: org, refetch: refetchOrg } = useQuery({
+  const { data: org } = useQuery({
     queryKey: ['org', 'by-domain', domainUuid],
     queryFn: async () => {
       const { data } = await (supabase as any).rpc('get_org_by_fusionpbx_domain', { _domain_uuid: domainUuid });
