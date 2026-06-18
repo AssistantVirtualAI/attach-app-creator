@@ -451,19 +451,13 @@ export default function CustomerDetail() {
               <Table>
                 <TableHeader><TableRow>
                   <TableHead>When</TableHead><TableHead>Dir</TableHead><TableHead>From</TableHead><TableHead>To</TableHead>
-                  <TableHead>Ext</TableHead><TableHead className="text-right">Sec</TableHead><TableHead>Status</TableHead>
+                  <TableHead>Ext</TableHead><TableHead>Caller name</TableHead>
+                  <TableHead className="text-right">Sec</TableHead><TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow></TableHeader>
                 <TableBody>
                   {filteredHistory.map((c: any) => (
-                    <TableRow key={c.id}>
-                      <TableCell className="text-xs">{formatDistanceToNow(new Date(c.start_at), { addSuffix: true })}</TableCell>
-                      <TableCell className="text-xs">{c.direction || '—'}</TableCell>
-                      <TableCell className="font-mono text-xs">{c.caller_number || '—'}</TableCell>
-                      <TableCell className="font-mono text-xs">{c.destination_number || '—'}</TableCell>
-                      <TableCell className="font-mono text-xs">{c.extension || '—'}</TableCell>
-                      <TableCell className="text-right font-mono text-xs">{Math.round(c.duration_seconds ?? 0)}</TableCell>
-                      <TableCell className="text-xs">{c.hangup_cause || '—'}</TableCell>
-                    </TableRow>
+                    <CdrRow key={c.id} row={c} onChanged={() => qc.invalidateQueries({ queryKey: ['cdr', 'history', domainUuid] })} />
                   ))}
                 </TableBody>
               </Table>
@@ -481,28 +475,44 @@ export default function CustomerDetail() {
               </p>
             )}
             {filteredRecordings.map((r: any) => (
-              <div key={r.id} className="border rounded-lg p-3 space-y-2">
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <div className="text-sm">
-                    <span className="font-medium">{r.caller_number ?? '—'} → {r.destination_number ?? '—'}</span>
-                    <span className="text-muted-foreground ml-2">Ext {r.extension ?? '—'} · {Math.round(r.duration_seconds ?? 0)}s · {formatDistanceToNow(new Date(r.start_at), { addSuffix: true })}</span>
-                  </div>
-                  <Button size="sm" variant="outline" disabled={recLoading === r.id} onClick={async () => {
-                    const u = await fetchRecording(r);
-                    if (u) setExpandedRec(expandedRec === r.id ? null : r.id);
-                  }}>{recLoading === r.id ? <Loader2 className="w-3 h-3 animate-spin" /> : expandedRec === r.id ? 'Hide' : 'Play'}</Button>
-                </div>
-                {expandedRec === r.id && recUrls[r.id] && <RecordingWavePlayer key={r.id} url={recUrls[r.id]} autoPlay />}
-              </div>
+              <RecordingRow
+                key={r.id} row={r}
+                expanded={expandedRec === r.id} url={recUrls[r.id]} loading={recLoading === r.id}
+                onPlay={async () => { const u = await fetchRecording(r); if (u) setExpandedRec(expandedRec === r.id ? null : r.id); }}
+                onChanged={() => qc.invalidateQueries({ queryKey: ['cdr', 'recordings', domainUuid] })}
+              />
             ))}
           </CardContent></Card>
         </TabsContent>
 
 
         <TabsContent value="moh">
-          <ReadOnlyList rows={moh as any[]} fields={['music_on_hold_name', 'music_on_hold_rate', 'music_on_hold_enabled']} />
+          <Card><CardContent className="p-4 space-y-2">
+            <p className="text-xs text-muted-foreground">MOH audio files are managed on the PBX server. Values shown are read-only.</p>
+            {(!moh || (moh as any[]).length === 0) ? (
+              <div className="py-6 text-center text-sm text-muted-foreground">No MOH entries.</div>
+            ) : (
+              <Table>
+                <TableHeader><TableRow>
+                  <TableHead>Name</TableHead><TableHead>Rate</TableHead><TableHead>Shuffle</TableHead><TableHead>Enabled</TableHead><TableHead>Path</TableHead>
+                </TableRow></TableHeader>
+                <TableBody>
+                  {(moh as any[]).map((m: any) => (
+                    <TableRow key={m.music_on_hold_uuid}>
+                      <TableCell className="font-medium">{pretty(m.music_on_hold_name)}</TableCell>
+                      <TableCell className="font-mono text-xs">{pretty(m.music_on_hold_rate)}</TableCell>
+                      <TableCell className="text-xs">{pretty(m.music_on_hold_shuffle)}</TableCell>
+                      <TableCell><Badge variant={normalize(m.music_on_hold_enabled) === 'true' ? 'default' : 'secondary'} className="text-[10px]">{normalize(m.music_on_hold_enabled) === 'true' ? 'on' : 'off'}</Badge></TableCell>
+                      <TableCell className="font-mono text-xs truncate max-w-[280px]">{pretty(m.music_on_hold_path)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent></Card>
         </TabsContent>
       </Tabs>
+
 
       {domain && (
         <>
