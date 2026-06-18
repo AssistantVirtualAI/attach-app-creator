@@ -177,6 +177,8 @@ import MyDevices from "./pages/lemtel/my/MyDevices";
 import MyGreetings from "./pages/lemtel/my/MyGreetings";
 import { DownloadCenter } from "./components/portal/DownloadCenter";
 import { AppLayout } from "./components/layout/AppLayout";
+import CustomerDomainGate from "./components/portal/CustomerDomainGate";
+import DomainDashboard from "./pages/lemtel/admin/DomainDashboard";
 
 // v4.0.0 — Multi-tenant reseller architecture
 import { WhitelabelProvider } from "./contexts/WhitelabelContext";
@@ -744,6 +746,39 @@ const App = () => (
                 <Route path="/org/lemtel/analytics/cdrs" element={<Navigate to="/org/lemtel/telephony/calls" replace />} />
                 <Route path="/org/lemtel/analytics/calls" element={<Navigate to="/org/lemtel/telephony/calls" replace />} />
                 <Route path="/org/lemtel/analytics" element={<Navigate to="/org/lemtel/telephony/calls" replace />} />
+
+                {/* Per-customer-domain phone-system cockpit (/domain/:slug/admin/*).
+                    Mirrors the Lemtel admin portal but scoped to the customer's org. */}
+                <Route path="/domain/:slug/admin" element={<Navigate to="dashboard" replace />} />
+                <Route path="/domain/:slug/admin/dashboard" element={<ProtectedRoute><CustomerDomainGate><DomainDashboard /></CustomerDomainGate></ProtectedRoute>} />
+                <Route path="/domain/:slug/admin/extensions" element={<ProtectedRoute><CustomerDomainGate><LemtelExtensions /></CustomerDomainGate></ProtectedRoute>} />
+                <Route path="/domain/:slug/admin/pbx-users" element={<ProtectedRoute><CustomerDomainGate><LemtelPbxUsers /></CustomerDomainGate></ProtectedRoute>} />
+                <Route path="/domain/:slug/admin/devices" element={<ProtectedRoute><CustomerDomainGate><LemtelDevices /></CustomerDomainGate></ProtectedRoute>} />
+                <Route path="/domain/:slug/admin/dids" element={<ProtectedRoute><CustomerDomainGate><LemtelDIDs /></CustomerDomainGate></ProtectedRoute>} />
+                <Route path="/domain/:slug/admin/numbers" element={<Navigate to="../dids" replace />} />
+                <Route path="/domain/:slug/admin/ivr" element={<ProtectedRoute><CustomerDomainGate><LemtelIVR /></CustomerDomainGate></ProtectedRoute>} />
+                <Route path="/domain/:slug/admin/queues" element={<ProtectedRoute><CustomerDomainGate><LemtelQueues /></CustomerDomainGate></ProtectedRoute>} />
+                <Route path="/domain/:slug/admin/ring-groups" element={<ProtectedRoute><CustomerDomainGate><TelephonyRingGroups /></CustomerDomainGate></ProtectedRoute>} />
+                <Route path="/domain/:slug/admin/hold-music" element={<ProtectedRoute><CustomerDomainGate><AdminHoldMusic /></CustomerDomainGate></ProtectedRoute>} />
+                <Route path="/domain/:slug/admin/recordings" element={<ProtectedRoute><CustomerDomainGate><AdminRecordings /></CustomerDomainGate></ProtectedRoute>} />
+                <Route path="/domain/:slug/admin/calls" element={<ProtectedRoute><CustomerDomainGate><TelephonyMediaCenter scope="org" /></CustomerDomainGate></ProtectedRoute>} />
+                <Route path="/domain/:slug/admin/voicemail" element={<ProtectedRoute><CustomerDomainGate><AdminVoicemail /></CustomerDomainGate></ProtectedRoute>} />
+                <Route path="/domain/:slug/admin/hours" element={<ProtectedRoute><CustomerDomainGate><BusinessHours /></CustomerDomainGate></ProtectedRoute>} />
+                <Route path="/domain/:slug/admin/time-conditions" element={<ProtectedRoute><CustomerDomainGate><AdminTimeConditions /></CustomerDomainGate></ProtectedRoute>} />
+                <Route path="/domain/:slug/admin/conferences" element={<ProtectedRoute><CustomerDomainGate><AdminConferences /></CustomerDomainGate></ProtectedRoute>} />
+                <Route path="/domain/:slug/admin/destinations" element={<ProtectedRoute><CustomerDomainGate><AdminDestinations /></CustomerDomainGate></ProtectedRoute>} />
+                <Route path="/domain/:slug/admin/call-forwarding" element={<ProtectedRoute><CustomerDomainGate><AdminCallForwarding /></CustomerDomainGate></ProtectedRoute>} />
+                <Route path="/domain/:slug/admin/recording-rules" element={<ProtectedRoute><CustomerDomainGate><AdminRecordingRules /></CustomerDomainGate></ProtectedRoute>} />
+                <Route path="/domain/:slug/admin/voicemail-settings" element={<ProtectedRoute><CustomerDomainGate><AdminVoicemailSettings /></CustomerDomainGate></ProtectedRoute>} />
+                <Route path="/domain/:slug/admin/active-calls" element={<ProtectedRoute><CustomerDomainGate><AdminActiveCalls /></CustomerDomainGate></ProtectedRoute>} />
+                <Route path="/domain/:slug/admin/registrations" element={<ProtectedRoute><CustomerDomainGate><AdminRegistrations /></CustomerDomainGate></ProtectedRoute>} />
+                <Route path="/domain/:slug/admin/reports" element={<ProtectedRoute><CustomerDomainGate><AdminReports /></CustomerDomainGate></ProtectedRoute>} />
+                <Route path="/domain/:slug/admin/sync-health" element={<ProtectedRoute><CustomerDomainGate><AdminSyncHealth /></CustomerDomainGate></ProtectedRoute>} />
+                <Route path="/domain/:slug/admin/agents" element={<ProtectedRoute><CustomerDomainGate><LemtelVoiceAgents /></CustomerDomainGate></ProtectedRoute>} />
+                <Route path="/domain/:slug/admin/settings" element={<ProtectedRoute><CustomerDomainGate><CustomerSettings /></CustomerDomainGate></ProtectedRoute>} />
+                <Route path="/domain/:slug/admin/downloads" element={<ProtectedRoute><CustomerDomainGate><DownloadCenter /></CustomerDomainGate></ProtectedRoute>} />
+
+
 
 
                 {/* v3.0 User Portal (/org/lemtel/my/*) */}
