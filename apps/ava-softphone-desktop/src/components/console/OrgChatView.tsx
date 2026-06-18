@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { theme } from '../../lib/theme';
 import { supabase } from '../../lib/supabaseClient';
 import { useTranslation } from '../../lib/i18n';
+import { mergeIncoming, mergeOnFetch } from './orgChatMerge';
+
 
 const { colors: c } = theme;
 
