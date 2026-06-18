@@ -17,9 +17,9 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
   const [filter, setFilter] = useState<'all' | 'missed' | 'recorded'>('all');
   const [number, setNumber] = useState('');
 
-  // Real-time CDR via Supabase Realtime (postgres_changes), with fallback polling
-  // when no auth/extension is available.
-  const { calls } = useRealtimeCDR(creds || null);
+  // Real-time CDR via Supabase Realtime (postgres_changes) with automatic
+  // 15s polling fallback + visible warning if the realtime channel fails.
+  const { calls, transport, warning, dismissWarning } = useRealtimeCDR(creds || null);
 
   if (selected) return <CallDetailScreen id={selected} onBack={() => setSelected(null)} />;
 
@@ -36,7 +36,18 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
 
   return (
     <div style={{ height: '100%', overflowY: 'auto', padding: '14px 14px 20px' }}>
+      {warning && (
+        <div role="status" style={{
+          marginBottom: 10, padding: '10px 12px', borderRadius: 12,
+          background: 'rgba(245,158,11,0.12)', border: `1px solid ${colors.warning}55`,
+          color: colors.warning, fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+        }}>
+          <span>⚠ {warning}</span>
+          <button onClick={dismissWarning} style={{ background: 'transparent', border: 'none', color: colors.warning, cursor: 'pointer', fontSize: 14 }}>×</button>
+        </div>
+      )}
       <SegmentedControl value={sub} onChange={setSub} />
+      {transport === 'realtime' && false /* could surface a "live" pill here */}
 
       {sub === 'dial' && (
         <div style={{ marginTop: 6 }}>
