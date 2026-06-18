@@ -1,10 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { theme } from '../../lib/theme';
 import { ava, ContactItem, ContactInteraction } from '../../lib/avaApi';
+import { supabase } from '../../lib/supabaseClient';
+import { useOrgId } from '../../lib/useOrgId';
 
 const { colors: c } = theme;
 
-type Filter = 'all' | 'favorites' | 'vip' | 'at-risk';
+type Filter = 'all' | 'favorites' | 'vip' | 'at-risk' | 'internal';
+
+const LS_MANUAL = 'ava-manual-contacts-v1';
 
 function fmtDate(iso: string) {
   const d = new Date(iso);
@@ -22,66 +26,197 @@ function fmtRel(iso: string) {
   return `${d}d ago`;
 }
 
-const LS_MANUAL = 'ava-manual-contacts-v1';
+function isOnline(status?: string | null, lastSeenAt?: string | null) {
+  if (status === 'online' || status === 'registered') return true;
+  if (!lastSeenAt) return false;
+  return Date.now() - +new Date(lastSeenAt) < 5 * 60 * 1000;
+}
+
+function dedupeByPhone(items: ContactItem[]): ContactItem[] {
+  const seen = new Map<string, ContactItem>();
+  for (const it of items) {
+    const key = (it.phone || it.id).replace(/[^\d+]/g, '').toLowerCase() || it.id;
+    if (!seen.has(key)) seen.set(key, it);
+  }
+  return Array.from(seen.values());
+}
 
 export default function ContactsView() {
+  const orgId = useOrgId();
   const [items, setItems] = useState<ContactItem[]>([]);
   const [filter, setFilter] = useState<Filter>('all');
   const [search, setSearch] = useState('');
   const [sel, setSel] = useState<ContactItem | null>(null);
   const [showAdd, setShowAdd] = useState(false);
-  const [draft, setDraft] = useState({ name: '', phone: '', company: '', email: '' });
+  const [draft, setDraft] = useState({ name: '', phone: '', email: '', company: '', notes: '' });
+  const [saving, setSaving] = useState(false);
 
-  // Edit state for the detail panel
   const [notes, setNotes] = useState('');
   const [tagDraft, setTagDraft] = useState('');
   const [savedFlash, setSavedFlash] = useState(false);
 
+  // One-time LS migration to org_contacts
+  useEffect(() => {
+    if (!orgId) return;
+    let raw: any[] = [];
+    try { raw = JSON.parse(localStorage.getItem(LS_MANUAL) || '[]'); } catch {}
+    if (!Array.isArray(raw) || raw.length === 0) return;
+    (async () => {
+      const rows = raw.map((x: any) => ({
+        organization_id: orgId, name: x.name || 'Unnamed',
+        phone: x.phone || null, email: x.email || null, company: x.company || null,
+        notes: x.notes || null, favorite: !!x.favorite, source: 'legacy-localstorage',
+      }));
+      const { error } = await (supabase as any).from('org_contacts').insert(rows);
+      if (!error) localStorage.removeItem(LS_MANUAL);
+    })();
+  }, [orgId]);
+
   const loadAll = React.useCallback(async () => {
-    const [contacts, exts] = await Promise.all([
+    const sources = await Promise.allSettled([
+      // 1. Internal softphone users (workspace extensions)
+      orgId
+        ? (supabase as any)
+            .from('pbx_softphone_users')
+            .select('id,extension,display_name,sip_domain,status,last_seen_at,account_status')
+            .eq('organization_id', orgId)
+            .order('extension')
+            .then((r: any) => r.data || [])
+        : Promise.resolve([]),
+      // 2. Workspace contacts table
+      orgId
+        ? (supabase as any)
+            .from('org_contacts')
+            .select('*')
+            .eq('organization_id', orgId)
+            .order('name')
+            .then((r: any) => r.data || [])
+        : Promise.resolve([]),
+      // 3. Legacy ava.contacts (CRM/Zoho if wired in avaApi)
       ava.contacts().catch(() => [] as ContactItem[]),
+      // 4. Legacy ava.extensions fallback (electron)
       ava.extensions().catch(() => [] as any[]),
     ]);
-    const internal: ContactItem[] = (Array.isArray(exts) ? exts : []).map((e: any) => ({
+
+    const sp = sources[0].status === 'fulfilled' ? sources[0].value : [];
+    const oc = sources[1].status === 'fulfilled' ? sources[1].value : [];
+    const ct = sources[2].status === 'fulfilled' ? sources[2].value : [];
+    const ex = sources[3].status === 'fulfilled' ? sources[3].value : [];
+
+    const internal: ContactItem[] = (Array.isArray(sp) ? sp : []).map((e: any) => {
+      const online = isOnline(e.status, e.last_seen_at);
+      return {
+        id: `sp-${e.id}`,
+        name: e.display_name || `Ext ${e.extension}`,
+        company: 'Internal · Extension',
+        phone: e.extension,
+        email: undefined,
+        lastInteraction: e.last_seen_at || new Date().toISOString(),
+        totalCalls: 0, totalMessages: 0,
+        sentiment: online ? 'positive' : 'neutral',
+        aiNote: `${online ? 'Online' : 'Offline'}${e.sip_domain ? ` · @${e.sip_domain}` : ''}`,
+        tags: ['internal', online ? 'online' : 'offline'],
+        favorite: false, interactions: [],
+        notes: undefined,
+      } as ContactItem;
+    });
+
+    const manual: ContactItem[] = (Array.isArray(oc) ? oc : []).map((x: any) => ({
+      id: `oc-${x.id}`,
+      name: x.name,
+      company: x.company || undefined,
+      phone: x.phone || '',
+      email: x.email || undefined,
+      lastInteraction: x.updated_at || x.created_at || new Date().toISOString(),
+      totalCalls: 0, totalMessages: 0,
+      sentiment: 'neutral',
+      aiNote: x.notes || 'Saved contact.',
+      tags: [x.source || 'manual'],
+      favorite: !!x.favorite,
+      interactions: [],
+      notes: x.notes || '',
+    } as ContactItem));
+
+    const extras: ContactItem[] = (Array.isArray(ex) ? ex : []).map((e: any) => ({
       id: `ext-${e.id}`,
       name: e.displayName || `Ext ${e.extension}`,
-      company: 'Internal · Extension',
+      company: 'PBX · Extension',
       phone: e.extension,
       email: e.user,
       lastInteraction: new Date().toISOString(),
       totalCalls: 0, totalMessages: 0,
       sentiment: 'neutral',
-      aiNote: `${e.enabled ? 'Active' : 'Disabled'} domain extension${e.status ? ` · ${e.status}` : ''}`,
-      tags: ['internal', e.status || 'offline'].filter(Boolean), favorite: false, interactions: [],
+      aiNote: `${e.enabled ? 'Active' : 'Disabled'}${e.status ? ` · ${e.status}` : ''}`,
+      tags: ['internal', e.status || 'offline'].filter(Boolean),
+      favorite: false, interactions: [],
     }));
-    let manual: ContactItem[] = [];
-    try { manual = JSON.parse(localStorage.getItem(LS_MANUAL) || '[]'); } catch {}
-    setItems([...(Array.isArray(contacts) ? contacts : []), ...internal, ...manual]);
-  }, []);
+
+    const all = dedupeByPhone([
+      ...internal,
+      ...manual,
+      ...(Array.isArray(ct) ? ct : []),
+      ...extras,
+    ]);
+    setItems(all);
+  }, [orgId]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
-  const addManualContact = () => {
+  // Realtime: refresh on softphone status changes + contacts inserts
+  useEffect(() => {
+    if (!orgId) return;
+    const ch = (supabase as any)
+      .channel(`contacts-${orgId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pbx_softphone_users', filter: `organization_id=eq.${orgId}` }, () => loadAll())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'org_contacts', filter: `organization_id=eq.${orgId}` }, () => loadAll())
+      .subscribe();
+    return () => { try { (supabase as any).removeChannel(ch); } catch {} };
+  }, [orgId, loadAll]);
+
+  const addManualContact = async () => {
     if (!draft.name.trim() || !draft.phone.trim()) return;
-    const next: ContactItem = {
-      id: `m-${Date.now()}`,
-      name: draft.name.trim(), phone: draft.phone.trim(),
-      company: draft.company.trim() || undefined,
-      email: draft.email.trim() || undefined,
-      lastInteraction: new Date().toISOString(),
-      totalCalls: 0, totalMessages: 0,
-      sentiment: 'neutral', aiNote: 'Manually added.',
-      tags: ['manual'], favorite: false, interactions: [],
-    };
-    const manual = items.filter((x) => x.id.startsWith('m-'));
-    const updated = [...manual, next];
-    try { localStorage.setItem(LS_MANUAL, JSON.stringify(updated)); } catch {}
-    setItems((all) => [...all, next]);
-    setDraft({ name: '', phone: '', company: '', email: '' });
+    if (!orgId) { return; }
+    setSaving(true);
+    const { error } = await (supabase as any).from('org_contacts').insert({
+      organization_id: orgId,
+      name: draft.name.trim(),
+      phone: draft.phone.trim(),
+      email: draft.email.trim() || null,
+      company: draft.company.trim() || null,
+      notes: draft.notes.trim() || null,
+      source: 'manual',
+    });
+    setSaving(false);
+    if (error) {
+      // Fallback: keep working even if RLS denies
+      try {
+        const ls = JSON.parse(localStorage.getItem(LS_MANUAL) || '[]');
+        ls.push({ ...draft, id: `m-${Date.now()}` });
+        localStorage.setItem(LS_MANUAL, JSON.stringify(ls));
+      } catch {}
+    }
+    setDraft({ name: '', phone: '', email: '', company: '', notes: '' });
     setShowAdd(false);
+    loadAll();
   };
 
-  // Sync editable state when selection changes
+  const toggleFav = async (it: ContactItem) => {
+    const next = !it.favorite;
+    setItems((all) => all.map((x) => x.id === it.id ? { ...x, favorite: next } : x));
+    if (sel?.id === it.id) setSel({ ...sel, favorite: next });
+    if (it.id.startsWith('oc-')) {
+      const uuid = it.id.replace(/^oc-/, '');
+      await (supabase as any).from('org_contacts').update({ favorite: next }).eq('id', uuid);
+    } else {
+      try { await ava.updateContact(it.id, { favorite: next }); } catch {}
+    }
+  };
+
+  const callContact = (it: ContactItem) => {
+    if (!it.phone) return;
+    try { window.dispatchEvent(new CustomEvent('lemtel:dial-number', { detail: { number: it.phone } })); } catch {}
+  };
+
   useEffect(() => {
     setNotes(sel?.notes || '');
     setTagDraft('');
@@ -93,6 +228,7 @@ export default function ContactsView() {
       if (filter === 'favorites' && !k.favorite) return false;
       if (filter === 'vip' && !k.tags.includes('vip')) return false;
       if (filter === 'at-risk' && !k.tags.includes('at-risk')) return false;
+      if (filter === 'internal' && !k.tags.includes('internal')) return false;
       if (!t) return true;
       const hay = `${k.name} ${k.company || ''} ${k.phone} ${k.email || ''} ${k.tags.join(' ')}`.toLowerCase();
       return hay.includes(t);
@@ -109,7 +245,12 @@ export default function ContactsView() {
 
   const saveNotes = async () => {
     if (!sel) return;
-    await ava.updateContact(sel.id, { notes });
+    if (sel.id.startsWith('oc-')) {
+      const uuid = sel.id.replace(/^oc-/, '');
+      await (supabase as any).from('org_contacts').update({ notes }).eq('id', uuid);
+    } else {
+      try { await ava.updateContact(sel.id, { notes }); } catch {}
+    }
     updateItem(sel.id, { notes });
     setSavedFlash(true);
     setTimeout(() => setSavedFlash(false), 1500);
@@ -118,21 +259,15 @@ export default function ContactsView() {
     const t = tagDraft.trim().toLowerCase();
     if (!sel || !t || sel.tags.includes(t)) { setTagDraft(''); return; }
     const tags = [...sel.tags, t];
-    await ava.updateContact(sel.id, { tags });
+    try { await ava.updateContact(sel.id, { tags }); } catch {}
     updateItem(sel.id, { tags });
     setTagDraft('');
   };
   const removeTag = async (t: string) => {
     if (!sel) return;
     const tags = sel.tags.filter((x) => x !== t);
-    await ava.updateContact(sel.id, { tags });
+    try { await ava.updateContact(sel.id, { tags }); } catch {}
     updateItem(sel.id, { tags });
-  };
-  const toggleFavorite = async () => {
-    if (!sel) return;
-    const favorite = !sel.favorite;
-    await ava.updateContact(sel.id, { favorite });
-    updateItem(sel.id, { favorite });
   };
 
   return (
@@ -142,7 +277,7 @@ export default function ContactsView() {
           <div>
             <h1 style={{ fontSize: 24, fontWeight: 700, color: c.textIce, margin: '0 0 4px' }}>Contacts</h1>
             <p style={{ fontSize: 12, color: c.mutedSilver, margin: 0 }}>
-              Internal extensions + external contacts · AVA notes & history.
+              Workspace extensions, saved contacts and CRM — live presence and one-click call.
             </p>
           </div>
           <button onClick={() => setShowAdd((v) => !v)} style={{
@@ -156,9 +291,10 @@ export default function ContactsView() {
           <div style={{ background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 10, padding: 12, marginBottom: 12, display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8 }}>
             <input placeholder="Name *" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} style={inputMini} />
             <input placeholder="Phone *" value={draft.phone} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} style={inputMini} />
-            <input placeholder="Company" value={draft.company} onChange={(e) => setDraft({ ...draft, company: e.target.value })} style={inputMini} />
             <input placeholder="Email" value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} style={inputMini} />
-            <button onClick={addManualContact} style={{ gridColumn: '1 / -1', padding: '8px 14px', borderRadius: 9, border: 'none', cursor: 'pointer', background: c.signalGold, color: c.midnight, fontWeight: 700, fontSize: 12 }}>Save contact</button>
+            <input placeholder="Company" value={draft.company} onChange={(e) => setDraft({ ...draft, company: e.target.value })} style={inputMini} />
+            <textarea placeholder="Notes" value={draft.notes} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} style={{ ...inputMini, gridColumn: '1 / -1', minHeight: 60, resize: 'vertical', fontFamily: 'inherit' }} />
+            <button disabled={saving} onClick={addManualContact} style={{ gridColumn: '1 / -1', padding: '8px 14px', borderRadius: 9, border: 'none', cursor: 'pointer', background: c.signalGold, color: c.midnight, fontWeight: 700, fontSize: 12, opacity: saving ? 0.5 : 1 }}>{saving ? 'Saving…' : 'Save contact'}</button>
           </div>
         )}
 
@@ -175,7 +311,7 @@ export default function ContactsView() {
         />
 
         <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
-          {(['all', 'favorites', 'vip', 'at-risk'] as Filter[]).map((f) => (
+          {(['all', 'internal', 'favorites', 'vip', 'at-risk'] as Filter[]).map((f) => (
             <button key={f} onClick={() => setFilter(f)} style={chip(filter === f)}>{f.toUpperCase()}</button>
           ))}
           <span style={{ marginLeft: 'auto', fontSize: 11, color: c.mutedSilver, alignSelf: 'center' }}>
@@ -184,31 +320,39 @@ export default function ContactsView() {
         </div>
 
         <div style={{ background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 12, overflow: 'hidden' }}>
-          {filtered.map((k) => (
-            <button key={k.id} onClick={() => setSel(k)} style={{
-              display: 'grid', gridTemplateColumns: '32px 1fr 70px 70px 70px',
-              alignItems: 'center', gap: 12, width: '100%',
-              padding: '12px 14px',
-              background: sel?.id === k.id ? 'rgba(122,76,255,0.06)' : 'transparent',
-              border: 'none', borderBottom: `1px solid ${c.border}`,
-              color: c.textIce, cursor: 'pointer', textAlign: 'left',
-            }}>
-              <span style={avatar}>{initials(k.name)}</span>
-              <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                <span style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {k.name}{k.favorite && <span style={{ color: c.signalGold, marginLeft: 6 }}>★</span>}
-                </span>
-                <span style={{ fontSize: 10.5, color: c.mutedSilver, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {k.company || k.phone}
-                </span>
-              </span>
-              <span style={{ fontSize: 11, color: c.mutedSilver, fontFamily: 'JetBrains Mono, monospace', textAlign: 'right' }}>{k.totalCalls} calls</span>
-              <span style={{ fontSize: 11, color: c.mutedSilver, textAlign: 'right' }}>{fmtDate(k.lastInteraction)}</span>
-              <span style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-                <span style={dot(sentColor(k.sentiment))}>●</span>
-              </span>
-            </button>
-          ))}
+          {filtered.map((k) => {
+            const online = k.tags.includes('online');
+            return (
+              <div key={k.id} style={{
+                display: 'grid', gridTemplateColumns: '32px 1fr 80px 90px 90px',
+                alignItems: 'center', gap: 12, width: '100%',
+                padding: '10px 14px',
+                background: sel?.id === k.id ? 'rgba(122,76,255,0.06)' : 'transparent',
+                borderBottom: `1px solid ${c.border}`, color: c.textIce,
+              }}>
+                <button onClick={() => setSel(k)} style={{ ...avatar, border: 'none', cursor: 'pointer', position: 'relative' }}>
+                  {initials(k.name)}
+                  {k.tags.includes('internal') && (
+                    <span style={{
+                      position: 'absolute', bottom: -2, right: -2, width: 10, height: 10, borderRadius: '50%',
+                      background: online ? c.success : c.mutedSilver, border: `2px solid ${c.bgCard}`,
+                    }} />
+                  )}
+                </button>
+                <button onClick={() => setSel(k)} style={{ background: 'transparent', border: 'none', textAlign: 'left', cursor: 'pointer', minWidth: 0, color: c.textIce }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {k.name}{k.favorite && <span style={{ color: c.signalGold, marginLeft: 6 }}>★</span>}
+                  </div>
+                  <div style={{ fontSize: 10.5, color: c.mutedSilver, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {k.company || k.phone}
+                  </div>
+                </button>
+                <span style={{ fontSize: 11, color: c.mutedSilver, fontFamily: 'JetBrains Mono, monospace', textAlign: 'right' }}>{k.phone}</span>
+                <button onClick={() => toggleFav(k)} title="Favorite" style={{ background: 'transparent', border: `1px solid ${c.border}`, borderRadius: 8, padding: '4px 8px', color: k.favorite ? c.signalGold : c.mutedSilver, cursor: 'pointer', fontSize: 14 }}>{k.favorite ? '★' : '☆'}</button>
+                <button onClick={() => callContact(k)} disabled={!k.phone} style={{ background: c.signalGold, border: 'none', borderRadius: 8, padding: '6px 10px', color: c.midnight, fontSize: 11, fontWeight: 700, cursor: k.phone ? 'pointer' : 'not-allowed', opacity: k.phone ? 1 : 0.4 }}>📞 Call</button>
+              </div>
+            );
+          })}
           {filtered.length === 0 && (
             <div style={{ padding: 28, textAlign: 'center', color: c.mutedSilver, fontSize: 12 }}>No contacts match.</div>
           )}
@@ -228,7 +372,7 @@ export default function ContactsView() {
               <div style={{ minWidth: 0, flex: 1 }}>
                 <h2 style={{ fontSize: 17, color: c.textIce, margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
                   {sel.name}
-                  <button onClick={toggleFavorite} title="Toggle favorite" style={{
+                  <button onClick={() => toggleFav(sel)} title="Toggle favorite" style={{
                     background: 'transparent', border: 'none', cursor: 'pointer',
                     color: sel.favorite ? c.signalGold : c.mutedSilver, fontSize: 16,
                   }}>{sel.favorite ? '★' : '☆'}</button>
@@ -313,7 +457,7 @@ export default function ContactsView() {
             </Panel>
 
             <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-              <button style={btnPrimary}>Call</button>
+              <button onClick={() => callContact(sel)} style={btnPrimary}>📞 Call</button>
               <button style={btnGhost}>Message</button>
             </div>
           </>
@@ -370,7 +514,6 @@ const chip = (active: boolean): React.CSSProperties => ({
   color: active ? c.avaViolet : c.mutedSilver,
   fontSize: 10, fontWeight: 700, letterSpacing: 1, cursor: 'pointer',
 });
-const dot = (col: string): React.CSSProperties => ({ color: col, fontSize: 9 });
 const tag = (col: string): React.CSSProperties => ({
   fontSize: 10, padding: '3px 8px', borderRadius: 999,
   background: 'rgba(255,255,255,0.04)', color: col,
