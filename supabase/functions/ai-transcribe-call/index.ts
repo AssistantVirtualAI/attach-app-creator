@@ -221,9 +221,12 @@ Deno.serve(async (req) => {
       return json({ transcript_text: fallbackTranscript, stub: true, reason: "missing-ai-key", fetchErrors });
     }
     if (!audioBytes || audioBytes.length === 0) {
-      await writeTranscript(fallbackTranscript, "stub-no-audio");
-      await audit("no-audio", { error_code: "no-audio", message: `fetch errors: ${fetchErrors.join("; ") || "none"}`, metadata: { fetchErrors } });
-      return json({ transcript_text: fallbackTranscript, stub: true, reason: "no-audio", fetchErrors }, 200);
+      // Friendlier reason when there's no recording metadata at all yet.
+      const hasAnyPath = !!(recording_path || call?.recording_path || recording_name || call?.recording_name || sourceUrl);
+      const reason = hasAnyPath ? "no-audio" : "recording-not-synced";
+      await writeTranscript(fallbackTranscript, `stub-${reason}`);
+      await audit(reason, { error_code: reason, message: `fetch errors: ${fetchErrors.join("; ") || "none"}`, metadata: { fetchErrors } });
+      return json({ transcript_text: fallbackTranscript, stub: true, reason, fetchErrors }, 200);
     }
 
     // Gemini supports inline audio up to ~20MB
