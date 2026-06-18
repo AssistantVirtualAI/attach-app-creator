@@ -8,15 +8,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Phone, Plus, MessageSquare, Loader2, Pencil, Route, CheckCircle2 } from 'lucide-react';
+import { Phone, Plus, MessageSquare, Loader2, Pencil, Route, CheckCircle2, ArrowRightLeft } from 'lucide-react';
 import { LEMTEL_ORG, usePbxExtensions, usePbxIvrs, usePbxPhoneNumbers, usePbxPhoneNumberAssignments, usePbxClients, usePbxQueues, usePbxRingGroups } from '@/hooks/usePbxData';
 import { PbxRefreshButton } from '@/components/lemtel/PbxRefreshButton';
 import { SyncEverythingButton } from '@/components/lemtel/SyncEverythingButton';
 import { OrderDIDModal } from '@/components/lemtel/OrderDIDModal';
+import PortingRequestDialog from '@/components/lemtel/PortingRequestDialog';
+import { useActiveDomain } from '@/hooks/useActiveDomain';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLanguage } from '@/context/LanguageContext';
+
 
 const label = {
   en: { title: 'Phone Numbers (DIDs)', subtitle: 'Provisioned numbers, inbound routing, SMS and destination sync.', order: 'Order DID', route: 'Edit routing', empty: 'No phone numbers yet — order or sync DIDs to start routing inbound calls.', number: 'Number', customer: 'Customer', provider: 'Provider', routing: 'Routing', sms: 'SMS', monthly: 'Monthly', status: 'Status', destinationType: 'Destination type', destination: 'Destination', save: 'Save routing', cancel: 'Cancel', synced: 'Routing synced', failed: 'Routing sync failed', notConfigured: 'Not routed' },
