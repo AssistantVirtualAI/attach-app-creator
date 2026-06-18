@@ -353,39 +353,31 @@ export default function CustomerDetail() {
 
         <TabsContent value="ivr" className="space-y-2">
           <div className="flex justify-end"><Button size="sm" onClick={() => setIvrOpen(true)}>+ New IVR</Button></div>
-          <Card><CardContent className="p-0">
-            {(!ivrs || (ivrs as any[]).length === 0) ? (
-              <div className="py-8 text-center text-sm text-muted-foreground">No IVR menus.</div>
-            ) : (
-              <Table>
-                <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Extension</TableHead><TableHead>Enabled</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
-                <TableBody>
-                  {(ivrs as any[]).map((r: any) => {
-                    const en = String(r.ivr_menu_enabled) === 'true';
-                    return (
-                      <TableRow key={r.ivr_menu_uuid}>
-                        <TableCell>{r.ivr_menu_name}</TableCell>
-                        <TableCell className="font-mono">{r.ivr_menu_extension}</TableCell>
-                        <TableCell><Badge variant={en ? 'default' : 'secondary'}>{en ? 'on' : 'off'}</Badge></TableCell>
-                        <TableCell className="text-right space-x-1">
-                          <Button size="sm" variant="outline" onClick={() => setManageIvr(r)}>Options</Button>
-                          <Button size="sm" variant="ghost" title={en ? 'Disable' : 'Enable'}
-                            onClick={async () => { if (await pbxWrite('update-ivr', { ivr_menu_uuid: r.ivr_menu_uuid, ivr_menu_enabled: en ? 'false' : 'true' }, 'IVR updated')) refetchIvrs(); }}>
-                            <Power className="w-3 h-3" />
-                          </Button>
-                          <Button size="sm" variant="ghost" title="Delete"
-                            onClick={async () => { if (confirm(`Delete IVR ${r.ivr_menu_name}?`) && await pbxWrite('delete-ivr', { ivr_menu_uuid: r.ivr_menu_uuid }, 'IVR deleted')) refetchIvrs(); }}>
-                            <Trash2 className="w-3 h-3 text-destructive" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent></Card>
+          {(!ivrs || (ivrs as any[]).length === 0) ? (
+            <Card><CardContent className="py-8 text-center text-sm text-muted-foreground">No IVR menus.</CardContent></Card>
+          ) : (
+            <>
+              <EditableList
+                rows={ivrs as any[]}
+                idKey="ivr_menu_uuid"
+                fields={['ivr_menu_name', 'ivr_menu_extension', 'ivr_menu_greet_long']}
+                editableFields={['ivr_menu_name', 'ivr_menu_extension', 'ivr_menu_greet_long']}
+                enabledKey="ivr_menu_enabled"
+                onToggle={async (r, en) => { if (await pbxWrite('update-ivr', { ivr_menu_uuid: r.ivr_menu_uuid, ivr_menu_enabled: en ? 'true' : 'false' }, 'IVR updated')) refetchIvrs(); }}
+                onSave={async (r, patch) => { const ok = await pbxWrite('update-ivr', { ivr_menu_uuid: r.ivr_menu_uuid, ...patch }, 'IVR saved'); if (ok) refetchIvrs(); return ok; }}
+                onDelete={async (r) => { if (confirm(`Delete IVR ${r.ivr_menu_name}?`) && await pbxWrite('delete-ivr', { ivr_menu_uuid: r.ivr_menu_uuid }, 'IVR deleted')) refetchIvrs(); }}
+              />
+              <div className="flex flex-wrap gap-2 pt-2">
+                {(ivrs as any[]).map((r: any) => (
+                  <Button key={r.ivr_menu_uuid} size="sm" variant="outline" onClick={() => setManageIvr(r)}>
+                    Options · {pretty(r.ivr_menu_name)}
+                  </Button>
+                ))}
+              </div>
+            </>
+          )}
         </TabsContent>
+
 
         <TabsContent value="queues" className="space-y-2">
           <div className="flex justify-end"><Button size="sm" onClick={() => setQueueOpen(true)}>+ New Queue</Button></div>
