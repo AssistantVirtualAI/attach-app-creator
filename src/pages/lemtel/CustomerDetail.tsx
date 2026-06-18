@@ -1,9 +1,8 @@
-import { useMemo, useRef, useState } from 'react';
+import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -11,18 +10,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { ArrowLeft, Globe, Loader2, RefreshCw, LogIn, Upload, UserPlus, Mail, Link2 } from 'lucide-react';
+import { ArrowLeft, Globe, Loader2, RefreshCw, LogIn, Link2, Trash2, Power, Mail, Link as LinkIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { RecordingWavePlayer } from '@/components/portal/RecordingWavePlayer';
 import { formatDistanceToNow } from 'date-fns';
 import { loadPbxRecordingAudio } from '@/lib/pbxRecordingAudio';
 import { useImpersonation } from '@/contexts/ImpersonationContext';
-import SendAppInviteButtons from '@/components/lemtel/SendAppInviteButtons';
 import { IvrCreateDialog } from '@/components/lemtel/IvrCreateDialog';
 import { RingGroupCreateDialog } from '@/components/lemtel/RingGroupCreateDialog';
 import { QueueCreateDialog } from '@/components/lemtel/QueueCreateDialog';
 import { PhoneNumbersTab } from '@/components/lemtel/PhoneNumbersTab';
 import { IvrOptionsDialog } from '@/components/lemtel/IvrOptionsDialog';
+import { ExtensionsPanel, type LiveState } from '@/components/lemtel/ExtensionsPanel';
+import { LEMTEL_ORG_ID } from '@/hooks/useLemtelAccess';
 
 async function pbxList(action: string, domain_uuid: string) {
   const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
@@ -32,36 +32,29 @@ async function pbxList(action: string, domain_uuid: string) {
   return data?.data || data?.[Object.keys(data || {})[0]] || [];
 }
 
+const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+
 export default function CustomerDetail() {
   const { domainUuid = '' } = useParams();
   const qc = useQueryClient();
   const impersonation = useImpersonation();
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [tab, setTab] = useState('users');
+  const [tab, setTab] = useState('extensions');
   const [recUrls, setRecUrls] = useState<Record<string, string>>({});
   const [recLoading, setRecLoading] = useState<string | null>(null);
   const [expandedRec, setExpandedRec] = useState<string | null>(null);
-  const [importing, setImporting] = useState(false);
-  const [importReport, setImportReport] = useState<any>(null);
-  const [addOpen, setAddOpen] = useState(false);
   const [ivrOpen, setIvrOpen] = useState(false);
   const [manageIvr, setManageIvr] = useState<any | null>(null);
   const [rgOpen, setRgOpen] = useState(false);
   const [queueOpen, setQueueOpen] = useState(false);
-  const [createdCreds, setCreatedCreds] = useState<any>(null);
-  const genPass = (len = 14) => Array.from(crypto.getRandomValues(new Uint8Array(len))).map(b => 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'[b % 54]).join('');
-  const genPin = () => String(Math.floor(1000 + Math.random() * 9000));
-  const [addForm, setAddForm] = useState({
-    extension: '', firstName: '', lastName: '', email: '', phone: '',
-    sip_password: '', caller_id_number: '', vm_enabled: true, vm_pin: '',
-    assign_phone_number: '', send_welcome_email: true,
-  });
+  const [syncing, setSyncing] = useState(false);
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [linkName, setLinkName] = useState('');
+  const [linkEmail, setLinkEmail] = useState('');
+  const [linking, setLinking] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<'org_admin' | 'manager'>('org_admin');
-  const [inviteResult, setInviteResult] = useState<{ link?: string; email?: string } | null>(null);
 
-  // Domain info + tenant org
   const { data: domain } = useQuery({
     queryKey: ['fpbx', 'domain', domainUuid],
     queryFn: async () => {
@@ -70,7 +63,7 @@ export default function CustomerDetail() {
     },
   });
 
-  const { data: org } = useQuery({
+  const { data: org, refetch: refetchOrg } = useQuery({
     queryKey: ['org', 'by-domain', domainUuid],
     queryFn: async () => {
       const { data } = await (supabase as any).rpc('get_org_by_fusionpbx_domain', { _domain_uuid: domainUuid });
@@ -78,47 +71,47 @@ export default function CustomerDetail() {
     },
   });
 
-  // Softphone users (DB-backed for app-access toggle)
-  const { data: spUsers = [], refetch: refetchSP } = useQuery({
-    queryKey: ['softphone_users', domainUuid, domain?.domain_name],
-    enabled: !!domain,
-    queryFn: async () => {
-      const { data } = await (supabase as any).from('pbx_softphone_users')
-        .select('id,extension,display_name,sip_domain,status,app_access_enabled,desktop_access_enabled,mobile_access_enabled,portal_user_id,account_status')
-        .ilike('sip_domain', `%${domain.domain_name}%`)
-        .order('extension');
-      return data || [];
-    },
-  });
+  const orgId = org?.id || LEMTEL_ORG_ID;
 
-  // Extensions (live FusionPBX)
-  const { data: extensions = [], isLoading: loadingExt } = useQuery({
+  // Live PBX data per tab
+  const { data: extensions = [], refetch: refetchExt, isLoading: loadingExt } = useQuery({
     queryKey: ['fpbx', 'extensions', domainUuid],
     queryFn: () => pbxList('list-extensions', domainUuid),
-    enabled: tab === 'extensions',
+    enabled: !!domain,
   });
-  const { data: ivrs = [] } = useQuery({
+  const liveExtState: LiveState = { exts: (extensions as any[]) || [] };
+
+  const { data: ivrs = [], refetch: refetchIvrs } = useQuery({
     queryKey: ['fpbx', 'ivrs', domainUuid],
     queryFn: () => pbxList('list-ivrs', domainUuid),
-    enabled: tab === 'ivr',
+    enabled: tab === 'ivr' && !!domain,
   });
-  const { data: queues = [] } = useQuery({
+  const { data: queues = [], refetch: refetchQueues } = useQuery({
     queryKey: ['fpbx', 'queues', domainUuid],
     queryFn: () => pbxList('list-queues', domainUuid),
-    enabled: tab === 'queues',
+    enabled: (tab === 'queues' || tab === 'ivr' || tab === 'numbers') && !!domain,
   });
-  const { data: ringGroups = [] } = useQuery({
+  const { data: ringGroups = [], refetch: refetchRG } = useQuery({
     queryKey: ['fpbx', 'rg', domainUuid],
     queryFn: () => pbxList('list-ring-groups', domainUuid),
-    enabled: tab === 'ringgroups',
+    enabled: (tab === 'ringgroups' || tab === 'ivr' || tab === 'numbers') && !!domain,
+  });
+  const { data: devices = [], refetch: refetchDevices } = useQuery({
+    queryKey: ['fpbx', 'devices', domainUuid],
+    queryFn: () => pbxList('list-devices', domainUuid),
+    enabled: tab === 'devices' && !!domain,
+  });
+  const { data: destinations = [], refetch: refetchDest } = useQuery({
+    queryKey: ['fpbx', 'destinations', domainUuid],
+    queryFn: () => pbxList('list-destinations', domainUuid),
+    enabled: tab === 'destinations' && !!domain,
   });
   const { data: moh = [] } = useQuery({
     queryKey: ['fpbx', 'moh', domainUuid],
     queryFn: () => pbxList('list-moh', domainUuid),
-    enabled: tab === 'moh',
+    enabled: tab === 'moh' && !!domain,
   });
 
-  // Recordings: CDRs with has_recording for this domain
   const { data: recordings = [] } = useQuery({
     queryKey: ['cdr', 'recordings', domainUuid],
     queryFn: async () => {
@@ -133,32 +126,78 @@ export default function CustomerDetail() {
     enabled: tab === 'recordings',
   });
 
-  const togglePlatformAccess = async (id: string, platform: 'app' | 'desktop' | 'mobile', enabled: boolean) => {
-    const { error } = await (supabase as any).rpc('set_softphone_platform_access', { _softphone_id: id, _platform: platform, _enabled: enabled });
-    if (error) return toast.error(error.message);
-    const label = platform === 'app' ? 'App' : platform === 'desktop' ? 'Desktop' : 'Mobile';
-    toast.success(enabled ? `${label} access enabled` : `${label} access revoked`);
-    refetchSP();
-  };
+  const { data: callHistory = [] } = useQuery({
+    queryKey: ['cdr', 'history', domainUuid],
+    queryFn: async () => {
+      const { data } = await (supabase as any).from('pbx_call_records')
+        .select('id,start_at,duration_seconds,caller_number,destination_number,extension,hangup_cause,direction')
+        .eq('domain_uuid', domainUuid)
+        .order('start_at', { ascending: false })
+        .limit(200);
+      return data || [];
+    },
+    enabled: tab === 'history',
+  });
 
+  // Full sync from PBX
   const syncAll = async () => {
-    toast.loading('Syncing…', { id: 'sync' });
-    const { error } = await supabase.functions.invoke('fusionpbx-proxy', {
-      body: { action: 'sync-all', resources: ['extensions', 'queues', 'ivrs', 'ring_groups'], organization_id: org?.id || '71755d33-ed64-4ad5-a828-61c9d2029eb7', domain_uuid: domainUuid },
-    });
-    toast.dismiss('sync');
-    if (error) return toast.error(error.message);
-    toast.success('Sync complete');
-    qc.invalidateQueries({ queryKey: ['fpbx'] });
+    setSyncing(true);
+    toast.loading('Syncing all resources from PBX…', { id: 'sync' });
+    try {
+      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
+        body: {
+          action: 'sync-all',
+          resources: ['extensions', 'devices', 'ivrs', 'queues', 'ring_groups', 'gateways', 'destinations', 'users', 'cdrs'],
+          organization_id: orgId,
+          domain_uuid: domainUuid,
+        },
+      });
+      if (error) throw error;
+      // Best-effort additional syncs
+      await Promise.allSettled([
+        supabase.functions.invoke('fusionpbx-proxy', { body: { action: 'sync-ivr-options', organization_id: orgId, domain_uuid: domainUuid } }),
+        supabase.functions.invoke('fusionpbx-proxy', { body: { action: 'sync-voicemail-messages', organization_id: orgId, domain_uuid: domainUuid } }),
+      ]);
+      const stats = (data as any)?.stats || {};
+      const parts = Object.entries(stats).filter(([, v]) => typeof v === 'number').map(([k, v]) => `${v} ${k}`);
+      toast.success(parts.length ? `Synced: ${parts.join(', ')}` : 'Sync complete', { id: 'sync' });
+      qc.invalidateQueries({ queryKey: ['fpbx'] });
+      qc.invalidateQueries({ queryKey: ['cdr'] });
+    } catch (e: any) {
+      toast.error(e?.message || 'Sync failed', { id: 'sync' });
+    } finally {
+      setSyncing(false);
+    }
   };
 
   const impersonate = async () => {
-    if (!domain) return;
-    if (!org) { toast.error('No tenant org linked'); return; }
+    if (!domain || !org) { toast.error('No tenant org linked'); return; }
     sessionStorage.setItem('lemtel.activeDomain', JSON.stringify({ uuid: domainUuid, name: domain.domain_name, org_id: org.id }));
     await impersonation.enter(org.id, org.name);
     toast.success(`Now managing ${domain.domain_name}`);
-    window.location.href = '/console';
+    window.location.href = org.slug ? `/domain/${org.slug}/admin/dashboard` : '/console';
+  };
+
+  const linkTenantOrg = async () => {
+    if (!domain || !linkName) { toast.error('Name required'); return; }
+    setLinking(true);
+    try {
+      const { error } = await (supabase as any).rpc('setup_customer_organization', {
+        _name: linkName,
+        _slug: slugify(linkName),
+        _domain_uuid: domainUuid,
+        _domain_name: domain.domain_name,
+        _admin_email: linkEmail || null,
+      });
+      if (error) throw error;
+      toast.success('Tenant organization linked');
+      setLinkOpen(false);
+      refetchOrg();
+    } catch (e: any) {
+      toast.error(e?.message || 'Link failed');
+    } finally {
+      setLinking(false);
+    }
   };
 
   const copyPortalLink = () => {
@@ -168,115 +207,38 @@ export default function CustomerDetail() {
     toast.success('Portal link copied');
   };
 
-  const parseCsv = (text: string): any[] => {
-    const lines = text.split(/\r?\n/).filter(l => l.trim());
-    if (!lines.length) return [];
-    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-    return lines.slice(1).map(line => {
-      const cells = line.split(',').map(c => c.trim());
-      const row: any = {};
-      headers.forEach((h, i) => { row[h] = cells[i] || ''; });
-      return row;
-    });
-  };
-
-  const handleCsvFile = async (f: File) => {
-    if (!org || !domain) { toast.error('Tenant or domain missing'); return; }
-    setImporting(true);
-    setImportReport(null);
-    try {
-      const text = await f.text();
-      const rows = parseCsv(text);
-      if (!rows.length) { toast.error('CSV empty'); return; }
-      const { data, error } = await supabase.functions.invoke('customer-users-import', {
-        body: {
-          organizationId: org.id,
-          domain_uuid: domainUuid,
-          domain_name: domain.domain_name,
-          users: rows,
-        },
-      });
-      if (error) throw error;
-      setImportReport(data);
-      toast.success(`Imported ${(data as any)?.succeeded || 0}/${(data as any)?.total || rows.length}`);
-      refetchSP();
-    } catch (e: any) {
-      toast.error(e.message || 'Import failed');
-    } finally { setImporting(false); if (fileRef.current) fileRef.current.value = ''; }
-  };
-
-  const handleAddUser = async () => {
-    if (!org || !domain || !addForm.extension) { toast.error('Extension required'); return; }
-    const displayName = `${addForm.firstName} ${addForm.lastName}`.trim();
-    const password = addForm.sip_password || genPass();
-    const vmPin = addForm.vm_pin || genPin();
-    const userPayload = {
-      extension: addForm.extension,
-      name: displayName || undefined,
-      email: addForm.email || undefined,
-      password,
-      caller_id_name: displayName || undefined,
-      caller_id_number: addForm.caller_id_number || undefined,
-      voicemail_enabled: addForm.vm_enabled,
-      voicemail_pin: vmPin,
-      assign_phone_number: addForm.assign_phone_number || undefined,
-    };
-    const { data, error } = await supabase.functions.invoke('customer-users-import', {
-      body: {
-        organizationId: org.id,
-        domain_uuid: domainUuid,
-        domain_name: domain.domain_name,
-        send_welcome_email: addForm.send_welcome_email,
-        users: [userPayload],
-      },
-    });
-    if (error) return toast.error(error.message);
-    const r = (data as any)?.results?.[0];
-    if (r?.ok) {
-      toast.success(`Extension ${addForm.extension} added`);
-      setCreatedCreds({
-        sip_domain: domain.domain_name,
-        extension: addForm.extension,
-        password,
-        wss: 'wss://node.lemtelcloud.net:7443',
-        vm_pin: addForm.vm_enabled ? vmPin : null,
-        email: addForm.email,
-      });
-      setAddOpen(false);
-      setAddForm({ extension: '', firstName: '', lastName: '', email: '', phone: '', sip_password: '', caller_id_number: '', vm_enabled: true, vm_pin: '', assign_phone_number: '', send_welcome_email: true });
-      refetchSP();
-    }
-    else toast.error(r?.error || 'Add failed');
-  };
-
-  const suggestExtension = () => {
-    const nums = (spUsers as any[]).map(u => parseInt(u.extension, 10)).filter(Number.isFinite);
-    const next = nums.length ? Math.max(...nums) + 1 : 1001;
-    setAddForm(f => ({ ...f, extension: String(next), sip_password: f.sip_password || genPass(), vm_pin: f.vm_pin || genPin() }));
-  };
-
   const handleInvite = async () => {
     if (!org || !inviteEmail) { toast.error('Email + linked tenant required'); return; }
-    setInviteResult(null);
-    const { data, error } = await supabase.functions.invoke('customer-invite-admin', {
+    const { error } = await supabase.functions.invoke('customer-invite-admin', {
       body: { organizationId: org.id, email: inviteEmail, role: inviteRole },
     });
     if (error) return toast.error(error.message);
-    toast.success(`Invite sent · ${inviteRole} assigned to ${org.name}`);
-    const link = (data as any)?.invite_url || (data as any)?.action_link;
-    setInviteResult({ link, email: inviteEmail });
+    toast.success(`Invite sent · ${inviteRole}`);
+    setInviteOpen(false);
+    setInviteEmail('');
   };
 
+  // Generic per-row PBX write
+  const pbxWrite = async (action: string, params: any, label: string) => {
+    try {
+      const { error } = await supabase.functions.invoke('pbx-write', {
+        body: { organizationId: orgId, action, params: { domain_uuid: domainUuid, ...params } },
+      });
+      if (error) throw error;
+      toast.success(label);
+      return true;
+    } catch (e: any) {
+      toast.error(e?.message || 'Action failed');
+      return false;
+    }
+  };
 
   const fetchRecording = async (r: any) => {
     if (recUrls[r.id]) return recUrls[r.id];
-    if (!r.pbx_uuid && !(r.recording_path && r.recording_name)) {
-      toast.error('Missing recording metadata');
-      return;
-    }
+    if (!r.pbx_uuid && !(r.recording_path && r.recording_name)) { toast.error('Missing recording metadata'); return; }
     setRecLoading(r.id);
     try {
-      const url = await loadPbxRecordingAudio(r, org?.id || '71755d33-ed64-4ad5-a828-61c9d2029eb7');
+      const url = await loadPbxRecordingAudio(r, orgId);
       setRecUrls(s => ({ ...s, [r.id]: url }));
       return url;
     } catch (e: any) {
@@ -294,93 +256,59 @@ export default function CustomerDetail() {
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Globe className="w-6 h-6" /> {domain?.domain_name || domainUuid}
           </h1>
-          <p className="text-sm text-muted-foreground">
-            {org ? <>Tenant: <strong>{org.name}</strong></> : 'Not linked to a tenant'}
+          <p className="text-sm text-muted-foreground flex items-center gap-2 mt-0.5">
+            {org ? (
+              <Badge variant="default" className="text-[10px]">Linked · {org.name}</Badge>
+            ) : (
+              <Badge variant="secondary" className="text-[10px] bg-amber-500/20 text-amber-700 dark:text-amber-300">No tenant org — click Link tenant</Badge>
+            )}
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={copyPortalLink}><Link2 className="w-4 h-4 mr-2" /> Portal link</Button>
-          <Button variant="outline" size="sm" onClick={syncAll}><RefreshCw className="w-4 h-4 mr-2" /> Sync</Button>
-          <Button size="sm" onClick={impersonate} disabled={!org}><LogIn className="w-4 h-4 mr-2" /> Manage as this tenant</Button>
+          <Button variant="outline" size="sm" onClick={syncAll} disabled={syncing}>
+            {syncing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />} Full sync from PBX
+          </Button>
+          {org ? (
+            <>
+              <Button variant="outline" size="sm" onClick={() => setInviteOpen(true)}><Mail className="w-4 h-4 mr-2" /> Invite admin</Button>
+              <Button size="sm" onClick={impersonate}><LogIn className="w-4 h-4 mr-2" /> Manage as this tenant</Button>
+            </>
+          ) : (
+            <Button size="sm" onClick={() => { setLinkName(domain?.domain_description || (domain?.domain_name || '').split('.')[0] || ''); setLinkOpen(true); }}>
+              <LinkIcon className="w-4 h-4 mr-2" /> Link tenant org
+            </Button>
+          )}
         </div>
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="flex flex-wrap">
-          <TabsTrigger value="users">Users ({spUsers.length})</TabsTrigger>
-          <TabsTrigger value="extensions">Extensions</TabsTrigger>
-          <TabsTrigger value="ivr">IVR</TabsTrigger>
-          <TabsTrigger value="queues">Queues</TabsTrigger>
-          <TabsTrigger value="ringgroups">Ring Groups</TabsTrigger>
+          <TabsTrigger value="extensions">Extensions ({(extensions as any[]).length})</TabsTrigger>
+          <TabsTrigger value="ivr">IVR ({(ivrs as any[]).length})</TabsTrigger>
+          <TabsTrigger value="queues">Queues ({(queues as any[]).length})</TabsTrigger>
+          <TabsTrigger value="ringgroups">Ring Groups ({(ringGroups as any[]).length})</TabsTrigger>
+          <TabsTrigger value="devices">Devices</TabsTrigger>
+          <TabsTrigger value="destinations">Destinations</TabsTrigger>
           <TabsTrigger value="numbers">Phone Numbers</TabsTrigger>
+          <TabsTrigger value="history">Call History</TabsTrigger>
           <TabsTrigger value="recordings">Recordings</TabsTrigger>
           <TabsTrigger value="moh">Music on Hold</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="users" className="space-y-3">
-          <div className="flex items-center gap-2 flex-wrap">
-            <input
-              ref={fileRef} type="file" accept=".csv,text/csv" className="hidden"
-              onChange={(e) => e.target.files?.[0] && handleCsvFile(e.target.files[0])}
+        <TabsContent value="extensions">
+          <Card><CardContent className="p-4">
+            <ExtensionsPanel
+              domainUuid={domainUuid}
+              domainName={domain?.domain_name || ''}
+              organizationId={orgId}
+              live={liveExtState}
+              loading={loadingExt}
+              onChanged={() => refetchExt()}
             />
-            <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()} disabled={importing || !org}>
-              {importing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
-              Import CSV
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => setAddOpen(true)} disabled={!org}>
-              <UserPlus className="w-4 h-4 mr-2" /> Add user
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => setInviteOpen(true)} disabled={!org}>
-              <Mail className="w-4 h-4 mr-2" /> Invite admin
-            </Button>
-            <span className="text-xs text-muted-foreground ml-2">
-              CSV columns: <code>extension,name,email,password,voicemail_pin,outbound_cid</code>
-            </span>
-          </div>
-          {importReport && (
-            <Card><CardContent className="p-3 text-xs space-y-1">
-              <div className="font-medium">Import: {importReport.succeeded}/{importReport.total} succeeded · {importReport.failed} failed</div>
-              {importReport.results?.filter((r: any) => !r.ok).slice(0, 10).map((r: any, i: number) => (
-                <div key={i} className="text-destructive">Ext {r.extension}: {r.error}</div>
-              ))}
-            </CardContent></Card>
-          )}
-          <Card><CardContent className="p-0">
-            <Table>
-              <TableHeader><TableRow>
-                <TableHead>Ext</TableHead><TableHead>Name</TableHead><TableHead>SIP Domain</TableHead>
-                <TableHead>Status</TableHead><TableHead className="text-right">App</TableHead><TableHead className="text-right">Desktop</TableHead><TableHead className="text-right">Mobile</TableHead><TableHead className="text-right">Invite</TableHead>
-              </TableRow></TableHeader>
-              <TableBody>
-                {spUsers.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">No users. Run Sync.</TableCell></TableRow>}
-                {spUsers.map((u: any) => (
-                  <TableRow key={u.id}>
-                    <TableCell className="font-mono">{u.extension}</TableCell>
-                    <TableCell>{u.display_name || '—'}</TableCell>
-                    <TableCell className="font-mono text-xs">{u.sip_domain}</TableCell>
-                    <TableCell><Badge variant={u.status === 'online' ? 'default' : 'secondary'}>{u.status || 'offline'}</Badge></TableCell>
-                    <TableCell className="text-right">
-                      <Switch checked={u.app_access_enabled !== false} onCheckedChange={(v) => togglePlatformAccess(u.id, 'app', v)} />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Switch checked={u.desktop_access_enabled !== false} disabled={u.app_access_enabled === false} onCheckedChange={(v) => togglePlatformAccess(u.id, 'desktop', v)} />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Switch checked={u.mobile_access_enabled !== false} disabled={u.app_access_enabled === false} onCheckedChange={(v) => togglePlatformAccess(u.id, 'mobile', v)} />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <SendAppInviteButtons portalUserId={u.portal_user_id} organizationId={org?.id} />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
           </CardContent></Card>
         </TabsContent>
 
-        <TabsContent value="extensions">
-          <SimpleList loading={loadingExt} rows={extensions} fields={['extension', 'effective_caller_id_name', 'enabled']} />
-        </TabsContent>
         <TabsContent value="ivr" className="space-y-2">
           <div className="flex justify-end"><Button size="sm" onClick={() => setIvrOpen(true)}>+ New IVR</Button></div>
           <Card><CardContent className="p-0">
@@ -390,35 +318,110 @@ export default function CustomerDetail() {
               <Table>
                 <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Extension</TableHead><TableHead>Enabled</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
                 <TableBody>
-                  {(ivrs as any[]).map((r: any) => (
-                    <TableRow key={r.ivr_menu_uuid}>
-                      <TableCell>{r.ivr_menu_name}</TableCell>
-                      <TableCell className="font-mono">{r.ivr_menu_extension}</TableCell>
-                      <TableCell><Badge variant={String(r.ivr_menu_enabled) === 'true' ? 'default' : 'secondary'}>{String(r.ivr_menu_enabled)}</Badge></TableCell>
-                      <TableCell className="text-right">
-                        <Button size="sm" variant="outline" onClick={() => setManageIvr(r)}>Manage options</Button>
-                      </TableCell>
+                  {(ivrs as any[]).map((r: any) => {
+                    const en = String(r.ivr_menu_enabled) === 'true';
+                    return (
+                      <TableRow key={r.ivr_menu_uuid}>
+                        <TableCell>{r.ivr_menu_name}</TableCell>
+                        <TableCell className="font-mono">{r.ivr_menu_extension}</TableCell>
+                        <TableCell><Badge variant={en ? 'default' : 'secondary'}>{en ? 'on' : 'off'}</Badge></TableCell>
+                        <TableCell className="text-right space-x-1">
+                          <Button size="sm" variant="outline" onClick={() => setManageIvr(r)}>Options</Button>
+                          <Button size="sm" variant="ghost" title={en ? 'Disable' : 'Enable'}
+                            onClick={async () => { if (await pbxWrite('update-ivr', { ivr_menu_uuid: r.ivr_menu_uuid, ivr_menu_enabled: en ? 'false' : 'true' }, 'IVR updated')) refetchIvrs(); }}>
+                            <Power className="w-3 h-3" />
+                          </Button>
+                          <Button size="sm" variant="ghost" title="Delete"
+                            onClick={async () => { if (confirm(`Delete IVR ${r.ivr_menu_name}?`) && await pbxWrite('delete-ivr', { ivr_menu_uuid: r.ivr_menu_uuid }, 'IVR deleted')) refetchIvrs(); }}>
+                            <Trash2 className="w-3 h-3 text-destructive" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent></Card>
+        </TabsContent>
+
+        <TabsContent value="queues" className="space-y-2">
+          <div className="flex justify-end"><Button size="sm" onClick={() => setQueueOpen(true)}>+ New Queue</Button></div>
+          <EditableList
+            rows={queues as any[]}
+            idKey="queue_uuid"
+            fields={['queue_name', 'queue_extension', 'queue_strategy']}
+            enabledKey="queue_enabled"
+            onToggle={async (r, en) => { if (await pbxWrite('update-queue', { queue_uuid: r.queue_uuid, queue_enabled: en ? 'true' : 'false' }, 'Queue updated')) refetchQueues(); }}
+            onDelete={async (r) => { if (confirm(`Delete queue ${r.queue_name}?`) && await pbxWrite('delete-queue', { queue_uuid: r.queue_uuid }, 'Queue deleted')) refetchQueues(); }}
+          />
+        </TabsContent>
+
+        <TabsContent value="ringgroups" className="space-y-2">
+          <div className="flex justify-end"><Button size="sm" onClick={() => setRgOpen(true)}>+ New Ring Group</Button></div>
+          <EditableList
+            rows={ringGroups as any[]}
+            idKey="ring_group_uuid"
+            fields={['ring_group_name', 'ring_group_extension']}
+            enabledKey="ring_group_enabled"
+            onToggle={async (r, en) => { if (await pbxWrite('update-ring-group', { ring_group_uuid: r.ring_group_uuid, ring_group_enabled: en ? 'true' : 'false' }, 'Ring group updated')) refetchRG(); }}
+            onDelete={async (r) => { if (confirm(`Delete ring group ${r.ring_group_name}?`) && await pbxWrite('delete-ring-group', { ring_group_uuid: r.ring_group_uuid }, 'Ring group deleted')) refetchRG(); }}
+          />
+        </TabsContent>
+
+        <TabsContent value="devices">
+          <EditableList
+            rows={devices as any[]}
+            idKey="device_uuid"
+            fields={['device_mac_address', 'device_template', 'device_label']}
+            enabledKey="device_enabled"
+            onToggle={async (r, en) => { if (await pbxWrite('update-device', { device_uuid: r.device_uuid, device_enabled: en ? 'true' : 'false' }, 'Device updated')) refetchDevices(); }}
+            onDelete={async (r) => { if (confirm(`Delete device ${r.device_mac_address || r.device_uuid}?`) && await pbxWrite('delete-device', { device_uuid: r.device_uuid }, 'Device deleted')) refetchDevices(); }}
+          />
+        </TabsContent>
+
+        <TabsContent value="destinations">
+          <EditableList
+            rows={destinations as any[]}
+            idKey="destination_uuid"
+            fields={['destination_number', 'destination_context', 'destination_actions']}
+            enabledKey="destination_enabled"
+            onToggle={async (r, en) => { if (await pbxWrite('update-destination', { destination_uuid: r.destination_uuid, destination_enabled: en ? 'true' : 'false' }, 'Destination updated')) refetchDest(); }}
+            onDelete={async (r) => { if (confirm(`Delete destination ${r.destination_number}?`) && await pbxWrite('delete-destination', { destination_uuid: r.destination_uuid }, 'Destination deleted')) refetchDest(); }}
+          />
+        </TabsContent>
+
+        <TabsContent value="numbers">
+          <PhoneNumbersTab domainUuid={domainUuid} domainName={domain?.domain_name || ''} organizationId={org?.id}
+            extensions={extensions as any[]} ivrs={ivrs as any[]} ringGroups={ringGroups as any[]} />
+        </TabsContent>
+
+        <TabsContent value="history">
+          <Card><CardContent className="p-0">
+            {callHistory.length === 0 ? (
+              <div className="py-8 text-center text-sm text-muted-foreground">No call history. Run Full sync to pull CDRs.</div>
+            ) : (
+              <Table>
+                <TableHeader><TableRow>
+                  <TableHead>When</TableHead><TableHead>Dir</TableHead><TableHead>From</TableHead><TableHead>To</TableHead>
+                  <TableHead>Ext</TableHead><TableHead className="text-right">Sec</TableHead><TableHead>Status</TableHead>
+                </TableRow></TableHeader>
+                <TableBody>
+                  {callHistory.map((c: any) => (
+                    <TableRow key={c.id}>
+                      <TableCell className="text-xs">{formatDistanceToNow(new Date(c.start_at), { addSuffix: true })}</TableCell>
+                      <TableCell className="text-xs">{c.direction || '—'}</TableCell>
+                      <TableCell className="font-mono text-xs">{c.caller_number || '—'}</TableCell>
+                      <TableCell className="font-mono text-xs">{c.destination_number || '—'}</TableCell>
+                      <TableCell className="font-mono text-xs">{c.extension || '—'}</TableCell>
+                      <TableCell className="text-right font-mono text-xs">{Math.round(c.duration_seconds ?? 0)}</TableCell>
+                      <TableCell className="text-xs">{c.hangup_cause || '—'}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             )}
           </CardContent></Card>
-        </TabsContent>
-        <TabsContent value="queues" className="space-y-2">
-          <div className="flex justify-end"><Button size="sm" onClick={() => setQueueOpen(true)}>+ New Queue</Button></div>
-          <SimpleList rows={queues} fields={['queue_name', 'queue_extension', 'queue_strategy', 'queue_enabled']} />
-        </TabsContent>
-        <TabsContent value="ringgroups" className="space-y-2">
-          <div className="flex justify-end"><Button size="sm" onClick={() => setRgOpen(true)}>+ New Ring Group</Button></div>
-          <SimpleList rows={ringGroups} fields={['ring_group_name', 'ring_group_extension', 'ring_group_enabled']} />
-        </TabsContent>
-        <TabsContent value="numbers">
-          <PhoneNumbersTab domainUuid={domainUuid} domainName={domain?.domain_name || ''} organizationId={org?.id}
-            extensions={extensions as any[]} ivrs={ivrs as any[]} ringGroups={ringGroups as any[]} />
-        </TabsContent>
-        <TabsContent value="moh">
-          <SimpleList rows={moh} fields={['music_on_hold_name', 'music_on_hold_rate', 'music_on_hold_enabled']} />
         </TabsContent>
 
         <TabsContent value="recordings">
@@ -441,89 +444,11 @@ export default function CustomerDetail() {
             ))}
           </CardContent></Card>
         </TabsContent>
+
+        <TabsContent value="moh">
+          <ReadOnlyList rows={moh as any[]} fields={['music_on_hold_name', 'music_on_hold_rate', 'music_on_hold_enabled']} />
+        </TabsContent>
       </Tabs>
-
-      <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Add user / extension</DialogTitle></DialogHeader>
-          <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
-            <div className="grid grid-cols-2 gap-2">
-              <div><Label>First name</Label><Input value={addForm.firstName} onChange={e => setAddForm({ ...addForm, firstName: e.target.value })} /></div>
-              <div><Label>Last name</Label><Input value={addForm.lastName} onChange={e => setAddForm({ ...addForm, lastName: e.target.value })} /></div>
-            </div>
-            <div><Label>Email</Label><Input type="email" value={addForm.email} onChange={e => setAddForm({ ...addForm, email: e.target.value.toLowerCase() })} /></div>
-            <div><Label>Phone</Label><Input value={addForm.phone} onChange={e => setAddForm({ ...addForm, phone: e.target.value })} placeholder="+15145551234" /></div>
-            <div className="border rounded-lg p-3 space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-sm font-semibold">SIP credentials</Label>
-                <Button size="sm" variant="ghost" onClick={suggestExtension}>Auto-fill</Button>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div><Label className="text-xs">Extension *</Label><Input value={addForm.extension} onChange={e => setAddForm({ ...addForm, extension: e.target.value })} placeholder="1001" /></div>
-                <div>
-                  <Label className="text-xs">SIP password</Label>
-                  <div className="flex gap-1">
-                    <Input value={addForm.sip_password} onChange={e => setAddForm({ ...addForm, sip_password: e.target.value })} placeholder="auto" />
-                    <Button type="button" size="sm" variant="outline" onClick={() => setAddForm({ ...addForm, sip_password: genPass() })}>↻</Button>
-                  </div>
-                </div>
-              </div>
-              <div><Label className="text-xs">Caller ID number (outbound)</Label><Input value={addForm.caller_id_number} onChange={e => setAddForm({ ...addForm, caller_id_number: e.target.value })} placeholder="+15145551234" /></div>
-              <div className="flex items-center justify-between">
-                <label className="flex items-center gap-2 text-sm"><Switch checked={addForm.vm_enabled} onCheckedChange={v => setAddForm({ ...addForm, vm_enabled: v })} />Voicemail</label>
-                {addForm.vm_enabled && (
-                  <div className="flex gap-1 items-center">
-                    <Label className="text-xs">PIN</Label>
-                    <Input className="w-24" value={addForm.vm_pin} onChange={e => setAddForm({ ...addForm, vm_pin: e.target.value })} placeholder="auto" />
-                    <Button type="button" size="sm" variant="outline" onClick={() => setAddForm({ ...addForm, vm_pin: genPin() })}>↻</Button>
-                  </div>
-                )}
-              </div>
-            </div>
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={addForm.send_welcome_email} onChange={e => setAddForm({ ...addForm, send_welcome_email: e.target.checked })} />
-              Send welcome email with credentials (requires email)
-            </label>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
-            <Button onClick={handleAddUser}>Create</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Credentials shown after creation */}
-      <Dialog open={!!createdCreds} onOpenChange={(o) => !o && setCreatedCreds(null)}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Extension {createdCreds?.extension} created</DialogTitle></DialogHeader>
-          {createdCreds && (
-            <div className="space-y-2">
-              <div className="border rounded-lg p-3 font-mono text-xs space-y-1 bg-muted/40">
-                <div><span className="text-muted-foreground">SIP Domain:</span> {createdCreds.sip_domain}</div>
-                <div><span className="text-muted-foreground">Extension:</span> {createdCreds.extension}</div>
-                <div><span className="text-muted-foreground">Password:</span> {createdCreds.password}</div>
-                <div><span className="text-muted-foreground">WSS Server:</span> {createdCreds.wss}</div>
-                {createdCreds.vm_pin && <div><span className="text-muted-foreground">Voicemail PIN:</span> {createdCreds.vm_pin}</div>}
-              </div>
-              <div className="flex gap-2">
-                <Button size="sm" variant="outline" onClick={() => {
-                  const t = `SIP Domain: ${createdCreds.sip_domain}\nExtension: ${createdCreds.extension}\nPassword: ${createdCreds.password}\nWSS: ${createdCreds.wss}${createdCreds.vm_pin ? `\nVoicemail PIN: ${createdCreds.vm_pin}` : ''}`;
-                  navigator.clipboard.writeText(t); toast.success('Copied');
-                }}>Copy all</Button>
-                {createdCreds.email && (
-                  <Button size="sm" variant="outline" onClick={async () => {
-                    await supabase.functions.invoke('customer-users-import', {
-                      body: { organizationId: org?.id, domain_uuid: domainUuid, domain_name: domain?.domain_name, send_welcome_email: true, users: [{ extension: createdCreds.extension, email: createdCreds.email, password: createdCreds.password, resend_only: true }] },
-                    });
-                    toast.success('Email sent');
-                  }}>Send via email</Button>
-                )}
-              </div>
-            </div>
-          )}
-          <DialogFooter><Button onClick={() => setCreatedCreds(null)}>Close</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {domain && (
         <>
@@ -544,41 +469,41 @@ export default function CustomerDetail() {
         </>
       )}
 
-      <Dialog open={inviteOpen} onOpenChange={(o) => { setInviteOpen(o); if (!o) { setInviteResult(null); setInviteEmail(''); } }}>
+      {/* Link tenant org dialog */}
+      <Dialog open={linkOpen} onOpenChange={setLinkOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Promote admin for {org?.name || 'tenant'}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Link tenant organization</DialogTitle></DialogHeader>
           <div className="space-y-3">
+            <div><Label>Organization name</Label><Input value={linkName} onChange={e => setLinkName(e.target.value)} /></div>
+            <div><Label>Admin email (optional)</Label><Input type="email" value={linkEmail} onChange={e => setLinkEmail(e.target.value.toLowerCase())} /></div>
+            <p className="text-xs text-muted-foreground">Creates a tenant organization linked to PBX domain <code>{domain?.domain_name}</code>. After linking, "Manage as this tenant" becomes active.</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLinkOpen(false)}>Cancel</Button>
+            <Button onClick={linkTenantOrg} disabled={linking}>
+              {linking && <Loader2 className="w-4 h-4 mr-2 animate-spin" />} Link
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Invite admin dialog */}
+      <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Invite admin for {org?.name || 'tenant'}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Email</Label><Input type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value.toLowerCase())} /></div>
             <div>
-              <Label>Email</Label>
-              <Input type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value.toLowerCase())} placeholder="admin@customer.com" />
-            </div>
-            <div>
-              <Label>Role for this domain</Label>
+              <Label>Role</Label>
               <div className="grid grid-cols-2 gap-2 mt-1">
-                <Button type="button" variant={inviteRole === 'org_admin' ? 'default' : 'outline'} size="sm" onClick={() => setInviteRole('org_admin')}>
-                  org_admin <span className="ml-1 text-[10px] opacity-70">(full)</span>
-                </Button>
-                <Button type="button" variant={inviteRole === 'manager' ? 'default' : 'outline'} size="sm" onClick={() => setInviteRole('manager')}>
-                  manager <span className="ml-1 text-[10px] opacity-70">(ops only)</span>
-                </Button>
+                <Button type="button" variant={inviteRole === 'org_admin' ? 'default' : 'outline'} size="sm" onClick={() => setInviteRole('org_admin')}>org_admin</Button>
+                <Button type="button" variant={inviteRole === 'manager' ? 'default' : 'outline'} size="sm" onClick={() => setInviteRole('manager')}>manager</Button>
               </div>
             </div>
-            <p className="text-xs text-muted-foreground">
-              User is invited (or linked if registered) and granted <code>{inviteRole}</code> on this domain only. They'll see the "My Domain Cockpit" link in their sidebar.
-            </p>
-            {inviteResult?.link && (
-              <div className="space-y-2 p-2 rounded border bg-muted/40">
-                <div className="text-xs font-medium">Invite link (valid until accepted)</div>
-                <div className="flex gap-2">
-                  <Input readOnly value={inviteResult.link} className="font-mono text-xs" />
-                  <Button size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(inviteResult.link!); toast.success('Copied'); }}>Copy</Button>
-                </div>
-              </div>
-            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setInviteOpen(false)}>Close</Button>
-            <Button onClick={handleInvite}>{inviteResult ? 'Resend' : 'Send invite'}</Button>
+            <Button onClick={handleInvite}>Send invite</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -586,9 +511,55 @@ export default function CustomerDetail() {
   );
 }
 
-function SimpleList({ rows, fields, loading }: { rows: any[]; fields: string[]; loading?: boolean }) {
-  if (loading) return <div className="py-8 flex justify-center"><Loader2 className="animate-spin" /></div>;
-  if (!rows || rows.length === 0) return <Card><CardContent className="py-8 text-center text-muted-foreground text-sm">Empty — try syncing.</CardContent></Card>;
+function EditableList({
+  rows, idKey, fields, enabledKey, onToggle, onDelete,
+}: {
+  rows: any[]; idKey: string; fields: string[]; enabledKey: string;
+  onToggle: (row: any, enabled: boolean) => Promise<void>;
+  onDelete: (row: any) => Promise<void>;
+}) {
+  const [busy, setBusy] = useState<string | null>(null);
+  if (!rows || rows.length === 0) {
+    return <Card><CardContent className="py-8 text-center text-muted-foreground text-sm">Empty — try Full sync from PBX.</CardContent></Card>;
+  }
+  return (
+    <Card><CardContent className="p-0">
+      <Table>
+        <TableHeader><TableRow>
+          {fields.map(f => <TableHead key={f}>{f.replace(/_/g, ' ')}</TableHead>)}
+          <TableHead>Status</TableHead>
+          <TableHead className="text-right">Actions</TableHead>
+        </TableRow></TableHeader>
+        <TableBody>
+          {rows.map((r) => {
+            const id = r[idKey];
+            const en = String(r[enabledKey]) === 'true' || r[enabledKey] === true;
+            const isBusy = busy === id;
+            return (
+              <TableRow key={id}>
+                {fields.map(f => <TableCell key={f} className="font-mono text-xs">{String(r[f] ?? '—').slice(0, 80)}</TableCell>)}
+                <TableCell><Badge variant={en ? 'default' : 'secondary'} className="text-[10px]">{en ? 'on' : 'off'}</Badge></TableCell>
+                <TableCell className="text-right space-x-1">
+                  <Button size="sm" variant="ghost" title={en ? 'Disable' : 'Enable'} disabled={isBusy}
+                    onClick={async () => { setBusy(id); try { await onToggle(r, !en); } finally { setBusy(null); } }}>
+                    {isBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Power className="w-3 h-3" />}
+                  </Button>
+                  <Button size="sm" variant="ghost" title="Delete" disabled={isBusy}
+                    onClick={async () => { setBusy(id); try { await onDelete(r); } finally { setBusy(null); } }}>
+                    <Trash2 className="w-3 h-3 text-destructive" />
+                  </Button>
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </CardContent></Card>
+  );
+}
+
+function ReadOnlyList({ rows, fields }: { rows: any[]; fields: string[] }) {
+  if (!rows || rows.length === 0) return <Card><CardContent className="py-8 text-center text-muted-foreground text-sm">Empty — try Full sync from PBX.</CardContent></Card>;
   return (
     <Card><CardContent className="p-0">
       <Table>
