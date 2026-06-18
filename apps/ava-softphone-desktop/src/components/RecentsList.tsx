@@ -147,3 +147,6 @@ const refreshBtn: React.CSSProperties = {
   color: '#FFD700', borderRadius: 8, width: 28, height: 28,
   cursor: 'pointer', fontSize: 13,
 };
+
+export default React.memo(RecentsListImpl);
+
