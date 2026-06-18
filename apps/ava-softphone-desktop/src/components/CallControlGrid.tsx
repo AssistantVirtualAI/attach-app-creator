@@ -132,3 +132,6 @@ const btnStyle: React.CSSProperties = {
   background: 'rgba(0,35,230,0.2)', color: '#e2e8f0', border: '1px solid rgba(0,35,230,0.4)',
   borderRadius: 4, padding: '2px 8px', fontSize: 11, cursor: 'pointer',
 };
+
+export default React.memo(CallControlGridImpl);
+
