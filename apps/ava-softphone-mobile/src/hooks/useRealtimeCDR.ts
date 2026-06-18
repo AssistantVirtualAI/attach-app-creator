@@ -42,30 +42,56 @@ function mapRow(r: any): CallRecord {
   };
 }
 
+export type CDRTransport = 'realtime' | 'polling' | 'idle';
+
 export function useRealtimeCDR(creds: Creds | null) {
   const [calls, setCalls] = useState<CallRecord[] | null>(null);
+  const [transport, setTransport] = useState<CDRTransport>('idle');
+  const [warning, setWarning] = useState<string | null>(null);
   const callsRef = useRef<CallRecord[] | null>(null);
   callsRef.current = calls;
 
   useEffect(() => {
     let cancelled = false;
+    let pollId: ReturnType<typeof setInterval> | null = null;
+
     const load = () => {
       mobileApi.calls().then((d) => { if (!cancelled) setCalls(d); }).catch(() => {});
     };
     load();
 
+    const startPolling = (reason?: string) => {
+      if (pollId) return;
+      setTransport('polling');
+      if (reason) setWarning(reason);
+      pollId = setInterval(load, 15_000); // resilient fallback: 15s polling
+    };
+    const stopPolling = () => {
+      if (pollId) { clearInterval(pollId); pollId = null; }
+    };
+
+    const onVis = () => document.visibilityState === 'visible' && load();
+    document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('focus', load);
+
     const ext = creds?.extension;
     const token = creds?.accessToken || null;
     if (!ext || !token) {
-      // No realtime — fall back to gentle polling.
-      const id = setInterval(load, 30_000);
-      const onVis = () => document.visibilityState === 'visible' && load();
-      document.addEventListener('visibilitychange', onVis);
-      return () => { cancelled = true; clearInterval(id); document.removeEventListener('visibilitychange', onVis); };
+      startPolling();
+      return () => {
+        cancelled = true; stopPolling();
+        document.removeEventListener('visibilitychange', onVis);
+        window.removeEventListener('focus', load);
+      };
     }
 
     const sb = client(token);
     const filter = `extension=eq.${ext}`;
+    let watchdog: ReturnType<typeof setTimeout> | null = setTimeout(() => {
+      // If we haven't reached SUBSCRIBED in 8s, fall back.
+      startPolling('Realtime CDR unavailable — switched to 15s polling.');
+    }, 8_000);
+
     const channel = sb
       .channel(`cdr-ext-${ext}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pbx_call_records', filter }, (payload) => {
@@ -80,19 +106,33 @@ export function useRealtimeCDR(creds: Creds | null) {
         const row = mapRow(payload.new);
         setCalls((prev) => (prev || []).map((c) => (c.id === row.id ? { ...c, ...row } : c)));
       })
-      .subscribe();
-
-    const onVis = () => document.visibilityState === 'visible' && load();
-    document.addEventListener('visibilitychange', onVis);
-    window.addEventListener('focus', load);
+      .subscribe((status) => {
+        if (cancelled) return;
+        if (status === 'SUBSCRIBED') {
+          if (watchdog) { clearTimeout(watchdog); watchdog = null; }
+          stopPolling();
+          setTransport('realtime');
+          setWarning(null);
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          startPolling('Realtime CDR disconnected — using 15s polling.');
+        }
+      });
 
     return () => {
       cancelled = true;
+      if (watchdog) clearTimeout(watchdog);
+      stopPolling();
       try { sb.removeChannel(channel); } catch {}
       document.removeEventListener('visibilitychange', onVis);
       window.removeEventListener('focus', load);
     };
   }, [creds?.extension, creds?.accessToken]);
 
-  return { calls, refresh: () => mobileApi.calls().then(setCalls).catch(() => {}) };
+  return {
+    calls,
+    transport,
+    warning,
+    dismissWarning: () => setWarning(null),
+    refresh: () => mobileApi.calls().then(setCalls).catch(() => {}),
+  };
 }
