@@ -21,6 +21,7 @@ import { requestAllPermissions, checkAllPermissions } from './lib/permissions';
 import { registerPush, sendPushTokenToBackend } from './lib/pushNotifications';
 import { syncDeviceContacts } from './lib/contacts';
 import { bootNative, onAppStateChange } from './lib/nativeBoot';
+import { registerDeepLinkHandler } from './lib/deepLink';
 import { configureMobileApi } from './lib/mobileApi';
 import { configureAudit, audit } from './lib/audit';
 
@@ -46,6 +47,8 @@ export default function MobileApp() {
       setTimeout(() => setBooting(false), 700);
     });
     initBackgroundSync().catch(() => {});
+    let unsubDeepLink: (() => void) | undefined;
+    registerDeepLinkHandler().then((u) => { unsubDeepLink = u; }).catch(() => {});
 
     // Accept navigation commands from /mobile-preview host.
     const onMsg = (e: MessageEvent) => {
