@@ -310,18 +310,21 @@ export default function CustomerDetail() {
 
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="flex flex-wrap">
-          <TabsTrigger value="extensions">Extensions ({(extensions as any[]).length})</TabsTrigger>
-          <TabsTrigger value="ivr">IVR ({(ivrs as any[]).length})</TabsTrigger>
-          <TabsTrigger value="queues">Queues ({(queues as any[]).length})</TabsTrigger>
-          <TabsTrigger value="ringgroups">Ring Groups ({(ringGroups as any[]).length})</TabsTrigger>
-          <TabsTrigger value="devices">Devices</TabsTrigger>
-          <TabsTrigger value="destinations">Destinations</TabsTrigger>
-          <TabsTrigger value="numbers">Phone Numbers</TabsTrigger>
-          <TabsTrigger value="history">Call History</TabsTrigger>
-          <TabsTrigger value="recordings">Recordings</TabsTrigger>
-          <TabsTrigger value="moh">Music on Hold</TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto -mx-1 px-1">
+          <TabsList className="inline-flex w-max min-w-full whitespace-nowrap">
+            <TabsTrigger value="extensions">Extensions ({(extensions as any[]).length})</TabsTrigger>
+            <TabsTrigger value="ivr">IVR ({(ivrs as any[]).length})</TabsTrigger>
+            <TabsTrigger value="queues">Queues ({(queues as any[]).length})</TabsTrigger>
+            <TabsTrigger value="ringgroups">Ring Groups ({(ringGroups as any[]).length})</TabsTrigger>
+            <TabsTrigger value="devices">Devices ({(devices as any[]).length})</TabsTrigger>
+            <TabsTrigger value="destinations">Destinations ({(destinations as any[]).length})</TabsTrigger>
+            <TabsTrigger value="numbers">Phone Numbers</TabsTrigger>
+            <TabsTrigger value="history">Call History</TabsTrigger>
+            <TabsTrigger value="recordings">Recordings</TabsTrigger>
+            <TabsTrigger value="moh">Music on Hold</TabsTrigger>
+          </TabsList>
+        </div>
+
 
         <TabsContent value="extensions">
           <Card><CardContent className="p-4">
