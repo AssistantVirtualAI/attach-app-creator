@@ -594,6 +594,63 @@ export default function LemtelCustomers() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!success} onOpenChange={(o) => !o && setSuccess(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>🎉 Customer provisioned</DialogTitle>
+          </DialogHeader>
+          {success && (
+            <div className="space-y-3 text-sm">
+              <div className="rounded-md border bg-muted/40 p-3 space-y-1">
+                <div><strong>Tenant:</strong> {success.orgName}</div>
+                <div><strong>SIP domain:</strong> <code className="text-xs">{success.domainName}</code></div>
+                <div><strong>Admin:</strong> {success.adminEmail}</div>
+              </div>
+              <div className="space-y-2">
+                <Label>Customer portal link</Label>
+                <div className="flex gap-2">
+                  <Input readOnly value={`${window.location.origin}/c/${encodeURIComponent(success.domainName)}`} />
+                  <Button variant="outline" size="sm" onClick={() => {
+                    navigator.clipboard.writeText(`${window.location.origin}/c/${encodeURIComponent(success.domainName)}`);
+                    toast.success('Portal link copied');
+                  }}>Copy</Button>
+                </div>
+              </div>
+              {success.inviteUrl && (
+                <div className="space-y-2">
+                  <Label>Email confirmation link (one-time)</Label>
+                  <div className="flex gap-2">
+                    <Input readOnly value={success.inviteUrl} />
+                    <Button variant="outline" size="sm" onClick={() => { navigator.clipboard.writeText(success.inviteUrl!); toast.success('Copied'); }}>Copy</Button>
+                  </div>
+                </div>
+              )}
+              <div className="space-y-2">
+                <Label>App invite links</Label>
+                <div className="flex gap-2 flex-wrap">
+                  <Button variant="outline" size="sm" onClick={() => mintAppInvite('desktop')} disabled={mintLoading === 'desktop' || !success.adminUserId}>
+                    {mintLoading === 'desktop' ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : null}
+                    Copy desktop invite
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => mintAppInvite('mobile')} disabled={mintLoading === 'mobile' || !success.adminUserId}>
+                    {mintLoading === 'mobile' ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : null}
+                    Copy mobile invite
+                  </Button>
+                </div>
+                {mintedLinks.desktop && <p className="text-xs text-muted-foreground break-all">🖥️ {mintedLinks.desktop}</p>}
+                {mintedLinks.mobile && <p className="text-xs text-muted-foreground break-all">📱 {mintedLinks.mobile}</p>}
+                {!success.adminUserId && (
+                  <p className="text-xs text-amber-600">App invite tokens require the admin user to be provisioned. If the email invite was queued but the user record isn't ready yet, ask them to accept the email first.</p>
+                )}
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={() => setSuccess(null)}>Done</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
