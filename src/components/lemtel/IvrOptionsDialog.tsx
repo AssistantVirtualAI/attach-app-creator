@@ -262,7 +262,18 @@ export function IvrOptionsDialog({
             {isFetching && !isLoading && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
           </DialogTitle>
         </DialogHeader>
-        <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
+        {options.length > 0 && (
+          <div className="relative">
+            <Search className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              className="h-8 pl-7"
+              placeholder="Search by digit or label…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+          </div>
+        )}
+        <div className="space-y-2 max-h-[55vh] overflow-y-auto pr-1">
           {isLoading ? (
             <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin" /></div>
           ) : (
@@ -270,7 +281,10 @@ export function IvrOptionsDialog({
               {options.length === 0 && !adding && (
                 <p className="text-sm text-muted-foreground text-center py-4">No options yet.</p>
               )}
-              {options.map(renderRow)}
+              {options.length > 0 && filtered.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-4">No matches for "{search}".</p>
+              )}
+              {paged.map(renderRow)}
               {adding && (
                 <div className="border rounded p-2 space-y-2 bg-muted/30 border-primary/40">
                   <div className="grid grid-cols-[60px_1fr_auto] gap-2 items-end">
@@ -289,6 +303,16 @@ export function IvrOptionsDialog({
             </>
           )}
         </div>
+        {filtered.length > PAGE_SIZE && (
+          <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
+            <span>{(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, filtered.length)} of {filtered.length}</span>
+            <div className="flex items-center gap-1">
+              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={safePage <= 1}><ChevronLeft className="w-3 h-3" /></Button>
+              <span>Page {safePage} / {totalPages}</span>
+              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={safePage >= totalPages}><ChevronRight className="w-3 h-3" /></Button>
+            </div>
+          </div>
+        )}
         <DialogFooter className="flex items-center justify-between sm:justify-between">
           <Button size="sm" variant="outline" onClick={startAdd} disabled={adding || !!editId}>
             <Plus className="w-3 h-3 mr-1" /> Add option
