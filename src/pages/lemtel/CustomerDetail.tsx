@@ -439,9 +439,13 @@ export default function CustomerDetail() {
         </TabsContent>
 
         <TabsContent value="history">
-          <Card><CardContent className="p-0">
-            {callHistory.length === 0 ? (
-              <div className="py-8 text-center text-sm text-muted-foreground">No call history. Run Full sync to pull CDRs.</div>
+          <Card><CardContent className="p-4 space-y-3">
+            <FilterBar q={histQ} setQ={setHistQ} from={histFrom} setFrom={setHistFrom} to={histTo} setTo={setHistTo}
+              ext={histExt} setExt={setHistExt} extOptions={extOptions} count={filteredHistory.length} total={callHistory.length} />
+            {filteredHistory.length === 0 ? (
+              <div className="py-8 text-center text-sm text-muted-foreground">
+                {callHistory.length === 0 ? 'No call history. Run Full sync to pull CDRs.' : 'No records match the filters.'}
+              </div>
             ) : (
               <Table>
                 <TableHeader><TableRow>
@@ -449,7 +453,7 @@ export default function CustomerDetail() {
                   <TableHead>Ext</TableHead><TableHead className="text-right">Sec</TableHead><TableHead>Status</TableHead>
                 </TableRow></TableHeader>
                 <TableBody>
-                  {callHistory.map((c: any) => (
+                  {filteredHistory.map((c: any) => (
                     <TableRow key={c.id}>
                       <TableCell className="text-xs">{formatDistanceToNow(new Date(c.start_at), { addSuffix: true })}</TableCell>
                       <TableCell className="text-xs">{c.direction || '—'}</TableCell>
@@ -468,8 +472,14 @@ export default function CustomerDetail() {
 
         <TabsContent value="recordings">
           <Card><CardContent className="space-y-2 p-4">
-            {recordings.length === 0 && <p className="text-sm text-muted-foreground">No recordings.</p>}
-            {recordings.map((r: any) => (
+            <FilterBar q={recQ} setQ={setRecQ} from={recFrom} setFrom={setRecFrom} to={recTo} setTo={setRecTo}
+              ext={recExt} setExt={setRecExt} extOptions={extOptions} count={filteredRecordings.length} total={recordings.length} />
+            {filteredRecordings.length === 0 && (
+              <p className="text-sm text-muted-foreground py-4 text-center">
+                {recordings.length === 0 ? 'No recordings.' : 'No recordings match the filters.'}
+              </p>
+            )}
+            {filteredRecordings.map((r: any) => (
               <div key={r.id} className="border rounded-lg p-3 space-y-2">
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div className="text-sm">
@@ -486,6 +496,7 @@ export default function CustomerDetail() {
             ))}
           </CardContent></Card>
         </TabsContent>
+
 
         <TabsContent value="moh">
           <ReadOnlyList rows={moh as any[]} fields={['music_on_hold_name', 'music_on_hold_rate', 'music_on_hold_enabled']} />
@@ -615,5 +626,54 @@ function ReadOnlyList({ rows, fields }: { rows: any[]; fields: string[] }) {
         </TableBody>
       </Table>
     </CardContent></Card>
+  );
+}
+
+function FilterBar(props: {
+  q: string; setQ: (v: string) => void;
+  from: string; setFrom: (v: string) => void;
+  to: string; setTo: (v: string) => void;
+  ext: string; setExt: (v: string) => void;
+  extOptions: string[];
+  count: number; total: number;
+}) {
+  const { q, setQ, from, setFrom, to, setTo, ext, setExt, extOptions, count, total } = props;
+  const dirty = q || from || to || ext !== 'all';
+  return (
+    <div className="flex flex-wrap items-end gap-2 border rounded-lg p-3 bg-muted/30">
+      <div className="flex-1 min-w-[180px]">
+        <Label className="text-xs text-muted-foreground">Phone / extension</Label>
+        <div className="relative">
+          <Search className="w-3.5 h-3.5 absolute left-2 top-2.5 text-muted-foreground" />
+          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search number…" className="pl-7 h-9" />
+        </div>
+      </div>
+      <div>
+        <Label className="text-xs text-muted-foreground">From</Label>
+        <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-9 w-[140px]" />
+      </div>
+      <div>
+        <Label className="text-xs text-muted-foreground">To</Label>
+        <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-9 w-[140px]" />
+      </div>
+      <div>
+        <Label className="text-xs text-muted-foreground">Device / Ext</Label>
+        <Select value={ext} onValueChange={setExt}>
+          <SelectTrigger className="h-9 w-[140px]"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All extensions</SelectItem>
+            {extOptions.map((e) => <SelectItem key={e} value={e}>Ext {e}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+      {dirty && (
+        <Button variant="ghost" size="sm" onClick={() => { setQ(''); setFrom(''); setTo(''); setExt('all'); }}>
+          <X className="w-3 h-3 mr-1" /> Clear
+        </Button>
+      )}
+      <div className="ml-auto text-xs text-muted-foreground self-center">
+        {count} / {total}
+      </div>
+    </div>
   );
 }
