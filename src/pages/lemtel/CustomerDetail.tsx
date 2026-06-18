@@ -628,3 +628,52 @@ function ReadOnlyList({ rows, fields }: { rows: any[]; fields: string[] }) {
     </CardContent></Card>
   );
 }
+
+function FilterBar(props: {
+  q: string; setQ: (v: string) => void;
+  from: string; setFrom: (v: string) => void;
+  to: string; setTo: (v: string) => void;
+  ext: string; setExt: (v: string) => void;
+  extOptions: string[];
+  count: number; total: number;
+}) {
+  const { q, setQ, from, setFrom, to, setTo, ext, setExt, extOptions, count, total } = props;
+  const dirty = q || from || to || ext !== 'all';
+  return (
+    <div className="flex flex-wrap items-end gap-2 border rounded-lg p-3 bg-muted/30">
+      <div className="flex-1 min-w-[180px]">
+        <Label className="text-xs text-muted-foreground">Phone / extension</Label>
+        <div className="relative">
+          <Search className="w-3.5 h-3.5 absolute left-2 top-2.5 text-muted-foreground" />
+          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search number…" className="pl-7 h-9" />
+        </div>
+      </div>
+      <div>
+        <Label className="text-xs text-muted-foreground">From</Label>
+        <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-9 w-[140px]" />
+      </div>
+      <div>
+        <Label className="text-xs text-muted-foreground">To</Label>
+        <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-9 w-[140px]" />
+      </div>
+      <div>
+        <Label className="text-xs text-muted-foreground">Device / Ext</Label>
+        <Select value={ext} onValueChange={setExt}>
+          <SelectTrigger className="h-9 w-[140px]"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All extensions</SelectItem>
+            {extOptions.map((e) => <SelectItem key={e} value={e}>Ext {e}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+      {dirty && (
+        <Button variant="ghost" size="sm" onClick={() => { setQ(''); setFrom(''); setTo(''); setExt('all'); }}>
+          <X className="w-3 h-3 mr-1" /> Clear
+        </Button>
+      )}
+      <div className="ml-auto text-xs text-muted-foreground self-center">
+        {count} / {total}
+      </div>
+    </div>
+  );
+}
