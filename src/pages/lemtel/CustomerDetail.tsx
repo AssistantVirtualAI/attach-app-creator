@@ -353,7 +353,7 @@ export default function CustomerDetail() {
               <Badge
                 key={r}
                 variant={ok ? 'default' : fail ? 'destructive' : 'secondary'}
-                title={j ? `${j.status}${j.error_message ? ' · ' + j.error_message : ''} · ${j.completed_at || j.started_at}` : 'never synced'}
+                title={j ? `${j.status}${j.error ? ' · ' + j.error : ''} · ${j.completed_at || j.started_at}` : 'never synced'}
               >
                 {r}: {j ? j.status : '—'}
               </Badge>
