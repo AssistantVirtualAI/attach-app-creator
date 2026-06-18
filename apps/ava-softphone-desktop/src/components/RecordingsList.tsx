@@ -37,11 +37,14 @@ function displayError(e: any) {
 // so users don't have to re-download the same PBX audio every time they revisit.
 const audioCache = new Map<string, string>();
 
+type JobStatus = 'idle' | 'queued' | 'running' | 'succeeded' | 'failed';
+
 export default function RecordingsList({ onAnalyze, extension }: { onAnalyze?: (id: string) => void; extension?: string | null }) {
   const [items, setItems] = useState<RecordingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [working, setWorking] = useState<string | null>(null);
+  const [statuses, setStatuses] = useState<Record<string, JobStatus>>({});
   const [error, setError] = useState<string | null>(null);
   const [itemErrors, setItemErrors] = useState<Record<string, string>>({});
   const [itemSuccess, setItemSuccess] = useState<Record<string, string>>({});
