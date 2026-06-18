@@ -22,6 +22,7 @@ import { IvrCreateDialog } from '@/components/lemtel/IvrCreateDialog';
 import { RingGroupCreateDialog } from '@/components/lemtel/RingGroupCreateDialog';
 import { QueueCreateDialog } from '@/components/lemtel/QueueCreateDialog';
 import { PhoneNumbersTab } from '@/components/lemtel/PhoneNumbersTab';
+import { IvrOptionsDialog } from '@/components/lemtel/IvrOptionsDialog';
 
 async function pbxList(action: string, domain_uuid: string) {
   const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
