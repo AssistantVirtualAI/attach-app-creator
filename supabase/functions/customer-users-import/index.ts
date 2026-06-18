@@ -1,5 +1,9 @@
 // Bulk-create FusionPBX extensions + local softphone rows from a CSV payload.
-// Body: { organizationId, domain_uuid, domain_name, users: [{ extension, name?, email?, password?, voicemail_pin?, outbound_cid? }] }
+// Body: {
+//   organizationId, domain_uuid, domain_name,
+//   send_welcome_email?: boolean,
+//   users: [{ extension, name?, email?, password?, voicemail_pin?, outbound_cid?, assign_phone_number? }]
+// }
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
@@ -16,7 +20,23 @@ type Row = {
   password?: string;
   voicemail_pin?: string;
   outbound_cid?: string;
+  assign_phone_number?: string;
 };
+
+function genStrongPassword(): string {
+  const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const lower = "abcdefghijkmnopqrstuvwxyz";
+  const nums = "23456789";
+  const sym = "!@#$%^&*";
+  const all = upper + lower + nums + sym;
+  let out = "";
+  out += upper[Math.floor(Math.random() * upper.length)];
+  out += lower[Math.floor(Math.random() * lower.length)];
+  out += nums[Math.floor(Math.random() * nums.length)];
+  out += sym[Math.floor(Math.random() * sym.length)];
+  for (let i = 0; i < 12; i++) out += all[Math.floor(Math.random() * all.length)];
+  return out.split("").sort(() => Math.random() - 0.5).join("");
+}
 
 async function callPbx(action: string, body: Record<string, unknown>, authHeader: string) {
   const url = `${Deno.env.get("SUPABASE_URL")}/functions/v1/pbx-write`;
@@ -51,8 +71,9 @@ Deno.serve(async (req) => {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const { organizationId, domain_uuid, domain_name, users } = body as {
-      organizationId: string; domain_uuid: string; domain_name: string; users: Row[];
+    const { organizationId, domain_uuid, domain_name, users, send_welcome_email } = body as {
+      organizationId: string; domain_uuid: string; domain_name: string;
+      users: Row[]; send_welcome_email?: boolean;
     };
     if (!organizationId || !domain_uuid || !domain_name || !Array.isArray(users)) {
       return new Response(JSON.stringify({ error: "organizationId, domain_uuid, domain_name, users[] required" }), {
@@ -66,16 +87,19 @@ Deno.serve(async (req) => {
       { auth: { persistSession: false } },
     );
 
-    const results: Array<{ extension: string; ok: boolean; error?: string; created?: boolean }> = [];
+    const results: Array<{
+      extension: string; ok: boolean; error?: string;
+      created?: boolean; password?: string; welcomed?: boolean;
+    }> = [];
 
     for (const raw of users) {
       const ext = String(raw.extension || "").trim();
       if (!ext) { results.push({ extension: "", ok: false, error: "missing extension" }); continue; }
-      const password = raw.password || Math.random().toString(36).slice(2, 10) + "Aa!1";
+      const password = raw.password && raw.password.length >= 8 ? raw.password : genStrongPassword();
       const vmPin = raw.voicemail_pin || ext;
       const cidName = raw.name || ext;
+      const outboundCid = raw.outbound_cid || raw.assign_phone_number || ext;
 
-      // 1) Create on FusionPBX (idempotent: pbx-write should upsert)
       const pbx = await callPbx("create-extension", {
         organizationId,
         params: {
@@ -84,7 +108,7 @@ Deno.serve(async (req) => {
           password,
           voicemail_password: vmPin,
           effective_caller_id_name: cidName,
-          effective_caller_id_number: raw.outbound_cid || ext,
+          effective_caller_id_number: outboundCid,
           enabled: true,
         },
       }, authHeader);
@@ -94,7 +118,6 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // 2) Upsert local softphone row + link portal user by email
       let portalUid: string | null = null;
       if (raw.email) {
         const { data: prof } = await supabase
@@ -107,6 +130,7 @@ Deno.serve(async (req) => {
         extension: ext,
         display_name: cidName,
         sip_domain: domain_name,
+        sip_password: password,
         portal_user_id: portalUid,
         app_access_enabled: true,
         desktop_access_enabled: true,
@@ -114,7 +138,40 @@ Deno.serve(async (req) => {
         status: "offline",
       }, { onConflict: "organization_id,extension" });
 
-      results.push({ extension: ext, ok: true, created: true });
+      // Best-effort DID assignment
+      if (raw.assign_phone_number) {
+        await supabase.from("lemtel_dids").update({
+          assigned_extension: ext,
+          domain_uuid,
+        }).eq("phone_number", raw.assign_phone_number).then(() => {}, () => {});
+      }
+
+      // Welcome email (best-effort)
+      let welcomed = false;
+      if (send_welcome_email && raw.email) {
+        try {
+          const portalUrl = `${Deno.env.get("PUBLIC_SITE_URL") || ""}/c/${domain_name}`;
+          const inv = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-transactional-email`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: authHeader },
+            body: JSON.stringify({
+              templateName: "customer-welcome",
+              recipientEmail: raw.email,
+              idempotencyKey: `welcome-${organizationId}-${ext}`,
+              templateData: {
+                name: cidName,
+                extension: ext,
+                sip_domain: domain_name,
+                sip_password: password,
+                portal_url: portalUrl,
+              },
+            }),
+          });
+          welcomed = inv.ok;
+        } catch { /* swallow */ }
+      }
+
+      results.push({ extension: ext, ok: true, created: true, password, welcomed });
     }
 
     return new Response(JSON.stringify({
