@@ -52,6 +52,7 @@ Deno.serve(async (req) => {
     }
 
     // ensure auth user exists; invite if missing
+    let targetId: string | null = null;
     let inviteUrl: string | null = null;
     const { data: existing } = await admin.from("profiles").select("id").eq("email", String(email).toLowerCase()).maybeSingle();
     if (existing?.id) {
