@@ -18,6 +18,10 @@ import { formatDistanceToNow } from 'date-fns';
 import { loadPbxRecordingAudio } from '@/lib/pbxRecordingAudio';
 import { useImpersonation } from '@/contexts/ImpersonationContext';
 import SendAppInviteButtons from '@/components/lemtel/SendAppInviteButtons';
+import { IvrCreateDialog } from '@/components/lemtel/IvrCreateDialog';
+import { RingGroupCreateDialog } from '@/components/lemtel/RingGroupCreateDialog';
+import { QueueCreateDialog } from '@/components/lemtel/QueueCreateDialog';
+import { PhoneNumbersTab } from '@/components/lemtel/PhoneNumbersTab';
 
 async function pbxList(action: string, domain_uuid: string) {
   const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
@@ -39,9 +43,16 @@ export default function CustomerDetail() {
   const [importing, setImporting] = useState(false);
   const [importReport, setImportReport] = useState<any>(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [ivrOpen, setIvrOpen] = useState(false);
+  const [rgOpen, setRgOpen] = useState(false);
+  const [queueOpen, setQueueOpen] = useState(false);
+  const [createdCreds, setCreatedCreds] = useState<any>(null);
+  const genPass = (len = 14) => Array.from(crypto.getRandomValues(new Uint8Array(len))).map(b => 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'[b % 54]).join('');
+  const genPin = () => String(Math.floor(1000 + Math.random() * 9000));
   const [addForm, setAddForm] = useState({
-    extension: '', name: '', email: '',
-    sip_password: '', assign_phone_number: '', send_welcome_email: true,
+    extension: '', firstName: '', lastName: '', email: '', phone: '',
+    sip_password: '', caller_id_number: '', vm_enabled: true, vm_pin: '',
+    assign_phone_number: '', send_welcome_email: true,
   });
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
@@ -194,11 +205,18 @@ export default function CustomerDetail() {
 
   const handleAddUser = async () => {
     if (!org || !domain || !addForm.extension) { toast.error('Extension required'); return; }
+    const displayName = `${addForm.firstName} ${addForm.lastName}`.trim();
+    const password = addForm.sip_password || genPass();
+    const vmPin = addForm.vm_pin || genPin();
     const userPayload = {
       extension: addForm.extension,
-      name: addForm.name || undefined,
+      name: displayName || undefined,
       email: addForm.email || undefined,
-      password: addForm.sip_password || undefined,
+      password,
+      caller_id_name: displayName || undefined,
+      caller_id_number: addForm.caller_id_number || undefined,
+      voicemail_enabled: addForm.vm_enabled,
+      voicemail_pin: vmPin,
       assign_phone_number: addForm.assign_phone_number || undefined,
     };
     const { data, error } = await supabase.functions.invoke('customer-users-import', {
@@ -213,19 +231,26 @@ export default function CustomerDetail() {
     if (error) return toast.error(error.message);
     const r = (data as any)?.results?.[0];
     if (r?.ok) {
-      const genPass = (data as any)?.results?.[0]?.password;
       toast.success(`Extension ${addForm.extension} added`);
-      if (genPass) {
-        toast.message('SIP password (one-time view)', {
-          description: genPass,
-          action: { label: 'Copy', onClick: () => navigator.clipboard.writeText(genPass) },
-        });
-      }
+      setCreatedCreds({
+        sip_domain: domain.domain_name,
+        extension: addForm.extension,
+        password,
+        wss: 'wss://node.lemtelcloud.net:7443',
+        vm_pin: addForm.vm_enabled ? vmPin : null,
+        email: addForm.email,
+      });
       setAddOpen(false);
-      setAddForm({ extension: '', name: '', email: '', sip_password: '', assign_phone_number: '', send_welcome_email: true });
+      setAddForm({ extension: '', firstName: '', lastName: '', email: '', phone: '', sip_password: '', caller_id_number: '', vm_enabled: true, vm_pin: '', assign_phone_number: '', send_welcome_email: true });
       refetchSP();
     }
     else toast.error(r?.error || 'Add failed');
+  };
+
+  const suggestExtension = () => {
+    const nums = (spUsers as any[]).map(u => parseInt(u.extension, 10)).filter(Number.isFinite);
+    const next = nums.length ? Math.max(...nums) + 1 : 1001;
+    setAddForm(f => ({ ...f, extension: String(next), sip_password: f.sip_password || genPass(), vm_pin: f.vm_pin || genPin() }));
   };
 
   const handleInvite = async () => {
@@ -285,6 +310,7 @@ export default function CustomerDetail() {
           <TabsTrigger value="ivr">IVR</TabsTrigger>
           <TabsTrigger value="queues">Queues</TabsTrigger>
           <TabsTrigger value="ringgroups">Ring Groups</TabsTrigger>
+          <TabsTrigger value="numbers">Phone Numbers</TabsTrigger>
           <TabsTrigger value="recordings">Recordings</TabsTrigger>
           <TabsTrigger value="moh">Music on Hold</TabsTrigger>
         </TabsList>
@@ -353,14 +379,21 @@ export default function CustomerDetail() {
         <TabsContent value="extensions">
           <SimpleList loading={loadingExt} rows={extensions} fields={['extension', 'effective_caller_id_name', 'enabled']} />
         </TabsContent>
-        <TabsContent value="ivr">
+        <TabsContent value="ivr" className="space-y-2">
+          <div className="flex justify-end"><Button size="sm" onClick={() => setIvrOpen(true)}>+ New IVR</Button></div>
           <SimpleList rows={ivrs} fields={['ivr_menu_name', 'ivr_menu_extension', 'ivr_menu_enabled']} />
         </TabsContent>
-        <TabsContent value="queues">
+        <TabsContent value="queues" className="space-y-2">
+          <div className="flex justify-end"><Button size="sm" onClick={() => setQueueOpen(true)}>+ New Queue</Button></div>
           <SimpleList rows={queues} fields={['queue_name', 'queue_extension', 'queue_strategy', 'queue_enabled']} />
         </TabsContent>
-        <TabsContent value="ringgroups">
+        <TabsContent value="ringgroups" className="space-y-2">
+          <div className="flex justify-end"><Button size="sm" onClick={() => setRgOpen(true)}>+ New Ring Group</Button></div>
           <SimpleList rows={ringGroups} fields={['ring_group_name', 'ring_group_extension', 'ring_group_enabled']} />
+        </TabsContent>
+        <TabsContent value="numbers">
+          <PhoneNumbersTab domainUuid={domainUuid} domainName={domain?.domain_name || ''} organizationId={org?.id}
+            extensions={extensions as any[]} ivrs={ivrs as any[]} ringGroups={ringGroups as any[]} />
         </TabsContent>
         <TabsContent value="moh">
           <SimpleList rows={moh} fields={['music_on_hold_name', 'music_on_hold_rate', 'music_on_hold_enabled']} />
@@ -392,23 +425,41 @@ export default function CustomerDetail() {
         <DialogContent>
           <DialogHeader><DialogTitle>Add user / extension</DialogTitle></DialogHeader>
           <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
-            <div><Label>Extension *</Label><Input value={addForm.extension} onChange={e => setAddForm({ ...addForm, extension: e.target.value })} placeholder="1001" /></div>
-            <div><Label>Display name</Label><Input value={addForm.name} onChange={e => setAddForm({ ...addForm, name: e.target.value })} /></div>
-            <div><Label>Email (optional — links portal user + receives welcome)</Label><Input type="email" value={addForm.email} onChange={e => setAddForm({ ...addForm, email: e.target.value.toLowerCase() })} /></div>
-            <div>
-              <Label>SIP password (leave blank to auto-generate)</Label>
-              <Input value={addForm.sip_password} onChange={e => setAddForm({ ...addForm, sip_password: e.target.value })} placeholder="min 12 chars" />
+            <div className="grid grid-cols-2 gap-2">
+              <div><Label>First name</Label><Input value={addForm.firstName} onChange={e => setAddForm({ ...addForm, firstName: e.target.value })} /></div>
+              <div><Label>Last name</Label><Input value={addForm.lastName} onChange={e => setAddForm({ ...addForm, lastName: e.target.value })} /></div>
             </div>
-            <div>
-              <Label>Assign phone number (optional, sets outbound CID)</Label>
-              <Input value={addForm.assign_phone_number} onChange={e => setAddForm({ ...addForm, assign_phone_number: e.target.value.trim() })} placeholder="+15145551234" />
+            <div><Label>Email</Label><Input type="email" value={addForm.email} onChange={e => setAddForm({ ...addForm, email: e.target.value.toLowerCase() })} /></div>
+            <div><Label>Phone</Label><Input value={addForm.phone} onChange={e => setAddForm({ ...addForm, phone: e.target.value })} placeholder="+15145551234" /></div>
+            <div className="border rounded-lg p-3 space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-semibold">SIP credentials</Label>
+                <Button size="sm" variant="ghost" onClick={suggestExtension}>Auto-fill</Button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div><Label className="text-xs">Extension *</Label><Input value={addForm.extension} onChange={e => setAddForm({ ...addForm, extension: e.target.value })} placeholder="1001" /></div>
+                <div>
+                  <Label className="text-xs">SIP password</Label>
+                  <div className="flex gap-1">
+                    <Input value={addForm.sip_password} onChange={e => setAddForm({ ...addForm, sip_password: e.target.value })} placeholder="auto" />
+                    <Button type="button" size="sm" variant="outline" onClick={() => setAddForm({ ...addForm, sip_password: genPass() })}>↻</Button>
+                  </div>
+                </div>
+              </div>
+              <div><Label className="text-xs">Caller ID number (outbound)</Label><Input value={addForm.caller_id_number} onChange={e => setAddForm({ ...addForm, caller_id_number: e.target.value })} placeholder="+15145551234" /></div>
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2 text-sm"><Switch checked={addForm.vm_enabled} onCheckedChange={v => setAddForm({ ...addForm, vm_enabled: v })} />Voicemail</label>
+                {addForm.vm_enabled && (
+                  <div className="flex gap-1 items-center">
+                    <Label className="text-xs">PIN</Label>
+                    <Input className="w-24" value={addForm.vm_pin} onChange={e => setAddForm({ ...addForm, vm_pin: e.target.value })} placeholder="auto" />
+                    <Button type="button" size="sm" variant="outline" onClick={() => setAddForm({ ...addForm, vm_pin: genPin() })}>↻</Button>
+                  </div>
+                )}
+              </div>
             </div>
             <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={addForm.send_welcome_email}
-                onChange={e => setAddForm({ ...addForm, send_welcome_email: e.target.checked })}
-              />
+              <input type="checkbox" checked={addForm.send_welcome_email} onChange={e => setAddForm({ ...addForm, send_welcome_email: e.target.checked })} />
               Send welcome email with credentials (requires email)
             </label>
           </div>
@@ -418,6 +469,55 @@ export default function CustomerDetail() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Credentials shown after creation */}
+      <Dialog open={!!createdCreds} onOpenChange={(o) => !o && setCreatedCreds(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Extension {createdCreds?.extension} created</DialogTitle></DialogHeader>
+          {createdCreds && (
+            <div className="space-y-2">
+              <div className="border rounded-lg p-3 font-mono text-xs space-y-1 bg-muted/40">
+                <div><span className="text-muted-foreground">SIP Domain:</span> {createdCreds.sip_domain}</div>
+                <div><span className="text-muted-foreground">Extension:</span> {createdCreds.extension}</div>
+                <div><span className="text-muted-foreground">Password:</span> {createdCreds.password}</div>
+                <div><span className="text-muted-foreground">WSS Server:</span> {createdCreds.wss}</div>
+                {createdCreds.vm_pin && <div><span className="text-muted-foreground">Voicemail PIN:</span> {createdCreds.vm_pin}</div>}
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={() => {
+                  const t = `SIP Domain: ${createdCreds.sip_domain}\nExtension: ${createdCreds.extension}\nPassword: ${createdCreds.password}\nWSS: ${createdCreds.wss}${createdCreds.vm_pin ? `\nVoicemail PIN: ${createdCreds.vm_pin}` : ''}`;
+                  navigator.clipboard.writeText(t); toast.success('Copied');
+                }}>Copy all</Button>
+                {createdCreds.email && (
+                  <Button size="sm" variant="outline" onClick={async () => {
+                    await supabase.functions.invoke('customer-users-import', {
+                      body: { organizationId: org?.id, domain_uuid: domainUuid, domain_name: domain?.domain_name, send_welcome_email: true, users: [{ extension: createdCreds.extension, email: createdCreds.email, password: createdCreds.password, resend_only: true }] },
+                    });
+                    toast.success('Email sent');
+                  }}>Send via email</Button>
+                )}
+              </div>
+            </div>
+          )}
+          <DialogFooter><Button onClick={() => setCreatedCreds(null)}>Close</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {domain && (
+        <>
+          <IvrCreateDialog open={ivrOpen} onOpenChange={setIvrOpen}
+            domainUuid={domainUuid} domainName={domain.domain_name}
+            extensions={extensions as any[]} ringGroups={ringGroups as any[]} queues={queues as any[]}
+            onCreated={() => qc.invalidateQueries({ queryKey: ['fpbx', 'ivrs', domainUuid] })} />
+          <RingGroupCreateDialog open={rgOpen} onOpenChange={setRgOpen}
+            domainUuid={domainUuid} domainName={domain.domain_name}
+            extensions={extensions as any[]}
+            onCreated={() => qc.invalidateQueries({ queryKey: ['fpbx', 'rg', domainUuid] })} />
+          <QueueCreateDialog open={queueOpen} onOpenChange={setQueueOpen}
+            domainUuid={domainUuid} extensions={extensions as any[]}
+            onCreated={() => qc.invalidateQueries({ queryKey: ['fpbx', 'queues', domainUuid] })} />
+        </>
+      )}
 
       <Dialog open={inviteOpen} onOpenChange={(o) => { setInviteOpen(o); if (!o) { setInviteResult(null); setInviteEmail(''); } }}>
         <DialogContent>
