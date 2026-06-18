@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { runTranscribeAndAnalyze, estimateQuality, isStubTranscript, type TranscriptStage } from '@/lib/transcriptStatus';
 import { TranscriptStagePill } from '@/components/transcripts/TranscriptStagePill';
+import { PendingSyncMetricsCard } from '@/components/transcripts/PendingSyncMetricsCard';
 
 
 const isRecordingListChange = (payload: any) => {
