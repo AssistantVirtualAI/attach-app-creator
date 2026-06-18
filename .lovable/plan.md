@@ -1,40 +1,56 @@
-## Problem
+## Scope
 
-On `/org/lemtel/admin/customers` (`src/pages/lemtel/LemtelCustomers.tsx`):
+Rework `src/pages/lemtel/CustomerDetail.tsx` (the per-domain admin page reached from the Customers list) so each domain is fully readable, syncable and editable against FusionPBX, and fix the "Manage as this tenant" button.
 
-1. The **Extensions** column shows `0` for most domains because it counts rows in the local `pbx_extensions` cache. That cache is only populated for domains that have been synced — domains with extensions on the FusionPBX server but no local sync show `0`.
-2. Clicking a row navigates to the internal admin detail page (`/org/lemtel/admin/customers/:uuid`) — a Lemtel-staff view. You want clicking the domain to drop you straight into that customer's portal so you can manage their phone system end-to-end (extensions, queues, IVRs, DIDs, etc.) as if you were them.
+## Changes
 
-## Changes (UI only — file: `src/pages/lemtel/LemtelCustomers.tsx`)
+### 1. Remove the Users tab
 
-### 1. Live extension counts per domain
+- Drop the `users` tab and all of its UI (CSV import, Add user dialog, invite-admin section, `spUsers` table, related state). The remaining tabs already cover what's needed.
+- Set the default `tab` to `extensions` (current default is `users`).
+- Keep `customer-invite-admin` reachable from the top header as a small "Invite admin" button (so admin promotion isn't lost) — it has no dependency on the Users tab.
 
-- Add a new React Query `['fusionpbx', 'ext-counts']` that calls the existing `fusionpbx-proxy` edge function with `action: 'list-extensions-counts'` (preferred) **or**, if the proxy doesn't support a counts action, fans out one `list-extensions` call per domain in parallel (using `Promise.all`) and stores `{ [domain_uuid]: number }`.
-- The query depends on `domains` and is enabled once `domains.length > 0`.
-- Merge the live count with the local cache count: display `liveCount ?? localCount`, falling back to a tiny spinner while loading, so the column is never stuck at `0` when extensions actually exist on the PBX.
-- Add a small "live" indicator (muted dot) when the number came from the PBX directly.
+### 2. Complete domain sync (one-click, all resources)
 
-### 2. Click row → enter customer portal
+- Rewrite `syncAll` to call `fusionpbx-proxy` `sync-all` with **all** supported resources: `['extensions','devices','ivrs','queues','ring_groups','gateways','destinations','users','cdrs']`, followed by `sync-ivr-options` and `sync-voicemail-messages` for the same domain. Sequential so the toast can show progress per phase.
+- The "Sync" button in the header becomes "Full sync from PBX" with a small spinner + stats toast (`X extensions, Y queues, …` from the `stats` object the function returns).
+- Invalidate every `['fpbx', …, domainUuid]` query plus DB-backed queries (`pbx_extensions`, `pbx_call_records`, `pbx_voicemails`) after sync.
 
-- Replace the row-level `onClick` (currently `window.location.href = '/org/lemtel/admin/customers/${uuid}'`) with the same flow as the existing `manageAs(d)` button:
-  - Pin `lemtel.activeDomain` in sessionStorage.
-  - Call `impersonation.enter(org.id, org.name)`.
-  - Navigate to that customer's cockpit: `/domain/${org.slug}/admin/dashboard` if a slug exists, otherwise `/console` (current fallback).
-- If the domain has **no linked tenant org**, show a toast (already exists in `manageAs`) and keep the row non-clickable instead of silently failing.
-- Keep the existing per-row action buttons (Sync, Edit, Delete, Copy portal link, "Open" detail link) untouched and `stopPropagation` so they still work. Rename the small `LogIn` button tooltip from "Manage as this customer" → "Open customer portal" for clarity, since the whole row now does it.
-- Keep the existing "Open" button pointing to the internal admin detail page for cases where staff want the Lemtel-side record view.
+### 3. Editable / manageable tabs
 
-### 3. Small polish
+Replace the read-only `SimpleList` usages with real management tables. All write actions go through `pbx-write` `update-*` / `delete-*` and refetch on success.
 
-- Add `title="Click to open this customer's portal"` on the row and a chevron-right hint that's already there.
-- Loading state: while `ext-counts` is fetching, show `…` instead of `0` for that domain only.
+- **Extensions tab**: reuse the new `ExtensionsPanel`-style UI (checkbox multi-select, inline Edit / Enable-Disable / Reset-VM, bulk actions, retry + Sync now) that already exists in `LemtelCustomers.tsx`. Extract it to `src/components/lemtel/ExtensionsPanel.tsx` so both pages share it.
+- **IVR tab**: keep current table; add Enable/Disable toggle (`update-ivr` with `ivr_menu_enabled`) and Delete (`delete-ivr`) per row, alongside the existing "Manage options".
+- **Queues tab**: editable table with columns Name / Extension / Strategy / Enabled / Actions (toggle enabled, delete). Wired to `update-queue` / `delete-queue`.
+- **Ring Groups tab**: editable table (toggle enabled, delete) → `update-ring-group` / `delete-ring-group`.
+- **Devices tab (new)**: list `list-devices`; columns MAC / template / extension / enabled; actions edit description + toggle enabled + delete via `update-device` / `delete-device`.
+- **Destinations tab (new)**: list `list-destinations`; columns Number / Context / Destination action / Enabled; inline edit destination target + enable/disable.
+- **Recordings tab**: keep current Play/Hide UI; add a Delete button (DB delete on `pbx_call_records.recording_path` cleared) — non-destructive on PBX, just hides locally.
+- **Music on Hold tab**: keep read-only list (no PBX write action available); add an upload button stub that calls existing `lemtel_ivr_audio`-style storage helper if present, otherwise hide if no helper exists.
+- **Phone Numbers tab**: already managed by `PhoneNumbersTab` — no change.
+
+### 4. Fix "Manage as this tenant"
+
+The button is disabled because `org` is null when the FusionPBX domain has no matching `organizations` row.
+
+- Detect that case and replace the disabled button with a **"Link tenant org"** action. It opens a small dialog with one field (org name, prefilled from `domain_description` or domain prefix) and calls the existing `setup_customer_organization(_name, _slug, _domain_uuid, _domain_name, _admin_email)` RPC. On success it refetches the org query so the button enables.
+- When `org` exists, keep the current `impersonate()` flow but: (a) navigate to `/domain/${org.slug}/admin/dashboard` when a slug exists (matches the LemtelCustomers row click), falling back to `/console`; (b) await both `sessionStorage.setItem` and `impersonation.enter` before navigating so the next page boots with the right tenant context.
+- Add an inline status pill near the title: green "Linked: {org.name}" or amber "No tenant org — click Link tenant org".
+
+### 5. Code hygiene
+
+- Remove now-unused imports (`Upload`, `UserPlus`, `Mail`, `SendAppInviteButtons`, `customer-users-import` calls, CSV parsing helpers) after deleting the Users tab.
+- Extract repetitive `pbx-write` toggle/delete helpers into a small local `usePbxAction(domainUuid)` hook inside the file.
 
 ## Out of scope
 
-- No backend / edge-function changes unless the `list-extensions` proxy can't be called per-domain (it already can — that's how `ConsoleExtensions` syncs).
-- No changes to the customer portal pages themselves.
-- No changes to permissions / RLS.
+- Backend / edge-function changes. `sync-all`, `update-*`, `delete-*` actions already exist in `fusionpbx-proxy` / `pbx-write`.
+- The other Lemtel admin pages (Customers list etc.) — already handled in the previous turn.
+- Auth/RLS changes.
 
 ## Files touched
 
-- `src/pages/lemtel/LemtelCustomers.tsx` (single file, UI only).
+- `src/pages/lemtel/CustomerDetail.tsx` (main rewrite)
+- New: `src/components/lemtel/ExtensionsPanel.tsx` (extracted from `LemtelCustomers.tsx`)
+- `src/pages/lemtel/LemtelCustomers.tsx` (swap inline `ExtensionsPanel` → import the shared component)
