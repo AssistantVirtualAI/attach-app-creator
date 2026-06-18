@@ -189,6 +189,16 @@ export default function OrgChatView() {
     setTypingNames([]);
 
 
+  // Messages
+  useEffect(() => {
+    if (!activeId) return;
+    let cancelled = false;
+    setTypingNames([]);
+
+    // Hydrate immediately from module-level cache so the UI never appears empty.
+    const cached = cacheGet(activeId);
+    if (cached.length) setMessages(cached);
+
     (async () => {
       const { data, error } = await supabase.from('org_chat_messages')
         .select('id,channel_id,sender_id,sender_name,content,created_at,reactions,attachments,message_type,edited_at')
@@ -200,15 +210,27 @@ export default function OrgChatView() {
         setErrMsg(`Messages error: ${error.message}`);
         return;
       }
-      setMessages((prev) => mergeOnFetch(prev as any, (data ?? []) as any, activeId) as any);
+      setMessages((prev) => {
+        const next = mergeOnFetch(prev as any, (data ?? []) as any, activeId) as Message[];
+        cacheSet(activeId, next);
+        return next;
+      });
     })();
 
     // Standardized realtime channel name (matches src/hooks/useOrgChat.ts).
     const ch = supabase.channel(`org-chat-${activeId}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'org_chat_messages', filter: `channel_id=eq.${activeId}` },
-        (payload) => setMessages((m) => mergeIncoming(m as any, [payload.new as any], activeId) as any))
+        (payload) => setMessages((m) => {
+          const next = mergeIncoming(m as any, [payload.new as any], activeId) as Message[];
+          cacheSet(activeId, next);
+          return next;
+        }))
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'org_chat_messages', filter: `channel_id=eq.${activeId}` },
-        (payload) => setMessages((m) => m.map((x) => x.id === (payload.new as any).id ? (payload.new as Message) : x)))
+        (payload) => setMessages((m) => {
+          const next = m.map((x) => x.id === (payload.new as any).id ? (payload.new as Message) : x);
+          cacheSet(activeId, next);
+          return next;
+        }))
       .subscribe();
 
 
