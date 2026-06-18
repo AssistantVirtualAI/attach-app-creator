@@ -240,14 +240,14 @@ export function IvrOptionsDialog({
       );
     }
     return (
-      <div key={o.ivr_menu_option_uuid} className="flex items-center gap-3 border rounded p-2">
+      <div key={o.ivr_menu_option_uuid} className={`flex items-center gap-3 border rounded p-2 ${o._pending ? 'opacity-60 animate-pulse' : ''}`}>
         <Badge variant="outline" className="font-mono text-base px-3">{o.ivr_menu_option_digits}</Badge>
         <div className="flex-1 min-w-0">
           <div className="text-sm truncate">{o.ivr_menu_option_description || <span className="text-muted-foreground italic">No label</span>}</div>
-          <div className="text-xs text-muted-foreground capitalize">{destType}{destValue ? ` · ${destValue}` : ''}</div>
+          <div className="text-xs text-muted-foreground capitalize">{destType}{destValue ? ` · ${destValue}` : ''}{o._pending ? ' · saving…' : ''}</div>
         </div>
-        <Button size="icon" variant="ghost" onClick={() => startEdit(o)} disabled={busy}><Pencil className="w-3 h-3" /></Button>
-        <Button size="icon" variant="ghost" onClick={() => del(o)} disabled={busy}><Trash2 className="w-3 h-3" /></Button>
+        <Button size="icon" variant="ghost" onClick={() => startEdit(o)} disabled={busy || o._pending}><Pencil className="w-3 h-3" /></Button>
+        <Button size="icon" variant="ghost" onClick={() => del(o)} disabled={busy || o._pending}><Trash2 className="w-3 h-3" /></Button>
       </div>
     );
   };
