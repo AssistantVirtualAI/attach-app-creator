@@ -38,12 +38,14 @@ Deno.serve(async (req) => {
     const { validateTwilioSignature } = await import('../_shared/twilio.ts');
     const twilioAuthToken = Deno.env.get('TWILIO_AUTH_TOKEN');
     const signature = req.headers.get('X-Twilio-Signature') || '';
-    if (twilioAuthToken) {
-      const isValid = await validateTwilioSignature(twilioAuthToken, signature, req.url, data);
-      if (!isValid) {
-        console.warn('Invalid Twilio signature for status callback');
-        return new Response('Forbidden', { status: 403, headers: corsHeaders });
-      }
+    if (!twilioAuthToken) {
+      console.error('TWILIO_AUTH_TOKEN not configured — rejecting status callback');
+      return new Response('Server misconfigured', { status: 500, headers: corsHeaders });
+    }
+    const isValid = await validateTwilioSignature(twilioAuthToken, signature, req.url, data);
+    if (!isValid) {
+      console.warn('Invalid Twilio signature for status callback');
+      return new Response('Forbidden', { status: 403, headers: corsHeaders });
     }
 
     console.log('Twilio Status Callback received:', JSON.stringify(data, null, 2));

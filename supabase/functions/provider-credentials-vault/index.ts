@@ -29,11 +29,12 @@ function bytesToB64(bytes: Uint8Array): string {
 let cryptoKeyPromise: Promise<CryptoKey> | null = null;
 function getKey(): Promise<CryptoKey> {
   if (cryptoKeyPromise) return cryptoKeyPromise;
-  let raw = b64ToBytes(ENC_KEY_B64 || btoa('lemtel-dev-key-32bytes-padding!!')).slice(0, 32);
+  if (!ENC_KEY_B64) {
+    throw new Error('PBX_ENCRYPTION_KEY is not configured');
+  }
+  let raw = b64ToBytes(ENC_KEY_B64).slice(0, 32);
   if (raw.length < 32) {
-    const padded = new Uint8Array(32);
-    padded.set(raw);
-    raw = padded;
+    throw new Error('PBX_ENCRYPTION_KEY must decode to at least 32 bytes');
   }
   cryptoKeyPromise = crypto.subtle.importKey('raw', raw, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
   return cryptoKeyPromise;
@@ -177,7 +178,14 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'audit') {
-      await audit(body.event || 'test', body.field || null, body.metadata || {});
+      // Only privileged users may write arbitrary audit entries (prevents log poisoning).
+      if (!(await isPrivileged())) {
+        return j({ error: 'forbidden' }, 403);
+      }
+      const allowed = new Set(['test', 'view', 'reveal', 'update', 'denied']);
+      const evt = String(body.event || 'test');
+      if (!allowed.has(evt)) return j({ error: 'invalid_event' }, 400);
+      await audit(evt, body.field || null, body.metadata || {});
       return j({ ok: true });
     }
 

@@ -12,7 +12,10 @@ const LEMTEL_ORG_ID = "71755d33-ed64-4ad5-a828-61c9d2029eb7";
 
 async function verifyTelnyxSignature(rawBody: string, signature: string | null, timestamp: string | null): Promise<boolean> {
   const pubKey = Deno.env.get("TELNYX_PUBLIC_KEY");
-  if (!pubKey) return true; // skip when not configured
+  if (!pubKey) {
+    console.error("TELNYX_PUBLIC_KEY not configured — rejecting webhook");
+    return false;
+  }
   if (!signature || !timestamp) return false;
   try {
     const key = await crypto.subtle.importKey(
