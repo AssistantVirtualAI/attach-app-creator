@@ -21,7 +21,7 @@ interface Props {
  * Click-to-call and click-to-transfer from BLF rows.
  * Keyboard shortcuts handled by parent (useShortcuts hook).
  */
-export default function CallControlGrid({ organizationId, onDial, onTransfer }: Props) {
+function CallControlGridImpl({ organizationId, onDial, onTransfer }: Props) {
   const [members, setMembers] = useState<Member[]>([]);
   const [activeLines, setActiveLines] = useState<any[]>([]);
   const [parked, setParked] = useState<any[]>([]);
