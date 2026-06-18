@@ -266,11 +266,14 @@ export default function SoftphonePane({
     if (micPermission === 'denied') { await requestMic(); return; }
     if (!sipReady) return;
     setCallBusy(true);
-    try {
-      await sp.call(dial);
-    } finally {
+    // Defer the (potentially expensive) JsSIP `call()` out of the click handler
+    // so React can paint the busy-state first. Wide-layout side panels otherwise
+    // re-render synchronously with the SIP session creation and freeze the UI.
+    const target = dial;
+    setTimeout(() => {
+      try { sp.call(target); } catch (e) { console.warn('[softphone] call failed', e); }
       setTimeout(() => setCallBusy(false), 1500);
-    }
+    }, 0);
   };
 
   const syncPhoneSystem = async () => {
