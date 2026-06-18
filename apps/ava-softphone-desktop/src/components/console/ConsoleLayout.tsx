@@ -291,3 +291,59 @@ export default function ConsoleLayout({
     </div>
   );
 }
+
+// Memoized wide dialer panel. Isolates dialer keystrokes from the parent
+// ConsoleLayout so typing digits never triggers a re-render of the rest of
+// the console (presence, timers, sync banners, etc.). Fixes the wide-mode
+// dialer freeze on phone-number entry.
+const dispatchDial = (n: string) =>
+  window.dispatchEvent(new CustomEvent('lemtel:dial-number', { detail: { number: n } }));
+
+const WideDialerPanel = React.memo(function WideDialerPanel({
+  creds, orgId, onOpenSettings,
+}: { creds: Creds; orgId: string; onOpenSettings: () => void }) {
+  return (
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: 'minmax(420px, 480px) 1fr',
+      gap: 24,
+      width: '100%', maxWidth: 1440, margin: '0 auto',
+      padding: '8px 24px 16px',
+      height: '100%', minHeight: 0,
+      alignItems: 'stretch',
+      willChange: 'transform',
+      contain: 'layout paint',
+    }}>
+      <div style={{
+        background: c.bgCard, border: `1px solid ${c.border}`,
+        borderRadius: 22, padding: 8,
+        boxShadow: '0 18px 48px -28px rgba(0,35,230,0.28)',
+        minHeight: 0, display: 'flex', flexDirection: 'column',
+        contain: 'layout paint',
+      }}>
+        <SoftphonePane creds={creds} onOpenSettings={onOpenSettings} hideTabs />
+      </div>
+      <div style={{ display: 'grid', gridTemplateRows: '1fr 1fr', gap: 16, minHeight: 0 }}>
+        <div style={{
+          background: c.bgCard, border: `1px solid ${c.border}`,
+          borderRadius: 22, padding: 4, overflow: 'hidden',
+          boxShadow: '0 18px 48px -28px rgba(0,35,230,0.20)',
+          minHeight: 0,
+        }}>
+          <CallControlGrid organizationId={orgId} onDial={dispatchDial} />
+        </div>
+        <div style={{
+          background: c.bgCard, border: `1px solid ${c.border}`,
+          borderRadius: 22, padding: 14, overflow: 'auto',
+          boxShadow: '0 18px 48px -28px rgba(0,35,230,0.20)',
+          minHeight: 0,
+        }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', color: c.textSub, marginBottom: 10 }}>
+            Recent calls
+          </div>
+          <RecentsList extension={creds.extension} onCall={dispatchDial} />
+        </div>
+      </div>
+    </div>
+  );
+});
