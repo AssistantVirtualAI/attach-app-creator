@@ -49,11 +49,16 @@ Deno.serve(async (req) => {
   try {
     const auth = req.headers.get("Authorization");
     if (!auth?.startsWith("Bearer ")) return json({ error: "Unauthorized" }, 401);
-    const userClient = createClient(SUPABASE_URL, ANON, { global: { headers: { Authorization: auth } } });
     const token = auth.replace("Bearer ", "");
-    const { data: claims, error: authErr } = await userClient.auth.getClaims(token);
-    if (authErr || !claims?.claims?.sub) return json({ error: "Unauthorized" }, 401);
-    const userId = claims.claims.sub as string;
+    const isService = token === SERVICE_ROLE;
+
+    let userId: string | null = null;
+    if (!isService) {
+      const userClient = createClient(SUPABASE_URL, ANON, { global: { headers: { Authorization: auth } } });
+      const { data: claims, error: authErr } = await userClient.auth.getClaims(token);
+      if (authErr || !claims?.claims?.sub) return json({ error: "Unauthorized" }, 401);
+      userId = claims.claims.sub as string;
+    }
 
     const body = await req.json().catch(() => ({}));
     const { callId, force } = body ?? {};
@@ -68,6 +73,13 @@ Deno.serve(async (req) => {
       .single();
     if (callErr || !call) return json({ error: "Call not found" }, 404);
 
+    // Idempotency key — same callId + recording URL = same logical request.
+    const recordingVersion = call.recording_url
+      ? Array.from(new Uint8Array(await crypto.subtle.digest("SHA-1", new TextEncoder().encode(call.recording_url))))
+          .map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 16)
+      : "no-url";
+    const idempotencyKey = `${callId}:${recordingVersion}`;
+
     const audit = async (event: string, status: string, extra: Record<string, unknown> = {}) => {
       await admin.from("call_intelligence_audit").insert({
         run_id: runId,
@@ -78,20 +90,44 @@ Deno.serve(async (req) => {
         forced: !!force,
         triggered_by: userId,
         duration_ms: Date.now() - startedAt,
+        idempotency_key: idempotencyKey,
         ...extra,
       });
     };
 
-    // Membership / super admin check
-    const { data: member } = await admin
-      .from("organization_members")
-      .select("id")
-      .eq("user_id", userId)
-      .eq("organization_id", call.organization_id)
-      .maybeSingle();
-    if (!member) {
-      const { data: isSa } = await admin.rpc("is_super_admin", { _user_id: userId });
-      if (!isSa) return json({ error: "Forbidden" }, 403);
+    // Membership / super admin check (skipped for internal service-role calls)
+    if (!isService && userId) {
+      const { data: member } = await admin
+        .from("organization_members")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("organization_id", call.organization_id)
+        .maybeSingle();
+      if (!member) {
+        const { data: isSa } = await admin.rpc("is_super_admin", { _user_id: userId });
+        if (!isSa) return json({ error: "Forbidden" }, 403);
+      }
+    }
+
+    // Early dedup via idempotency key — same recording version already running/done in last 5 min
+    if (!force) {
+      const since = new Date(Date.now() - 5 * 60_000).toISOString();
+      const { data: recentRun } = await admin
+        .from("call_intelligence_audit")
+        .select("status, run_id")
+        .eq("idempotency_key", idempotencyKey)
+        .gte("created_at", since)
+        .in("status", ["queued", "processing", "analyzed"])
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (recentRun) {
+        return json({
+          status: recentRun.status === "analyzed" ? "cached" : "processing",
+          message: `Deduped via idempotency key (existing run ${(recentRun as any).run_id.slice(0,8)})`,
+          idempotency_key: idempotencyKey,
+        }, recentRun.status === "analyzed" ? 200 : 202);
+      }
     }
 
     // Short-circuit: already processed

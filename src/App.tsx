@@ -116,6 +116,7 @@ import LemtelDevices from "./pages/lemtel/LemtelDevices";
 import TelephonyDashboard from "./pages/telephony/TelephonyDashboard";
 import TelephonySettings from "./pages/telephony/TelephonySettings";
 import TelephonyRecordings from "./pages/telephony/TelephonyRecordings";
+import CallIntelligenceDashboard from "./pages/admin/CallIntelligenceDashboard";
 import TelephonyMediaCenter from "./pages/telephony/TelephonyMediaCenter";
 import TelephonyRingGroups from "./pages/telephony/TelephonyRingGroups";
 import TelephonyAI from "./pages/telephony/TelephonyAI";
@@ -668,6 +669,7 @@ const App = () => (
                 <Route path="/org/lemtel/telephony/devices" element={<LemtelTelephonyPage><LemtelDevices /></LemtelTelephonyPage>} />
                 <Route path="/org/lemtel/telephony/calls" element={<LemtelTelephonyPage><LemtelPortalCalls /></LemtelTelephonyPage>} />
                 <Route path="/org/lemtel/telephony/recordings" element={<LemtelTelephonyPage><TelephonyRecordings /></LemtelTelephonyPage>} />
+                <Route path="/org/lemtel/telephony/ai-pipeline" element={<LemtelTelephonyPage><CallIntelligenceDashboard /></LemtelTelephonyPage>} />
                 <Route path="/org/lemtel/telephony/media" element={<LemtelTelephonyPage><TelephonyMediaCenter scope="org" /></LemtelTelephonyPage>} />
                 <Route path="/org/lemtel/telephony/ivr" element={<LemtelTelephonyPage><LemtelIVR /></LemtelTelephonyPage>} />
                 <Route path="/org/lemtel/telephony/queues" element={<LemtelTelephonyPage><LemtelQueues /></LemtelTelephonyPage>} />

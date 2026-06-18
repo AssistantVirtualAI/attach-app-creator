@@ -1235,6 +1235,7 @@ export type Database = {
           event: string
           forced: boolean
           id: string
+          idempotency_key: string | null
           metadata: Json
           organization_id: string
           pipeline: string | null
@@ -1252,6 +1253,7 @@ export type Database = {
           event: string
           forced?: boolean
           id?: string
+          idempotency_key?: string | null
           metadata?: Json
           organization_id: string
           pipeline?: string | null
@@ -1269,6 +1271,7 @@ export type Database = {
           event?: string
           forced?: boolean
           id?: string
+          idempotency_key?: string | null
           metadata?: Json
           organization_id?: string
           pipeline?: string | null
@@ -9130,6 +9133,25 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      call_intel_failure_reasons: {
+        Row: {
+          count: number | null
+          day: string | null
+          error: string | null
+          organization_id: string | null
+          pipeline: string | null
+        }
+        Relationships: []
+      }
+      call_intel_pipeline_stats: {
+        Row: {
+          count: number | null
+          day: string | null
+          organization_id: string | null
+          status: string | null
+        }
+        Relationships: []
       }
       client_members_safe: {
         Row: {
