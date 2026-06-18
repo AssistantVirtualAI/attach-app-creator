@@ -24,6 +24,8 @@ import { QueueCreateDialog } from '@/components/lemtel/QueueCreateDialog';
 import { PhoneNumbersTab } from '@/components/lemtel/PhoneNumbersTab';
 import { IvrOptionsDialog } from '@/components/lemtel/IvrOptionsDialog';
 import { ExtensionsPanel, type LiveState } from '@/components/lemtel/ExtensionsPanel';
+import { PbxRowEditDialog } from '@/components/lemtel/PbxRowEditDialog';
+import { DeviceCreateDialog } from '@/components/lemtel/DeviceCreateDialog';
 import { LEMTEL_ORG_ID } from '@/hooks/useLemtelAccess';
 
 async function pbxList(action: string, domain_uuid: string) {
