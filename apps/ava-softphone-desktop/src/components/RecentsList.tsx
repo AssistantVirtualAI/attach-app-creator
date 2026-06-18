@@ -28,7 +28,7 @@ function fmtDur(s: number) {
   return m > 0 ? `${m}m ${sec}s` : `${sec}s`;
 }
 
-export default function RecentsList({ extension, onCall }: Props) {
+function RecentsListImpl({ extension, onCall }: Props) {
   const [rows, setRows] = useState<CallRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -147,3 +147,6 @@ const refreshBtn: React.CSSProperties = {
   color: '#FFD700', borderRadius: 8, width: 28, height: 28,
   cursor: 'pointer', fontSize: 13,
 };
+
+export default React.memo(RecentsListImpl);
+

@@ -21,7 +21,7 @@ interface Props {
  * Click-to-call and click-to-transfer from BLF rows.
  * Keyboard shortcuts handled by parent (useShortcuts hook).
  */
-export default function CallControlGrid({ organizationId, onDial, onTransfer }: Props) {
+function CallControlGridImpl({ organizationId, onDial, onTransfer }: Props) {
   const [members, setMembers] = useState<Member[]>([]);
   const [activeLines, setActiveLines] = useState<any[]>([]);
   const [parked, setParked] = useState<any[]>([]);
@@ -132,3 +132,6 @@ const btnStyle: React.CSSProperties = {
   background: 'rgba(0,35,230,0.2)', color: '#e2e8f0', border: '1px solid rgba(0,35,230,0.4)',
   borderRadius: 4, padding: '2px 8px', fontSize: 11, cursor: 'pointer',
 };
+
+export default React.memo(CallControlGridImpl);
+
