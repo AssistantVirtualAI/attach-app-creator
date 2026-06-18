@@ -105,6 +105,7 @@ export function IvrOptionsDialog({
       if (error) throw error;
       toast.success(editId ? 'Option updated' : 'Option added');
       cancel();
+      await qc.invalidateQueries({ queryKey });
       await refetch();
       qc.invalidateQueries({ queryKey: ['fpbx', 'ivrs'] });
     } catch (e: any) { toast.error(e?.message || 'Failed'); }
@@ -120,7 +121,9 @@ export function IvrOptionsDialog({
       });
       if (error) throw error;
       toast.success('Option deleted');
+      await qc.invalidateQueries({ queryKey });
       await refetch();
+      qc.invalidateQueries({ queryKey: ['fpbx', 'ivrs'] });
     } catch (e: any) { toast.error(e?.message || 'Failed'); }
     finally { setBusy(false); }
   };
