@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Search, X } from 'lucide-react';
 import { useParams, Link } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -139,7 +141,47 @@ export default function CustomerDetail() {
     enabled: tab === 'history',
   });
 
-  // Full sync from PBX
+  // Search / filter state for Call History & Recordings
+  const [histQ, setHistQ] = useState('');
+  const [histFrom, setHistFrom] = useState('');
+  const [histTo, setHistTo] = useState('');
+  const [histExt, setHistExt] = useState('all');
+  const [recQ, setRecQ] = useState('');
+  const [recFrom, setRecFrom] = useState('');
+  const [recTo, setRecTo] = useState('');
+  const [recExt, setRecExt] = useState('all');
+
+  const applyFilters = (rows: any[], q: string, from: string, to: string, ext: string) => {
+    const needle = q.trim().toLowerCase();
+    const fromTs = from ? new Date(from).getTime() : null;
+    const toTs = to ? new Date(to).getTime() + 86_400_000 : null;
+    return rows.filter((r: any) => {
+      if (ext !== 'all' && String(r.extension ?? '') !== ext) return false;
+      if (fromTs && new Date(r.start_at).getTime() < fromTs) return false;
+      if (toTs && new Date(r.start_at).getTime() > toTs) return false;
+      if (needle) {
+        const hay = `${r.caller_number ?? ''} ${r.destination_number ?? ''} ${r.extension ?? ''}`.toLowerCase();
+        if (!hay.includes(needle)) return false;
+      }
+      return true;
+    });
+  };
+
+  const extOptions = useMemo(() => {
+    const list = (extensions as any[]).map((e: any) => String(e.extension)).filter(Boolean);
+    return Array.from(new Set(list)).sort();
+  }, [extensions]);
+
+  const filteredHistory = useMemo(
+    () => applyFilters(callHistory as any[], histQ, histFrom, histTo, histExt),
+    [callHistory, histQ, histFrom, histTo, histExt],
+  );
+  const filteredRecordings = useMemo(
+    () => applyFilters(recordings as any[], recQ, recFrom, recTo, recExt),
+    [recordings, recQ, recFrom, recTo, recExt],
+  );
+
+
   const syncAll = async () => {
     setSyncing(true);
     toast.loading('Syncing all resources from PBX…', { id: 'sync' });
