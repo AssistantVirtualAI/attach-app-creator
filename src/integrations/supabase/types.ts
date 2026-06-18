@@ -4232,6 +4232,8 @@ export type Database = {
           ai_model: string | null
           call_record_id: string | null
           client_id: string | null
+          coaching_notes: string[]
+          coaching_score: number | null
           created_at: string | null
           escalation_needed: boolean | null
           id: string
@@ -4252,6 +4254,8 @@ export type Database = {
           ai_model?: string | null
           call_record_id?: string | null
           client_id?: string | null
+          coaching_notes?: string[]
+          coaching_score?: number | null
           created_at?: string | null
           escalation_needed?: boolean | null
           id?: string
@@ -4272,6 +4276,8 @@ export type Database = {
           ai_model?: string | null
           call_record_id?: string | null
           client_id?: string | null
+          coaching_notes?: string[]
+          coaching_score?: number | null
           created_at?: string | null
           escalation_needed?: boolean | null
           id?: string

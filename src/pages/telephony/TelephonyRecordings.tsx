@@ -12,6 +12,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { runTranscribeAndAnalyze, estimateQuality, isStubTranscript, type TranscriptStage } from '@/lib/transcriptStatus';
 import { TranscriptStagePill } from '@/components/transcripts/TranscriptStagePill';
 import { PendingSyncMetricsCard } from '@/components/transcripts/PendingSyncMetricsCard';
+import { CallIntelligencePanel } from '@/components/calls/CallIntelligencePanel';
 
 
 const isRecordingListChange = (payload: any) => {
@@ -188,6 +189,7 @@ export default function TelephonyRecordings({ scope = 'org' }: { scope?: 'org' |
                               </div>
                             </>
                           )}
+                          <CallIntelligencePanel callId={c.id} canRegenerate />
                         </div>
                       )}
                     </>

@@ -1,46 +1,136 @@
-## Plan: Fix dialer freeze, SIP 403 loop, and transcription/AI
 
-### 1. Desktop SIP 403 keep-alive loop — circuit breaker
-File: `apps/ava-softphone-desktop/src/lib/sip/jssipProvider.ts`
+# Universal call intelligence: transcribe → analyze → coach (once per recording)
 
-- Add `authBlocked: { code: 401|403|407; reason: string; since: number } | null` flag.
-- In `registrationFailed` handler: when `status_code` is 401 / 403 / 407, set `authBlocked`, stop `keepAliveTimer`, do NOT call `ua.register()` from the `unregistered` handler.
-- In `kickReconnect` and `startKeepAlive`: short-circuit while `authBlocked` is set — log once, do not call `register()`/`start()`. (Keeps WebSocket alive but stops the credential-failure storm.)
-- Clear `authBlocked` only on:
-  - explicit `restart()` (manual user action), or
-  - a successful `softphone-sync-password` invocation that bumps `config.password` (detected by `sameConfig` returning false → fresh `init`).
-- Add a user-visible banner in `SoftphonePane.tsx` when `snap.authBlocked`: text + button "Refresh SIP credentials" that calls `softphone-sync-password` (force_local_to_pbx) then `sipProvider.restart()`.
-- Mirror the same `authBlocked` short-circuit in `src/lib/softphone/jssipProvider.ts` (web softphone) so the bug can't reappear in the web app.
+## Goal
 
-### 2. Wide-page dialer freeze on Answer
-File: `apps/ava-softphone-desktop/src/components/SoftphonePane.tsx`
+Every call recording is processed exactly **once**:
+1. Transcribed to text
+2. Analyzed (sentiment, topics, intent, satisfaction)
+3. Summarized
+4. Enriched with **action items** and **coaching notes**
 
-- Symptom matches the existing wide-mode comment on `handleCall` (line ~269): wide-mode side panels re-render synchronously with the JsSIP session and freeze the UI.
-- Apply the same defer pattern to Answer:
-  - Wrap `sp.answer()` call sites (IncomingCall `onAnswer={sp.answer}` at line 539 and the keyboard `Enter` handler at line 168) into a small `deferredAnswer()` helper that does `setTimeout(() => sp.answer(), 0)` after toggling a local `answering` busy flag.
-  - Disable Answer button while `answering` so double-clicks can't double-attach the session.
-- In `jssipProvider.attachSession`: ensure `setSinkId` / track attachment is wrapped in `queueMicrotask` and any heavy snapshot updates batched (single `update()` call, not three).
-- Also normalize the same pattern in the web `SoftphoneWidget.tsx` Answer button so the freeze doesn't recur on the web preview.
+Results are stored in the database and surfaced identically in the **admin portal**, the **desktop softphone**, and the **mobile softphone**. No app ever re-runs work that already exists.
 
-### 3. Transcription "Bucket not found" + AI `anthropic_404`
-Files: `supabase/functions/ai-transcribe-call/index.ts`, `supabase/functions/ai-analyze-call/index.ts`
+---
 
-- **Anthropic 404**: model id `claude-sonnet-4-20250514` is invalid → 404. Remove the Anthropic branch from `ai-analyze-call` and always use the Lovable AI Gateway (`google/gemini-2.5-flash` or `google/gemini-2.5-pro` for long transcripts). Drop `ANTHROPIC_API_KEY` lookups so a stale secret can't reintroduce the bad model id. Audit-log entry stays, but `provider="lovable-ai"`.
-- **Storage bucket not found**:
-  - Resolve the correct recordings bucket up front: query `storage.buckets` for `pbx-recordings` (then fallbacks `recordings`, `call-recordings`). Cache result for the request.
-  - If the parsed bucket from `recording_path` doesn't exist, skip Step 2 cleanly (no `storage:Bucket not found` error in `fetchErrors`) and jump straight to fusionpbx-proxy `get-recording`.
-  - When `recording_path` is missing or points to a non-existent bucket AND the fusionpbx-proxy returns no audio, return a typed reason `recording-not-synced` (instead of generic `no-audio`) so the UI shows "Recording not yet synced from PBX — try again in a few minutes" instead of a scary `storage:Bucket not found`.
-- **UI side** (`src/components/portal/RecordingWavePlayer.tsx` or the AI panel that displays the transcription status): when reason === `recording-not-synced`, replace "fetch errors: storage:Bucket not found" with the friendly message + a "Retry sync" button that calls `fusionpbx-proxy` `sync-all` for recordings on the current domain.
+## Single source of truth (DB)
 
-### 4. Safeguards
-- Add `provider_credentials_audit` entry on every 401/403/407 SIP failure (one per minute max) so we can trace future credential drift.
-- Add a unit test under `apps/ava-softphone-desktop/src/lib/__tests__/` that simulates a `registrationFailed` with status 403 and asserts `keepAliveTimer` stops and `kickReconnect` becomes a no-op until `restart()`.
+Reuse existing tables — no schema change required:
 
-### Files
-- Edit: `apps/ava-softphone-desktop/src/lib/sip/jssipProvider.ts`, `apps/ava-softphone-desktop/src/components/SoftphonePane.tsx`, `src/lib/softphone/jssipProvider.ts`, `src/components/softphone/SoftphoneWidget.tsx`, `supabase/functions/ai-transcribe-call/index.ts`, `supabase/functions/ai-analyze-call/index.ts`.
-- Possibly edit the recording/transcription panel component that renders "fetch errors: …".
-- New: `apps/ava-softphone-desktop/src/lib/__tests__/sip.authBlocked.test.ts`.
+- `pbx_call_transcripts` → transcript text (already exists)
+- `pbx_ai_insights` → summary, sentiment, topics, action_items, key_phrases, etc. (already exists)
+- Extend `pbx_ai_insights` with two text[] columns via migration:
+  - `coaching_notes text[]` — concrete coaching feedback for the agent
+  - `coaching_score numeric` — overall 1–5 quality rating
 
-### Out of scope
-- Backfilling `recording_path` rows that were stored with a wrong bucket name (separate data migration if needed after this lands).
-- Reworking PBX → storage recording upload pipeline.
+A recording is "fully processed" when both a transcript row AND an insight row exist for its `call_record_id`. The `pbx_call_records.transcribed` and `analyzed` boolean flags are the fast lookup signal already used by the UI.
+
+---
+
+## Single processing pipeline (edge function)
+
+Create one orchestrator function: **`process-call-recording`** (idempotent).
+
+Input: `{ callId }` (or `pbx_uuid`).
+
+Flow:
+1. Load `pbx_call_records` row + membership/permission check.
+2. **Short-circuit**: if `pbx_ai_insights` row exists AND `pbx_call_transcripts` row exists → return cached result immediately. No model calls, no billing.
+3. If no transcript:
+   - Use existing `ai-transcribe-call` (with the pending-sync exponential backoff already built last turn).
+   - On `pending_sync`, return status so the client shows the pending pill; do NOT mark analyzed.
+4. If transcript exists but no insight:
+   - Call Lovable AI Gateway (`google/gemini-3-flash-preview`) with one tool schema that returns:
+     `summary, sentiment, satisfaction_score, quality_score, intent, topics[], action_items[], coaching_notes[], coaching_score, risks[], sales_opportunities[], key_phrases[], escalation_needed`
+   - Insert into `pbx_ai_insights` (delete-then-insert keyed by `call_record_id`).
+   - Set `pbx_call_records.transcribed = true, analyzed = true`.
+5. Return the cached/just-written insight payload.
+
+Concurrency guard: use an advisory lock on `call_record_id` (or a `processing` flag with a short TTL) so two clients hitting "Analyze" at the same moment don't double-bill.
+
+The existing `ai-summarize-call` becomes a thin wrapper that calls `process-call-recording`, so existing UI keeps working.
+
+---
+
+## Auto-trigger (so users never have to click)
+
+Trigger `process-call-recording` automatically when a recording becomes available:
+- In the FusionPBX/CDR sync code path that flips `pbx_call_records.has_recording = true` (or inserts into `pbx_call_recordings`), enqueue a call to the orchestrator.
+- Also add a **backfill button + nightly cron** that finds rows where `has_recording = true AND analyzed = false` and processes them in small batches with rate-limit backoff.
+
+This guarantees the work happens once, in the background, regardless of which app the user opens first.
+
+---
+
+## Shared client hook
+
+Add `src/hooks/useCallIntelligence.ts` used by all three apps (web portal, desktop, mobile):
+
+- React Query key: `["call-intel", callId]`
+- Reads `pbx_ai_insights` + `pbx_call_transcripts` directly (RLS scoped).
+- If missing, calls `process-call-recording` once and caches the result.
+- Exposes `{ transcript, summary, sentiment, actionItems, coachingNotes, coachingScore, status }`.
+- Long `staleTime` (e.g. 24h) — insights are immutable per recording.
+
+Mirror the hook into `apps/ava-softphone-desktop/src/hooks/` and `apps/ava-softphone-mobile/src/hooks/` (same logic, same query key shape).
+
+---
+
+## UI surfaces (read-only consumers of the same data)
+
+All three apps render the same `<CallIntelligencePanel />` component (per-app copy, identical contract):
+
+- **Summary** (2–4 sentences)
+- **Sentiment + satisfaction + quality score** badges
+- **Action items** checklist
+- **Coaching notes** section with score
+- **Transcript** (collapsible)
+- **Pending sync** pill (reuses last turn's component) when transcript isn't ready yet
+- **"Force re-analyze"** button — admin-only, sends `{ force: true }`
+
+Surfaces to wire:
+- Portal: `src/pages/telephony/TelephonyRecordings.tsx`, conversation detail dialogs, `MyRecordings.tsx`
+- Desktop: call history detail pane in `apps/ava-softphone-desktop/src/components/`
+- Mobile: recording detail screen in `apps/ava-softphone-mobile/src/screens/`
+
+---
+
+## "Done once" guarantees
+
+1. DB short-circuit in `process-call-recording` (step 2 above).
+2. Advisory lock prevents concurrent duplicates.
+3. Client hook caches via React Query + DB row; never calls the function if rows exist.
+4. Auto-trigger on recording arrival means the typical case is "already done before user opens it".
+5. Only `force: true` (admin) bypasses the cache.
+
+---
+
+## Technical details
+
+**Migration**
+```sql
+ALTER TABLE public.pbx_ai_insights
+  ADD COLUMN IF NOT EXISTS coaching_notes text[] DEFAULT '{}'::text[],
+  ADD COLUMN IF NOT EXISTS coaching_score numeric;
+```
+
+**New files**
+- `supabase/functions/process-call-recording/index.ts`
+- `src/hooks/useCallIntelligence.ts` (+ desktop/mobile mirrors)
+- `src/components/calls/CallIntelligencePanel.tsx` (+ desktop/mobile mirrors)
+- `supabase/migrations/<ts>_call_intel_coaching.sql`
+
+**Edited**
+- `supabase/functions/ai-summarize-call/index.ts` → delegate to orchestrator
+- CDR/recording ingest path → enqueue orchestrator
+- Portal/desktop/mobile recording detail screens → mount `<CallIntelligencePanel />`
+
+**Model**: `google/gemini-3-flash-preview` via Lovable AI Gateway with a single `save_insight` tool that includes the new coaching fields.
+
+---
+
+## Out of scope (ask if you want them)
+
+- Real-time live-call coaching (this plan covers post-call only).
+- Multi-language coaching style customization per org.
+- Manual editing of AI coaching notes by supervisors.
