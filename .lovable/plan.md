@@ -1,44 +1,94 @@
-# Plan: Provider Credentials Hardening + Mobile Realtime/Theme
 
-## 1. Provider Credentials Audit Log
-- New table `provider_credentials_audit` (org_id, actor_user_id, actor_email, provider, action [create/update/delete/view/test], field_changed, ip, user_agent, created_at). RLS: only org admins + super_admin SELECT; service_role INSERT.
-- Edge function `provider-credentials-audit-log` writes entries (called from `ProviderCredentials.tsx` on save/test/view).
-- New tab "Audit Log" in `src/pages/lemtel/ProviderCredentials.tsx` showing paginated table with filters (provider, action, date range, actor).
+# Plan — Lemtel customer onboarding end-to-end
 
-## 2. Encryption-at-Rest + Field-Level Protection
-- Store credentials in new table `provider_credentials_encrypted` (org_id, provider, ciphertext bytea, iv, auth_tag, key_version, updated_by). 
-- Edge function `provider-credentials-vault` with actions `get/set/delete/list`:
-  - AES-256-GCM via Deno `crypto.subtle`, key from secret `PROVIDER_CRED_ENCRYPTION_KEY` (request via add_secret if missing).
-  - Field-level: each secret field encrypted individually so we can return masked values without decrypt.
-  - Returns masked values by default; full reveal requires `reveal: true` + writes audit entry.
-- Refactor `ProviderCredentials.tsx`:
-  - Save/load through vault function (never store raw in frontend state after save).
-  - Masking helper: show last 4 chars only; eye toggle calls reveal endpoint → auto-rehide after 30s.
-  - "View instructions" modal per provider with step-by-step guide (Twilio/Telnyx/Skyetel/VoIP.ms) — links, screenshots placeholders, copy buttons for callback URLs.
+Large scope. Shipped in 4 sequenced slices, each independently testable. I will execute slices 1→4 in order without stopping unless something blocks me.
 
-## 3. Mobile "Calling Features" Screen
-- New `apps/ava-softphone-mobile/src/screens/FeaturesScreen.tsx`: grid of feature cards (Hold, Mute, Transfer Blind, Transfer Attended, 3-Way Conf, Record, Park, Unpark, DND, Call Forwarding, DTMF, Voicemail, Call Waiting, Blocklist).
-- Each card: icon, label, short description, availability badge (Available / Requires Active Call / Premium / Coming Soon), long-press tooltip via `<TooltipSheet>`.
-- Add tab entry in bottom nav (or under MoreScreen as "Features").
-- Availability rules derived from `useSoftphone()` state (call active, hold supported, license tier).
+## Slice 1 — Onboarding wizard (STEPS 1-2)
 
-## 4. Realtime Per-Extension CDR
-- Migration: `ALTER PUBLICATION supabase_realtime ADD TABLE public.pbx_call_records;` and ensure REPLICA IDENTITY FULL.
-- New hook `apps/ava-softphone-mobile/src/hooks/useRealtimeCDR.ts`:
-  - Subscribes to `postgres_changes` filtered by `extension=eq.<ext>`.
-  - Merges into local list; falls back to one initial fetch via `mobileApi.calls()`.
-  - Cleanup on unmount.
-- Replace 15s polling block in `CallsScreen.tsx` with the hook; keep `visibilitychange` as a soft refetch only.
+**Edge function `customer-provision` (new)** — single orchestrator so the UI doesn't juggle 7 sequential calls. Lemtel-admin-only.
 
-## 5. Dark Theme Verification
-- Audit `ActiveCallSheet.tsx` for each state (ringing, active, hold, transfer-in-progress, ended) — verify token usage, no hardcoded white/black, contrast AA.
-- Add explicit state-scoped classes: `.state-ringing`, `.state-active`, `.state-hold`, `.state-transfer`, `.state-ended` in `styles.css` using existing tokens (cyan pulse for ringing, blue for active, amber for hold, violet for transfer, muted for ended).
-- Sweep `CallsScreen`, `DialerScreen`, `MoreScreen`, `SettingsScreen` for residual hardcoded colors; convert to tokens.
+Sequence inside the function:
+1. Validate input (zod). Auto-derive SIP domain `slugify(company).lemtel.tel` if not provided.
+2. `organizations` insert (name, slug, sip_domain, address fields, fusionpbx_domain_name).
+3. `fusionpbx-proxy` → `create-domain`. Store returned `domain_uuid` on `organizations.fusionpbx_domain_uuid`.
+4. `auth.admin.createUser` for admin email (random password, email confirmed) OR invite if exists.
+5. `user_roles` insert `org_admin` + `organization_members` insert.
+6. `billing_config` row (trial).
+7. Optional: insert `phone_numbers` placeholder rows for `numbers_to_port[]` with status `pending_port`.
+8. Invoke `customer-invite-admin` for welcome email (already deployed).
+9. Mint two `app_login_tokens` (desktop + mobile) via existing `mint-app-login-token` function.
+10. Return `{ organization_id, admin_email, temp_password, portal_url, desktop_invite_url, mobile_invite_url }`.
 
-## Technical Notes
-- Files added: `provider-credentials-vault/index.ts`, `provider-credentials-audit-log/index.ts`, `FeaturesScreen.tsx`, `useRealtimeCDR.ts`, `ProviderInstructionsModal.tsx`, `AuditLogTab.tsx`.
-- Migrations: 2 (audit table + encrypted table + realtime publication).
-- Secret: `PROVIDER_CRED_ENCRYPTION_KEY` (32-byte base64) — will request via add_secret.
-- No changes to landing, electron config, or workflows.
+**UI — `src/pages/lemtel/LemtelCustomers.tsx`**: Replace "New Customer" dialog content with multi-step form using existing shadcn `Dialog`+`Form` (zod):
+- Step 1: company + address
+- Step 2: admin contact + auto-suggested SIP domain (editable)
+- Step 3: numbers to port (dynamic array) + notes
+- On submit → `supabase.functions.invoke('customer-provision', ...)`.
 
-Approve to proceed.
+**Success screen** (new component `CustomerProvisionResult.tsx`): shows portal link, admin email + temp password (one-time reveal), Copy buttons for desktop/mobile invite URLs. Embeds `consume-app-login-token` deep links: `ava-desktop://invite?token=...` and `ava-mobile://invite?token=...` plus https fallback.
+
+## Slice 2 — CustomerDetail tabs + Add User (STEPS 3-4)
+
+**Page `src/pages/lemtel/CustomerDetail.tsx`** (extend if exists, else create) wired from row click in `LemtelCustomers`.
+
+Tabs (shadcn `Tabs`):
+- **Overview** — org info, sip_domain, fusionpbx_domain_uuid, address, phone numbers count, edit-in-place.
+- **Users** — table from `pbx_softphone_users` filtered by `organization_id`. "Add User" dialog.
+- **Phone System** — see Slice 3 (sub-tabs).
+- **Call History** — reuse existing `AdminCallHistory` filtered by `organization_id` prop.
+- **Recordings** — reuse existing `AdminRecordings` filtered by `organization_id`.
+- **Settings** — domain settings (codec, dtmf, recording rule defaults) + `org_business_hours` editor.
+
+**Add User flow** — new edge function `customer-add-user`:
+1. Suggest next extension via SQL: `MAX(extension::int)+1` within domain, starting at 1001.
+2. `auth.admin.createUser` (random password).
+3. `user_roles` insert (role from form).
+4. `fusionpbx-proxy` → `create-extension` with domain_uuid + SIP pwd.
+5. `pbx_softphone_users` insert (extension, sip_domain, portal_user_id linked).
+6. Send welcome email (Resend, reusing pattern from `customer-invite-admin`) — SIP creds + portal link.
+7. Mint desktop + mobile `app_login_tokens` → return URLs.
+
+UI dialog mirrors the slice-1 success screen.
+
+## Slice 3 — Phone System CRUD (STEP 5)
+
+Inside `CustomerDetail` "Phone System" tab, 4 sub-tabs. All writes routed through existing `usePbxAction` (`pbx-write` → `fusionpbx-proxy` with audit) — actions already supported per memory:
+
+- **IVR**: list from `pbx_ivrs` + `pbx_ivr_options`. New IVR dialog: name, extension, greeting (textarea → `tts` field or file upload to Supabase Storage `pbx-ivr-audio` bucket); per-digit option editor; submit → `create-ivr` then loop `create-ivr-option`.
+- **Ring Groups**: list from `pbx_ring_groups`. New dialog with member multi-select (from `pbx_extensions` of domain), per-member ring timeout, no-answer destination. Submit → `create-ring-group`.
+- **Queues**: list from `pbx_call_queues`. New dialog with strategy, agents, max-wait, hold music. Submit → `create-queue` + loop `add-queue-tier`.
+- **Phone Numbers**: list from `phone_numbers` filtered by `organization_id`. Assign (modal to pick from unassigned pool). Request Port → form that inserts into `number_porting_requests` (carrier, account number, PIN, numbers[], service address, desired date).
+
+## Slice 4 — Small fixes
+
+- **Recording CSRF in `fusionpbx-proxy`**: audit existing `get-recording` action; if it doesn't do (1) `GET /login.php` → parse `<input type=hidden name="csrf-name" value="csrf-val">`, (2) `POST /login.php` with username+password+csrf pair, (3) reuse `PHPSESSID` cookie for `GET /app/xml_cdr/download.php?id={uuid}` → return base64, then rewrite that path. Update `pbxRecordingAudio.ts` to call `{ action:'get-recording', xml_cdr_uuid }`.
+- **Chat badge in `LeftRail.tsx`**: import `useOrgChat`, read `unreadCount`, render `Badge` next to MessageSquare icon when `>0`; clear on tab open (already handled by `mark_channel_read`).
+- **Click-to-call in `ContactsView.tsx`**: ensure call button calls `sp.call(contact.phone_number)` from the shared `useSoftphone` instance; open `ActiveCallSheet` immediately.
+- **Resend status panel** in `LemtelSettings` → Integrations tab: new edge function `resend-domain-status` (server-side fetch `https://api.resend.com/domains` with `RESEND_API_KEY`), returns `{ verified, status }` for `ava-telecom.ca`. UI shows green check or red warning + link to `https://resend.com/domains`.
+
+## Files (high level)
+
+New:
+- `supabase/functions/customer-provision/index.ts`
+- `supabase/functions/customer-add-user/index.ts`
+- `supabase/functions/resend-domain-status/index.ts`
+- `src/pages/lemtel/CustomerDetail.tsx` (+ tab components under `src/components/lemtel/customer-detail/`)
+- `src/components/lemtel/CustomerProvisionResult.tsx`
+- `src/components/lemtel/NewCustomerWizard.tsx`
+- Migration: add `address_*`, `sip_domain` (if missing), `numbers_to_port` JSONB to `organizations`; create `number_porting_requests` if missing (the table already exists per supabase-tables list — will reuse).
+
+Edited:
+- `src/pages/lemtel/LemtelCustomers.tsx` — wizard + row click → detail.
+- `supabase/functions/fusionpbx-proxy/index.ts` — fix `get-recording` CSRF flow if broken.
+- `apps/ava-softphone-desktop/src/components/console/LeftRail.tsx` — unread badge.
+- `apps/ava-softphone-desktop/src/components/console/ContactsView.tsx` — click-to-call wiring.
+- `src/lib/pbxRecordingAudio.ts` — switch to `get-recording` action.
+- `src/pages/lemtel/LemtelSettings.tsx` (or current integrations tab) — Resend status card.
+
+## Out of scope (explicit)
+
+- `vite.config.ts`, `electron-builder.yml`, `.github/workflows/**` — untouched per directive.
+- Landing page — locked.
+- Lovable Emails infra — using Resend directly per prior decision.
+
+Reply **approve** to start Slice 1, or tell me which slices to skip / reorder.
