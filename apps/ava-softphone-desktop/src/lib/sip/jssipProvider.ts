@@ -211,6 +211,12 @@ export interface SipEvent {
   message: string;
 }
 
+export interface AuthBlock {
+  code: number;
+  reason: string;
+  since: number;
+}
+
 export interface SoftphoneSnapshot {
   status: SipStatus;
   callState: CallState;
@@ -222,6 +228,7 @@ export interface SoftphoneSnapshot {
   direction: 'in' | 'out' | null;
   startedAt: number | null;
   events: SipEvent[];
+  authBlocked?: AuthBlock | null;
 }
 
 export interface SoftphoneConfig {
@@ -265,6 +272,7 @@ class JsSipProvider {
     direction: null,
     startedAt: null,
     events: [],
+    authBlocked: null,
   };
   audioEl: HTMLAudioElement | null = null;
   outputDeviceId: string | null = null;
@@ -356,6 +364,12 @@ class JsSipProvider {
 
   private kickReconnect(why: string) {
     if (!this.ua) return;
+    if (this.snap.authBlocked) {
+      // Auth-rejected by PBX (401/403/407). Re-registering with the same
+      // bad credentials would just spam the server — wait for a manual
+      // restart or a password sync that bumps the config.
+      return;
+    }
     try {
       const connected = this.ua.isConnected?.() ?? false;
       const registered = this.ua.isRegistered?.() ?? false;
@@ -375,6 +389,7 @@ class JsSipProvider {
     if (this.keepAliveTimer) clearInterval(this.keepAliveTimer);
     this.keepAliveTimer = setInterval(() => {
       if (!this.ua) return;
+      if (this.snap.authBlocked) return;
       try {
         const connected = this.ua.isConnected?.() ?? false;
         const registered = this.ua.isRegistered?.() ?? false;
@@ -427,6 +442,8 @@ class JsSipProvider {
     }
     if (this.ua) this.stop();
     this.config = cfg;
+    // Fresh init with (potentially) new credentials — clear any prior auth block.
+    if (this.snap.authBlocked) this.update({ authBlocked: null, errorCause: undefined });
 
     if (cfg.mock || !cfg.password) {
       this.logEvent('warn', cfg.mock ? 'Mock mode — skipping JsSIP init' : 'No SIP password — skipping JsSIP init');
@@ -509,7 +526,9 @@ class JsSipProvider {
       });
       ua.on('unregistered', () => {
         this.logEvent('warn', 'Unregistered — keep-alive will re-register');
-        // Don't downgrade status; keep-alive will re-register on the next tick.
+        // Don't auto re-register if we're auth-blocked — that's the bug that
+        // produced the 403 storm. kickReconnect() short-circuits when blocked.
+        if (this.snap.authBlocked) return;
         try { ua.register(); } catch { /* noop */ }
       });
       ua.on('registrationFailed', (e: any) => {
@@ -518,6 +537,12 @@ class JsSipProvider {
         const detail = code ? `${code} ${reason}` : reason;
         this.logEvent('error', `Registration failed: ${detail}`);
         this.setStatus('error', detail);
+        if (code === 401 || code === 403 || code === 407) {
+          // Stop the keep-alive/re-register loop until manual restart or new password.
+          if (this.keepAliveTimer) { clearInterval(this.keepAliveTimer); this.keepAliveTimer = null; }
+          this.update({ authBlocked: { code, reason, since: Date.now() } });
+          this.logEvent('warn', `Auth blocked (${code}) — keep-alive disabled. Refresh SIP credentials to retry.`);
+        }
       });
       ua.on('newRTCSession', (e: any) => this.attachSession(e.session, e.originator));
 

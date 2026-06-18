@@ -336,7 +336,7 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
         <Button onClick={() => sp.hangup()} variant="destructive" className="h-12">
           <PhoneOff className="w-5 h-5 mr-2" /> Decline
         </Button>
-        <Button onClick={() => sp.answer()} className="h-12 bg-emerald-600 hover:bg-emerald-700">
+        <Button onClick={() => setTimeout(() => sp.answer(), 0)} className="h-12 bg-emerald-600 hover:bg-emerald-700">
           <Phone className="w-5 h-5 mr-2" /> Answer
         </Button>
       </div>

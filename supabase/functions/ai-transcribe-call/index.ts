@@ -141,20 +141,27 @@ Deno.serve(async (req) => {
         } catch (e: any) { fetchErrors.push(`direct:${e?.message || "err"}`); }
       }
 
-      // 2. Supabase Storage
+      // 2. Supabase Storage — verify bucket exists first so a stale path
+      //    doesn't surface a scary "Bucket not found" error to the UI.
       const storagePath = recording_path || call?.recording_path;
       if (!audioBytes && storagePath && typeof storagePath === "string" && !storagePath.startsWith("http")) {
         try {
           const parts = storagePath.split("/");
           const bucket = parts.shift()!;
           const path = parts.join("/");
-          const dl = await admin.storage.from(bucket).download(path);
-          if (dl.data) {
-            audioBytes = new Uint8Array(await dl.data.arrayBuffer());
-            audioMime = detectMime(storagePath, dl.data.type);
-            audioSource = "storage";
-          } else if (dl.error) {
-            fetchErrors.push(`storage:${dl.error.message}`);
+          const { data: bucketInfo } = await admin.storage.getBucket(bucket);
+          if (!bucketInfo) {
+            // Bucket missing — silently skip; the proxy fallback below will run.
+            console.log("ai-transcribe-call storage bucket missing, skipping", { bucket });
+          } else {
+            const dl = await admin.storage.from(bucket).download(path);
+            if (dl.data) {
+              audioBytes = new Uint8Array(await dl.data.arrayBuffer());
+              audioMime = detectMime(storagePath, dl.data.type);
+              audioSource = "storage";
+            } else if (dl.error) {
+              fetchErrors.push(`storage:${dl.error.message}`);
+            }
           }
         } catch (e: any) { fetchErrors.push(`storage:${e?.message || "err"}`); }
       }
@@ -214,9 +221,12 @@ Deno.serve(async (req) => {
       return json({ transcript_text: fallbackTranscript, stub: true, reason: "missing-ai-key", fetchErrors });
     }
     if (!audioBytes || audioBytes.length === 0) {
-      await writeTranscript(fallbackTranscript, "stub-no-audio");
-      await audit("no-audio", { error_code: "no-audio", message: `fetch errors: ${fetchErrors.join("; ") || "none"}`, metadata: { fetchErrors } });
-      return json({ transcript_text: fallbackTranscript, stub: true, reason: "no-audio", fetchErrors }, 200);
+      // Friendlier reason when there's no recording metadata at all yet.
+      const hasAnyPath = !!(recording_path || call?.recording_path || recording_name || call?.recording_name || sourceUrl);
+      const reason = hasAnyPath ? "no-audio" : "recording-not-synced";
+      await writeTranscript(fallbackTranscript, `stub-${reason}`);
+      await audit(reason, { error_code: reason, message: `fetch errors: ${fetchErrors.join("; ") || "none"}`, metadata: { fetchErrors } });
+      return json({ transcript_text: fallbackTranscript, stub: true, reason, fetchErrors }, 200);
     }
 
     // Gemini supports inline audio up to ~20MB
