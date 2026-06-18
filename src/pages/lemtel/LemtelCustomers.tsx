@@ -472,6 +472,12 @@ export default function LemtelCustomers() {
                         <Button asChild variant="ghost" size="sm" onClick={(e) => e.stopPropagation()}>
                           <Link to={`/org/lemtel/admin/customers/${d.domain_uuid}`}>Open</Link>
                         </Button>
+                        {orgByDomain.get(d.domain_uuid)?.slug && (
+                          <Button asChild variant="secondary" size="sm" onClick={(e) => e.stopPropagation()}>
+                            <Link to={`/domain/${orgByDomain.get(d.domain_uuid)!.slug}/admin/dashboard`}>Cockpit</Link>
+                          </Button>
+                        )}
+
                       </TableCell>
                     </TableRow>
                   );
