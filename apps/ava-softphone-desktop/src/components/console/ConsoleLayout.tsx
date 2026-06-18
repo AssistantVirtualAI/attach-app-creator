@@ -216,10 +216,6 @@ export default function ConsoleLayout({
             isWide ? (
               <WideDialerPanel creds={creds} orgId={orgId || ''} onOpenSettings={() => setView('settings')} />
             ) : (
-                  </div>
-                </div>
-              </div>
-            ) : (
               <div style={{ maxWidth: 460, margin: '0 auto', height: '100%' }}>
                 <SoftphonePane creds={creds} onOpenSettings={() => setView('settings')} hideTabs />
               </div>
