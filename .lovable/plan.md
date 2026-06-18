@@ -1,41 +1,46 @@
-## Plan: Tenant audit logging, per-tenant scoping & full FusionPBX field mapping
+## Plan: Fix dialer freeze, SIP 403 loop, and transcription/AI
 
-### 1. Audit log for tenant portal access
-- Add new edge function call site: when "Open tenant portal" or impersonation triggers in `CustomerDetail.tsx`, write to `telecom_audit_logs` (or `audit_logs`) via existing `audit-log` function with action `lemtel.open_tenant_portal` / `lemtel.impersonate_tenant`, including `domain_uuid`, `domain_name`, target `org_id` (if any), and actor user id.
-- Surface entries in `ProviderAuditLog.tsx` with filter by action type.
+### 1. Desktop SIP 403 keep-alive loop — circuit breaker
+File: `apps/ava-softphone-desktop/src/lib/sip/jssipProvider.ts`
 
-### 2. Per-tenant permissioning after impersonation
-- In `start-impersonation` edge function: ensure issued session token carries `organization_id` matching the linked tenant org, and that `pbx_call_records` / `pbx_call_recordings` RLS policies scope by `domain_uuid` belonging to that org.
-- Audit RLS on `pbx_call_records` and `pbx_call_recordings`: add a `domain_uuid IN (SELECT domain_uuid FROM pbx_domains WHERE org_id = current org)` predicate using a `SECURITY DEFINER` helper `public.user_can_access_pbx_domain(_uuid)`.
-- Client: in `CustomerDetail.tsx`, every query against `pbx_call_records`/`pbx_call_recordings` must always pass `.eq('domain_uuid', customer.domain_uuid)` — add a single `useTenantScope(domain_uuid)` helper to avoid drift.
+- Add `authBlocked: { code: 401|403|407; reason: string; since: number } | null` flag.
+- In `registrationFailed` handler: when `status_code` is 401 / 403 / 407, set `authBlocked`, stop `keepAliveTimer`, do NOT call `ua.register()` from the `unregistered` handler.
+- In `kickReconnect` and `startKeepAlive`: short-circuit while `authBlocked` is set — log once, do not call `register()`/`start()`. (Keeps WebSocket alive but stops the credential-failure storm.)
+- Clear `authBlocked` only on:
+  - explicit `restart()` (manual user action), or
+  - a successful `softphone-sync-password` invocation that bumps `config.password` (detected by `sameConfig` returning false → fresh `init`).
+- Add a user-visible banner in `SoftphonePane.tsx` when `snap.authBlocked`: text + button "Refresh SIP credentials" that calls `softphone-sync-password` (force_local_to_pbx) then `sipProvider.restart()`.
+- Mirror the same `authBlocked` short-circuit in `src/lib/softphone/jssipProvider.ts` (web softphone) so the bug can't reappear in the web app.
 
-### 3. Tenants page visual grouping
-- In `CustomerDetail.tsx`: wrap the TabsList + content in a `TenantHeader` card showing tenant name, domain, linked-org chip, and a **sync status strip** (last sync timestamp + per-resource pill: extensions / IVR / queues / devices / CDR / recordings / MOH) sourced from `pbx_sync_jobs` (latest row per `resource`).
-- Add explicit loading skeletons (per tab) and standardized error banners with retry.
-- Group edit dialogs under a consistent header "{Tenant name} › {Resource}" so dialogs visibly belong to the active tenant.
+### 2. Wide-page dialer freeze on Answer
+File: `apps/ava-softphone-desktop/src/components/SoftphonePane.tsx`
 
-### 4. Full FusionPBX field mapping layer
-- New file `src/lib/fusionpbx/fieldMaps.ts` exporting a typed schema per resource (`extensions`, `ivr_menus`, `ivr_menu_options`, `call_queues`, `ring_groups`, `devices`, `device_lines`, `device_keys`, `destinations`, `voicemail`). Each entry: `{ key, label, type, group, required, default, readOnly }` mirroring FusionPBX v5 column list.
-- `PbxRowEditDialog.tsx` and a new `IvrEditDialog.tsx` render groups via this schema so "All fields" dialog matches FusionPBX exactly.
-- IVR voicemail PIN: route through `pbx-write` action `update-extension` with `voicemail_password`, `voicemail_enabled`, never `create-extension`. Add a dedicated `ResetVoicemailPinDialog` that calls `update-extension` only.
-- `pbx-write` extended with `update-ivr-full`, `update-device-full`, `update-queue-full`, `update-ringgroup-full`, `update-destination-full` accepting the full field payload; server validates allowed keys against the schema and forwards to FusionPBX API.
+- Symptom matches the existing wide-mode comment on `handleCall` (line ~269): wide-mode side panels re-render synchronously with the JsSIP session and freeze the UI.
+- Apply the same defer pattern to Answer:
+  - Wrap `sp.answer()` call sites (IncomingCall `onAnswer={sp.answer}` at line 539 and the keyboard `Enter` handler at line 168) into a small `deferredAnswer()` helper that does `setTimeout(() => sp.answer(), 0)` after toggling a local `answering` busy flag.
+  - Disable Answer button while `answering` so double-clicks can't double-attach the session.
+- In `jssipProvider.attachSession`: ensure `setSinkId` / track attachment is wrapped in `queueMicrotask` and any heavy snapshot updates batched (single `update()` call, not three).
+- Also normalize the same pattern in the web `SoftphoneWidget.tsx` Answer button so the freeze doesn't recur on the web preview.
 
-### 5. Device create scoped to selected tenant
-- `DeviceCreateDialog.tsx`: always pass `domain_uuid` from the open tenant; `pbx-write` action `create-device` must reject if `domain_uuid` is missing or doesn't belong to the actor's accessible tenants.
-- Remove any code path that auto-creates a `lemtel_customers` or `pbx_domains` row when creating a device.
-- After successful create, call `fusionpbx-sync-config` with `{ resource: 'devices', domain_uuid }` and then refetch the devices list (invalidate React Query key `['pbx-devices', domain_uuid]`).
+### 3. Transcription "Bucket not found" + AI `anthropic_404`
+Files: `supabase/functions/ai-transcribe-call/index.ts`, `supabase/functions/ai-analyze-call/index.ts`
 
-### 6. Tenant-domain scope filter for History & Recordings
-- Centralize the active tenant in `CustomerDetail.tsx` via a `TenantContext` providing `{ domain_uuid, domain_name, org_id }`.
-- `CdrRow`/`RecordingRow` and the CDR/Recordings tab queries read `domain_uuid` from context; no query may run without it (guarded by `enabled: !!domain_uuid`).
-- On tenant switch, clear React Query caches matching `domain_uuid` to prevent cross-tenant bleed.
+- **Anthropic 404**: model id `claude-sonnet-4-20250514` is invalid → 404. Remove the Anthropic branch from `ai-analyze-call` and always use the Lovable AI Gateway (`google/gemini-2.5-flash` or `google/gemini-2.5-pro` for long transcripts). Drop `ANTHROPIC_API_KEY` lookups so a stale secret can't reintroduce the bad model id. Audit-log entry stays, but `provider="lovable-ai"`.
+- **Storage bucket not found**:
+  - Resolve the correct recordings bucket up front: query `storage.buckets` for `pbx-recordings` (then fallbacks `recordings`, `call-recordings`). Cache result for the request.
+  - If the parsed bucket from `recording_path` doesn't exist, skip Step 2 cleanly (no `storage:Bucket not found` error in `fetchErrors`) and jump straight to fusionpbx-proxy `get-recording`.
+  - When `recording_path` is missing or points to a non-existent bucket AND the fusionpbx-proxy returns no audio, return a typed reason `recording-not-synced` (instead of generic `no-audio`) so the UI shows "Recording not yet synced from PBX — try again in a few minutes" instead of a scary `storage:Bucket not found`.
+- **UI side** (`src/components/portal/RecordingWavePlayer.tsx` or the AI panel that displays the transcription status): when reason === `recording-not-synced`, replace "fetch errors: storage:Bucket not found" with the friendly message + a "Retry sync" button that calls `fusionpbx-proxy` `sync-all` for recordings on the current domain.
+
+### 4. Safeguards
+- Add `provider_credentials_audit` entry on every 401/403/407 SIP failure (one per minute max) so we can trace future credential drift.
+- Add a unit test under `apps/ava-softphone-desktop/src/lib/__tests__/` that simulates a `registrationFailed` with status 403 and asserts `keepAliveTimer` stops and `kickReconnect` becomes a no-op until `restart()`.
 
 ### Files
-- New: `src/lib/fusionpbx/fieldMaps.ts`, `src/components/lemtel/IvrEditDialog.tsx`, `src/components/lemtel/ResetVoicemailPinDialog.tsx`, `src/components/lemtel/TenantContext.tsx`, `src/components/lemtel/TenantSyncStatus.tsx`.
-- Edited: `src/pages/lemtel/CustomerDetail.tsx`, `src/components/lemtel/PbxRowEditDialog.tsx`, `src/components/lemtel/DeviceCreateDialog.tsx`, `src/components/lemtel/ExtensionsPanel.tsx`, `src/pages/lemtel/ProviderAuditLog.tsx`.
-- Edge functions: `supabase/functions/pbx-write/index.ts` (extend), `supabase/functions/start-impersonation/index.ts` (audit + scope), `supabase/functions/audit-log/index.ts` (new action types).
-- Migration: RLS helper `user_can_access_pbx_domain`, tightened policies on `pbx_call_records`, `pbx_call_recordings`.
+- Edit: `apps/ava-softphone-desktop/src/lib/sip/jssipProvider.ts`, `apps/ava-softphone-desktop/src/components/SoftphonePane.tsx`, `src/lib/softphone/jssipProvider.ts`, `src/components/softphone/SoftphoneWidget.tsx`, `supabase/functions/ai-transcribe-call/index.ts`, `supabase/functions/ai-analyze-call/index.ts`.
+- Possibly edit the recording/transcription panel component that renders "fetch errors: …".
+- New: `apps/ava-softphone-desktop/src/lib/__tests__/sip.authBlocked.test.ts`.
 
 ### Out of scope
-- MOH editing (stays read-only).
-- Reworking the FusionPBX sync engine itself; only resource-scoped refresh after writes.
+- Backfilling `recording_path` rows that were stored with a wrong bucket name (separate data migration if needed after this lands).
+- Reworking PBX → storage recording upload pipeline.
