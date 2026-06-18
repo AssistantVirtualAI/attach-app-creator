@@ -49,10 +49,9 @@ export default function CustomerDetail() {
   const [rgOpen, setRgOpen] = useState(false);
   const [queueOpen, setQueueOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  const [linkOpen, setLinkOpen] = useState(false);
-  const [linkName, setLinkName] = useState('');
-  const [linkEmail, setLinkEmail] = useState('');
-  const [linking, setLinking] = useState(false);
+  const [deviceCreateOpen, setDeviceCreateOpen] = useState(false);
+  const [editRow, setEditRow] = useState<{ kind: 'queue' | 'ringgroup' | 'device' | 'destination'; row: any } | null>(null);
+
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<'org_admin' | 'manager'>('org_admin');
