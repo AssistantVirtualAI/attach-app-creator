@@ -750,3 +750,118 @@ function FilterBar(props: {
     </div>
   );
 }
+
+function CdrRow({ row, onChanged }: { row: any; onChanged: () => void }) {
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(normalize(row.caller_name));
+  const [notes, setNotes] = useState(normalize(row.notes));
+  const [busy, setBusy] = useState(false);
+
+  const save = async () => {
+    setBusy(true);
+    const { error } = await (supabase as any).from('pbx_call_records')
+      .update({ caller_name: name || null, notes: notes || null }).eq('id', row.id);
+    setBusy(false);
+    if (error) return toast.error(error.message);
+    toast.success('Saved'); setEditing(false); onChanged();
+  };
+  const del = async () => {
+    if (!confirm('Delete this record locally?')) return;
+    setBusy(true);
+    const { error } = await (supabase as any).from('pbx_call_records').delete().eq('id', row.id);
+    setBusy(false);
+    if (error) return toast.error(error.message);
+    toast.success('Deleted'); onChanged();
+  };
+
+  return (
+    <TableRow>
+      <TableCell className="text-xs">{row.start_at ? formatDistanceToNow(new Date(row.start_at), { addSuffix: true }) : '—'}</TableCell>
+      <TableCell className="text-xs">{pretty(row.direction)}</TableCell>
+      <TableCell className="font-mono text-xs">{pretty(row.caller_number)}</TableCell>
+      <TableCell className="font-mono text-xs">{pretty(row.destination_number)}</TableCell>
+      <TableCell className="font-mono text-xs">{pretty(row.extension)}</TableCell>
+      <TableCell className="text-xs">
+        {editing ? <Input value={name} onChange={(e) => setName(e.target.value)} className="h-7 text-xs" />
+          : pretty(row.caller_name)}
+      </TableCell>
+      <TableCell className="text-right font-mono text-xs">{Math.round(row.duration_seconds ?? 0)}</TableCell>
+      <TableCell className="text-xs">{pretty(row.hangup_cause)}</TableCell>
+      <TableCell className="text-right space-x-1 whitespace-nowrap">
+        {editing ? (
+          <>
+            <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes" className="h-7 text-xs inline-block w-32" />
+            <Button size="sm" variant="default" disabled={busy} onClick={save}>{busy ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Save'}</Button>
+            <Button size="sm" variant="ghost" disabled={busy} onClick={() => setEditing(false)}>Cancel</Button>
+          </>
+        ) : (
+          <>
+            <Button size="sm" variant="ghost" onClick={() => setEditing(true)}>Edit</Button>
+            <Button size="sm" variant="ghost" disabled={busy} onClick={del}><Trash2 className="w-3 h-3 text-destructive" /></Button>
+          </>
+        )}
+      </TableCell>
+    </TableRow>
+  );
+}
+
+function RecordingRow({ row, expanded, url, loading, onPlay, onChanged }: {
+  row: any; expanded: boolean; url?: string; loading: boolean;
+  onPlay: () => void; onChanged: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(normalize(row.caller_name));
+  const [notes, setNotes] = useState(normalize(row.notes));
+  const [busy, setBusy] = useState(false);
+
+  const save = async () => {
+    setBusy(true);
+    const { error } = await (supabase as any).from('pbx_call_records')
+      .update({ caller_name: name || null, notes: notes || null }).eq('id', row.id);
+    setBusy(false);
+    if (error) return toast.error(error.message);
+    toast.success('Saved'); setEditing(false); onChanged();
+  };
+  const hide = async () => {
+    if (!confirm('Hide this recording locally? (PBX file is kept)')) return;
+    setBusy(true);
+    const { error } = await (supabase as any).from('pbx_call_records')
+      .update({ has_recording: false, recording_url: null }).eq('id', row.id);
+    setBusy(false);
+    if (error) return toast.error(error.message);
+    toast.success('Hidden'); onChanged();
+  };
+
+  return (
+    <div className="border rounded-lg p-3 space-y-2">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="text-sm">
+          <span className="font-medium">{pretty(row.caller_number)} → {pretty(row.destination_number)}</span>
+          <span className="text-muted-foreground ml-2">
+            {pretty(row.caller_name) !== '—' && `· ${pretty(row.caller_name)} `}
+            Ext {pretty(row.extension)} · {Math.round(row.duration_seconds ?? 0)}s · {row.start_at ? formatDistanceToNow(new Date(row.start_at), { addSuffix: true }) : '—'}
+          </span>
+        </div>
+        <div className="flex gap-1">
+          <Button size="sm" variant="outline" disabled={loading} onClick={onPlay}>
+            {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : expanded ? 'Hide' : 'Play'}
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setEditing((e) => !e)}>{editing ? 'Close' : 'Edit'}</Button>
+          <Button size="sm" variant="ghost" disabled={busy} onClick={hide}><Trash2 className="w-3 h-3 text-destructive" /></Button>
+        </div>
+      </div>
+      {editing && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div><Label className="text-xs">Caller name</Label><Input value={name} onChange={(e) => setName(e.target.value)} className="h-8 text-xs" /></div>
+          <div><Label className="text-xs">Notes</Label><Input value={notes} onChange={(e) => setNotes(e.target.value)} className="h-8 text-xs" /></div>
+          <div className="col-span-full flex justify-end gap-2">
+            <Button size="sm" variant="ghost" onClick={() => setEditing(false)} disabled={busy}>Cancel</Button>
+            <Button size="sm" onClick={save} disabled={busy}>{busy ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Save'}</Button>
+          </div>
+        </div>
+      )}
+      {pretty(row.notes) !== '—' && !editing && <p className="text-xs text-muted-foreground italic">📝 {row.notes}</p>}
+      {expanded && url && <RecordingWavePlayer key={row.id} url={url} autoPlay />}
+    </div>
+  );
+}
