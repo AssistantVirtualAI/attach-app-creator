@@ -60,7 +60,7 @@ export default function TelephonyRecordings({ scope = 'org' }: { scope?: 'org' |
     },
   });
   const queryExt = scope === 'mine' ? myExt : (extFilter.trim() || undefined);
-  const { data: cdrs = [], isLoading } = usePbxCallRecords(200, {
+  const { data: cdrs = [], isLoading } = usePbxCallRecords(500, {
     extension: queryExt,
     rangeDays,
     enabled: scope !== 'mine' || !!myExt,
