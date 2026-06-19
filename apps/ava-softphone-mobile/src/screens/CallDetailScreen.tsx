@@ -133,11 +133,11 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
   const fmt = (s: number) => `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
   const hasTranscript = (data?.transcript?.length || 0) > 0;
 
-  return (
   if (debugOpen) return <RecordingDebugScreen callId={id} onBack={() => setDebugOpen(false)} />;
 
   return (
     <div style={{ height: '100%', overflowY: 'auto', padding: '14px 14px 20px' }}>
+
 
       <button onClick={onBack} style={{
         display: 'inline-flex', alignItems: 'center', gap: 6,
