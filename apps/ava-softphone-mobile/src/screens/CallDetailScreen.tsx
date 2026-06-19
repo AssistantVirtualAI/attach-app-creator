@@ -48,26 +48,43 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
     setAudioError(null);
     setLoadingAudio(true);
     try {
-      const res: any = await mobileApi.voicemailAudio({
-        xml_cdr_uuid: id,
-        organization_id: mobile.organizationId || undefined,
+      // Use fetch() directly to handle binary audio/mpeg response
+      const SUPABASE_URL = 'https://gejxisrqtvxavbrfcoxz.supabase.co';
+      const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdlanhpc3JxdHZ4YXZicmZjb3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1MDMxNzQsImV4cCI6MjA3NzA3OTE3NH0.kaO-GslE99OCNrZ4_AMnbzGqya2azqz_UMZR34zZvvo';
+      const token = mobile.accessToken;
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/fusionpbx-proxy`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'apikey': ANON_KEY,
+        },
+        body: JSON.stringify({
+          action: 'get-recording',
+          xml_cdr_uuid: id,
+          recording_name: (data?.record_name || id) + '.mp3',
+          recording_path: data?.record_path || '',
+          domain_uuid: mobile.fusionpbxDomainUuid || '2936594e-17b7-42a9-9165-95be48627923',
+        }),
       });
-      if (res?.ok === false || !res?.url) {
-        const msg = res?.error === 'RECORDING_NOT_FOUND'
-          ? 'Recording not available — file may have been deleted from the PBX after the retention period.'
-          : res?.error === 'RECORDING_EMPTY'
-            ? 'Recording file is empty on the PBX.'
-            : 'No recording available for this call.';
-        throw new Error(msg);
+      const contentType = response.headers.get('content-type') || '';
+      if (!response.ok || !contentType.includes('audio')) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(
+          err.error === 'RECORDING_NOT_FOUND'
+            ? 'Recording not available — file may have been deleted from the PBX after the retention period.'
+            : err.message || 'No recording available for this call.'
+        );
       }
-      return res.url;
+      const blob = await response.blob();
+      return URL.createObjectURL(blob);
     } catch (e: any) {
       setAudioError(e?.message || 'Unable to load recording');
       return null;
     } finally {
       setLoadingAudio(false);
     }
-  }, [id, mobile.organizationId]);
+  }, [id, mobile.accessToken, mobile.fusionpbxDomainUuid, data]);
 
 
   const togglePlay = useCallback(async () => {
