@@ -47,14 +47,23 @@ Deno.serve(async (req) => {
     const since = new Date(startOfToday);
     since.setDate(since.getDate() - (days - 1));
 
-    let callsQuery = sb.from("pbx_call_records")
-      .select("id, call_status, missed_call, duration_seconds, voicemail_message, extension, start_at, direction, hangup_cause")
-      .eq("organization_id", orgId)
-      .gte("start_at", since.toISOString());
-    if (sp.domain_uuid) callsQuery = callsQuery.eq("domain_uuid", sp.domain_uuid);
-    const { data: rows } = await callsQuery;
-
-    const list = rows ?? [];
+    // Page through all rows to bypass the 1000-row PostgREST default cap.
+    const PAGE = 1000;
+    const list: any[] = [];
+    for (let from = 0; from < 100000; from += PAGE) {
+      let q = sb.from("pbx_call_records")
+        .select("id, call_status, missed_call, duration_seconds, voicemail_message, extension, start_at, direction, hangup_cause")
+        .eq("organization_id", orgId)
+        .gte("start_at", since.toISOString())
+        .order("start_at", { ascending: false })
+        .range(from, from + PAGE - 1);
+      if (sp.domain_uuid) q = q.eq("domain_uuid", sp.domain_uuid);
+      const { data: page, error } = await q;
+      if (error) break;
+      const chunk = page ?? [];
+      list.push(...chunk);
+      if (chunk.length < PAGE) break;
+    }
     const totalCalls = list.length;
     const missed = list.filter((r: any) => r.missed_call || r.call_status === "missed").length;
     const voicemails = list.filter((r: any) => !!r.voicemail_message || r.call_status === "voicemail").length;
