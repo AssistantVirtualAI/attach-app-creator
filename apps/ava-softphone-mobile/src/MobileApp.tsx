@@ -112,11 +112,11 @@ function AuthenticatedShell({
 
   // Build SIP config from the same backend credentials used by desktop/portal,
   // but keep the mobile transport pinned to CA-signed WSS endpoints.
-  const sipPassword = creds.sipPassword || (creds as any).sipPassword;
-  const WORKING_WSS = 'wss://node.lemtelcloud.net:7443';
-  const WORKING_WSS_FALLBACK = 'wss://pbxnode.lemtel.tel:7443';
-  const wssUrls = Array.from(new Set([WORKING_WSS, WORKING_WSS_FALLBACK, ...((creds as any).wssUrls || [])]
-    .filter((u) => /^wss:\/\/(node\.lemtelcloud\.net|pbxnode\.lemtel\.tel):7443$/i.test(String(u)))));
+  const sipPassword = creds.sipPassword;
+  const WORKING_WSS = [
+    'wss://node.lemtelcloud.net:7443',
+    'wss://pbxnode.lemtel.tel:7443',
+  ];
   const sipDomain = creds.sipDomain || 'lemtel.lemtel.tel';
   const credentialsReady = !creds.accessToken || freshCredentialToken === creds.accessToken;
 
@@ -126,8 +126,8 @@ function AuthenticatedShell({
         displayName: creds.displayName || creds.email || 'User',
         password: sipPassword,
         domain: sipDomain,
-        wssUrl: wssUrls[0] || WORKING_WSS,
-        wssUrls,
+        wssUrl: WORKING_WSS[0],
+        wssUrls: WORKING_WSS,
         authUsername: creds.authUsername || creds.extension,
       }
     : null;
