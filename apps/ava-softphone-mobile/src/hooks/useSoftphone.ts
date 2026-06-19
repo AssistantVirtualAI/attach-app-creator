@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { createSIPUA, JsSIPUnavailableError, SIPConfig, sdpModifier, classifySipFailure } from '../lib/sip/jssipProvider';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { createSIPUA, JsSIPUnavailableError, SIPConfig, sdpModifier, classifySipFailure, hasWebRTC, WEBRTC_UNAVAILABLE_MESSAGE } from '../lib/sip/jssipProvider';
 
 export type SIPStatus = 'idle' | 'connecting' | 'registered' | 'retrying' | 'error';
 export type CallState = 'idle' | 'ringing' | 'active' | 'ended';
@@ -12,7 +12,7 @@ export interface UseSoftphoneReturn {
   isMuted: boolean;
   isOnHold: boolean;
   activeCallNumber: string;
-  call: (number: string) => void;
+  call: (number: string) => boolean | void;
   hangup: () => void;
   answer: () => void;
   mute: () => void;
@@ -21,6 +21,7 @@ export interface UseSoftphoneReturn {
   unhold: () => void;
   sendDTMF: (key: string) => void;
   setStatus: (status: string) => void;
+  reconnect: () => void;
 }
 
 export function useSoftphone(
