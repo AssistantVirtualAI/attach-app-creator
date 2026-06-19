@@ -132,3 +132,28 @@ textarea, input { user-select: text; }
 .lemtel-btn-primary:not(:disabled):active { transform: translateY(1px); }
 @keyframes spin { to { transform: rotate(360deg); } }
 .spin { animation: spin 1s linear infinite; transform-origin: center; }
+
+/* === LIGHT THEME OVERRIDES === */
+:root[data-theme="light"] {
+  --bg-0: #f0f4ff;
+  --bg-1: #ffffff;
+  --bg-2: #ffffff;
+  --text: #1a2340;
+  --text-muted: #5a6a8a;
+  --border: rgba(0,0,0,0.08);
+}
+body[data-theme="light"] {
+  background: linear-gradient(180deg, #e8eeff 0%, #f0f4ff 100%) !important;
+  color: #1a2340 !important;
+}
+body[data-theme="light"] .lemtel-glass {
+  background: #ffffff !important;
+  border: 1px solid rgba(0,0,0,0.06) !important;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08) !important;
+}
+body[data-theme="light"] .lemtel-input {
+  background: #ffffff;
+  border-color: rgba(0,0,0,0.10);
+  color: #1a2340;
+}
+body[data-theme="light"] .lemtel-input::placeholder { color: rgba(26,35,64,0.45); }
