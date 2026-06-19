@@ -227,28 +227,21 @@ Deno.serve(async (req) => {
     }
 
     if (action === "list_directory") {
-      // Collect every user belonging to the same org (organization_members + org_members)
-      const { data: callerDomains } = await admin
-        .from("pbx_softphone_users")
-        .select("domain_uuid")
-        .eq("portal_user_id", userId)
-        .eq("organization_id", orgId);
-      const domainIds = (callerDomains ?? []).map((r: any) => r.domain_uuid).filter(Boolean);
-      const [{ data: m1 }, { data: m2 }, { data: domainUsers }, { data: orgUsers }] = await Promise.all([
-        admin.from("organization_members").select("user_id").eq("organization_id", orgId),
-        admin.from("org_members").select("user_id").eq("org_id", orgId),
-        (domainIds.length
-          ? admin.from("pbx_softphone_users").select("portal_user_id, extension, display_name").eq("organization_id", orgId).in("domain_uuid", domainIds)
-          : Promise.resolve({ data: [] as any[] })),
-        // Always include every softphone row in the org (covers rows missing domain_uuid).
-        admin.from("pbx_softphone_users").select("portal_user_id, extension, display_name").eq("organization_id", orgId),
+      const [{ data: byDomainUuid }, { data: bySipDomain }, { data: extensionRows }] = await Promise.all([
+        admin.from("pbx_softphone_users").select("portal_user_id, extension, display_name, domain_uuid, sip_domain").in("domain_uuid", callerDomainKeys),
+        admin.from("pbx_softphone_users").select("portal_user_id, extension, display_name, domain_uuid, sip_domain").in("sip_domain", callerDomainKeys),
+        admin.from("pbx_extensions_directory").select("portal_user_id, extension, display_name, domain_uuid").in("domain_uuid", callerDomainKeys),
       ]);
-      // Linked portal users (have user_id) — surfaced as full members with presence.
+      const domainUsers = sameDomainFilter([...(byDomainUuid ?? []), ...(bySipDomain ?? []), ...(extensionRows ?? [])]);
+      const byExt = new Map<string, any>();
+      for (const r of domainUsers) {
+        const ext = String(r.extension || "").trim();
+        if (!ext) continue;
+        byExt.set(ext, { ...byExt.get(ext), ...r, extension: ext });
+      }
+      const domainRows = Array.from(byExt.values());
       const ids = Array.from(new Set([
-        ...(m1 ?? []).map((r: any) => r.user_id),
-        ...(m2 ?? []).map((r: any) => r.user_id),
-        ...(domainUsers ?? []).map((r: any) => r.portal_user_id).filter(Boolean),
-        ...(orgUsers ?? []).map((r: any) => r.portal_user_id).filter(Boolean),
+        ...domainRows.map((r: any) => r.portal_user_id).filter(Boolean),
       ])).filter(Boolean);
       const linkedMembers: any[] = [];
       if (ids.length) {
@@ -281,8 +274,8 @@ Deno.serve(async (req) => {
           });
         }
       }
-      // Unlinked extensions — still surface them in the directory so admins can see the full team.
-      const unlinked = (orgUsers ?? []).filter((r: any) => !r.portal_user_id).map((r: any) => ({
+      // Unlinked extensions — still surface them in the directory for the same PBX domain.
+      const unlinked = domainRows.filter((r: any) => !r.portal_user_id).map((r: any) => ({
         user_id: `ext:${r.extension}`,
         full_name: r.display_name || (r.extension ? `Ext ${r.extension}` : null),
         email: null,
@@ -299,22 +292,15 @@ Deno.serve(async (req) => {
     if (action === "ensure_dm_channel") {
       const otherId = String(payload?.user_id ?? "");
       if (!otherId || otherId === userId) return json({ error: "invalid_user" }, 400);
-      // Verify other user belongs to the same org (check every membership source the directory uses)
-      const { data: callerDomainRows } = await admin
-        .from("pbx_softphone_users")
-        .select("domain_uuid")
-        .eq("portal_user_id", userId)
-        .eq("organization_id", orgId);
-      const callerDomains = (callerDomainRows ?? []).map((r: any) => r.domain_uuid).filter(Boolean);
-      const [{ data: other }, { data: other2 }, { data: other3 }, { data: other4 }] = await Promise.all([
-        admin.from("organization_members").select("user_id").eq("organization_id", orgId).eq("user_id", otherId).maybeSingle(),
-        admin.from("org_members").select("user_id").eq("org_id", orgId).eq("user_id", otherId).maybeSingle(),
-        admin.from("pbx_softphone_users").select("portal_user_id").eq("organization_id", orgId).eq("portal_user_id", otherId).maybeSingle(),
-        callerDomains.length
-          ? admin.from("pbx_softphone_users").select("portal_user_id").in("domain_uuid", callerDomains).eq("portal_user_id", otherId).maybeSingle()
-          : Promise.resolve({ data: null }),
+      // Verify other user is linked to an extension in the same PBX domain as caller.
+      const [{ data: otherByDomain }, { data: otherBySip }, { data: otherByExtensionDir }] = await Promise.all([
+        admin.from("pbx_softphone_users").select("portal_user_id, extension, domain_uuid, sip_domain").eq("portal_user_id", otherId).in("domain_uuid", callerDomainKeys),
+        admin.from("pbx_softphone_users").select("portal_user_id, extension, domain_uuid, sip_domain").eq("portal_user_id", otherId).in("sip_domain", callerDomainKeys),
+        admin.from("pbx_extensions_directory").select("portal_user_id, extension, domain_uuid").eq("portal_user_id", otherId).in("domain_uuid", callerDomainKeys),
       ]);
-      if (!other && !other2 && !other3 && !other4) return json({ error: "not_in_org" }, 403);
+      const otherRows = sameDomainFilter([...(otherByDomain ?? []), ...(otherBySip ?? []), ...(otherByExtensionDir ?? [])])
+        .filter((r: any) => String(r.portal_user_id || "") === otherId && String(r.extension || "").trim());
+      if (otherRows.length === 0) return json({ error: "not_in_domain" }, 403);
       const pair = [userId, otherId].sort();
       const dmKey = `dm:${pair[0].slice(0, 8)}:${pair[1].slice(0, 8)}`;
       const { data: existing } = await admin
