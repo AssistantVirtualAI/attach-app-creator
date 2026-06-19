@@ -106,8 +106,8 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
       }
       console.info('[AVA keypad] SIP call started', { to, sipStatus: sp?.snap?.status, stamp });
       setDialDebug(`SIP call started · ${stamp}`);
-      // Informational log only — no FusionPBX originate.
-      mobileApi.startCall(to, 'webrtc').catch(() => {});
+      // NOTE: Do NOT call mobile-calls-start — JsSIP handles the call directly.
+      // The FusionPBX originate API lacks permissions and was causing a 403.
     } catch (e: any) {
       const msg = e?.message || 'Unable to start call';
       const detail = { message: msg, status: e?.status, detail: e?.detail, path: e?.path, to, sipStatus: sp?.snap?.status, sipError: sp?.snap?.error, stamp };
