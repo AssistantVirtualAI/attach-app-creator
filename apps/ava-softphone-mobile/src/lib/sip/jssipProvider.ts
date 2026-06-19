@@ -189,26 +189,19 @@ export async function createSIPUA(config: SIPConfig, timeoutMs = 8000) {
   sockets.forEach((s: any) => { try { s.via_transport = 'wss'; } catch {} });
   // IMPORTANT: config must match portal/desktop exactly to avoid SIP 403
   // portal src/lib/softphone/jssipProvider.ts works — copy same params
+  // EXACT same config as portal src/lib/softphone/jssipProvider.ts (confirmed working)
   return new JsSIP.UA({
     sockets,
     uri: `sip:${config.extension}@${config.domain}`,
     password: config.password,
-    authorization_user: config.extension,  // do NOT use authUsername — must match extension
-    // NO realm field — portal doesn't set it, FusionPBX auto-negotiates
+    authorization_user: config.extension,
+    realm: config.domain,
     contact_uri: `sip:${config.extension}@${config.domain};transport=wss`,
-    display_name: config.displayName || config.extension,
     register: true,
     session_timers: false,
     register_expires: 300,
     connection_recovery_min_interval: 2,
     connection_recovery_max_interval: 30,
-    no_answer_timeout: 60,
-    use_preloaded_route: false,
-    pcConfig: {
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-      ],
-    },
+    user_agent: "AVA Softphone 1.1",
   });
 }
