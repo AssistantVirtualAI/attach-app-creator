@@ -88,7 +88,7 @@ export default function DialerScreen({
   };
 
   const startClickToCall = async () => {
-    if (!num || !CLICK_TO_CALL_ENABLED) return;
+    if (!num || !c2c.enabled) return;
     await haptic(ImpactStyle.Medium);
     setError(null);
     try {
