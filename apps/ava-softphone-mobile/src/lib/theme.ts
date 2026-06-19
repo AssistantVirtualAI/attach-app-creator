@@ -1,15 +1,21 @@
 import type React from 'react';
 /**
  * Lemtel AI Phone — Mobile design tokens.
- * Dark cyberpunk glass UI: deep navy surfaces, Lemtel blue + signal gold + AVA cyan/violet AI shimmer.
+ *
+ * The `colors` export is a runtime Proxy that resolves each token against
+ * the *current* theme (dark by default, light when
+ * `document.documentElement.dataset.theme === 'light'`). This lets every
+ * `colors.textIce` style read pick the correct value without refactoring
+ * every screen import. Components that need reactive re-render on theme
+ * toggle should additionally call `useThemeColors()` from ThemeContext.
  */
-export const colors = {
+export const darkColors = {
   // Dark foundation
   midnight:   '#0A1429',
   midnight2:  '#0E1B3D',
   graphite:   'rgba(255,255,255,0.06)',
   graphite2:  'rgba(255,255,255,0.10)',
-  // Brand — aligned with AVA Statistic portal (primary #0023e6)
+  // Brand
   lemtelBlue: '#0023e6',
   blueGlow:   '#2a4dff',
   signalGold: '#E0A800',
@@ -30,6 +36,64 @@ export const colors = {
   success:    '#10B981',
   warning:    '#F59E0B',
 } as const;
+
+export type ColorTokens = typeof darkColors;
+
+/** Light-mode parallel palette — same keys, readable on white surfaces. */
+export const lightColors: ColorTokens = {
+  midnight:   '#ffffff',
+  midnight2:  '#f5f7ff',
+  graphite:   '#ffffff',
+  graphite2:  '#f0f4ff',
+  lemtelBlue: '#0023e6',
+  blueGlow:   '#2a4dff',
+  signalGold: '#b8860b',
+  goldSoft:   '#d4a017',
+  avaCyan:    '#0891b2',
+  avaViolet:  '#7c3aed',
+  textIce:    '#0d1426',
+  textSub:    '#3a4560',
+  mutedSilver:'#6b7a99',
+  border:     'rgba(0,0,0,0.10)',
+  borderGold: 'rgba(184,134,11,0.45)',
+  borderAI:   'rgba(124,58,237,0.40)',
+  danger:     '#dc2626',
+  success:    '#16a34a',
+  warning:    '#d97706',
+};
+
+function currentPalette(): ColorTokens {
+  if (typeof document !== 'undefined') {
+    const t =
+      document.documentElement.getAttribute('data-theme') ||
+      document.body.getAttribute('data-theme');
+    if (t === 'light') return lightColors;
+  }
+  return darkColors;
+}
+
+/**
+ * Runtime-resolving palette. Always read tokens via `colors.X`, never
+ * destructure at module top-level, or the value will freeze to dark.
+ */
+export const colors: ColorTokens = new Proxy({} as ColorTokens, {
+  get(_t, prop: string) {
+    return (currentPalette() as any)[prop];
+  },
+  has(_t, prop: string) {
+    return prop in darkColors;
+  },
+  ownKeys() {
+    return Reflect.ownKeys(darkColors);
+  },
+  getOwnPropertyDescriptor(_t, prop: string) {
+    return {
+      enumerable: true,
+      configurable: true,
+      value: (currentPalette() as any)[prop],
+    };
+  },
+}) as ColorTokens;
 
 export const gradients = {
   app:    `radial-gradient(1000px 620px at 6% -12%, rgba(0,35,230,0.32), transparent 62%), radial-gradient(780px 560px at 105% 105%, rgba(224,168,0,0.18), transparent 58%), linear-gradient(180deg, #060C1C 0%, #0A1429 52%, #0E1B3D 100%)`,
