@@ -209,7 +209,7 @@ export interface CallRecord {
   hasRecording: boolean; hasTranscript: boolean;
   sentiment?: 'positive' | 'neutral' | 'negative';
   customer?: string;
-  organization_id?: string; extension?: string | null; extension_uuid?: string | null; transcript_text?: string;
+  organization_id?: string; extension?: string | null; source_number?: string | null; extension_uuid?: string | null; transcript_text?: string;
   pbx_uuid?: string | null; domain_uuid?: string | null; domain_name?: string | null;
   recording_path?: string | null; recording_name?: string | null;
   record_path?: string | null; record_name?: string | null; recording_url?: string | null;
@@ -267,7 +267,7 @@ export interface VoicemailItem {
   summary: string; sentiment: 'positive' | 'neutral' | 'negative';
   priority: 'low' | 'normal' | 'high';
   handled?: boolean; feedback?: Feedback;
-  organization_id?: string; extension?: string | null; extension_uuid?: string | null; callId?: string;
+  organization_id?: string; extension?: string | null; source_number?: string | null; extension_uuid?: string | null; callId?: string;
   pbx_uuid?: string | null; domain_uuid?: string | null; domain_name?: string | null;
   recording_path?: string | null; recording_name?: string | null;
   record_path?: string | null; record_name?: string | null; recording_url?: string | null;
@@ -277,7 +277,7 @@ export interface RecordingItem {
   recordedAt: string; durationSec: number; sizeKb: number;
   qualityScore: number; sentiment: 'positive' | 'neutral' | 'negative';
   summary: string | null; topics: string[]; tags: string[]; feedback?: Feedback;
-  organization_id?: string; extension?: string | null; extension_uuid?: string | null; transcript_text?: string | null;
+  organization_id?: string; extension?: string | null; source_number?: string | null; extension_uuid?: string | null; transcript_text?: string | null;
   pbx_uuid?: string | null; domain_uuid?: string | null; domain_name?: string | null;
   recording_path?: string | null; recording_name?: string | null;
   record_path?: string | null; record_name?: string | null; recording_url?: string | null;
