@@ -81,7 +81,7 @@ export const usePbxQueues = () => usePbxTable('pbx_call_queues', { order: 'name'
 export const usePbxRingGroups = () => usePbxTable('pbx_ring_groups', { order: 'name', ascending: true });
 export const usePbxCallRecords = (limit = 100, opts?: { extension?: string | null; enabled?: boolean; rangeDays?: 7 | 30 | null }) => {
   const qc = useQueryClient();
-  const since = opts?.rangeDays ? new Date(Date.now() - opts.rangeDays * 864e5).toISOString() : undefined;
+  const since = opts?.rangeDays ? (() => { const d = new Date(); d.setDate(d.getDate() - opts.rangeDays); d.setHours(0, 0, 0, 0); return d.toISOString(); })() : undefined;
   const q = usePbxTable('pbx_call_records', {
     order: 'start_at',
     limit,
