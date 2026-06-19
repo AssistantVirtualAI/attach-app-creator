@@ -136,6 +136,7 @@ Deno.serve(async (req) => {
       range,
       totalCalls, answered, missed, voicemails,
       totalTalkSec, avgDurationSec, answerRate, peakHour,
+      outboundCalls, dialFailedCount, dialSuccessRate,
       buckets, topExtensions, activeExtensions,
       // legacy fields
       callsToday, answeredToday, missedToday, voicemailsToday, last7Days,
