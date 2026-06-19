@@ -27,13 +27,14 @@ export function getEffectiveOrgId(): string {
   return readActiveDomainOrg() || DEFAULT_LEMTEL_ORG;
 }
 
-function usePbxTable<T = any>(table: string, opts?: { order?: string; ascending?: boolean; limit?: number; filters?: Record<string, string | number | boolean>; orFilter?: string; enabled?: boolean }) {
+function usePbxTable<T = any>(table: string, opts?: { order?: string; ascending?: boolean; limit?: number; filters?: Record<string, string | number | boolean>; gteFilters?: Record<string, string>; orFilter?: string; enabled?: boolean }) {
   return useQuery({
     queryKey: ['pbx', table, opts],
     enabled: opts?.enabled ?? true,
     queryFn: async () => {
       let q = supabase.from(table as any).select('*').eq('organization_id', LEMTEL_ORG);
       Object.entries(opts?.filters || {}).forEach(([key, value]) => { q = q.eq(key, value as any); });
+      Object.entries(opts?.gteFilters || {}).forEach(([key, value]) => { q = q.gte(key, value); });
       if (opts?.orFilter) q = q.or(opts.orFilter);
       if (opts?.order) q = q.order(opts.order, { ascending: opts.ascending ?? false });
       if (opts?.limit) q = q.limit(opts.limit);
@@ -78,12 +79,14 @@ export const usePbxIvrAudio = (ivrId: string | null) => useQuery({
 });
 export const usePbxQueues = () => usePbxTable('pbx_call_queues', { order: 'name', ascending: true });
 export const usePbxRingGroups = () => usePbxTable('pbx_ring_groups', { order: 'name', ascending: true });
-export const usePbxCallRecords = (limit = 100, opts?: { extension?: string | null; enabled?: boolean }) => {
+export const usePbxCallRecords = (limit = 100, opts?: { extension?: string | null; enabled?: boolean; rangeDays?: 7 | 30 | null }) => {
   const qc = useQueryClient();
+  const since = opts?.rangeDays ? (() => { const d = new Date(); d.setDate(d.getDate() - opts.rangeDays); d.setHours(0, 0, 0, 0); return d.toISOString(); })() : undefined;
   const q = usePbxTable('pbx_call_records', {
     order: 'start_at',
     limit,
     enabled: opts?.enabled,
+    gteFilters: since ? { start_at: since } : undefined,
     orFilter: opts?.extension
       ? `extension.eq.${opts.extension},caller_number.eq.${opts.extension},destination_number.eq.${opts.extension},source_number.eq.${opts.extension}`
       : undefined,

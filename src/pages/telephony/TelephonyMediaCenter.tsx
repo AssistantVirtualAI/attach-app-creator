@@ -18,12 +18,14 @@ import { TranscriptStagePill } from "@/components/transcripts/TranscriptStagePil
 
 
 type Scope = "org" | "mine";
+type HistoryRange = 7 | 30;
 
 export default function TelephonyMediaCenter({ scope = "org" }: { scope?: Scope }) {
   const qc = useQueryClient();
   const [tab, setTab] = useState("cdr");
   const [q, setQ] = useState("");
   const [extFilter, setExtFilter] = useState("");
+  const [rangeDays, setRangeDays] = useState<HistoryRange>(7);
 
   // -------- Realtime invalidation --------
   useEffect(() => {
@@ -95,6 +97,13 @@ export default function TelephonyMediaCenter({ scope = "org" }: { scope?: Scope 
               className="max-w-[180px] font-mono"
             />
           )}
+          <div className="flex rounded-md border border-border overflow-hidden">
+            {([7, 30] as const).map((days) => (
+              <Button key={days} type="button" size="sm" variant={rangeDays === days ? "default" : "ghost"} className="rounded-none" onClick={() => setRangeDays(days)}>
+                {days} days
+              </Button>
+            ))}
+          </div>
           <Button variant="outline" size="sm" onClick={async () => {
             toast.info("Synchronisation en cours…");
             await supabase.functions.invoke("fusionpbx-proxy", { body: { action: "sync-cdrs", organization_id: orgId } }).catch(() => {});
@@ -115,10 +124,10 @@ export default function TelephonyMediaCenter({ scope = "org" }: { scope?: Scope 
         </TabsList>
 
         <TabsContent value="cdr" className="mt-4">
-          {mineReady ? <CdrTab orgId={orgId} extension={filterExt} search={q} /> : <Card><CardContent className="py-8 text-sm text-muted-foreground">Aucune extension liée à votre compte.</CardContent></Card>}
+          {mineReady ? <CdrTab orgId={orgId} extension={filterExt} search={q} rangeDays={rangeDays} /> : <Card><CardContent className="py-8 text-sm text-muted-foreground">Aucune extension liée à votre compte.</CardContent></Card>}
         </TabsContent>
         <TabsContent value="recordings" className="mt-4">
-          {mineReady ? <RecordingsTab orgId={orgId} extension={filterExt} search={q} /> : <Card><CardContent className="py-8 text-sm text-muted-foreground">Aucune extension liée à votre compte.</CardContent></Card>}
+          {mineReady ? <RecordingsTab orgId={orgId} extension={filterExt} search={q} rangeDays={rangeDays} /> : <Card><CardContent className="py-8 text-sm text-muted-foreground">Aucune extension liée à votre compte.</CardContent></Card>}
         </TabsContent>
         <TabsContent value="voicemail" className="mt-4">
           {mineReady ? <VoicemailTab orgId={orgId} extension={filterExt} search={q} /> : <Card><CardContent className="py-8 text-sm text-muted-foreground">Aucune extension liée à votre compte.</CardContent></Card>}
@@ -129,21 +138,22 @@ export default function TelephonyMediaCenter({ scope = "org" }: { scope?: Scope 
 }
 
 /* ---------------- CDR TAB ---------------- */
-function CdrTab({ orgId, extension, search }: { orgId: string; extension: string | null; search: string }) {
+function CdrTab({ orgId, extension, search, rangeDays }: { orgId: string; extension: string | null; search: string; rangeDays: HistoryRange }) {
   const write = usePbxWrite();
   const { data: rows = [], isLoading } = useQuery({
-    queryKey: ["media", "cdr", orgId, extension],
+    queryKey: ["media", "cdr", orgId, extension, rangeDays],
     queryFn: async () => {
+      const since = (() => { const d = new Date(); d.setDate(d.getDate() - rangeDays); d.setHours(0, 0, 0, 0); return d.toISOString(); })();
       let q = (supabase as any).from("pbx_call_records")
-        .select("id,start_at,duration_seconds,direction,caller_number,destination_number,extension,call_status,hangup_cause,recording_path,has_recording,pbx_uuid")
-        .eq("organization_id", orgId).order("start_at", { ascending: false }).limit(300);
+        .select("id,start_at,duration_seconds,direction,caller_number,destination_number,source_number,extension,call_status,hangup_cause,recording_path,has_recording,pbx_uuid")
+        .eq("organization_id", orgId).gte("start_at", since).order("start_at", { ascending: false }).limit(500);
       if (extension) q = q.or(`extension.eq.${extension},caller_number.eq.${extension},destination_number.eq.${extension},source_number.eq.${extension}`);
       const { data } = await q;
       return (data || []) as any[];
     },
   });
 
-  const filtered = rows.filter((r) => !search || `${r.caller_number ?? ""} ${r.destination_number ?? ""} ${r.extension ?? ""}`.toLowerCase().includes(search.toLowerCase()));
+  const filtered = rows.filter((r) => !search || `${r.caller_number ?? ""} ${r.destination_number ?? ""} ${r.extension ?? ""} ${r.source_number ?? ""}`.toLowerCase().includes(search.toLowerCase()));
 
   const remove = async (r: any) => {
     if (!confirm("Supprimer ce CDR ?")) return;
@@ -183,7 +193,7 @@ function CdrTab({ orgId, extension, search }: { orgId: string; extension: string
 }
 
 /* ---------------- RECORDINGS TAB ---------------- */
-function RecordingsTab({ orgId, extension, search }: { orgId: string; extension: string | null; search: string }) {
+function RecordingsTab({ orgId, extension, search, rangeDays }: { orgId: string; extension: string | null; search: string; rangeDays: HistoryRange }) {
   const write = usePbxWrite();
   const qc = useQueryClient();
   const [signed, setSigned] = useState<Record<string, string>>({});
@@ -192,11 +202,12 @@ function RecordingsTab({ orgId, extension, search }: { orgId: string; extension:
 
 
   const { data: rows = [], isLoading } = useQuery({
-    queryKey: ["media", "recordings", orgId, extension],
+    queryKey: ["media", "recordings", orgId, extension, rangeDays],
     queryFn: async () => {
+      const since = (() => { const d = new Date(); d.setDate(d.getDate() - rangeDays); d.setHours(0, 0, 0, 0); return d.toISOString(); })();
       let q = (supabase as any).from("pbx_call_records")
-        .select("id,organization_id,start_at,duration_seconds,caller_number,destination_number,extension,recording_path,recording_name,recording_url,ai_summary,transcribed,pbx_uuid,domain_uuid,domain_name,raw_data")
-        .eq("organization_id", orgId).not("recording_path", "is", null).order("start_at", { ascending: false }).limit(150);
+        .select("id,organization_id,start_at,duration_seconds,caller_number,destination_number,source_number,extension,recording_path,recording_name,recording_url,ai_summary,transcribed,pbx_uuid,domain_uuid,domain_name,raw_data")
+        .eq("organization_id", orgId).gte("start_at", since).not("recording_path", "is", null).order("start_at", { ascending: false }).limit(500);
       if (extension) q = q.or(`extension.eq.${extension},caller_number.eq.${extension},destination_number.eq.${extension},source_number.eq.${extension}`);
       const { data } = await q;
       return (data || []) as any[];
@@ -256,7 +267,7 @@ function RecordingsTab({ orgId, extension, search }: { orgId: string; extension:
     toast.success("Enregistrement supprimé");
   };
 
-  const filtered = rows.filter((r) => !search || `${r.caller_number ?? ""} ${r.destination_number ?? ""} ${r.raw_data?.transcript_text ?? ""}`.toLowerCase().includes(search.toLowerCase()));
+  const filtered = rows.filter((r) => !search || `${r.caller_number ?? ""} ${r.destination_number ?? ""} ${r.source_number ?? ""} ${r.extension ?? ""} ${r.raw_data?.transcript_text ?? ""}`.toLowerCase().includes(search.toLowerCase()));
   if (isLoading) return <div className="flex justify-center py-8"><Loader2 className="animate-spin" /></div>;
 
   return (

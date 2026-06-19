@@ -41,6 +41,14 @@ function cleanText(v: any): string {
   return s && s.toLowerCase() !== 'null' && s.toLowerCase() !== 'undefined' ? s : '';
 }
 
+function rangeStartIso(days?: 7 | 30 | null): string | null {
+  if (!days) return null;
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  d.setHours(0, 0, 0, 0);
+  return d.toISOString();
+}
+
 /** A CDR row counts as a voicemail when the PBX attached a voicemail message or marked it as such. */
 function isVoicemailLike(r: any): boolean {
   if (!r) return false;
@@ -201,7 +209,7 @@ export interface CallRecord {
   hasRecording: boolean; hasTranscript: boolean;
   sentiment?: 'positive' | 'neutral' | 'negative';
   customer?: string;
-  organization_id?: string; extension?: string | null; extension_uuid?: string | null; transcript_text?: string;
+  organization_id?: string; extension?: string | null; source_number?: string | null; extension_uuid?: string | null; transcript_text?: string;
   pbx_uuid?: string | null; domain_uuid?: string | null; domain_name?: string | null;
   recording_path?: string | null; recording_name?: string | null;
   record_path?: string | null; record_name?: string | null; recording_url?: string | null;
@@ -259,7 +267,7 @@ export interface VoicemailItem {
   summary: string; sentiment: 'positive' | 'neutral' | 'negative';
   priority: 'low' | 'normal' | 'high';
   handled?: boolean; feedback?: Feedback;
-  organization_id?: string; extension?: string | null; extension_uuid?: string | null; callId?: string;
+  organization_id?: string; extension?: string | null; source_number?: string | null; extension_uuid?: string | null; callId?: string;
   pbx_uuid?: string | null; domain_uuid?: string | null; domain_name?: string | null;
   recording_path?: string | null; recording_name?: string | null;
   record_path?: string | null; record_name?: string | null; recording_url?: string | null;
@@ -269,7 +277,7 @@ export interface RecordingItem {
   recordedAt: string; durationSec: number; sizeKb: number;
   qualityScore: number; sentiment: 'positive' | 'neutral' | 'negative';
   summary: string | null; topics: string[]; tags: string[]; feedback?: Feedback;
-  organization_id?: string; extension?: string | null; extension_uuid?: string | null; transcript_text?: string | null;
+  organization_id?: string; extension?: string | null; source_number?: string | null; extension_uuid?: string | null; transcript_text?: string | null;
   pbx_uuid?: string | null; domain_uuid?: string | null; domain_name?: string | null;
   recording_path?: string | null; recording_name?: string | null;
   record_path?: string | null; record_name?: string | null; recording_url?: string | null;
@@ -403,6 +411,8 @@ function mapCdrToCall(r: any): CallRecord {
     durationSec:  billsec,
     hasRecording: !!(r.has_recording || r.recording_path || r.recording_name),
     hasTranscript: !!r.transcribed,
+    extension:    r.extension ?? null,
+    source_number: r.source_number ?? null,
     sentiment:    undefined,
   };
 }
@@ -422,6 +432,7 @@ function mapCdrToVoicemail(r: any): VoicemailItem {
     priority:    'normal' as const,
     organization_id: r.organization_id ?? undefined,
     extension: r.extension ?? null,
+    source_number: r.source_number ?? null,
     extension_uuid: r.extension_uuid ?? null,
     callId:      r.id ?? undefined,
     pbx_uuid:    r.pbx_uuid ?? null,
@@ -477,17 +488,21 @@ function mapCdrToRecording(r: any): RecordingItem {
 
 
 
-async function readCallRecordRows(limit = 100, opts?: { scope?: 'mine' | 'org'; extension?: string | null }): Promise<any[]> {
+async function readCallRecordRows(limit = 100, opts?: { scope?: 'mine' | 'org'; extension?: string | null; rangeDays?: 7 | 30 | null }): Promise<any[]> {
   const me = await getMeContext();
   const orgFilter = me.organization_id ? `&organization_id=eq.${me.organization_id}` : '';
   const scopeOrg = opts?.scope === 'org';
   const scopedExtension = cleanText(opts?.extension || me.extension);
-  const extFilter = scopeOrg
-    ? ''
-    : scopedExtension
+  const extFilter = opts?.extension
+    ? `&or=(extension.eq.${encodeURIComponent(cleanText(opts.extension))},caller_number.eq.${encodeURIComponent(cleanText(opts.extension))},destination_number.eq.${encodeURIComponent(cleanText(opts.extension))},source_number.eq.${encodeURIComponent(cleanText(opts.extension))})`
+    : scopeOrg
+      ? ''
+      : scopedExtension
       ? `&or=(extension.eq.${encodeURIComponent(scopedExtension)},caller_number.eq.${encodeURIComponent(scopedExtension)},destination_number.eq.${encodeURIComponent(scopedExtension)},source_number.eq.${encodeURIComponent(scopedExtension)})`
       : '&id=is.null';
-  const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,organization_id,extension,extension_uuid,pbx_uuid,domain_uuid,domain_name,caller_name,caller_number,destination,source_number,destination_number,start_at,duration_seconds,billsec,direction,call_status,missed_call,has_recording,recording_path,recording_name,hangup_cause,voicemail_message,transcribed,analyzed,mos,raw_data,notes,tags${orgFilter}${extFilter}&order=start_at.desc&limit=${limit}`;
+  const rangeStart = rangeStartIso(opts?.rangeDays);
+  const sinceFilter = rangeStart ? `&start_at=gte.${encodeURIComponent(rangeStart)}` : '';
+  const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,organization_id,extension,extension_uuid,pbx_uuid,domain_uuid,domain_name,caller_name,caller_number,destination,source_number,destination_number,start_at,duration_seconds,billsec,direction,call_status,missed_call,has_recording,recording_path,recording_name,hangup_cause,voicemail_message,transcribed,analyzed,mos,raw_data,notes,tags${orgFilter}${extFilter}${sinceFilter}&order=start_at.desc&limit=${limit}`;
 
   const res = await fetch(url, {
     headers: {
@@ -599,18 +614,18 @@ export const ava = {
     missed: 3, answered: 12, unreadSms: 5, voicemail: 2, aiActions: 4, pbxHealth: 'ok',
     brief: 'You have 3 missed calls and 2 unread voicemails requiring callbacks. One conversation flagged a renewal opportunity.',
   }),
-  calls: async (limit = 100, opts?: { scope?: 'mine' | 'org'; extension?: string | null }) => {
+  calls: async (limit = 100, opts?: { scope?: 'mine' | 'org'; extension?: string | null; rangeDays?: 7 | 30 | null }) => {
     if (MOCK) return MOCK_CALLS;
     await bestEffortCdrSync(Math.max(limit, 200));
     return (await readCallRecordRows(limit, opts)).map(mapCdrToCall);
   },
-  refreshCalls: async (limit = 150, opts?: { scope?: 'mine' | 'org'; extension?: string | null }) => {
+  refreshCalls: async (limit = 150, opts?: { scope?: 'mine' | 'org'; extension?: string | null; rangeDays?: 7 | 30 | null }) => {
     if (MOCK) return MOCK_CALLS;
     await bestEffortCdrSync(Math.max(limit, 250), 0, true);
     if (typeof window !== 'undefined') window.dispatchEvent(new Event('lemtel:phone-sync-complete'));
     return (await readCallRecordRows(limit, opts)).map(mapCdrToCall);
   },
-  scopedCallRecords: async (limit = 100, opts?: { scope?: 'mine' | 'org'; extension?: string | null }) => {
+  scopedCallRecords: async (limit = 100, opts?: { scope?: 'mine' | 'org'; extension?: string | null; rangeDays?: 7 | 30 | null }) => {
     if (MOCK) return MOCK_CALLS as any[];
     await bestEffortCdrSync(Math.max(limit, 200));
     return readCallRecordRows(limit, opts);
@@ -783,7 +798,7 @@ export const ava = {
   },
   markVoicemailRead: (id: string) =>
     call<{ ok: true }>(`/fn/${FN.fusionpbxProxy}`, { method: 'POST', body: JSON.stringify({ action: 'voicemail-read', id }) }, { ok: true }).catch(() => ({ ok: true as const })),
-  recordings: async (limit = 100, opts?: { scope?: 'mine' | 'org'; extension?: string | null }) => {
+  recordings: async (limit = 100, opts?: { scope?: 'mine' | 'org'; extension?: string | null; rangeDays?: 7 | 30 | null }) => {
     if (MOCK) return SAMPLE_RECORDING_EMPTY;
     await bestEffortCdrSync(Math.max(limit, 200));
     try {
@@ -791,12 +806,16 @@ export const ava = {
       const orgFilter = me.organization_id ? `&organization_id=eq.${me.organization_id}` : '';
       const scopeOrg = opts?.scope === 'org';
       const scopedExtension = cleanText(opts?.extension || me.extension);
-      const extFilter = scopeOrg
-        ? ''
-        : scopedExtension
+      const rangeStart = rangeStartIso(opts?.rangeDays);
+      const sinceFilter = rangeStart ? `&start_at=gte.${encodeURIComponent(rangeStart)}` : '';
+      const extFilter = opts?.extension
+        ? `&or=(extension.eq.${encodeURIComponent(cleanText(opts.extension))},caller_number.eq.${encodeURIComponent(cleanText(opts.extension))},destination_number.eq.${encodeURIComponent(cleanText(opts.extension))},source_number.eq.${encodeURIComponent(cleanText(opts.extension))})`
+        : scopeOrg
+          ? ''
+          : scopedExtension
           ? `&or=(extension.eq.${encodeURIComponent(scopedExtension)},caller_number.eq.${encodeURIComponent(scopedExtension)},destination_number.eq.${encodeURIComponent(scopedExtension)},source_number.eq.${encodeURIComponent(scopedExtension)})`
           : '&id=is.null';
-      const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,organization_id,extension,extension_uuid,pbx_uuid,domain_uuid,domain_name,caller_name,caller_number,destination,destination_number,source_number,start_at,billsec,duration_seconds,has_recording,recording_path,recording_name,mos&has_recording=eq.true${orgFilter}${extFilter}&order=start_at.desc&limit=${limit}`;
+      const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,organization_id,extension,extension_uuid,pbx_uuid,domain_uuid,domain_name,caller_name,caller_number,destination,destination_number,source_number,start_at,billsec,duration_seconds,has_recording,recording_path,recording_name,mos,raw_data,transcribed&has_recording=eq.true${orgFilter}${extFilter}${sinceFilter}&order=start_at.desc&limit=${limit}`;
       const res = await fetch(url, {
         headers: {
           'Content-Type': 'application/json',
@@ -812,7 +831,7 @@ export const ava = {
       return [] as RecordingItem[];
     }
   },
-  refreshRecordings: async (limit = 100, opts?: { scope?: 'mine' | 'org'; extension?: string | null }) => {
+  refreshRecordings: async (limit = 100, opts?: { scope?: 'mine' | 'org'; extension?: string | null; rangeDays?: 7 | 30 | null }) => {
     if (MOCK) return SAMPLE_RECORDING_EMPTY;
     await bestEffortRecentTelephonySync(Math.max(limit, 250), true);
     if (typeof window !== 'undefined') window.dispatchEvent(new Event('lemtel:recordings-updated'));

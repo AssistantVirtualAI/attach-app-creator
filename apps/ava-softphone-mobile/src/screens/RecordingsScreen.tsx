@@ -12,10 +12,14 @@ export default function RecordingsScreen({
   creds,
   isAdmin,
   myExtension,
+  rangeDays,
+  onRangeDaysChange,
 }: {
   creds?: Creds | null;
   isAdmin: boolean;
   myExtension: string | null;
+  rangeDays: 7 | 30;
+  onRangeDaysChange: (days: 7 | 30) => void;
 }) {
   const [items, setItems] = useState<RecordingEntry[] | null>(null);
   const [extFilter, setExtFilter] = useState<string>(isAdmin ? 'all' : (myExtension || 'all'));
@@ -25,6 +29,7 @@ export default function RecordingsScreen({
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Load recordings
@@ -33,11 +38,11 @@ export default function RecordingsScreen({
     setItems(null);
     setError(null);
     const ext = isAdmin ? (extFilter === 'all' ? undefined : extFilter) : (myExtension || undefined);
-    mobileApi.recordings(ext)
+    mobileApi.recordings(ext, { rangeDays })
       .then((rows) => { if (!cancelled) setItems(rows); })
       .catch((e: any) => { if (!cancelled) { setError(e?.message || 'Failed to load recordings'); setItems([]); } });
     return () => { cancelled = true; };
-  }, [extFilter, isAdmin, myExtension, creds?.accessToken]);
+  }, [extFilter, isAdmin, myExtension, creds?.accessToken, rangeDays]);
 
   // Fallback: derive domain_uuid from /mobile-me when creds lack it.
   useEffect(() => {
@@ -132,6 +137,11 @@ export default function RecordingsScreen({
         )
       )}
 
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', margin: '0 2px 10px' }}>
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name, number, extension…" style={{ flex: 1, minWidth: 0, padding: '8px 10px', borderRadius: 10, border: `1px solid ${colors.border}`, background: 'rgba(255,255,255,0.06)', color: colors.textIce, fontSize: 12, outline: 'none' }} />
+        {([7, 30] as const).map((d) => <button key={d} onClick={() => onRangeDaysChange(d)} style={{ padding: '7px 9px', borderRadius: 10, border: `1px solid ${rangeDays === d ? colors.borderGold : colors.border}`, background: rangeDays === d ? colors.signalGold + '1a' : 'rgba(255,255,255,0.04)', color: rangeDays === d ? colors.signalGold : colors.mutedSilver, fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>{d}d</button>)}
+      </div>
+
       <audio ref={audioRef} onEnded={() => setPlayingId(null)} style={{ width: '100%', marginBottom: 10 }} controls />
 
       {error && (
@@ -142,10 +152,10 @@ export default function RecordingsScreen({
       )}
 
       {!items && <ListSkeleton rows={5} />}
-      {items && items.length === 0 && (
+      {items && items.filter((r) => !search.trim() || [r.customer, r.from, r.to, r.extension, r.summary].filter(Boolean).join(' ').toLowerCase().includes(search.trim().toLowerCase())).length === 0 && (
         <EmptyState icon="🎙" title="No recordings yet" hint={isAdmin ? 'No domain recordings match this filter.' : 'Recordings for your extension will appear here.'} />
       )}
-      {items && items.map((r) => (
+      {items && items.filter((r) => !search.trim() || [r.customer, r.from, r.to, r.extension, r.summary].filter(Boolean).join(' ').toLowerCase().includes(search.trim().toLowerCase())).map((r) => (
         <div key={r.id} style={{ marginBottom: 8 }}>
           <div style={{
             display: 'flex', alignItems: 'center', gap: 12,

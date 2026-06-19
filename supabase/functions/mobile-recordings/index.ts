@@ -53,22 +53,28 @@ Deno.serve(async (req) => {
 
     const url = new URL(req.url);
     const extParam = url.searchParams.get("extension");
+    const days = Math.min(Math.max(Number(url.searchParams.get("days")) || 7, 1), 30);
+    const sinceDate = new Date();
+    sinceDate.setDate(sinceDate.getDate() - days);
+    sinceDate.setHours(0, 0, 0, 0);
+    const since = sinceDate.toISOString();
     const ext = sp.extension;
 
     let q = admin.from("pbx_call_records")
       .select("id, pbx_uuid, caller_name, caller_number, destination_number, extension, start_at, duration_seconds, transcribed, ai_summary, recording_path, recording_name, recording_url, domain_uuid, domain_name, organization_id")
       .eq("organization_id", sp.organization_id)
-      .eq("has_recording", true);
+      .eq("has_recording", true)
+      .gte("start_at", since);
 
     if (sp.domain_uuid) q = q.or(`domain_uuid.eq.${sp.domain_uuid},domain_uuid.is.null`);
 
     if (!isDomainAdmin) {
       // Hard-restrict to own extension.
       if (!ext) return json([]);
-      q = q.or(`extension.eq.${ext},caller_number.eq.${ext},destination_number.eq.${ext}`);
+      q = q.or(`extension.eq.${ext},caller_number.eq.${ext},source_number.eq.${ext},destination_number.eq.${ext}`);
     } else if (extParam && extParam !== "all") {
       // Admin filtering on a specific extension.
-      q = q.or(`extension.eq.${extParam},caller_number.eq.${extParam},destination_number.eq.${extParam}`);
+      q = q.or(`extension.eq.${extParam},caller_number.eq.${extParam},source_number.eq.${extParam},destination_number.eq.${extParam}`);
     }
 
     const { data: rows, error } = await q.order("start_at", { ascending: false }).limit(200);

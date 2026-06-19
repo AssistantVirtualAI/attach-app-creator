@@ -72,9 +72,10 @@ export default function RecordingsView({ scope = 'mine' }: { scope?: 'mine' | 'o
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState<Quality>('all');
   const [s, setS] = useState<Sent>('all');
-  const [range, setRange] = useState<Range>('all');
+  const [range, setRange] = useState<Range>('7d');
   const [sort, setSort] = useState<Sort>('recent');
   const [search, setSearch] = useState('');
+  const [extensionQuery, setExtensionQuery] = useState('');
   const [sel, setSel] = useState<RecordingItem | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [exporting, setExporting] = useState(false);
@@ -94,7 +95,9 @@ export default function RecordingsView({ scope = 'mine' }: { scope?: 'mine' | 'o
     if (opts?.force) setRefreshing(true);
     setError(null);
     try {
-      const d = opts?.force ? await ava.refreshRecordings(100, { scope }) : await ava.recordings(100, { scope });
+      const rangeDays: 7 | 30 | null = range === '7d' ? 7 : range === '30d' ? 30 : null;
+      const apiOpts: { scope: 'mine' | 'org'; extension: string | null; rangeDays: 7 | 30 | null } = { scope, extension: scope === 'org' ? (extensionQuery.trim() || null) : null, rangeDays };
+      const d = opts?.force ? await ava.refreshRecordings(500, apiOpts) : await ava.recordings(500, apiOpts);
       setItems(Array.isArray(d) ? d : []);
     } catch (err: any) {
       if (!opts?.silent || opts?.force) setItems([]);
@@ -103,7 +106,7 @@ export default function RecordingsView({ scope = 'mine' }: { scope?: 'mine' | 'o
       if (!opts?.silent) setLoading(false);
       if (opts?.force) setRefreshing(false);
     }
-  }, [scope]);
+  }, [scope, extensionQuery, range]);
 
   const silentLoad = useCallback(() => { void load({ silent: true }); }, [load]);
 
@@ -323,13 +326,26 @@ export default function RecordingsView({ scope = 'mine' }: { scope?: 'mine' | 'o
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search recordings, customers, topics…"
+          placeholder="Search recordings, customers, extension, topics…"
           style={{
             width: '100%', padding: '10px 12px', borderRadius: 10,
             background: c.bgCard, border: `1px solid ${c.border}`,
             color: c.textIce, fontSize: 13, marginBottom: 10, outline: 'none',
           }}
         />
+
+        {scope === 'org' && (
+          <input
+            value={extensionQuery}
+            onChange={(e) => setExtensionQuery(e.target.value.replace(/[^0-9*]/g, ''))}
+            placeholder="Filter by extension #"
+            style={{
+              width: '100%', padding: '10px 12px', borderRadius: 10,
+              background: c.bgCard, border: `1px solid ${c.border}`,
+              color: c.textIce, fontSize: 13, marginBottom: 10, outline: 'none', fontFamily: 'JetBrains Mono, monospace',
+            }}
+          />
+        )}
 
         <div style={{ display: 'flex', gap: 14, marginBottom: 14, flexWrap: 'wrap' }}>
           <FilterGroup label="Quality" value={q} onChange={(v) => setQ(v as Quality)} options={['all', 'high', 'medium', 'low']} />

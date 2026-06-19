@@ -325,7 +325,7 @@ export const mobileApi = {
   ),
 
   // Recents: scoped server-side to the caller's org + extension via mobile-calls.
-  calls: () => call<CallRecord[] | any>('/mobile-calls', undefined, callsMock).then((raw: any) => {
+  calls: (opts?: { rangeDays?: 7 | 30; extension?: string | null }) => call<CallRecord[] | any>(`/mobile-calls?days=${opts?.rangeDays || 7}&limit=200${opts?.extension && opts.extension !== 'all' ? `&extension=${encodeURIComponent(opts.extension)}` : ''}`, undefined, callsMock).then((raw: any) => {
     if (isMockMode()) return raw as CallRecord[];
     if (!Array.isArray(raw)) throw new Error('Invalid response from mobile-calls');
     return raw as CallRecord[];
@@ -334,8 +334,8 @@ export const mobileApi = {
 
   // Recordings: list of completed calls with audio. Scoped server-side
   // (admins see the whole domain, regular users only their extension).
-  recordings: (extension?: string) => call<RecordingEntry[] | any>(
-    `/mobile-recordings${extension && extension !== 'all' ? `?extension=${encodeURIComponent(extension)}` : ''}`,
+  recordings: (extension?: string, opts?: { rangeDays?: 7 | 30 }) => call<RecordingEntry[] | any>(
+    `/mobile-recordings?days=${opts?.rangeDays || 7}${extension && extension !== 'all' ? `&extension=${encodeURIComponent(extension)}` : ''}`,
     undefined, [] as RecordingEntry[],
   ).then((raw: any) => {
     if (Array.isArray(raw)) return raw as RecordingEntry[];

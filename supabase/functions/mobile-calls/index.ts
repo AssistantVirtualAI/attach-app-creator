@@ -72,6 +72,7 @@ Deno.serve(async (req) => {
 
     const url = new URL(req.url);
     const id = url.searchParams.get("id");
+    const extParam = url.searchParams.get("extension");
 
     const ext = sp.extension;
     const extFilter = `extension.eq.${ext},caller_number.eq.${ext},source_number.eq.${ext},destination_number.eq.${ext},destination.eq.${ext}`;
@@ -125,11 +126,18 @@ Deno.serve(async (req) => {
       });
     }
 
+    const days = Math.min(Math.max(Number(url.searchParams.get("days")) || 7, 1), 30);
+    const sinceDate = new Date();
+    sinceDate.setDate(sinceDate.getDate() - days);
+    sinceDate.setHours(0, 0, 0, 0);
+    const since = sinceDate.toISOString();
     const limit = Math.min(Number(url.searchParams.get("limit")) || 50, 200);
     let listQ = admin.from("pbx_call_records")
       .select("id, pbx_uuid, organization_id, domain_uuid, domain_name, direction, call_status, caller_name, caller_number, source_number, destination, destination_number, extension, start_at, duration_seconds, missed_call, has_recording, recording_path, recording_name, recording_url, transcribed")
-      .eq("organization_id", sp.organization_id);
+      .eq("organization_id", sp.organization_id)
+      .gte("start_at", since);
     if (!isDomainAdmin) listQ = listQ.or(extFilter);
+    else if (extParam && extParam !== "all") listQ = listQ.or(`extension.eq.${extParam},caller_number.eq.${extParam},source_number.eq.${extParam},destination_number.eq.${extParam},destination.eq.${extParam}`);
     if (sp.domain_uuid) listQ = listQ.or(`domain_uuid.eq.${sp.domain_uuid},domain_uuid.is.null`);
     const { data: rows, error } = await listQ
       .order("start_at", { ascending: false })
