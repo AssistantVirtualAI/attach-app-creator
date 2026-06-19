@@ -58,7 +58,7 @@ export default function RecordingsScreen() {
     load().then(() => setError(null)).catch((e) => { setError(e?.message || 'Recordings failed'); setData([]); });
   }, [load, mobile.loading, mobile.accessToken, mobile.domainUuid]);
 
-  useEffect(() => () => { audioRef.current?.pause(); objectUrls.current.forEach((u) => URL.revokeObjectURL(u)); }, []);
+  useEffect(() => () => { objectUrls.current.forEach((u) => URL.revokeObjectURL(u)); }, []);
 
   useEffect(() => {
     if (!mobile.accessToken || !mobile.domainUuid) return;
@@ -75,30 +75,21 @@ export default function RecordingsScreen() {
     return (data || []).filter((r) => [r.caller_name, r.caller_number, r.destination_number, r.extension, r.ai_summary].filter(Boolean).some((v) => String(v).toLowerCase().includes(t)));
   }, [data, q]);
 
-  const play = async (r: Recording) => {
-    if (playing === r.id) { audioRef.current?.pause(); setPlaying(null); return; }
-    audioRef.current?.pause();
-    audioRef.current = null;
-    let url = urlCache.current.get(r.id) || '';
-    if (!url) {
-      setLoadingAudio(r.id);
-      try {
-        url = await loadPbxRecordingAudioMobile(r, mobile.accessToken, mobile.organizationId);
-        urlCache.current.set(r.id, url);
-        if (url.startsWith('blob:')) objectUrls.current.add(url);
-      } catch (e: any) {
-        showMobileToast(e?.message || 'Playback failed', 'error');
-        setLoadingAudio(null);
-        return;
-      }
+  const loadAudio = async (r: Recording) => {
+    if (audioUrls[r.id]) return;
+    setAudioErrors((e) => { const n = { ...e }; delete n[r.id]; return n; });
+    setLoadingAudio(r.id);
+    try {
+      const url = await loadPbxRecordingAudioMobile(r, mobile.accessToken, mobile.organizationId);
+      if (url.startsWith('blob:')) objectUrls.current.add(url);
+      setAudioUrls((u) => ({ ...u, [r.id]: url }));
+    } catch (e: any) {
+      const msg = e?.message || 'Playback failed';
+      setAudioErrors((errs) => ({ ...errs, [r.id]: msg }));
+      showMobileToast(msg, 'error');
+    } finally {
       setLoadingAudio(null);
     }
-    const audio = new Audio(url);
-    audio.onended = () => setPlaying(null);
-    audio.onerror = () => { setPlaying(null); showMobileToast('Playback failed', 'error'); };
-    audioRef.current = audio;
-    setPlaying(r.id);
-    audio.play().catch(() => { setPlaying(null); showMobileToast('Playback failed', 'error'); });
   };
 
   const transcribe = async (id: string) => {
