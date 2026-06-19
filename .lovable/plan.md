@@ -1,136 +1,97 @@
+# Mobile app `/m` — Pre-launch data sync + new bottom navigation
 
-# Universal call intelligence: transcribe → analyze → coach (once per recording)
+Two goals:
+1. Make sure CDRs, recordings, voicemail, and contacts always show real, fresh data for the signed-in extension — so beta testers on App Store / Play Store don't see empty screens.
+2. Add dedicated **Contacts**, **Voicemail**, and **Recordings** buttons to the bottom tab bar (instead of being buried in "More").
 
-## Goal
-
-Every call recording is processed exactly **once**:
-1. Transcribed to text
-2. Analyzed (sentiment, topics, intent, satisfaction)
-3. Summarized
-4. Enriched with **action items** and **coaching notes**
-
-Results are stored in the database and surfaced identically in the **admin portal**, the **desktop softphone**, and the **mobile softphone**. No app ever re-runs work that already exists.
+No changes to `vite.config.ts`, `electron-builder.yml`, or `.github/workflows/`.
 
 ---
 
-## Single source of truth (DB)
+## Part A — Auto-sync correctness (so `/m` is never empty)
 
-Reuse existing tables — no schema change required:
+### A1. Resolve extension → organization on sign-in
+- On successful sign-in (`AuthScreen`), call a small `mobile-bootstrap` edge function that:
+  - Looks up the user in `pbx_softphone_users` by `portal_user_id` (or `extension` for ext-login).
+  - Returns `{ organization_id, extension, displayName, sipDomain }`.
+  - Persists the resolved IDs into `creds` so every screen uses the same scope.
+- Today some screens silently return `[]` when no softphone link is found — we'll surface a clear "Extension not linked" banner with a "Retry sync" button instead of an empty list.
 
-- `pbx_call_transcripts` → transcript text (already exists)
-- `pbx_ai_insights` → summary, sentiment, topics, action_items, key_phrases, etc. (already exists)
-- Extend `pbx_ai_insights` with two text[] columns via migration:
-  - `coaching_notes text[]` — concrete coaching feedback for the agent
-  - `coaching_score numeric` — overall 1–5 quality rating
+### A2. Real-time CDRs for the signed-in extension
+- `useRealtimeCDR` already subscribes to `pbx_call_records`, but the filter is too loose. Tighten it to `organization_id = <org>` AND (`extension = <ext>` OR `caller_number = <ext>` OR `destination_number = <ext>`).
+- Verify `pbx_call_records` is in `supabase_realtime` publication; if not, add it via migration.
+- On Realtime reconnect, re-fetch the last 50 rows via `mobile-recents` to fill any gap.
 
-A recording is "fully processed" when both a transcript row AND an insight row exist for its `call_record_id`. The `pbx_call_records.transcribed` and `analyzed` boolean flags are the fast lookup signal already used by the UI.
+### A3. Recordings auto-sync
+- `mobile-recordings` edge function already filters by org but not by extension. Add extension filter and order by `start_at desc`.
+- Subscribe to Realtime updates on `pbx_call_records` where `has_recording = true` and update the recordings list live.
+- On row click, fetch a signed URL via existing recording storage helper.
 
----
+### A4. Voicemail auto-sync
+- Hook `useMyVoicemail` (web) works via Realtime on `pbx_voicemails`. Port the same pattern into the mobile app as `useMobileVoicemail` that filters by `extension`.
+- Trigger `voicemail-sync` edge function on app foreground + every 60s via existing `useAutoSync`.
 
-## Single processing pipeline (edge function)
+### A5. Device contacts
+- `syncDeviceContacts()` exists but is only called from `MobileApp` once. We'll:
+  - Re-run on app foreground.
+  - Merge device contacts with `org_contacts` (org directory) via a new `mobile-contacts` edge function.
+  - Show empty-state with an "Allow contacts access" CTA when permission is denied (web preview shows a stub message).
 
-Create one orchestrator function: **`process-call-recording`** (idempotent).
+### A6. Sync health indicator
+- Small dot in the header (green / amber / red) showing last successful sync time per data source (CDR, voicemail, recordings, contacts). Tap → opens a Sync Status sheet with "Retry all".
 
-Input: `{ callId }` (or `pbx_uuid`).
-
-Flow:
-1. Load `pbx_call_records` row + membership/permission check.
-2. **Short-circuit**: if `pbx_ai_insights` row exists AND `pbx_call_transcripts` row exists → return cached result immediately. No model calls, no billing.
-3. If no transcript:
-   - Use existing `ai-transcribe-call` (with the pending-sync exponential backoff already built last turn).
-   - On `pending_sync`, return status so the client shows the pending pill; do NOT mark analyzed.
-4. If transcript exists but no insight:
-   - Call Lovable AI Gateway (`google/gemini-3-flash-preview`) with one tool schema that returns:
-     `summary, sentiment, satisfaction_score, quality_score, intent, topics[], action_items[], coaching_notes[], coaching_score, risks[], sales_opportunities[], key_phrases[], escalation_needed`
-   - Insert into `pbx_ai_insights` (delete-then-insert keyed by `call_record_id`).
-   - Set `pbx_call_records.transcribed = true, analyzed = true`.
-5. Return the cached/just-written insight payload.
-
-Concurrency guard: use an advisory lock on `call_record_id` (or a `processing` flag with a short TTL) so two clients hitting "Analyze" at the same moment don't double-bill.
-
-The existing `ai-summarize-call` becomes a thin wrapper that calls `process-call-recording`, so existing UI keeps working.
-
----
-
-## Auto-trigger (so users never have to click)
-
-Trigger `process-call-recording` automatically when a recording becomes available:
-- In the FusionPBX/CDR sync code path that flips `pbx_call_records.has_recording = true` (or inserts into `pbx_call_recordings`), enqueue a call to the orchestrator.
-- Also add a **backfill button + nightly cron** that finds rows where `has_recording = true AND analyzed = false` and processes them in small batches with rate-limit backoff.
-
-This guarantees the work happens once, in the background, regardless of which app the user opens first.
+### A7. Pre-launch verification checklist (added to `apps/ava-softphone-mobile/RELEASE.md`)
+- Sign in as a test extension → CDRs appear within 3s.
+- Place a test call → new row appears live without refresh.
+- Recording finishes → appears in Recordings tab within 5s.
+- Leave a voicemail → appears in Voicemail tab.
+- Contacts permission granted → device contacts searchable in dialer + Contacts tab.
 
 ---
 
-## Shared client hook
+## Part B — New bottom tab bar
 
-Add `src/hooks/useCallIntelligence.ts` used by all three apps (web portal, desktop, mobile):
+Replace the current 5-tab layout (`Home / Calls / AVA / Messages / More`) with a 6-button bar that keeps the centered AVA orb:
 
-- React Query key: `["call-intel", callId]`
-- Reads `pbx_ai_insights` + `pbx_call_transcripts` directly (RLS scoped).
-- If missing, calls `process-call-recording` once and caches the result.
-- Exposes `{ transcript, summary, sentiment, actionItems, coachingNotes, coachingScore, status }`.
-- Long `staleTime` (e.g. 24h) — insights are immutable per recording.
-
-Mirror the hook into `apps/ava-softphone-desktop/src/hooks/` and `apps/ava-softphone-mobile/src/hooks/` (same logic, same query key shape).
-
----
-
-## UI surfaces (read-only consumers of the same data)
-
-All three apps render the same `<CallIntelligencePanel />` component (per-app copy, identical contract):
-
-- **Summary** (2–4 sentences)
-- **Sentiment + satisfaction + quality score** badges
-- **Action items** checklist
-- **Coaching notes** section with score
-- **Transcript** (collapsible)
-- **Pending sync** pill (reuses last turn's component) when transcript isn't ready yet
-- **"Force re-analyze"** button — admin-only, sends `{ force: true }`
-
-Surfaces to wire:
-- Portal: `src/pages/telephony/TelephonyRecordings.tsx`, conversation detail dialogs, `MyRecordings.tsx`
-- Desktop: call history detail pane in `apps/ava-softphone-desktop/src/components/`
-- Mobile: recording detail screen in `apps/ava-softphone-mobile/src/screens/`
-
----
-
-## "Done once" guarantees
-
-1. DB short-circuit in `process-call-recording` (step 2 above).
-2. Advisory lock prevents concurrent duplicates.
-3. Client hook caches via React Query + DB row; never calls the function if rows exist.
-4. Auto-trigger on recording arrival means the typical case is "already done before user opens it".
-5. Only `force: true` (admin) bypasses the cache.
-
----
-
-## Technical details
-
-**Migration**
-```sql
-ALTER TABLE public.pbx_ai_insights
-  ADD COLUMN IF NOT EXISTS coaching_notes text[] DEFAULT '{}'::text[],
-  ADD COLUMN IF NOT EXISTS coaching_score numeric;
+```text
+[ Home ]  [ Calls ]  [ Recordings ]  ( AVA )  [ Voicemail ]  [ Contacts ]  [ More ]
 ```
 
-**New files**
-- `supabase/functions/process-call-recording/index.ts`
-- `src/hooks/useCallIntelligence.ts` (+ desktop/mobile mirrors)
-- `src/components/calls/CallIntelligencePanel.tsx` (+ desktop/mobile mirrors)
-- `supabase/migrations/<ts>_call_intel_coaching.sql`
+Because 6 + AVA is too cramped on small screens, we go with this final layout:
 
-**Edited**
-- `supabase/functions/ai-summarize-call/index.ts` → delegate to orchestrator
-- CDR/recording ingest path → enqueue orchestrator
-- Portal/desktop/mobile recording detail screens → mount `<CallIntelligencePanel />`
+```text
+[ Calls ]  [ Recordings ]  [ Voicemail ]  ( AVA )  [ Contacts ]  [ Messages ]  [ More ]
+```
 
-**Model**: `google/gemini-3-flash-preview` via Lovable AI Gateway with a single `save_insight` tool that includes the new coaching fields.
+- Home moves into the AVA tab's dashboard header (already shows domain stats).
+- `BottomTabs.tsx` grid becomes `1fr 1fr 1fr 88px 1fr 1fr 1fr`.
+- Tab IDs extended: `'calls' | 'recordings' | 'voicemail' | 'ava' | 'contacts' | 'messages' | 'more'`.
+- `MobileApp` routes each tab to the existing screen (`RecordingsScreen`, `VoicemailScreen`, `ContactsScreen` are already implemented under `screens/`).
+- "More" keeps Settings, Queues, Features, AI audit, Privacy, Support, Delete account, Sign out — items promoted to the bar are removed from More.
+- On very narrow widths (<360px) labels hide and only icons show (already supported pattern).
 
 ---
 
-## Out of scope (ask if you want them)
+## Technical notes
 
-- Real-time live-call coaching (this plan covers post-call only).
-- Multi-language coaching style customization per org.
-- Manual editing of AI coaching notes by supervisors.
+- Files touched:
+  - `apps/ava-softphone-mobile/src/components/BottomTabs.tsx` — new layout + icons.
+  - `apps/ava-softphone-mobile/src/MobileApp.tsx` — tab routing + bootstrap call.
+  - `apps/ava-softphone-mobile/src/hooks/useRealtimeCDR.ts` — tighter filter, reconnect refresh.
+  - `apps/ava-softphone-mobile/src/hooks/useMobileVoicemail.ts` *(new)*.
+  - `apps/ava-softphone-mobile/src/hooks/useMobileRecordings.ts` *(new)* with Realtime.
+  - `apps/ava-softphone-mobile/src/screens/{RecordingsScreen,VoicemailScreen,ContactsScreen}.tsx` — use new hooks.
+  - `apps/ava-softphone-mobile/src/screens/MoreScreen.tsx` — remove promoted entries.
+  - `apps/ava-softphone-mobile/src/lib/contacts.ts` — foreground re-sync.
+  - `apps/ava-softphone-mobile/RELEASE.md` — verification checklist.
+- New edge functions: `mobile-bootstrap`, `mobile-contacts` (`mobile-recordings` updated).
+- Migration: ensure `pbx_call_records`, `pbx_voicemails` are in `supabase_realtime` publication (no-op if already added).
+- No changes to desktop, portal, or AVA org pages.
+- No build-system files touched.
+
+---
+
+## What I will NOT do (unless you ask)
+- No PWA / service worker changes.
+- No changes to AVA org pages or the landing page.
+- No changes to billing / RLS beyond verifying mobile reads use existing safe scopes.
