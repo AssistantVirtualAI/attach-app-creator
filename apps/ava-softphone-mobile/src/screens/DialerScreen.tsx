@@ -200,22 +200,22 @@ export default function DialerScreen({
           <div style={{ padding: '0 24px 8px' }}>
             <button
               onClick={startClickToCall}
-              disabled={!num || !CLICK_TO_CALL_ENABLED}
-              title={!CLICK_TO_CALL_ENABLED ? CLICK_TO_CALL_DISABLED_REASON : 'Ring your desk phone, then connect'}
+              disabled={!num || !c2c.enabled}
+              title={!c2c.enabled ? (c2c.reason || CLICK_TO_CALL_FALLBACK_REASON) : 'Ring your desk phone, then connect'}
               style={{
                 width: '100%', padding: '12px 14px', borderRadius: 12,
                 border: '1px solid rgba(255,255,255,0.16)',
-                background: CLICK_TO_CALL_ENABLED && num ? 'rgba(59,130,246,0.18)' : 'rgba(255,255,255,0.06)',
-                color: CLICK_TO_CALL_ENABLED ? '#93c5fd' : 'rgba(255,255,255,0.55)',
+                background: c2c.enabled && num ? 'rgba(59,130,246,0.18)' : 'rgba(255,255,255,0.06)',
+                color: c2c.enabled ? '#93c5fd' : 'rgba(255,255,255,0.55)',
                 fontWeight: 700, fontSize: 13,
-                cursor: CLICK_TO_CALL_ENABLED && num ? 'pointer' : 'not-allowed',
+                cursor: c2c.enabled && num ? 'pointer' : 'not-allowed',
               }}
             >
-              {CLICK_TO_CALL_ENABLED ? 'Use click-to-call instead' : 'Click-to-call unavailable'}
+              {c2c.enabled ? 'Use click-to-call instead' : 'Click-to-call unavailable'}
             </button>
-            {!CLICK_TO_CALL_ENABLED && (
+            {!c2c.enabled && (
               <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.4 }}>
-                {CLICK_TO_CALL_DISABLED_REASON}
+                {c2c.reason || CLICK_TO_CALL_FALLBACK_REASON}
               </div>
             )}
           </div>
