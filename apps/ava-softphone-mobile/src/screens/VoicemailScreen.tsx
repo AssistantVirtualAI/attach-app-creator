@@ -1,23 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ImpactStyle } from '@capacitor/haptics';
 import { Search, RefreshCw, Voicemail as VmIcon } from 'lucide-react';
-import { createClient } from '@supabase/supabase-js';
 import { colors, font, radius, gradients } from '../lib/theme';
 import { mobileApi, VoicemailEntry } from '../lib/mobileApi';
 import { Card, Chip, EmptyState, GhostButton, AIPanel, Skeleton } from '../components/ui/Primitives';
 import { audit } from '../lib/audit';
 import { useMobileCredentials } from '../hooks/useMobileCredentials';
-import { edgeCall } from '../lib/mobileSupabase';
-
-const SUPABASE_URL = 'https://gejxisrqtvxavbrfcoxz.supabase.co';
-const SUPABASE_ANON =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdlanhpc3JxdHZ4YXZicmZjb3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1MDMxNzQsImV4cCI6MjA3NzA3OTE3NH0.kaO-GslE99OCNrZ4_AMnbzGqya2azqz_UMZR34zZvvo';
-let _vmClient: ReturnType<typeof createClient> | null = null;
-function vmClient(token?: string | null) {
-  if (!_vmClient) _vmClient = createClient(SUPABASE_URL, SUPABASE_ANON, { auth: { persistSession: false, autoRefreshToken: false } });
-  if (token) _vmClient.realtime.setAuth(token);
-  return _vmClient;
-}
+import { authedRealtime, edgeCall } from '../lib/mobileSupabase';
 
 export default function VoicemailScreen({ haptic }: { haptic?: (s?: ImpactStyle) => Promise<void> }) {
   const mobile = useMobileCredentials();
@@ -40,6 +29,7 @@ export default function VoicemailScreen({ haptic }: { haptic?: (s?: ImpactStyle)
   const [voiceId, setVoiceId] = useState('EXAVITQu4vr4xnSDxMaL');
   const [greetingBusy, setGreetingBusy] = useState(false);
   const [greetingMsg, setGreetingMsg] = useState<string | null>(null);
+  const [greetingPreviewUrl, setGreetingPreviewUrl] = useState<string | null>(null);
 
   const reload = async () => {
     setRefreshing(true);
@@ -57,6 +47,7 @@ export default function VoicemailScreen({ haptic }: { haptic?: (s?: ImpactStyle)
         setVoices(r.voices || []);
         setGreetingText(r.settings?.greeting_tts_text || '');
         setVoiceId(r.settings?.greeting_voice_id || 'EXAVITQu4vr4xnSDxMaL');
+        setGreetingPreviewUrl(r.settings?.greeting_audio_url || null);
       })
       .catch(() => {});
   }, [mobile.accessToken]);
@@ -70,11 +61,14 @@ export default function VoicemailScreen({ haptic }: { haptic?: (s?: ImpactStyle)
         payload: { name: `Mobile greeting ${new Date().toLocaleDateString()}`, text: greetingText.trim(), voice_id: voiceId, extension: mobile.extension },
       });
       const id = created?.greeting?.id;
-      if (id) await edgeCall<any>('user-voicemail-greeting', mobile.accessToken, { action: 'activate_greeting', payload: { id } });
+      const activated = id ? await edgeCall<any>('user-voicemail-greeting', mobile.accessToken, { action: 'activate_greeting', payload: { id } }) : null;
+      const storagePath = created?.greeting?.storage_path || null;
+      const audioUrl = activated?.audio_url || created?.greeting?.audio_url || null;
       await edgeCall<any>('user-voicemail-greeting', mobile.accessToken, {
         action: 'save_settings',
-        payload: { greeting_type: 'tts', greeting_tts_text: greetingText.trim(), greeting_voice_id: voiceId, greeting_voice_name: voices.find((v) => v.id === voiceId)?.name || null, transcription_enabled: true, ai_summary_enabled: true },
+        payload: { greeting_type: 'tts', greeting_tts_text: greetingText.trim(), greeting_voice_id: voiceId, greeting_voice_name: voices.find((v) => v.id === voiceId)?.name || null, greeting_storage_path: storagePath, greeting_audio_url: audioUrl, transcription_enabled: true, ai_summary_enabled: true },
       });
+      setGreetingPreviewUrl(audioUrl);
       setGreetingMsg('Greeting updated with ElevenLabs voice.');
     } catch (e: any) {
       setGreetingMsg(e?.message || 'Greeting update failed');
@@ -87,7 +81,7 @@ export default function VoicemailScreen({ haptic }: { haptic?: (s?: ImpactStyle)
     let cancelled = false;
     (async () => {
       if (!mobile.accessToken) return;
-      const client = vmClient(mobile.accessToken);
+      const client = authedRealtime(mobile.accessToken);
       const domainUuid = mobile.domainUuid;
       const filter = domainUuid ? `domain_uuid=eq.${domainUuid}` : undefined;
       channel = client
@@ -96,7 +90,7 @@ export default function VoicemailScreen({ haptic }: { haptic?: (s?: ImpactStyle)
           () => { if (!cancelled) reload(); })
         .subscribe();
     })();
-    return () => { cancelled = true; try { channel && _vmClient?.removeChannel(channel); } catch {} };
+    return () => { cancelled = true; try { channel && authedRealtime(mobile.accessToken).removeChannel(channel); } catch {} };
   }, [mobile.accessToken, mobile.domainUuid]);
 
 
@@ -237,6 +231,7 @@ export default function VoicemailScreen({ haptic }: { haptic?: (s?: ImpactStyle)
           </select>
           <button onClick={saveGreeting} disabled={greetingBusy || !greetingText.trim()} style={{ padding: '8px 12px', borderRadius: radius.md, border: 'none', background: greetingText.trim() ? gradients.call : 'rgba(255,255,255,0.08)', color: '#fff', fontSize: 12, fontWeight: 800, cursor: greetingBusy ? 'default' : 'pointer' }}>{greetingBusy ? '…' : 'Save'}</button>
         </div>
+        {greetingPreviewUrl && <audio controls src={greetingPreviewUrl} style={{ width: '100%', marginTop: 10 }} />}
         {greetingMsg && <div style={{ marginTop: 8, fontSize: 11, color: greetingMsg.includes('failed') ? colors.danger : colors.success }}>{greetingMsg}</div>}
       </Card>
     </div>

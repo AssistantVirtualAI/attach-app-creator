@@ -24,7 +24,7 @@ Deno.serve(async (req) => {
 
     const { data: sp } = await sb
       .from("pbx_softphone_users")
-      .select("organization_id, extension")
+      .select("organization_id, extension, domain_uuid")
       .eq("portal_user_id", u.user.id)
       .maybeSingle();
 
@@ -47,10 +47,12 @@ Deno.serve(async (req) => {
     const since = new Date(startOfToday);
     since.setDate(since.getDate() - (days - 1));
 
-    const { data: rows } = await sb.from("pbx_call_records")
+    let callsQuery = sb.from("pbx_call_records")
       .select("id, call_status, missed_call, duration_seconds, voicemail_message, extension, start_at, direction, hangup_cause")
       .eq("organization_id", orgId)
       .gte("start_at", since.toISOString());
+    if (sp.domain_uuid) callsQuery = callsQuery.eq("domain_uuid", sp.domain_uuid);
+    const { data: rows } = await callsQuery;
 
     const list = rows ?? [];
     const totalCalls = list.length;

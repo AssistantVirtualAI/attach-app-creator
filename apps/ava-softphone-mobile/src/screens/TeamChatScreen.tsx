@@ -37,7 +37,11 @@ export default function TeamChatScreen(_props: { accessToken?: string | null; us
 
   const loadMembers = useCallback(async () => {
     if (!token || !mobile.domainUuid) return [] as Member[];
-    const rows = await restGet<any[]>(`/rest/v1/pbx_softphone_users_safe?select=portal_user_id,extension,display_name,status,last_seen_at&domain_uuid=eq.${encodeURIComponent(mobile.domainUuid)}&order=extension.asc`, token);
+    let rows = await restGet<any[]>(`/rest/v1/pbx_softphone_users_safe?select=portal_user_id,extension,display_name,status,last_seen_at&domain_uuid=eq.${encodeURIComponent(mobile.domainUuid)}&order=extension.asc`, token).catch(() => []);
+    if (!rows?.some((r) => r.portal_user_id)) {
+      const directory = await chatCall('list_directory', {}).catch(() => ({ members: [] }));
+      rows = (directory.members || []).map((m: any) => ({ portal_user_id: m.user_id, extension: m.extension, display_name: m.full_name || m.email, status: m.status, last_seen_at: m.last_seen_at }));
+    }
     const ids = (rows || []).map((r) => r.portal_user_id).filter(Boolean);
     const pres = ids.length ? await restGet<any[]>(`/rest/v1/user_presence?select=user_id,status,call_state,last_seen_at&user_id=in.(${ids.map((id: string) => `"${id}"`).join(',')})`, token).catch(() => []) : [];
     const pmap = new Map((pres || []).map((p: any) => [p.user_id, p]));
@@ -49,7 +53,7 @@ export default function TeamChatScreen(_props: { accessToken?: string | null; us
     });
     setMembers(list);
     return list;
-  }, [mobile.domainUuid, token, userId]);
+  }, [chatCall, mobile.domainUuid, token, userId]);
 
   const loadChannels = useCallback(async () => {
     if (!token) return;
@@ -84,6 +88,15 @@ export default function TeamChatScreen(_props: { accessToken?: string | null; us
       .subscribe();
     return () => { client.removeChannel(channel); };
   }, [loadMembers, mobile.organizationId, token]);
+
+  useEffect(() => {
+    if (!token || !mobile.organizationId) return;
+    const client = authedRealtime(token);
+    const channel = client.channel(`team-channels-${mobile.organizationId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'org_chat_channels', filter: `organization_id=eq.${mobile.organizationId}` } as any, () => loadChannels().catch(() => {}))
+      .subscribe();
+    return () => { client.removeChannel(channel); };
+  }, [loadChannels, mobile.organizationId, token]);
 
   const loadMessages = useCallback(async (channelId: string) => {
     const r = await chatCall('list_messages', { channel_id: channelId, limit: 80 });

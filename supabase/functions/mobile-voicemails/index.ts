@@ -24,7 +24,7 @@ Deno.serve(async (req) => {
     if (__mobileAllowed === false) return json({ error: "MOBILE_ACCESS_DISABLED", message: "Mobile access not granted by Lemtel administrators." }, 403);
 
     const { data: sp } = await sb.from("pbx_softphone_users")
-      .select("organization_id, extension")
+      .select("organization_id, extension, domain_uuid")
       .eq("portal_user_id", u.user.id).maybeSingle();
     if (!sp) return json({ items: [], noSoftphone: true });
     if (!sp.extension) return json({ items: [], noExtension: true });
@@ -38,6 +38,7 @@ Deno.serve(async (req) => {
       `)
       .eq("organization_id", sp.organization_id)
       .eq("call_status", "voicemail");
+    if (sp.domain_uuid) q = q.eq("domain_uuid", sp.domain_uuid);
     // Per-user scoping — never leak voicemails across extensions in the same org.
     q = q.eq("extension", sp.extension);
 
