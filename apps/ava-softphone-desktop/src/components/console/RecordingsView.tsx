@@ -486,6 +486,9 @@ export default function RecordingsView({ scope = 'mine' }: { scope?: 'mine' | 'o
                   : (transcript ? '↻ Re-analyze' : '✨ Transcribe & Analyze')}
               </button>
             </div>
+            <div style={{ marginBottom: 12, padding: '8px 10px', borderRadius: 8, background: analysis ? 'rgba(16,185,129,0.08)' : aiLoading ? 'rgba(35,214,255,0.08)' : 'rgba(255,255,255,0.04)', border: `1px solid ${analysis ? c.success + '55' : c.border}`, color: analysis ? c.success : c.mutedSilver, fontSize: 11, fontWeight: 700 }}>
+              {aiLoading ? 'AI analysis: en cours' : analysis ? 'AI analysis: déjà traité — cache réutilisé' : 'AI analysis: non traité'}
+            </div>
             {aiLoading && (
               <div style={{ marginBottom: 12 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: c.mutedSilver, marginBottom: 4 }}>
@@ -523,7 +526,14 @@ export default function RecordingsView({ scope = 'mine' }: { scope?: 'mine' | 'o
               <Panel title="AI Analysis" accent={c.avaViolet}>
                 <div style={{ fontSize: 12, color: c.textIce, display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {analysis.sentiment && <div><span style={{ color: c.mutedSilver }}>Sentiment:</span> {analysis.sentiment}</div>}
+                  {analysis.quality_score != null && <div><span style={{ color: c.mutedSilver }}>Score:</span> {analysis.quality_score}/10</div>}
+                  {analysis.coaching_score != null && <div><span style={{ color: c.mutedSilver }}>Coaching:</span> {analysis.coaching_score}/5</div>}
                   {analysis.summary && <div>{analysis.summary}</div>}
+                  {Array.isArray(analysis.coaching_notes) && analysis.coaching_notes.length > 0 && (
+                    <ul style={{ margin: '4px 0 0 14px', padding: 0 }}>
+                      {analysis.coaching_notes.map((n: string, i: number) => <li key={i} style={{ fontSize: 11.5 }}>{n}</li>)}
+                    </ul>
+                  )}
                   {Array.isArray(analysis.action_items) && analysis.action_items.length > 0 && (
                     <ul style={{ margin: '4px 0 0 14px', padding: 0 }}>
                       {analysis.action_items.map((a: string, i: number) => <li key={i} style={{ fontSize: 11.5 }}>{a}</li>)}
