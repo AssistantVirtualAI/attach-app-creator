@@ -41,6 +41,7 @@ export function useSoftphone(
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const authBlockedRef = useRef(false);
   const retryAttemptRef = useRef(0);
   const reconnectRef = useRef<() => void>(() => {});
   const [reconnectTick, setReconnectTick] = useState(0);
@@ -63,6 +64,7 @@ export function useSoftphone(
     const clearRetry = () => {
       if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null; }
     };
+    authBlockedRef.current = false;
 
     const start = () => {
       if (cancelled) return;
@@ -86,6 +88,11 @@ export function useSoftphone(
             });
             setSipStatus('error');
             setSipError(msg);
+            const code = e?.response?.status_code;
+            if (code === 401 || code === 403 || code === 407) {
+              authBlockedRef.current = true;
+              return;
+            }
             scheduleRetry();
           });
           ua.on('disconnected', (e: any) => {
@@ -145,6 +152,7 @@ export function useSoftphone(
 
     const scheduleRetry = () => {
       if (cancelled) return;
+      if (authBlockedRef.current) return;
       const attempt = retryAttemptRef.current;
       const delay = RETRY_DELAYS_MS[Math.min(attempt, RETRY_DELAYS_MS.length - 1)];
       retryAttemptRef.current = attempt + 1;

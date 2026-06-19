@@ -37,7 +37,8 @@ describe('buildWssFallbackList', () => {
   it('keeps primary first, dedupes, and appends known backups', () => {
     const list = buildWssFallbackList(cfg);
     expect(list[0]).toBe('wss://node.lemtelcloud.net:7443');
-    expect(list).toContain('wss://lemtel.lemtel.tel:7443');
+    expect(list).toContain('wss://pbxnode.lemtel.tel:7443');
+    expect(list).not.toContain('wss://lemtel.lemtel.tel:7443');
     expect(new Set(list).size).toBe(list.length); // no duplicates
   });
 

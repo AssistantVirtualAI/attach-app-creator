@@ -8,7 +8,10 @@ export type Creds = {
   displayName?: string;
   sipDomain?: string;
   wssUrl?: string;
+  wssUrls?: string[];
   sipPassword?: string;
+  authUsername?: string;
+  passwordSource?: string;
   accessToken?: string;
   refreshToken?: string;
   userId?: string;
@@ -137,7 +140,10 @@ export async function hydrateSoftphoneCredentials(platform: 'mobile' | 'desktop'
       displayName: d.display_name || d.displayName || c.displayName,
       sipDomain: d.sip_domain || d.sipDomain || c.sipDomain,
       wssUrl: d.wss_url || d.wssUrl || c.wssUrl,
+      wssUrls: d.wss_urls || d.wssUrls || c.wssUrls,
       sipPassword: d.sip_password || d.password || c.sipPassword,
+      authUsername: d.auth_username || d.authUsername || d.extension || c.authUsername,
+      passwordSource: d.password_source || d.passwordSource || c.passwordSource,
       organizationId: d.organization_id || c.organizationId,
       organizationName: d.organization_name || c.organizationName,
       fusionpbxDomainUuid: d.fusionpbx_domain_uuid || c.fusionpbxDomainUuid,

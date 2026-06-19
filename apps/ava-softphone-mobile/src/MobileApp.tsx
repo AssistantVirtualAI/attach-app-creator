@@ -88,7 +88,9 @@ function AuthenticatedShell({
 
   const [permsGateDone, setPermsGateDone] = useState<boolean | null>(isPreviewMode ? true : null);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [freshCredentialToken, setFreshCredentialToken] = useState('');
   const passwordHealRef = useRef('');
+  const hydratedTokenRef = useRef('');
 
   // Decide whether to show the onboarding permission gate.
   useEffect(() => {
@@ -108,23 +110,25 @@ function AuthenticatedShell({
     return () => { cancelled = true; };
   }, []);
 
-  // Build SIP config. ALWAYS use the known-working WSS endpoint as primary
-  // because mobile browsers refuse self-signed certs on wss://lemtel.lemtel.tel
-  // and wss://170.39.199.132. Desktop/Electron is more permissive, but mobile
-  // MUST use a CA-signed host. The fallback list inside jssipProvider also
-  // includes pbxnode.lemtel.tel for redundancy.
+  // Build SIP config from the same backend credentials used by desktop/portal,
+  // but keep the mobile transport pinned to CA-signed WSS endpoints.
   const sipPassword = creds.sipPassword || (creds as any).sipPassword;
   const WORKING_WSS = 'wss://node.lemtelcloud.net:7443';
-  const wssUrl = WORKING_WSS; // hard-pin — backend may still return the broken host
+  const WORKING_WSS_FALLBACK = 'wss://pbxnode.lemtel.tel:7443';
+  const wssUrls = Array.from(new Set([WORKING_WSS, WORKING_WSS_FALLBACK, ...((creds as any).wssUrls || [])]
+    .filter((u) => /^wss:\/\/(node\.lemtelcloud\.net|pbxnode\.lemtel\.tel):7443$/i.test(String(u)))));
   const sipDomain = creds.sipDomain || 'lemtel.lemtel.tel';
+  const credentialsReady = !creds.accessToken || freshCredentialToken === creds.accessToken;
 
-  const sipConfig = creds.extension && sipPassword
+  const sipConfig = credentialsReady && creds.extension && sipPassword
     ? {
         extension: creds.extension,
         displayName: creds.displayName || creds.email || 'User',
         password: sipPassword,
         domain: sipDomain,
-        wssUrl: wssUrl,
+        wssUrl: wssUrls[0] || WORKING_WSS,
+        wssUrls,
+        authUsername: creds.authUsername || creds.extension,
       }
     : null;
 
@@ -142,7 +146,7 @@ function AuthenticatedShell({
     const key = `${creds.userId || creds.email}:${creds.extension}:${softphone.sipError}`;
     if (passwordHealRef.current === key) return;
     passwordHealRef.current = key;
-    edgeCall('softphone-sync-password', creds.accessToken, { force_local_to_pbx: true })
+    edgeCall('softphone-sync-password', creds.accessToken, { force_local_to_pbx: false })
       .then(() => hydrateSoftphoneCredentials('mobile'))
       .then((next) => { if (next) setCreds(next); })
       .catch((e) => console.warn('[SIP] password auto-sync failed', e?.message || e));
@@ -205,15 +209,16 @@ function AuthenticatedShell({
     });
     configureAudit(async () => creds.accessToken || null);
     if (creds.accessToken) audit('softphone.signed_in', creds.userId, { extension: creds.extension });
-    // Hydrate full SIP credentials (extension, sip_domain, wss_url, password,
-    // org, role) from softphone-credentials so Settings displays real data and
-    // SIP can register — covers email-only sign-ins and legacy sessions.
-    const missing = !creds.organizationId || !creds.extension || !creds.sipDomain || !creds.wssUrl || !creds.sipPassword;
-    if (creds.accessToken && missing) {
+    // Desktop/portal always fetch fresh SIP credentials from the backend.
+    // Do the same on mobile once per session so stale cached SIP passwords from
+    // prior logins cannot keep causing PBX auth failures.
+    if (creds.accessToken && hydratedTokenRef.current !== creds.accessToken) {
+      hydratedTokenRef.current = creds.accessToken;
       hydrateSoftphoneCredentials('mobile').then((next) => {
         if (next) setCreds(next);
         else if (!creds.organizationId) ensureStoredOrganizationId().catch(() => {});
-      }).catch(() => {});
+        setFreshCredentialToken(creds.accessToken || '');
+      }).catch(() => { setFreshCredentialToken(creds.accessToken || ''); });
     }
   }, [creds]);
 

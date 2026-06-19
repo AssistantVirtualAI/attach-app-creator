@@ -14,6 +14,7 @@ export interface SIPConfig {
   wssUrl: string;
   wssUrls?: string[];
   displayName?: string;
+  authUsername?: string;
 }
 
 export class JsSIPUnavailableError extends Error {
@@ -187,7 +188,7 @@ export async function createSIPUA(config: SIPConfig, timeoutMs = 8000) {
     sockets,
     uri: `sip:${config.extension}@${config.domain}`,
     password: config.password,
-    authorization_user: config.extension,
+    authorization_user: config.authUsername || config.extension,
     realm: config.domain,
     contact_uri: `sip:${config.extension}@${config.domain};transport=wss`,
     display_name: config.displayName || config.extension,
