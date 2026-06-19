@@ -7,14 +7,19 @@ const SUPABASE_URL = 'https://gejxisrqtvxavbrfcoxz.supabase.co';
 const SUPABASE_ANON =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdlanhpc3JxdHZ4YXZicmZjb3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1MDMxNzQsImV4cCI6MjA3NzA3OTE3NH0.kaO-GslE99OCNrZ4_AMnbzGqya2azqz_UMZR34zZvvo';
 
-type Status = 'available' | 'busy' | 'dnd' | 'away' | 'on_call';
+type Status = 'available' | 'busy' | 'on_call' | 'meeting' | 'lunch' | 'break' | 'dnd' | 'away' | 'out_of_office' | 'offline';
 
 const STATUS_OPTIONS: { id: Status; label: string; color: string }[] = [
-  { id: 'available', label: 'Available', color: '#22c55e' },
-  { id: 'busy',      label: 'Busy',      color: '#f59e0b' },
-  { id: 'dnd',       label: 'Do not disturb', color: '#ef4444' },
-  { id: 'away',      label: 'Away',      color: '#94a3b8' },
-  { id: 'on_call',   label: 'On a call', color: '#3b82f6' },
+  { id: 'available',     label: 'Available',       color: '#22c55e' },
+  { id: 'busy',          label: 'Busy',            color: '#f59e0b' },
+  { id: 'on_call',       label: 'On a call',       color: '#3b82f6' },
+  { id: 'meeting',       label: 'In a meeting',    color: '#8b5cf6' },
+  { id: 'lunch',         label: 'Lunch',           color: '#f97316' },
+  { id: 'break',         label: 'On a break',      color: '#14b8a6' },
+  { id: 'dnd',           label: 'Do not disturb',  color: '#ef4444' },
+  { id: 'away',          label: 'Away',            color: '#94a3b8' },
+  { id: 'out_of_office', label: 'Out of office',   color: '#6366f1' },
+  { id: 'offline',       label: 'Appear offline',  color: '#64748b' },
 ];
 
 async function rest(path: string, init: RequestInit & { token?: string }) {
@@ -37,8 +42,12 @@ export default function ProfileSheet({
   const [savingStatus, setSavingStatus] = useState<Status | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [pwOpen, setPwOpen] = useState(false);
+  const [pwNew, setPwNew] = useState('');
+  const [pwConfirm, setPwConfirm] = useState('');
   const [pwBusy, setPwBusy] = useState(false);
   const [pwMsg, setPwMsg] = useState<string | null>(null);
+  const [pwError, setPwError] = useState(false);
 
   // Load current status + avatar
   useEffect(() => {
@@ -111,19 +120,47 @@ export default function ProfileSheet({
     setUploading(false);
   };
 
-  const requestPasswordChange = async () => {
+  const updatePassword = async () => {
+    setPwMsg(null); setPwError(false);
+    if (pwNew.length < 8) { setPwMsg('Password must be at least 8 characters.'); setPwError(true); return; }
+    if (pwNew !== pwConfirm) { setPwMsg('Passwords do not match.'); setPwError(true); return; }
+    if (!creds.accessToken) { setPwMsg('Not signed in.'); setPwError(true); return; }
+    setPwBusy(true);
+    try {
+      const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+        method: 'PUT',
+        headers: {
+          apikey: SUPABASE_ANON,
+          Authorization: `Bearer ${creds.accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ password: pwNew }),
+      });
+      if (!r.ok) {
+        const d = await r.json().catch(() => null);
+        throw new Error(d?.msg || d?.error_description || `HTTP ${r.status}`);
+      }
+      setPwMsg('Password updated.'); setPwError(false);
+      setPwNew(''); setPwConfirm('');
+      setTimeout(() => { setPwOpen(false); setPwMsg(null); }, 1200);
+    } catch (e: any) {
+      setPwMsg(e?.message || 'Could not update password.'); setPwError(true);
+    }
+    setPwBusy(false);
+  };
+
+  const sendResetEmail = async () => {
     if (!creds.email) return;
-    setPwBusy(true); setPwMsg(null);
+    setPwBusy(true); setPwMsg(null); setPwError(false);
     try {
       const r = await fetch(`${SUPABASE_URL}/auth/v1/recover`, {
         method: 'POST',
         headers: { apikey: SUPABASE_ANON, 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: creds.email }),
       });
-      setPwMsg(r.ok ? 'Reset email sent — check your inbox.' : 'Could not send reset email.');
-    } catch {
-      setPwMsg('Could not send reset email.');
-    }
+      if (!r.ok) throw new Error();
+      setPwMsg('Reset email sent — check your inbox.');
+    } catch { setPwMsg('Could not send reset email.'); setPwError(true); }
     setPwBusy(false);
   };
 
@@ -218,12 +255,42 @@ export default function ProfileSheet({
 
         {/* Account */}
         <SectionLabel>Account</SectionLabel>
-        <button onClick={requestPasswordChange} disabled={pwBusy} style={rowBtn}>
+        <button onClick={() => { setPwOpen((v) => !v); setPwMsg(null); }} style={rowBtn}>
           <KeyRound size={18} />
-          <span style={{ flex: 1, textAlign: 'left' }}>{pwBusy ? 'Sending…' : 'Change password'}</span>
+          <span style={{ flex: 1, textAlign: 'left' }}>Change password</span>
+          <span style={{ fontSize: 11, color: colors.mutedSilver }}>{pwOpen ? '▲' : '▼'}</span>
         </button>
-        {pwMsg && <div style={{ fontSize: 11, color: colors.mutedSilver, padding: '4px 4px 0' }}>{pwMsg}</div>}
-        <button onClick={onSignOut} style={{ ...rowBtn, color: '#ef4444', marginTop: 6 }}>
+        {pwOpen && (
+          <div style={{
+            display: 'flex', flexDirection: 'column', gap: 8,
+            padding: 12, marginTop: 6, borderRadius: radius.lg,
+            background: 'rgba(255,255,255,0.04)', border: `1px solid ${colors.border}`,
+          }}>
+            <input type="password" placeholder="New password (min 8 characters)"
+              value={pwNew} onChange={(e) => setPwNew(e.target.value)} style={pwInput} />
+            <input type="password" placeholder="Confirm new password"
+              value={pwConfirm} onChange={(e) => setPwConfirm(e.target.value)} style={pwInput} />
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button onClick={updatePassword} disabled={pwBusy || !pwNew || !pwConfirm}
+                style={{
+                  flex: 1, padding: '10px 12px', borderRadius: radius.md, border: 'none',
+                  background: gradients.call, color: '#fff', fontSize: 13, fontWeight: 800,
+                  cursor: pwBusy ? 'default' : 'pointer', opacity: pwBusy ? 0.7 : 1,
+                }}>{pwBusy ? 'Updating…' : 'Update password'}</button>
+              <button onClick={sendResetEmail} disabled={pwBusy} style={{
+                padding: '10px 12px', borderRadius: radius.md,
+                background: 'transparent', border: `1px solid ${colors.border}`,
+                color: colors.textIce, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              }}>Email link</button>
+            </div>
+            {pwMsg && (
+              <div style={{ fontSize: 11, color: pwError ? '#ef4444' : '#22c55e', padding: '2px 2px 0' }}>
+                {pwMsg}
+              </div>
+            )}
+          </div>
+        )}
+        <button onClick={onSignOut} style={{ ...rowBtn, color: '#ef4444', marginTop: 8 }}>
           <LogOut size={18} />
           <span style={{ flex: 1, textAlign: 'left' }}>Sign out</span>
         </button>
@@ -250,4 +317,10 @@ const rowBtn: React.CSSProperties = {
   padding: '12px 14px', borderRadius: radius.lg,
   background: 'rgba(255,255,255,0.04)', border: `1px solid ${colors.border}`,
   color: colors.textIce, cursor: 'pointer', fontSize: 14, fontWeight: 600,
+};
+
+const pwInput: React.CSSProperties = {
+  padding: '10px 12px', borderRadius: 10,
+  background: 'rgba(255,255,255,0.06)', border: `1px solid ${colors.border}`,
+  color: colors.textIce, fontSize: 13, outline: 'none',
 };

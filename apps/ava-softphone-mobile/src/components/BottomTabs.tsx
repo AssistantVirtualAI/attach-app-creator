@@ -12,85 +12,57 @@ export type Tab =
 
 type Item = { id: Tab; label: string; Icon: LucideIcon };
 
-const SIDE_LEFT: Item[] = [
+// Primary row (with center AVA orb)
+const PRIMARY_LEFT: Item[] = [
   { id: 'home',  label: 'Home',  Icon: Home },
   { id: 'calls', label: 'Calls', Icon: Phone },
 ];
-const SIDE_RIGHT: Item[] = [
+const PRIMARY_RIGHT: Item[] = [
   { id: 'messages', label: 'Chat', Icon: MessageCircle },
-  { id: 'more',     label: 'More', Icon: MoreHorizontal },
+  { id: 'contacts', label: 'People', Icon: Users },
 ];
 
-const EXTRA: Item[] = [
-  { id: 'voicemail',  label: 'Voicemail',  Icon: Voicemail },
-  { id: 'recordings', label: 'Recordings', Icon: Mic },
-  { id: 'contacts',   label: 'Contacts',   Icon: Users },
-  { id: 'sms',        label: 'SMS',        Icon: MessageSquare },
-  { id: 'queues',     label: 'Queues',     Icon: Layers },
-  { id: 'settings',   label: 'Settings',   Icon: SettingsIcon },
+// Secondary row — narrow pills inside the bottom bar.
+const SECONDARY: Item[] = [
+  { id: 'voicemail',  label: 'VM',       Icon: Voicemail },
+  { id: 'recordings', label: 'Rec',      Icon: Mic },
+  { id: 'sms',        label: 'SMS',      Icon: MessageSquare },
+  { id: 'queues',     label: 'Queues',   Icon: Layers },
+  { id: 'settings',   label: 'Settings', Icon: SettingsIcon },
+  { id: 'more',       label: 'More',     Icon: MoreHorizontal },
 ];
 
 export default function BottomTabs({
   active, onChange,
 }: { active: Tab; onChange: (t: Tab) => void }) {
   const accent = colors.lemtelBlue;
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      {/* Secondary scrollable row */}
+    <nav
+      style={{
+        position: 'relative',
+        display: 'flex', flexDirection: 'column', gap: 6,
+        margin: '0 10px calc(10px + var(--safe-bottom))',
+        padding: '10px 8px 8px',
+        background:
+          'linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(244,247,255,0.86) 100%)',
+        backdropFilter: 'blur(28px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(28px) saturate(180%)',
+        border: '1px solid rgba(255,255,255,0.9)',
+        borderRadius: radius.xxl,
+        boxShadow:
+          '0 24px 60px -28px rgba(7,22,168,0.35), 0 1px 0 rgba(255,255,255,0.9) inset, 0 -1px 0 rgba(0,35,230,0.05) inset',
+      }}
+    >
+      {/* Primary row with AVA orb */}
       <div
         style={{
-          display: 'flex', gap: 8, overflowX: 'auto',
-          padding: '4px 12px 0', WebkitOverflowScrolling: 'touch',
-          scrollbarWidth: 'none',
-        }}
-      >
-        {EXTRA.map((it) => {
-          const on = active === it.id;
-          const Icon = it.Icon;
-          return (
-            <button
-              key={it.id}
-              onClick={() => onChange(it.id)}
-              style={{
-                flex: '0 0 auto', display: 'inline-flex', alignItems: 'center', gap: 6,
-                padding: '8px 14px', borderRadius: 999,
-                background: on
-                  ? `linear-gradient(180deg, ${accent}, ${colors.avaCyan})`
-                  : 'rgba(255,255,255,0.78)',
-                color: on ? '#fff' : colors.lemtelBlue,
-                border: on ? 'none' : `1px solid ${colors.border}`,
-                fontSize: 12, fontWeight: 700, letterSpacing: 0.3, cursor: 'pointer',
-                boxShadow: on ? `0 8px 18px -10px ${accent}` : 'none',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              <Icon size={14} strokeWidth={on ? 2.6 : 2.2} />
-              {it.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Primary bottom nav */}
-      <nav
-        style={{
-          position: 'relative',
           display: 'grid',
-          gridTemplateColumns: '1fr 1fr 88px 1fr 1fr',
+          gridTemplateColumns: '1fr 1fr 78px 1fr 1fr',
           alignItems: 'center',
-          margin: '0 10px calc(10px + var(--safe-bottom))',
-          padding: '10px 8px',
-          background:
-            'linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(244,247,255,0.86) 100%)',
-          backdropFilter: 'blur(28px) saturate(180%)',
-          WebkitBackdropFilter: 'blur(28px) saturate(180%)',
-          border: '1px solid rgba(255,255,255,0.9)',
-          borderRadius: radius.xxl,
-          boxShadow:
-            '0 24px 60px -28px rgba(7,22,168,0.35), 0 1px 0 rgba(255,255,255,0.9) inset, 0 -1px 0 rgba(0,35,230,0.05) inset',
         }}
       >
-        {SIDE_LEFT.map((it) => (
+        {PRIMARY_LEFT.map((it) => (
           <TabBtn key={it.id} item={it} active={active === it.id} onPress={() => onChange(it.id)} />
         ))}
 
@@ -99,34 +71,72 @@ export default function BottomTabs({
             onClick={() => onChange('ava')}
             aria-label="AVA assistant"
             style={{
-              position: 'absolute', top: -36, width: 68, height: 68,
+              position: 'absolute', top: -34, width: 62, height: 62,
               borderRadius: '50%', background: gradients.ai,
               border: '3px solid rgba(255,255,255,0.96)',
               boxShadow:
                 '0 18px 38px -12px rgba(122,76,255,0.6), 0 0 0 6px rgba(122,76,255,0.08), 0 0 24px rgba(106,225,255,0.35) inset',
               color: '#fff', cursor: 'pointer', display: 'grid', placeItems: 'center',
               transform: active === 'ava' ? 'scale(1.08) translateY(-2px)' : 'scale(1)',
-              transition: 'transform .25s cubic-bezier(.34,1.56,.64,1), box-shadow .25s ease',
+              transition: 'transform .25s cubic-bezier(.34,1.56,.64,1)',
             }}
           >
-            <Sparkles size={28} strokeWidth={2.4} />
+            <Sparkles size={26} strokeWidth={2.4} />
           </button>
           <span
             style={{
-              position: 'absolute', top: 40, fontSize: 10, fontWeight: 800, letterSpacing: 1.4,
+              position: 'absolute', top: 36, fontSize: 9.5, fontWeight: 800, letterSpacing: 1.4,
               color: active === 'ava' ? colors.avaViolet : colors.mutedSilver,
-              transition: 'color .2s ease',
             }}
           >
             AVA
           </span>
         </div>
 
-        {SIDE_RIGHT.map((it) => (
+        {PRIMARY_RIGHT.map((it) => (
           <TabBtn key={it.id} item={it} active={active === it.id} onPress={() => onChange(it.id)} />
         ))}
-      </nav>
-    </div>
+      </div>
+
+      {/* Secondary row of slim pills, integrated into bottom bar */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: `repeat(${SECONDARY.length}, 1fr)`,
+          gap: 4,
+          paddingTop: 6,
+          borderTop: '1px solid rgba(0,35,230,0.08)',
+        }}
+      >
+        {SECONDARY.map((it) => {
+          const on = active === it.id;
+          const Icon = it.Icon;
+          return (
+            <button
+              key={it.id}
+              onClick={() => onChange(it.id)}
+              style={{
+                display: 'inline-flex', flexDirection: 'column',
+                alignItems: 'center', justifyContent: 'center', gap: 2,
+                padding: '6px 2px', borderRadius: 12,
+                background: on
+                  ? `linear-gradient(180deg, ${accent}22 0%, rgba(255,255,255,0.4) 100%)`
+                  : 'transparent',
+                border: on ? `1px solid ${accent}33` : '1px solid transparent',
+                color: on ? accent : colors.mutedSilver,
+                cursor: 'pointer',
+                transition: 'all .18s ease',
+              }}
+            >
+              <Icon size={15} strokeWidth={on ? 2.6 : 2.1} />
+              <span style={{ fontSize: 9.5, fontWeight: on ? 800 : 600, letterSpacing: 0.3 }}>
+                {it.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </nav>
   );
 }
 
@@ -137,9 +147,9 @@ function TabBtn({ item, active, onPress }: { item: Item; active: boolean; onPres
     <button
       onClick={onPress}
       style={{
-        position: 'relative', minHeight: 54, display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center', gap: 4, padding: '8px 4px',
-        borderRadius: radius.xl,
+        position: 'relative', minHeight: 50, display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center', gap: 3, padding: '6px 2px',
+        borderRadius: radius.lg,
         background: active
           ? `linear-gradient(180deg, ${accent}22 0%, rgba(255,255,255,0.4) 100%)`
           : 'transparent',
@@ -155,27 +165,17 @@ function TabBtn({ item, active, onPress }: { item: Item; active: boolean; onPres
     >
       <span
         style={{
-          display: 'grid', placeItems: 'center', width: 32, height: 32, borderRadius: 12,
+          display: 'grid', placeItems: 'center', width: 28, height: 28, borderRadius: 10,
           background: active
             ? `radial-gradient(circle at 30% 30%, ${accent}33, ${accent}11 70%)`
             : 'transparent',
-          transition: 'background .22s ease',
         }}
       >
-        <Icon size={20} strokeWidth={active ? 2.6 : 2} />
+        <Icon size={18} strokeWidth={active ? 2.6 : 2} />
       </span>
-      <span style={{ fontSize: 10, fontWeight: active ? 800 : 600, letterSpacing: 0.4 }}>
+      <span style={{ fontSize: 9.5, fontWeight: active ? 800 : 600, letterSpacing: 0.3 }}>
         {label}
       </span>
-      {active && (
-        <span
-          style={{
-            position: 'absolute', bottom: 4, width: 18, height: 3, borderRadius: 2,
-            background: `linear-gradient(90deg, ${accent}, ${colors.avaCyan})`,
-            boxShadow: `0 0 8px ${accent}88`,
-          }}
-        />
-      )}
     </button>
   );
 }
