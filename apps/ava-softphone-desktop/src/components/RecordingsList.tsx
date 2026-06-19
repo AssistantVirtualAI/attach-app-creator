@@ -51,6 +51,8 @@ export default function RecordingsList({ onAnalyze, extension }: { onAnalyze?: (
   const [audio, setAudio] = useState<Record<string, string>>(() => Object.fromEntries(audioCache));
   const [audioErrors, setAudioErrors] = useState<Record<string, string>>({});
   const [audioLoading, setAudioLoading] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [rangeDays, setRangeDays] = useState<7 | 30>(7);
 
   const hydrateTranscripts = useCallback(async (rows: RecordingItem[]) => {
     const ids = rows.map(r => r.callId || r.id).filter(Boolean);
@@ -86,7 +88,7 @@ export default function RecordingsList({ onAnalyze, extension }: { onAnalyze?: (
     if (!silent) { setLoading(true); setError(null); }
     if (force) setRefreshing(true);
     try {
-      const data = force ? await ava.refreshRecordings(100, { extension }) : await ava.recordings(100, { extension });
+      const data = force ? await ava.refreshRecordings(200, { extension, rangeDays }) : await ava.recordings(200, { extension, rangeDays });
       const list = Array.isArray(data) ? data : [];
       setItems(list);
       // Hydrate persisted transcripts so reload shows them.
@@ -100,7 +102,7 @@ export default function RecordingsList({ onAnalyze, extension }: { onAnalyze?: (
       if (!silent) setLoading(false);
       if (force) setRefreshing(false);
     }
-  }, [extension, hydrateTranscripts]);
+  }, [extension, rangeDays, hydrateTranscripts]);
 
   const silentLoad = useCallback(() => { void load(true); }, [load]);
 
@@ -259,17 +261,24 @@ export default function RecordingsList({ onAnalyze, extension }: { onAnalyze?: (
         }}>{refreshing ? 'Syncing…' : '↻ Refresh'}</button>
       </div>
 
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name, number, extension…" style={{ flex: 1, minWidth: 0, padding: '7px 9px', borderRadius: 8, border: `1px solid ${c.border}`, background: 'rgba(255,255,255,0.06)', color: c.text, fontSize: 11, outline: 'none' }} />
+        {([7, 30] as const).map((d) => (
+          <button key={d} onClick={() => setRangeDays(d)} style={{ background: rangeDays === d ? 'rgba(255,215,0,0.16)' : 'rgba(255,255,255,0.05)', border: `1px solid ${rangeDays === d ? c.yellow : c.border}`, color: rangeDays === d ? c.yellow : c.textSub, padding: '6px 8px', borderRadius: 8, fontSize: 11, cursor: 'pointer' }}>{d}d</button>
+        ))}
+      </div>
+
       {error && (
         <div style={{ padding: 10, background: 'rgba(239,68,68,0.10)', color: c.red, fontSize: 11, borderRadius: 8 }}>
           {error}
         </div>
       )}
 
-      {items.length === 0 ? (
+      {items.filter((r) => !search.trim() || [r.customer, r.from, r.to, (r as any).extension, (r as any).source_number, r.summary, r.transcript_text].filter(Boolean).join(' ').toLowerCase().includes(search.trim().toLowerCase())).length === 0 ? (
         <div style={{ textAlign: 'center', padding: 40, color: c.textSub, fontSize: 12 }}>
-          No recordings yet.
+          No recordings match this filter.
         </div>
-      ) : items.map(r => {
+      ) : items.filter((r) => !search.trim() || [r.customer, r.from, r.to, (r as any).extension, (r as any).source_number, r.summary, r.transcript_text].filter(Boolean).join(' ').toLowerCase().includes(search.trim().toLowerCase())).map(r => {
         const sentiment = r.sentiment;
         const sentColor =
           sentiment?.includes('positive') ? c.green :
