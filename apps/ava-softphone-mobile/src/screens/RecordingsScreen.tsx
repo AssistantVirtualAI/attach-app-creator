@@ -3,7 +3,7 @@ import { Loader2, Play, Search, Sparkles } from 'lucide-react';
 import { colors, font, radius } from '../lib/theme';
 import { Card, Chip, EmptyState, SectionTitle, Skeleton } from '../components/ui/Primitives';
 import { useMobileCredentials } from '../hooks/useMobileCredentials';
-import { authedRealtime, loadPbxRecordingAudioMobile, restGet } from '../lib/mobileSupabase';
+import { authedRealtime, getCachedRecordingAudio, getCachedRecordingAudioEntries, loadPbxRecordingAudioMobile, restGet } from '../lib/mobileSupabase';
 import { mobileApi } from '../lib/mobileApi';
 import { showMobileToast } from '../lib/mobileToast';
 import CallDetailScreen from './CallDetailScreen';
@@ -22,7 +22,11 @@ export default function RecordingsScreen() {
   const [q, setQ] = useState('');
   const [open, setOpen] = useState<string | null>(null);
   const [loadingAudio, setLoadingAudio] = useState<string | null>(null);
-  const [audioUrls, setAudioUrls] = useState<Record<string, string>>({});
+  const [audioUrls, setAudioUrls] = useState<Record<string, string>>(() => {
+    const seed: Record<string, string> = {};
+    for (const [k, v] of getCachedRecordingAudioEntries()) seed[k] = v;
+    return seed;
+  });
   const [audioErrors, setAudioErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<Record<string, 'running' | 'failed' | undefined>>({});
   const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
@@ -87,10 +91,13 @@ export default function RecordingsScreen() {
 
   const loadAudio = async (r: Recording) => {
     if (audioUrls[r.id]) return;
+    const cacheKey = (r.pbx_uuid || r.id) as string;
+    const cached = getCachedRecordingAudio(cacheKey);
+    if (cached) { setAudioUrls((u) => ({ ...u, [r.id]: cached })); return; }
     setAudioErrors((e) => { const n = { ...e }; delete n[r.id]; return n; });
     setLoadingAudio(r.id);
     try {
-      const url = await loadPbxRecordingAudioMobile(r, mobile.accessToken, mobile.organizationId);
+      const url = await loadPbxRecordingAudioMobile(r, mobile.accessToken, mobile.organizationId, mobile.domainUuid);
       if (url.startsWith('blob:')) objectUrls.current.add(url);
       setAudioUrls((u) => ({ ...u, [r.id]: url }));
     } catch (e: any) {
