@@ -409,7 +409,8 @@ function CompactRail({ view, onChange, onOpenSettings, items }: { view: ConsoleV
         boxShadow: '0 -10px 30px -16px rgba(11,21,48,0.18)',
       }}>
 
-      <div className="lemtel-rail-h">
+      <div className="lemtel-rail-h" style={{ display: 'flex', gap: 4, overflowX: 'auto', overflowY: 'hidden', padding: '6px 8px', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'thin' }}>
+
         {all.map((v) => {
           const active = view === v;
           const isAI = v === 'ai';
