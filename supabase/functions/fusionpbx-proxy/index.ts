@@ -1774,18 +1774,24 @@ Deno.serve(async (req) => {
       if (xml_cdr_uuid) {
         for (const fileBase of fileBases) {
           const id = encodeURIComponent(String(xml_cdr_uuid));
-          // Primary PBX-node fallbacks, in the order confirmed for Lemtel recordings.
-          tryUrls.push(`${fileBase}/app/xml_cdr/xml_cdr_download.php?id=${id}&t=bin`);
-          tryUrls.push(`${fileBase}/app/xml_cdr/download.php?id=${id}`);
+          // PROVEN WORKING for Lemtel: recording_name without extension is the FusionPBX CDR UUID
+          // e.g. recording_name="351e1129-86e2-4aef-a33b-7447dc2f91bf.mp3"
+          // -> download.php?id=351e1129-86e2-4aef-a33b-7447dc2f91bf  ✅
           if (record_name) {
+            const recUuid = encodeURIComponent(normalizeRecordName(record_name).replace(/\.(mp3|wav|ogg)$/i, ""));
+            // TRY RECORD_NAME UUID FIRST — this is the actual FusionPBX CDR UUID
+            tryUrls.push(`${fileBase}/app/xml_cdr/download.php?id=${recUuid}`);
+            tryUrls.push(withQueryAuth(`${fileBase}/app/xml_cdr/download.php?id=${recUuid}`));
+            tryUrls.push(`${fileBase}/app/xml_cdr/xml_cdr_download.php?id=${recUuid}&t=bin`);
             const n = encodeURIComponent(normalizeRecordName(record_name));
             tryUrls.push(withQueryAuth(`${fileBase}/app/recordings/${n}`));
           }
-          // Additional authenticated and non-authenticated variants for older FusionPBX routes.
+          // Then try Supabase id (usually fails but keep as fallback)
+          tryUrls.push(`${fileBase}/app/xml_cdr/download.php?id=${id}`);
+          tryUrls.push(withQueryAuth(`${fileBase}/app/xml_cdr/download.php?id=${id}`));
           tryUrls.push(withQueryAuth(`${fileBase}/app/xml_cdr/xml_cdr_download.php?id=${id}&t=bin`));
           tryUrls.push(withQueryAuth(`${fileBase}/app/xml_cdr/xml_cdr_download.php?id=${id}`));
           tryUrls.push(withQueryAuth(`${fileBase}/app/xml_cdr/download.php?id=${id}&t=bin`));
-          tryUrls.push(withQueryAuth(`${fileBase}/app/xml_cdr/download.php?id=${id}`));
           tryUrls.push(`${fileBase}/app/xml_cdr/xml_cdr_download.php?id=${id}`);
           tryUrls.push(`${fileBase}/app/xml_cdr/download.php?id=${id}&t=bin`);
         }
