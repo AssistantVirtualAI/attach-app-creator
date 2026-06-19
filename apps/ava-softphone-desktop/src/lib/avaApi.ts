@@ -599,18 +599,18 @@ export const ava = {
     missed: 3, answered: 12, unreadSms: 5, voicemail: 2, aiActions: 4, pbxHealth: 'ok',
     brief: 'You have 3 missed calls and 2 unread voicemails requiring callbacks. One conversation flagged a renewal opportunity.',
   }),
-  calls: async (limit = 100, opts?: { scope?: 'mine' | 'org'; extension?: string | null }) => {
+  calls: async (limit = 100, opts?: { scope?: 'mine' | 'org'; extension?: string | null; rangeDays?: 7 | 30 | null }) => {
     if (MOCK) return MOCK_CALLS;
     await bestEffortCdrSync(Math.max(limit, 200));
     return (await readCallRecordRows(limit, opts)).map(mapCdrToCall);
   },
-  refreshCalls: async (limit = 150, opts?: { scope?: 'mine' | 'org'; extension?: string | null }) => {
+  refreshCalls: async (limit = 150, opts?: { scope?: 'mine' | 'org'; extension?: string | null; rangeDays?: 7 | 30 | null }) => {
     if (MOCK) return MOCK_CALLS;
     await bestEffortCdrSync(Math.max(limit, 250), 0, true);
     if (typeof window !== 'undefined') window.dispatchEvent(new Event('lemtel:phone-sync-complete'));
     return (await readCallRecordRows(limit, opts)).map(mapCdrToCall);
   },
-  scopedCallRecords: async (limit = 100, opts?: { scope?: 'mine' | 'org'; extension?: string | null }) => {
+  scopedCallRecords: async (limit = 100, opts?: { scope?: 'mine' | 'org'; extension?: string | null; rangeDays?: 7 | 30 | null }) => {
     if (MOCK) return MOCK_CALLS as any[];
     await bestEffortCdrSync(Math.max(limit, 200));
     return readCallRecordRows(limit, opts);
@@ -783,7 +783,7 @@ export const ava = {
   },
   markVoicemailRead: (id: string) =>
     call<{ ok: true }>(`/fn/${FN.fusionpbxProxy}`, { method: 'POST', body: JSON.stringify({ action: 'voicemail-read', id }) }, { ok: true }).catch(() => ({ ok: true as const })),
-  recordings: async (limit = 100, opts?: { scope?: 'mine' | 'org'; extension?: string | null }) => {
+  recordings: async (limit = 100, opts?: { scope?: 'mine' | 'org'; extension?: string | null; rangeDays?: 7 | 30 | null }) => {
     if (MOCK) return SAMPLE_RECORDING_EMPTY;
     await bestEffortCdrSync(Math.max(limit, 200));
     try {
@@ -791,12 +791,13 @@ export const ava = {
       const orgFilter = me.organization_id ? `&organization_id=eq.${me.organization_id}` : '';
       const scopeOrg = opts?.scope === 'org';
       const scopedExtension = cleanText(opts?.extension || me.extension);
+      const sinceFilter = opts?.rangeDays ? `&start_at=gte.${encodeURIComponent(new Date(Date.now() - opts.rangeDays * 864e5).toISOString())}` : '';
       const extFilter = scopeOrg
         ? ''
         : scopedExtension
           ? `&or=(extension.eq.${encodeURIComponent(scopedExtension)},caller_number.eq.${encodeURIComponent(scopedExtension)},destination_number.eq.${encodeURIComponent(scopedExtension)},source_number.eq.${encodeURIComponent(scopedExtension)})`
           : '&id=is.null';
-      const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,organization_id,extension,extension_uuid,pbx_uuid,domain_uuid,domain_name,caller_name,caller_number,destination,destination_number,source_number,start_at,billsec,duration_seconds,has_recording,recording_path,recording_name,mos&has_recording=eq.true${orgFilter}${extFilter}&order=start_at.desc&limit=${limit}`;
+      const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,organization_id,extension,extension_uuid,pbx_uuid,domain_uuid,domain_name,caller_name,caller_number,destination,destination_number,source_number,start_at,billsec,duration_seconds,has_recording,recording_path,recording_name,mos,raw_data,transcribed&has_recording=eq.true${orgFilter}${extFilter}${sinceFilter}&order=start_at.desc&limit=${limit}`;
       const res = await fetch(url, {
         headers: {
           'Content-Type': 'application/json',
@@ -812,7 +813,7 @@ export const ava = {
       return [] as RecordingItem[];
     }
   },
-  refreshRecordings: async (limit = 100, opts?: { scope?: 'mine' | 'org'; extension?: string | null }) => {
+  refreshRecordings: async (limit = 100, opts?: { scope?: 'mine' | 'org'; extension?: string | null; rangeDays?: 7 | 30 | null }) => {
     if (MOCK) return SAMPLE_RECORDING_EMPTY;
     await bestEffortRecentTelephonySync(Math.max(limit, 250), true);
     if (typeof window !== 'undefined') window.dispatchEvent(new Event('lemtel:recordings-updated'));
