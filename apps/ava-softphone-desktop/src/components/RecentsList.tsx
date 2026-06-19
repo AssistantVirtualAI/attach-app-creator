@@ -97,7 +97,7 @@ function RecentsListImpl({ extension, onCall }: Props) {
   }, silentLoad);
 
   if (loading) return <div style={center}>Loading recents…</div>;
-  if (err) return <div style={{ ...center, color: '#ff8a8a' }}>{err}<br /><button onClick={() => load()} style={refreshBtn}>Retry</button></div>;
+  if (err && rows.length === 0) return <div style={{ ...center, color: '#ff8a8a' }}>{err}<br /><button onClick={() => load()} style={refreshBtn}>Retry</button></div>;
   if (rows.length === 0) return <div style={center}>No recent calls</div>;
 
   return (
