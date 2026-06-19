@@ -20,6 +20,8 @@ export default function DashboardScreen({
 }: { onNavigate: (t: Tab) => void; haptic: (s?: ImpactStyle) => Promise<void>; onOpenProfile?: () => void }) {
   const { mode, toggle } = useTheme();
   const [range, setRange] = useState<StatsRange>('today');
+  const [notifOpen, setNotifOpen] = useState(false);
+  const notifCounts = useNotificationCounts();
   const me = useAutoSync<MeResponse>(() => mobileApi.me(), { intervalMs: 5 * 60_000 });
   const stats = useAutoSync<DomainStats>(() => mobileApi.domainStats(range), { intervalMs: 60_000, deps: [range] });
   const m = me.data; const s = stats.data;
