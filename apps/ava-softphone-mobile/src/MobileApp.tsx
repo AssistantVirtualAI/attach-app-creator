@@ -77,9 +77,9 @@ export default function MobileApp() {
 
 
   if (loading || booting) return <SplashAva />;
-  if (!creds) return <AuthScreen onAuthenticated={setCreds} />;
+  if (!creds) return <ThemeProvider><AuthScreen onAuthenticated={setCreds} /></ThemeProvider>;
 
-  return <AuthenticatedShell creds={creds} setCreds={setCreds} tab={tab} setTab={setTab} onSignOut={clearCreds} />;
+  return <ThemeProvider><AuthenticatedShell creds={creds} setCreds={setCreds} tab={tab} setTab={setTab} onSignOut={clearCreds} /></ThemeProvider>;
 }
 
 function AuthenticatedShell({
