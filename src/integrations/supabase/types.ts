@@ -7293,6 +7293,7 @@ export type Database = {
           notify_push: boolean
           notify_sms: boolean
           notify_sms_number: string | null
+          organization_id: string | null
           pin_hash: string | null
           transcription_enabled: boolean
           updated_at: string
@@ -7313,6 +7314,7 @@ export type Database = {
           notify_push?: boolean
           notify_sms?: boolean
           notify_sms_number?: string | null
+          organization_id?: string | null
           pin_hash?: string | null
           transcription_enabled?: boolean
           updated_at?: string
@@ -7333,6 +7335,7 @@ export type Database = {
           notify_push?: boolean
           notify_sms?: boolean
           notify_sms_number?: string | null
+          organization_id?: string | null
           pin_hash?: string | null
           transcription_enabled?: boolean
           updated_at?: string

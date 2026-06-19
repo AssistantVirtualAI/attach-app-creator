@@ -39,7 +39,7 @@ Deno.serve(async (req) => {
     if (__mobileAllowed === false) return json({ error: "MOBILE_ACCESS_DISABLED", message: "Mobile access not granted by Lemtel administrators." }, 403);
 
     const { data: sp } = await sb.from("pbx_softphone_users")
-      .select("organization_id, extension")
+      .select("organization_id, extension, domain_uuid")
       .eq("portal_user_id", u.user.id).maybeSingle();
     if (!sp) return json({ error: "NO_SOFTPHONE_ACCOUNT" }, 404);
     if (!sp.extension) return json({ error: "NO_EXTENSION_ASSIGNED" }, 403);
@@ -54,6 +54,7 @@ Deno.serve(async (req) => {
       let detailQ = sb.from("pbx_call_records").select("*")
         .eq("id", id).eq("organization_id", sp.organization_id)
         .or(extFilter);
+      if (sp.domain_uuid) detailQ = detailQ.eq("domain_uuid", sp.domain_uuid);
       const { data: r } = await detailQ.maybeSingle();
       if (!r) return json({ error: "not_found" }, 404);
 
@@ -98,10 +99,12 @@ Deno.serve(async (req) => {
     }
 
     const limit = Math.min(Number(url.searchParams.get("limit")) || 50, 200);
-    const { data: rows, error } = await sb.from("pbx_call_records")
+    let listQ = sb.from("pbx_call_records")
       .select("id, direction, call_status, caller_name, caller_number, source_number, destination, destination_number, extension, start_at, duration_seconds, missed_call, has_recording, transcribed")
       .eq("organization_id", sp.organization_id)
-      .or(extFilter)
+      .or(extFilter);
+    if (sp.domain_uuid) listQ = listQ.eq("domain_uuid", sp.domain_uuid);
+    const { data: rows, error } = await listQ
       .order("start_at", { ascending: false })
       .limit(limit);
     if (error) throw error;

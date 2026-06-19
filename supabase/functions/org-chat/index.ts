@@ -223,13 +223,23 @@ Deno.serve(async (req) => {
 
     if (action === "list_directory") {
       // Collect every user belonging to the same org (organization_members + org_members)
-      const [{ data: m1 }, { data: m2 }] = await Promise.all([
+      const { data: callerDomains } = await admin
+        .from("pbx_softphone_users")
+        .select("domain_uuid")
+        .eq("portal_user_id", userId)
+        .eq("organization_id", orgId);
+      const domainIds = (callerDomains ?? []).map((r: any) => r.domain_uuid).filter(Boolean);
+      const [{ data: m1 }, { data: m2 }, { data: domainUsers }] = await Promise.all([
         admin.from("organization_members").select("user_id").eq("organization_id", orgId),
         admin.from("org_members").select("user_id").eq("org_id", orgId),
+        (domainIds.length
+          ? admin.from("pbx_softphone_users").select("portal_user_id, extension, display_name").eq("organization_id", orgId).in("domain_uuid", domainIds)
+          : admin.from("pbx_softphone_users").select("portal_user_id, extension, display_name").eq("organization_id", orgId)),
       ]);
       const ids = Array.from(new Set([
         ...(m1 ?? []).map((r: any) => r.user_id),
         ...(m2 ?? []).map((r: any) => r.user_id),
+        ...(domainUsers ?? []).map((r: any) => r.portal_user_id),
       ])).filter(Boolean);
       if (ids.length === 0) return json({ members: [] });
       const [{ data: profs }, { data: pres }, { data: spu }] = await Promise.all([

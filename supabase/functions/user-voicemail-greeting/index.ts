@@ -24,6 +24,16 @@ const TOP_VOICES = [
   { id: "Xb7hH8MSUJpSbSDYk0k2", name: "Alice" },
 ];
 
+function arrayBufferToBase64(buffer: ArrayBuffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
+
 const MAX_CONCURRENT_PER_USER = 2;
 
 type TtsResult = {
@@ -209,7 +219,7 @@ Deno.serve(async (req) => {
 
     const { data: spu } = await admin
       .from("pbx_softphone_users")
-      .select("id, organization_id, extension")
+      .select("id, organization_id, extension, domain_uuid, pbx_uuid")
       .eq("portal_user_id", userId)
       .maybeSingle();
 
@@ -488,6 +498,51 @@ Deno.serve(async (req) => {
       const { data: signed } = await admin.storage
         .from("voicemail-greetings")
         .createSignedUrl(g.storage_path, 3600);
+      let pbxPublish: any = null;
+      try {
+        const { data: fileData, error: dlErr } = await admin.storage.from("voicemail-greetings").download(g.storage_path);
+        if (dlErr) throw dlErr;
+        const audioBase64 = arrayBufferToBase64(await fileData.arrayBuffer());
+        const safeExt = String(g.extension || spu.extension || "voicemail").replace(/[^A-Za-z0-9_-]/g, "_");
+        const filename = `ava-voicemail-${safeExt}-${g.id}.mp3`;
+        const uploadRes = await fetch(`${SUPABASE_URL}/functions/v1/fusionpbx-proxy`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}`, apikey: SERVICE_KEY },
+          body: JSON.stringify({
+            action: "upload-recording",
+            organization_id: spu.organization_id,
+            params: { domain_uuid: spu.domain_uuid, filename, audio_base64: audioBase64, mime: "audio/mpeg", description: `Voicemail greeting: ${g.name}` },
+          }),
+        });
+        pbxPublish = await uploadRes.json().catch(() => ({ ok: false, status: uploadRes.status }));
+        if (pbxPublish?.ok) {
+          const updateRes = await fetch(`${SUPABASE_URL}/functions/v1/fusionpbx-proxy`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}`, apikey: SERVICE_KEY },
+            body: JSON.stringify({
+              action: "update-extension",
+              organization_id: spu.organization_id,
+              params: {
+                domain_uuid: spu.domain_uuid,
+                extension_uuid: spu.pbx_uuid,
+                extension: spu.extension,
+                voicemail_enabled: "true",
+                voicemail_custom_prompt: "true",
+                voicemail_file: filename,
+              },
+            }),
+          });
+          const extensionUpdate = await updateRes.json().catch(() => ({ ok: false, status: updateRes.status }));
+          pbxPublish = { ...pbxPublish, extension_update: extensionUpdate };
+          await admin.from("pbx_softphone_users").update({
+            voicemail_file: filename,
+            voicemail_custom_prompt: true,
+            updated_at: new Date().toISOString(),
+          }).eq("id", spu.id);
+        }
+      } catch (e: any) {
+        pbxPublish = { ok: false, error: String(e?.message || e) };
+      }
       await admin.from("pbx_voicemail_settings").upsert({
         user_id: userId,
         organization_id: spu.organization_id,
@@ -506,9 +561,9 @@ Deno.serve(async (req) => {
         action: "voicemail_greeting_activated",
         resource_type: "pbx_voicemail_greetings",
         resource_id: id,
-        metadata: { extension: g.extension, name: g.name },
+        metadata: { extension: g.extension, name: g.name, pbx_publish: pbxPublish },
       });
-      return json({ ok: true, audio_url: signed?.signedUrl ?? null });
+      return json({ ok: true, audio_url: signed?.signedUrl ?? null, pbx_publish: pbxPublish });
     }
 
     if (action === "rename_greeting") {

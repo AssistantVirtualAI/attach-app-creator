@@ -68,6 +68,7 @@ type RecordingMeta = {
   organization_id?: string | null;
   start_at?: string | null;
   recorded_at?: string | null;
+  recording_url?: string | null;
 };
 
 const clean = (value: unknown) => {
@@ -81,6 +82,35 @@ export async function loadPbxRecordingAudioMobile(recording: RecordingMeta, toke
   const record_name = clean(recording.record_name || recording.recording_name);
   if (!xml_cdr_uuid && (!record_path || !record_name)) throw new Error('Missing recording metadata');
 
+  const payload = {
+    organization_id: clean(recording.organization_id) || organizationId || undefined,
+    params: {
+      xml_cdr_uuid,
+      record_path,
+      record_name,
+      domain_uuid: clean(recording.domain_uuid),
+      domain_name: clean(recording.domain_name),
+      recorded_at: clean(recording.recorded_at || recording.start_at),
+      local_recording_url: clean(recording.recording_url),
+      expires_in: 300,
+    },
+  };
+
+  const signed = await fetch(`${SUPABASE_URL}/functions/v1/fusionpbx-proxy`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: SUPABASE_ANON,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ action: 'get-recording-signed-url', ...payload }),
+  });
+
+  if (signed.ok) {
+    const json = await signed.json().catch(() => null);
+    if (json?.ok && json?.url) return json.url as string;
+  }
+
   const res = await fetch(`${SUPABASE_URL}/functions/v1/fusionpbx-proxy`, {
     method: 'POST',
     headers: {
@@ -88,18 +118,7 @@ export async function loadPbxRecordingAudioMobile(recording: RecordingMeta, toke
       apikey: SUPABASE_ANON,
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify({
-      action: 'get-recording',
-      organization_id: clean(recording.organization_id) || organizationId || undefined,
-      params: {
-        xml_cdr_uuid,
-        record_path,
-        record_name,
-        domain_uuid: clean(recording.domain_uuid),
-        domain_name: clean(recording.domain_name),
-        recorded_at: clean(recording.recorded_at || recording.start_at),
-      },
-    }),
+    body: JSON.stringify({ action: 'get-recording', ...payload }),
   });
 
   if (!res.ok) {

@@ -27,6 +27,7 @@ export default function RecordingsScreen() {
   const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const urlCache = useRef<Map<string, string>>(new Map());
+  const objectUrls = useRef<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     if (!mobile.accessToken || !mobile.domainUuid) return;
@@ -41,7 +42,7 @@ export default function RecordingsScreen() {
     load().then(() => setError(null)).catch((e) => { setError(e?.message || 'Recordings failed'); setData([]); });
   }, [load, mobile.loading, mobile.accessToken, mobile.domainUuid]);
 
-  useEffect(() => () => { audioRef.current?.pause(); urlCache.current.forEach((u) => URL.revokeObjectURL(u)); }, []);
+  useEffect(() => () => { audioRef.current?.pause(); objectUrls.current.forEach((u) => URL.revokeObjectURL(u)); }, []);
 
   useEffect(() => {
     if (!mobile.accessToken || !mobile.domainUuid) return;
@@ -61,12 +62,14 @@ export default function RecordingsScreen() {
   const play = async (r: Recording) => {
     if (playing === r.id) { audioRef.current?.pause(); setPlaying(null); return; }
     audioRef.current?.pause();
-    let url = urlCache.current.get(r.id) || r.recording_url || '';
+    audioRef.current = null;
+    let url = urlCache.current.get(r.id) || '';
     if (!url) {
       setLoadingAudio(r.id);
       try {
         url = await loadPbxRecordingAudioMobile(r, mobile.accessToken, mobile.organizationId);
         urlCache.current.set(r.id, url);
+        if (url.startsWith('blob:')) objectUrls.current.add(url);
       } catch (e: any) {
         showMobileToast(e?.message || 'Playback failed', 'error');
         setLoadingAudio(null);

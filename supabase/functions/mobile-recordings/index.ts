@@ -22,15 +22,15 @@ Deno.serve(async (req) => {
     if (!u?.user) return json({ error: "unauthorized" }, 401);
 
     const { data: sp } = await sb.from("pbx_softphone_users")
-      .select("organization_id").eq("portal_user_id", u.user.id).maybeSingle();
+      .select("organization_id, domain_uuid").eq("portal_user_id", u.user.id).maybeSingle();
     if (!sp?.organization_id) return json({ items: [], noSoftphone: true });
 
-    const { data: rows } = await sb.from("pbx_call_records")
+    let q = sb.from("pbx_call_records")
       .select("id, pbx_uuid, caller_name, caller_number, destination_number, start_at, duration_seconds, transcribed, ai_summary, recording_path, recording_name, domain_uuid, domain_name, organization_id")
       .eq("organization_id", sp.organization_id)
-      .eq("has_recording", true)
-      .order("start_at", { ascending: false })
-      .limit(100);
+      .eq("has_recording", true);
+    if (sp.domain_uuid) q = q.eq("domain_uuid", sp.domain_uuid);
+    const { data: rows } = await q.order("start_at", { ascending: false }).limit(100);
 
     const out = (rows ?? []).map((r: any) => ({
       id: r.id,
