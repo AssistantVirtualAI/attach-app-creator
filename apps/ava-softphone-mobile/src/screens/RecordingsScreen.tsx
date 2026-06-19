@@ -21,15 +21,14 @@ export default function RecordingsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState('');
   const [open, setOpen] = useState<string | null>(null);
-  const [playing, setPlaying] = useState<string | null>(null);
   const [loadingAudio, setLoadingAudio] = useState<string | null>(null);
+  const [audioUrls, setAudioUrls] = useState<Record<string, string>>({});
+  const [audioErrors, setAudioErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<Record<string, 'running' | 'failed' | undefined>>({});
   const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
   const [extFilter, setExtFilter] = useState<string>('all');
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [myExt, setMyExt] = useState<string | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const urlCache = useRef<Map<string, string>>(new Map());
   const objectUrls = useRef<Set<string>>(new Set());
 
   // Resolve admin role + own extension once
