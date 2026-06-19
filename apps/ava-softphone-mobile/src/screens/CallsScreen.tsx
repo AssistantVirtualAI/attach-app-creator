@@ -158,6 +158,21 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
             ))}
           </div>
 
+          {isAdmin && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '0 2px 10px' }}>
+              <label style={{ fontSize: font.xs, color: colors.mutedSilver, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>Extension</label>
+              <select value={extFilter} onChange={(e) => setExtFilter(e.target.value)} style={{ flex: 1, padding: '7px 10px', borderRadius: 10, border: `1px solid ${colors.border}`, background: 'rgba(255,255,255,0.06)', color: colors.textIce, fontSize: 12, fontWeight: 700 }}>
+                <option value="all">All extensions (domain)</option>
+                {myExt && <option value={myExt}>Mine ({myExt})</option>}
+                {extensionOptions.filter((e) => e !== myExt).map((e) => <option key={e} value={e}>{e}</option>)}
+              </select>
+            </div>
+          )}
+          {isAdmin === false && myExt && (
+            <div style={{ fontSize: font.xs, color: colors.mutedSilver, margin: '0 2px 10px' }}>Showing your extension {myExt} only.</div>
+          )}
+
+
           {!calls && <ListSkeleton rows={6} />}
           {calls && filtered.length === 0 && (
             <EmptyState icon="📞" title="No calls yet" hint="Your call history will appear here. Tap the keypad to start one." cta={{ label: 'Open dialer', onPress: () => setSub('dial') }} />
