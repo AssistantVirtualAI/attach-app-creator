@@ -86,15 +86,23 @@ export function useRealtimeCDR(creds: Creds | null) {
     }
 
     const sb = client(token);
-    const filter = `extension=eq.${ext}`;
+    const orgId = (creds as any)?.organizationId as string | undefined;
+    // Realtime postgres_changes only accepts a single filter; we use org when available,
+    // otherwise extension. Client-side mapping already filters by extension.
+    const filter = orgId ? `organization_id=eq.${orgId}` : `extension=eq.${ext}`;
+    const matchesExt = (row: any) =>
+      row?.extension === ext ||
+      row?.caller_number === ext ||
+      row?.destination_number === ext;
+
     let watchdog: ReturnType<typeof setTimeout> | null = setTimeout(() => {
-      // If we haven't reached SUBSCRIBED in 8s, fall back.
       startPolling('Realtime CDR unavailable — switched to 15s polling.');
     }, 8_000);
 
     const channel = sb
       .channel(`cdr-ext-${ext}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pbx_call_records', filter }, (payload) => {
+        if (!matchesExt(payload.new)) return;
         const row = mapRow(payload.new);
         setCalls((prev) => {
           const list = prev || [];
@@ -103,6 +111,7 @@ export function useRealtimeCDR(creds: Creds | null) {
         });
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pbx_call_records', filter }, (payload) => {
+        if (!matchesExt(payload.new)) return;
         const row = mapRow(payload.new);
         setCalls((prev) => (prev || []).map((c) => (c.id === row.id ? { ...c, ...row } : c)));
       })
@@ -113,6 +122,8 @@ export function useRealtimeCDR(creds: Creds | null) {
           stopPolling();
           setTransport('realtime');
           setWarning(null);
+          // Reconnect refresh: pull latest snapshot to fill any gap.
+          load();
         } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
           startPolling('Realtime CDR disconnected — using 15s polling.');
         }
