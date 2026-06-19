@@ -166,7 +166,7 @@ function AuthenticatedShell({
       sendDtmf: softphone.sendDTMF,
       sendDTMF: softphone.sendDTMF,
       setStatus: softphone.setStatus,
-      reconnect: () => softphone.setStatus('reconnect'),
+      reconnect: softphone.reconnect,
       setAudioEl: (_el: HTMLAudioElement | null) => {},
       transfer: (_target?: string) => {},
       park: () => {},
