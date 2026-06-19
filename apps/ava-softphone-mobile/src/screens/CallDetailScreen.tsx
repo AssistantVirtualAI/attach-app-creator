@@ -3,7 +3,7 @@ import { Play, Pause, Loader2, Sparkles, RefreshCw, Stethoscope } from 'lucide-r
 import { colors, font, radius, gradients } from '../lib/theme';
 import { mobileApi, CallDetail } from '../lib/mobileApi';
 import { Card, Chip, AIPanel, Skeleton, GhostButton } from '../components/ui/Primitives';
-import { getCredentials } from '../lib/creds';
+import { getCredentials, ensureStoredOrganizationId } from '../lib/creds';
 import RecordingDebugScreen from './RecordingDebugScreen';
 import { showMobileToast } from '../lib/mobileToast';
 
