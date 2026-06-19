@@ -167,15 +167,13 @@ export function classifySipFailure(input: {
   return input.cause || input.message || 'SIP initialization failed';
 }
 
-/** Build the list of WSS URLs to try, primary first. */
+/** Build the list of WSS URLs to try, primary first. Only confirmed-working endpoints. */
 export function buildWssFallbackList(config: SIPConfig): string[] {
   const list = [
     config.wssUrl,
     ...(config.wssUrls || []),
-    'wss://node.lemtelcloud.net:7443',
-    'wss://lemtel.lemtel.tel:7443',
-    'wss://pbxnode.lemtel.tel:7443',
-    'wss://170.39.199.132:7443',
+    'wss://node.lemtelcloud.net:7443', // confirmed OK
+    'wss://pbxnode.lemtel.tel:7443',   // confirmed OK
   ];
   return Array.from(new Set(list.filter(Boolean)));
 }
