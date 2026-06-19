@@ -19,7 +19,6 @@ import { useLemtelAccess } from "@/hooks/useLemtelAccess";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
-import { SoftphoneDiagnostics } from "@/components/softphone/SoftphoneDiagnostics";
 import { useToast } from "@/hooks/use-toast";
 
 type Tab = "dial" | "recents" | "sms" | "contacts";
@@ -473,80 +472,26 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
         </div>
       )}
 
-      {/* SIP credential inspector */}
-      <div className="rounded-md border border-border/60 bg-muted/30 text-[11px] overflow-hidden">
-        <button
-          type="button"
-          onClick={() => setShowCredInspector((v) => !v)}
-          className="w-full flex items-center justify-between px-2.5 py-1.5 hover:bg-muted/60 transition"
-          aria-expanded={showCredInspector}
-        >
-          <span className="flex items-center gap-1.5 font-medium">
-            <Settings className="w-3 h-3" /> SIP credential inspector
-          </span>
-          <ChevronDown className={cn("w-3 h-3 transition-transform", showCredInspector && "rotate-180")} />
-        </button>
-        {showCredInspector && (
-          <dl className="px-2.5 py-2 space-y-1.5 border-t border-border/60">
-            <div className="flex items-start justify-between gap-2">
-              <dt className="text-muted-foreground shrink-0">SIP URI</dt>
-              <dd className="font-mono text-right break-all">
-                {sp.config?.sipUri || (sp.config?.extension ? `sip:${sp.config.extension}@${sp.config.sipDomain}` : "—")}
-              </dd>
-            </div>
-            <div className="flex items-start justify-between gap-2">
-              <dt className="text-muted-foreground shrink-0">Auth username</dt>
-              <dd className="font-mono text-right break-all">{sp.config?.authUsername || sp.config?.extension || "—"}</dd>
-            </div>
-            <div className="flex items-start justify-between gap-2">
-              <dt className="text-muted-foreground shrink-0">Domain</dt>
-              <dd className="font-mono text-right break-all">{sp.config?.sipDomain || "—"}</dd>
-            </div>
-            <div className="flex items-start justify-between gap-2">
-              <dt className="text-muted-foreground shrink-0">WSS</dt>
-              <dd className="font-mono text-right break-all text-[10px]">{sp.config?.wssUrl || "—"}</dd>
-            </div>
-            <div className="flex items-start justify-between gap-2">
-              <dt className="text-muted-foreground shrink-0">Password</dt>
-              <dd className="font-mono text-right">
-                {sp.config?.password
-                  ? `•••• (${sp.config.password.length} chars)`
-                  : <span className="text-rose-500">missing</span>}
-              </dd>
-            </div>
-            <div className="flex items-start justify-between gap-2">
-              <dt className="text-muted-foreground shrink-0">Password source</dt>
-              <dd className="text-right">
-                <Badge variant="outline" className="text-[10px] font-normal">
-                  {sp.config?.passwordSource || "unknown"}
-                </Badge>
-              </dd>
-            </div>
-            <div className="flex items-start justify-between gap-2">
-              <dt className="text-muted-foreground shrink-0">Registration</dt>
-              <dd className="text-right capitalize">{sipStatus}{sp.snap.errorCause ? ` · ${sp.snap.errorCause}` : ""}</dd>
-            </div>
-          </dl>
-        )}
-      </div>
+      {/* Number display */}
       <div className={cn(
-        "h-14 rounded-lg bg-muted/40 flex items-center justify-center font-mono text-2xl tabular-nums px-3 truncate",
+        "h-16 rounded-xl bg-gradient-to-br from-muted/60 to-muted/30 border border-border/60 flex items-center justify-center font-mono text-3xl font-semibold tabular-nums px-3 truncate text-foreground shadow-inner",
         shake && "animate-[shake_0.4s]",
       )}>
-        {number || <span className="text-muted-foreground/40 text-base">Enter number</span>}
+        {number || <span className="text-muted-foreground/60 text-base font-sans font-normal">Enter number</span>}
       </div>
-      <div className="grid grid-cols-3 gap-1.5">
+      <div className="grid grid-cols-3 gap-2">
         {DIALPAD.map(({ k, sub }) => (
           <button
             key={k}
             onClick={() => dialPress(k)}
-            className="h-12 rounded-lg bg-muted/40 hover:bg-muted active:scale-95 transition flex flex-col items-center justify-center"
+            className="h-14 rounded-xl bg-card border border-border/70 hover:bg-muted hover:border-primary/40 active:scale-95 transition shadow-sm flex flex-col items-center justify-center text-foreground"
           >
-            <span className="text-lg font-medium leading-none">{k}</span>
-            {sub && <span className="text-[9px] text-muted-foreground mt-0.5">{sub}</span>}
+            <span className="text-xl font-semibold leading-none">{k}</span>
+            {sub && <span className="text-[10px] font-medium text-muted-foreground mt-0.5 tracking-wider">{sub}</span>}
           </button>
         ))}
       </div>
+
       <div className="flex items-center gap-2">
         <Button variant="outline" size="icon" className="h-11 w-11" onClick={() => setNumber((n) => n.slice(0, -1))}>
           <Delete className="w-4 h-4" />
@@ -683,23 +628,45 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
     </div>
   );
 
-  // Compact AI Insights — surfaces today's calls + missed + unread voicemail
+  // AI Insights — richer hero panel replacing the old diagnostics chips
   const todayCalls = summary?.today_calls ?? 0;
   const unreadVm = summary?.unread_voicemail ?? 0;
+  const missedToday = summary?.missed_today ?? 0;
+  const avgDuration = summary?.avg_duration_seconds ?? 0;
 
-  const insightsStrip = callState === "idle" && hasExtension && showInsights && insightsTip && (
-    <div className="px-3 py-2 border-t border-border/60 bg-primary/5">
+  const insightsStrip = callState === "idle" && hasExtension && showInsights && (
+    <div className="px-3 py-2.5 border-t border-border/60 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent">
       <div className="flex items-start gap-2">
-        <Sparkles className="w-3.5 h-3.5 text-primary mt-0.5 shrink-0" />
+        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-primary/60 text-primary-foreground flex items-center justify-center shrink-0 shadow-sm">
+          <Sparkles className="w-3.5 h-3.5" />
+        </div>
         <div className="flex-1 min-w-0">
-          <div className="text-[10px] uppercase tracking-wide text-primary/80 font-semibold flex items-center gap-1.5">
-            AI insight
-            <div className="flex gap-1 ml-1">
-              <Badge variant="outline" className="h-3.5 text-[9px] px-1 font-mono">{todayCalls} today</Badge>
-              {unreadVm > 0 && <Badge variant="outline" className="h-3.5 text-[9px] px-1 font-mono text-amber-600 border-amber-500/40">{unreadVm} vm</Badge>}
-            </div>
+          <div className="text-[10px] uppercase tracking-wider text-primary font-bold">
+            AVA AI · Live insights
           </div>
-          <p className="text-[11px] text-foreground/80 leading-snug mt-0.5">{insightsTip}</p>
+          {insightsTip && (
+            <p className="text-[11.5px] text-foreground/90 leading-snug mt-0.5 font-medium">{insightsTip}</p>
+          )}
+          <div className="flex flex-wrap gap-1.5 mt-1.5">
+            <Badge variant="secondary" className="h-5 text-[10px] px-1.5 font-mono">
+              <Phone className="w-2.5 h-2.5 mr-1" />{todayCalls} today
+            </Badge>
+            {missedToday > 0 && (
+              <Badge variant="outline" className="h-5 text-[10px] px-1.5 font-mono text-rose-600 border-rose-500/40 bg-rose-500/5">
+                {missedToday} missed
+              </Badge>
+            )}
+            {unreadVm > 0 && (
+              <Badge variant="outline" className="h-5 text-[10px] px-1.5 font-mono text-amber-600 border-amber-500/40 bg-amber-500/5">
+                {unreadVm} voicemail
+              </Badge>
+            )}
+            {avgDuration > 0 && (
+              <Badge variant="outline" className="h-5 text-[10px] px-1.5 font-mono">
+                ⌀ {Math.round(avgDuration)}s
+              </Badge>
+            )}
+          </div>
         </div>
         <button onClick={() => setShowInsights(false)} className="text-muted-foreground hover:text-foreground" aria-label="Hide insights">
           <X className="w-3 h-3" />
@@ -707,6 +674,7 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
       </div>
     </div>
   );
+
 
   const content = (
     <>
@@ -728,7 +696,6 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
         {content}
         {insightsStrip}
         {(callState === "idle") && tabBar}
-        <SoftphoneDiagnostics />
         {incomingOverlay}
       </div>
     );
@@ -745,7 +712,6 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
             {content}
             {insightsStrip}
             {(callState === "idle") && tabBar}
-            <SoftphoneDiagnostics />
             {incomingOverlay}
           </div>
         )}
