@@ -34,6 +34,8 @@ function RecentsListImpl({ extension, onCall }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [rangeDays, setRangeDays] = useState<7 | 30>(7);
 
   const load = useCallback(async (silent = false, force = false) => {
     if (!silent) { setLoading(true); setErr(null); }
@@ -42,7 +44,7 @@ function RecentsListImpl({ extension, onCall }: Props) {
       let data: CallRecord[] = [];
       if (force) {
         try {
-          data = await ava.refreshCalls(50, { extension });
+          data = await ava.refreshCalls(200, { extension, rangeDays });
         } catch (e: any) {
           const msg = String(e?.message || '');
           if (/NO_CDR_ENDPOINT/i.test(msg)) {
@@ -50,10 +52,10 @@ function RecentsListImpl({ extension, onCall }: Props) {
           } else {
             setErr(msg || 'Reconnecting to PBX… realtime updates continue in the background.');
           }
-          data = await ava.calls(50, { extension });
+          data = await ava.calls(200, { extension, rangeDays });
         }
       } else {
-        data = await ava.calls(50, { extension });
+        data = await ava.calls(200, { extension, rangeDays });
       }
       setRows(Array.isArray(data) ? data : []);
       setLastUpdated(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
@@ -66,7 +68,7 @@ function RecentsListImpl({ extension, onCall }: Props) {
       if (!silent) setLoading(false);
       if (force) setRefreshing(false);
     }
-  }, [extension]);
+  }, [extension, rangeDays]);
 
   const silentLoad = useCallback(() => { void load(true); }, [load]);
 
@@ -107,6 +109,13 @@ function RecentsListImpl({ extension, onCall }: Props) {
 
   if (loading) return <div style={center}>Loading recents…</div>;
   if (err && rows.length === 0) return <div style={{ ...center, color: '#ff8a8a' }}>{err}<br /><button onClick={() => load()} style={refreshBtn}>Retry</button></div>;
+  const filteredRows = rows.filter((r) => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return [r.customer, r.from, r.to, (r as any).extension, (r as any).source_number, r.status, r.direction]
+      .filter(Boolean).join(' ').toLowerCase().includes(q);
+  });
+
   if (rows.length === 0) return <div style={center}>No recent calls</div>;
 
   return (
@@ -135,7 +144,11 @@ function RecentsListImpl({ extension, onCall }: Props) {
           {refreshing ? 'Reloading…' : '↻ Reload CDR'}
         </button>
       </div>
-      {rows.map((r) => {
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name, number, extension…" style={{ flex: 1, minWidth: 0, padding: '7px 9px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)', color: '#F5F5F7', fontSize: 11, outline: 'none' }} />
+        {([7, 30] as const).map((d) => <button key={d} onClick={() => setRangeDays(d)} style={{ ...reloadCdrBtn, padding: '6px 8px', opacity: rangeDays === d ? 1 : 0.55 }}>{d}d</button>)}
+      </div>
+      {filteredRows.map((r) => {
         const outbound = r.direction === 'out';
         const peer = outbound ? (r.to || '?') : (r.from || '?');
         const name = r.customer || (outbound ? null : r.from);
@@ -175,6 +188,7 @@ function RecentsListImpl({ extension, onCall }: Props) {
           </button>
         );
       })}
+      {filteredRows.length === 0 && <div style={center}>No calls match this filter</div>}
     </div>
   );
 }
