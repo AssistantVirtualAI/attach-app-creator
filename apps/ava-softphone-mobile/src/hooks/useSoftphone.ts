@@ -323,7 +323,7 @@ export function useSoftphone(
         rtcOfferConstraints: { offerToReceiveAudio: true, offerToReceiveVideo: false },
         // Force PCMU/PCMA + strip DTLS so FusionPBX accepts the offer.
         sessionDescriptionHandlerModifiers: [sdpModifier],
-        rtcOfferConstraints: { offerToReceiveAudio: true, offerToReceiveVideo: false },
+        
         eventHandlers: {
           failed: (e: any) => {
             const msg = classifySipFailure({
