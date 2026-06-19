@@ -198,6 +198,14 @@ function AuthenticatedShell({
     };
   }, [softphone, sipConfig]);
 
+  const notif = useNotificationCounts({
+    accessToken: creds.accessToken,
+    organizationId: creds.organizationId,
+    userId: creds.userId,
+  });
+
+
+
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   useEffect(() => { sp.setAudioEl(audioRef.current); }, [sp]);
