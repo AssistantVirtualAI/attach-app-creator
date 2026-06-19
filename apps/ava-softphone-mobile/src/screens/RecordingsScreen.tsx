@@ -10,6 +10,19 @@ export default function RecordingsScreen() {
   const { data, loading, refresh, lastSyncedAt, error } =
     useAutoSync<RecordingEntry[]>(() => mobileApi.recordings(), { intervalMs: 60_000 });
   const [open, setOpen] = useState<string | null>(null);
+  const [busy, setBusy] = useState<Record<string, 'running' | 'failed' | undefined>>({});
+
+  const transcribe = async (id: string) => {
+    if (busy[id] === 'running') return;
+    setBusy((b) => ({ ...b, [id]: 'running' }));
+    try {
+      await mobileApi.analyzeCall(id);
+      setBusy((b) => { const n = { ...b }; delete n[id]; return n; });
+      refresh();
+    } catch {
+      setBusy((b) => ({ ...b, [id]: 'failed' }));
+    }
+  };
 
   if (open) return <CallDetailScreen id={open} onBack={() => setOpen(null)} />;
 
