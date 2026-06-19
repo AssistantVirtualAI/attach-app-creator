@@ -207,13 +207,26 @@ export default function SoftphonePane({
   useEffect(() => {
     if (sp.snap.callState !== 'active' && sp.snap.callState !== 'held') { setTimer(0); return; }
     if (!sp.snap.startedAt) return;
+    console.debug('[AVA] call-timer started', { callState: sp.snap.callState, startedAt: sp.snap.startedAt });
     // 1s cadence is enough for a mm:ss display and halves the in-call render
     // load — the wide-layout dialer was freezing because the 500ms tick was
     // cascading into every memo + audio visualizer paint on each frame.
+    let lastTickAt = performance.now();
+    let slowFrames = 0;
     const id = setInterval(() => {
+      const nowPerf = performance.now();
+      const drift = nowPerf - lastTickAt - 1000;
+      lastTickAt = nowPerf;
+      if (drift > 500) {
+        slowFrames++;
+        console.warn('[AVA] call-timer slow tick — main thread blocked', { driftMs: Math.round(drift), slowFrames });
+      }
       setTimer(Math.floor((Date.now() - (sp.snap.startedAt || Date.now())) / 1000));
     }, 1000);
-    return () => clearInterval(id);
+    return () => {
+      clearInterval(id);
+      console.debug('[AVA] call-timer stopped', { slowFrames });
+    };
   }, [sp.snap.callState, sp.snap.startedAt]);
 
   // Reset audio output to default when call ends if auto-reset is enabled
