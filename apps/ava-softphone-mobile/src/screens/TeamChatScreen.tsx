@@ -209,7 +209,7 @@ export default function TeamChatScreen(_props: { accessToken?: string | null; us
 }
 
 function Bubble({ m, mine }: { m: Message; mine: boolean }) {
-  return <div style={{ alignSelf: mine ? 'flex-end' : 'flex-start', maxWidth: '78%' }}>{!mine && <div style={{ fontSize: 10, color: colors.mutedSilver, marginBottom: 2, paddingLeft: 6 }}>{m.sender_name || '—'}</div>}<div style={{ padding: '8px 12px', borderRadius: 14, background: mine ? 'linear-gradient(135deg, #0023e6, #21d4fd)' : 'rgba(255,255,255,0.06)', color: colors.textIce, fontSize: 14, lineHeight: 1.4, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{m.content}</div></div>;
+  return <div style={{ alignSelf: mine ? 'flex-end' : 'flex-start', maxWidth: '78%' }}>{!mine && <div style={{ fontSize: 10, color: colors.mutedSilver, marginBottom: 2, paddingLeft: 6 }}>{m.sender_name || '—'}</div>}<div data-bubble={mine ? 'me' : 'them'} style={{ padding: '8px 12px', borderRadius: 14, background: mine ? 'linear-gradient(135deg, #0023e6, #21d4fd)' : 'rgba(255,255,255,0.06)', color: colors.textIce, fontSize: 14, lineHeight: 1.4, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{m.content}</div></div>;
 }
 
 function Avatar({ m }: { m: Member }) {

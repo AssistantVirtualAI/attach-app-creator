@@ -1,45 +1,26 @@
-## Fix Plan
+Je vais corriger uniquement l’app mobile, sans toucher à `vite.config.ts`, `electron-builder.yml` ni `.github/workflows/`.
 
-1. **Fix the recordings 42703 error**
-   - The database has `pbx_call_recordings.summary`, not `pbx_call_recordings.ai_summary`.
-   - Update all code paths that expect `ai_summary` from `pbx_call_recordings` to use `summary`, while keeping `pbx_call_records.ai_summary` unchanged.
-   - Verify mobile recordings still load from the same PBX playback flow as desktop/portal.
+Plan:
+1. Light theme
+   - Ajouter des hooks CSS génériques (`data-search-bar`, `data-pill`, `data-bubble`, classes de surfaces) aux écrans ciblés.
+   - Renforcer les overrides light pour boutons, icônes, headers, bottom/input bars, modals, listes, badges et bulles.
+   - Passer les composants communs (`Card`, `Chip`, `SectionTitle`, `EmptyState`, rows) sur des classes/data-hooks testables.
 
-2. **Make People show existing domain extensions**
-   - Current data shows `pbx_softphone_users.domain_uuid` is empty, so filtering only by `domain_uuid` returns no contacts.
-   - Update mobile People to fall back to `organization_id` when `domain_uuid` is missing/empty.
-   - Keep categories separate: **My domain**, **Mobile**, **Manual**.
+2. Recordings
+   - Garder le scope strict: admin/super_admin = tout le domaine; non-admin = seulement sa propre extension.
+   - Charger les extensions du domaine séparément pour que le filtre extension montre toutes les extensions, pas seulement celles déjà présentes dans les 100 derniers enregistrements.
+   - Corriger les champs requis par le player audio (`xml_cdr_uuid`/metadata) et rendre le filtre visible/lisible en light mode.
 
-3. **Make Team Chat show extensions as team members**
-   - Update Team Chat member loading to include all `pbx_softphone_users_safe` rows for the user’s organization when domain filtering returns none.
-   - Include unlinked extensions too, displaying them as extension contacts/status entries.
-   - Keep DMs only for linked portal users; unlinked extensions remain visible as team extensions.
+3. Contacts
+   - Remplacer le chargement fragile côté REST direct par un fallback Edge Function `org-chat/list_directory` qui retourne aussi les extensions non liées à l’app.
+   - Fusionner `pbx_extensions_directory` + softphone users + directory backend pour afficher toutes les extensions du domaine.
+   - Empêcher les erreurs de présence de casser la liste.
 
-4. **Fix General chat history visibility**
-   - Ensure `org-chat` resolves the caller’s organization consistently from softphone/user membership.
-   - Ensure `list_channels` creates/returns the General channel and `list_messages` returns existing General messages.
-   - Keep realtime reload on `org_chat_messages` for the active channel.
+4. Team Chat / General
+   - S’assurer que le canal `general` est sélectionnable et que `list_messages` recharge les anciens messages.
+   - Augmenter la limite initiale raisonnablement et afficher les messages existants (Kenny/Juliano) si le backend les retourne.
+   - Ajouter les hooks light-mode aux bulles et inputs.
 
-5. **Database/API permissions check**
-   - Add/repair grants only if needed for `pbx_softphone_users_safe`, chat tables, and recordings tables.
-   - Do not expose credentials or sensitive base-table fields.
-
-6. **Validation**
-   - Check schema columns after changes.
-   - Verify source queries no longer reference missing `pbx_call_recordings.ai_summary`.
-   - Verify mobile People/Team Chat query by org fallback and General message loading path.
-
-## Files expected to change
-
-- `apps/ava-softphone-mobile/src/screens/ContactsScreen.tsx`
-- `apps/ava-softphone-mobile/src/screens/TeamChatScreen.tsx`
-- `supabase/functions/org-chat/index.ts`
-- Any recording files that incorrectly select `pbx_call_recordings.ai_summary`
-- A migration only if grants or a compatibility column/view repair is required
-
-## Protected files
-
-I will not modify:
-- `vite.config.ts`
-- `electron-builder.yml`
-- `.github/workflows/`
+5. Validation
+   - Vérifier par requêtes backend les données attendues: enregistrements domaine, 18 extensions, messages general existants.
+   - Mettre à jour/ajouter les tests de non-régression light mode pour couvrir les hooks ajoutés et éviter le retour de texte illisible.

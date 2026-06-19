@@ -29,6 +29,7 @@ export default function RecordingsScreen() {
   const [extFilter, setExtFilter] = useState<string>('all');
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [myExt, setMyExt] = useState<string | null>(null);
+  const [domainExtensions, setDomainExtensions] = useState<string[]>([]);
   const objectUrls = useRef<Set<string>>(new Set());
 
   // Resolve admin role + own extension once
@@ -40,6 +41,15 @@ export default function RecordingsScreen() {
       if (!m?.permissions?.admin && m?.extension?.number) setExtFilter(m.extension.number);
     }).catch(() => { setIsAdmin(false); });
   }, [mobile.accessToken]);
+
+  // Load every extension in the PBX domain so the filter dropdown lists them all
+  // (not just the ones already present in the last 100 recordings).
+  useEffect(() => {
+    if (!mobile.accessToken || !mobile.domainUuid || !isAdmin) return;
+    restGet<{ extension: string }[]>(`/rest/v1/pbx_extensions_directory?select=extension&domain_uuid=eq.${encodeURIComponent(mobile.domainUuid)}&enabled=eq.true&order=extension.asc`, mobile.accessToken)
+      .then((rows) => setDomainExtensions((rows || []).map((r) => String(r.extension)).filter(Boolean)))
+      .catch(() => setDomainExtensions([]));
+  }, [mobile.accessToken, mobile.domainUuid, isAdmin]);
 
   const load = useCallback(async () => {
     if (!mobile.accessToken || !mobile.domainUuid) return;
@@ -114,16 +124,16 @@ export default function RecordingsScreen() {
     <div style={{ height: '100%', overflowY: 'auto', padding: '14px 14px 20px' }}>
       <SectionTitle eyebrow={mobile.sipDomain || 'AI transcribed'} title="Call recordings" />
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '0 2px 10px' }}>
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, padding: '8px 10px', borderRadius: 12, background: 'rgba(255,255,255,0.7)', border: `1px solid ${colors.border}` }}><Search size={14} color={colors.mutedSilver} /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search recordings…" style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 13, color: colors.textIce }} /></div>
-        <button onClick={() => load().catch((e) => setError(e?.message || 'Refresh failed'))} disabled={mobile.loading} style={{ padding: '8px 12px', borderRadius: 999, border: `1px solid ${colors.border}`, background: 'rgba(255,255,255,0.7)', color: colors.lemtelBlue, fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>{mobile.loading ? '…' : '↻'}</button>
+        <div data-search-bar="true" style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, padding: '8px 10px', borderRadius: 12, background: 'rgba(255,255,255,0.06)', border: `1px solid ${colors.border}` }}><Search size={14} color={colors.mutedSilver} /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search recordings…" style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 13, color: colors.textIce }} /></div>
+        <button onClick={() => load().catch((e) => setError(e?.message || 'Refresh failed'))} disabled={mobile.loading} style={{ padding: '8px 12px', borderRadius: 999, border: `1px solid ${colors.border}`, background: 'rgba(255,255,255,0.06)', color: colors.lemtelBlue, fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>{mobile.loading ? '…' : '↻'}</button>
       </div>
       {isAdmin && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '0 2px 10px' }}>
           <label style={{ fontSize: font.xs, color: colors.mutedSilver, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>Extension</label>
-          <select value={extFilter} onChange={(e) => setExtFilter(e.target.value)} style={{ flex: 1, padding: '7px 10px', borderRadius: 10, border: `1px solid ${colors.border}`, background: 'rgba(255,255,255,0.7)', color: colors.textIce, fontSize: 12, fontWeight: 700 }}>
+          <select value={extFilter} onChange={(e) => setExtFilter(e.target.value)} style={{ flex: 1, padding: '7px 10px', borderRadius: 10, border: `1px solid ${colors.border}`, background: 'rgba(255,255,255,0.06)', color: colors.textIce, fontSize: 12, fontWeight: 700 }}>
             <option value="all">All extensions</option>
             {myExt && <option value={myExt}>Mine ({myExt})</option>}
-            {Array.from(new Set((data || []).map((r) => r.extension).filter(Boolean) as string[])).sort().filter((e) => e !== myExt).map((e) => <option key={e} value={e}>{e}</option>)}
+            {Array.from(new Set([...domainExtensions, ...((data || []).map((r) => r.extension).filter(Boolean) as string[])])).sort().filter((e) => e !== myExt).map((e) => <option key={e} value={e}>{e}</option>)}
           </select>
         </div>
       )}
