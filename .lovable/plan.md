@@ -1,39 +1,99 @@
-## Goal
-Add per-recording AI (transcription + summary + coaching) on the mobile Recordings screen, and make sure the extension filter is visible on both Recordings and Call History.
+# AVA Assistant — Agentic Chatbot
 
-## 1. Recordings screen — AI transcription, coaching, notes, summary
+A single AI assistant available in Web, Desktop, and Mobile that can read PBX data, analyze recordings, run reports, and take actions (with confirmation) across the caller's PBX domain.
 
-File: `apps/ava-softphone-mobile/src/screens/RecordingsScreen.tsx`
+## Architecture
 
-- Each recording row becomes expandable. Tapping reveals an inline panel with:
-  - ▶ Audio player (already loads via `fusionpbx-proxy`).
-  - "Transcribe with AI" button (only if no transcript yet) → calls existing `mobileApi.transcribeCall(id, meta)` (backed by edge function `ai-transcribe-call`, Lovable AI `openai/gpt-4o-mini-transcribe`).
-  - Once transcript exists, auto-trigger `mobileApi.analyzeCall(id)` (backed by `ai-analyze-call`, Lovable AI `google/gemini-3-flash-preview`) to produce: summary, coaching score, coaching notes, action items, sentiment, topics.
-  - Render: summary paragraph, coaching score chip, coaching notes list, action items, full transcript (collapsible).
-- Status pills: "Transcribing…", "Analyzing…", "AI ready", error banner with retry.
-- Cache results: read `transcript`/`summary`/`coachingScore`/`coachingNotes` from `mobileApi.callDetail(id)` first; only run AI if missing. Same pattern already used in `CallDetailScreen.tsx` — extract a shared `useCallAi(callId, meta)` hook in `apps/ava-softphone-mobile/src/hooks/useCallAi.ts` and reuse it in both screens to avoid duplication.
+```text
+[Web /  Desktop / Mobile chat UI]
+          │  POST {messages, threadId}
+          ▼
+supabase/functions/ava-assistant   ← new edge function (verify JWT in code)
+  ├─ AI SDK streamText + Lovable AI Gateway (google/gemini-3-flash-preview)
+  ├─ Tools (Zod) → call existing edge functions + service-role queries
+  │    • read_calls / read_recordings / read_voicemails
+  │    • read_sms_threads / read_contacts / read_presence / read_extensions
+  │    • analyze_recording (transcript + summary)
+  │    • run_report  (volume, missed, talk-time, per-extension)
+  │    • send_sms     (needsApproval)
+  │    • click_to_call(needsApproval)
+  │    • blind_transfer(needsApproval)
+  │    • play_voicemail(returns signed URL)
+  └─ stopWhen: stepCountIs(50)
+          │
+          ▼
+[ava_chat_threads / ava_chat_messages] (per-user persistence)
+```
 
-## 2. Extension filter — Recordings
+Backend boundary stays in the edge function. `LOVABLE_API_KEY` and service-role calls never leave the server.
 
-File: `apps/ava-softphone-mobile/src/screens/RecordingsScreen.tsx`
+## Tools (server-side)
 
-- Filter is currently shown only when `isAdmin === true`. It is not appearing because:
-  - `isAdmin` is passed in from `CallsScreen` and resolves to `false` for non-admin users — by design end-users only see their own extension.
-- Confirm behaviour with admin user. If the admin still sees no filter, the cause is `domainUuid` missing on `creds` — add a fallback that derives `domain_uuid` from `mobileApi.me()` and refetches `pbx_extensions_directory`. Also surface "Loading extensions…" / "No other extensions" hints so the dropdown is never silently empty.
+| Tool | Action | Confirm |
+|---|---|---|
+| `read_calls` | pbx_call_records filtered by domain + range + extension | no |
+| `read_recordings` | pbx_call_records where has_recording, with transcript flags | no |
+| `analyze_recording` | fetch transcript + ai_summary; if missing, enqueue ai_job | no |
+| `read_voicemails` | pbx_voicemails, mark read on request | no |
+| `read_sms_threads` / `read_sms_messages` | pbx_sms_threads / pbx_sms_messages | no |
+| `read_contacts` | org_contacts (domain scope) | no |
+| `read_presence` | user_presence + pbx_softphone_users | no |
+| `read_extensions` | pbx_extensions_directory (domain scope) | no |
+| `run_report` | aggregate calls/missed/talk/handle by extension or day | no |
+| `send_sms` | proxies `pbx-sms-send` | **yes** |
+| `click_to_call` | proxies `pbx-click-to-call` | **yes** |
+| `blind_transfer` | proxies `pbx-call-transfer` | **yes** |
+| `get_voicemail_url` | signed URL from `softphone-recording-url` | no |
 
-## 3. Extension filter — Call History
+All tools scope by `domain_uuid` resolved from `pbx_softphone_users` for `auth.uid()`.
 
-File: `apps/ava-softphone-mobile/src/screens/CallsScreen.tsx`
+## Chat persistence
 
-- Filter already renders for admins (lines 184–193). Apply the same `domainUuid` fallback so it never disappears for admins whose creds lack `domainUuid`.
-- Keep end-user scoping (own extension only) — that is a security requirement.
+New tables (one conversation per user, but with history):
+- `ava_chat_threads(id, user_id, title, created_at, updated_at)`
+- `ava_chat_messages(id, thread_id, role, parts jsonb, created_at)`
 
-## 4. No backend changes required
-- `ai-transcribe-call` and `ai-analyze-call` already exist and are wired through `mobileApi`.
-- No DB migration, no new edge function.
+RLS: user can read/write own threads only. GRANTs to `authenticated` + `service_role`.
 
-## Files touched
-- `apps/ava-softphone-mobile/src/hooks/useCallAi.ts` (new)
-- `apps/ava-softphone-mobile/src/screens/RecordingsScreen.tsx`
-- `apps/ava-softphone-mobile/src/screens/CallsScreen.tsx`
-- `apps/ava-softphone-mobile/src/screens/CallDetailScreen.tsx` (refactor to use the new hook)
+## Frontend
+
+Shared component `src/components/ava/AvaAssistant.tsx` (web), reused via thin wrappers:
+- Desktop: `apps/ava-softphone-desktop/src/components/AvaAssistant.tsx`
+- Mobile: `apps/ava-softphone-mobile/src/screens/AssistantScreen.tsx`
+
+Uses `@ai-sdk/react` `useChat` with `DefaultChatTransport` pointed at `${SUPABASE_URL}/functions/v1/ava-assistant`. Renders `message.parts` with `react-markdown`. Tool calls render as small cards; mutating tools show a Confirm/Cancel button before execution (`needsApproval` via AI SDK pattern).
+
+Entry points:
+- Web: floating button in `MyAppShell` → drawer.
+- Desktop: new sidebar item "Assistant".
+- Mobile: new bottom-tab "Assistant".
+
+## Technical details
+
+- Edge function: `supabase/functions/ava-assistant/index.ts` using `npm:ai` + `@ai-sdk/openai-compatible` via shared `_shared/ai-gateway.ts`.
+- JWT validated in code with `getClaims()`; resolve `domain_uuid` once per request.
+- Tool inputs validated with `zod`; results compact JSON, capped to 50 rows.
+- `stopWhen: stepCountIs(50)`.
+- Confirmation: assistant calls mutating tool with `needsApproval`; UI surfaces approval card before the tool `execute` runs.
+- Reports computed in SQL via `read_query`-style helpers (date_trunc, count, sum duration_seconds).
+
+## Files
+
+New:
+- `supabase/functions/ava-assistant/index.ts`
+- `supabase/functions/_shared/ai-gateway.ts` (if absent)
+- `supabase/migrations/<ts>_ava_assistant.sql` (tables, grants, RLS)
+- `src/components/ava/AvaAssistant.tsx`, `useAvaChat.ts`, `ToolCallCard.tsx`
+- `apps/ava-softphone-desktop/src/components/AvaAssistant.tsx`
+- `apps/ava-softphone-mobile/src/screens/AssistantScreen.tsx`
+
+Edited:
+- `src/components/my/MyAppShell.tsx` (floating button)
+- Desktop sidebar + router
+- Mobile tab navigator
+
+## Out of scope
+
+- Cross-domain access (always domain-scoped).
+- Background/scheduled agent runs.
+- Voice input/output (text chat only for v1).
