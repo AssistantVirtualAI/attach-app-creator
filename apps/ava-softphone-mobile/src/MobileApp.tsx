@@ -88,6 +88,7 @@ function AuthenticatedShell({
 
   const [permsGateDone, setPermsGateDone] = useState<boolean | null>(isPreviewMode ? true : null);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [freshCredentialToken, setFreshCredentialToken] = useState('');
   const passwordHealRef = useRef('');
   const hydratedTokenRef = useRef('');
 
@@ -117,8 +118,9 @@ function AuthenticatedShell({
   const wssUrls = Array.from(new Set([WORKING_WSS, WORKING_WSS_FALLBACK, ...((creds as any).wssUrls || [])]
     .filter((u) => /^wss:\/\/(node\.lemtelcloud\.net|pbxnode\.lemtel\.tel):7443$/i.test(String(u)))));
   const sipDomain = creds.sipDomain || 'lemtel.lemtel.tel';
+  const credentialsReady = !creds.accessToken || freshCredentialToken === creds.accessToken;
 
-  const sipConfig = creds.extension && sipPassword
+  const sipConfig = credentialsReady && creds.extension && sipPassword
     ? {
         extension: creds.extension,
         displayName: creds.displayName || creds.email || 'User',
@@ -144,7 +146,7 @@ function AuthenticatedShell({
     const key = `${creds.userId || creds.email}:${creds.extension}:${softphone.sipError}`;
     if (passwordHealRef.current === key) return;
     passwordHealRef.current = key;
-      edgeCall('softphone-sync-password', creds.accessToken, { force_local_to_pbx: false })
+    edgeCall('softphone-sync-password', creds.accessToken, { force_local_to_pbx: false })
       .then(() => hydrateSoftphoneCredentials('mobile'))
       .then((next) => { if (next) setCreds(next); })
       .catch((e) => console.warn('[SIP] password auto-sync failed', e?.message || e));
@@ -215,6 +217,7 @@ function AuthenticatedShell({
       hydrateSoftphoneCredentials('mobile').then((next) => {
         if (next) setCreds(next);
         else if (!creds.organizationId) ensureStoredOrganizationId().catch(() => {});
+        setFreshCredentialToken(creds.accessToken || '');
       }).catch(() => {});
     }
   }, [creds]);
