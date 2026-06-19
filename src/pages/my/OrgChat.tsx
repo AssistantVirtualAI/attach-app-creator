@@ -105,6 +105,51 @@ export default function OrgChat() {
         )}
       </div>
       <DirectoryPanel members={directoryQ.data?.members ?? []} loading={directoryQ.isLoading} onOpenDm={openDm} t={t} />
+
+      <Dialog open={!!unlinked} onOpenChange={(o) => !o && setUnlinked(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="h-5 w-5 text-primary" />
+              {t("Teammate not on portal yet", "Coéquipier pas encore sur le portail")}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="rounded-md border bg-muted/40 p-3">
+              <div className="text-sm font-medium">{unlinked?.full_name || (unlinked?.extension ? `Ext ${unlinked.extension}` : "—")}</div>
+              {unlinked?.extension && (
+                <div className="text-xs text-muted-foreground font-mono mt-0.5">Ext {unlinked.extension}</div>
+              )}
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {t(
+                "This extension exists in the PBX but the user hasn't activated their portal account, so direct messages are unavailable. You can still reach them by phone, or invite them to join.",
+                "Cette extension existe dans le PBX mais l'utilisateur n'a pas activé son compte portail, la messagerie directe est donc indisponible. Vous pouvez l'appeler ou l'inviter à rejoindre.",
+              )}
+            </p>
+          </div>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            {unlinked?.extension && (
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent("lemtel:start-call", { detail: { to: unlinked.extension } }));
+                  toast.success(t("Calling extension", "Appel de l'extension") + ` ${unlinked.extension}`);
+                  setUnlinked(null);
+                }}
+              >
+                <Phone className="h-4 w-4" /> {t("Call extension", "Appeler l'extension")}
+              </Button>
+            )}
+            <Button asChild className="gap-2" onClick={() => setUnlinked(null)}>
+              <Link to="/telephony/team">
+                <Mail className="h-4 w-4" /> {t("Invite to portal", "Inviter au portail")}
+              </Link>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
