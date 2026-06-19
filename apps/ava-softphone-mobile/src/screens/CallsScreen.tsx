@@ -19,6 +19,8 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
   const [selected, setSelected] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'missed'>('all');
   const [extFilter, setExtFilter] = useState<string>('all');
+  const [search, setSearch] = useState('');
+  const [rangeDays, setRangeDays] = useState<7 | 30>(7);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [myExt, setMyExt] = useState<string | null>(null);
   const [domainExtensions, setDomainExtensions] = useState<string[]>([]);
@@ -30,7 +32,7 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
 
   // Real-time CDR via Supabase Realtime (postgres_changes) with automatic
   // 15s polling fallback + visible warning if the realtime channel fails.
-  const { calls, transport, warning, dismissWarning } = useRealtimeCDR(creds || null);
+  const { calls, transport, warning, dismissWarning } = useRealtimeCDR(creds || null, rangeDays);
 
   // Resolve admin + own extension to scope/filter the History list.
   useEffect(() => {
@@ -64,6 +66,10 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
     if (!statusOk) return false;
     if (isAdmin === false && myExt) return matchExt(c, myExt);
     if (isAdmin && extFilter !== 'all') return matchExt(c, extFilter);
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      return [c.customer, c.from, c.to, c.extension, c.status, c.direction].filter(Boolean).join(' ').toLowerCase().includes(q);
+    }
     return true;
   });
 
@@ -165,7 +171,7 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
 
       {sub === 'recordings' && (
         <div style={{ marginTop: 6 }}>
-          <RecordingsScreen creds={creds || null} isAdmin={!!isAdmin} myExtension={myExt} />
+          <RecordingsScreen creds={creds || null} isAdmin={!!isAdmin} myExtension={myExt} rangeDays={rangeDays} onRangeDaysChange={setRangeDays} />
         </div>
       )}
 
@@ -196,6 +202,11 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
           {isAdmin === false && myExt && (
             <div style={{ fontSize: font.xs, color: colors.mutedSilver, margin: '0 2px 10px' }}>Showing your extension {myExt} only.</div>
           )}
+
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', margin: '0 2px 10px' }}>
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name, number, extension…" style={{ flex: 1, minWidth: 0, padding: '8px 10px', borderRadius: 10, border: `1px solid ${colors.border}`, background: 'rgba(255,255,255,0.06)', color: colors.textIce, fontSize: 12, outline: 'none' }} />
+            {([7, 30] as const).map((d) => <button key={d} onClick={() => setRangeDays(d)} style={{ padding: '7px 9px', borderRadius: 10, border: `1px solid ${rangeDays === d ? colors.borderGold : colors.border}`, background: rangeDays === d ? colors.signalGold + '1a' : 'rgba(255,255,255,0.04)', color: rangeDays === d ? colors.signalGold : colors.mutedSilver, fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>{d}d</button>)}
+          </div>
 
 
           {!calls && <ListSkeleton rows={6} />}
