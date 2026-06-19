@@ -164,6 +164,9 @@ export interface DomainStats {
   answerRate?: number;
   peakHour?: number | null;
   buckets?: number[];
+  outboundCalls?: number;
+  dialFailedCount?: number;
+  dialSuccessRate?: number;
 }
 
 export interface ChatReply { answer: string }
