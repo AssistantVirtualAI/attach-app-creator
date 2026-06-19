@@ -255,12 +255,42 @@ export default function ProfileSheet({
 
         {/* Account */}
         <SectionLabel>Account</SectionLabel>
-        <button onClick={requestPasswordChange} disabled={pwBusy} style={rowBtn}>
+        <button onClick={() => { setPwOpen((v) => !v); setPwMsg(null); }} style={rowBtn}>
           <KeyRound size={18} />
-          <span style={{ flex: 1, textAlign: 'left' }}>{pwBusy ? 'Sending…' : 'Change password'}</span>
+          <span style={{ flex: 1, textAlign: 'left' }}>Change password</span>
+          <span style={{ fontSize: 11, color: colors.mutedSilver }}>{pwOpen ? '▲' : '▼'}</span>
         </button>
-        {pwMsg && <div style={{ fontSize: 11, color: colors.mutedSilver, padding: '4px 4px 0' }}>{pwMsg}</div>}
-        <button onClick={onSignOut} style={{ ...rowBtn, color: '#ef4444', marginTop: 6 }}>
+        {pwOpen && (
+          <div style={{
+            display: 'flex', flexDirection: 'column', gap: 8,
+            padding: 12, marginTop: 6, borderRadius: radius.lg,
+            background: 'rgba(255,255,255,0.04)', border: `1px solid ${colors.border}`,
+          }}>
+            <input type="password" placeholder="New password (min 8 characters)"
+              value={pwNew} onChange={(e) => setPwNew(e.target.value)} style={pwInput} />
+            <input type="password" placeholder="Confirm new password"
+              value={pwConfirm} onChange={(e) => setPwConfirm(e.target.value)} style={pwInput} />
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button onClick={updatePassword} disabled={pwBusy || !pwNew || !pwConfirm}
+                style={{
+                  flex: 1, padding: '10px 12px', borderRadius: radius.md, border: 'none',
+                  background: gradients.call, color: '#fff', fontSize: 13, fontWeight: 800,
+                  cursor: pwBusy ? 'default' : 'pointer', opacity: pwBusy ? 0.7 : 1,
+                }}>{pwBusy ? 'Updating…' : 'Update password'}</button>
+              <button onClick={sendResetEmail} disabled={pwBusy} style={{
+                padding: '10px 12px', borderRadius: radius.md,
+                background: 'transparent', border: `1px solid ${colors.border}`,
+                color: colors.textIce, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              }}>Email link</button>
+            </div>
+            {pwMsg && (
+              <div style={{ fontSize: 11, color: pwError ? '#ef4444' : '#22c55e', padding: '2px 2px 0' }}>
+                {pwMsg}
+              </div>
+            )}
+          </div>
+        )}
+        <button onClick={onSignOut} style={{ ...rowBtn, color: '#ef4444', marginTop: 8 }}>
           <LogOut size={18} />
           <span style={{ flex: 1, textAlign: 'left' }}>Sign out</span>
         </button>
