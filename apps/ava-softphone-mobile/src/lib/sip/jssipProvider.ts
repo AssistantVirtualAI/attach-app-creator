@@ -138,10 +138,16 @@ export function classifySipFailure(input: {
   const reason = (input.reason_phrase || '').toLowerCase();
   const cause = (input.cause || input.message || '').toLowerCase();
 
+  if (code === 401 || /401|unauthorized/.test(reason) || /401|unauthorized/.test(cause)) {
+    return 'Wrong SIP password';
+  }
+  if (code === 403 || /403|forbidden/.test(reason) || /403|forbidden/.test(cause)) {
+    return 'Extension not authorized';
+  }
   if (code === 488 || /not acceptable/.test(reason)) {
     return 'Codec rejected by PBX (488). Workaround active — contact your PBX admin.';
   }
-  if (code === 401 || code === 403 || code === 407 || /auth/.test(reason) || /unauthor/.test(cause)) {
+  if (code === 407 || /auth/.test(reason) || /unauthor/.test(cause)) {
     return 'Authentication failed — check the SIP extension and password.';
   }
   if (code === 404 || /not found/.test(reason)) {
@@ -151,7 +157,7 @@ export function classifySipFailure(input: {
     return 'Busy — the remote party rejected the call.';
   }
   if (code === 408 || /timeout/.test(reason) || /request timeout/.test(cause) || /registration timeout/.test(cause)) {
-    return 'Registration timeout — PBX did not respond. Check network/firewall.';
+    return 'Phone server not responding';
   }
   if (/dns/.test(cause)) {
     return 'DNS resolution failed — SIP domain not reachable.';
@@ -160,7 +166,7 @@ export function classifySipFailure(input: {
     return 'SSL certificate rejected by the browser — the WSS endpoint is using a self-signed or untrusted certificate. Ask your administrator to install a valid CA-signed certificate on port 7443.';
   }
   if (/connection|websocket|network|transport/.test(cause)) {
-    return 'WSS connection failed — check network/firewall (port 7443). If this persists, the SIP server may be presenting an invalid SSL certificate.';
+    return 'Cannot reach phone server';
   }
   if (code && code >= 400 && code < 700) {
     return `Call rejected (${code} ${input.reason_phrase || ''}).`.trim();
@@ -170,13 +176,10 @@ export function classifySipFailure(input: {
 
 /** Build the list of WSS URLs to try, primary first. Only confirmed-working endpoints. */
 export function buildWssFallbackList(config: SIPConfig): string[] {
-  const list = [
-    config.wssUrl,
-    ...(config.wssUrls || []),
-    'wss://node.lemtelcloud.net:7443', // confirmed OK
-    'wss://pbxnode.lemtel.tel:7443',   // confirmed OK
+  return [
+    'wss://node.lemtelcloud.net:7443',
+    'wss://pbxnode.lemtel.tel:7443',
   ];
-  return Array.from(new Set(list.filter(Boolean)));
 }
 
 export async function createSIPUA(config: SIPConfig, timeoutMs = 8000) {
@@ -197,6 +200,7 @@ export async function createSIPUA(config: SIPConfig, timeoutMs = 8000) {
     register_expires: 300,
     connection_recovery_min_interval: 2,
     connection_recovery_max_interval: 30,
+    no_answer_timeout: 60,
     use_preloaded_route: false,
     user_agent: 'Lemtel-Softphone-Mobile/2.3.5',
     hackWssInTransport: true,
