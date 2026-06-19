@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { createSIPUA, JsSIPUnavailableError, SIPConfig, sdpModifier, classifySipFailure } from '../lib/sip/jssipProvider';
 
-export type SIPStatus = 'idle' | 'connecting' | 'registered' | 'error';
+export type SIPStatus = 'idle' | 'connecting' | 'registered' | 'retrying' | 'error';
 export type CallState = 'idle' | 'ringing' | 'active' | 'ended';
 
 export interface UseSoftphoneReturn {
@@ -136,6 +136,9 @@ export function useSoftphone(
       const delay = RETRY_DELAYS_MS[Math.min(attempt, RETRY_DELAYS_MS.length - 1)];
       retryAttemptRef.current = attempt + 1;
       clearRetry();
+      // Surface the back-off visibly so the UI can render "Retrying…"
+      // for the entire 5 s / 15 s window instead of frozen on "error".
+      setSipStatus('retrying');
       retryTimerRef.current = setTimeout(() => {
         if (cancelled) return;
         console.log(`[AVA SIP] Retrying registration (attempt ${attempt + 1})…`);

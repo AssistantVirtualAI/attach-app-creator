@@ -32,7 +32,7 @@ describe('build smoke', () => {
       ),
     );
     expect(result.current.sipStatus).toBe('connecting');
-    await waitFor(() => expect(result.current.sipStatus).toBe('error'), { timeout: 1500 });
+    await waitFor(() => expect(result.current.sipStatus).toBe('retrying'), { timeout: 1500 });
     expect(result.current.sipError).toMatch(/library failed to load/i);
   });
 });

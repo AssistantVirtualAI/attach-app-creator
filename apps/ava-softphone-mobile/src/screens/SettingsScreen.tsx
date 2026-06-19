@@ -29,8 +29,12 @@ export default function SettingsScreen({
     setForwarding(next); try { await mobileApi.setForwarding(next); } catch {}
   };
 
-  const sipState: 'registered' | 'connecting' | 'offline' =
-    sp?.snap?.status === 'registered' ? 'registered' : sp?.snap?.status === 'connecting' ? 'connecting' : 'offline';
+  const s = sp?.snap?.status;
+  const sipState: 'registered' | 'connecting' | 'retrying' | 'offline' =
+    s === 'registered' ? 'registered' :
+    s === 'retrying'   ? 'retrying' :
+    s === 'connecting' ? 'connecting' :
+                         'offline';
 
   return (
     <div style={{ height: '100%', overflowY: 'auto', padding: '14px 14px 20px' }}>
