@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { SyncEvent } from './useRealtimeSync';
+import type { SyncEvent, SyncLogEntry } from './useRealtimeSync';
 import { sipProvider, type SipStatus } from '../lib/sip/jssipProvider';
 
 export type PbxStatus = Extract<SipStatus, 'registered' | 'connecting' | 'connected' | 'disconnected' | 'error'>;
@@ -11,6 +11,10 @@ export function useSyncStatus() {
   });
   const [syncConnected, setSyncConnected] = useState(false);
   const [lastEvent, setLastEvent] = useState<SyncEvent | null>(null);
+  const [lastSyncAt, setLastSyncAt] = useState<number | null>(null);
+  const [nextRetryAt, setNextRetryAt] = useState<number | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  const [log, setLog] = useState<SyncLogEntry[]>([]);
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
@@ -20,18 +24,30 @@ export function useSyncStatus() {
     };
     const onSyncStatus = (e: Event) => {
       const d = (e as CustomEvent).detail;
-      if (d && typeof d.connected === 'boolean') setSyncConnected(d.connected);
+      if (d && typeof d.connected === 'boolean') {
+        setSyncConnected(d.connected);
+        setLastSyncAt(d.connected ? d.at || Date.now() : (prev) => prev);
+        setNextRetryAt(d.nextRetryAt ?? null);
+        setAttempt(Number(d.attempt || 0));
+      }
     };
-    const onSync = (e: Event) => setLastEvent((e as CustomEvent).detail as SyncEvent);
+    const onSync = (e: Event) => {
+      const evt = (e as CustomEvent).detail as SyncEvent;
+      setLastEvent(evt);
+      setLastSyncAt(evt.at);
+    };
+    const onSyncLog = (e: Event) => setLog((cur) => [((e as CustomEvent).detail as SyncLogEntry), ...cur].slice(0, 40));
     window.addEventListener('lemtel:sip-status', onSip as EventListener);
     window.addEventListener('lemtel:sync-status', onSyncStatus as EventListener);
     window.addEventListener('lemtel:sync', onSync as EventListener);
+    window.addEventListener('lemtel:sync-log', onSyncLog as EventListener);
 
     const id = window.setInterval(() => setTick((t) => t + 1), 15_000);
     return () => {
       window.removeEventListener('lemtel:sip-status', onSip as EventListener);
       window.removeEventListener('lemtel:sync-status', onSyncStatus as EventListener);
       window.removeEventListener('lemtel:sync', onSync as EventListener);
+      window.removeEventListener('lemtel:sync-log', onSyncLog as EventListener);
       window.clearInterval(id);
     };
   }, []);
@@ -42,7 +58,7 @@ export function useSyncStatus() {
   // tick used so age label re-renders
   void tick;
 
-  return { pbx, syncConnected, lastEvent, ageMs, fresh, healthy };
+  return { pbx, syncConnected, lastEvent, lastSyncAt, nextRetryAt, attempt, log, ageMs, fresh, healthy };
 }
 
 export function formatAge(ms: number | null): string {
