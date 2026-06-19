@@ -149,6 +149,7 @@ export function useExtensionDataSync(
         if ((data as any)?.error) throw new Error(String((data as any).error));
         return data;
       }).then((res) => {
+        if (res.ok && !cancelled) reportSuccess(orgId, extension, action);
         if (!res.ok && !cancelled) reportFailure(orgId, extension, action, res.error);
         return res;
       });
