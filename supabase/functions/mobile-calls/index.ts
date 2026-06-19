@@ -55,11 +55,13 @@ Deno.serve(async (req) => {
       const { data: r } = await detailQ.maybeSingle();
       if (!r) return json({ error: "not_found" }, 404);
 
-      const [{ data: tr }, { data: ins }] = await Promise.all([
+      const [{ data: tr }, { data: ins }, { data: audit }] = await Promise.all([
         sb.from("pbx_call_transcripts").select("transcript_json, transcript_text")
           .eq("call_record_id", id).maybeSingle(),
-        sb.from("pbx_ai_insights").select("summary, topics, action_items, quality_score, intent, tags, sentiment")
+        sb.from("pbx_ai_insights").select("summary, topics, action_items, quality_score, coaching_score, coaching_notes, intent, tags, sentiment, ai_model, created_at")
           .eq("call_record_id", id).maybeSingle(),
+        sb.from("ai_request_audit_log").select("status, error_code, message, created_at")
+          .eq("call_record_id", id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
       ]);
 
       let transcript: any[] = [];
@@ -81,6 +83,13 @@ Deno.serve(async (req) => {
         topics: (ins as any)?.topics || [],
         actionItems: (ins as any)?.action_items || [],
         qualityScore: (ins as any)?.quality_score ?? 0,
+        coachingScore: (ins as any)?.coaching_score ?? null,
+        coachingNotes: (ins as any)?.coaching_notes || [],
+        aiStatus: (ins as any)?.ai_model && !String((ins as any).ai_model).startsWith("stub") && (tr as any)?.transcript_text ? "cached"
+          : (audit as any)?.status === "error" || (audit as any)?.status === "ai-error" ? "failed"
+          : "missing",
+        aiError: (audit as any)?.status === "error" || (audit as any)?.status === "ai-error" ? ((audit as any)?.message || (audit as any)?.error_code || "AI analysis failed") : null,
+        aiCached: !!((ins as any)?.ai_model && !String((ins as any).ai_model).startsWith("stub") && (tr as any)?.transcript_text),
         intent: (ins as any)?.intent || "",
         tags: (ins as any)?.tags || [],
       });
