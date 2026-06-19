@@ -100,7 +100,7 @@ Deno.serve(async (req) => {
     const domainUuid: string | null = spu?.domain_uuid ?? null;
     const sipDomain: string | null = spu?.sip_domain ?? null;
 
-    // Centralized audit writer
+    // Centralized audit writer — maps to telecom_admin_ai_actions schema
     const writeAudit = async (
       action: string,
       payload: any,
@@ -109,11 +109,15 @@ Deno.serve(async (req) => {
     ) => {
       try {
         await admin.from("telecom_admin_ai_actions").insert({
-          user_id: u.user.id,
-          action,
-          payload: { ...payload, _org: orgId, _ext: myExt, _rid: rid },
-          result,
-          status,
+          organization_id: orgId,
+          admin_user_id: u.user.id,
+          interpreted_action: action,
+          proposed_changes_json: { ...payload, _ext: myExt, _rid: rid },
+          execution_result_json: result,
+          execution_status: status,
+          confirmation_status: status === "denied" ? "denied" : "auto",
+          source: "ava-assistant",
+          executed_at: new Date().toISOString(),
         });
       } catch { /* never block on audit */ }
     };
