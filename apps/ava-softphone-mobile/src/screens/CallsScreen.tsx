@@ -6,12 +6,13 @@ import { Card, Chip, SectionTitle, Skeleton, EmptyState, PrimaryButton, GhostBut
 import CallDetailScreen from './CallDetailScreen';
 import Dialpad from '../components/Dialpad';
 import VoicemailScreen from './VoicemailScreen';
+import RecordingsScreen from './RecordingsScreen';
 import { useRealtimeCDR } from '../hooks/useRealtimeCDR';
 import type { Creds } from '../lib/creds';
 import { showMobileToast } from '../lib/mobileToast';
 import { restGet } from '../lib/mobileSupabase';
 
-type SubTab = 'recents' | 'voicemail' | 'dial';
+type SubTab = 'recents' | 'recordings' | 'voicemail' | 'dial';
 
 export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s?: ImpactStyle) => Promise<void>; creds?: Creds | null }) {
   const [sub, setSub] = useState<SubTab>('recents');
@@ -80,18 +81,24 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
     setDialError(null);
     const stamp = new Date().toISOString();
     try {
-      if (sp?.snap?.status === 'registered' && sp?.call) {
-        const ok = sp.call(to);
-        if (ok !== false) {
-          console.info('[AVA keypad] SIP call started', { to, sipStatus: sp?.snap?.status, stamp });
-          setDialDebug(`SIP call started · ${stamp}`);
-          return;
-        }
+      if (sp?.snap?.status !== 'registered' || !sp?.call) {
+        const msg = sp?.snap?.error || 'SIP not registered yet — tap Retry on the dialer to reconnect.';
+        setDialError(msg);
+        setDialDebug(JSON.stringify({ message: msg, sipStatus: sp?.snap?.status, stamp }));
+        showMobileToast(msg, 'error');
+        return;
       }
-      const res = await mobileApi.startCall(to, 'click_to_call');
-      console.info('[AVA keypad] click-to-call requested', { to, res, sipStatus: sp?.snap?.status, stamp });
-      setDialDebug(`Click-to-call OK · from ${res?.from || 'extension'} to ${res?.to || to}`);
-      showMobileToast('Deskphone call requested.', 'success');
+      const ok = sp.call(to);
+      if (ok === false) {
+        const msg = 'Unable to start call via SIP';
+        setDialError(msg);
+        showMobileToast(msg, 'error');
+        return;
+      }
+      console.info('[AVA keypad] SIP call started', { to, sipStatus: sp?.snap?.status, stamp });
+      setDialDebug(`SIP call started · ${stamp}`);
+      // Informational log only — no FusionPBX originate.
+      mobileApi.startCall(to, 'webrtc').catch(() => {});
     } catch (e: any) {
       const msg = e?.message || 'Unable to start call';
       const detail = { message: msg, status: e?.status, detail: e?.detail, path: e?.path, to, sipStatus: sp?.snap?.status, sipError: sp?.snap?.error, stamp };
@@ -144,13 +151,19 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
           )}
           {sp?.snap?.status !== 'registered' && (
             <Card style={{ marginTop: 14 }} accent="gold">
-              <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 1.4, color: colors.signalGold, textTransform: 'uppercase' }}>WebRTC unavailable</div>
+              <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 1.4, color: colors.signalGold, textTransform: 'uppercase' }}>SIP not registered</div>
               <p style={{ fontSize: font.sm, color: colors.mutedSilver, margin: '6px 0 10px', lineHeight: 1.5 }}>
-                Your SIP is not registered yet. You can still place a click-to-call request that rings your deskphone.
+                {sp?.snap?.error || 'The SIP client is still connecting. Tap retry to reconnect now.'}
               </p>
-              <PrimaryButton onClick={() => startCall(number)} disabled={!number || dialing}>{dialing ? 'Dialing…' : 'Click-to-call deskphone'}</PrimaryButton>
+              <PrimaryButton onClick={() => sp?.reconnect?.()}>Retry connection</PrimaryButton>
             </Card>
           )}
+        </div>
+      )}
+
+      {sub === 'recordings' && (
+        <div style={{ marginTop: 6 }}>
+          <RecordingsScreen creds={creds || null} isAdmin={!!isAdmin} myExtension={myExt} />
         </div>
       )}
 
@@ -201,6 +214,7 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
 function SegmentedControl({ value, onChange }: { value: SubTab; onChange: (v: SubTab) => void }) {
   const items: { id: SubTab; label: string }[] = [
     { id: 'recents', label: 'History' },
+    { id: 'recordings', label: 'Recordings' },
     { id: 'voicemail', label: 'Voicemail' },
     { id: 'dial', label: 'Keypad' },
   ];

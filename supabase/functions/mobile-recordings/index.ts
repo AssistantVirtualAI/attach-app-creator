@@ -1,4 +1,7 @@
-// mobile-recordings: list of calls that have recordings, with optional AI summary.
+// mobile-recordings: list of calls that have recordings.
+// - Admins (domain admins) see all recordings for the organization/domain.
+// - Regular users see only recordings tied to their own extension.
+// - Optional ?extension=NNN filter (admin-only).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const cors = {
@@ -18,39 +21,80 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
       { global: { headers: { Authorization: authHeader } } },
     );
+    const admin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
     const { data: u } = await sb.auth.getUser();
     if (!u?.user) return json({ error: "unauthorized" }, 401);
 
-    const { data: sp } = await sb.from("pbx_softphone_users")
-      .select("organization_id, domain_uuid").eq("portal_user_id", u.user.id).maybeSingle();
+    const { data: __mobileAllowed } = await sb.rpc("my_platform_access_allowed", { _platform: "mobile" });
+    if (__mobileAllowed === false) return json({ error: "MOBILE_ACCESS_DISABLED", message: "Mobile access not granted." }, 403);
+
+    const { data: sp } = await admin.from("pbx_softphone_users")
+      .select("organization_id, extension, domain_uuid")
+      .eq("portal_user_id", u.user.id).maybeSingle();
     if (!sp?.organization_id) return json({ items: [], noSoftphone: true });
 
-    let q = sb.from("pbx_call_records")
-      .select("id, pbx_uuid, caller_name, caller_number, destination_number, start_at, duration_seconds, transcribed, ai_summary, recording_path, recording_name, domain_uuid, domain_name, organization_id")
+    // Resolve admin status the same way mobile-calls does.
+    const [{ data: roleRow }, { data: orgMember }, { data: superAdmin }, { data: lemtelAdmin }] = await Promise.all([
+      admin.from("user_roles").select("role").eq("user_id", u.user.id).eq("organization_id", sp.organization_id).maybeSingle(),
+      admin.from("org_members").select("role, can_manage_extensions, can_listen_calls").eq("user_id", u.user.id).eq("org_id", sp.organization_id).maybeSingle(),
+      (async () => { try { return await admin.rpc("is_super_admin", { _user_id: u.user.id }).maybeSingle(); } catch { return { data: false } as any; } })(),
+      (async () => { try { return await admin.rpc("is_lemtel_admin", { _user_id: u.user.id }).maybeSingle(); } catch { return { data: false } as any; } })(),
+    ]);
+    const orgMemberRole = (orgMember as any)?.role || "";
+    const appRole = (roleRow as any)?.role || "agent";
+    const isDomainAdmin = !!superAdmin || !!lemtelAdmin
+      || ["master_admin", "ava_admin", "reseller_admin", "customer_admin"].includes(orgMemberRole)
+      || ["super_admin", "admin", "org_admin", "manager"].includes(appRole)
+      || !!(orgMember as any)?.can_manage_extensions
+      || !!(orgMember as any)?.can_listen_calls;
+
+    const url = new URL(req.url);
+    const extParam = url.searchParams.get("extension");
+    const ext = sp.extension;
+
+    let q = admin.from("pbx_call_records")
+      .select("id, pbx_uuid, caller_name, caller_number, destination_number, extension, start_at, duration_seconds, transcribed, ai_summary, recording_path, recording_name, recording_url, domain_uuid, domain_name, organization_id")
       .eq("organization_id", sp.organization_id)
       .eq("has_recording", true);
-    if (sp.domain_uuid) q = q.eq("domain_uuid", sp.domain_uuid);
-    const { data: rows } = await q.order("start_at", { ascending: false }).limit(100);
+
+    if (sp.domain_uuid) q = q.or(`domain_uuid.eq.${sp.domain_uuid},domain_uuid.is.null`);
+
+    if (!isDomainAdmin) {
+      // Hard-restrict to own extension.
+      if (!ext) return json([]);
+      q = q.or(`extension.eq.${ext},caller_number.eq.${ext},destination_number.eq.${ext}`);
+    } else if (extParam && extParam !== "all") {
+      // Admin filtering on a specific extension.
+      q = q.or(`extension.eq.${extParam},caller_number.eq.${extParam},destination_number.eq.${extParam}`);
+    }
+
+    const { data: rows, error } = await q.order("start_at", { ascending: false }).limit(200);
+    if (error) throw error;
 
     const out = (rows ?? []).map((r: any) => ({
       id: r.id,
       from: r.caller_number || "",
       to: r.destination_number || "",
+      extension: r.extension || undefined,
       customer: r.caller_name || undefined,
       startedAt: r.start_at,
       durationSec: Number(r.duration_seconds || 0),
       hasTranscript: !!r.transcribed,
       summary: r.ai_summary || undefined,
-      // Audio addressing for /fusionpbx-proxy get-recording-signed-url
       xml_cdr_uuid: r.pbx_uuid || r.id,
       record_path: r.recording_path || undefined,
       record_name: r.recording_name || undefined,
+      recording_url: r.recording_url || undefined,
       domain_uuid: r.domain_uuid || undefined,
       domain_name: r.domain_name || undefined,
       organization_id: r.organization_id || undefined,
     }));
     return json(out);
   } catch (e: any) {
-    return json({ error: e.message || "error" }, 500);
+    console.error("[mobile-recordings]", e);
+    return json({ error: e?.message || "error" }, 500);
   }
 });

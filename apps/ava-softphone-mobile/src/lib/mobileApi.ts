@@ -140,6 +140,23 @@ export interface VoicemailEntry {
   organization_id?: string;
 }
 
+export interface RecordingEntry {
+  id: string;
+  from: string;
+  to: string;
+  extension?: string;
+  customer?: string;
+  startedAt: string;
+  durationSec: number;
+  hasTranscript: boolean;
+  summary?: string;
+  xml_cdr_uuid?: string;
+  record_path?: string;
+  record_name?: string;
+  domain_uuid?: string;
+  domain_name?: string;
+  organization_id?: string;
+
 export interface QueueRow {
   id: string;
   name: string;
@@ -303,6 +320,18 @@ export const mobileApi = {
     return raw as CallRecord[];
   }),
   callDetail: (id: string) => call<CallDetail>(`/mobile-calls?id=${encodeURIComponent(id)}`, undefined, callDetailMock(id)),
+
+  // Recordings: list of completed calls with audio. Scoped server-side
+  // (admins see the whole domain, regular users only their extension).
+  recordings: (extension?: string) => call<RecordingEntry[] | any>(
+    `/mobile-recordings${extension && extension !== 'all' ? `?extension=${encodeURIComponent(extension)}` : ''}`,
+    undefined, [] as RecordingEntry[],
+  ).then((raw: any) => {
+    if (Array.isArray(raw)) return raw as RecordingEntry[];
+    if (Array.isArray(raw?.items)) return raw.items as RecordingEntry[];
+    throw new Error('Invalid response from mobile-recordings');
+  }),
+
 
   threads:    () => call<SmsThread[]>('/mobile-sms', undefined, threadsMock),
   thread:     (id: string) => call<SmsMessage[]>(`/mobile-sms?threadId=${encodeURIComponent(id)}`, undefined, messagesMock[id] || []),

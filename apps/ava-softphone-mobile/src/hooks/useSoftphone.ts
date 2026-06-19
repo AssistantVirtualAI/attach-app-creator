@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { createSIPUA, JsSIPUnavailableError, SIPConfig, sdpModifier, classifySipFailure } from '../lib/sip/jssipProvider';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { createSIPUA, JsSIPUnavailableError, SIPConfig, sdpModifier, classifySipFailure, hasWebRTC, WEBRTC_UNAVAILABLE_MESSAGE } from '../lib/sip/jssipProvider';
 
 export type SIPStatus = 'idle' | 'connecting' | 'registered' | 'retrying' | 'error';
 export type CallState = 'idle' | 'ringing' | 'active' | 'ended';
@@ -12,7 +12,7 @@ export interface UseSoftphoneReturn {
   isMuted: boolean;
   isOnHold: boolean;
   activeCallNumber: string;
-  call: (number: string) => void;
+  call: (number: string) => boolean | void;
   hangup: () => void;
   answer: () => void;
   mute: () => void;
@@ -21,6 +21,7 @@ export interface UseSoftphoneReturn {
   unhold: () => void;
   sendDTMF: (key: string) => void;
   setStatus: (status: string) => void;
+  reconnect: () => void;
 }
 
 export function useSoftphone(
@@ -41,9 +42,21 @@ export function useSoftphone(
 
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryAttemptRef = useRef(0);
+  const reconnectRef = useRef<() => void>(() => {});
+  const [reconnectTick, setReconnectTick] = useState(0);
+
+  // WebRTC capability check on mount — surfaces clear error immediately so
+  // UI doesn't sit on "connecting…" for ever.
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !hasWebRTC()) {
+      setSipStatus('error');
+      setSipError(WEBRTC_UNAVAILABLE_MESSAGE);
+    }
+  }, []);
 
   useEffect(() => {
     if (!config) return;
+    if (typeof window !== 'undefined' && !hasWebRTC()) return;
     let cancelled = false;
 
     const RETRY_DELAYS_MS = [5000, 15000];
@@ -148,6 +161,15 @@ export function useSoftphone(
       }, delay);
     };
 
+    reconnectRef.current = () => {
+      if (cancelled) return;
+      clearRetry();
+      retryAttemptRef.current = 0;
+      try { uaRef.current?.stop(); } catch {}
+      uaRef.current = null;
+      start();
+    };
+
     start();
 
     return () => {
@@ -157,8 +179,9 @@ export function useSoftphone(
       if (timerRef.current) clearInterval(timerRef.current);
       try { uaRef.current?.stop(); } catch {}
       uaRef.current = null;
+      reconnectRef.current = () => {};
     };
-  }, [config?.extension, config?.wssUrl, config?.domain, config?.password, opts.jsSipTimeoutMs]);
+  }, [config?.extension, config?.wssUrl, config?.domain, config?.password, opts.jsSipTimeoutMs, reconnectTick]);
 
   const call = (number: string) => {
     if (!uaRef.current || !config || sipStatus !== 'registered') return false;
@@ -210,9 +233,19 @@ export function useSoftphone(
   const sendDTMF = (key: string) =>
     sessionRef.current?.sendDTMF(key, { duration: 100, interToneGap: 70 });
   const setStatus = (status: string) => console.log('Status change:', status);
+  const reconnect = useCallback(() => {
+    setSipError('');
+    setSipStatus('connecting');
+    if (reconnectRef.current) {
+      reconnectRef.current();
+    }
+    // Always bump the tick so a fresh effect runs if the previous one
+    // was cancelled (e.g. WebRTC missing on first mount, then enabled).
+    setReconnectTick((t) => t + 1);
+  }, []);
 
   return {
     sipStatus, sipError, callState, callTimer, isMuted, isOnHold, activeCallNumber,
-    call, hangup, answer, mute, unmute, hold, unhold, sendDTMF, setStatus,
+    call, hangup, answer, mute, unmute, hold, unhold, sendDTMF, setStatus, reconnect,
   };
 }

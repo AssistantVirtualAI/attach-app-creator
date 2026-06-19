@@ -35,7 +35,7 @@ const cfg = {
   displayName: 'Test',
 };
 
-beforeEach(() => { delete (window as any).JsSIP; });
+beforeEach(() => { delete (window as any).JsSIP; if (!(window as any).RTCPeerConnection) (window as any).RTCPeerConnection = vi.fn(); });
 afterEach(() => { delete (window as any).JsSIP; });
 
 describe('SIP failure classification → UI message', () => {

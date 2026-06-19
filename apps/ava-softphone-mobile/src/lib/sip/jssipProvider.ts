@@ -23,7 +23,7 @@ export class JsSIPUnavailableError extends Error {
   }
 }
 
-function hasWebRTC(): boolean {
+export function hasWebRTC(): boolean {
   if (typeof window === 'undefined') return false;
   return !!(
     (window as any).RTCPeerConnection ||
@@ -31,6 +31,9 @@ function hasWebRTC(): boolean {
     (window as any).mozRTCPeerConnection
   );
 }
+
+export const WEBRTC_UNAVAILABLE_MESSAGE =
+  'WebRTC not supported in this browser. Open in Chrome or Safari, or use the native mobile app.';
 
 function bundledJsSIP() {
   const mod: any = JsSIPModule as any;
@@ -47,9 +50,7 @@ export function waitForJsSIP(timeoutMs = 8000, intervalMs = 100): Promise<any> {
       return;
     }
     if (!hasWebRTC()) {
-      reject(new JsSIPUnavailableError(
-        'WebRTC not supported in this browser. Open in Chrome or Safari, or use the native mobile app.'
-      ));
+      reject(new JsSIPUnavailableError(WEBRTC_UNAVAILABLE_MESSAGE));
       return;
     }
     if (window.JsSIP) {
@@ -154,8 +155,11 @@ export function classifySipFailure(input: {
   if (/dns/.test(cause)) {
     return 'DNS resolution failed — SIP domain not reachable.';
   }
+  if (/ssl|certificate|cert|tls|handshake/.test(cause)) {
+    return 'SSL certificate rejected by the browser — the WSS endpoint is using a self-signed or untrusted certificate. Ask your administrator to install a valid CA-signed certificate on port 7443.';
+  }
   if (/connection|websocket|network|transport/.test(cause)) {
-    return 'WSS connection failed — check network/firewall (port 7443).';
+    return 'WSS connection failed — check network/firewall (port 7443). If this persists, the SIP server may be presenting an invalid SSL certificate.';
   }
   if (code && code >= 400 && code < 700) {
     return `Call rejected (${code} ${input.reason_phrase || ''}).`.trim();
