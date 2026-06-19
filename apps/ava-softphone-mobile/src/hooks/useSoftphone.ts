@@ -109,12 +109,27 @@ export function useSoftphone(
   }, [config?.extension, config?.wssUrl, config?.domain, opts.jsSipTimeoutMs]);
 
   const call = (number: string) => {
-    if (!uaRef.current || !config) return;
+    if (!uaRef.current || !config || sipStatus !== 'registered') return false;
     setActiveCallNumber(number);
     setCallState('ringing');
-    uaRef.current.call(`sip:${number}@${config.domain}`, {
-      mediaConstraints: { audio: true, video: false },
-    });
+    try {
+      uaRef.current.call(`sip:${number}@${config.domain}`, {
+        mediaConstraints: { audio: true, video: false },
+        eventHandlers: {
+          failed: (e: any) => {
+            console.error('[AVA keypad] SIP call failed', e);
+            setSipError(e?.cause || 'SIP call failed');
+          },
+        },
+      });
+      return true;
+    } catch (err: any) {
+      console.error('[AVA keypad] SIP call exception', err);
+      setCallState('idle');
+      setActiveCallNumber('');
+      setSipError(err?.message || 'SIP call failed');
+      return false;
+    }
   };
   const hangup = () => {
     sessionRef.current?.terminate();

@@ -34,8 +34,13 @@ async function liveCall<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(`${portalUrl}/functions/v1${path}`, { ...init, headers });
   if (!res.ok) {
     let detail: any = null;
-    try { detail = await res.json(); } catch {}
-    throw new Error(detail?.error || `HTTP ${res.status} ${path}`);
+    let text = '';
+    try { detail = await res.json(); } catch { try { text = await res.text(); } catch {} }
+    const err = new Error(detail?.message || detail?.error || text || `HTTP ${res.status} ${path}`) as Error & { status?: number; detail?: any; path?: string };
+    err.status = res.status;
+    err.detail = detail || text;
+    err.path = path;
+    throw err;
   }
   return res.json() as Promise<T>;
 }
@@ -287,8 +292,8 @@ export const mobileApi = {
     { token: 'mock', expiresAt: new Date(Date.now() + 30*60e3).toISOString(), wssUrl: 'wss://lemtel.lemtel.tel:7443' },
   ),
 
-  startCall: (to: string) => call<{ callId: string; mode: 'webrtc' | 'click_to_call' }>(
-    '/mobile-calls-start', { method: 'POST', body: JSON.stringify({ to }) },
+  startCall: (to: string, mode?: 'webrtc' | 'click_to_call') => call<{ callId: string; mode: 'webrtc' | 'click_to_call'; to?: string; from?: string }>(
+    '/mobile-calls-start', { method: 'POST', body: JSON.stringify({ to, mode }) },
     { callId: 'call-' + Date.now(), mode: 'webrtc' },
   ),
 

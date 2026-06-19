@@ -9,6 +9,7 @@ import VoicemailScreen from './VoicemailScreen';
 import RecordingsScreen from './RecordingsScreen';
 import { useRealtimeCDR } from '../hooks/useRealtimeCDR';
 import type { Creds } from '../lib/creds';
+import { showMobileToast } from '../lib/mobileToast';
 
 type SubTab = 'recents' | 'recordings' | 'voicemail' | 'dial';
 
@@ -17,6 +18,9 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
   const [selected, setSelected] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'missed' | 'recorded'>('all');
   const [number, setNumber] = useState('');
+  const [dialError, setDialError] = useState<string | null>(null);
+  const [dialDebug, setDialDebug] = useState<string | null>(null);
+  const [dialing, setDialing] = useState(false);
 
   // Real-time CDR via Supabase Realtime (postgres_changes) with automatic
   // 15s polling fallback + visible warning if the realtime channel fails.
@@ -31,8 +35,32 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
   const startCall = async (to: string) => {
     if (!to) return;
     await haptic(ImpactStyle.Medium);
-    try { await mobileApi.startCall(to); } catch {}
-    if (sp?.call) sp.call(to);
+    setDialing(true);
+    setDialError(null);
+    const stamp = new Date().toISOString();
+    try {
+      if (sp?.snap?.status === 'registered' && sp?.call) {
+        const ok = sp.call(to);
+        if (ok !== false) {
+          console.info('[AVA keypad] SIP call started', { to, sipStatus: sp?.snap?.status, stamp });
+          setDialDebug(`SIP call started · ${stamp}`);
+          return;
+        }
+      }
+      const res = await mobileApi.startCall(to, 'click_to_call');
+      console.info('[AVA keypad] click-to-call requested', { to, res, sipStatus: sp?.snap?.status, stamp });
+      setDialDebug(`Click-to-call OK · from ${res?.from || 'extension'} to ${res?.to || to}`);
+      showMobileToast('Deskphone call requested.', 'success');
+    } catch (e: any) {
+      const msg = e?.message || 'Unable to start call';
+      const detail = { message: msg, status: e?.status, detail: e?.detail, path: e?.path, to, sipStatus: sp?.snap?.status, sipError: sp?.snap?.error, stamp };
+      console.error('[AVA keypad] call failed', detail);
+      setDialError(msg);
+      setDialDebug(JSON.stringify(detail));
+      showMobileToast(msg, 'error');
+    } finally {
+      setDialing(false);
+    }
   };
 
   return (
@@ -58,20 +86,28 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
             onLongPressZero={() => { haptic(ImpactStyle.Medium); setNumber((n) => n + '+'); }}
           />
           <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
-            <PrimaryButton onClick={() => startCall(number)} disabled={!number} style={{ flex: 1 }}>
-              📞 Call
+            <PrimaryButton onClick={() => startCall(number)} disabled={!number || dialing} style={{ flex: 1 }}>
+              {dialing ? '⏳ Dialing…' : '📞 Call'}
             </PrimaryButton>
             <GhostButton tone="cyan" onClick={() => sp?.snap?.status === 'connecting' ? null : haptic()}>
               {sp?.snap?.status === 'registered' ? 'SIP · Live' : sp?.snap?.status || 'Offline'}
             </GhostButton>
           </div>
+          {(dialError || dialDebug) && (
+            <Card style={{ marginTop: 12 }} accent={dialError ? 'gold' : 'cyan'}>
+              {dialError && <div style={{ fontSize: font.sm, color: colors.danger, fontWeight: 800, marginBottom: 6 }}>Keypad error: {dialError}</div>}
+              <div style={{ fontSize: 11, color: colors.mutedSilver, lineHeight: 1.45, wordBreak: 'break-word', fontFamily: 'JetBrains Mono, monospace' }}>
+                {dialDebug || `SIP status: ${sp?.snap?.status || 'offline'}`}
+              </div>
+            </Card>
+          )}
           {sp?.snap?.status !== 'registered' && (
             <Card style={{ marginTop: 14 }} accent="gold">
               <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 1.4, color: colors.signalGold, textTransform: 'uppercase' }}>WebRTC unavailable</div>
               <p style={{ fontSize: font.sm, color: colors.mutedSilver, margin: '6px 0 10px', lineHeight: 1.5 }}>
                 Your SIP is not registered yet. You can still place a click-to-call request that rings your deskphone.
               </p>
-              <PrimaryButton onClick={() => startCall(number)} disabled={!number}>Click-to-call deskphone</PrimaryButton>
+              <PrimaryButton onClick={() => startCall(number)} disabled={!number || dialing}>{dialing ? 'Dialing…' : 'Click-to-call deskphone'}</PrimaryButton>
             </Card>
           )}
         </div>
