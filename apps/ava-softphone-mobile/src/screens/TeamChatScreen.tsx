@@ -8,7 +8,7 @@ type Channel = { id: string; name: string; channel_type: string; members: string
 type Message = { id: string; channel_id: string; sender_id: string; sender_name: string | null; content: string; created_at: string };
 type Member = { user_id: string; full_name: string | null; email: string | null; extension: string | null; status: string; is_self?: boolean };
 
-const safe = (v: string) => encodeURIComponent(v);
+
 
 const STATUS_COLOR: Record<string, string> = { online: '#22d39a', available: '#22d39a', busy: '#ff5a5f', dnd: '#ff5a5f', on_call: '#ff8a3d', away: '#f4c248', offline: '#6b7280', meeting: '#a855f7', lunch: '#eab308', break: '#f97316' };
 
@@ -34,13 +34,13 @@ export default function TeamChatScreen(_props: { accessToken?: string | null; us
 
   const chatCall = useCallback((action: string, payload: Record<string, unknown> = {}) => {
     if (!token) throw new Error('Not authenticated');
-    return edgeCall<any>('org-chat', token, { action, payload: { ...payload, organization_id: mobile.organizationId } });
-  }, [token, mobile.organizationId]);
+    return edgeCall<any>('org-chat', token, { action, payload });
+  }, [token]);
 
   const loadMembers = useCallback(async () => {
-    if (!token || !mobile.organizationId) return [] as Member[];
+    if (!token || !mobile.domainUuid) return [] as Member[];
     const [safeRows, directory] = await Promise.all([
-      restGet<any[]>(`/rest/v1/pbx_softphone_users_safe?select=portal_user_id,extension,display_name,status,last_seen_at&organization_id=eq.${safe(mobile.organizationId)}&order=extension.asc`, token).catch(() => []),
+      restGet<any[]>(`/rest/v1/pbx_softphone_users_safe?select=portal_user_id,extension,display_name,status,last_seen_at&domain_uuid=eq.${encodeURIComponent(mobile.domainUuid)}&order=extension.asc`, token).catch(() => []),
       chatCall('list_directory', {}).catch(() => ({ members: [] })),
     ]);
     const byId = new Map<string, any>();
@@ -68,7 +68,7 @@ export default function TeamChatScreen(_props: { accessToken?: string | null; us
 
   useEffect(() => {
     if (mobile.loading) return;
-    if (!token || !mobile.organizationId) { setLoading(false); return; }
+    if (!token || !mobile.domainUuid) { setLoading(false); return; }
     let cancelled = false;
     (async () => {
       try {
