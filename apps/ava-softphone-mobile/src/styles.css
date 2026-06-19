@@ -131,3 +131,4 @@ textarea, input { user-select: text; }
 .lemtel-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 .lemtel-btn-primary:not(:disabled):active { transform: translateY(1px); }
 @keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin 1s linear infinite; transform-origin: center; }
