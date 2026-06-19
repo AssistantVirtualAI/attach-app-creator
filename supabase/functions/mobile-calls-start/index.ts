@@ -29,6 +29,10 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
       { global: { headers: { Authorization: authHeader } } },
     );
+    const admin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
     const { data: u } = await sb.auth.getUser();
     if (!u?.user) return json({ error: "unauthorized" }, 401);
     const { data: __mobileAllowed } = await sb.rpc("my_platform_access_allowed", { _platform: "mobile" });
@@ -39,14 +43,14 @@ Deno.serve(async (req) => {
 
     const target = e164(to);
 
-    const { data: sp } = await sb.from("pbx_softphone_users")
+    const { data: sp } = await admin.from("pbx_softphone_users")
       .select("organization_id, extension, sip_domain, dnd_enabled")
       .eq("portal_user_id", u.user.id).maybeSingle();
     if (!sp) return json({ error: "NO_SOFTPHONE_ACCOUNT" }, 404);
     if (!sp.extension || !sp.sip_domain) return json({ error: "NO_DIAL_EXTENSION" }, 403);
 
     // Log call attempt
-    const { data: rec } = await sb.from("pbx_call_records").insert({
+    const { data: rec } = await admin.from("pbx_call_records").insert({
       organization_id: sp.organization_id,
       direction: "outbound",
       caller_number: sp.extension,
