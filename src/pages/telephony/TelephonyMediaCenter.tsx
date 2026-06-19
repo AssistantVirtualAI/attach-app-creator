@@ -84,8 +84,17 @@ export default function TelephonyMediaCenter({ scope = "org" }: { scope?: Scope 
           </h1>
           <p className="text-sm text-muted-foreground">{scope === "mine" ? "Vos appels, enregistrements et messagerie" : "CDR, enregistrements et messagerie unifiés"}</p>
         </div>
-        <div className="flex gap-2 items-center">
+        <div className="flex gap-2 items-center flex-wrap">
           <Input placeholder="Rechercher numéro, nom, transcription…" value={q} onChange={(e) => setQ(e.target.value)} className="max-w-sm" />
+          {scope !== "mine" && (
+            <Input
+              placeholder="Filter by extension #"
+              value={extFilter}
+              onChange={(e) => setExtFilter(e.target.value.replace(/[^0-9*]/g, ""))}
+              inputMode="numeric"
+              className="max-w-[180px] font-mono"
+            />
+          )}
           <Button variant="outline" size="sm" onClick={async () => {
             toast.info("Synchronisation en cours…");
             await supabase.functions.invoke("fusionpbx-proxy", { body: { action: "sync-cdrs", organization_id: orgId } }).catch(() => {});
