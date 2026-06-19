@@ -125,10 +125,13 @@ Deno.serve(async (req) => {
       });
     }
 
+    const days = Math.min(Math.max(Number(url.searchParams.get("days")) || 7, 1), 30);
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
     const limit = Math.min(Number(url.searchParams.get("limit")) || 50, 200);
     let listQ = admin.from("pbx_call_records")
       .select("id, pbx_uuid, organization_id, domain_uuid, domain_name, direction, call_status, caller_name, caller_number, source_number, destination, destination_number, extension, start_at, duration_seconds, missed_call, has_recording, recording_path, recording_name, recording_url, transcribed")
-      .eq("organization_id", sp.organization_id);
+      .eq("organization_id", sp.organization_id)
+      .gte("start_at", since);
     if (!isDomainAdmin) listQ = listQ.or(extFilter);
     if (sp.domain_uuid) listQ = listQ.or(`domain_uuid.eq.${sp.domain_uuid},domain_uuid.is.null`);
     const { data: rows, error } = await listQ
