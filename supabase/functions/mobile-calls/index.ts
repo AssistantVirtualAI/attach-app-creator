@@ -54,7 +54,8 @@ Deno.serve(async (req) => {
       let detailQ = sb.from("pbx_call_records").select("*")
         .eq("id", id).eq("organization_id", sp.organization_id)
         .or(extFilter);
-      if (sp.domain_uuid) detailQ = detailQ.eq("domain_uuid", sp.domain_uuid);
+      // Allow rows where domain_uuid is NULL (older CDRs) OR matches the user's domain.
+      if (sp.domain_uuid) detailQ = detailQ.or(`domain_uuid.eq.${sp.domain_uuid},domain_uuid.is.null`);
       const { data: r } = await detailQ.maybeSingle();
       if (!r) return json({ error: "not_found" }, 404);
 
