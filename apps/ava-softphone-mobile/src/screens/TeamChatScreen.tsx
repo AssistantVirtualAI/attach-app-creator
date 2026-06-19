@@ -139,8 +139,13 @@ export default function TeamChatScreen(_props: { accessToken?: string | null; us
   }, [activeChannel?.id, loadMessages, token]);
 
   const openDm = async (m: Member) => {
+    if (!m.user_id || String(m.user_id).startsWith('ext:')) {
+      setError("This teammate hasn't activated their portal yet — DM unavailable.");
+      return;
+    }
     try {
       const r = await chatCall('ensure_dm_channel', { user_id: m.user_id });
+      if (r?.error) { setError(r.error === 'not_in_org' ? 'Teammate is not in your workspace.' : String(r.error)); return; }
       if (r.channel) { setActiveChannel(r.channel); setView('chat'); await loadChannels(); }
     } catch (e: any) { setError(e?.message || 'DM failed'); }
   };

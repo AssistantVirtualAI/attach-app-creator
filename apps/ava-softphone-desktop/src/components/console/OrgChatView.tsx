@@ -305,12 +305,18 @@ export default function OrgChatView() {
 
   const openDM = async (otherId: string, otherName: string) => {
     if (!me || !orgId || otherId === me.id) return;
+    if (!otherId || String(otherId).startsWith('ext:')) {
+      setErrMsg("This teammate hasn't activated their portal yet — DM unavailable.");
+      return;
+    }
     const key = [me.id, otherId].sort().join(':');
     const dmName = `dm:${key}`;
     let dm = channels.find((c) => isDmChannel(c) && (c.name === dmName || (c.members?.includes(me.id) && c.members?.includes(otherId))));
     if (!dm) {
       const { data, error } = await supabase.functions.invoke('org-chat', { body: { action: 'ensure_dm_channel', payload: { user_id: otherId } } });
-      if (error || !(data as any)?.channel) { alert('DM error: ' + ((error as any)?.message || (data as any)?.error || 'Unable to open chat')); return; }
+      const err = (error as any)?.message || (data as any)?.error;
+      if (err) { setErrMsg(err === 'not_in_org' ? 'Teammate is not in your workspace.' : `DM error: ${err}`); return; }
+      if (!(data as any)?.channel) { setErrMsg('Unable to open chat'); return; }
       dm = (data as any).channel as Channel;
       setChannels((cs) => [...cs, dm!]);
     }

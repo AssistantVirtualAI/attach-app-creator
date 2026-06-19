@@ -52,11 +52,17 @@ export default function OrgChat() {
   }, [channels, activeId]);
 
   const openDm = async (m: DirectoryMember) => {
+    if (!m.user_id || String(m.user_id).startsWith("ext:")) {
+      toast.error("This teammate hasn't activated their portal yet — DM unavailable.");
+      return;
+    }
     try {
       const r: any = await ensureDm.mutateAsync(m.user_id);
       if (r?.channel?.id) {
         await channelsQ.refetch();
         setActiveId(r.channel.id);
+      } else if (r?.error) {
+        toast.error(r.error === "not_in_org" ? "Teammate is not in your workspace." : String(r.error));
       }
     } catch (e: any) {
       toast.error(e?.message || "Failed to open DM");
