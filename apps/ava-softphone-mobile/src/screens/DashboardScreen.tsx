@@ -139,6 +139,13 @@ export default function DashboardScreen({
         <Metric label="Active ext." value={s?.activeExtensions ?? undefined} tone="violet" />
       </div>
 
+      {m?.extension?.number && (
+        <>
+          <SectionTitle eyebrow="My extension" title={`Ext ${m.extension.number} · ${RANGE_LABELS[range]}`} />
+          <MyExtensionStats range={range} extension={m.extension.number} domainUuid={m.domain.fusionpbxDomainUuid} accessToken={(window as any).__avaToken || null} />
+        </>
+      )}
+
       <SectionTitle eyebrow={RANGE_LABELS[range]} title="Calls per day" />
       <Card padded={true}>
         <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(1, buckets.length)}, 1fr)`, gap: range === '30d' ? 2 : 6, alignItems: 'end', height: 90 }}>
