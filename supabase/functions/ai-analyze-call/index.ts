@@ -99,6 +99,27 @@ Deno.serve(async (req) => {
       .select("organization_id").eq("user_id", user.id).eq("organization_id", organization_id).maybeSingle();
     if (!member && !orgMember && !softphoneMember && !roleMember) return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: corsHeaders });
 
+    // ---- Idempotency: return cached insights immediately unless caller forces re-analysis ----
+    const force = body?.force === true || body?.reanalyze === true;
+    if (!force) {
+      const { data: cached } = await admin.from("pbx_ai_insights")
+        .select("*").eq("call_record_id", call_record_id)
+        .order("created_at", { ascending: false }).limit(1).maybeSingle();
+      const cachedModel = (cached as any)?.ai_model;
+      if (cached && cachedModel && cachedModel !== "stub" && cachedModel !== "skipped-no-transcript") {
+        const { data: existingCall } = await admin.from("pbx_call_records")
+          .select("raw_data").eq("id", call_record_id).maybeSingle();
+        const cachedTranscript = (existingCall?.raw_data as any)?.transcript_text || "";
+        return new Response(JSON.stringify({
+          ok: true, cached: true, stub: false, ai_model: cachedModel,
+          ...cached, insights: cached, analysis: cached,
+          transcript: cachedTranscript, transcript_text: cachedTranscript,
+          summary: cached.summary, sentiment: cached.sentiment, topics: cached.topics,
+          action_items: cached.action_items, jobId: crypto.randomUUID(),
+        }), { headers: corsHeaders });
+      }
+    }
+
     let transcriptProvider: string | null = null;
     if (!transcript_text) {
       const { data: existingTranscript } = await admin.from("pbx_call_transcripts")
