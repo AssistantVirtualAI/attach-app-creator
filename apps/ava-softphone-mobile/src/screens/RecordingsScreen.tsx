@@ -77,15 +77,20 @@ export default function RecordingsScreen() {
     <div style={{ height: '100%', overflowY: 'auto', padding: '14px 14px 20px' }}>
       <SectionTitle eyebrow="AI transcribed" title="Call recordings" />
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '0 2px 12px' }}>
-        <span style={{ fontSize: font.xs, color: colors.mutedSilver }}>
-          {lastSyncedAt ? `Synced ${new Date(lastSyncedAt).toLocaleTimeString()}` : 'Syncing…'}
-        </span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '0 2px 10px' }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, padding: '8px 10px', borderRadius: 12, background: 'rgba(255,255,255,0.7)', border: `1px solid ${colors.border}` }}>
+          <Search size={14} color={colors.mutedSilver} />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search recordings…"
+            style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 13, color: colors.textIce }} />
+        </div>
         <button onClick={refresh} disabled={loading} style={{
-          padding: '6px 12px', borderRadius: 999, border: `1px solid ${colors.border}`,
+          padding: '8px 12px', borderRadius: 999, border: `1px solid ${colors.border}`,
           background: 'rgba(255,255,255,0.7)', color: colors.lemtelBlue,
           fontSize: 11, fontWeight: 800, letterSpacing: 0.8, cursor: 'pointer',
-        }}>{loading ? 'Refreshing…' : '↻ Refresh'}</button>
+        }}>{loading ? '…' : '↻'}</button>
+      </div>
+      <div style={{ fontSize: font.xs, color: colors.mutedSilver, margin: '0 2px 10px' }}>
+        {(filtered?.length ?? 0)} of {data?.length ?? 0} · live sync {lastSyncedAt ? `· ${new Date(lastSyncedAt).toLocaleTimeString()}` : ''}
       </div>
 
       {error && <Card accent="gold"><div style={{ fontSize: font.sm, color: colors.danger }}>{error.message}</div></Card>}
