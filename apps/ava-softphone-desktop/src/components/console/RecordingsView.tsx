@@ -96,7 +96,7 @@ export default function RecordingsView({ scope = 'mine' }: { scope?: 'mine' | 'o
     setError(null);
     try {
       const rangeDays: 7 | 30 | null = range === '7d' ? 7 : range === '30d' ? 30 : null;
-      const apiOpts = { scope, extension: scope === 'org' ? (extensionQuery.trim() || null) : null, rangeDays };
+      const apiOpts: { scope: 'mine' | 'org'; extension: string | null; rangeDays: 7 | 30 | null } = { scope, extension: scope === 'org' ? (extensionQuery.trim() || null) : null, rangeDays };
       const d = opts?.force ? await ava.refreshRecordings(500, apiOpts) : await ava.recordings(500, apiOpts);
       setItems(Array.isArray(d) ? d : []);
     } catch (err: any) {
