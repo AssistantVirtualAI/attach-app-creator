@@ -31,11 +31,12 @@ jobs:
       - name: Package Windows
         working-directory: apps/ava-softphone-desktop
         run: npx electron-builder --win --x64 --publish never
-      - name: Upload to Release
+      - name: List dist files
+        working-directory: apps/ava-softphone-desktop
+        run: ls -la dist-electron/
+      - name: Upload files to release
         working-directory: apps/ava-softphone-desktop
         run: |
-          gh release upload ${{ github.ref_name }} \
-            dist-electron/*.dmg \
-            dist-electron/*.exe \
-            dist-electron/*-mac.zip \
-            --clobber 2>/dev/null || true
+          for f in dist-electron/*.dmg dist-electron/*.exe dist-electron/*.zip; do
+            [ -f "$f" ] && gh release upload ${{ github.ref_name }} "$f" --clobber && echo "Uploaded $f" || true
+          done
