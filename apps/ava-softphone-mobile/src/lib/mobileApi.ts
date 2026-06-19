@@ -99,6 +99,11 @@ export interface CallDetail extends CallRecord {
   topics: string[];
   actionItems: string[];
   qualityScore: number;
+  coachingScore?: number | null;
+  coachingNotes?: string[];
+  aiStatus?: 'cached' | 'processing' | 'failed' | 'missing';
+  aiError?: string | null;
+  aiCached?: boolean;
   intent: string;
   tags: string[];
 }
