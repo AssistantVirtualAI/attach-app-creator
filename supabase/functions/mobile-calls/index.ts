@@ -48,10 +48,10 @@ Deno.serve(async (req) => {
     const id = url.searchParams.get("id");
 
     if (id) {
+      const ext = sp.extension;
       let detailQ = sb.from("pbx_call_records").select("*")
-        .eq("id", id).eq("organization_id", sp.organization_id);
-      // Scope per-extension so two users in the same org cannot see each other's records.
-      detailQ = detailQ.eq("extension", sp.extension);
+        .eq("id", id).eq("organization_id", sp.organization_id)
+        .or(`extension.eq.${ext},caller_number.eq.${ext},destination_number.eq.${ext}`);
       const { data: r } = await detailQ.maybeSingle();
       if (!r) return json({ error: "not_found" }, 404);
 
