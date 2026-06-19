@@ -285,13 +285,22 @@ Deno.serve(async (req) => {
     if (action === "ensure_dm_channel") {
       const otherId = String(payload?.user_id ?? "");
       if (!otherId || otherId === userId) return json({ error: "invalid_user" }, 400);
-      // Verify other user belongs to the same org
-      const { data: other } = await admin.from("organization_members").select("user_id").eq("organization_id", orgId).eq("user_id", otherId).maybeSingle();
-      const { data: other2 } = await admin.from("org_members").select("user_id").eq("org_id", orgId).eq("user_id", otherId).maybeSingle();
-      const { data: other3 } = (!other && !other2)
-        ? await admin.from("pbx_softphone_users").select("portal_user_id").eq("organization_id", orgId).eq("portal_user_id", otherId).maybeSingle()
-        : { data: null };
-      if (!other && !other2 && !other3) return json({ error: "not_in_org" }, 403);
+      // Verify other user belongs to the same org (check every membership source the directory uses)
+      const { data: callerDomainRows } = await admin
+        .from("pbx_softphone_users")
+        .select("domain_uuid")
+        .eq("portal_user_id", userId)
+        .eq("organization_id", orgId);
+      const callerDomains = (callerDomainRows ?? []).map((r: any) => r.domain_uuid).filter(Boolean);
+      const [{ data: other }, { data: other2 }, { data: other3 }, { data: other4 }] = await Promise.all([
+        admin.from("organization_members").select("user_id").eq("organization_id", orgId).eq("user_id", otherId).maybeSingle(),
+        admin.from("org_members").select("user_id").eq("org_id", orgId).eq("user_id", otherId).maybeSingle(),
+        admin.from("pbx_softphone_users").select("portal_user_id").eq("organization_id", orgId).eq("portal_user_id", otherId).maybeSingle(),
+        callerDomains.length
+          ? admin.from("pbx_softphone_users").select("portal_user_id").in("domain_uuid", callerDomains).eq("portal_user_id", otherId).maybeSingle()
+          : Promise.resolve({ data: null }),
+      ]);
+      if (!other && !other2 && !other3 && !other4) return json({ error: "not_in_org" }, 403);
       const pair = [userId, otherId].sort();
       const dmKey = `dm:${pair[0].slice(0, 8)}:${pair[1].slice(0, 8)}`;
       const { data: existing } = await admin
