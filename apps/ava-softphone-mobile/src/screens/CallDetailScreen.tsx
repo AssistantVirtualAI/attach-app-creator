@@ -20,6 +20,16 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
   const load = useCallback(() => { mobileApi.callDetail(id).then(setData).catch(() => {}); }, [id]);
   useEffect(() => { load(); }, [load]);
 
+  // Auto-prefetch signed audio URL the moment we know a recording exists,
+  // so the Play button is instant on tap. Silent failure (audioError state
+  // surfaces it inline) — never throws into the screen.
+  useEffect(() => {
+    if (data?.hasRecording && !audioUrl && !loadingAudio) {
+      fetchUrl().then((u) => { if (u) setAudioUrl(u); });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data?.hasRecording]);
+
   // Cleanup audio on unmount or call change
   useEffect(() => () => {
     audioRef.current?.pause();
