@@ -560,10 +560,10 @@ async function bestEffortCdrSync(limit = 200, minIntervalMs = 30_000, force = fa
         if (!cdrEndpointDownSince) cdrEndpointDownSince = Date.now();
         console.warn('[AVA] CDR sync skipped — PBX endpoint unavailable; scheduling auto-retry', { attempt: cdrRetryAttempt + 1 });
         scheduleCdrEndpointRetry(limit);
-        if (force) throw new Error('NO_CDR_ENDPOINT — PBX live-CDR endpoint is unreachable. Showing cached records; will retry automatically.');
+        if (force) throw new Error('Reconnecting to PBX… realtime updates continue in the background.');
       } else {
         console.warn('[AVA] CDR sync failed', e);
-        if (force) throw new Error('Live CDR sync is temporarily unavailable — showing cached records.');
+        if (force) throw new Error('Reconnecting to PBX… realtime CDR stream is still active.');
       }
     } finally {
       cdrSyncInFlight = null;

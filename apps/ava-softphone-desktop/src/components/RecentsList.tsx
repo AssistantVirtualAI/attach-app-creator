@@ -46,9 +46,9 @@ function RecentsListImpl({ extension, onCall }: Props) {
         } catch (e: any) {
           const msg = String(e?.message || '');
           if (/NO_CDR_ENDPOINT/i.test(msg)) {
-            setErr('PBX live-CDR endpoint is unreachable. Showing cached records — will retry automatically in the background.');
+            setErr('Reconnecting to PBX… realtime updates continue in the background.');
           } else {
-            setErr(msg || 'Live CDR sync unavailable — showing cached records.');
+            setErr(msg || 'Reconnecting to PBX… realtime updates continue in the background.');
           }
           data = await ava.calls(50, { extension });
         }

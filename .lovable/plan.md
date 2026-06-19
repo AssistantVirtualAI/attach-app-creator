@@ -1,59 +1,136 @@
-## Goal
-Wire all mobile screens to the user's real SIP domain context via a single shared hook, and fix data loading + navigation across Recordings, Team Chat, Contacts, Voicemail, Queues, and SMS.
+# Final Verification + Fix Plan — All Platforms
 
-## 1. Shared hook
-Create `apps/ava-softphone-mobile/src/hooks/useMobileCredentials.ts`:
-- Read stored creds via existing `Store.get()` (from `lib/creds.ts`).
-- If `extension`/`domainUuid` missing, call `hydrateSoftphoneCredentials('mobile')` (already implemented).
-- Returns `{ extension, sipDomain, domainUuid, organizationId, wssUrl, userId, accessToken, loading }`.
-- All screens below gate their effects on `credentials?.domainUuid`.
+Goal: verify each reported bug end-to-end and fix anything that isn't actually working across Desktop, Mobile, Admin Portal, and User Portal. Constraint: do NOT touch `vite.config.ts`, `electron-builder.yml`, or `.github/workflows/`.
 
-## 2. RecordingsScreen
-- List: `pbx_call_records` filtered by `domain_uuid = credentials.domainUuid`, ordered by `start_stamp desc limit 50`.
-- Play via `supabase.functions.invoke('fusionpbx-proxy', { body: { action: 'get-recording', xml_cdr_uuid, recording_name: record_name+'.mp3', recording_path, domain_uuid } })`.
-- Decode `audio_base64` → Blob → object URL → `<audio>` element.
-- On `data.error === 'Recording expired'` (or proxy 404), show "Recording expired — file deleted from PBX after retention period".
+Work is split into 6 phases. Each phase ends with an explicit verification step before moving on.
 
-## 3. TeamChatScreen
-- Domain members: `pbx_softphone_users` joined with `profiles` filtered by `domain_uuid`.
-- Presence: `user_presence` for those `portal_user_id`s; green dot if `last_seen < 5min`.
-- Channel list: "General" (org-wide channel from `org_chat_channels`), DMs per member, group channels the user belongs to.
-- Messages from `org_chat_messages` by `channel_id`, ascending.
-- Realtime: `supabase.channel('chat-'+channelId).on('postgres_changes', INSERT on org_chat_messages filter channel_id=eq.<id>)`.
+---
 
-## 4. ContactsScreen
-- `pbx_softphone_users` (extension, sip_domain, portal_user_id, profiles) filtered by `domain_uuid`.
-- Presence join → status dot.
-- Buttons: Call → `sp.call(extension)`; Message → navigate to TeamChat DM with that user.
-- Local search by name/extension.
+## Phase 0 — Audit (read-only, no changes)
 
-## 5. VoicemailScreen
-- List via `fusionpbx-proxy` `{ action: 'list-voicemails', domain_uuid, extension }`.
-- Greeting editor: textarea + voice dropdown (GET `/v1/voices` through an existing edge function proxy if available — otherwise reuse a server function; do not expose `ELEVENLABS_API_KEY` to the client).
-- Preview button → TTS via existing ElevenLabs edge function → inline playback.
-- "Set as Greeting" → upload generated audio to PBX as voicemail greeting via `fusionpbx-proxy`.
-- Per-voicemail: inline play, delete, transcribe buttons.
+Goal: confirm current state so we only fix what's actually broken.
 
-## 6. QueuesScreen
-- List via `fusionpbx-proxy` `{ action: 'list-queues', domain_uuid }`; combine with existing `pbx_queue_agent_state` realtime to render agent counts/waiting/user status.
-- Buttons: Join/Pause/Leave invoke `fusionpbx-proxy` with `queue-login` / `queue-pause` / `queue-logout` + `queue_uuid` + `extension`.
-- Keep realtime sub on `pbx_queue_agent_state` for current user.
+1. Inspect realtime CDR code paths:
+   - `apps/ava-softphone-desktop/src/components/console/CallsView.tsx`
+   - `apps/ava-softphone-mobile/src/screens/CallsScreen.tsx` (and `RecordingsScreen.tsx`)
+   - `src/pages/lemtel/admin/AdminDashboard.tsx`
+   - User portal CDR view under `src/pages/lemtel/`
+   - Any shared `useRealtimeCDR` hook
+2. Inspect chat code paths:
+   - Desktop `OrgChatView`, mobile `TeamChatScreen`, portal `OrgChat`
+3. Inspect `supabase/functions/fusionpbx-proxy/index.ts` for: `get-recording`, `get-recording-signed-url`, `list-extensions`, `list-active-calls`.
+4. Inspect storage + DB state via read queries:
+   - `storage.buckets` for `call-recordings`
+   - `pg_publication_tables` for `supabase_realtime`
+   - `org_chat_messages` columns (look for `deleted_at`)
+   - `pbx_call_records` columns (transcription/ai_summary/sentiment/score/coaching_points/analyzed/analyzed_at)
+   - Existence of `general` channel for Lemtel org
 
-## 7. MessagesScreen (SMS)
-- Threads from `pbx_sms_threads` filtered by `organization_id` (already used) — confirm filter uses `credentials.organizationId` from hook.
-- Send via `twilio-send-sms` edge function.
-- Keep existing realtime + search.
+Deliverable: a short pass/fail list per bug feeding the phases below.
 
-## 8. Navigation audit
-- Verify every top pill and bottom nav target in `BottomTabs.tsx` and `MobileApp.tsx` routes correctly: Voicemail, Recordings, Contacts, SMS, Queues, Settings, Home, Calls, AVA, Chat, More.
-- Confirm each screen is imported and route registered; fix any missing wiring.
+---
 
-## Constraints
-- Do not touch `vite.config.ts`, `electron-builder.yml`, `.github/workflows/`.
-- Do not touch landing page.
-- All data fetches gated on `credentials` from `useMobileCredentials`.
+## Phase 1 — Database + Storage foundations (single migration)
+
+Only run statements whose audit shows them missing.
+
+1. Add missing columns:
+   - `org_chat_messages.deleted_at TIMESTAMPTZ`
+   - On `pbx_call_records`: `transcription`, `ai_summary`, `sentiment`, `call_score`, `coaching_points jsonb`, `analyzed boolean default false`, `analyzed_at timestamptz`
+2. Add tables to realtime publication (idempotent DO block):
+   `pbx_call_records`, `org_chat_messages`, `user_presence`, `pbx_ai_insights`, `pbx_queue_agent_state`
+3. Ensure REPLICA IDENTITY FULL on `pbx_call_records` and `org_chat_messages` (needed for UPDATE payloads).
+4. Create `call-recordings` storage bucket (private) via the storage tool if missing, plus RLS policies on `storage.objects` allowing service_role write and authenticated read for own org.
+5. Seed `general` chat channel for Lemtel org `71755d33-…` if missing (via insert tool, not migration).
+
+Verification: re-run audit queries; all should pass.
+
+---
+
+## Phase 2 — CDR realtime unification (Bug 1)
+
+1. Create/normalize a single shared hook used by all 4 platforms:
+   - Desktop + mobile already import from their own apps — keep per-app file, but make the logic identical.
+   - Initial transport state = `'connecting'` (yellow).
+   - On `SUBSCRIBED` → `'live'` (green). On `CHANNEL_ERROR` → `'unavailable'` (red). On `TIMED_OUT`/`CLOSED` → keep `'connecting'` and retry.
+   - Channel name: `cdr-live-${domainUuid}`.
+   - Filter: `domain_uuid=eq.${domainUuid}` on INSERT + UPDATE of `pbx_call_records`.
+   - Cleanup via `removeChannel` in effect teardown.
+2. Update status badge components in all 4 platforms to render the 3-state indicator and never default to "unavailable".
+3. Files to touch:
+   - `apps/ava-softphone-desktop/src/components/console/CallsView.tsx` (+ any hook it uses)
+   - `apps/ava-softphone-mobile/src/screens/CallsScreen.tsx`
+   - `src/pages/lemtel/admin/AdminDashboard.tsx`
+   - User portal CDR view (exact file confirmed in Phase 0)
+
+Verification: place a test row insert via SQL; confirm UI updates without refresh on each platform, badge goes Connecting → Live.
+
+---
+
+## Phase 3 — Recording download + transcription pipeline (Bug 2)
+
+1. In `supabase/functions/fusionpbx-proxy/index.ts`, ensure the `get-recording` action implements full PHP CSRF flow:
+   - GET `/login.php`, parse hidden CSRF `name`/`value`.
+   - POST `/login.php` with url-encoded `username`, `password`, CSRF — capture `PHPSESSID`.
+   - GET `/app/xml_cdr/download.php?id={xml_cdr_uuid}` with `Cookie: PHPSESSID=…`.
+   - Stream the audio/mpeg body, upload to `call-recordings` bucket under `${org_id}/${call_id}.mp3`, create a signed URL, return it.
+   - Cache the PHPSESSID in memory for reuse across invocations.
+2. `get-recording-signed-url` action: return existing object's signed URL if already uploaded.
+3. Transcription worker / edge function: on success, UPDATE `pbx_call_records` with `transcription`, `ai_summary`, `sentiment`, `call_score`, `coaching_points`, `analyzed=true`, `analyzed_at=now()` — single UPDATE so realtime fires once.
+4. UI: desktop CallsView, mobile RecordingsScreen, portal recording panel — all subscribe to `pbx_call_records` UPDATE and re-render when `analyzed` flips.
+
+Verification: trigger Transcribe on a call with a known recording UUID; confirm bucket object exists, row updates, all platforms reflect change within 60s without refresh.
+
+---
+
+## Phase 4 — Domain chat (Bug 3)
+
+1. Confirm column + general channel exist (from Phase 1).
+2. Update chat query layer to ignore deleted messages: `is_hidden = false AND deleted_at IS NULL`.
+3. Members list source = `pbx_softphone_users_safe` filtered by `domain_uuid = '2936594e-17b7-42a9-9165-95be48627923'` (Lemtel) for Lemtel users, and by the caller's resolved `domain_uuid` for others.
+4. Presence: join `user_presence`, treat `last_seen_at > now() - interval '5 minutes'` as online; render green/grey dots.
+5. Realtime: subscribe channel `chat-${channelId}` to INSERT/UPDATE/DELETE on `org_chat_messages` filtered by `channel_id=eq.${channelId}`; subscribe presence on `user_presence` filtered by `organization_id`.
+6. Apply identically to desktop `OrgChatView`, mobile `TeamChatScreen`, portal `OrgChat`.
+
+Verification: send messages between desktop and portal user; messages appear <3s both ways; member list shows all domain extensions with correct dots.
+
+---
+
+## Phase 5 — Desktop Admin wide mode (Bug 4)
+
+File: `apps/ava-softphone-desktop/src/components/console/AdminView.tsx`.
+
+1. Detect `window.innerWidth > 1200` (or `useMediaQuery`) → switch to two-pane layout.
+2. LEFT (280px, scrollable): customer domain list (org `name`, `fusionpbx_domain_name`, extension count) loaded from `organizations` + a count from `pbx_softphone_users_safe` grouped by `domain_uuid`. Click selects.
+3. RIGHT: tabs — Extensions / IVR / Ring Groups / Queues / Active Calls / Call History.
+   - Extensions tab: `fusionpbx-proxy { action: 'list-extensions', domain_uuid }`, columns ext/name/reg status, Add/Edit/Delete dialogs reusing existing extension mutation actions.
+   - Active Calls tab: `{ action: 'list-active-calls', domain_uuid }`.
+   - Call History tab: query `pbx_call_records` filtered by `domain_uuid`.
+4. Add `list-extensions` action in `fusionpbx-proxy` if missing:
+   - `GET https://pbxnode.lemtel.tel/app/api/7/extensions?domain_uuid=…&limit=50&offset=0`
+   - Headers: `X-Key`, `X-Username` from secrets.
+
+Verification: open desktop full-screen → Admin tab; left list populated; click a domain → extensions render; add/edit/delete round-trips to PBX.
+
+---
+
+## Phase 6 — Self-test pass (manual + scripted checks)
+
+Run the full checklist from the request:
+- CDR realtime: test insert → all 4 surfaces show LIVE and new row.
+- Transcription: trigger on a real recording → row + UI update.
+- Chat: cross-platform send + member list + presence dots.
+- Desktop admin wide: domain list, extensions, CRUD.
+- Mobile screens: Recordings, Contacts, Chat, Voicemail (with ElevenLabs greeting visible), Queues.
+
+For each failing item, loop back to the relevant phase and patch before declaring done.
+
+---
 
 ## Technical notes
-- Edge functions used: `softphone-credentials`, `fusionpbx-proxy`, `twilio-send-sms`, ElevenLabs TTS proxy (server-side; client never reads `ELEVENLABS_API_KEY`).
-- Tables: `pbx_call_records`, `pbx_softphone_users`, `profiles`, `user_presence`, `org_chat_channels`, `org_chat_messages`, `pbx_queue_agent_state`, `pbx_sms_threads`, `pbx_sms_messages`.
-- Realtime channels created in `useEffect` with cleanup `supabase.removeChannel`.
+
+- All edge function changes go in `supabase/functions/<name>/index.ts`; they auto-deploy.
+- All schema changes via the migration tool with GRANTs + RLS preserved; data seeds via the insert tool.
+- Realtime subscriptions must live inside `useEffect` with cleanup to avoid leaks (per project rule).
+- No changes to `vite.config.ts`, `electron-builder.yml`, or `.github/workflows/`.
+- Landing page files remain untouched.
