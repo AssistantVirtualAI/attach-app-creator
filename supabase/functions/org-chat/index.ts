@@ -266,7 +266,10 @@ Deno.serve(async (req) => {
       // Verify other user belongs to the same org
       const { data: other } = await admin.from("organization_members").select("user_id").eq("organization_id", orgId).eq("user_id", otherId).maybeSingle();
       const { data: other2 } = await admin.from("org_members").select("user_id").eq("org_id", orgId).eq("user_id", otherId).maybeSingle();
-      if (!other && !other2) return json({ error: "not_in_org" }, 403);
+      const { data: other3 } = (!other && !other2)
+        ? await admin.from("pbx_softphone_users").select("portal_user_id").eq("organization_id", orgId).eq("portal_user_id", otherId).maybeSingle()
+        : { data: null };
+      if (!other && !other2 && !other3) return json({ error: "not_in_org" }, 403);
       const pair = [userId, otherId].sort();
       const dmKey = `dm:${pair[0].slice(0, 8)}:${pair[1].slice(0, 8)}`;
       const { data: existing } = await admin

@@ -6,7 +6,7 @@ import { colors, font, radius, gradients } from '../lib/theme';
 import { mobileApi, SmsThread, SmsMessage } from '../lib/mobileApi';
 import { Card, Chip, EmptyState, GhostButton, SectionTitle, Skeleton } from '../components/ui/Primitives';
 import { audit } from '../lib/audit';
-import { getCredentials } from '../lib/creds';
+import { useMobileCredentials } from '../hooks/useMobileCredentials';
 
 const SUPABASE_URL = 'https://gejxisrqtvxavbrfcoxz.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdlanhpc3JxdHZ4YXZicmZjb3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1MDMxNzQsImV4cCI6MjA3NzA3OTE3NH0.kaO-GslE99OCNrZ4_AMnbzGqya2azqz_UMZR34zZvvo';
@@ -18,6 +18,7 @@ function smsClient(token?: string | null) {
 }
 
 export default function MessagesScreen({ haptic }: { haptic: (s?: ImpactStyle) => Promise<void> }) {
+  const mobile = useMobileCredentials();
   const [threads, setThreads] = useState<SmsThread[] | null>(null);
   const [active, setActive] = useState<SmsThread | null>(null);
   const [msgs, setMsgs] = useState<SmsMessage[]>([]);
@@ -36,18 +37,17 @@ export default function MessagesScreen({ haptic }: { haptic: (s?: ImpactStyle) =
     let channel: any = null;
     let cancelled = false;
     (async () => {
-      const c = await getCredentials();
-      if (!c?.accessToken) return;
-      const orgId = (c as any).organizationId;
+      if (!mobile.accessToken) return;
+      const orgId = mobile.organizationId;
       const filter = orgId ? `organization_id=eq.${orgId}` : undefined;
-      const client = smsClient(c.accessToken);
+      const client = smsClient(mobile.accessToken);
       channel = client.channel('sms-threads-mobile')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'pbx_sms_threads', ...(filter ? { filter } : {}) } as any,
           () => { if (!cancelled) loadThreads(); })
         .subscribe();
     })();
     return () => { cancelled = true; try { channel && _smsClient?.removeChannel(channel); } catch {} };
-  }, []);
+  }, [mobile.accessToken, mobile.organizationId]);
 
   // Realtime messages for active thread
   useEffect(() => {
@@ -55,16 +55,15 @@ export default function MessagesScreen({ haptic }: { haptic: (s?: ImpactStyle) =
     let channel: any = null;
     let cancelled = false;
     (async () => {
-      const c = await getCredentials();
-      if (!c?.accessToken) return;
-      const client = smsClient(c.accessToken);
+      if (!mobile.accessToken) return;
+      const client = smsClient(mobile.accessToken);
       channel = client.channel(`sms-msgs-${active.id}`)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'pbx_sms_messages', filter: `thread_id=eq.${active.id}` } as any,
           () => { if (!cancelled) loadMsgs(active.id); })
         .subscribe();
     })();
     return () => { cancelled = true; try { channel && _smsClient?.removeChannel(channel); } catch {} };
-  }, [active?.id]);
+  }, [active?.id, mobile.accessToken]);
 
   const send = async () => {
     if (!draft.trim() || !active) return;

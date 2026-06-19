@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { colors, font, radius } from '../lib/theme';
 import { mobileApi } from '../lib/mobileApi';
-import { getCredentials, ensureStoredOrganizationId } from '../lib/creds';
 import { Card } from '../components/ui/Primitives';
+import { useMobileCredentials } from '../hooks/useMobileCredentials';
 
 
 type Step = {
@@ -17,6 +17,7 @@ type Step = {
  * Reachable from CallDetailScreen → "Debug playback" link.
  */
 export default function RecordingDebugScreen({ callId, onBack }: { callId: string; onBack: () => void }) {
+  const mobile = useMobileCredentials();
   const [steps, setSteps] = useState<Step[]>([
     { label: '1. Resolve organization context', status: 'pending' },
     { label: '2. Request signed recording URL', status: 'pending' },
@@ -33,15 +34,10 @@ export default function RecordingDebugScreen({ callId, onBack }: { callId: strin
     let cancelled = false;
     (async () => {
       try {
-        const creds = await getCredentials();
         if (cancelled) return;
-        let orgId = creds?.organizationId || null;
+        const orgId = mobile.organizationId || null;
         if (!orgId) {
-          // Fallback: fetch from user_roles on-the-fly and persist back.
-          orgId = await ensureStoredOrganizationId();
-        }
-        if (!orgId) {
-          set(0, { status: 'fail', detail: 'No organizationId found for this user (user_roles returned nothing).' });
+          set(0, { status: 'fail', detail: 'No organizationId found for this user.' });
           return;
         }
         set(0, { status: 'ok', detail: `org ${orgId.slice(0, 8)}…` });
@@ -109,7 +105,7 @@ export default function RecordingDebugScreen({ callId, onBack }: { callId: strin
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [callId]);
+  }, [callId, mobile.organizationId]);
 
   const badge = (s: Step['status']) =>
     s === 'ok' ? { c: colors.success, t: '✓' } :
