@@ -482,9 +482,11 @@ async function readCallRecordRows(limit = 100, opts?: { scope?: 'mine' | 'org'; 
   const orgFilter = me.organization_id ? `&organization_id=eq.${me.organization_id}` : '';
   const scopeOrg = opts?.scope === 'org';
   const scopedExtension = cleanText(opts?.extension || me.extension);
-  const extFilter = scopeOrg
-    ? ''
-    : scopedExtension
+  const extFilter = opts?.extension
+    ? `&or=(extension.eq.${encodeURIComponent(cleanText(opts.extension))},caller_number.eq.${encodeURIComponent(cleanText(opts.extension))},destination_number.eq.${encodeURIComponent(cleanText(opts.extension))},source_number.eq.${encodeURIComponent(cleanText(opts.extension))})`
+    : scopeOrg
+      ? ''
+      : scopedExtension
       ? `&or=(extension.eq.${encodeURIComponent(scopedExtension)},caller_number.eq.${encodeURIComponent(scopedExtension)},destination_number.eq.${encodeURIComponent(scopedExtension)},source_number.eq.${encodeURIComponent(scopedExtension)})`
       : '&id=is.null';
   const sinceFilter = opts?.rangeDays ? `&start_at=gte.${encodeURIComponent(new Date(Date.now() - opts.rangeDays * 864e5).toISOString())}` : '';
