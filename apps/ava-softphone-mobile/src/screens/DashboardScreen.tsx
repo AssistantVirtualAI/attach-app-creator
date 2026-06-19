@@ -142,7 +142,7 @@ export default function DashboardScreen({
       {m?.extension?.number && (
         <>
           <SectionTitle eyebrow="My extension" title={`Ext ${m.extension.number} · ${RANGE_LABELS[range]}`} />
-          <MyExtensionStats range={range} extension={m.extension.number} domainUuid={m.domain.fusionpbxDomainUuid} accessToken={(window as any).__avaToken || null} />
+          <MyExtensionStats range={range} extension={m.extension.number} domainUuid={m.domain.fusionpbxDomainUuid} />
         </>
       )}
 
