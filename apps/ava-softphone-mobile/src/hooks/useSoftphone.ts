@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { createSIPUA, JsSIPUnavailableError, SIPConfig, sdpModifier, classifySipFailure } from '../lib/sip/jssipProvider';
 
-export type SIPStatus = 'idle' | 'connecting' | 'registered' | 'error';
+export type SIPStatus = 'idle' | 'connecting' | 'registered' | 'retrying' | 'error';
 export type CallState = 'idle' | 'ringing' | 'active' | 'ended';
 
 export interface UseSoftphoneReturn {
