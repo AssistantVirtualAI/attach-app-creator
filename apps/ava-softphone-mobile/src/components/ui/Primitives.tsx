@@ -78,10 +78,18 @@ export function Chip({
 }
 
 /* ─── StatusDot ─────────────────────────────────────────────── */
-export function StatusDot({ state }: { state: 'registered' | 'connecting' | 'offline' }) {
-  const c = state === 'registered' ? colors.success : state === 'connecting' ? colors.warning : colors.danger;
+export function StatusDot({ state }: { state: 'registered' | 'connecting' | 'retrying' | 'offline' }) {
+  const c =
+    state === 'registered' ? colors.success :
+    state === 'retrying'   ? colors.warning :
+    state === 'connecting' ? colors.warning :
+                             colors.danger;
+  const label =
+    state === 'registered' ? 'Live' :
+    state === 'retrying'   ? 'Retrying…' :
+    state;
   return (
-    <span style={{
+    <span data-status={state} style={{
       display: 'inline-flex', alignItems: 'center', gap: 6,
       fontSize: font.xs, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase',
       color: c,
@@ -90,7 +98,7 @@ export function StatusDot({ state }: { state: 'registered' | 'connecting' | 'off
         width: 8, height: 8, borderRadius: '50%',
         background: c, boxShadow: `0 0 10px ${c}`,
       }} />
-      {state === 'registered' ? 'Live' : state}
+      {label}
     </span>
   );
 }
