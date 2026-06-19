@@ -63,7 +63,11 @@ Deno.serve(async (req) => {
 
     const admin = admin0;
     const body = await req.json().catch(() => ({}));
-    let { call_record_id, recording_url, organization_id, recording_path, recording_name } = body || {};
+    let { call_record_id, recording_url, organization_id, recording_path, recording_name, xml_cdr_uuid, record_name, record_path, domain_uuid } = body || {};
+    // Accept aliases from UI
+    recording_name = recording_name || record_name;
+    recording_path = recording_path || record_path;
+    if (!call_record_id) call_record_id = xml_cdr_uuid;
     if (!call_record_id) call_record_id = body?.callId;
     if (!organization_id) {
       const { data: sp } = await admin.from("pbx_softphone_users")
@@ -141,16 +145,68 @@ Deno.serve(async (req) => {
       await admin.from("pbx_call_records").update({ transcribed: !provider.startsWith("stub") }).eq("id", call_record_id).then(() => {}, () => {});
     };
 
-    // Try to fetch audio. Order: direct URL → Supabase Storage path → fusionpbx-proxy → twilio-recording-proxy
+    // Try to fetch audio. Order: FusionPBX first (recordings live on PBX) → direct URL → Twilio
     let audioBytes: Uint8Array | null = null;
     let audioMime = "audio/wav";
     let audioSource: string | null = null;
     const fetchErrors: string[] = [];
+    var storagePendingSync = false;
     const isTwilio = /api\.twilio\.com/i.test(sourceUrl || "") || /^RE[0-9a-f]{32}$/i.test(call?.recording_name || "");
 
+    const effectiveRecName = recording_name || call?.recording_name;
+    const effectiveRecPath = recording_path || call?.recording_path;
+
     try {
-      // 1. Direct URL (skip for Twilio — needs basic auth via proxy)
-      if (sourceUrl && !isTwilio) {
+      // 1. FusionPBX FIRST — recordings live on PBX, not Supabase Storage
+      if (!isTwilio && (effectiveRecName || effectiveRecPath)) {
+        try {
+          const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+          const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+          const recName = effectiveRecName ? (effectiveRecName.endsWith(".mp3") || effectiveRecName.endsWith(".wav") ? effectiveRecName : `${effectiveRecName}.mp3`) : "";
+          const proxyRes = await fetch(`${SUPABASE_URL}/functions/v1/fusionpbx-proxy`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${SERVICE_KEY}`,
+              "apikey": SERVICE_KEY,
+            },
+            body: JSON.stringify({
+              action: "get-recording",
+              organization_id,
+              xml_cdr_uuid: call_record_id,
+              recording_name: recName,
+              recording_path: effectiveRecPath || "",
+              domain_uuid: domain_uuid || undefined,
+            }),
+          });
+          const ct = proxyRes.headers.get("content-type") || "";
+          if (proxyRes.ok && /audio\//i.test(ct)) {
+            audioBytes = new Uint8Array(await proxyRes.arrayBuffer());
+            audioMime = ct.split(";")[0];
+            audioSource = "fusionpbx-proxy";
+          } else if (proxyRes.ok && /json/i.test(ct)) {
+            // legacy: base64 wrapper
+            const j = await proxyRes.json().catch(() => null);
+            const b64 = (j as any)?.audio_base64 || (j as any)?.recording_base64;
+            if (b64) {
+              const bin = atob(b64);
+              const arr = new Uint8Array(bin.length);
+              for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+              audioBytes = arr;
+              audioMime = detectMime(recName);
+              audioSource = "fusionpbx-proxy";
+            } else {
+              fetchErrors.push(`fusion:${(j as any)?.error || "no-audio"}`);
+            }
+          } else {
+            const errTxt = await proxyRes.text().catch(() => "");
+            fetchErrors.push(`fusion:${proxyRes.status}:${errTxt.slice(0, 120)}`);
+          }
+        } catch (e: any) { fetchErrors.push(`fusion:${e?.message || "err"}`); }
+      }
+
+      // 2. Direct URL fallback
+      if (!audioBytes && sourceUrl && !isTwilio) {
         try {
           const r = await fetch(sourceUrl);
           if (r.ok) {
@@ -163,74 +219,7 @@ Deno.serve(async (req) => {
         } catch (e: any) { fetchErrors.push(`direct:${e?.message || "err"}`); }
       }
 
-      // 2. Supabase Storage — verify bucket exists, then retry with
-      //    exponential backoff so a recording that's still syncing from the
-      //    PBX doesn't immediately fall through to "no audio".
-      const storagePath = recording_path || call?.recording_path;
-      var storagePendingSync = false;
-      if (!audioBytes && storagePath && typeof storagePath === "string" && !storagePath.startsWith("http")) {
-        const parts = storagePath.split("/");
-        const bucket = parts.shift()!;
-        const path = parts.join("/");
-        const delays = [0, 750, 2000, 4000]; // ~7s upper bound total
-        for (let attempt = 0; attempt < delays.length && !audioBytes; attempt++) {
-          if (delays[attempt]) await new Promise((r) => setTimeout(r, delays[attempt]));
-          try {
-            const { data: bucketInfo } = await admin.storage.getBucket(bucket);
-            if (!bucketInfo) {
-              storagePendingSync = true;
-              fetchErrors.push(`storage:bucket-missing:${bucket}:try${attempt + 1}`);
-              continue;
-            }
-            const dl = await admin.storage.from(bucket).download(path);
-            if (dl.data) {
-              audioBytes = new Uint8Array(await dl.data.arrayBuffer());
-              audioMime = detectMime(storagePath, dl.data.type);
-              audioSource = "storage";
-              storagePendingSync = false;
-              break;
-            }
-            if (dl.error) {
-              const msg = dl.error.message || "";
-              const transient = /not.?found|temporar|timeout|fetch|network/i.test(msg);
-              fetchErrors.push(`storage:${msg}:try${attempt + 1}`);
-              storagePendingSync = transient;
-              if (!transient) break;
-            }
-          } catch (e: any) {
-            const msg = e?.message || "err";
-            fetchErrors.push(`storage:${msg}:try${attempt + 1}`);
-            storagePendingSync = /not.?found|temporar|timeout|fetch|network/i.test(msg);
-          }
-        }
-      }
-
-      // 3. FusionPBX proxy
-      if (!audioBytes && (recording_path || recording_name || call?.recording_path || call?.recording_name)) {
-        try {
-          const proxyRes = await admin.functions.invoke("fusionpbx-proxy", {
-            body: {
-              organization_id, action: "get-recording",
-              xml_cdr_uuid: call_record_id,
-              record_path: recording_path || call?.recording_path,
-              record_name: recording_name || call?.recording_name,
-            },
-          });
-          const b64 = (proxyRes.data as any)?.audio_base64 || (proxyRes.data as any)?.recording_base64;
-          if (b64) {
-            const bin = atob(b64);
-            const arr = new Uint8Array(bin.length);
-            for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-            audioBytes = arr;
-            audioMime = detectMime(recording_name || call?.recording_name || "");
-            audioSource = "fusionpbx-proxy";
-          } else if (proxyRes.error) {
-            fetchErrors.push(`fusion:${proxyRes.error.message}`);
-          }
-        } catch (e: any) { fetchErrors.push(`fusion:${e?.message || "err"}`); }
-      }
-
-      // 4. Twilio recording proxy
+      // 3. Twilio recording proxy
       if (!audioBytes && (isTwilio || /^RE/.test(call?.recording_name || ""))) {
         try {
           const proxyRes = await admin.functions.invoke("twilio-recording-proxy", {

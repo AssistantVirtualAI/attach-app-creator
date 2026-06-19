@@ -109,11 +109,22 @@ export default function RecordingsScreen() {
     }
   };
 
-  const transcribe = async (id: string) => {
+  const transcribe = async (rec: Recording) => {
+    const id = rec.id;
     if (busy[id] === 'running') return;
+    if (!rec.recording_name && !rec.recording_path) {
+      showMobileToast('Recording pending sync — please retry in a moment.', 'warning');
+      return;
+    }
     setBusy((b) => ({ ...b, [id]: 'running' }));
     try {
-      const t = await mobileApi.transcribeCall(id);
+      const t = await mobileApi.transcribeCall(id, {
+        recording_path: rec.recording_path,
+        recording_name: rec.recording_name,
+        domain_uuid: rec.domain_uuid,
+        xml_cdr_uuid: rec.pbx_uuid || id,
+        organization_id: rec.organization_id,
+      });
       if (t?.stub || t?.error) throw new Error([t.error || t.reason || 'transcription unavailable', ...(t.fetchErrors || [])].filter(Boolean).join(' · '));
       await mobileApi.analyzeCall(id);
       setBusy((b) => { const n = { ...b }; delete n[id]; return n; });
@@ -157,7 +168,7 @@ export default function RecordingsScreen() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <button onClick={(e) => { e.stopPropagation(); loadAudio(r); }} disabled={loadingAudio === r.id || !!url} style={{ width: 38, height: 38, borderRadius: '50%', border: 'none', display: 'grid', placeItems: 'center', background: audErr ? 'rgba(239,68,68,0.2)' : 'linear-gradient(135deg, #0023e6, #21d4fd)', color: '#fff', cursor: 'pointer', flexShrink: 0 }}>{loadingAudio === r.id ? <Loader2 size={15} className="spin" /> : <Play size={15} />}</button>
             <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: font.base, fontWeight: 800, color: colors.textIce, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</div><div style={{ fontSize: font.xs, color: colors.mutedSilver, marginTop: 2, fontFamily: 'JetBrains Mono, monospace' }}>{r.start_at ? new Date(r.start_at).toLocaleString() : '—'} · {fmtDuration(Number(r.duration_seconds || 0))}{r.extension ? ` · ext ${r.extension}` : ''}</div></div>
-            <div onClick={(e) => e.stopPropagation()} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}><Chip tone="gold" size="xs">REC</Chip>{r.transcribed ? <Chip tone="violet" size="xs">AI ✓</Chip> : <button onClick={(e) => { e.stopPropagation(); transcribe(r.id); }} disabled={state === 'running'} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 999, border: 'none', background: state === 'failed' ? 'rgba(239,68,68,0.18)' : `linear-gradient(135deg, ${colors.avaViolet}, ${colors.avaCyan})`, color: state === 'failed' ? colors.danger : '#fff', fontSize: 10, fontWeight: 800, cursor: state === 'running' ? 'default' : 'pointer' }}>{state === 'running' ? <Loader2 size={10} className="spin" /> : <Sparkles size={10} />}{state === 'running' ? 'WORKING' : state === 'failed' ? 'RETRY' : 'AI'}</button>}</div>
+            <div onClick={(e) => e.stopPropagation()} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}><Chip tone="gold" size="xs">REC</Chip>{r.transcribed ? <Chip tone="violet" size="xs">AI ✓</Chip> : <button onClick={(e) => { e.stopPropagation(); transcribe(r); }} disabled={state === 'running'} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 999, border: 'none', background: state === 'failed' ? 'rgba(239,68,68,0.18)' : `linear-gradient(135deg, ${colors.avaViolet}, ${colors.avaCyan})`, color: state === 'failed' ? colors.danger : '#fff', fontSize: 10, fontWeight: 800, cursor: state === 'running' ? 'default' : 'pointer' }}>{state === 'running' ? <Loader2 size={10} className="spin" /> : <Sparkles size={10} />}{state === 'running' ? 'WORKING' : state === 'failed' ? 'RETRY' : 'AI'}</button>}</div>
           </div>
           {url && (
             <div onClick={(e) => e.stopPropagation()} style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>

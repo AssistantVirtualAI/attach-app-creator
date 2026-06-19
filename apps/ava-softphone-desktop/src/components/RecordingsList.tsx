@@ -131,9 +131,13 @@ export default function RecordingsList({ onAnalyze, extension }: { onAnalyze?: (
         body: {
           callId: r.callId || r.id,
           call_record_id: r.callId || r.id,
+          xml_cdr_uuid: (r as any).xml_cdr_uuid || r.callId || r.id,
           organization_id,
           recording_path: r.recording_path,
           recording_name: r.recording_name,
+          record_path: r.recording_path,
+          record_name: r.recording_name,
+          domain_uuid: (r as any).domain_uuid,
         },
       });
       if (r1.error) throw r1.error;
