@@ -54,7 +54,10 @@ Deno.serve(async (req) => {
     const url = new URL(req.url);
     const extParam = url.searchParams.get("extension");
     const days = Math.min(Math.max(Number(url.searchParams.get("days")) || 7, 1), 30);
-    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+    const sinceDate = new Date();
+    sinceDate.setDate(sinceDate.getDate() - days);
+    sinceDate.setHours(0, 0, 0, 0);
+    const since = sinceDate.toISOString();
     const ext = sp.extension;
 
     let q = admin.from("pbx_call_records")
