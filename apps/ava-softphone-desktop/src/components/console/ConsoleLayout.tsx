@@ -175,6 +175,21 @@ export default function ConsoleLayout({
         flex: 1, minWidth: 0, minHeight: 0, overflow: 'hidden', position: 'relative',
         paddingBottom: compact ? 78 : 0, paddingTop: compact ? 54 : 0, display: 'flex', flexDirection: 'column',
       }}>
+        {!compact && (orgName || domainLabel) && (
+          <div style={{
+            position: 'absolute', top: 10, right: 16, zIndex: 5,
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '5px 10px', borderRadius: 999,
+            background: 'rgba(255,255,255,0.7)', border: `1px solid ${c.border}`,
+            backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
+            fontSize: 11, fontWeight: 600, color: c.textSub, letterSpacing: 0.2,
+            boxShadow: '0 4px 14px -4px rgba(0,35,230,0.18)',
+          }}>
+            <span style={{ width: 6, height: 6, borderRadius: 3, background: '#22d39a' }} />
+            {orgName && <span style={{ color: c.textIce }}>{orgName}</span>}
+            {domainLabel && <span style={{ opacity: 0.7 }}>· {domainLabel}</span>}
+          </div>
+        )}
         {compact && (
           <div
             className="ava-glass"
