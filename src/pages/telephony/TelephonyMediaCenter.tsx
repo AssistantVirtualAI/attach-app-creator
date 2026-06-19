@@ -145,7 +145,7 @@ function CdrTab({ orgId, extension, search, rangeDays }: { orgId: string; extens
     queryFn: async () => {
       const since = new Date(Date.now() - rangeDays * 864e5).toISOString();
       let q = (supabase as any).from("pbx_call_records")
-        .select("id,start_at,duration_seconds,direction,caller_number,destination_number,extension,call_status,hangup_cause,recording_path,has_recording,pbx_uuid")
+        .select("id,start_at,duration_seconds,direction,caller_number,destination_number,source_number,extension,call_status,hangup_cause,recording_path,has_recording,pbx_uuid")
         .eq("organization_id", orgId).gte("start_at", since).order("start_at", { ascending: false }).limit(500);
       if (extension) q = q.or(`extension.eq.${extension},caller_number.eq.${extension},destination_number.eq.${extension},source_number.eq.${extension}`);
       const { data } = await q;
