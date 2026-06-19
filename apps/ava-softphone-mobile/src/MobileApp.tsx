@@ -247,6 +247,8 @@ function AuthenticatedShell({
   }
 
 
+  const [profileOpen, setProfileOpen] = useState(false);
+
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', height: '100vh',
@@ -260,17 +262,32 @@ function AuthenticatedShell({
       <RealtimeHeader creds={creds} />
 
       <div key={tab} className="lemtel-page-enter" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        {tab === 'home'     && <DashboardScreen onNavigate={setTab as any} haptic={haptic} />}
-        {tab === 'calls'    && <CallsScreen sp={sp} haptic={haptic} creds={creds} />}
-        {tab === 'ava'      && <AVAChatScreen />}
-        {tab === 'messages' && <TeamChatScreen accessToken={creds.accessToken || null} userId={creds.userId} />}
-        {tab === 'more'     && <MoreScreen creds={creds} sp={sp} onSignOut={onSignOut} haptic={haptic} />}
+        {tab === 'home'       && <DashboardScreen onNavigate={setTab as any} haptic={haptic} onOpenProfile={() => setProfileOpen(true)} />}
+        {tab === 'calls'      && <CallsScreen sp={sp} haptic={haptic} creds={creds} />}
+        {tab === 'ava'        && <AVAChatScreen />}
+        {tab === 'messages'   && <TeamChatScreen accessToken={creds.accessToken || null} userId={creds.userId} />}
+        {tab === 'more'       && <MoreScreen creds={creds} sp={sp} onSignOut={onSignOut} haptic={haptic} />}
+        {tab === 'voicemail'  && <VoicemailScreen haptic={haptic} />}
+        {tab === 'recordings' && <RecordingsScreen />}
+        {tab === 'contacts'   && <ContactsScreen sp={sp} />}
+        {tab === 'sms'        && <MessagesScreen haptic={haptic} />}
+        {tab === 'queues'     && <QueuesScreen />}
+        {tab === 'settings'   && <SettingsScreen creds={creds} sp={sp} onSignOut={onSignOut} />}
       </div>
 
       <BottomTabs active={tab} onChange={(t) => { haptic(ImpactStyle.Light); setTab(t); }} />
 
       {!inCall && <DialerFab sp={sp} haptic={haptic} />}
       {inCall && <ActiveCallSheet sp={sp} haptic={haptic} />}
+
+      {profileOpen && (
+        <ProfileSheet
+          creds={creds}
+          onClose={() => setProfileOpen(false)}
+          onSignOut={() => { setProfileOpen(false); onSignOut(); }}
+          onCredsUpdate={setCreds}
+        />
+      )}
     </div>
   );
 }
