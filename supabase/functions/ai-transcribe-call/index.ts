@@ -110,6 +110,21 @@ Deno.serve(async (req) => {
       }
     }
 
+    if (body?.force !== true) {
+      const { data: existingTranscript } = await admin.from("pbx_call_transcripts")
+        .select("transcript_text, provider, created_at")
+        .eq("call_record_id", call_record_id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const provider = String((existingTranscript as any)?.provider || "");
+      const text = String((existingTranscript as any)?.transcript_text || "").trim();
+      if (text && !provider.startsWith("stub")) {
+        await audit("cached", { provider, message: "Transcript already exists — skipped re-transcription", metadata: { cached_at: (existingTranscript as any)?.created_at } });
+        return json({ transcript_text: text, cached: true, stub: false, provider, skipped_reason: "Transcript already exists — no STT tokens used." });
+      }
+    }
+
     const sourceUrl = recording_url || call?.recording_url || null;
     const fallbackTranscript = [
       `Call ${call?.direction || "unknown"} from ${call?.caller_name || call?.caller_number || "unknown caller"} to ${call?.destination_number || call?.destination || "unknown destination"}.`,
