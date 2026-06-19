@@ -1,5 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createSIPUA, JsSIPUnavailableError, SIPConfig, sdpModifier, classifySipFailure, hasWebRTC, WEBRTC_UNAVAILABLE_MESSAGE } from '../lib/sip/jssipProvider';
+import {
+  appendSipLog, clearSipLog as clearPersistedLog, loadPersistedError, loadPersistedStatus,
+  loadSipLog, PersistedSipError, RETRY_BACKOFF_MS, savePersistedError, savePersistedStatus,
+  SipLogEntry,
+} from '../lib/sip/sipPersistence';
 
 export type SIPStatus = 'idle' | 'connecting' | 'registered' | 'retrying' | 'error';
 export type CallState = 'idle' | 'ringing' | 'active' | 'ended';
@@ -22,19 +27,32 @@ export interface UseSoftphoneReturn {
   sendDTMF: (key: string) => void;
   setStatus: (status: string) => void;
   reconnect: () => void;
+  /** Last persisted error (from prior session if app was restarted). */
+  lastPersistedError: PersistedSipError | null;
+  /** Rolling buffer of SIP-related events (latest last). */
+  sipLog: SipLogEntry[];
+  clearSipLog: () => void;
+  /** Current retry attempt counter (0 = none). */
+  retryAttempt: number;
+  /** When the next auto-retry is scheduled (epoch ms) or null. */
+  nextRetryAt: number | null;
 }
 
 export function useSoftphone(
   config: SIPConfig | null,
   opts: { jsSipTimeoutMs?: number } = {},
 ): UseSoftphoneReturn {
-  const [sipStatus, setSipStatus] = useState<SIPStatus>('idle');
-  const [sipError, setSipError] = useState('');
+  const [sipStatus, setSipStatusState] = useState<SIPStatus>('idle');
+  const [sipError, setSipErrorState] = useState('');
   const [callState, setCallState] = useState<CallState>('idle');
   const [callTimer, setCallTimer] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [isOnHold, setIsOnHold] = useState(false);
   const [activeCallNumber, setActiveCallNumber] = useState('');
+  const [lastPersistedError, setLastPersistedError] = useState<PersistedSipError | null>(() => loadPersistedError());
+  const [sipLog, setSipLog] = useState<SipLogEntry[]>(() => loadSipLog());
+  const [retryAttempt, setRetryAttempt] = useState(0);
+  const [nextRetryAt, setNextRetryAt] = useState<number | null>(null);
 
   const uaRef = useRef<any>(null);
   const sessionRef = useRef<any>(null);
@@ -46,59 +64,114 @@ export function useSoftphone(
   const reconnectRef = useRef<() => void>(() => {});
   const [reconnectTick, setReconnectTick] = useState(0);
 
+  // --- logging helpers ---
+  const log = useCallback((event: string, detail?: string, level: 'info' | 'warn' | 'error' = 'info') => {
+    const entry: SipLogEntry = { time: Date.now(), level, event, detail };
+    const next = appendSipLog(entry);
+    setSipLog(next);
+    // Mirror to console for live debugging.
+    const tag = `[SIP][${level}] ${event}`;
+    if (level === 'error') console.error(tag, detail || '');
+    else if (level === 'warn') console.warn(tag, detail || '');
+    else console.log(tag, detail || '');
+  }, []);
+
+  const setSipStatus = useCallback((s: SIPStatus) => {
+    setSipStatusState(s);
+    savePersistedStatus(s);
+  }, []);
+
+  const setSipError = useCallback((msg: string, ctx?: { extension?: string; domain?: string }) => {
+    setSipErrorState(msg);
+    if (msg && (ctx?.extension || ctx?.domain)) {
+      const persisted: PersistedSipError = {
+        error: msg,
+        extension: ctx?.extension || '',
+        domain: ctx?.domain || '',
+        time: Date.now(),
+      };
+      savePersistedError(persisted);
+      setLastPersistedError(persisted);
+    }
+  }, []);
+
+  const clearSipLog = useCallback(() => { clearPersistedLog(); setSipLog([]); }, []);
+
+  // Restore persisted status on mount so UI doesn't flash "idle" on cold start.
+  useEffect(() => {
+    const prior = loadPersistedStatus();
+    if (prior === 'error' || prior === 'retrying') {
+      setSipStatusState('connecting');
+    }
+  }, []);
+
   // WebRTC capability check on mount — surfaces clear error immediately so
   // UI doesn't sit on "connecting…" for ever.
   useEffect(() => {
     if (typeof window !== 'undefined' && !hasWebRTC()) {
       setSipStatus('error');
       setSipError(WEBRTC_UNAVAILABLE_MESSAGE);
+      log('webrtc.unavailable', WEBRTC_UNAVAILABLE_MESSAGE, 'error');
     }
-  }, []);
+  }, [log, setSipError, setSipStatus]);
 
   useEffect(() => {
     if (!config) return;
     if (typeof window !== 'undefined' && !hasWebRTC()) return;
     let cancelled = false;
 
-    const RETRY_DELAYS_MS = [5000, 15000];
+    const ctx = { extension: config.extension, domain: config.domain };
     const clearRetry = () => {
       if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null; }
+      setNextRetryAt(null);
     };
     authBlockedRef.current = false;
 
     const start = () => {
       if (cancelled) return;
       setSipStatus('connecting');
-      setSipError('');
+      setSipErrorState('');
+      log('register.start', `ext=${config.extension}@${config.domain} wss=${config.wssUrl}`);
 
       createSIPUA(config, opts.jsSipTimeoutMs ?? 8000)
         .then((ua) => {
           if (cancelled) { try { ua.stop(); } catch {} return; }
+          ua.on('connecting', () => log('ws.connecting', config.wssUrl));
+          ua.on('connected', () => log('ws.connected', config.wssUrl));
           ua.on('registered', () => {
             retryAttemptRef.current = 0;
+            setRetryAttempt(0);
             clearRetry();
             setSipStatus('registered');
-            setSipError('');
+            setSipErrorState('');
+            log('register.ok', `ext=${config.extension}@${config.domain}`);
+          });
+          ua.on('unregistered', (e: any) => {
+            log('register.unregistered', e?.cause || '', 'warn');
           });
           ua.on('registrationFailed', (e: any) => {
+            const code = e?.response?.status_code;
             const msg = classifySipFailure({
               cause: e?.cause,
-              status_code: e?.response?.status_code,
+              status_code: code,
               reason_phrase: e?.response?.reason_phrase,
             });
             setSipStatus('error');
-            setSipError(msg);
-            const code = e?.response?.status_code;
+            setSipError(msg, ctx);
+            log('register.failed', `code=${code ?? '?'} cause=${e?.cause || ''} → ${msg}`, 'error');
             if (code === 401 || code === 403 || code === 407) {
               authBlockedRef.current = true;
+              log('retry.blocked', `auth failure (${code}) — auto-retry disabled until credentials change`, 'warn');
               return;
             }
             scheduleRetry();
           });
           ua.on('disconnected', (e: any) => {
             setSipStatus('connecting');
+            log('ws.disconnected', `code=${e?.code || ''} reason=${e?.reason || ''}`, 'warn');
             if (e?.error) {
-              setSipError(classifySipFailure({ cause: e?.reason || 'WSS connection failed' }));
+              const msg = classifySipFailure({ cause: e?.reason || 'WSS connection failed' });
+              setSipError(msg, ctx);
               scheduleRetry();
             }
           });
@@ -107,13 +180,16 @@ export function useSoftphone(
             sessionRef.current = session;
             const remoteNumber = session.remote_identity?.uri?.user || 'Unknown';
             setActiveCallNumber(remoteNumber);
+            log('session.new', `${session.direction} ${remoteNumber}`);
             if (session.direction === 'incoming') setCallState('ringing');
             session.on('confirmed', () => {
               setCallState('active');
+              log('session.confirmed', remoteNumber);
               timerRef.current = setInterval(() => setCallTimer((t) => t + 1), 1000);
             });
             session.on('ended', () => {
               setCallState('ended');
+              log('session.ended', remoteNumber);
               if (timerRef.current) clearInterval(timerRef.current);
               setTimeout(() => {
                 setCallState('idle');
@@ -129,7 +205,8 @@ export function useSoftphone(
                 status_code: e?.message?.status_code,
                 reason_phrase: e?.message?.reason_phrase,
               });
-              setSipError(msg);
+              setSipError(msg, ctx);
+              log('session.failed', `${remoteNumber} → ${msg}`, 'error');
               setCallState('idle');
               if (timerRef.current) clearInterval(timerRef.current);
               setActiveCallNumber('');
@@ -141,11 +218,11 @@ export function useSoftphone(
         .catch((err) => {
           if (cancelled) return;
           setSipStatus('error');
-          setSipError(
-            err instanceof JsSIPUnavailableError
-              ? 'Phone library failed to load. Check your internet connection and try again.'
-              : classifySipFailure({ cause: err?.message }),
-          );
+          const msg = err instanceof JsSIPUnavailableError
+            ? 'Phone library failed to load. Check your internet connection and try again.'
+            : classifySipFailure({ cause: err?.message });
+          setSipError(msg, ctx);
+          log('ua.create-failed', `${err?.name || ''}: ${err?.message || ''}`, 'error');
           scheduleRetry();
         });
     };
@@ -154,15 +231,17 @@ export function useSoftphone(
       if (cancelled) return;
       if (authBlockedRef.current) return;
       const attempt = retryAttemptRef.current;
-      const delay = RETRY_DELAYS_MS[Math.min(attempt, RETRY_DELAYS_MS.length - 1)];
+      const delay = RETRY_BACKOFF_MS[Math.min(attempt, RETRY_BACKOFF_MS.length - 1)];
       retryAttemptRef.current = attempt + 1;
+      setRetryAttempt(attempt + 1);
       clearRetry();
-      // Surface the back-off visibly so the UI can render "Retrying…"
-      // for the entire 5 s / 15 s window instead of frozen on "error".
       setSipStatus('retrying');
+      const fireAt = Date.now() + delay;
+      setNextRetryAt(fireAt);
+      log('retry.scheduled', `attempt=${attempt + 1} delay=${Math.round(delay / 1000)}s`);
       retryTimerRef.current = setTimeout(() => {
         if (cancelled) return;
-        console.log(`[AVA SIP] Retrying registration (attempt ${attempt + 1})…`);
+        log('retry.fire', `attempt=${attempt + 1}`);
         try { uaRef.current?.stop(); } catch {}
         uaRef.current = null;
         start();
@@ -173,6 +252,9 @@ export function useSoftphone(
       if (cancelled) return;
       clearRetry();
       retryAttemptRef.current = 0;
+      setRetryAttempt(0);
+      authBlockedRef.current = false;
+      log('reconnect.manual', 'user-initiated');
       try { uaRef.current?.stop(); } catch {}
       uaRef.current = null;
       start();
@@ -189,7 +271,7 @@ export function useSoftphone(
       uaRef.current = null;
       reconnectRef.current = () => {};
     };
-  }, [config?.extension, config?.wssUrl, config?.domain, config?.password, opts.jsSipTimeoutMs, reconnectTick]);
+  }, [config?.extension, config?.wssUrl, config?.domain, config?.password, opts.jsSipTimeoutMs, reconnectTick, log, setSipError, setSipStatus]);
 
   const call = (number: string) => {
     if (!uaRef.current || !config || sipStatus !== 'registered') return false;
@@ -242,7 +324,7 @@ export function useSoftphone(
     sessionRef.current?.sendDTMF(key, { duration: 100, interToneGap: 70 });
   const setStatus = (status: string) => console.log('Status change:', status);
   const reconnect = useCallback(() => {
-    setSipError('');
+    setSipErrorState('');
     setSipStatus('connecting');
     if (reconnectRef.current) {
       reconnectRef.current();
@@ -250,10 +332,11 @@ export function useSoftphone(
     // Always bump the tick so a fresh effect runs if the previous one
     // was cancelled (e.g. WebRTC missing on first mount, then enabled).
     setReconnectTick((t) => t + 1);
-  }, []);
+  }, [setSipStatus]);
 
   return {
     sipStatus, sipError, callState, callTimer, isMuted, isOnHold, activeCallNumber,
     call, hangup, answer, mute, unmute, hold, unhold, sendDTMF, setStatus, reconnect,
+    lastPersistedError, sipLog, clearSipLog, retryAttempt, nextRetryAt,
   };
 }
