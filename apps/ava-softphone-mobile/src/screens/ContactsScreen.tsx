@@ -68,14 +68,14 @@ export default function ContactsScreen({ sp }: { sp: any }) {
 
   useEffect(() => {
     if (mobile.loading) return;
-    if (!mobile.accessToken || !mobile.domainUuid) { setContacts([]); return; }
+    if (!mobile.accessToken || (!mobile.domainUuid && !mobile.organizationId)) { setContacts([]); return; }
     let cancelled = false;
     syncDeviceContacts().then(() => loadContacts()).catch(() => {});
     loadContacts().then(() => !cancelled && setError(null)).catch((e) => {
       if (!cancelled) { setContacts([]); setError(e?.message || 'Contacts failed'); }
     });
     return () => { cancelled = true; };
-  }, [loadContacts, mobile.loading, mobile.accessToken, mobile.domainUuid]);
+  }, [loadContacts, mobile.loading, mobile.accessToken, mobile.domainUuid, mobile.organizationId]);
 
   useEffect(() => {
     if (!mobile.accessToken || !mobile.domainUuid) return;

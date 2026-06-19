@@ -38,27 +38,38 @@ export default function TeamChatScreen(_props: { accessToken?: string | null; us
   }, [token]);
 
   const loadMembers = useCallback(async () => {
-    if (!token || !mobile.domainUuid) return [] as Member[];
-    const [safeRows, directory] = await Promise.all([
-      restGet<any[]>(`/rest/v1/pbx_softphone_users_safe?select=portal_user_id,extension,display_name,status,last_seen_at&domain_uuid=eq.${encodeURIComponent(mobile.domainUuid)}&order=extension.asc`, token).catch(() => []),
+    if (!token || (!mobile.domainUuid && !mobile.organizationId)) return [] as Member[];
+    // Pull every softphone row for the user's domain AND/OR org (fallback for rows missing domain_uuid).
+    const domainFilter = mobile.domainUuid ? `domain_uuid=eq.${encodeURIComponent(mobile.domainUuid)}` : null;
+    const orgFilter = mobile.organizationId ? `organization_id=eq.${encodeURIComponent(mobile.organizationId)}` : null;
+    const [domainRows, orgRows, directory] = await Promise.all([
+      domainFilter ? restGet<any[]>(`/rest/v1/pbx_softphone_users_safe?select=id,portal_user_id,extension,display_name,status,last_seen_at&${domainFilter}&order=extension.asc`, token).catch(() => []) : Promise.resolve([]),
+      orgFilter ? restGet<any[]>(`/rest/v1/pbx_softphone_users_safe?select=id,portal_user_id,extension,display_name,status,last_seen_at&${orgFilter}&order=extension.asc`, token).catch(() => []) : Promise.resolve([]),
       chatCall('list_directory', {}).catch(() => ({ members: [] })),
     ]);
-    const byId = new Map<string, any>();
-    (safeRows || []).forEach((r) => r.portal_user_id && byId.set(r.portal_user_id, { portal_user_id: r.portal_user_id, extension: r.extension, display_name: r.display_name, status: r.status, last_seen_at: r.last_seen_at }));
-    (directory.members || []).forEach((m: any) => m.user_id && byId.set(m.user_id, { ...byId.get(m.user_id), portal_user_id: m.user_id, extension: m.extension || byId.get(m.user_id)?.extension, display_name: m.full_name || m.email || byId.get(m.user_id)?.display_name, status: m.status, last_seen_at: m.last_seen_at }));
-    const rows = Array.from(byId.values());
+    // Merge softphone rows (use extension as fallback key when not linked to a portal user).
+    const byKey = new Map<string, any>();
+    for (const r of [...(domainRows || []), ...(orgRows || [])]) {
+      const key = r.portal_user_id || `ext:${r.extension}`;
+      byKey.set(key, { ...byKey.get(key), key, portal_user_id: r.portal_user_id || null, extension: r.extension, display_name: r.display_name, status: r.status, last_seen_at: r.last_seen_at });
+    }
+    (directory.members || []).forEach((m: any) => {
+      if (!m.user_id) return;
+      byKey.set(m.user_id, { ...byKey.get(m.user_id), key: m.user_id, portal_user_id: m.user_id, extension: m.extension || byKey.get(m.user_id)?.extension, display_name: m.full_name || m.email || byKey.get(m.user_id)?.display_name, status: m.status, last_seen_at: m.last_seen_at });
+    });
+    const rows = Array.from(byKey.values());
     const ids = rows.map((r) => r.portal_user_id).filter(Boolean);
     const pres = ids.length ? await restGet<any[]>(`/rest/v1/user_presence?select=user_id,status,call_state,last_seen_at&user_id=in.(${ids.map((id: string) => `"${id}"`).join(',')})`, token).catch(() => []) : [];
     const pmap = new Map((pres || []).map((p: any) => [p.user_id, p]));
-    const list = (rows || []).filter((r) => r.portal_user_id).map((r) => {
-      const p: any = pmap.get(r.portal_user_id);
+    const list = rows.map((r) => {
+      const p: any = r.portal_user_id ? pmap.get(r.portal_user_id) : null;
       const stale = !p?.last_seen_at || Date.now() - new Date(p.last_seen_at).getTime() > 5 * 60 * 1000;
       const status = p?.call_state && p.call_state !== 'idle' ? 'on_call' : stale ? (p?.status === 'available' ? 'away' : p?.status || r.status || 'offline') : (p?.status || r.status || 'available');
-      return { user_id: r.portal_user_id, full_name: r.display_name, email: null, extension: r.extension, status, is_self: r.portal_user_id === userId } as Member;
+      return { user_id: r.portal_user_id || `ext:${r.extension}`, full_name: r.display_name || (r.extension ? `Ext ${r.extension}` : null), email: null, extension: r.extension, status, is_self: r.portal_user_id === userId } as Member;
     });
     setMembers(list);
     return list;
-  }, [chatCall, mobile.domainUuid, token, userId]);
+  }, [chatCall, mobile.domainUuid, mobile.organizationId, token, userId]);
 
   const loadChannels = useCallback(async () => {
     if (!token) return;
