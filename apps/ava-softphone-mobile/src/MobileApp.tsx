@@ -7,7 +7,7 @@ import AuthScreen from './screens/AuthScreen';
 import DashboardScreen from './screens/DashboardScreen';
 import CallsScreen from './screens/CallsScreen';
 import AVAChatScreen from './screens/AVAChatScreen';
-import InboxScreen from './screens/InboxScreen';
+import TeamChatScreen from './screens/TeamChatScreen';
 import MoreScreen from './screens/MoreScreen';
 import BottomTabs, { Tab } from './components/BottomTabs';
 import ActiveCallSheet from './components/ActiveCallSheet';
@@ -17,7 +17,7 @@ import DialerFab from './components/DialerFab';
 import RealtimeStatusPill from './components/RealtimeStatusPill';
 import { useRealtimeCDR } from './hooks/useRealtimeCDR';
 import { initBackgroundSync } from './lib/backgroundSync';
-import { useStoredCreds, Creds, ensureStoredOrganizationId } from './lib/creds';
+import { useStoredCreds, Creds, ensureStoredOrganizationId, hydrateSoftphoneCredentials } from './lib/creds';
 import { gradients, colors } from './lib/theme';
 import { requestAllPermissions, checkAllPermissions } from './lib/permissions';
 import { registerPush, sendPushTokenToBackend } from './lib/pushNotifications';
@@ -69,12 +69,13 @@ export default function MobileApp() {
   if (loading || booting) return <SplashAva />;
   if (!creds) return <AuthScreen onAuthenticated={setCreds} />;
 
-  return <AuthenticatedShell creds={creds} tab={tab} setTab={setTab} onSignOut={clearCreds} />;
+  return <AuthenticatedShell creds={creds} setCreds={setCreds} tab={tab} setTab={setTab} onSignOut={clearCreds} />;
 }
 
 function AuthenticatedShell({
-  creds, tab, setTab, onSignOut,
-}: { creds: Creds; tab: Tab; setTab: (t: Tab) => void; onSignOut: () => void }) {
+  creds, setCreds, tab, setTab, onSignOut,
+}: { creds: Creds; setCreds: (c: Creds) => void; tab: Tab; setTab: (t: Tab) => void; onSignOut: () => void }) {
+
   const [permsGateDone, setPermsGateDone] = useState<boolean | null>(isPreviewMode ? true : null);
 
   // Decide whether to show the onboarding permission gate.
@@ -161,12 +162,18 @@ function AuthenticatedShell({
     });
     configureAudit(async () => creds.accessToken || null);
     if (creds.accessToken) audit('softphone.signed_in', creds.userId, { extension: creds.extension });
-    // Backfill organizationId on legacy sessions that signed in before the
-    // user_roles resolver was added — keeps Recording debug + CDR realtime working.
-    if (creds.accessToken && creds.userId && !creds.organizationId) {
-      ensureStoredOrganizationId().catch(() => {});
+    // Hydrate full SIP credentials (extension, sip_domain, wss_url, password,
+    // org, role) from softphone-credentials so Settings displays real data and
+    // SIP can register — covers email-only sign-ins and legacy sessions.
+    const missing = !creds.organizationId || !creds.extension || !creds.sipDomain || !creds.wssUrl || !creds.sipPassword;
+    if (creds.accessToken && missing) {
+      hydrateSoftphoneCredentials('mobile').then((next) => {
+        if (next) setCreds(next);
+        else if (!creds.organizationId) ensureStoredOrganizationId().catch(() => {});
+      }).catch(() => {});
     }
   }, [creds]);
+
 
 
   // Once the permission gate is dismissed, finalize permissions + push.
@@ -248,7 +255,7 @@ function AuthenticatedShell({
         {tab === 'home'     && <DashboardScreen onNavigate={setTab as any} haptic={haptic} />}
         {tab === 'calls'    && <CallsScreen sp={sp} haptic={haptic} creds={creds} />}
         {tab === 'ava'      && <AVAChatScreen />}
-        {tab === 'messages' && <InboxScreen haptic={haptic} />}
+        {tab === 'messages' && <TeamChatScreen accessToken={creds.accessToken || null} userId={creds.userId} />}
         {tab === 'more'     && <MoreScreen creds={creds} sp={sp} onSignOut={onSignOut} haptic={haptic} />}
       </div>
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Phone, MessageSquare, MoreHorizontal, Sparkles, type LucideIcon } from 'lucide-react';
+import { Home, Phone, MessageCircle, MoreHorizontal, Sparkles, type LucideIcon } from 'lucide-react';
 import { colors, gradients, radius } from '../lib/theme';
 
 export type Tab = 'home' | 'calls' | 'ava' | 'messages' | 'more';
@@ -11,9 +11,10 @@ const SIDE_LEFT: Item[] = [
   { id: 'calls', label: 'Calls', Icon: Phone },
 ];
 const SIDE_RIGHT: Item[] = [
-  { id: 'messages', label: 'Messages', Icon: MessageSquare },
+  { id: 'messages', label: 'Chat', Icon: MessageCircle },
   { id: 'more',     label: 'More',     Icon: MoreHorizontal },
 ];
+
 
 export default function BottomTabs({
   active, onChange,
