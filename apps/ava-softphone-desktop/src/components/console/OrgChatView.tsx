@@ -315,7 +315,7 @@ export default function OrgChatView() {
     if (!dm) {
       const { data, error } = await supabase.functions.invoke('org-chat', { body: { action: 'ensure_dm_channel', payload: { user_id: otherId } } });
       const err = (error as any)?.message || (data as any)?.error;
-      if (err) { setErrMsg(err === 'not_in_org' ? 'Teammate is not in your workspace.' : `DM error: ${err}`); return; }
+      if (err) { setErrMsg(['not_in_org', 'not_in_domain'].includes(err) ? 'Teammate is not linked to your PBX domain.' : `DM error: ${err}`); return; }
       if (!(data as any)?.channel) { setErrMsg('Unable to open chat'); return; }
       dm = (data as any).channel as Channel;
       setChannels((cs) => [...cs, dm!]);
