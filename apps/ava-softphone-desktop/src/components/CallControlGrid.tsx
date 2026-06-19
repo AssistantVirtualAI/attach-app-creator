@@ -56,19 +56,34 @@ function CallControlGridImpl({ organizationId, onDial, onTransfer }: Props) {
     return () => { cancelled = true; supabase.removeChannel(channel); };
   }, [organizationId]);
 
-  // Poll parked + active lines from PBX
+  // Poll parked + active lines from PBX. Backs off on repeated failures and
+  // pauses while the tab is hidden so the polling doesn't stack up during
+  // long active calls (was contributing to wide-layout dialer freezes).
   useEffect(() => {
     let timer: any;
+    let cancelled = false;
+    let failures = 0;
     const tick = async () => {
+      if (cancelled) return;
+      if (typeof document !== 'undefined' && document.hidden) {
+        timer = setTimeout(tick, 8000);
+        return;
+      }
+      let delay = 4000;
       try {
-        const { data } = await supabase.functions.invoke('fusionpbx-proxy', { body: { action: 'call-state' } });
+        const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', { body: { action: 'call-state' } });
+        if (error) throw error;
         setActiveLines(data?.active || []);
         setParked(data?.parked || []);
-      } catch {}
-      timer = setTimeout(tick, 4000);
+        failures = 0;
+      } catch {
+        failures = Math.min(failures + 1, 6);
+        delay = Math.min(4000 * 2 ** failures, 60_000); // exponential backoff, cap 60s
+      }
+      if (!cancelled) timer = setTimeout(tick, delay);
     };
     tick();
-    return () => clearTimeout(timer);
+    return () => { cancelled = true; clearTimeout(timer); };
   }, []);
 
   const statusColor = (s: string) => ({

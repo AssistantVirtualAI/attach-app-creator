@@ -537,9 +537,16 @@ async function bestEffortCdrSync(limit = 200, minIntervalMs = 30_000, force = fa
         max_pages: 2,
         from_beginning: true,
       });
-    } catch (e) {
-      console.warn('[AVA] CDR sync failed', e);
-      if (force) throw e;
+    } catch (e: any) {
+      const msg = String(e?.message || e || '');
+      // NO_CDR_ENDPOINT means the PBX live-CDR endpoint is unreachable. Keep
+      // the cached Supabase rows usable instead of failing the whole refresh.
+      if (/NO_CDR_ENDPOINT/i.test(msg)) {
+        console.warn('[AVA] CDR sync skipped — PBX endpoint unavailable, showing cached records.');
+      } else {
+        console.warn('[AVA] CDR sync failed', e);
+        if (force) throw new Error('Live CDR sync is temporarily unavailable — showing cached records.');
+      }
     } finally {
       cdrSyncInFlight = null;
     }
