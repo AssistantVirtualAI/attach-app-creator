@@ -65,7 +65,7 @@ export default function OrgChat() {
         await channelsQ.refetch();
         setActiveId(r.channel.id);
       } else if (r?.error) {
-        toast.error(r.error === "not_in_org" ? "Teammate is not in your workspace." : String(r.error));
+        toast.error(["not_in_org", "not_in_domain"].includes(r.error) ? "Teammate is not linked to your PBX domain." : String(r.error));
       }
     } catch (e: any) {
       toast.error(e?.message || "Failed to open DM");
