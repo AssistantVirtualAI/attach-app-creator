@@ -121,11 +121,34 @@ export default function DashboardScreen({
         </Card>
       ))}
 
-      <SectionTitle eyebrow="AVA assistant" title="Ask anything" />
-      <AIPanel title="Talk to AVA" right={<GhostButton tone="violet" style={{ padding: '6px 10px' }} onClick={() => onNavigate('ava')}>Open chat</GhostButton>}>
-        <p style={{ fontSize: font.base, lineHeight: 1.55, color: colors.textIce, margin: 0 }}>
-          Ask about today's calls, missed customers, recordings or queue performance.
-        </p>
+      <SectionTitle eyebrow="AVA assistant" title={`AVA summary · ${RANGE_LABELS[range]}`} />
+      <AIPanel title="What AVA sees" accent={colors.avaViolet} right={<GhostButton tone="violet" style={{ padding: '6px 10px' }} onClick={() => onNavigate('ava')}>Open chat</GhostButton>}>
+        {!s ? (
+          <Skeleton w="100%" h={42} />
+        ) : (
+          <div style={{ fontSize: font.base, lineHeight: 1.55, color: colors.textIce }}>
+            <p style={{ margin: '0 0 8px' }}>
+              {total === 0
+                ? `No calls in this range yet — refresh once new CDRs land.`
+                : `Across ${RANGE_LABELS[range].toLowerCase()}, your team handled ${total} calls · ${answered} answered, ${missed} missed, ${voicemails} voicemails. Answer rate ${s.answerRate ?? 0}%${s.peakHour != null ? `, peak at ${s.peakHour}:00` : ''}.`}
+            </p>
+            {s.topExtensions?.length > 0 && (
+              <p style={{ margin: 0, color: colors.textSub, fontSize: font.sm }}>
+                Top extension #{s.topExtensions[0].extension}{s.topExtensions[0].name ? ` (${s.topExtensions[0].name})` : ''} with {s.topExtensions[0].calls} calls.
+              </p>
+            )}
+            <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+              {(['today','7d','30d'] as StatsRange[]).map((r) => (
+                <button key={r} onClick={() => { haptic(); setRange(r); }} style={{
+                  padding: '4px 10px', borderRadius: 999, border: `1px solid ${colors.border}`,
+                  background: range === r ? colors.avaViolet : 'transparent',
+                  color: range === r ? '#fff' : colors.textSub, fontSize: 10.5, fontWeight: 700,
+                  letterSpacing: 0.6, textTransform: 'uppercase', cursor: 'pointer',
+                }}>{RANGE_LABELS[r]}</button>
+              ))}
+            </div>
+          </div>
+        )}
       </AIPanel>
 
       {stats.lastSyncedAt && (
