@@ -19,7 +19,7 @@ function mapCall(r: any) {
     to: r.destination_number || r.destination || r.extension || "",
     customer: r.caller_name || undefined,
     startedAt: r.start_at, durationSec: r.duration_seconds || 0,
-    hasRecording: !!r.has_recording, hasTranscript: !!r.transcribed,
+    hasRecording: !!(r.has_recording || r.recording_path || r.recording_name || r.recording_url), hasTranscript: !!r.transcribed,
   };
 }
 
@@ -78,11 +78,11 @@ Deno.serve(async (req) => {
       if (!r) return json({ error: "not_found" }, 404);
 
       const [{ data: tr }, { data: ins }, { data: audit }] = await Promise.all([
-        sb.from("pbx_call_transcripts").select("transcript_json, transcript_text")
+        admin.from("pbx_call_transcripts").select("transcript_json, transcript_text")
           .eq("call_record_id", id).maybeSingle(),
-        sb.from("pbx_ai_insights").select("summary, topics, action_items, quality_score, coaching_score, coaching_notes, intent, tags, sentiment, ai_model, created_at")
+        admin.from("pbx_ai_insights").select("summary, topics, action_items, quality_score, coaching_score, coaching_notes, intent, tags, sentiment, ai_model, created_at")
           .eq("call_record_id", id).maybeSingle(),
-        sb.from("ai_request_audit_log").select("status, error_code, message, created_at")
+        admin.from("ai_request_audit_log").select("status, error_code, message, created_at")
           .eq("call_record_id", id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
       ]);
 
@@ -119,7 +119,7 @@ Deno.serve(async (req) => {
 
     const limit = Math.min(Number(url.searchParams.get("limit")) || 50, 200);
     let listQ = admin.from("pbx_call_records")
-      .select("id, direction, call_status, caller_name, caller_number, source_number, destination, destination_number, extension, start_at, duration_seconds, missed_call, has_recording, transcribed")
+      .select("id, direction, call_status, caller_name, caller_number, source_number, destination, destination_number, extension, start_at, duration_seconds, missed_call, has_recording, recording_path, recording_name, recording_url, transcribed")
       .eq("organization_id", sp.organization_id);
     if (!isDomainAdmin) listQ = listQ.or(extFilter);
     if (sp.domain_uuid) listQ = listQ.or(`domain_uuid.eq.${sp.domain_uuid},domain_uuid.is.null`);
