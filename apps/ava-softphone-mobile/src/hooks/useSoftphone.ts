@@ -102,6 +102,16 @@ export function useSoftphone(
 
   const clearSipLog = useCallback(() => { clearPersistedLog(); setSipLog([]); }, []);
 
+  const clearSipState = useCallback(() => {
+    clearPersistedStatus();
+    savePersistedError(null);
+    setLastPersistedError(null);
+    setSipErrorState('');
+    setSipStatusState('idle');
+    setRetryAttempt(0);
+    setRetryLimitReached(false);
+  }, []);
+
   // Restore persisted status on mount so UI doesn't flash "idle" on cold start.
   useEffect(() => {
     const prior = loadPersistedStatus();
