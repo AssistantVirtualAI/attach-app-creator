@@ -214,6 +214,7 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
 function SegmentedControl({ value, onChange }: { value: SubTab; onChange: (v: SubTab) => void }) {
   const items: { id: SubTab; label: string }[] = [
     { id: 'recents', label: 'History' },
+    { id: 'recordings', label: 'Recordings' },
     { id: 'voicemail', label: 'Voicemail' },
     { id: 'dial', label: 'Keypad' },
   ];
