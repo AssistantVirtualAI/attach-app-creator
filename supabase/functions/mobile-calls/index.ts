@@ -51,8 +51,8 @@ Deno.serve(async (req) => {
     const [{ data: roleRow }, { data: orgMember }, { data: superAdmin }, { data: lemtelAdmin }] = await Promise.all([
       admin.from("user_roles").select("role").eq("user_id", u.user.id).eq("organization_id", sp.organization_id).maybeSingle(),
       admin.from("org_members").select("role, can_manage_extensions, can_listen_calls").eq("user_id", u.user.id).eq("org_id", sp.organization_id).maybeSingle(),
-      (async () => await admin.rpc("is_super_admin", { _user_id: u.user.id }).maybeSingle().catch(() => ({ data: false } as any)))(),
-      (async () => await admin.rpc("is_lemtel_admin", { _user_id: u.user.id }).maybeSingle().catch(() => ({ data: false } as any)))(),
+      (async () => { try { return await admin.rpc("is_super_admin", { _user_id: u.user.id }).maybeSingle(); } catch { return { data: false } as any; } })(),
+      (async () => { try { return await admin.rpc("is_lemtel_admin", { _user_id: u.user.id }).maybeSingle(); } catch { return { data: false } as any; } })(),
     ]);
     const orgMemberRole = (orgMember as any)?.role || "";
     const appRole = (roleRow as any)?.role || "agent";
