@@ -70,3 +70,37 @@ export function clearSipLog() {
 
 /** Exponential back-off with cap (ms). Skipped entirely for auth failures. */
 export const RETRY_BACKOFF_MS = [3000, 6000, 12000, 24000, 45000, 60000];
+
+/** Hard cap on auto-retries per session before we stop and require manual action. */
+export const MAX_AUTO_RETRIES = 6;
+
+/** Quick WSS reachability probe — opens a WebSocket and waits for `open` or `error`. */
+export function probeWss(url: string, timeoutMs = 3500): Promise<{ ok: boolean; reason?: string; ms: number }> {
+  return new Promise((resolve) => {
+    if (typeof WebSocket === 'undefined') return resolve({ ok: false, reason: 'no-websocket', ms: 0 });
+    const start = Date.now();
+    let done = false;
+    let ws: WebSocket | null = null;
+    const finish = (ok: boolean, reason?: string) => {
+      if (done) return;
+      done = true;
+      try { ws?.close(); } catch {}
+      resolve({ ok, reason, ms: Date.now() - start });
+    };
+    const timer = setTimeout(() => finish(false, 'timeout'), timeoutMs);
+    try {
+      ws = new WebSocket(url, 'sip');
+      ws.onopen = () => { clearTimeout(timer); finish(true); };
+      ws.onerror = () => { clearTimeout(timer); finish(false, 'error'); };
+      ws.onclose = (ev) => { clearTimeout(timer); if (!done) finish(false, `close:${ev.code}`); };
+    } catch (e: any) {
+      clearTimeout(timer);
+      finish(false, e?.message || 'exception');
+    }
+  });
+}
+
+export function clearPersistedStatus() {
+  if (typeof localStorage === 'undefined') return;
+  safe(() => localStorage.removeItem(STATUS_KEY), undefined);
+}
