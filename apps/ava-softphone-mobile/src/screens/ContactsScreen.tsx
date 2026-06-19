@@ -26,10 +26,12 @@ export default function ContactsScreen({ sp }: { sp: any }) {
     if (!mobile.accessToken || !rows?.length) { setPresence({}); return; }
     const ids = rows.map((c) => c.user_id).filter(Boolean) as string[];
     if (!ids.length) { setPresence({}); return; }
-    const pres = await restGet<Presence[]>(`/rest/v1/user_presence?select=user_id,status,call_state,last_seen_at&user_id=in.(${ids.map((id) => `"${id}"`).join(',')})`, mobile.accessToken);
-    const map: Record<string, Presence> = {};
-    (pres || []).forEach((p) => { map[p.user_id] = p; });
-    setPresence(map);
+    try {
+      const pres = await restGet<Presence[]>(`/rest/v1/user_presence?select=user_id,status,call_state,last_seen_at&user_id=in.(${ids.join(',')})`, mobile.accessToken);
+      const map: Record<string, Presence> = {};
+      (pres || []).forEach((p) => { map[p.user_id] = p; });
+      setPresence(map);
+    } catch { /* presence is optional, never break the directory */ }
   }, [mobile.accessToken]);
 
   const loadContacts = useCallback(async () => {
