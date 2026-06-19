@@ -28,13 +28,16 @@ Deno.serve(async (req) => {
     const { data: __mobileAllowed } = await sb.rpc("my_platform_access_allowed", { _platform: "mobile" });
     if (__mobileAllowed === false) return json({ error: "MOBILE_ACCESS_DISABLED", message: "Mobile access not granted by Lemtel administrators." }, 403);
 
+    // Use admin client for the softphone lookup — the user owns this row
+    // and we hit intermittent RLS misses with the user-scoped client.
     const [{ data: profile }, { data: sp }] = await Promise.all([
       sb.from("profiles").select("full_name, email, avatar_url").eq("id", u.user.id).maybeSingle(),
-      sb.from("pbx_softphone_users")
+      admin.from("pbx_softphone_users")
         .select("organization_id, client_id, extension_id, extension, sip_domain, display_name, forward_enabled, forward_to, dnd_enabled, status, status_updated_at, updated_at, wss_url, app_access_enabled, mobile_access_enabled")
         .eq("portal_user_id", u.user.id)
         .maybeSingle(),
     ]);
+
 
     if (!sp) {
       // Graceful fallback: portal user without a provisioned softphone extension.
