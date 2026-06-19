@@ -168,6 +168,10 @@ Deno.serve(async (req) => {
     const { data: allowed } = await admin.rpc(rpcName, { _user_id: userId });
     let permitted = !!allowed;
     if (!permitted) {
+      const { data: isSuper } = await admin.rpc("is_super_admin", { _user_id: userId });
+      if (isSuper) permitted = true;
+    }
+    if (!permitted) {
       // Fallback: is caller an org_admin of the tenant tied to the requested domain?
       const targetDomain = _bodyEarly?.domain_uuid || _bodyEarly?.params?.domain_uuid;
       if (targetDomain) {
@@ -202,6 +206,19 @@ Deno.serve(async (req) => {
             .maybeSingle();
           if (mem?.organization_id) permitted = true;
         }
+      }
+    }
+    if (!permitted && !isRead) {
+      const targetOrg = _bodyEarly?.organization_id;
+      if (targetOrg) {
+        const { data: mem } = await admin
+          .from("org_members")
+          .select("role, can_manage_extensions, can_listen_calls")
+          .eq("user_id", userId)
+          .eq("org_id", targetOrg)
+          .limit(1)
+          .maybeSingle();
+        if (mem && (["master_admin", "ava_admin", "reseller_admin", "customer_admin", "owner", "admin"].includes((mem as any).role) || (mem as any).can_manage_extensions || (mem as any).can_listen_calls)) permitted = true;
       }
     }
     if (!permitted) {
@@ -1605,15 +1622,18 @@ Deno.serve(async (req) => {
       }
       if (!record) return false;
 
-      const { data: isLemtelAdmin } = await admin.rpc("is_lemtel_admin", { _user_id: userId });
-      if (isLemtelAdmin) return true;
+      const [{ data: isSuperAdmin }, { data: isLemtelAdmin }] = await Promise.all([
+        admin.rpc("is_super_admin", { _user_id: userId }),
+        admin.rpc("is_lemtel_admin", { _user_id: userId }),
+      ]);
+      if (isSuperAdmin || isLemtelAdmin) return true;
 
       const { data: orgMember } = await admin
         .from("org_members")
         .select("role")
         .eq("user_id", userId)
         .eq("org_id", record.organization_id)
-        .in("role", ["owner", "admin"])
+        .in("role", ["owner", "admin", "master_admin", "ava_admin", "reseller_admin", "customer_admin"])
         .maybeSingle();
       if (orgMember) return true;
 
@@ -2199,6 +2219,25 @@ Deno.serve(async (req) => {
           organization_id, user_id: userId, action: "pbx.call_transferred",
           resource_type: "active_call", resource_id: uuid,
           metadata: { uuid, destination, context, ok: r?.ok },
+        });
+      }
+      return json(r, r?.ok ? 200 : 500);
+    }
+
+    if (action === "originate-click-to-call") {
+      const fromExtension = String(body.from_extension || params.from_extension || "").replace(/[^0-9*#+]/g, "");
+      const destination = String(body.destination || params.destination || "").replace(/[^0-9*#+]/g, "");
+      const domainName = String(body.domain_name || params.domain_name || "").trim();
+      if (!fromExtension || !destination || !domainName) return json({ error: "from_extension, destination, domain_name required" }, 400);
+      const args = `{origination_caller_id_name='AVA Mobile',origination_caller_id_number=${fromExtension}}user/${fromExtension}@${domainName} ${destination} XML ${domainName}`;
+      const r = await pbxWrite(`commands`, "POST", {
+        commands: [{ command: "originate", arguments: args }],
+      });
+      if (organization_id) {
+        await admin.from("audit_logs").insert({
+          organization_id, user_id: userId, action: "pbx.mobile_click_to_call",
+          resource_type: "pbx_extension", resource_id: fromExtension,
+          metadata: { from_extension: fromExtension, destination, ok: r?.ok },
         });
       }
       return json(r, r?.ok ? 200 : 500);

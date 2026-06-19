@@ -55,7 +55,7 @@ export type SyncLogEntry = {
   source: 'realtime' | 'polling' | 'manual' | 'snapshot';
 };
 
-export function useRealtimeCDR(creds: Creds | null) {
+export function useRealtimeCDR(creds: Creds | null, opts: { extension?: string | null; status?: 'all' | 'missed' | 'recorded'; domainAdmin?: boolean } = {}) {
   const [calls, setCalls] = useState<CallRecord[] | null>(null);
   const [transport, setTransport] = useState<CDRTransport>('idle');
   const [warning, setWarning] = useState<string | null>(null);
@@ -70,7 +70,7 @@ export function useRealtimeCDR(creds: Creds | null) {
 
   const load = useCallback(async () => {
     try {
-      const d = await mobileApi.calls();
+      const d = await mobileApi.calls({ extension: opts.extension, status: opts.status, limit: 200 });
       setCalls(d);
       setLastSyncAt(Date.now());
       pushLog({ status: 'success', source: 'snapshot', reason: `Snapshot loaded (${Array.isArray(d) ? d.length : 0} CDRs)` });
@@ -79,7 +79,7 @@ export function useRealtimeCDR(creds: Creds | null) {
       setWarning(reason);
       pushLog({ status: 'failed', source: 'snapshot', reason });
     }
-  }, [pushLog]);
+  }, [pushLog, opts.extension, opts.status]);
 
   useEffect(() => {
     let cancelled = false;
@@ -109,8 +109,9 @@ export function useRealtimeCDR(creds: Creds | null) {
       const sb = client(token);
       // Prefer extension scope; fall back to organization scope when the user
       // signed in via email and has no extension bound (e.g. org admins).
-      const filter = ext ? `extension=eq.${ext}` : `organization_id=eq.${orgId}`;
-      const chanKey = ext ? `cdr-ext-${ext}` : `cdr-org-${orgId}`;
+      const scopedExt = opts.extension && opts.extension !== 'all' ? opts.extension : null;
+      const filter = scopedExt ? `extension=eq.${scopedExt}` : opts.domainAdmin && orgId ? `organization_id=eq.${orgId}` : ext ? `extension=eq.${ext}` : `organization_id=eq.${orgId}`;
+      const chanKey = scopedExt ? `cdr-ext-${scopedExt}` : opts.domainAdmin && orgId ? `cdr-org-${orgId}` : ext ? `cdr-ext-${ext}` : `cdr-org-${orgId}`;
       watchdog = setTimeout(() => {
         startPolling('Realtime unavailable — polling every 15s.');
       }, 8_000);
@@ -207,7 +208,7 @@ export function useRealtimeCDR(creds: Creds | null) {
       window.removeEventListener('focus', load);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [creds?.extension, creds?.accessToken, creds?.organizationId]);
+  }, [creds?.extension, creds?.accessToken, creds?.organizationId, opts.extension, opts.domainAdmin, opts.status]);
 
   return {
     calls,

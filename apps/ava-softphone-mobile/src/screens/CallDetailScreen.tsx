@@ -6,6 +6,7 @@ import { Card, Chip, AIPanel, Skeleton, GhostButton } from '../components/ui/Pri
 import RecordingDebugScreen from './RecordingDebugScreen';
 import { showMobileToast } from '../lib/mobileToast';
 import { useMobileCredentials } from '../hooks/useMobileCredentials';
+import { loadPbxRecordingAudioMobile } from '../lib/mobileSupabase';
 
 type AiStage = 'idle' | 'transcribing' | 'analyzing' | 'done' | 'error';
 
@@ -48,26 +49,24 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
     setAudioError(null);
     setLoadingAudio(true);
     try {
-      const res: any = await mobileApi.voicemailAudio({
-        xml_cdr_uuid: id,
-        organization_id: mobile.organizationId || undefined,
-      });
-      if (res?.ok === false || !res?.url) {
-        const msg = res?.error === 'RECORDING_NOT_FOUND'
-          ? 'Recording not available — file may have been deleted from the PBX after the retention period.'
-          : res?.error === 'RECORDING_EMPTY'
-            ? 'Recording file is empty on the PBX.'
-            : 'No recording available for this call.';
-        throw new Error(msg);
-      }
-      return res.url;
+      return await loadPbxRecordingAudioMobile({
+        id,
+        pbx_uuid: data?.pbx_uuid || id,
+        recording_path: data?.recording_path,
+        recording_name: data?.recording_name,
+        recording_url: data?.recording_url,
+        domain_uuid: data?.domain_uuid || mobile.domainUuid,
+        domain_name: data?.domain_name,
+        organization_id: data?.organization_id || mobile.organizationId,
+        start_at: data?.startedAt,
+      }, mobile.accessToken, mobile.organizationId, mobile.domainUuid);
     } catch (e: any) {
       setAudioError(e?.message || 'Unable to load recording');
       return null;
     } finally {
       setLoadingAudio(false);
     }
-  }, [id, mobile.organizationId]);
+  }, [id, data, mobile.accessToken, mobile.organizationId, mobile.domainUuid]);
 
 
   const togglePlay = useCallback(async () => {

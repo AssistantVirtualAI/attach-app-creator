@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ImpactStyle } from '@capacitor/haptics';
 import { colors, font, radius, gradients } from '../lib/theme';
 import { mobileApi, CallRecord } from '../lib/mobileApi';
@@ -6,21 +6,37 @@ import { Card, Chip, SectionTitle, Skeleton, EmptyState, PrimaryButton, GhostBut
 import CallDetailScreen from './CallDetailScreen';
 import Dialpad from '../components/Dialpad';
 import VoicemailScreen from './VoicemailScreen';
-import RecordingsScreen from './RecordingsScreen';
 import { useRealtimeCDR } from '../hooks/useRealtimeCDR';
 import type { Creds } from '../lib/creds';
+import { restGet } from '../lib/mobileSupabase';
+import { showMobileToast } from '../lib/mobileToast';
 
-type SubTab = 'recents' | 'recordings' | 'voicemail' | 'dial';
+type SubTab = 'recents' | 'voicemail' | 'dial';
 
 export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s?: ImpactStyle) => Promise<void>; creds?: Creds | null }) {
   const [sub, setSub] = useState<SubTab>('recents');
   const [selected, setSelected] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'missed' | 'recorded'>('all');
+  const [extFilter, setExtFilter] = useState<string>('all');
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const [domainExtensions, setDomainExtensions] = useState<string[]>([]);
   const [number, setNumber] = useState('');
 
   // Real-time CDR via Supabase Realtime (postgres_changes) with automatic
   // 15s polling fallback + visible warning if the realtime channel fails.
-  const { calls, transport, warning, dismissWarning } = useRealtimeCDR(creds || null);
+  useEffect(() => {
+    mobileApi.me().then((m) => setIsAdmin(!!m?.permissions?.admin)).catch(() => setIsAdmin(false));
+  }, [creds?.accessToken]);
+
+  useEffect(() => {
+    const domainUuid = creds?.domainUuid || creds?.fusionpbxDomainUuid;
+    if (!creds?.accessToken || !domainUuid || !isAdmin) return;
+    restGet<{ extension: string }[]>(`/rest/v1/pbx_extensions_directory?select=extension&domain_uuid=eq.${encodeURIComponent(domainUuid)}&enabled=eq.true&order=extension.asc`, creds.accessToken)
+      .then((rows) => setDomainExtensions((rows || []).map((r) => String(r.extension)).filter(Boolean)))
+      .catch(() => setDomainExtensions([]));
+  }, [creds?.accessToken, creds?.domainUuid, creds?.fusionpbxDomainUuid, isAdmin]);
+
+  const { calls, transport, warning, dismissWarning } = useRealtimeCDR(creds || null, { extension: isAdmin ? extFilter : null, status: filter, domainAdmin: !!isAdmin });
 
   if (selected) return <CallDetailScreen id={selected} onBack={() => setSelected(null)} />;
 
@@ -31,8 +47,13 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
   const startCall = async (to: string) => {
     if (!to) return;
     await haptic(ImpactStyle.Medium);
-    try { await mobileApi.startCall(to); } catch {}
-    if (sp?.call) sp.call(to);
+    if (sp?.snap?.status === 'registered' && sp?.call) { sp.call(to); return; }
+    try {
+      await mobileApi.startCall(to, 'click_to_call');
+      showMobileToast('Deskphone call requested.', 'success');
+    } catch (e: any) {
+      showMobileToast(e?.message || 'Unable to start call', 'error');
+    }
   };
 
   return (
@@ -91,6 +112,16 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
             ))}
           </div>
 
+          {isAdmin && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '0 0 10px' }}>
+              <label style={{ fontSize: font.xs, color: colors.mutedSilver, fontWeight: 800, textTransform: 'uppercase' }}>Extension</label>
+              <select value={extFilter} onChange={(e) => setExtFilter(e.target.value)} style={{ flex: 1, padding: '8px 10px', borderRadius: 10, border: `1px solid ${colors.border}`, background: 'rgba(255,255,255,0.06)', color: colors.textIce, fontSize: 12, fontWeight: 700 }}>
+                <option value="all">All extensions</option>
+                {Array.from(new Set(domainExtensions)).sort().map((e) => <option key={e} value={e}>{e}</option>)}
+              </select>
+            </div>
+          )}
+
           {!calls && <ListSkeleton rows={6} />}
           {calls && filtered.length === 0 && (
             <EmptyState icon="📞" title="No calls yet" hint="Your call history will appear here. Tap the keypad to start one." cta={{ label: 'Open dialer', onPress: () => setSub('dial') }} />
@@ -99,7 +130,6 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
         </>
       )}
 
-      {sub === 'recordings' && <div style={{ marginTop: 12 }}><RecordingsScreen /></div>}
       {sub === 'voicemail' && <div style={{ marginTop: 12 }}><VoicemailScreen haptic={haptic} /></div>}
 
       <div style={{ height: 80 }} />
@@ -110,7 +140,6 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
 function SegmentedControl({ value, onChange }: { value: SubTab; onChange: (v: SubTab) => void }) {
   const items: { id: SubTab; label: string }[] = [
     { id: 'recents', label: 'History' },
-    { id: 'recordings', label: 'Recordings' },
     { id: 'voicemail', label: 'Voicemail' },
     { id: 'dial', label: 'Keypad' },
   ];
