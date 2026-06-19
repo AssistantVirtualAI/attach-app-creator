@@ -63,13 +63,16 @@ export default function DialerScreen({
       : 'rgba(239,68,68,0.12)';
   const bannerColor = isRegistered ? '#22c55e' : isRetrying ? '#f59e0b' : '#ef4444';
 
+  const retryLimitReached: boolean = !!sp.retryLimitReached;
   const bannerTitle = isRegistered
     ? `✅ Registered — Extension ${sp.sipConfig?.extension || ''}`.trim()
     : isRetrying
       ? (countdown !== null && retryAttempt > 0
           ? `🔄 Retrying in ${countdown}s (attempt ${retryAttempt})…`
           : '🔄 Connecting...')
-      : `❌ SIP error${sipError ? ` — ${sipError}` : ''}`;
+      : retryLimitReached
+        ? `⛔ Auto-retry stopped after ${retryAttempt} attempts${sipError ? ` — ${sipError}` : ''}. Tap Retry to try again.`
+        : `❌ SIP error${sipError ? ` — ${sipError}` : ''}`;
 
   const startCall = async () => {
     if (!num || dialing) return;
