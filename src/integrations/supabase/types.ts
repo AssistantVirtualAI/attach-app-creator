@@ -10905,6 +10905,13 @@ export type Database = {
       }
       current_user_internal_org_ids: { Args: never; Returns: string[] }
       current_user_org_ids: { Args: never; Returns: string[] }
+      current_user_softphone_domain_uuids: {
+        Args: never
+        Returns: {
+          domain_uuid: string
+          organization_id: string
+        }[]
+      }
       ensure_general_channel: {
         Args: { _org_id: string; _user_id: string }
         Returns: string
