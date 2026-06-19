@@ -18,7 +18,7 @@ export function useMobileCredentials() {
     (async () => {
       const stored = await Store.get();
       if (cancelled) return;
-      if (stored?.extension && (stored.domainUuid || stored.fusionpbxDomainUuid)) {
+      if (stored?.extension && (stored.domainUuid || stored.fusionpbxDomainUuid) && stored.organizationId) {
         setCreds(stored);
         setLoading(false);
         return;
