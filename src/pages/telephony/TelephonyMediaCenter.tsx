@@ -72,8 +72,8 @@ export default function TelephonyMediaCenter({ scope = "org" }: { scope?: Scope 
   });
 
   const orgId = (myExt as any)?.organization_id ?? LEMTEL_ORG;
-  const filterExt: string | null = scope === "mine" ? (myExt as any)?.extension ?? null : null;
-  const mineReady = scope !== "mine" || !!filterExt;
+  const filterExt: string | null = scope === "mine" ? (myExt as any)?.extension ?? null : (extFilter.trim() || null);
+  const mineReady = scope !== "mine" || !!((myExt as any)?.extension);
 
   return (
     <div className="space-y-4">
