@@ -314,7 +314,12 @@ Deno.serve(async (req) => {
     if (action === "create_group") {
       const name = String(payload?.name ?? "").trim() || "group";
       const memberIds: string[] = Array.isArray(payload?.member_ids) ? payload.member_ids : [];
-      const { data, error } = await admin.rpc("create_group_chat", { _name: name, _member_ids: memberIds });
+      const members = Array.from(new Set([userId, ...memberIds]));
+      const { data, error } = await admin
+        .from("org_chat_channels")
+        .insert({ organization_id: orgId, name, channel_type: "private", created_by: userId, members, description: "Group chat" })
+        .select()
+        .single();
       if (error) throw error;
       return json({ channel: data });
     }
