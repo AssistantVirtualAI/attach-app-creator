@@ -26,7 +26,7 @@ Deno.serve(async (req) => {
     if (!sp?.organization_id) return json({ items: [], noSoftphone: true });
 
     const { data: rows } = await sb.from("pbx_call_records")
-      .select("id, caller_name, caller_number, destination_number, start_at, duration_seconds, transcribed, ai_summary")
+      .select("id, pbx_uuid, caller_name, caller_number, destination_number, start_at, duration_seconds, transcribed, ai_summary, recording_path, recording_name, domain_uuid, domain_name, organization_id")
       .eq("organization_id", sp.organization_id)
       .eq("has_recording", true)
       .order("start_at", { ascending: false })
@@ -41,6 +41,13 @@ Deno.serve(async (req) => {
       durationSec: Number(r.duration_seconds || 0),
       hasTranscript: !!r.transcribed,
       summary: r.ai_summary || undefined,
+      // Audio addressing for /fusionpbx-proxy get-recording-signed-url
+      xml_cdr_uuid: r.pbx_uuid || r.id,
+      record_path: r.recording_path || undefined,
+      record_name: r.recording_name || undefined,
+      domain_uuid: r.domain_uuid || undefined,
+      domain_name: r.domain_name || undefined,
+      organization_id: r.organization_id || undefined,
     }));
     return json(out);
   } catch (e: any) {
