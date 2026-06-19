@@ -89,6 +89,7 @@ function AuthenticatedShell({
   const [permsGateDone, setPermsGateDone] = useState<boolean | null>(isPreviewMode ? true : null);
   const [profileOpen, setProfileOpen] = useState(false);
   const passwordHealRef = useRef('');
+  const hydratedTokenRef = useRef('');
 
   // Decide whether to show the onboarding permission gate.
   useEffect(() => {
@@ -206,11 +207,11 @@ function AuthenticatedShell({
     });
     configureAudit(async () => creds.accessToken || null);
     if (creds.accessToken) audit('softphone.signed_in', creds.userId, { extension: creds.extension });
-    // Hydrate full SIP credentials (extension, sip_domain, wss_url, password,
-    // org, role) from softphone-credentials so Settings displays real data and
-    // SIP can register — covers email-only sign-ins and legacy sessions.
-    const missing = !creds.organizationId || !creds.extension || !creds.sipDomain || !creds.wssUrl || !creds.sipPassword;
-    if (creds.accessToken && missing) {
+    // Desktop/portal always fetch fresh SIP credentials from the backend.
+    // Do the same on mobile once per session so stale cached SIP passwords from
+    // prior logins cannot keep causing PBX auth failures.
+    if (creds.accessToken && hydratedTokenRef.current !== creds.accessToken) {
+      hydratedTokenRef.current = creds.accessToken;
       hydrateSoftphoneCredentials('mobile').then((next) => {
         if (next) setCreds(next);
         else if (!creds.organizationId) ensureStoredOrganizationId().catch(() => {});
