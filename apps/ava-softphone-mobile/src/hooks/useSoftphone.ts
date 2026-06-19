@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { createSIPUA, JsSIPUnavailableError, SIPConfig } from '../lib/sip/jssipProvider';
+import { createSIPUA, JsSIPUnavailableError, SIPConfig, sdpModifier, classifySipFailure } from '../lib/sip/jssipProvider';
 
 export type SIPStatus = 'idle' | 'connecting' | 'registered' | 'error';
 export type CallState = 'idle' | 'ringing' | 'active' | 'ended';
@@ -39,69 +39,118 @@ export function useSoftphone(
   const sessionRef = useRef<any>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const retryAttemptRef = useRef(0);
+
   useEffect(() => {
     if (!config) return;
     let cancelled = false;
-    setSipStatus('connecting');
-    setSipError('');
 
-    createSIPUA(config, opts.jsSipTimeoutMs ?? 8000)
-      .then((ua) => {
-        if (cancelled) {
-          try { ua.stop(); } catch {}
-          return;
-        }
-        ua.on('registered', () => {
-          setSipStatus('registered');
-          setSipError('');
-        });
-        ua.on('registrationFailed', (e: any) => {
-          setSipStatus('error');
-          setSipError(e?.cause || 'Registration failed');
-        });
-        ua.on('disconnected', () => setSipStatus('connecting'));
-        ua.on('newRTCSession', (data: any) => {
-          const session = data.session;
-          sessionRef.current = session;
-          const remoteNumber = session.remote_identity?.uri?.user || 'Unknown';
-          setActiveCallNumber(remoteNumber);
-          if (session.direction === 'incoming') setCallState('ringing');
-          session.on('confirmed', () => {
-            setCallState('active');
-            timerRef.current = setInterval(() => setCallTimer((t) => t + 1), 1000);
+    const RETRY_DELAYS_MS = [5000, 15000];
+    const clearRetry = () => {
+      if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null; }
+    };
+
+    const start = () => {
+      if (cancelled) return;
+      setSipStatus('connecting');
+      setSipError('');
+
+      createSIPUA(config, opts.jsSipTimeoutMs ?? 8000)
+        .then((ua) => {
+          if (cancelled) { try { ua.stop(); } catch {} return; }
+          ua.on('registered', () => {
+            retryAttemptRef.current = 0;
+            clearRetry();
+            setSipStatus('registered');
+            setSipError('');
           });
-          session.on('ended', () => {
-            setCallState('ended');
-            if (timerRef.current) clearInterval(timerRef.current);
-            setTimeout(() => {
+          ua.on('registrationFailed', (e: any) => {
+            const msg = classifySipFailure({
+              cause: e?.cause,
+              status_code: e?.response?.status_code,
+              reason_phrase: e?.response?.reason_phrase,
+            });
+            setSipStatus('error');
+            setSipError(msg);
+            scheduleRetry();
+          });
+          ua.on('disconnected', (e: any) => {
+            setSipStatus('connecting');
+            if (e?.error) {
+              setSipError(classifySipFailure({ cause: e?.reason || 'WSS connection failed' }));
+              scheduleRetry();
+            }
+          });
+          ua.on('newRTCSession', (data: any) => {
+            const session = data.session;
+            sessionRef.current = session;
+            const remoteNumber = session.remote_identity?.uri?.user || 'Unknown';
+            setActiveCallNumber(remoteNumber);
+            if (session.direction === 'incoming') setCallState('ringing');
+            session.on('confirmed', () => {
+              setCallState('active');
+              timerRef.current = setInterval(() => setCallTimer((t) => t + 1), 1000);
+            });
+            session.on('ended', () => {
+              setCallState('ended');
+              if (timerRef.current) clearInterval(timerRef.current);
+              setTimeout(() => {
+                setCallState('idle');
+                setCallTimer(0);
+                setIsMuted(false);
+                setIsOnHold(false);
+                setActiveCallNumber('');
+              }, 2000);
+            });
+            session.on('failed', (e: any) => {
+              const msg = classifySipFailure({
+                cause: e?.cause,
+                status_code: e?.message?.status_code,
+                reason_phrase: e?.message?.reason_phrase,
+              });
+              setSipError(msg);
               setCallState('idle');
-              setCallTimer(0);
-              setIsMuted(false);
-              setIsOnHold(false);
+              if (timerRef.current) clearInterval(timerRef.current);
               setActiveCallNumber('');
-            }, 2000);
+            });
           });
-          session.on('failed', () => {
-            setCallState('idle');
-            if (timerRef.current) clearInterval(timerRef.current);
-            setActiveCallNumber('');
-          });
+          ua.start();
+          uaRef.current = ua;
+        })
+        .catch((err) => {
+          if (cancelled) return;
+          setSipStatus('error');
+          setSipError(
+            err instanceof JsSIPUnavailableError
+              ? 'Phone library failed to load. Check your internet connection and try again.'
+              : classifySipFailure({ cause: err?.message }),
+          );
+          scheduleRetry();
         });
-        ua.start();
-        uaRef.current = ua;
-      })
-      .catch((err) => {
+    };
+
+    const scheduleRetry = () => {
+      if (cancelled) return;
+      const attempt = retryAttemptRef.current;
+      const delay = RETRY_DELAYS_MS[Math.min(attempt, RETRY_DELAYS_MS.length - 1)];
+      retryAttemptRef.current = attempt + 1;
+      clearRetry();
+      retryTimerRef.current = setTimeout(() => {
         if (cancelled) return;
-        setSipStatus('error');
-        setSipError(
-          err instanceof JsSIPUnavailableError
-            ? 'Phone library failed to load. Check your internet connection and try again.'
-            : err?.message || 'SIP initialization failed',
-        );
-      });
+        console.log(`[AVA SIP] Retrying registration (attempt ${attempt + 1})…`);
+        try { uaRef.current?.stop(); } catch {}
+        uaRef.current = null;
+        start();
+      }, delay);
+    };
+
+    start();
 
     return () => {
       cancelled = true;
+      clearRetry();
+      retryAttemptRef.current = 0;
       if (timerRef.current) clearInterval(timerRef.current);
       try { uaRef.current?.stop(); } catch {}
       uaRef.current = null;
@@ -115,10 +164,18 @@ export function useSoftphone(
     try {
       uaRef.current.call(`sip:${number}@${config.domain}`, {
         mediaConstraints: { audio: true, video: false },
+        // Force PCMU/PCMA + strip DTLS so FusionPBX accepts the offer.
+        sessionDescriptionHandlerModifiers: [sdpModifier],
+        rtcOfferConstraints: { offerToReceiveAudio: true, offerToReceiveVideo: false },
         eventHandlers: {
           failed: (e: any) => {
+            const msg = classifySipFailure({
+              cause: e?.cause,
+              status_code: e?.message?.status_code,
+              reason_phrase: e?.message?.reason_phrase,
+            });
             console.error('[AVA keypad] SIP call failed', e);
-            setSipError(e?.cause || 'SIP call failed');
+            setSipError(msg);
           },
         },
       });
@@ -127,7 +184,7 @@ export function useSoftphone(
       console.error('[AVA keypad] SIP call exception', err);
       setCallState('idle');
       setActiveCallNumber('');
-      setSipError(err?.message || 'SIP call failed');
+      setSipError(classifySipFailure({ cause: err?.message }));
       return false;
     }
   };
@@ -139,7 +196,10 @@ export function useSoftphone(
     setActiveCallNumber('');
   };
   const answer = () =>
-    sessionRef.current?.answer({ mediaConstraints: { audio: true, video: false } });
+    sessionRef.current?.answer({
+      mediaConstraints: { audio: true, video: false },
+      sessionDescriptionHandlerModifiers: [sdpModifier],
+    });
   const mute = () => { sessionRef.current?.mute({ audio: true }); setIsMuted(true); };
   const unmute = () => { sessionRef.current?.unmute({ audio: true }); setIsMuted(false); };
   const hold = () => { sessionRef.current?.hold(); setIsOnHold(true); };
