@@ -55,7 +55,7 @@ export default function ContactsScreen({ sp }: { sp: any }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'user_presence', ...(mobile.organizationId ? { filter: `organization_id=eq.${mobile.organizationId}` } : {}) } as any, () => loadPresence(contacts).catch(() => {}))
       .subscribe();
     return () => { client.removeChannel(softphoneChannel); client.removeChannel(presenceChannel); };
-  }, [loadContacts, loadPresence, mobile.accessToken, mobile.domainUuid, mobile.organizationId]);
+  }, [loadContacts, loadPresence, mobile.accessToken, mobile.domainUuid, mobile.organizationId, contacts]);
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
