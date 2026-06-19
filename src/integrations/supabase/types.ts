@@ -3241,6 +3241,7 @@ export type Database = {
           channel_id: string | null
           content: string
           created_at: string
+          deleted_at: string | null
           edit_count: number
           edited_at: string | null
           hidden_at: string | null
@@ -3267,6 +3268,7 @@ export type Database = {
           channel_id?: string | null
           content: string
           created_at?: string
+          deleted_at?: string | null
           edit_count?: number
           edited_at?: string | null
           hidden_at?: string | null
@@ -3293,6 +3295,7 @@ export type Database = {
           channel_id?: string | null
           content?: string
           created_at?: string
+          deleted_at?: string | null
           edit_count?: number
           edited_at?: string | null
           hidden_at?: string | null
