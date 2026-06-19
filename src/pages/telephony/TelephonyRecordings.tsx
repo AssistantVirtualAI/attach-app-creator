@@ -95,7 +95,13 @@ export default function TelephonyRecordings({ scope = 'org' }: { scope?: 'org' |
         ...row,
         transcribed: result.stage === 'complete',
         analyzed: result.stage === 'complete' && !result.insightStub,
-        raw_data: { ...(row.raw_data || {}), ai: result.data?.insights || result.data },
+        ai_summary: result.data?.summary ?? row.ai_summary,
+        raw_data: {
+          ...(row.raw_data || {}),
+          transcript_text: result.data?.transcript_text || result.data?.transcript || row.raw_data?.transcript_text,
+          transcript_provider: result.data?.transcript_provider || row.raw_data?.transcript_provider,
+          ai: result.data?.insights || result.data?.analysis || result.data,
+        },
       } : row);
     });
     setWorking(null);
