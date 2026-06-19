@@ -1,0 +1,163 @@
+import React, { useEffect, useState } from 'react';
+import { colors, font, radius } from '../lib/theme';
+import { mobileApi } from '../lib/mobileApi';
+import { getCredentials } from '../lib/creds';
+import { Card } from '../components/ui/Primitives';
+
+type Step = {
+  label: string;
+  status: 'pending' | 'ok' | 'fail';
+  detail?: string;
+};
+
+/**
+ * Playback debug checklist. Walks through the exact pipeline a recording
+ * takes from the PBX to the <audio> element and shows where it breaks.
+ * Reachable from CallDetailScreen → "Debug playback" link.
+ */
+export default function RecordingDebugScreen({ callId, onBack }: { callId: string; onBack: () => void }) {
+  const [steps, setSteps] = useState<Step[]>([
+    { label: '1. Resolve organization context', status: 'pending' },
+    { label: '2. Request signed recording URL', status: 'pending' },
+    { label: '3. HEAD the signed URL (server reachable?)', status: 'pending' },
+    { label: '4. Inspect Content-Type / Content-Length', status: 'pending' },
+    { label: '5. Probe <audio> canplaythrough', status: 'pending' },
+  ]);
+  const [signedUrl, setSignedUrl] = useState<string | null>(null);
+
+  const set = (i: number, patch: Partial<Step>) =>
+    setSteps((cur) => cur.map((s, idx) => (idx === i ? { ...s, ...patch } : s)));
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const creds = await getCredentials();
+        if (cancelled) return;
+        if (!creds?.organizationId) {
+          set(0, { status: 'fail', detail: 'No organizationId in stored credentials.' });
+          return;
+        }
+        set(0, { status: 'ok', detail: `org ${creds.organizationId.slice(0, 8)}…` });
+
+        // Step 2: signed URL via mobile edge function
+        let res: any;
+        try {
+          res = await mobileApi.voicemailAudio({ xml_cdr_uuid: callId, organization_id: creds.organizationId });
+        } catch (e: any) {
+          set(1, { status: 'fail', detail: e?.message || 'invoke failed' });
+          return;
+        }
+        if (!res?.url) {
+          set(1, { status: 'fail', detail: `${res?.error || 'NO_URL'} — ${res?.message || 'edge function returned no URL'}` });
+          return;
+        }
+        const url: string = res.url;
+        setSignedUrl(url);
+        set(1, { status: 'ok', detail: url.slice(0, 64) + '…' });
+
+        // Step 3: HEAD request
+        let head: Response | null = null;
+        try {
+          head = await fetch(url, { method: 'HEAD' });
+          if (!head.ok) {
+            set(2, { status: 'fail', detail: `HTTP ${head.status} ${head.statusText}` });
+            return;
+          }
+          set(2, { status: 'ok', detail: `HTTP ${head.status}` });
+        } catch (e: any) {
+          set(2, { status: 'fail', detail: e?.message || 'network error' });
+          return;
+        }
+
+        // Step 4: content metadata
+        const ct = head.headers.get('content-type') || '(none)';
+        const cl = head.headers.get('content-length') || '(unknown)';
+        const looksAudio = /audio|octet-stream|mpeg|wav|mp4|ogg/i.test(ct);
+        set(3, {
+          status: looksAudio ? 'ok' : 'fail',
+          detail: `type=${ct} · bytes=${cl}`,
+        });
+
+        // Step 5: <audio> canplaythrough probe
+        await new Promise<void>((resolve) => {
+          const audio = new Audio();
+          let done = false;
+          const finish = (ok: boolean, detail: string) => {
+            if (done) return; done = true;
+            set(4, { status: ok ? 'ok' : 'fail', detail });
+            audio.src = ''; resolve();
+          };
+          audio.oncanplaythrough = () => finish(true, `duration ${audio.duration.toFixed(1)}s`);
+          audio.onerror = () => finish(false, `media error code=${audio.error?.code ?? '?'}`);
+          setTimeout(() => finish(false, 'timeout after 8s waiting for canplaythrough'), 8_000);
+          audio.preload = 'auto';
+          audio.src = url;
+          audio.load();
+        });
+      } catch (e: any) {
+        const open = steps.findIndex((s) => s.status === 'pending');
+        if (open >= 0) set(open, { status: 'fail', detail: e?.message || String(e) });
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [callId]);
+
+  const badge = (s: Step['status']) =>
+    s === 'ok' ? { c: colors.success, t: '✓' } :
+    s === 'fail' ? { c: colors.danger, t: '✗' } :
+                   { c: colors.mutedSilver, t: '…' };
+
+  return (
+    <div style={{ height: '100%', overflowY: 'auto', padding: '14px 14px 28px' }}>
+      <button onClick={onBack} style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6,
+        padding: '8px 12px', marginBottom: 12,
+        background: 'rgba(255,255,255,0.04)',
+        border: `1px solid ${colors.border}`,
+        borderRadius: 999, color: colors.textIce, fontSize: font.sm, cursor: 'pointer',
+      }}>← Back</button>
+
+      <h1 style={{ fontSize: font.xxl, color: colors.textIce, margin: '4px 0 4px', fontWeight: 800 }}>Playback debug</h1>
+      <div style={{ fontSize: font.sm, color: colors.mutedSilver, marginBottom: 14 }}>
+        Verifies the recording pipeline for <span style={{ fontFamily: 'JetBrains Mono, monospace' }}>{callId.slice(0, 12)}…</span>
+      </div>
+
+      <Card>
+        {steps.map((s, i) => {
+          const b = badge(s.status);
+          return (
+            <div key={i} style={{
+              display: 'flex', alignItems: 'flex-start', gap: 10,
+              padding: '10px 0',
+              borderBottom: i === steps.length - 1 ? 'none' : `1px solid ${colors.border}`,
+            }}>
+              <span style={{
+                width: 22, height: 22, borderRadius: 999,
+                background: `${b.c}22`, color: b.c,
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                fontWeight: 900, fontSize: 13, flexShrink: 0,
+              }}>{b.t}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: font.base, color: colors.textIce, fontWeight: 700 }}>{s.label}</div>
+                {s.detail && (
+                  <div style={{
+                    fontSize: 11, color: s.status === 'fail' ? colors.danger : colors.mutedSilver,
+                    marginTop: 3, fontFamily: 'JetBrains Mono, monospace', wordBreak: 'break-all',
+                  }}>{s.detail}</div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </Card>
+
+      {signedUrl && (
+        <div style={{ marginTop: 14, fontSize: 10, color: colors.mutedSilver, fontFamily: 'JetBrains Mono, monospace', wordBreak: 'break-all', padding: 10, border: `1px solid ${colors.border}`, borderRadius: radius.md }}>
+          {signedUrl}
+        </div>
+      )}
+    </div>
+  );
+}
