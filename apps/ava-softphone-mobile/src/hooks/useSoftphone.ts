@@ -42,9 +42,21 @@ export function useSoftphone(
 
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryAttemptRef = useRef(0);
+  const reconnectRef = useRef<() => void>(() => {});
+  const [reconnectTick, setReconnectTick] = useState(0);
+
+  // WebRTC capability check on mount — surfaces clear error immediately so
+  // UI doesn't sit on "connecting…" for ever.
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !hasWebRTC()) {
+      setSipStatus('error');
+      setSipError(WEBRTC_UNAVAILABLE_MESSAGE);
+    }
+  }, []);
 
   useEffect(() => {
     if (!config) return;
+    if (typeof window !== 'undefined' && !hasWebRTC()) return;
     let cancelled = false;
 
     const RETRY_DELAYS_MS = [5000, 15000];
