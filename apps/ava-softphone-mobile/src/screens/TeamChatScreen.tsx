@@ -90,13 +90,15 @@ export default function TeamChatScreen(props: { accessToken?: string | null; use
     let cancelled = false;
     (async () => {
       try {
-        setLoading(true); setError(null);
-        await Promise.all([loadMembers(), loadChannels()]);
-        await chatCall('heartbeat', { status: 'available', platform: 'mobile', call_state: 'idle' }).catch(() => {});
-      } catch (e: any) {
-        if (!cancelled) setError(e?.message || 'Failed to load team chat');
-      } finally {
+        setError(null);
+        // Load channels first — that's the default view. Unblock UI ASAP.
+        await loadChannels();
         if (!cancelled) setLoading(false);
+        // Load members + heartbeat in the background (members view will render as soon as ready).
+        loadMembers().catch(() => {});
+        chatCall('heartbeat', { status: 'available', platform: 'mobile', call_state: 'idle' }).catch(() => {});
+      } catch (e: any) {
+        if (!cancelled) { setError(e?.message || 'Failed to load team chat'); setLoading(false); }
       }
     })();
     const heartbeat = window.setInterval(() => chatCall('heartbeat', { status: 'available', platform: 'mobile', call_state: 'idle' }).catch(() => {}), 30000);
