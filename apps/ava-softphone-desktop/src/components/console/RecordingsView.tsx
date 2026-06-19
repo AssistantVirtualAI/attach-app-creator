@@ -4,6 +4,7 @@ import { ava, RecordingItem, Feedback } from '../../lib/avaApi';
 import { supabase } from '../../lib/supabaseClient';
 import { useRealtimeRefresh } from '../../lib/useRealtimeRefresh';
 import { useOrgId } from '../../lib/useOrgId';
+import { toast } from '../../lib/toast';
 import PageHeader, { EmptyState, ListSkeleton } from './PageHeader';
 
 const LEMTEL_ORG = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
@@ -263,7 +264,10 @@ export default function RecordingsView({ scope = 'mine' }: { scope?: 'mine' | 'o
           body: { callId, call_record_id: callId, organization_id,
                   recording_path: (sel as any).recording_path, recording_name: (sel as any).recording_name },
         });
-        if (r1.error) throw r1.error;
+      if (r1.error) throw r1.error;
+      if ((r1.data as any)?.stub || (r1.data as any)?.error) {
+        throw new Error([((r1.data as any)?.error || (r1.data as any)?.reason || 'transcription unavailable'), ...(((r1.data as any)?.fetchErrors || []) as string[])].filter(Boolean).join(' · '));
+      }
         txt = String((r1.data as any)?.transcript_text || '').trim();
         if (txt) setTranscript(txt);
       }
@@ -278,8 +282,11 @@ export default function RecordingsView({ scope = 'mine' }: { scope?: 'mine' | 'o
       setAnalysis(ai);
       if (ai?.summary) updateItem(sel.id, { summary: ai.summary, topics: ai.topics || sel.topics, sentiment: ai.sentiment || sel.sentiment });
       setAiStage('done');
+      toast.success((r2.data as any)?.cached ? 'AI analysis: déjà traité — cache réutilisé' : 'Transcrit, scoré et analysé');
     } catch (e: any) {
-      setAiError(aiErr(e));
+      const msg = aiErr(e);
+      setAiError(msg);
+      toast.error(`Transcription/scoring failed — ${msg}`);
       setAiStage('error');
     } finally {
       setAiLoading(false);
