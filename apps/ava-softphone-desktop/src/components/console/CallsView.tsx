@@ -41,6 +41,8 @@ export default function CallsView({ scope = 'mine' }: { scope?: 'mine' | 'org' }
   const [syncing, setSyncing] = useState(false);
   const [filter, setFilter] = useState<'all' | 'missed' | 'in' | 'out' | 'recorded'>('all');
   const [query, setQuery] = useState('');
+  const [extensionQuery, setExtensionQuery] = useState('');
+  const [rangeDays, setRangeDays] = useState<7 | 30>(7);
   const [sel, setSel] = useState<CallRecord | null>(null);
   const [insight, setInsight] = useState<any>(null);
   const [analyzing, setAnalyzing] = useState(false);
@@ -75,7 +77,8 @@ export default function CallsView({ scope = 'mine' }: { scope?: 'mine' | 'org' }
     if (!silent) setLoading(true);
     setError(null); setSyncing(true);
     try {
-      const scopedCalls = force ? await ava.refreshCalls(150, { scope }) : await ava.calls(150, { scope });
+      const apiOpts = { scope, extension: scope === 'org' ? (extensionQuery.trim() || null) : null, rangeDays };
+      const scopedCalls = force ? await ava.refreshCalls(500, apiOpts) : await ava.calls(500, apiOpts);
       setCalls(scopedCalls);
       setSel((current) => current ? scopedCalls.find((cr) => cr.id === current.id) || current : current);
     } catch (err: any) {
@@ -85,7 +88,7 @@ export default function CallsView({ scope = 'mine' }: { scope?: 'mine' | 'org' }
       if (!silent) setLoading(false);
       setSyncing(false);
     }
-  }, [scope]);
+  }, [scope, extensionQuery, rangeDays]);
 
   useEffect(() => {
     (window as any).__lemtelRefreshCalls = () => load(true);
@@ -206,9 +209,20 @@ export default function CallsView({ scope = 'mine' }: { scope?: 'mine' | 'org' }
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search name, number, transcript…"
+            placeholder="Search name, number, extension, transcript…"
             style={{ flex: 1, minWidth: 220, padding: '8px 11px', borderRadius: 999, border: `1px solid ${c.border}`, background: c.bgCard, color: c.textIce, fontSize: 12, outline: 'none' }}
           />
+          {scope === 'org' && (
+            <input
+              value={extensionQuery}
+              onChange={(e) => setExtensionQuery(e.target.value.replace(/[^0-9*]/g, ''))}
+              placeholder="Extension #"
+              style={{ width: 130, padding: '8px 11px', borderRadius: 999, border: `1px solid ${c.border}`, background: c.bgCard, color: c.textIce, fontSize: 12, outline: 'none', fontFamily: 'JetBrains Mono, monospace' }}
+            />
+          )}
+          {([7, 30] as const).map((days) => (
+            <button key={days} onClick={() => setRangeDays(days)} style={chip(rangeDays === days)}>{days}D</button>
+          ))}
         </div>
 
         {loading && <ListSkeleton rows={8} />}
