@@ -42,7 +42,7 @@ export default function NotificationsSheet({
   const items = useMemo(() => ([
     { tab: 'calls' as Tab, icon: PhoneMissed, label: 'Missed calls (24h)', count: c.missed, tone: '#ff5a5a' },
     { tab: 'voicemail' as Tab, icon: Voicemail, label: 'New voicemails', count: c.voicemails, tone: colors.signalGold },
-    { tab: 'recordings' as Tab, icon: Disc, label: 'New recordings (24h)', count: c.recordings, tone: colors.avaCyan },
+    { tab: 'calls' as Tab, icon: Disc, label: 'New recordings (24h)', count: c.recordings, tone: colors.avaCyan },
     { tab: 'sms' as Tab, icon: MessageSquare, label: 'Unread messages', count: c.sms, tone: colors.lemtelBlue },
   ]), [c]);
 
