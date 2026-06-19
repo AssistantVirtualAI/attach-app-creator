@@ -69,12 +69,13 @@ export default function MobileApp() {
   if (loading || booting) return <SplashAva />;
   if (!creds) return <AuthScreen onAuthenticated={setCreds} />;
 
-  return <AuthenticatedShell creds={creds} tab={tab} setTab={setTab} onSignOut={clearCreds} />;
+  return <AuthenticatedShell creds={creds} setCreds={setCreds} tab={tab} setTab={setTab} onSignOut={clearCreds} />;
 }
 
 function AuthenticatedShell({
-  creds, tab, setTab, onSignOut,
-}: { creds: Creds; tab: Tab; setTab: (t: Tab) => void; onSignOut: () => void }) {
+  creds, setCreds, tab, setTab, onSignOut,
+}: { creds: Creds; setCreds: (c: Creds) => void; tab: Tab; setTab: (t: Tab) => void; onSignOut: () => void }) {
+
   const [permsGateDone, setPermsGateDone] = useState<boolean | null>(isPreviewMode ? true : null);
 
   // Decide whether to show the onboarding permission gate.
