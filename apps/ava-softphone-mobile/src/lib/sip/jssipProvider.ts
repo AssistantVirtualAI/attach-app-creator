@@ -23,7 +23,7 @@ export class JsSIPUnavailableError extends Error {
   }
 }
 
-function hasWebRTC(): boolean {
+export function hasWebRTC(): boolean {
   if (typeof window === 'undefined') return false;
   return !!(
     (window as any).RTCPeerConnection ||
@@ -31,6 +31,9 @@ function hasWebRTC(): boolean {
     (window as any).mozRTCPeerConnection
   );
 }
+
+export const WEBRTC_UNAVAILABLE_MESSAGE =
+  'WebRTC not supported in this browser. Open in Chrome or Safari, or use the native mobile app.';
 
 function bundledJsSIP() {
   const mod: any = JsSIPModule as any;
