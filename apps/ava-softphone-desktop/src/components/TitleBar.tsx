@@ -38,11 +38,11 @@ export default function TitleBar(_props: Props = {}) {
       {/* Left: window controls spacer (macOS traffic lights) */}
       <div style={{ width: 70 }} />
 
-      <details style={{ ...dragStyle, position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>
+      <details style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
         <summary style={{
           listStyle: 'none', display: 'inline-flex', alignItems: 'center', gap: 7,
           padding: '4px 10px', borderRadius: 999, border: `1px solid ${sync.syncConnected ? colors.success : colors.warning}66`,
-          background: colors.surface, color: colors.text, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+          background: colors.bgCard, color: colors.text, fontSize: 11, fontWeight: 700, cursor: 'pointer',
         }}>
           <span style={{ width: 7, height: 7, borderRadius: 999, background: sync.syncConnected ? colors.success : colors.warning, boxShadow: `0 0 10px ${sync.syncConnected ? colors.success : colors.warning}` }} />
           CDR {sync.syncConnected ? 'Live' : 'Retrying'} · {formatAge(sync.lastSyncAt ? Date.now() - sync.lastSyncAt : null)}
@@ -50,8 +50,8 @@ export default function TitleBar(_props: Props = {}) {
         </summary>
         <div style={{
           position: 'absolute', top: 31, left: '50%', transform: 'translateX(-50%)', width: 380,
-          background: colors.surfaceElev, border: `1px solid ${colors.border}`, borderRadius: 12,
-          boxShadow: colors.shadow, padding: 10, zIndex: 1002,
+          background: colors.bgElev, border: `1px solid ${colors.border}`, borderRadius: 12,
+          boxShadow: '0 18px 50px -18px rgba(0,0,0,.55)', padding: 10, zIndex: 1002,
         }}>
           <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 6 }}>CDR sync attempts</div>
           {sync.log.length === 0 ? <div style={{ fontSize: 11, color: colors.textMuted }}>No attempts logged yet.</div> : sync.log.slice(0, 8).map((l) => (
