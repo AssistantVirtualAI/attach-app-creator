@@ -176,9 +176,11 @@ export function classifySipFailure(input: {
 
 /** Build the list of WSS URLs to try, primary first. Only confirmed-working endpoints. */
 export function buildWssFallbackList(config: SIPConfig): string[] {
+  // pbxnode.lemtel.tel has the matching Let's Encrypt cert (CN=pbxnode.lemtel.tel)
+  // node.lemtelcloud.net resolves to same server but cert CN mismatch may cause SIP 403
   return [
-    'wss://node.lemtelcloud.net:7443',
     'wss://pbxnode.lemtel.tel:7443',
+    'wss://node.lemtelcloud.net:7443',
   ];
 }
 
