@@ -192,17 +192,26 @@ export default function TeamChatScreen({ accessToken, userId }: { accessToken: s
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
         <header style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          <button onClick={() => { setView('channels'); setActiveChannel(null); }}
+          <button onClick={() => { setView('channels'); setActiveChannel(null); setShowMsgSearch(false); setMsgQuery(''); }}
             style={{ background: 'none', border: 'none', color: colors.textIce, cursor: 'pointer' }}>
             <ArrowLeft size={20} />
           </button>
-          <div style={{ flex: 1, fontWeight: 700, color: colors.textIce, fontSize: 15 }}>
-            {channelDisplay(activeChannel)}
-          </div>
+          {showMsgSearch ? (
+            <input autoFocus value={msgQuery} onChange={(e) => setMsgQuery(e.target.value)} placeholder="Search messages…"
+              style={{ flex: 1, padding: '6px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', color: colors.textIce, fontSize: 13, outline: 'none' }} />
+          ) : (
+            <div style={{ flex: 1, fontWeight: 700, color: colors.textIce, fontSize: 15 }}>
+              {channelDisplay(activeChannel)}
+            </div>
+          )}
+          <button onClick={() => { setShowMsgSearch((v) => !v); if (showMsgSearch) setMsgQuery(''); }}
+            style={{ background: 'none', border: 'none', color: showMsgSearch ? '#21d4fd' : colors.mutedSilver, cursor: 'pointer' }}>
+            <Search size={18} />
+          </button>
         </header>
 
         <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {messages.map((m) => {
+          {(msgQuery.trim() ? messages.filter((m) => m.content.toLowerCase().includes(msgQuery.trim().toLowerCase()) || (m.sender_name || '').toLowerCase().includes(msgQuery.trim().toLowerCase())) : messages).map((m) => {
             const mine = m.sender_id === userId;
             return (
               <div key={m.id} style={{ alignSelf: mine ? 'flex-end' : 'flex-start', maxWidth: '78%' }}>
