@@ -411,6 +411,8 @@ function mapCdrToCall(r: any): CallRecord {
     durationSec:  billsec,
     hasRecording: !!(r.has_recording || r.recording_path || r.recording_name),
     hasTranscript: !!r.transcribed,
+    extension:    r.extension ?? null,
+    source_number: r.source_number ?? null,
     sentiment:    undefined,
   };
 }
@@ -430,6 +432,7 @@ function mapCdrToVoicemail(r: any): VoicemailItem {
     priority:    'normal' as const,
     organization_id: r.organization_id ?? undefined,
     extension: r.extension ?? null,
+    source_number: r.source_number ?? null,
     extension_uuid: r.extension_uuid ?? null,
     callId:      r.id ?? undefined,
     pbx_uuid:    r.pbx_uuid ?? null,
