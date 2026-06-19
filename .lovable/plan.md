@@ -1,37 +1,59 @@
-## Plan: 4 chantiers en parallèle
+## Goal
+Wire all mobile screens to the user's real SIP domain context via a single shared hook, and fix data loading + navigation across Recordings, Team Chat, Contacts, Voicemail, Queues, and SMS.
 
-### 1. Domaines visibles sur Desktop
-- Fix sélecteur de domaine dans `ConsoleLayout` / contexte org desktop
-- Charger via `get_org_by_fusionpbx_domain` + `current_user_org_ids`
-- Afficher badge domain actif dans header
+## 1. Shared hook
+Create `apps/ava-softphone-mobile/src/hooks/useMobileCredentials.ts`:
+- Read stored creds via existing `Store.get()` (from `lib/creds.ts`).
+- If `extension`/`domainUuid` missing, call `hydrateSoftphoneCredentials('mobile')` (already implemented).
+- Returns `{ extension, sipDomain, domainUuid, organizationId, wssUrl, userId, accessToken, loading }`.
+- All screens below gate their effects on `credentials?.domainUuid`.
 
-### 2. Recordings + Transcription + AI Coaching complet
-- **DB**: étendre `pbx_call_recordings` (transcription_text, sentiment, quality_score, coaching_notes, ai_status)
-- **Edge function `transcribe-recording`**: download MP3 → Lovable AI STT (`openai/gpt-4o-mini-transcribe`) → save transcript
-- **Edge function `analyze-call`**: Gemini 2.5 Flash → sentiment + score 0-100 + 3-5 points coaching + notes auto + résumé
-- **UI Desktop**: panneau "Call Intelligence" sur détail appel (player + transcript + coaching tabs)
-- **UI Mobile**: bottom-sheet avec transcript + résumé + score
-- **Trigger**: bouton "Analyser" manuel + auto sur nouveaux recordings via cron
+## 2. RecordingsScreen
+- List: `pbx_call_records` filtered by `domain_uuid = credentials.domainUuid`, ordered by `start_stamp desc limit 50`.
+- Play via `supabase.functions.invoke('fusionpbx-proxy', { body: { action: 'get-recording', xml_cdr_uuid, recording_name: record_name+'.mp3', recording_path, domain_uuid } })`.
+- Decode `audio_base64` → Blob → object URL → `<audio>` element.
+- On `data.error === 'Recording expired'` (or proxy 404), show "Recording expired — file deleted from PBX after retention period".
 
-### 3. Chat équipe cross-platform (Desktop + Mobile + Web)
-- **Scope**: même `fusionpbx_domain_uuid` (filter via `pbx_softphone_users.organization_id` matching domain)
-- **DM 1-1**: nouvelle fonction RPC `get_or_create_dm_channel(_other_user_id)`
-- **Group chat**: déjà existant `create_group_chat` — exposer UI
-- **Liste team**: vue `team_members_by_domain` listant tous softphone users du même domain avec `user_presence`
-- **Présence live**: Realtime sur `user_presence` + heartbeat 30s via `upsert_user_presence`
-- **Mobile**: ajouter écran Chat (manquant) avec liste channels + DMs + présence
-- **Desktop**: fix erreur "org/domain" lors création channel
-- **Realtime**: vérifier `org_chat_messages` + `user_presence` dans publication
+## 3. TeamChatScreen
+- Domain members: `pbx_softphone_users` joined with `profiles` filtered by `domain_uuid`.
+- Presence: `user_presence` for those `portal_user_id`s; green dot if `last_seen < 5min`.
+- Channel list: "General" (org-wide channel from `org_chat_channels`), DMs per member, group channels the user belongs to.
+- Messages from `org_chat_messages` by `channel_id`, ascending.
+- Realtime: `supabase.channel('chat-'+channelId).on('postgres_changes', INSERT on org_chat_messages filter channel_id=eq.<id>)`.
 
-### 4. Sync + Dispatch
-- Realtime sur toutes les tables critiques (déjà fait pour cdrs)
-- Deploy toutes les edge functions
-- Test cross-platform
+## 4. ContactsScreen
+- `pbx_softphone_users` (extension, sip_domain, portal_user_id, profiles) filtered by `domain_uuid`.
+- Presence join → status dot.
+- Buttons: Call → `sp.call(extension)`; Message → navigate to TeamChat DM with that user.
+- Local search by name/extension.
 
-### Détails techniques
-- Modèles AI: `openai/gpt-4o-mini-transcribe` (STT), `google/gemini-2.5-flash` (analyse)
-- Storage: recordings dans bucket existant
-- RLS: nouveaux helpers `is_same_domain_as(_user)` pour chat team
-- Mobile chat: nouveau `ChatScreen.tsx` + `useTeamPresence` hook
+## 5. VoicemailScreen
+- List via `fusionpbx-proxy` `{ action: 'list-voicemails', domain_uuid, extension }`.
+- Greeting editor: textarea + voice dropdown (GET `/v1/voices` through an existing edge function proxy if available — otherwise reuse a server function; do not expose `ELEVENLABS_API_KEY` to the client).
+- Preview button → TTS via existing ElevenLabs edge function → inline playback.
+- "Set as Greeting" → upload generated audio to PBX as voicemail greeting via `fusionpbx-proxy`.
+- Per-voicemail: inline play, delete, transcribe buttons.
 
-Confirmez et je lance les 4 chantiers en parallèle.
+## 6. QueuesScreen
+- List via `fusionpbx-proxy` `{ action: 'list-queues', domain_uuid }`; combine with existing `pbx_queue_agent_state` realtime to render agent counts/waiting/user status.
+- Buttons: Join/Pause/Leave invoke `fusionpbx-proxy` with `queue-login` / `queue-pause` / `queue-logout` + `queue_uuid` + `extension`.
+- Keep realtime sub on `pbx_queue_agent_state` for current user.
+
+## 7. MessagesScreen (SMS)
+- Threads from `pbx_sms_threads` filtered by `organization_id` (already used) — confirm filter uses `credentials.organizationId` from hook.
+- Send via `twilio-send-sms` edge function.
+- Keep existing realtime + search.
+
+## 8. Navigation audit
+- Verify every top pill and bottom nav target in `BottomTabs.tsx` and `MobileApp.tsx` routes correctly: Voicemail, Recordings, Contacts, SMS, Queues, Settings, Home, Calls, AVA, Chat, More.
+- Confirm each screen is imported and route registered; fix any missing wiring.
+
+## Constraints
+- Do not touch `vite.config.ts`, `electron-builder.yml`, `.github/workflows/`.
+- Do not touch landing page.
+- All data fetches gated on `credentials` from `useMobileCredentials`.
+
+## Technical notes
+- Edge functions used: `softphone-credentials`, `fusionpbx-proxy`, `twilio-send-sms`, ElevenLabs TTS proxy (server-side; client never reads `ELEVENLABS_API_KEY`).
+- Tables: `pbx_call_records`, `pbx_softphone_users`, `profiles`, `user_presence`, `org_chat_channels`, `org_chat_messages`, `pbx_queue_agent_state`, `pbx_sms_threads`, `pbx_sms_messages`.
+- Realtime channels created in `useEffect` with cleanup `supabase.removeChannel`.
