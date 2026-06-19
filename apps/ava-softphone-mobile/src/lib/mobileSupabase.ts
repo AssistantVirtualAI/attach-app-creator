@@ -32,6 +32,21 @@ export async function restGet<T = any>(path: string, token?: string | null): Pro
   return res.json().catch(() => null) as Promise<T>;
 }
 
+export async function restPost<T = any>(path: string, token: string | null | undefined, body: any): Promise<T> {
+  const res = await fetch(`${SUPABASE_URL}${path}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Prefer: 'return=representation',
+      apikey: SUPABASE_ANON,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
+  return res.json().catch(() => null) as Promise<T>;
+}
+
 export async function edgeCall<T = any>(functionName: string, token: string | null | undefined, body: any): Promise<T> {
   const res = await fetch(`${SUPABASE_URL}/functions/v1/${functionName}`, {
     method: 'POST',
