@@ -54,10 +54,10 @@ export default function DialerScreen({
   const bannerColor = isRegistered ? '#22c55e' : isRetrying ? '#f59e0b' : '#ef4444';
 
   const bannerTitle = isRegistered
-    ? 'SIP registered · ready to call'
+    ? `✅ Registered — Extension ${sp.sipConfig?.extension || ''}`.trim()
     : isRetrying
-      ? 'Connecting to SIP server…'
-      : 'SIP registration failed';
+      ? '🔄 Connecting...'
+      : `❌ Registration failed${sipError ? ` — ${sipError}` : ''}`;
 
   const startCall = async () => {
     if (!num || dialing) return;
@@ -117,8 +117,8 @@ export default function DialerScreen({
       <div style={{ margin: '10px 16px 0', padding: '10px 12px', borderRadius: 12,
         background: bannerBg, border: `1px solid ${bannerColor}55`, color: bannerColor, fontSize: 12,
       }}>
-        <div style={{ fontWeight: 700, marginBottom: sipError || !isRegistered ? 4 : 0 }}>{bannerTitle}</div>
-        {sipError && <div style={{ fontWeight: 400, opacity: 0.9, lineHeight: 1.4 }}>{sipError}</div>}
+        <div style={{ fontWeight: 700, marginBottom: sipError && !isFailed ? 4 : 0 }}>{bannerTitle}</div>
+        {sipError && !isFailed && <div style={{ fontWeight: 400, opacity: 0.9, lineHeight: 1.4 }}>{sipError}</div>}
         {sslLikely && (
           <div style={{ marginTop: 8, padding: 8, background: 'rgba(0,0,0,0.25)', borderRadius: 8, color: '#fde68a', fontSize: 11, lineHeight: 1.45 }}>
             <div style={{ fontWeight: 700, marginBottom: 4 }}>⚠ SSL certificate problem detected</div>

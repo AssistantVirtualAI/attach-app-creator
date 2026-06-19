@@ -73,6 +73,15 @@ export default function SettingsScreen({
         <SettingsRow label="Notifications" icon="🔔" value="Push enabled" onPress={() => {}} />
       </Card>
 
+      <SectionTitle eyebrow="SIP" title="Debug" />
+      <Card padded={false}>
+        <SettingsRow label="Status" icon="●" value={sp?.snap?.status || 'idle'} />
+        <SettingsRow label="WSS URL" icon="↔" value={sp?.sipConfig?.wssUrl || '—'} />
+        <SettingsRow label="Extension + domain" icon="☎" value={`${sp?.sipConfig?.extension || creds.extension || '—'}@${sp?.sipConfig?.domain || creds.sipDomain || '—'}`} />
+        <SettingsRow label="Last error" icon="!" value={sp?.snap?.error || 'None'} />
+        <SettingsRow label="Retry Registration" icon="↻" onPress={() => sp?.reconnect?.()} />
+      </Card>
+
       {me?.permissions.admin && (
         <>
           <SectionTitle eyebrow="Admin" title="Workspace controls" />
