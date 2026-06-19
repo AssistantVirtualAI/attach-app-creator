@@ -155,8 +155,11 @@ export function classifySipFailure(input: {
   if (/dns/.test(cause)) {
     return 'DNS resolution failed — SIP domain not reachable.';
   }
+  if (/ssl|certificate|cert|tls|handshake/.test(cause)) {
+    return 'SSL certificate rejected by the browser — the WSS endpoint is using a self-signed or untrusted certificate. Ask your administrator to install a valid CA-signed certificate on port 7443.';
+  }
   if (/connection|websocket|network|transport/.test(cause)) {
-    return 'WSS connection failed — check network/firewall (port 7443).';
+    return 'WSS connection failed — check network/firewall (port 7443). If this persists, the SIP server may be presenting an invalid SSL certificate.';
   }
   if (code && code >= 400 && code < 700) {
     return `Call rejected (${code} ${input.reason_phrase || ''}).`.trim();
