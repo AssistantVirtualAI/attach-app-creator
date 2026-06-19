@@ -35,9 +35,10 @@ export default function MobileApp() {
   const initialTab = (() => {
     try {
       const t = new URLSearchParams(window.location.search).get('tab');
-      if (t === 'home' || t === 'calls' || t === 'ava' || t === 'messages' || t === 'more') return t as Tab;
+      const allowed: Tab[] = ['home','calls','recordings','voicemail','ava','contacts','messages','more'];
+      if (t && allowed.includes(t as Tab)) return t as Tab;
     } catch {}
-    return 'home' as Tab;
+    return 'calls' as Tab;
   })();
   const [tab, setTab] = useState<Tab>(initialTab);
   const [booting, setBooting] = useState(!isPreviewMode);
