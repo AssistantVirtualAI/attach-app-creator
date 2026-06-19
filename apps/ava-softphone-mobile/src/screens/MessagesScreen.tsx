@@ -163,6 +163,11 @@ export default function MessagesScreen({ haptic }: { haptic: (s?: ImpactStyle) =
   return (
     <div style={{ height: '100%', overflowY: 'auto', padding: '14px 14px 20px' }}>
       <SectionTitle eyebrow="Inbox" title="Messages" right={threads ? <Chip tone="gold">{threads.length}</Chip> : null} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 10px', borderRadius: 12, background: 'rgba(255,255,255,0.7)', border: `1px solid ${colors.border}`, margin: '0 0 10px' }}>
+        <Search size={14} color={colors.mutedSilver} />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search threads…"
+          style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 13, color: colors.textIce }} />
+      </div>
       {!threads && (
         <div>
           {Array.from({ length: 4 }).map((_, i) => (
