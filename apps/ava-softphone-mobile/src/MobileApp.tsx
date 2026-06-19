@@ -248,7 +248,6 @@ function AuthenticatedShell({
   }
 
 
-  const [profileOpen, setProfileOpen] = useState(false);
 
   return (
     <div style={{
