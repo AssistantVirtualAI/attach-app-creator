@@ -35,16 +35,22 @@ export default function RecordingDebugScreen({ callId, onBack }: { callId: strin
       try {
         const creds = await getCredentials();
         if (cancelled) return;
-        if (!creds?.organizationId) {
-          set(0, { status: 'fail', detail: 'No organizationId in stored credentials.' });
+        let orgId = creds?.organizationId || null;
+        if (!orgId) {
+          // Fallback: fetch from user_roles on-the-fly and persist back.
+          orgId = await ensureStoredOrganizationId();
+        }
+        if (!orgId) {
+          set(0, { status: 'fail', detail: 'No organizationId found for this user (user_roles returned nothing).' });
           return;
         }
-        set(0, { status: 'ok', detail: `org ${creds.organizationId.slice(0, 8)}…` });
+        set(0, { status: 'ok', detail: `org ${orgId.slice(0, 8)}…` });
 
         // Step 2: signed URL via mobile edge function
         let res: any;
         try {
-          res = await mobileApi.voicemailAudio({ xml_cdr_uuid: callId, organization_id: creds.organizationId });
+          res = await mobileApi.voicemailAudio({ xml_cdr_uuid: callId, organization_id: orgId });
+
         } catch (e: any) {
           set(1, { status: 'fail', detail: e?.message || 'invoke failed' });
           return;
