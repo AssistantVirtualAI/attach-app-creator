@@ -173,6 +173,7 @@ import AdminVoicemailSettings from "./pages/lemtel/admin/AdminVoicemailSettings"
 import AdminActiveCalls from "./pages/lemtel/admin/AdminActiveCalls";
 import AdminRegistrations from "./pages/lemtel/admin/AdminRegistrations";
 import AdminSystemStatus from "./pages/lemtel/admin/AdminSystemStatus";
+import AdminAIActions from "./pages/lemtel/admin/AdminAIActions";
 import MySettings from "./pages/lemtel/my/MySettings";
 import MyForwarding from "./pages/lemtel/my/MyForwarding";
 import MyDevices from "./pages/lemtel/my/MyDevices";
