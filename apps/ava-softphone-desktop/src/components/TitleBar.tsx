@@ -2,6 +2,7 @@ import React from 'react';
 import LemtelLogo from './LemtelLogo';
 import ProfileMenu from './ProfileMenu';
 import { theme } from '../lib/theme';
+import { formatAge, useSyncStatus } from '../hooks/useSyncStatus';
 
 const dragStyle: React.CSSProperties = {
   // @ts-expect-error electron CSS
@@ -14,6 +15,8 @@ interface Props {
 
 export default function TitleBar(_props: Props = {}) {
   const { colors } = theme;
+  const sync = useSyncStatus();
+  const retryIn = sync.nextRetryAt ? Math.max(0, Math.round((sync.nextRetryAt - Date.now()) / 1000)) : 0;
 
   return (
     <div
@@ -35,8 +38,30 @@ export default function TitleBar(_props: Props = {}) {
       {/* Left: window controls spacer (macOS traffic lights) */}
       <div style={{ width: 70 }} />
 
-      {/* Center: empty (status pills removed) */}
-      <div />
+      <details style={{ ...dragStyle, position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>
+        <summary style={{
+          listStyle: 'none', display: 'inline-flex', alignItems: 'center', gap: 7,
+          padding: '4px 10px', borderRadius: 999, border: `1px solid ${sync.syncConnected ? colors.success : colors.warning}66`,
+          background: colors.surface, color: colors.text, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+        }}>
+          <span style={{ width: 7, height: 7, borderRadius: 999, background: sync.syncConnected ? colors.success : colors.warning, boxShadow: `0 0 10px ${sync.syncConnected ? colors.success : colors.warning}` }} />
+          CDR {sync.syncConnected ? 'Live' : 'Retrying'} · {formatAge(sync.lastSyncAt ? Date.now() - sync.lastSyncAt : null)}
+          {retryIn > 0 ? ` · retry ${retryIn}s` : ''}
+        </summary>
+        <div style={{
+          position: 'absolute', top: 31, left: '50%', transform: 'translateX(-50%)', width: 380,
+          background: colors.surfaceElev, border: `1px solid ${colors.border}`, borderRadius: 12,
+          boxShadow: colors.shadow, padding: 10, zIndex: 1002,
+        }}>
+          <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 6 }}>CDR sync attempts</div>
+          {sync.log.length === 0 ? <div style={{ fontSize: 11, color: colors.textMuted }}>No attempts logged yet.</div> : sync.log.slice(0, 8).map((l) => (
+            <div key={l.id} style={{ padding: '6px 0', borderTop: `1px solid ${colors.border}`, fontSize: 11, color: l.status === 'failed' ? colors.danger : l.status === 'success' ? colors.success : colors.textMuted }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}><strong>{l.status.toUpperCase()}</strong><span>{new Date(l.at).toLocaleTimeString()}</span></div>
+              <div style={{ marginTop: 2, color: colors.textMuted }}>{l.source}{l.attempt ? ` · attempt ${l.attempt}` : ''} — {l.reason}</div>
+            </div>
+          ))}
+        </div>
+      </details>
 
       {/* Right: profile menu */}
       <ProfileMenu />
