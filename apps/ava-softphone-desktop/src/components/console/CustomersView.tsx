@@ -210,12 +210,20 @@ function DomainModal({ state, onClose, onSaved }: { state: Exclude<EditState, nu
   const [name, setName] = useState(initial?.domain_name || '');
   const [desc, setDesc] = useState(initial?.domain_description || '');
   const [enabled, setEnabled] = useState<boolean>(initial ? (initial.domain_enabled === 'true' || initial.domain_enabled === true) : true);
+  const [orgId, setOrgId] = useState<string>(initial?.org_id || '');
+  const [orgs, setOrgs] = useState<{ id: string; name: string; fusionpbx_domain_uuid?: string | null }[]>([]);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.from('organizations').select('id,name,fusionpbx_domain_uuid').order('name')
+      .then(({ data }) => setOrgs((data || []) as any));
+  }, []);
 
   const save = async () => {
     setSaving(true); setErr(null);
     try {
+      let workingDomainUuid = initial?.domain_uuid || '';
       if (isEdit) {
         const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
           body: { action: 'update-domain', domain_uuid: initial!.domain_uuid, params: { domain_description: desc, domain_enabled: enabled ? 'true' : 'false' } },
@@ -227,7 +235,32 @@ function DomainModal({ state, onClose, onSaved }: { state: Exclude<EditState, nu
           body: { action: 'create-domain', domain_name: name.trim(), domain_description: desc || `Customer ${name}` },
         });
         if (error || (data as any)?.ok === false) throw new Error(error?.message || (data as any)?.error || 'Create failed');
+        workingDomainUuid = (data as any)?.domain_uuid || '';
       }
+
+      // Link / unlink organization
+      if (orgId && workingDomainUuid) {
+        // Clear domain on any other org currently pointing here
+        await supabase.from('organizations')
+          .update({ fusionpbx_domain_uuid: null })
+          .eq('fusionpbx_domain_uuid', workingDomainUuid)
+          .neq('id', orgId);
+        await supabase.from('organizations')
+          .update({ fusionpbx_domain_uuid: workingDomainUuid })
+          .eq('id', orgId);
+      } else if (!orgId && initial?.org_id) {
+        await supabase.from('organizations')
+          .update({ fusionpbx_domain_uuid: null })
+          .eq('id', initial.org_id);
+      }
+
+      // Trigger background sync so counts refresh
+      if (orgId && workingDomainUuid) {
+        supabase.functions.invoke('fusionpbx-proxy', {
+          body: { action: 'sync-all', resources: ['extensions','queues','phone_numbers'], organization_id: orgId, domain_uuid: workingDomainUuid },
+        }).catch(() => {});
+      }
+
       onSaved();
     } catch (e: any) { setErr(e?.message || 'Failed'); }
     finally { setSaving(false); }
@@ -235,15 +268,28 @@ function DomainModal({ state, onClose, onSaved }: { state: Exclude<EditState, nu
 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9000 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: 440, maxWidth: '92vw', background: c.deepPanel, border: `1px solid ${c.border}`, borderRadius: 14, padding: 22, color: c.text }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: 520, maxWidth: '92vw', maxHeight: '88vh', overflowY: 'auto', background: c.deepPanel, border: `1px solid ${c.border}`, borderRadius: 14, padding: 22, color: c.text }}>
         <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>{isEdit ? 'Edit customer' : 'New customer'}</h2>
-        <p style={{ margin: '4px 0 14px', fontSize: 12, color: c.textSub }}>{isEdit ? 'Update this FusionPBX domain.' : 'Create a new FusionPBX domain / tenant.'}</p>
+        <p style={{ margin: '4px 0 14px', fontSize: 12, color: c.textSub }}>{isEdit ? 'Update this FusionPBX domain and link it to a workspace.' : 'Create a new FusionPBX domain / tenant.'}</p>
 
         <label style={lbl(c)}>Domain name</label>
         <input value={name} onChange={(e) => setName(e.target.value)} disabled={isEdit} placeholder="customer.example.com" style={inp(c)} />
 
         <label style={lbl(c)}>Description</label>
-        <input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Friendly name" style={inp(c)} />
+        <input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Friendly customer name" style={inp(c)} />
+
+        <label style={lbl(c)}>Linked workspace / organization</label>
+        <select value={orgId} onChange={(e) => setOrgId(e.target.value)} style={inp(c)}>
+          <option value="">— not linked —</option>
+          {orgs.map((o) => (
+            <option key={o.id} value={o.id}>
+              {o.name}{o.fusionpbx_domain_uuid && o.fusionpbx_domain_uuid !== (initial?.domain_uuid || '') ? ' (linked elsewhere)' : ''}
+            </option>
+          ))}
+        </select>
+        <p style={{ fontSize: 10.5, color: c.mutedSilver, marginTop: 4 }}>
+          Linking enables extension / number / queue counts and per-customer sync.
+        </p>
 
         {isEdit && (
           <label style={{ ...lbl(c), display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 }}>
@@ -255,7 +301,7 @@ function DomainModal({ state, onClose, onSaved }: { state: Exclude<EditState, nu
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 18 }}>
           <button onClick={onClose} style={btnGhost(c)}>Cancel</button>
-          <button onClick={save} disabled={saving} style={{ padding: '8px 16px', borderRadius: 9, background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`, border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1 }}>{saving ? 'Saving…' : isEdit ? 'Save' : 'Create'}</button>
+          <button onClick={save} disabled={saving} style={{ padding: '8px 16px', borderRadius: 9, background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`, border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1 }}>{saving ? 'Saving…' : isEdit ? 'Save & Sync' : 'Create'}</button>
         </div>
       </div>
     </div>
