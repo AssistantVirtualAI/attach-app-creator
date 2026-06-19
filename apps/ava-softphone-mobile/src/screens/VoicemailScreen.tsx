@@ -336,6 +336,7 @@ export default function VoicemailScreen({ haptic }: { haptic?: (s?: ImpactStyle)
           </Card>
         );
       })}
+      </div>
     </div>
   );
 }
