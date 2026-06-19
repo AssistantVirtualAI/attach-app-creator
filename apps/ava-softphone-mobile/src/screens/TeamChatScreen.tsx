@@ -96,13 +96,13 @@ export default function TeamChatScreen({ accessToken, userId }: { accessToken: s
     return () => clearInterval(id);
   }, [accessToken]);
 
-  // Load messages on channel change + poll
+  // Load messages on channel change + realtime subscribe + 30s safety poll
   useEffect(() => {
     if (!activeChannel || !accessToken) return;
     let cancelled = false;
     const fetchMsgs = async () => {
       try {
-        const r = await chatCall('list_messages', { channel_id: activeChannel.id, limit: 60 }, accessToken);
+        const r = await chatCall('list_messages', { channel_id: activeChannel.id, limit: 80 }, accessToken);
         if (!cancelled) {
           setMessages(r.messages || []);
           requestAnimationFrame(() => {
@@ -112,8 +112,18 @@ export default function TeamChatScreen({ accessToken, userId }: { accessToken: s
       } catch {}
     };
     fetchMsgs();
-    pollRef.current = window.setInterval(fetchMsgs, 4000) as unknown as number;
-    return () => { cancelled = true; if (pollRef.current) clearInterval(pollRef.current); };
+    const client = chatRT(accessToken);
+    const channel = client
+      .channel(`chat-${activeChannel.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'org_chat_messages', filter: `channel_id=eq.${activeChannel.id}` } as any,
+        () => { if (!cancelled) fetchMsgs(); })
+      .subscribe();
+    pollRef.current = window.setInterval(fetchMsgs, 30000) as unknown as number;
+    return () => {
+      cancelled = true;
+      if (pollRef.current) clearInterval(pollRef.current);
+      try { _chatRT?.removeChannel(channel); } catch {}
+    };
   }, [activeChannel, accessToken]);
 
   const openDm = async (m: Member) => {
