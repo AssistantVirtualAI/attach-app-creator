@@ -267,14 +267,15 @@ function AuthenticatedShell({
         {tab === 'home'       && <DashboardScreen onNavigate={setTab as any} haptic={haptic} onOpenProfile={() => setProfileOpen(true)} />}
         {tab === 'calls'      && <CallsScreen sp={sp} haptic={haptic} creds={creds} />}
         {tab === 'ava'        && <AVAChatScreen />}
-        {tab === 'messages'   && <TeamChatScreen accessToken={creds.accessToken || null} userId={creds.userId} />}
+        {tab === 'messages'   && <MessagesHubScreen accessToken={creds.accessToken || null} userId={creds.userId} sp={sp} haptic={haptic} />}
+        {tab === 'settings'   && <SettingsScreen creds={creds} sp={sp} onSignOut={onSignOut} />}
+        {/* legacy deep-link routes */}
         {tab === 'more'       && <MoreScreen creds={creds} sp={sp} onSignOut={onSignOut} haptic={haptic} />}
         {tab === 'voicemail'  && <VoicemailScreen haptic={haptic} />}
         {tab === 'recordings' && <RecordingsScreen />}
         {tab === 'contacts'   && <ContactsScreen sp={sp} />}
         {tab === 'sms'        && <MessagesScreen haptic={haptic} />}
         {tab === 'queues'     && <QueuesScreen />}
-        {tab === 'settings'   && <SettingsScreen creds={creds} sp={sp} onSignOut={onSignOut} />}
       </div>
 
       <BottomTabs active={tab} onChange={(t) => { haptic(ImpactStyle.Light); setTab(t); }} />
