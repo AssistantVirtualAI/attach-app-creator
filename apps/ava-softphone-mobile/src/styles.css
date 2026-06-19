@@ -157,3 +157,24 @@ body[data-theme="light"] .lemtel-input {
   color: #1a2340;
 }
 body[data-theme="light"] .lemtel-input::placeholder { color: rgba(26,35,64,0.45); }
+
+/* Card primitives override in light mode (beats inline gradient/bg) */
+body[data-theme="light"] .lemtel-card {
+  background: #ffffff !important;
+  border-color: rgba(0,0,0,0.08) !important;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06) !important;
+  color: #1a2340 !important;
+}
+body[data-theme="light"] .lemtel-card h1,
+body[data-theme="light"] .lemtel-card h2,
+body[data-theme="light"] .lemtel-card h3,
+body[data-theme="light"] .lemtel-card p,
+body[data-theme="light"] .lemtel-card span:not([class]),
+body[data-theme="light"] .lemtel-card div:not([class]) {
+  color: #1a2340 !important;
+}
+body[data-theme="light"] input,
+body[data-theme="light"] textarea {
+  color: #1a2340 !important;
+  background: #ffffff !important;
+}
