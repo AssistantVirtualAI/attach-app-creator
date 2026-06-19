@@ -207,9 +207,12 @@ export default function SoftphonePane({
   useEffect(() => {
     if (sp.snap.callState !== 'active' && sp.snap.callState !== 'held') { setTimer(0); return; }
     if (!sp.snap.startedAt) return;
+    // 1s cadence is enough for a mm:ss display and halves the in-call render
+    // load — the wide-layout dialer was freezing because the 500ms tick was
+    // cascading into every memo + audio visualizer paint on each frame.
     const id = setInterval(() => {
       setTimer(Math.floor((Date.now() - (sp.snap.startedAt || Date.now())) / 1000));
-    }, 500);
+    }, 1000);
     return () => clearInterval(id);
   }, [sp.snap.callState, sp.snap.startedAt]);
 
