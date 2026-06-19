@@ -1,9 +1,18 @@
 // Team chat for mobile: list members of same PBX domain, DMs, group channels, presence live.
 // Reuses the desktop `org-chat` edge function so all platforms share the same data.
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Send, Users, MessageCircle, Plus, ArrowLeft, Circle } from 'lucide-react';
+import { Send, Users, MessageCircle, Plus, ArrowLeft, Circle, Search } from 'lucide-react';
+import { createClient } from '@supabase/supabase-js';
 import { colors, radius, font } from '../lib/theme';
 import { MOBILE_DEFAULT_PORTAL } from '../lib/mobileApi';
+
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdlanhpc3JxdHZ4YXZicmZjb3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1MDMxNzQsImV4cCI6MjA3NzA3OTE3NH0.kaO-GslE99OCNrZ4_AMnbzGqya2azqz_UMZR34zZvvo';
+let _chatRT: ReturnType<typeof createClient> | null = null;
+function chatRT(token?: string | null) {
+  if (!_chatRT) _chatRT = createClient(MOBILE_DEFAULT_PORTAL, SUPABASE_ANON, { auth: { persistSession: false, autoRefreshToken: false } });
+  if (token) _chatRT.realtime.setAuth(token);
+  return _chatRT;
+}
 
 type Channel = { id: string; name: string; channel_type: string; members: string[] | null };
 type Message = { id: string; channel_id: string; sender_id: string; sender_name: string | null; content: string; created_at: string };
