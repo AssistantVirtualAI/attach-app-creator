@@ -13,6 +13,7 @@ import VoicemailScreen from './screens/VoicemailScreen';
 import RecordingsScreen from './screens/RecordingsScreen';
 import ContactsScreen from './screens/ContactsScreen';
 import MessagesScreen from './screens/MessagesScreen';
+import MessagesHubScreen from './screens/MessagesHubScreen';
 import QueuesScreen from './screens/QueuesScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import BottomTabs, { Tab } from './components/BottomTabs';
@@ -26,6 +27,7 @@ import { useRealtimeCDR } from './hooks/useRealtimeCDR';
 import { initBackgroundSync } from './lib/backgroundSync';
 import { useStoredCreds, Creds, ensureStoredOrganizationId, hydrateSoftphoneCredentials } from './lib/creds';
 import { gradients, colors } from './lib/theme';
+import { ThemeProvider } from './lib/ThemeContext';
 import { requestAllPermissions, checkAllPermissions } from './lib/permissions';
 import { registerPush, sendPushTokenToBackend } from './lib/pushNotifications';
 import { syncDeviceContacts } from './lib/contacts';
@@ -75,9 +77,9 @@ export default function MobileApp() {
 
 
   if (loading || booting) return <SplashAva />;
-  if (!creds) return <AuthScreen onAuthenticated={setCreds} />;
+  if (!creds) return <ThemeProvider><AuthScreen onAuthenticated={setCreds} /></ThemeProvider>;
 
-  return <AuthenticatedShell creds={creds} setCreds={setCreds} tab={tab} setTab={setTab} onSignOut={clearCreds} />;
+  return <ThemeProvider><AuthenticatedShell creds={creds} setCreds={setCreds} tab={tab} setTab={setTab} onSignOut={clearCreds} /></ThemeProvider>;
 }
 
 function AuthenticatedShell({
@@ -265,14 +267,15 @@ function AuthenticatedShell({
         {tab === 'home'       && <DashboardScreen onNavigate={setTab as any} haptic={haptic} onOpenProfile={() => setProfileOpen(true)} />}
         {tab === 'calls'      && <CallsScreen sp={sp} haptic={haptic} creds={creds} />}
         {tab === 'ava'        && <AVAChatScreen />}
-        {tab === 'messages'   && <TeamChatScreen accessToken={creds.accessToken || null} userId={creds.userId} />}
+        {tab === 'messages'   && <MessagesHubScreen accessToken={creds.accessToken || null} userId={creds.userId} sp={sp} haptic={haptic} />}
+        {tab === 'settings'   && <SettingsScreen creds={creds} sp={sp} onSignOut={onSignOut} />}
+        {/* legacy deep-link routes */}
         {tab === 'more'       && <MoreScreen creds={creds} sp={sp} onSignOut={onSignOut} haptic={haptic} />}
         {tab === 'voicemail'  && <VoicemailScreen haptic={haptic} />}
         {tab === 'recordings' && <RecordingsScreen />}
         {tab === 'contacts'   && <ContactsScreen sp={sp} />}
         {tab === 'sms'        && <MessagesScreen haptic={haptic} />}
         {tab === 'queues'     && <QueuesScreen />}
-        {tab === 'settings'   && <SettingsScreen creds={creds} sp={sp} onSignOut={onSignOut} />}
       </div>
 
       <BottomTabs active={tab} onChange={(t) => { haptic(ImpactStyle.Light); setTab(t); }} />

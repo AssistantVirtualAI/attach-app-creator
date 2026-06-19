@@ -1,35 +1,24 @@
 import React from 'react';
 import {
-  Home, Phone, MessageCircle, MoreHorizontal, Sparkles,
-  Voicemail, Mic, Users, MessageSquare, Layers, Settings as SettingsIcon,
+  Home, Phone, MessageCircle, Sparkles, Settings as SettingsIcon,
   type LucideIcon,
 } from 'lucide-react';
 import { colors, gradients, radius } from '../lib/theme';
 
 export type Tab =
-  | 'home' | 'calls' | 'ava' | 'messages' | 'more'
-  | 'voicemail' | 'recordings' | 'contacts' | 'sms' | 'queues' | 'settings';
+  | 'home' | 'calls' | 'ava' | 'messages' | 'settings'
+  // legacy routes still reachable via deep-link / query param:
+  | 'more' | 'voicemail' | 'recordings' | 'contacts' | 'sms' | 'queues';
 
 type Item = { id: Tab; label: string; Icon: LucideIcon };
 
-// Primary row (with center AVA orb)
-const PRIMARY_LEFT: Item[] = [
+const LEFT: Item[] = [
   { id: 'home',  label: 'Home',  Icon: Home },
   { id: 'calls', label: 'Calls', Icon: Phone },
 ];
-const PRIMARY_RIGHT: Item[] = [
-  { id: 'messages', label: 'Chat', Icon: MessageCircle },
-  { id: 'contacts', label: 'People', Icon: Users },
-];
-
-// Secondary row — narrow pills inside the bottom bar.
-const SECONDARY: Item[] = [
-  { id: 'voicemail',  label: 'VM',       Icon: Voicemail },
-  { id: 'recordings', label: 'Rec',      Icon: Mic },
-  { id: 'sms',        label: 'SMS',      Icon: MessageSquare },
-  { id: 'queues',     label: 'Queues',   Icon: Layers },
-  { id: 'settings',   label: 'Settings', Icon: SettingsIcon },
-  { id: 'more',       label: 'More',     Icon: MoreHorizontal },
+const RIGHT: Item[] = [
+  { id: 'messages', label: 'Messages', Icon: MessageCircle },
+  { id: 'settings', label: 'Settings', Icon: SettingsIcon },
 ];
 
 export default function BottomTabs({
@@ -41,7 +30,7 @@ export default function BottomTabs({
     <nav
       style={{
         position: 'relative',
-        display: 'flex', flexDirection: 'column', gap: 6,
+        display: 'flex', flexDirection: 'column',
         margin: '0 10px calc(10px + var(--safe-bottom))',
         padding: '10px 8px 8px',
         background:
@@ -54,7 +43,6 @@ export default function BottomTabs({
           '0 24px 60px -28px rgba(7,22,168,0.35), 0 1px 0 rgba(255,255,255,0.9) inset, 0 -1px 0 rgba(0,35,230,0.05) inset',
       }}
     >
-      {/* Primary row with AVA orb */}
       <div
         style={{
           display: 'grid',
@@ -62,7 +50,7 @@ export default function BottomTabs({
           alignItems: 'center',
         }}
       >
-        {PRIMARY_LEFT.map((it) => (
+        {LEFT.map((it) => (
           <TabBtn key={it.id} item={it} active={active === it.id} onPress={() => onChange(it.id)} />
         ))}
 
@@ -93,48 +81,9 @@ export default function BottomTabs({
           </span>
         </div>
 
-        {PRIMARY_RIGHT.map((it) => (
+        {RIGHT.map((it) => (
           <TabBtn key={it.id} item={it} active={active === it.id} onPress={() => onChange(it.id)} />
         ))}
-      </div>
-
-      {/* Secondary row of slim pills, integrated into bottom bar */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: `repeat(${SECONDARY.length}, 1fr)`,
-          gap: 4,
-          paddingTop: 6,
-          borderTop: '1px solid rgba(0,35,230,0.08)',
-        }}
-      >
-        {SECONDARY.map((it) => {
-          const on = active === it.id;
-          const Icon = it.Icon;
-          return (
-            <button
-              key={it.id}
-              onClick={() => onChange(it.id)}
-              style={{
-                display: 'inline-flex', flexDirection: 'column',
-                alignItems: 'center', justifyContent: 'center', gap: 2,
-                padding: '6px 2px', borderRadius: 12,
-                background: on
-                  ? `linear-gradient(180deg, ${accent}22 0%, rgba(255,255,255,0.4) 100%)`
-                  : 'transparent',
-                border: on ? `1px solid ${accent}33` : '1px solid transparent',
-                color: on ? accent : colors.mutedSilver,
-                cursor: 'pointer',
-                transition: 'all .18s ease',
-              }}
-            >
-              <Icon size={15} strokeWidth={on ? 2.6 : 2.1} />
-              <span style={{ fontSize: 9.5, fontWeight: on ? 800 : 600, letterSpacing: 0.3 }}>
-                {it.label}
-              </span>
-            </button>
-          );
-        })}
       </div>
     </nav>
   );

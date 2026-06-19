@@ -1,10 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { ImpactStyle } from '@capacitor/haptics';
+import { Moon, Sun } from 'lucide-react';
 import { colors, font, gradients, radius } from '../lib/theme';
 import { mobileApi, DomainStats, MeResponse, StatsRange } from '../lib/mobileApi';
 import { Card, Chip, SectionTitle, Skeleton, StatusDot, AIPanel, GhostButton } from '../components/ui/Primitives';
 import { LemtelMark, AvaBadge, HeroGradient } from '../components/Brand';
 import { useAutoSync } from '../hooks/useAutoSync';
+import { useTheme } from '../lib/ThemeContext';
 import type { Tab } from '../components/BottomTabs';
 
 const RANGE_LABELS: Record<StatsRange, string> = { today: 'Today', '7d': '7 days', '30d': '30 days' };
@@ -13,6 +15,7 @@ const AI_CACHE_KEY = (range: string) => `ava.aisummary.${range}`;
 export default function DashboardScreen({
   onNavigate, haptic, onOpenProfile,
 }: { onNavigate: (t: Tab) => void; haptic: (s?: ImpactStyle) => Promise<void>; onOpenProfile?: () => void }) {
+  const { mode, toggle } = useTheme();
   const [range, setRange] = useState<StatsRange>('today');
   const me = useAutoSync<MeResponse>(() => mobileApi.me(), { intervalMs: 5 * 60_000 });
   const stats = useAutoSync<DomainStats>(() => mobileApi.domainStats(range), { intervalMs: 60_000, deps: [range] });
@@ -65,6 +68,20 @@ export default function DashboardScreen({
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {s ? <StatusDot state="registered" /> : <Skeleton w={40} h={14} />}
+            <button
+              onClick={() => { haptic(); toggle(); }}
+              aria-label="Toggle theme"
+              title={mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              style={{
+                width: 38, height: 38, borderRadius: '50%',
+                background: 'rgba(255,255,255,0.10)',
+                border: '1px solid rgba(255,255,255,0.18)',
+                color: colors.textIce, cursor: 'pointer',
+                display: 'grid', placeItems: 'center',
+              }}
+            >
+              {mode === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
             <button
               onClick={onOpenProfile}
               aria-label="My profile"

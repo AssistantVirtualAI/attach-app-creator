@@ -6,10 +6,11 @@ import { Card, Chip, SectionTitle, Skeleton, EmptyState, PrimaryButton, GhostBut
 import CallDetailScreen from './CallDetailScreen';
 import Dialpad from '../components/Dialpad';
 import VoicemailScreen from './VoicemailScreen';
+import RecordingsScreen from './RecordingsScreen';
 import { useRealtimeCDR } from '../hooks/useRealtimeCDR';
 import type { Creds } from '../lib/creds';
 
-type SubTab = 'recents' | 'dial' | 'voicemail';
+type SubTab = 'recents' | 'recordings' | 'voicemail' | 'dial';
 
 export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s?: ImpactStyle) => Promise<void>; creds?: Creds | null }) {
   const [sub, setSub] = useState<SubTab>('recents');
@@ -98,6 +99,7 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
         </>
       )}
 
+      {sub === 'recordings' && <div style={{ marginTop: 12 }}><RecordingsScreen /></div>}
       {sub === 'voicemail' && <div style={{ marginTop: 12 }}><VoicemailScreen haptic={haptic} /></div>}
 
       <div style={{ height: 80 }} />
@@ -107,9 +109,10 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
 
 function SegmentedControl({ value, onChange }: { value: SubTab; onChange: (v: SubTab) => void }) {
   const items: { id: SubTab; label: string }[] = [
-    { id: 'recents', label: 'Recents' },
-    { id: 'dial', label: 'Keypad' },
+    { id: 'recents', label: 'History' },
+    { id: 'recordings', label: 'Recordings' },
     { id: 'voicemail', label: 'Voicemail' },
+    { id: 'dial', label: 'Keypad' },
   ];
   return (
     <div style={{
