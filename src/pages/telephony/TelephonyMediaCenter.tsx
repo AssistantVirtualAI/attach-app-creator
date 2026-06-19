@@ -23,6 +23,7 @@ export default function TelephonyMediaCenter({ scope = "org" }: { scope?: Scope 
   const qc = useQueryClient();
   const [tab, setTab] = useState("cdr");
   const [q, setQ] = useState("");
+  const [extFilter, setExtFilter] = useState("");
 
   // -------- Realtime invalidation --------
   useEffect(() => {
