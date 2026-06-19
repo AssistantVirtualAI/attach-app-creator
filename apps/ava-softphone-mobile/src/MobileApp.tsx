@@ -24,6 +24,7 @@ import RealtimeStatusPill from './components/RealtimeStatusPill';
 import ProfileSheet from './components/ProfileSheet';
 import { useRealtimeCDR } from './hooks/useRealtimeCDR';
 import { initBackgroundSync } from './lib/backgroundSync';
+import { useNotificationCounts } from './hooks/useNotificationCounts';
 import { useStoredCreds, Creds, ensureStoredOrganizationId, hydrateSoftphoneCredentials } from './lib/creds';
 import { gradients, colors } from './lib/theme';
 import { ThemeProvider } from './lib/ThemeContext';
@@ -197,6 +198,14 @@ function AuthenticatedShell({
     };
   }, [softphone, sipConfig]);
 
+  const notif = useNotificationCounts({
+    accessToken: creds.accessToken,
+    organizationId: creds.organizationId,
+    userId: creds.userId,
+  });
+
+
+
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   useEffect(() => { sp.setAudioEl(audioRef.current); }, [sp]);
@@ -313,7 +322,7 @@ function AuthenticatedShell({
         {tab === 'home'       && <DashboardScreen onNavigate={setTab as any} haptic={haptic} onOpenProfile={() => setProfileOpen(true)} />}
         {tab === 'calls'      && <CallsScreen sp={sp} haptic={haptic} creds={creds} />}
         {tab === 'ava'        && <AVAChatScreen />}
-        {tab === 'messages'   && <MessagesHubScreen accessToken={creds.accessToken || null} userId={creds.userId} sp={sp} haptic={haptic} />}
+        {tab === 'messages'   && <MessagesHubScreen accessToken={creds.accessToken || null} userId={creds.userId} sp={sp} haptic={haptic} channelUnread={notif.channelUnread} />}
         {tab === 'settings'   && <SettingsScreen creds={creds} sp={sp} onSignOut={onSignOut} />}
         {/* legacy deep-link routes */}
         {tab === 'more'       && <MoreScreen creds={creds} sp={sp} onSignOut={onSignOut} haptic={haptic} />}
@@ -324,7 +333,20 @@ function AuthenticatedShell({
         {tab === 'queues'     && <QueuesScreen />}
       </div>
 
-      <BottomTabs active={tab} onChange={(t) => { haptic(ImpactStyle.Light); setTab(t); }} />
+      <BottomTabs
+        active={tab}
+        onChange={(t) => {
+          haptic(ImpactStyle.Light);
+          if (t === 'calls') notif.markSeen('calls');
+          if (t === 'voicemail') notif.markSeen('voicemail');
+          setTab(t);
+        }}
+        badges={{
+          calls: notif.missedCalls + notif.voicemails,
+          messages: notif.messages,
+          voicemail: notif.voicemails,
+        }}
+      />
 
       {!inCall && <DialerFab sp={sp} haptic={haptic} />}
       {inCall && <ActiveCallSheet sp={sp} haptic={haptic} />}
