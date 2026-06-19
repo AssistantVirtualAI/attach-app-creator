@@ -1,14 +1,52 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { colors, font, radius, gradients } from '../lib/theme';
 import { mobileApi, RecordingEntry } from '../lib/mobileApi';
 import { Card, Chip, SectionTitle, EmptyState, Skeleton } from '../components/ui/Primitives';
 import { useAutoSync } from '../hooks/useAutoSync';
 import CallDetailScreen from './CallDetailScreen';
+import { createClient } from '@supabase/supabase-js';
+import { getCredentials } from '../lib/creds';
+
+const SUPABASE_URL = 'https://gejxisrqtvxavbrfcoxz.supabase.co';
+const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdlanhpc3JxdHZ4YXZicmZjb3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1MDMxNzQsImV4cCI6MjA3NzA3OTE3NH0.kaO-GslE99OCNrZ4_AMnbzGqya2azqz_UMZR34zZvvo';
 
 export default function RecordingsScreen() {
   const { data, loading, refresh, lastSyncedAt, error } =
     useAutoSync<RecordingEntry[]>(() => mobileApi.recordings(), { intervalMs: 60_000 });
   const [open, setOpen] = useState<string | null>(null);
+
+  // Live refresh: when a new recording arrives for this org/extension, pull again.
+  useEffect(() => {
+    let channel: any = null;
+    let cancelled = false;
+    (async () => {
+      const creds = await getCredentials();
+      if (!creds?.accessToken || cancelled) return;
+      const sb = createClient(SUPABASE_URL, ANON_KEY, {
+        auth: { persistSession: false, autoRefreshToken: false },
+        realtime: { params: { eventsPerSecond: 2 } },
+      });
+      sb.realtime.setAuth(creds.accessToken);
+      const filter = creds.organizationId
+        ? `organization_id=eq.${creds.organizationId}`
+        : `extension=eq.${creds.extension}`;
+      channel = sb
+        .channel(`recordings-${creds.extension}`)
+        .on('postgres_changes',
+          { event: '*', schema: 'public', table: 'pbx_call_records', filter },
+          (payload: any) => {
+            const row: any = payload.new || payload.old;
+            if (!row?.has_recording) return;
+            if (row.extension && row.extension !== creds.extension &&
+                row.caller_number !== creds.extension &&
+                row.destination_number !== creds.extension) return;
+            refresh();
+          })
+        .subscribe();
+    })();
+    return () => { cancelled = true; try { channel?.unsubscribe(); } catch {} };
+  }, [refresh]);
+
 
   if (open) return <CallDetailScreen id={open} onBack={() => setOpen(null)} />;
 
