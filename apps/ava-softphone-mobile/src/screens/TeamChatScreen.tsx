@@ -37,12 +37,15 @@ export default function TeamChatScreen(_props: { accessToken?: string | null; us
 
   const loadMembers = useCallback(async () => {
     if (!token || !mobile.domainUuid) return [] as Member[];
-    let rows = await restGet<any[]>(`/rest/v1/pbx_softphone_users_safe?select=portal_user_id,extension,display_name,status,last_seen_at&domain_uuid=eq.${encodeURIComponent(mobile.domainUuid)}&order=extension.asc`, token).catch(() => []);
-    if (!rows?.some((r) => r.portal_user_id)) {
-      const directory = await chatCall('list_directory', {}).catch(() => ({ members: [] }));
-      rows = (directory.members || []).map((m: any) => ({ portal_user_id: m.user_id, extension: m.extension, display_name: m.full_name || m.email, status: m.status, last_seen_at: m.last_seen_at }));
-    }
-    const ids = (rows || []).map((r) => r.portal_user_id).filter(Boolean);
+    const [safeRows, directory] = await Promise.all([
+      restGet<any[]>(`/rest/v1/pbx_softphone_users_safe?select=portal_user_id,extension,display_name,status,last_seen_at&domain_uuid=eq.${encodeURIComponent(mobile.domainUuid)}&order=extension.asc`, token).catch(() => []),
+      chatCall('list_directory', {}).catch(() => ({ members: [] })),
+    ]);
+    const byId = new Map<string, any>();
+    (safeRows || []).forEach((r) => r.portal_user_id && byId.set(r.portal_user_id, { portal_user_id: r.portal_user_id, extension: r.extension, display_name: r.display_name, status: r.status, last_seen_at: r.last_seen_at }));
+    (directory.members || []).forEach((m: any) => m.user_id && byId.set(m.user_id, { ...byId.get(m.user_id), portal_user_id: m.user_id, extension: m.extension || byId.get(m.user_id)?.extension, display_name: m.full_name || m.email || byId.get(m.user_id)?.display_name, status: m.status, last_seen_at: m.last_seen_at }));
+    const rows = Array.from(byId.values());
+    const ids = rows.map((r) => r.portal_user_id).filter(Boolean);
     const pres = ids.length ? await restGet<any[]>(`/rest/v1/user_presence?select=user_id,status,call_state,last_seen_at&user_id=in.(${ids.map((id: string) => `"${id}"`).join(',')})`, token).catch(() => []) : [];
     const pmap = new Map((pres || []).map((p: any) => [p.user_id, p]));
     const list = (rows || []).filter((r) => r.portal_user_id).map((r) => {
@@ -101,6 +104,7 @@ export default function TeamChatScreen(_props: { accessToken?: string | null; us
   const loadMessages = useCallback(async (channelId: string) => {
     const r = await chatCall('list_messages', { channel_id: channelId, limit: 80 });
     setMessages(r.messages || []);
+    await chatCall('mark_read', { channel_id: channelId }).catch(() => {});
     requestAnimationFrame(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }));
   }, [chatCall]);
 
