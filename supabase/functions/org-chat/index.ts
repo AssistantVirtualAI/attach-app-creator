@@ -220,47 +220,65 @@ Deno.serve(async (req) => {
         .eq("portal_user_id", userId)
         .eq("organization_id", orgId);
       const domainIds = (callerDomains ?? []).map((r: any) => r.domain_uuid).filter(Boolean);
-      const [{ data: m1 }, { data: m2 }, { data: domainUsers }] = await Promise.all([
+      const [{ data: m1 }, { data: m2 }, { data: domainUsers }, { data: orgUsers }] = await Promise.all([
         admin.from("organization_members").select("user_id").eq("organization_id", orgId),
         admin.from("org_members").select("user_id").eq("org_id", orgId),
         (domainIds.length
           ? admin.from("pbx_softphone_users").select("portal_user_id, extension, display_name").eq("organization_id", orgId).in("domain_uuid", domainIds)
-          : admin.from("pbx_softphone_users").select("portal_user_id, extension, display_name").eq("organization_id", orgId)),
+          : Promise.resolve({ data: [] as any[] })),
+        // Always include every softphone row in the org (covers rows missing domain_uuid).
+        admin.from("pbx_softphone_users").select("portal_user_id, extension, display_name").eq("organization_id", orgId),
       ]);
+      // Linked portal users (have user_id) — surfaced as full members with presence.
       const ids = Array.from(new Set([
         ...(m1 ?? []).map((r: any) => r.user_id),
         ...(m2 ?? []).map((r: any) => r.user_id),
-        ...(domainUsers ?? []).map((r: any) => r.portal_user_id),
+        ...(domainUsers ?? []).map((r: any) => r.portal_user_id).filter(Boolean),
+        ...(orgUsers ?? []).map((r: any) => r.portal_user_id).filter(Boolean),
       ])).filter(Boolean);
-      if (ids.length === 0) return json({ members: [] });
-      const [{ data: profs }, { data: pres }, { data: spu }] = await Promise.all([
-        admin.from("profiles").select("id, full_name, email, avatar_url").in("id", ids),
-        admin.from("user_presence").select("user_id, status, status_message, call_state, last_seen_at").in("user_id", ids),
-        admin.from("pbx_softphone_users").select("portal_user_id, extension, display_name").in("portal_user_id", ids),
-      ]);
-      const presenceMap = new Map((pres ?? []).map((p: any) => [p.user_id, p]));
-      const extMap = new Map((spu ?? []).map((s: any) => [s.portal_user_id, s]));
-      const profileMap = new Map((profs ?? []).map((p: any) => [p.id, p]));
-      const members = ids.map((id: string) => {
-        const p = profileMap.get(id) as any;
-        const sp = extMap.get(id) as any;
-        const pr = presenceMap.get(id) as any;
-        const lastSeen = pr?.last_seen_at ? new Date(pr.last_seen_at).getTime() : 0;
-        const stale = !lastSeen || Date.now() - lastSeen > 5 * 60 * 1000;
-        let status = pr?.status || "offline";
-        if (stale && status !== "offline") status = "away";
-        if (pr?.call_state && pr.call_state !== "idle") status = "on_call";
-        return {
-          user_id: id,
-          full_name: p?.full_name || sp?.display_name || (sp?.extension ? `Ext ${sp.extension}` : null),
-          email: p?.email ?? null,
-          avatar_url: p?.avatar_url ?? null,
-          extension: sp?.extension ?? null,
-          status,
-          status_message: pr?.status_message ?? null,
-          is_self: id === userId,
-        };
-      }).sort((a: any, b: any) => (a.full_name || a.email || "").localeCompare(b.full_name || b.email || ""));
+      const linkedMembers: any[] = [];
+      if (ids.length) {
+        const [{ data: profs }, { data: pres }, { data: spu }] = await Promise.all([
+          admin.from("profiles").select("id, full_name, email, avatar_url").in("id", ids),
+          admin.from("user_presence").select("user_id, status, status_message, call_state, last_seen_at").in("user_id", ids),
+          admin.from("pbx_softphone_users").select("portal_user_id, extension, display_name").in("portal_user_id", ids),
+        ]);
+        const presenceMap = new Map((pres ?? []).map((p: any) => [p.user_id, p]));
+        const extMap = new Map((spu ?? []).map((s: any) => [s.portal_user_id, s]));
+        const profileMap = new Map((profs ?? []).map((p: any) => [p.id, p]));
+        for (const id of ids) {
+          const p = profileMap.get(id) as any;
+          const sp = extMap.get(id) as any;
+          const pr = presenceMap.get(id) as any;
+          const lastSeen = pr?.last_seen_at ? new Date(pr.last_seen_at).getTime() : 0;
+          const stale = !lastSeen || Date.now() - lastSeen > 5 * 60 * 1000;
+          let status = pr?.status || "offline";
+          if (stale && status !== "offline") status = "away";
+          if (pr?.call_state && pr.call_state !== "idle") status = "on_call";
+          linkedMembers.push({
+            user_id: id,
+            full_name: p?.full_name || sp?.display_name || (sp?.extension ? `Ext ${sp.extension}` : null),
+            email: p?.email ?? null,
+            avatar_url: p?.avatar_url ?? null,
+            extension: sp?.extension ?? null,
+            status,
+            status_message: pr?.status_message ?? null,
+            is_self: id === userId,
+          });
+        }
+      }
+      // Unlinked extensions — still surface them in the directory so admins can see the full team.
+      const unlinked = (orgUsers ?? []).filter((r: any) => !r.portal_user_id).map((r: any) => ({
+        user_id: `ext:${r.extension}`,
+        full_name: r.display_name || (r.extension ? `Ext ${r.extension}` : null),
+        email: null,
+        avatar_url: null,
+        extension: r.extension,
+        status: "offline",
+        status_message: null,
+        is_self: false,
+      }));
+      const members = [...linkedMembers, ...unlinked].sort((a: any, b: any) => (a.full_name || a.email || "").localeCompare(b.full_name || b.email || ""));
       return json({ members });
     }
 

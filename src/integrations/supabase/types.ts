@@ -4664,6 +4664,7 @@ export type Database = {
         Row: {
           access_status: string | null
           action_items: Json | null
+          ai_summary: string | null
           analyzed: boolean | null
           available: boolean | null
           call_record_id: string | null
@@ -4696,6 +4697,7 @@ export type Database = {
         Insert: {
           access_status?: string | null
           action_items?: Json | null
+          ai_summary?: string | null
           analyzed?: boolean | null
           available?: boolean | null
           call_record_id?: string | null
@@ -4728,6 +4730,7 @@ export type Database = {
         Update: {
           access_status?: string | null
           action_items?: Json | null
+          ai_summary?: string | null
           analyzed?: boolean | null
           available?: boolean | null
           call_record_id?: string | null
