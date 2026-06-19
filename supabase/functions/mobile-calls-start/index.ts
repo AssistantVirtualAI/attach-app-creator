@@ -59,19 +59,13 @@ Deno.serve(async (req) => {
       start_at: new Date().toISOString(),
     }).select("id").single();
 
-    const mode = requestedMode === "click_to_call" ? "click_to_call" : "webrtc";
-    if (mode === "click_to_call") {
-      const proxyRes = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/fusionpbx-proxy`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: authHeader, apikey: Deno.env.get("SUPABASE_ANON_KEY") || "" },
-        body: JSON.stringify({ action: "originate-click-to-call", organization_id: sp.organization_id, params: { from_extension: sp.extension, destination: target, domain_name: sp.sip_domain } }),
-      });
-      if (!proxyRes.ok) {
-        const detail = await proxyRes.json().catch(() => ({}));
-        return json({ error: detail?.error || "CLICK_TO_CALL_FAILED", message: detail?.message || detail?.error || "PBX click-to-call failed" }, proxyRes.status);
-      }
-    }
+    // Outbound calls are always placed client-side via JsSIP/WebRTC.
+    // The previous FusionPBX "originate-click-to-call" path required
+    // command_add/command_edit on the PBX API user, which is not granted.
+    // We only log the attempt here; the client does the SIP INVITE.
+    const mode = "webrtc";
     return json({ callId: rec?.id || `call-${Date.now()}`, mode, to: target, from: sp.extension });
+
   } catch (e) {
     console.error("[mobile-calls-start]", e);
     return json({ error: String((e as Error).message || e) }, 500);
