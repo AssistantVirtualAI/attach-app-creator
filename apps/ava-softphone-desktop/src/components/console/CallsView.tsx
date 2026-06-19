@@ -168,7 +168,7 @@ export default function CallsView({ scope = 'mine' }: { scope?: 'mine' | 'org' }
         cr.direction === filter;
       if (!matchesFilter) return false;
       if (!q) return true;
-      const haystack = [cr.customer, cr.from, cr.to, cr.transcript_text, cr.status, cr.direction].filter(Boolean).join(' ').toLowerCase();
+      const haystack = [cr.customer, cr.from, cr.to, (cr as any).extension, (cr as any).source_number, cr.transcript_text, cr.status, cr.direction].filter(Boolean).join(' ').toLowerCase();
       return haystack.includes(q);
     });
   }, [calls, filter, query]);

@@ -162,7 +162,7 @@ export default function RecordingsView({ scope = 'mine' }: { scope?: 'mine' | 'o
       if (cutoff && new Date(r.recordedAt).getTime() < cutoff) return false;
       if (search) {
         const t = search.toLowerCase();
-        const hay = `${r.customer || ''} ${r.from || ''} ${r.to || ''} ${r.summary || ''} ${(r.topics || []).join(' ')} ${(r.tags || []).join(' ')}`.toLowerCase();
+        const hay = `${r.customer || ''} ${r.from || ''} ${r.to || ''} ${(r as any).extension || ''} ${(r as any).source_number || ''} ${r.summary || ''} ${(r.topics || []).join(' ')} ${(r.tags || []).join(' ')}`.toLowerCase();
         if (!hay.includes(t)) return false;
       }
       return true;
