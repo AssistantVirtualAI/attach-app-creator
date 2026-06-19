@@ -239,11 +239,14 @@ function AuthenticatedShell({
       <audio ref={audioRef} autoPlay playsInline />
 
       <div key={tab} className="lemtel-page-enter" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        {tab === 'home'     && <DashboardScreen onNavigate={setTab as any} haptic={haptic} />}
-        {tab === 'calls'    && <CallsScreen sp={sp} haptic={haptic} creds={creds} />}
-        {tab === 'ava'      && <AVAChatScreen />}
-        {tab === 'messages' && <InboxScreen haptic={haptic} />}
-        {tab === 'more'     && <MoreScreen creds={creds} sp={sp} onSignOut={onSignOut} haptic={haptic} />}
+        {tab === 'home'       && <DashboardScreen onNavigate={setTab as any} haptic={haptic} />}
+        {tab === 'calls'      && <CallsScreen sp={sp} haptic={haptic} creds={creds} />}
+        {tab === 'recordings' && <RecordingsScreen />}
+        {tab === 'voicemail'  && <VoicemailScreen haptic={haptic} />}
+        {tab === 'ava'        && <AVAChatScreen />}
+        {tab === 'contacts'   && <ContactsScreen sp={sp} />}
+        {tab === 'messages'   && <InboxScreen haptic={haptic} />}
+        {tab === 'more'       && <MoreScreen creds={creds} sp={sp} onSignOut={onSignOut} haptic={haptic} />}
       </div>
 
       <BottomTabs active={tab} onChange={(t) => { haptic(ImpactStyle.Light); setTab(t); }} />
