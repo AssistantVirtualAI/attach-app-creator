@@ -324,7 +324,7 @@ export function useSoftphone(
     sessionRef.current?.sendDTMF(key, { duration: 100, interToneGap: 70 });
   const setStatus = (status: string) => console.log('Status change:', status);
   const reconnect = useCallback(() => {
-    setSipError('');
+    setSipErrorState('');
     setSipStatus('connecting');
     if (reconnectRef.current) {
       reconnectRef.current();
@@ -332,10 +332,11 @@ export function useSoftphone(
     // Always bump the tick so a fresh effect runs if the previous one
     // was cancelled (e.g. WebRTC missing on first mount, then enabled).
     setReconnectTick((t) => t + 1);
-  }, []);
+  }, [setSipStatus]);
 
   return {
     sipStatus, sipError, callState, callTimer, isMuted, isOnHold, activeCallNumber,
     call, hangup, answer, mute, unmute, hold, unhold, sendDTMF, setStatus, reconnect,
+    lastPersistedError, sipLog, clearSipLog, retryAttempt, nextRetryAt,
   };
 }
