@@ -162,9 +162,22 @@ export function useRealtimeCDR(creds: Creds | null) {
       if (backoffTimer) { clearTimeout(backoffTimer); backoffTimer = null; }
       attempt = 0;
       setNextRetryAt(null);
-      pushLog({ status: 'info', source: 'manual', reason: 'Manual CDR retry requested' });
-      load();
-      connect();
+      pushLog({ status: 'info', source: 'manual', reason: 'Manual CDR retry — triggering PBX sync' });
+      // Force a backend CDR sync, then reload the snapshot so brand-new calls show up.
+      (async () => {
+        try {
+          const token = creds?.accessToken || null;
+          if (token) {
+            await fetch(`${SUPABASE_URL}/functions/v1/cron-pbx-sync`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, apikey: ANON_KEY },
+              body: JSON.stringify({}),
+            }).catch(() => {});
+          }
+        } catch {}
+        load();
+        connect();
+      })();
     };
 
     load();
