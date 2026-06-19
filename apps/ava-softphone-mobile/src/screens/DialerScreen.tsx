@@ -43,6 +43,16 @@ export default function DialerScreen({
   const isRegistered = status === 'registered';
   const isRetrying = status === 'connecting' || status === 'retrying';
   const isFailed = status === 'error';
+  const retryAttempt: number = sp.retryAttempt || 0;
+  const nextRetryAt: number | null = sp.nextRetryAt || null;
+  const [countdown, setCountdown] = useState<number | null>(null);
+  useEffect(() => {
+    if (!nextRetryAt) { setCountdown(null); return; }
+    const tick = () => setCountdown(Math.max(0, Math.round((nextRetryAt - Date.now()) / 1000)));
+    tick();
+    const id = setInterval(tick, 500);
+    return () => clearInterval(id);
+  }, [nextRetryAt]);
 
   const sslLikely = /ssl|certificate|cert|tls|handshake|wss connection failed/i.test(sipError);
 
@@ -56,8 +66,10 @@ export default function DialerScreen({
   const bannerTitle = isRegistered
     ? `✅ Registered — Extension ${sp.sipConfig?.extension || ''}`.trim()
     : isRetrying
-      ? '🔄 Connecting...'
-      : `❌ Registration failed${sipError ? ` — ${sipError}` : ''}`;
+      ? (countdown !== null && retryAttempt > 0
+          ? `🔄 Retrying in ${countdown}s (attempt ${retryAttempt})…`
+          : '🔄 Connecting...')
+      : `❌ SIP error${sipError ? ` — ${sipError}` : ''}`;
 
   const startCall = async () => {
     if (!num || dialing) return;
