@@ -1,75 +1,114 @@
-# Mobile playback + transcribe + live CDR (mobile / desktop / portal) + richer home stats
+# Unified Recording Intelligence + Live CDR Sync
 
-No changes to `vite.config.ts`, `electron-builder.yml`, or `.github/workflows/`.
+Transcribe & analyze each recording exactly **once** server-side, persist the result, and stream it to every surface (mobile app, desktop app, admin portal, client portal). Add realtime sync indicators, richer per-range Home stats, and a robust CDR retry/refresh path.
 
----
+## 1. Transcribe-once + analyze-once pipeline (shared backend)
 
-## 1. Fix recording playback + transcribe (CallDetailScreen — mobile)
+**Storage of truth:** `pbx_call_records` already has `transcribed`, `ai_summary`, `ai_score`, etc. Add (migration):
+- `transcript_text` (text)
+- `transcript_json` (jsonb — segments + speakers)
+- `ai_sentiment` (text), `ai_topics` (text[]), `ai_action_items` (text[])
+- `ai_coaching_notes` (jsonb — array of `{ category, severity, note }`)
+- `ai_score` (already present) + `ai_score_breakdown` (jsonb)
+- `ai_status` enum: `idle | queued | running | done | failed`
+- `ai_error` (text), `ai_started_at`, `ai_completed_at`
 
-Today the **Play** button in `apps/ava-softphone-mobile/src/screens/CallDetailScreen.tsx` is a static `<button>` with no `onClick` — nothing plays, nothing transcribes. Rewire it:
+**Edge function `ai-analyze-call` (existing) becomes idempotent:**
+1. Lock row (`ai_status='running'` only if currently `idle|failed`). If `done` → return cached result immediately. If `running` → return `{status:'running'}`.
+2. Pull recording bytes via the existing `fusionpbx-proxy get-recording` path.
+3. Transcribe via Lovable AI STT (`openai/gpt-4o-mini-transcribe`).
+4. Analyze via Lovable AI chat (`google/gemini-3-flash-preview`): summary, sentiment, topics, action items, coaching notes, score 0–100 with breakdown.
+5. Persist everything to `pbx_call_records`, set `ai_status='done'`, broadcast via Realtime.
 
-- Add a single `audioRef` with proper lifecycle (pause/cleanup on unmount and on switch).
-- On **Play**: call existing `mobileApi.voicemailAudio({ xml_cdr_uuid: callId, organization_id })` (same endpoint already issues signed URLs for both voicemail and call recordings). Cache the URL per call id. Show loading / error states + a "Retry in 3s" button.
-- Real progress bar driven by `audio.ontimeupdate`; click-to-seek on the waveform.
-- **Transcribe**: when the call has no transcript, show a "Transcribe with AVA" button that calls `mobileApi.analyzeCall(callId)` and then re-fetches `callDetail`. Auto-trigger after playback ends if `hasTranscript` is false.
-- Surface transcript + summary + action items live as they arrive.
+**Realtime fan-out:** ensure `pbx_call_records` is in `supabase_realtime` publication (it already is). All clients subscribe; updates dispatch instantly.
 
-This same screen is rendered from Recordings tab today, so the fix covers both entry points.
+## 2. Auto-load recordings (no second tap)
 
-## 2. Broaden CDR fetch so "yesterday/today" calls always appear
+- **Mobile `CallDetailScreen` / `RecordingsScreen`:** prefetch the signed URL the moment the row mounts (or list opens) so Play is instant. Show a small "loading audio" spinner inline; if `RECORDING_NOT_FOUND` (already returns 200+fallback), show the friendly badge.
+- **Desktop `RecentsList`:** same prefetch when the row is hovered/selected.
+- **Portal call-detail drawer:** prefetch via existing `loadPbxRecordingAudio`.
 
-`supabase/functions/mobile-calls/index.ts` filters with a hard `.eq("extension", sp.extension)`. Calls written by FreeSWITCH where `extension` is null but `caller_number` or `destination_number` matches the user's extension are silently dropped. Change list query to:
+## 3. One-tap Transcribe action
 
-```text
-organization_id = sp.organization_id
-AND (extension = sp.extension
-     OR caller_number = sp.extension
-     OR destination_number = sp.extension)
-ORDER BY start_at DESC
-LIMIT 200
-```
+- **Mobile recordings list:** add a `Transcribe` chip on each row.
+  - If `ai_status='done'` → chip becomes `View AI` (opens detail with transcript + score + coaching).
+  - If `running|queued` → shows animated progress chip with elapsed seconds.
+  - If `failed` → red chip with `ai_error` tooltip + Retry.
+- **Desktop `RecentsList` + Portal recordings table:** same chip states.
+- All three surfaces call the same `ai-analyze-call` function — cached result returns instantly, no re-transcription, no token burn.
 
-Apply the same OR to the detail query so deep links never 404. Same broadening already applied to the mobile realtime CDR client filter — no further change needed there.
+## 4. Realtime sync status indicator
 
-## 3. Live CDR sync — verify across mobile, desktop, portal
+Tiny pill in the header of each surface:
+- 🟢 `Live` — Realtime channel `SUBSCRIBED` and last event < 60s
+- 🟡 `Reconnecting` — channel `CHANNEL_ERROR` / `TIMED_OUT`, auto-retrying
+- 🔴 `Offline` — no socket; manual Retry button
+- Click pill → expanded popover with last-event timestamp, channel name, and `Force resync` button.
 
-- **Mobile** — already has `useRealtimeCDR` (tightened last turn) + Recordings live refresh. Add the same realtime subscription to the home **Calls** tab so new rows appear without a manual reload.
-- **Desktop** (`apps/ava-softphone-desktop`) — `RecentsList` already uses `useRealtimeRefresh` on `pbx_call_records`. Add the same OR-on-extension filter on its initial load query so existing data appears even when `extension` column is empty, and on realtime INSERT/UPDATE re-pull a fresh page.
-- **Portal** (`src/hooks/usePbxRealtime.ts` / call lists) — add a subscription to `pbx_call_records` for the current org that invalidates the calls list query. Already publishes to `supabase_realtime` (migration done last turn).
+Implementation: shared `useRealtimeHealth(channelName)` hook in each app, reading `channel.state` + heartbeat timestamps.
 
-No changes to RLS — existing `pbx_call_records` policies already scope per org/extension.
+## 5. CDR sync retry (manual + auto)
 
-## 4. Home dashboard: Today / 7 days / 30 days with richer stats
+- **Auto:** on `visibilitychange → visible`, on app foreground (Capacitor `App.appStateChange`), on Realtime reconnect → refetch last 24h CDRs.
+- **Backoff:** if a CDR insert event references a row not yet readable (replication lag), retry the row fetch with 250ms → 500ms → 1s → 2s backoff (max 4 tries).
+- **Manual:** existing Refresh button stays; add `Force PBX pull` secondary action that invokes `cron-pbx-sync` for the user's domain (single-flight guarded — already implemented per prior change).
 
-- Add a segmented control (Today / 7d / 30d) at the top of `DashboardScreen.tsx`.
-- Extend `mobile-domain-stats` to accept `?range=today|7d|30d` and return:
-  - total calls, answered, missed, voicemails
-  - total talk time (sum of `duration_seconds`)
-  - average duration
-  - average answer rate %
-  - peak hour bucket
-  - per-day bar chart (1/7/30 buckets)
-  - top 5 extensions by call volume
-- Client-side: replace today-only metrics + 7-day chart with the new range-aware payload. Loading skeletons preserved.
+## 6. Home screen — richer per-range stats
 
-## 5. Physical mobile app parity
+`mobile-domain-stats` already supports `today | 7d | 30d`. Extend response with:
+- `missedCalls`, `answeredCalls`, `outboundCalls`
+- `avgDurationSec`, `totalTalkSec`
+- `dialSuccessRate` (answered / total outbound), `dialFailedCount`
+- `peakHour`, `perDay[]` (already present)
 
-The native app on iOS/Android **is** the same codebase under `apps/ava-softphone-mobile`, wrapped by Capacitor. No native code change is required — the bottom tabs, dashboard, recordings, voicemail, contacts, playback, and transcribe will all ship on device. After pulling, the user runs `npx cap sync` once before the next native build (already documented in `apps/ava-softphone-mobile/RELEASE.md`; I'll add a one-line reminder for this batch).
+New tiles on `DashboardScreen.tsx`: Missed, Avg Duration, Dial Success %, Failed Dials. Same data surfaced on the desktop Home pane.
 
----
+## 7. Playback debug checklist (dev-only mobile drawer)
+
+Behind a long-press on the audio waveform (or `?debug=1`), show:
+1. Signed URL issued ✓ / ✗  (+ expiry countdown)
+2. `HEAD` request reachable ✓ / ✗  (status code)
+3. Content-Type starts with `audio/` ✓ / ✗
+4. `<audio>` `canplaythrough` fired ✓ / ✗
+5. First `timeupdate` fired ✓ / ✗
+6. PBX path source (xml_cdr / call_recordings / fallback)
+
+Surfaces the exact failure point without needing remote logs.
 
 ## Files touched
 
-- `apps/ava-softphone-mobile/src/screens/CallDetailScreen.tsx` — real Play + Transcribe wiring.
-- `apps/ava-softphone-mobile/src/screens/DashboardScreen.tsx` — range tabs + new metrics rendering.
-- `apps/ava-softphone-mobile/src/screens/CallsScreen.tsx` — realtime subscription on calls list (small hook reuse).
-- `supabase/functions/mobile-calls/index.ts` — broaden list + detail filter.
-- `supabase/functions/mobile-domain-stats/index.ts` — range support + extra fields.
-- `apps/ava-softphone-desktop/src/components/RecentsList.tsx` — broaden initial CDR query + realtime invalidation.
-- `src/hooks/usePbxRealtime.ts` (or `src/hooks/usePbxData.ts`) — subscribe to `pbx_call_records` for live portal CDR.
-- `apps/ava-softphone-mobile/RELEASE.md` — note `npx cap sync` for this update.
+**Backend (edge functions + migration):**
+- `supabase/migrations/<new>.sql` — add AI columns + status enum
+- `supabase/functions/ai-analyze-call/index.ts` — idempotent transcribe+analyze+coach
+- `supabase/functions/mobile-domain-stats/index.ts` — extended metrics
+- `supabase/functions/mobile-recordings/index.ts` — include `ai_status`, `ai_score`
 
-## Out of scope (will not change)
+**Mobile (`apps/ava-softphone-mobile/`):**
+- `src/screens/RecordingsScreen.tsx` — Transcribe chip, prefetch, status badges
+- `src/screens/CallDetailScreen.tsx` — auto-load audio, coaching panel, debug drawer
+- `src/screens/DashboardScreen.tsx` — new stat tiles
+- `src/components/RealtimeStatusPill.tsx` (new)
+- `src/hooks/useRealtimeHealth.ts` (new)
+- `src/hooks/useRealtimeCDR.ts` — backoff retry on row-not-found
+- `src/MobileApp.tsx` — mount pill in header
 
-- AVA org pages, landing page, billing, RLS schema, native build configs.
-- No new edge functions beyond the existing ones above.
+**Desktop (`apps/ava-softphone-desktop/`):**
+- `src/components/RecentsList.tsx` — Transcribe chip + prefetch + AI panel
+- `src/components/RealtimeStatusPill.tsx` (new)
+- `src/hooks/useRealtimeHealth.ts` (new)
+- `src/lib/avaApi.ts` — `analyzeCall`, `getCallAi` helpers
+
+**Portal (`src/`):**
+- `src/hooks/usePbxData.ts` — surface `ai_*` columns
+- `src/hooks/useRealtimeHealth.ts` (new)
+- `src/components/pbx/RecordingsTable.tsx` — Transcribe chip + AI badge
+- `src/components/pbx/CallDetailDrawer.tsx` (or equivalent) — transcript + coaching + score panel
+- Header: realtime pill
+
+## Out of scope (this plan)
+
+- No changes to `Landing.tsx` / `landing/**` (locked).
+- No changes to CI/CD, electron-builder, or Capacitor native configs.
+- No new storage buckets (reuses `lemtel-recordings`).
+
+After approval I will execute the migration first, then ship backend, then the three UI layers.
