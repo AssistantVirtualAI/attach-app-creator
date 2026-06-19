@@ -108,24 +108,28 @@ function AuthenticatedShell({
     return () => { cancelled = true; };
   }, []);
 
-  // Debug: log SIP credentials availability
+  // Build SIP config. Use known-working WSS / domain fallbacks so SIP can
+  // register even before the async credential hydration has completed.
   const sipPassword = creds.sipPassword || (creds as any).sipPassword;
-  if (creds.extension && !sipPassword) {
-    console.warn('[SIP] Extension found but sipPassword missing - waiting for hydration');
-  }
-  if (creds.extension && sipPassword) {
-    console.log('[SIP] Config ready:', creds.extension, creds.sipDomain, creds.wssUrl);
-  }
+  const wssUrl = creds.wssUrl || 'wss://node.lemtelcloud.net:7443';
+  const sipDomain = creds.sipDomain || 'lemtel.lemtel.tel';
 
-  const sipConfig = creds.extension && creds.wssUrl && creds.sipDomain && sipPassword
+  const sipConfig = creds.extension && sipPassword
     ? {
         extension: creds.extension,
-        displayName: creds.displayName || creds.email,
+        displayName: creds.displayName || creds.email || 'User',
         password: sipPassword,
-        domain: creds.sipDomain,
-        wssUrl: creds.wssUrl,
+        domain: sipDomain,
+        wssUrl: wssUrl,
       }
     : null;
+
+  console.log('[SIP] sipConfig:', sipConfig
+    ? `ext=${sipConfig.extension} domain=${sipConfig.domain} wss=${sipConfig.wssUrl}`
+    : 'NULL - missing: ' + [
+        !creds.extension && 'extension',
+        !sipPassword && 'password',
+      ].filter(Boolean).join(', '));
   const softphone = useSoftphone(sipConfig);
 
   useEffect(() => {
