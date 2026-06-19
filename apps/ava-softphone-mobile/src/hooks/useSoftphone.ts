@@ -233,9 +233,18 @@ export function useSoftphone(
   const sendDTMF = (key: string) =>
     sessionRef.current?.sendDTMF(key, { duration: 100, interToneGap: 70 });
   const setStatus = (status: string) => console.log('Status change:', status);
+  const reconnect = useCallback(() => {
+    setSipError('');
+    setSipStatus('connecting');
+    if (reconnectRef.current && reconnectRef.current !== (() => {})) {
+      reconnectRef.current();
+    } else {
+      setReconnectTick((t) => t + 1);
+    }
+  }, []);
 
   return {
     sipStatus, sipError, callState, callTimer, isMuted, isOnHold, activeCallNumber,
-    call, hangup, answer, mute, unmute, hold, unhold, sendDTMF, setStatus,
+    call, hangup, answer, mute, unmute, hold, unhold, sendDTMF, setStatus, reconnect,
   };
 }
