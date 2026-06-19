@@ -39,7 +39,18 @@ function RecentsListImpl({ extension, onCall }: Props) {
     if (!silent) { setLoading(true); setErr(null); }
     if (force) setRefreshing(true);
     try {
-      const data = force ? await ava.refreshCalls(50, { extension }) : await ava.calls(50, { extension });
+      let data: CallRecord[] = [];
+      if (force) {
+        try {
+          data = await ava.refreshCalls(50, { extension });
+        } catch (e: any) {
+          // Live PBX sync unavailable — fall back to cached records and surface a soft notice.
+          setErr(e?.message || 'Live CDR sync unavailable — showing cached records.');
+          data = await ava.calls(50, { extension });
+        }
+      } else {
+        data = await ava.calls(50, { extension });
+      }
       setRows(Array.isArray(data) ? data : []);
       setLastUpdated(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
     } catch (e: any) {
