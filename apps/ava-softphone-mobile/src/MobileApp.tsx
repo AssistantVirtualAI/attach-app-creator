@@ -85,6 +85,7 @@ function AuthenticatedShell({
 }: { creds: Creds; setCreds: (c: Creds) => void; tab: Tab; setTab: (t: Tab) => void; onSignOut: () => void }) {
 
   const [permsGateDone, setPermsGateDone] = useState<boolean | null>(isPreviewMode ? true : null);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   // Decide whether to show the onboarding permission gate.
   useEffect(() => {
@@ -247,7 +248,6 @@ function AuthenticatedShell({
   }
 
 
-  const [profileOpen, setProfileOpen] = useState(false);
 
   return (
     <div style={{
