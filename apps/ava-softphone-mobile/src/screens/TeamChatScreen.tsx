@@ -12,7 +12,8 @@ type Member = { user_id: string; full_name: string | null; email: string | null;
 
 const STATUS_COLOR: Record<string, string> = { online: '#22d39a', available: '#22d39a', busy: '#ff5a5f', dnd: '#ff5a5f', on_call: '#ff8a3d', away: '#f4c248', offline: '#6b7280', meeting: '#a855f7', lunch: '#eab308', break: '#f97316' };
 
-export default function TeamChatScreen(_props: { accessToken?: string | null; userId?: string }) {
+export default function TeamChatScreen(props: { accessToken?: string | null; userId?: string; channelUnread?: Record<string, number> }) {
+  const channelUnread = props.channelUnread || {};
   const mobile = useMobileCredentials();
   const token = mobile.accessToken;
   const userId = mobile.userId;
@@ -156,7 +157,10 @@ export default function TeamChatScreen(_props: { accessToken?: string | null; us
     setInput('');
     try {
       const r = await chatCall('send_message', { channel_id: activeChannel.id, content: text });
-      if (r.message) setMessages((prev) => [...prev, r.message]);
+      if (r.message) {
+        setMessages((prev) => prev.some((m) => m.id === r.message.id) ? prev : [...prev, r.message]);
+        requestAnimationFrame(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }));
+      }
     } catch (e: any) { setError(e?.message || 'Send failed'); }
   };
 
