@@ -325,7 +325,7 @@ export const mobileApi = {
   ),
 
   // Recents: scoped server-side to the caller's org + extension via mobile-calls.
-  calls: (opts?: { rangeDays?: 7 | 30 }) => call<CallRecord[] | any>(`/mobile-calls?days=${opts?.rangeDays || 7}&limit=200`, undefined, callsMock).then((raw: any) => {
+  calls: (opts?: { rangeDays?: 7 | 30; extension?: string | null }) => call<CallRecord[] | any>(`/mobile-calls?days=${opts?.rangeDays || 7}&limit=200${opts?.extension && opts.extension !== 'all' ? `&extension=${encodeURIComponent(opts.extension)}` : ''}`, undefined, callsMock).then((raw: any) => {
     if (isMockMode()) return raw as CallRecord[];
     if (!Array.isArray(raw)) throw new Error('Invalid response from mobile-calls');
     return raw as CallRecord[];
