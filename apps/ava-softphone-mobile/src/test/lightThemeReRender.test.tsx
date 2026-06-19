@@ -48,11 +48,12 @@ describe('useThemeColors re-render guarantee', () => {
       expect(log[id][log[id].length - 1]).toBe(lightColors.textIce);
     }
 
-    // And the DOM attribute is in sync — no stale paint.
+    // And the DOM attribute is in sync — no stale paint. jsdom normalises
+    // inline `color` to rgb(), so we compare via getComputedStyle.
     expect(document.documentElement.getAttribute('data-theme')).toBe('light');
     for (const id of screens) {
       const el = getByTestId(`probe-${id}`);
-      expect(el.getAttribute('style')).toContain(lightColors.textIce);
+      expect(getComputedStyle(el).color).toBe('rgb(13, 20, 38)'); // #0d1426
     }
   });
 });
