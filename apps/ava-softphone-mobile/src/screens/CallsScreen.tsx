@@ -86,20 +86,28 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
             onLongPressZero={() => { haptic(ImpactStyle.Medium); setNumber((n) => n + '+'); }}
           />
           <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
-            <PrimaryButton onClick={() => startCall(number)} disabled={!number} style={{ flex: 1 }}>
-              📞 Call
+            <PrimaryButton onClick={() => startCall(number)} disabled={!number || dialing} style={{ flex: 1 }}>
+              {dialing ? '⏳ Dialing…' : '📞 Call'}
             </PrimaryButton>
             <GhostButton tone="cyan" onClick={() => sp?.snap?.status === 'connecting' ? null : haptic()}>
               {sp?.snap?.status === 'registered' ? 'SIP · Live' : sp?.snap?.status || 'Offline'}
             </GhostButton>
           </div>
+          {(dialError || dialDebug) && (
+            <Card style={{ marginTop: 12 }} accent={dialError ? 'gold' : 'cyan'}>
+              {dialError && <div style={{ fontSize: font.sm, color: colors.danger, fontWeight: 800, marginBottom: 6 }}>Keypad error: {dialError}</div>}
+              <div style={{ fontSize: 11, color: colors.mutedSilver, lineHeight: 1.45, wordBreak: 'break-word', fontFamily: 'JetBrains Mono, monospace' }}>
+                {dialDebug || `SIP status: ${sp?.snap?.status || 'offline'}`}
+              </div>
+            </Card>
+          )}
           {sp?.snap?.status !== 'registered' && (
             <Card style={{ marginTop: 14 }} accent="gold">
               <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 1.4, color: colors.signalGold, textTransform: 'uppercase' }}>WebRTC unavailable</div>
               <p style={{ fontSize: font.sm, color: colors.mutedSilver, margin: '6px 0 10px', lineHeight: 1.5 }}>
                 Your SIP is not registered yet. You can still place a click-to-call request that rings your deskphone.
               </p>
-              <PrimaryButton onClick={() => startCall(number)} disabled={!number}>Click-to-call deskphone</PrimaryButton>
+              <PrimaryButton onClick={() => startCall(number)} disabled={!number || dialing}>{dialing ? 'Dialing…' : 'Click-to-call deskphone'}</PrimaryButton>
             </Card>
           )}
         </div>
