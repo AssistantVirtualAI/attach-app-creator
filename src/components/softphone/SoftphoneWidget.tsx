@@ -629,23 +629,45 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
     </div>
   );
 
-  // Compact AI Insights — surfaces today's calls + missed + unread voicemail
+  // AI Insights — richer hero panel replacing the old diagnostics chips
   const todayCalls = summary?.today_calls ?? 0;
   const unreadVm = summary?.unread_voicemail ?? 0;
+  const missedToday = summary?.missed_today ?? 0;
+  const avgDuration = summary?.avg_duration_seconds ?? 0;
 
-  const insightsStrip = callState === "idle" && hasExtension && showInsights && insightsTip && (
-    <div className="px-3 py-2 border-t border-border/60 bg-primary/5">
+  const insightsStrip = callState === "idle" && hasExtension && showInsights && (
+    <div className="px-3 py-2.5 border-t border-border/60 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent">
       <div className="flex items-start gap-2">
-        <Sparkles className="w-3.5 h-3.5 text-primary mt-0.5 shrink-0" />
+        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-primary/60 text-primary-foreground flex items-center justify-center shrink-0 shadow-sm">
+          <Sparkles className="w-3.5 h-3.5" />
+        </div>
         <div className="flex-1 min-w-0">
-          <div className="text-[10px] uppercase tracking-wide text-primary/80 font-semibold flex items-center gap-1.5">
-            AI insight
-            <div className="flex gap-1 ml-1">
-              <Badge variant="outline" className="h-3.5 text-[9px] px-1 font-mono">{todayCalls} today</Badge>
-              {unreadVm > 0 && <Badge variant="outline" className="h-3.5 text-[9px] px-1 font-mono text-amber-600 border-amber-500/40">{unreadVm} vm</Badge>}
-            </div>
+          <div className="text-[10px] uppercase tracking-wider text-primary font-bold">
+            AVA AI · Live insights
           </div>
-          <p className="text-[11px] text-foreground/80 leading-snug mt-0.5">{insightsTip}</p>
+          {insightsTip && (
+            <p className="text-[11.5px] text-foreground/90 leading-snug mt-0.5 font-medium">{insightsTip}</p>
+          )}
+          <div className="flex flex-wrap gap-1.5 mt-1.5">
+            <Badge variant="secondary" className="h-5 text-[10px] px-1.5 font-mono">
+              <Phone className="w-2.5 h-2.5 mr-1" />{todayCalls} today
+            </Badge>
+            {missedToday > 0 && (
+              <Badge variant="outline" className="h-5 text-[10px] px-1.5 font-mono text-rose-600 border-rose-500/40 bg-rose-500/5">
+                {missedToday} missed
+              </Badge>
+            )}
+            {unreadVm > 0 && (
+              <Badge variant="outline" className="h-5 text-[10px] px-1.5 font-mono text-amber-600 border-amber-500/40 bg-amber-500/5">
+                {unreadVm} voicemail
+              </Badge>
+            )}
+            {avgDuration > 0 && (
+              <Badge variant="outline" className="h-5 text-[10px] px-1.5 font-mono">
+                ⌀ {Math.round(avgDuration)}s
+              </Badge>
+            )}
+          </div>
         </div>
         <button onClick={() => setShowInsights(false)} className="text-muted-foreground hover:text-foreground" aria-label="Hide insights">
           <X className="w-3 h-3" />
@@ -653,6 +675,7 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
       </div>
     </div>
   );
+
 
   const content = (
     <>
