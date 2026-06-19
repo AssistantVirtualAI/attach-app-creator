@@ -1,11 +1,11 @@
 import { colors } from './theme';
 
-type ToastKind = 'success' | 'error' | 'info';
+type ToastKind = 'success' | 'error' | 'info' | 'warning';
 
 export function showMobileToast(message: string, kind: ToastKind = 'info', onClick?: () => void) {
   if (typeof document === 'undefined') return;
   const root = document.createElement('button');
-  const color = kind === 'success' ? colors.success : kind === 'error' ? colors.danger : colors.avaCyan;
+  const color = kind === 'success' ? colors.success : kind === 'error' ? colors.danger : kind === 'warning' ? colors.warning : colors.avaCyan;
   root.type = 'button';
   root.textContent = message;
   root.onclick = onClick || null;

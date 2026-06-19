@@ -100,6 +100,14 @@ export interface CallRecord {
 }
 
 export interface CallDetail extends CallRecord {
+  pbx_uuid?: string | null;
+  organization_id?: string | null;
+  domain_uuid?: string | null;
+  domain_name?: string | null;
+  recording_path?: string | null;
+  recording_name?: string | null;
+  record_path?: string | null;
+  record_name?: string | null;
   transcript: { speaker: 'agent' | 'customer'; text: string; t: number }[];
   summary: string;
   topics: string[];
