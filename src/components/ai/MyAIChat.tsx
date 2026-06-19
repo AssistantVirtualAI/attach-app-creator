@@ -5,12 +5,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Sparkles, Send, Loader2, X, MessageCircle, Trash2, Zap, ZapOff } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Sparkles, Send, Loader2, X, MessageCircle, Trash2, Zap, ZapOff, FileText, ShieldAlert, Phone, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 type Attachment = { kind: string; title?: string; filename?: string; url: string };
-type Msg = { role: "user" | "assistant"; content: string; attachments?: Attachment[] };
+type ToolResult = { name: string; output: any };
+type Msg = { role: "user" | "assistant"; content: string; attachments?: Attachment[]; toolResults?: ToolResult[] };
 type PageContext = {
   path: string;
   page: "voicemail" | "calls" | "recordings" | "other";
