@@ -22,10 +22,10 @@ export default function Dialpad({
   onPress: (d: string) => void;
   onLongPressZero?: () => void;
 }) {
-  // Touch devices fire BOTH `touchstart` and a synthetic `click`. Without
-  // this guard the digit is registered twice (the "22" bug). We mark a
-  // short window after touchstart and have onClick bail out.
-  const touchedAtRef = React.useRef(0);
+  // Use pointerdown only — fires exactly once for both mouse and touch
+  // (unlike onClick + onTouchStart which double-fired the "22" bug).
+  const handledRef = React.useRef<number>(0);
+  const longTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   return (
     <div style={gridStyle}>
@@ -33,24 +33,24 @@ export default function Dialpad({
         <button
           key={k.d}
           type="button"
-          onTouchStart={(e) => {
-            e.preventDefault(); // suppress the synthetic mouse event chain
-            touchedAtRef.current = Date.now();
+          onPointerDown={(e) => {
+            // Guard against any duplicate event in the same tick.
+            const now = Date.now();
+            if (now - handledRef.current < 50) return;
+            handledRef.current = now;
+            e.preventDefault();
             onPress(k.d);
             if (k.d === '0' && onLongPressZero) {
-              (e.currentTarget as any)._lt = setTimeout(() => onLongPressZero(), 600);
+              longTimerRef.current = setTimeout(() => onLongPressZero(), 600);
             }
           }}
-          onTouchEnd={(e) => {
-            const lt = (e.currentTarget as any)._lt;
-            if (lt) clearTimeout(lt);
+          onPointerUp={() => {
+            if (longTimerRef.current) { clearTimeout(longTimerRef.current); longTimerRef.current = null; }
           }}
-          onClick={() => {
-            // Skip the click if a touchstart fired in the last 500 ms —
-            // it has already registered the digit.
-            if (Date.now() - touchedAtRef.current < 500) return;
-            onPress(k.d);
+          onPointerLeave={() => {
+            if (longTimerRef.current) { clearTimeout(longTimerRef.current); longTimerRef.current = null; }
           }}
+          onClick={(e) => { e.preventDefault(); /* handled in pointerdown */ }}
           style={keyStyle}
         >
           <span style={{ fontSize: 30, fontWeight: 300 }}>{k.d}</span>
@@ -60,6 +60,7 @@ export default function Dialpad({
     </div>
   );
 }
+
 
 const gridStyle: React.CSSProperties = {
   display: 'grid',
