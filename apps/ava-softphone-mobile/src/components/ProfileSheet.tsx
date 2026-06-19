@@ -120,19 +120,47 @@ export default function ProfileSheet({
     setUploading(false);
   };
 
-  const requestPasswordChange = async () => {
+  const updatePassword = async () => {
+    setPwMsg(null); setPwError(false);
+    if (pwNew.length < 8) { setPwMsg('Password must be at least 8 characters.'); setPwError(true); return; }
+    if (pwNew !== pwConfirm) { setPwMsg('Passwords do not match.'); setPwError(true); return; }
+    if (!creds.accessToken) { setPwMsg('Not signed in.'); setPwError(true); return; }
+    setPwBusy(true);
+    try {
+      const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+        method: 'PUT',
+        headers: {
+          apikey: SUPABASE_ANON,
+          Authorization: `Bearer ${creds.accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ password: pwNew }),
+      });
+      if (!r.ok) {
+        const d = await r.json().catch(() => null);
+        throw new Error(d?.msg || d?.error_description || `HTTP ${r.status}`);
+      }
+      setPwMsg('Password updated.'); setPwError(false);
+      setPwNew(''); setPwConfirm('');
+      setTimeout(() => { setPwOpen(false); setPwMsg(null); }, 1200);
+    } catch (e: any) {
+      setPwMsg(e?.message || 'Could not update password.'); setPwError(true);
+    }
+    setPwBusy(false);
+  };
+
+  const sendResetEmail = async () => {
     if (!creds.email) return;
-    setPwBusy(true); setPwMsg(null);
+    setPwBusy(true); setPwMsg(null); setPwError(false);
     try {
       const r = await fetch(`${SUPABASE_URL}/auth/v1/recover`, {
         method: 'POST',
         headers: { apikey: SUPABASE_ANON, 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: creds.email }),
       });
-      setPwMsg(r.ok ? 'Reset email sent — check your inbox.' : 'Could not send reset email.');
-    } catch {
-      setPwMsg('Could not send reset email.');
-    }
+      if (!r.ok) throw new Error();
+      setPwMsg('Reset email sent — check your inbox.');
+    } catch { setPwMsg('Could not send reset email.'); setPwError(true); }
     setPwBusy(false);
   };
 
