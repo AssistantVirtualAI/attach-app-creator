@@ -143,7 +143,9 @@ export interface RecordingEntry {
   summary?: string;
 }
 
+export type StatsRange = 'today' | '7d' | '30d';
 export interface DomainStats {
+  // legacy
   callsToday: number;
   answeredToday: number;
   missedToday: number;
@@ -152,6 +154,16 @@ export interface DomainStats {
   activeExtensions: number;
   last7Days: number[];
   topExtensions: { extension: string; name?: string; calls: number }[];
+  // range-aware (added)
+  range?: StatsRange;
+  totalCalls?: number;
+  answered?: number;
+  missed?: number;
+  voicemails?: number;
+  totalTalkSec?: number;
+  answerRate?: number;
+  peakHour?: number | null;
+  buckets?: number[];
 }
 
 export interface ChatReply { answer: string }
