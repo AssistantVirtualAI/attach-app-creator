@@ -112,6 +112,19 @@ Deno.serve(async (req) => {
           admin.from("pbx_call_transcripts").select("transcript_text").eq("call_record_id", call_record_id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
         ]);
         const cachedTranscript = (existingTranscript as any)?.transcript_text || (existingCall?.raw_data as any)?.transcript_text || "";
+        await admin.from("pbx_call_records").update({
+          analyzed: true,
+          transcribed: !!cachedTranscript,
+          ai_processing: false,
+          ai_summary: (cached as any).summary || null,
+          raw_data: {
+            ...((existingCall?.raw_data as Record<string, unknown>) || {}),
+            ai: { ...(cached as Record<string, unknown>) },
+            ai_model: cachedModel,
+            transcript_text: cachedTranscript,
+            transcript_provider: (existingCall?.raw_data as any)?.transcript_provider || null,
+          },
+        }).eq("id", call_record_id);
         return new Response(JSON.stringify({
           ok: true, cached: true, stub: false, ai_model: cachedModel,
           ...cached, insights: cached, analysis: cached,
