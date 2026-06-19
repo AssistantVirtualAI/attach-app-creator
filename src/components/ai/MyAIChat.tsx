@@ -9,7 +9,8 @@ import { Sparkles, Send, Loader2, X, MessageCircle, Trash2, Zap, ZapOff } from "
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
-type Msg = { role: "user" | "assistant"; content: string };
+type Attachment = { kind: string; title?: string; filename?: string; url: string };
+type Msg = { role: "user" | "assistant"; content: string; attachments?: Attachment[] };
 type PageContext = {
   path: string;
   page: "voicemail" | "calls" | "recordings" | "other";
