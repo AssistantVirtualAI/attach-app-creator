@@ -91,11 +91,31 @@ const clean = (value: unknown) => {
   return text && text !== 'null' && text !== 'undefined' ? text : '';
 };
 
-export async function loadPbxRecordingAudioMobile(recording: RecordingMeta, token?: string | null, organizationId?: string | null) {
+// Module-level cache so blob: URLs survive tab switches within the session.
+const audioBlobCache = new Map<string, string>();
+
+export function getCachedRecordingAudio(key: string): string | undefined {
+  return audioBlobCache.get(key);
+}
+
+export function getCachedRecordingAudioEntries(): Array<[string, string]> {
+  return Array.from(audioBlobCache.entries());
+}
+
+export async function loadPbxRecordingAudioMobile(
+  recording: RecordingMeta,
+  token?: string | null,
+  organizationId?: string | null,
+  fallbackDomainUuid?: string | null,
+) {
   const xml_cdr_uuid = clean(recording.xml_cdr_uuid || recording.pbx_uuid || recording.id);
   const record_path = clean(recording.record_path || recording.recording_path);
   const record_name = clean(recording.record_name || recording.recording_name);
   if (!xml_cdr_uuid && (!record_path || !record_name)) throw new Error('Missing recording metadata');
+
+  const cacheKey = xml_cdr_uuid || `${record_path}/${record_name}`;
+  const cached = audioBlobCache.get(cacheKey);
+  if (cached) return cached;
 
   const payload = {
     organization_id: clean(recording.organization_id) || organizationId || undefined,
@@ -103,7 +123,7 @@ export async function loadPbxRecordingAudioMobile(recording: RecordingMeta, toke
       xml_cdr_uuid,
       record_path,
       record_name,
-      domain_uuid: clean(recording.domain_uuid),
+      domain_uuid: clean(recording.domain_uuid) || clean(fallbackDomainUuid),
       domain_name: clean(recording.domain_name),
       recorded_at: clean(recording.recorded_at || recording.start_at),
       local_recording_url: clean(recording.recording_url),
@@ -123,7 +143,10 @@ export async function loadPbxRecordingAudioMobile(recording: RecordingMeta, toke
 
   if (signed.ok) {
     const json = await signed.json().catch(() => null);
-    if (json?.ok && json?.url) return json.url as string;
+    if (json?.ok && json?.url) {
+      audioBlobCache.set(cacheKey, json.url as string);
+      return json.url as string;
+    }
   }
 
   const res = await fetch(`${SUPABASE_URL}/functions/v1/fusionpbx-proxy`, {
@@ -144,13 +167,15 @@ export async function loadPbxRecordingAudioMobile(recording: RecordingMeta, toke
     let parsed: any = null;
     try { parsed = JSON.parse(text); } catch { /* not json */ }
     const code = parsed?.error || '';
-    if (code === 'RECORDING_NOT_FOUND') throw new Error('File deleted from PBX storage.');
-    if (code === 'LOGIN_FAILED') throw new Error('PBX authentication failed.');
+    if (code === 'RECORDING_NOT_FOUND') throw new Error('File deleted from PBX after retention period');
+    if (code === 'LOGIN_FAILED') throw new Error('PBX authentication failed');
     if (code === 'Forbidden') throw new Error('You do not have access to this recording.');
     throw new Error(parsed?.message || parsed?.error || text.slice(0, 200) || `Recording unavailable (${res.status})`);
   }
 
   const blob = await res.blob();
   if (!blob.size) throw new Error('Empty recording');
-  return URL.createObjectURL(blob);
+  const url = URL.createObjectURL(blob);
+  audioBlobCache.set(cacheKey, url);
+  return url;
 }
