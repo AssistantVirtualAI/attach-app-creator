@@ -8,7 +8,8 @@ import { colors, gradients, radius } from '../lib/theme';
 export type Tab =
   | 'home' | 'calls' | 'ava' | 'messages' | 'settings'
   // legacy routes still reachable via deep-link / query param:
-  | 'more' | 'voicemail' | 'recordings' | 'contacts' | 'sms' | 'queues';
+  | 'more' | 'voicemail' | 'contacts' | 'sms' | 'queues';
+
 
 type Item = { id: Tab; label: string; Icon: LucideIcon };
 
