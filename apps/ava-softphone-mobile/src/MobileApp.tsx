@@ -197,9 +197,14 @@ function AuthenticatedShell({
       }
     })();
 
-    // Re-register SIP when app comes back to foreground.
+    // Re-register SIP + refresh device contacts when app comes back to foreground.
     let unsub: () => void = () => {};
-    onAppStateChange((active) => { if (active) sp.reconnect?.(); }).then((u) => { unsub = u; });
+    onAppStateChange((active) => {
+      if (active) {
+        sp.reconnect?.();
+        syncDeviceContacts().catch(() => {});
+      }
+    }).then((u) => { unsub = u; });
 
     return () => { cancelled = true; unsub(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
