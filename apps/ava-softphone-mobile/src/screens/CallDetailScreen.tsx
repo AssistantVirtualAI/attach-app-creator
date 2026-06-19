@@ -5,6 +5,9 @@ import { mobileApi, CallDetail } from '../lib/mobileApi';
 import { Card, Chip, AIPanel, Skeleton, GhostButton } from '../components/ui/Primitives';
 import { getCredentials } from '../lib/creds';
 import RecordingDebugScreen from './RecordingDebugScreen';
+import { showMobileToast } from '../lib/mobileToast';
+
+type AiStage = 'idle' | 'transcribing' | 'analyzing' | 'done' | 'error';
 
 export default function CallDetailScreen({ id, onBack }: { id: string; onBack: () => void }) {
   const [debugOpen, setDebugOpen] = useState(false);
@@ -17,6 +20,8 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
   const [dur, setDur] = useState(0);
   const [transcribing, setTranscribing] = useState(false);
   const [transcribeError, setTranscribeError] = useState<string | null>(null);
+  const [aiStage, setAiStage] = useState<AiStage>('idle');
+  const errorRef = useRef<HTMLDivElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const load = useCallback(() => { mobileApi.callDetail(id).then(setData).catch(() => {}); }, [id]);
@@ -111,13 +116,25 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
     if (transcribing) return;
     setTranscribing(true);
     setTranscribeError(null);
+    setAiStage('transcribing');
     try {
+      const t = await mobileApi.transcribeCall(id);
+      if (t?.stub || t?.error) {
+        const detail = [t.error || t.reason || 'transcription unavailable', ...(t.fetchErrors || [])].filter(Boolean).join(' · ');
+        throw new Error(detail);
+      }
+      setAiStage('analyzing');
       await mobileApi.analyzeCall(id);
       // Poll once for the freshly written transcript/insights
       await new Promise((r) => setTimeout(r, 1500));
       load();
+      setAiStage('done');
+      showMobileToast('AI analysis: déjà traité et mis en cache.', 'success');
     } catch (e: any) {
-      setTranscribeError(e?.message || 'Transcription failed');
+      const msg = e?.message || 'Transcription failed';
+      setTranscribeError(msg);
+      setAiStage('error');
+      showMobileToast(`Transcription/scoring failed — tap to view error`, 'error', () => errorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
     } finally {
       setTranscribing(false);
     }
@@ -132,6 +149,12 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
 
   const fmt = (s: number) => `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
   const hasTranscript = (data?.transcript?.length || 0) > 0;
+  const aiDone = hasTranscript && !!data?.summary;
+  const statusText = transcribing
+    ? aiStage === 'analyzing' ? 'AI analysis: en cours — scoring/coaching' : 'AI analysis: en cours — transcription'
+    : aiDone || data?.aiCached ? 'AI analysis: déjà traité — cache réutilisé'
+    : transcribeError || data?.aiError ? 'AI analysis: échec'
+    : 'AI analysis: non traité';
 
   if (debugOpen) return <RecordingDebugScreen callId={id} onBack={() => setDebugOpen(false)} />;
 
