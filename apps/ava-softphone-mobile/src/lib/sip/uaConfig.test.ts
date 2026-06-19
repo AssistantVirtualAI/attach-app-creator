@@ -30,6 +30,7 @@ function installFakeJsSIP(socketProbe: string[]) {
   return ua;
 }
 
+beforeEach(() => { if (!(window as any).RTCPeerConnection) (window as any).RTCPeerConnection = vi.fn(); });
 afterEach(() => { delete (window as any).JsSIP; });
 
 describe('buildWssFallbackList', () => {
