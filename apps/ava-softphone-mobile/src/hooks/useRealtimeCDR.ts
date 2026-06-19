@@ -202,7 +202,7 @@ export function useRealtimeCDR(creds: Creds | null) {
       window.removeEventListener('focus', load);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [creds?.extension, creds?.accessToken]);
+  }, [creds?.extension, creds?.accessToken, creds?.organizationId]);
 
   return {
     calls,
