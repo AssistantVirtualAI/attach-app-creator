@@ -37,15 +37,19 @@ function RecentsListImpl({ extension, onCall }: Props) {
 
   const load = useCallback(async (silent = false, force = false) => {
     if (!silent) { setLoading(true); setErr(null); }
-    if (force) setRefreshing(true);
+    if (force) { setRefreshing(true); setErr(null); }
     try {
       let data: CallRecord[] = [];
       if (force) {
         try {
           data = await ava.refreshCalls(50, { extension });
         } catch (e: any) {
-          // Live PBX sync unavailable — fall back to cached records and surface a soft notice.
-          setErr(e?.message || 'Live CDR sync unavailable — showing cached records.');
+          const msg = String(e?.message || '');
+          if (/NO_CDR_ENDPOINT/i.test(msg)) {
+            setErr('PBX live-CDR endpoint is unreachable. Showing cached records — will retry automatically in the background.');
+          } else {
+            setErr(msg || 'Live CDR sync unavailable — showing cached records.');
+          }
           data = await ava.calls(50, { extension });
         }
       } else {
@@ -82,8 +86,13 @@ function RecentsListImpl({ extension, onCall }: Props) {
   }, [load]);
   useEffect(() => {
     const onSync = () => { void load(true); };
+    const onRecovered = () => { setErr(null); void load(true); };
     window.addEventListener('lemtel:phone-sync-complete', onSync);
-    return () => window.removeEventListener('lemtel:phone-sync-complete', onSync);
+    window.addEventListener('lemtel:cdr-endpoint-recovered', onRecovered);
+    return () => {
+      window.removeEventListener('lemtel:phone-sync-complete', onSync);
+      window.removeEventListener('lemtel:cdr-endpoint-recovered', onRecovered);
+    };
   }, [load]);
 
   // Realtime: refresh on new CDR rows
