@@ -79,7 +79,7 @@ export default function TeamChatScreen(_props: { accessToken?: string | null; us
 
   useEffect(() => {
     if (mobile.loading) return;
-    if (!token || !mobile.domainUuid) { setLoading(false); return; }
+    if (!token || (!mobile.domainUuid && !mobile.organizationId)) { setLoading(false); return; }
     let cancelled = false;
     (async () => {
       try {
@@ -94,7 +94,7 @@ export default function TeamChatScreen(_props: { accessToken?: string | null; us
     })();
     const heartbeat = window.setInterval(() => chatCall('heartbeat', { status: 'available', platform: 'mobile', call_state: 'idle' }).catch(() => {}), 30000);
     return () => { cancelled = true; clearInterval(heartbeat); };
-  }, [chatCall, loadChannels, loadMembers, mobile.loading, mobile.domainUuid, token]);
+  }, [chatCall, loadChannels, loadMembers, mobile.loading, mobile.domainUuid, mobile.organizationId, token]);
 
   useEffect(() => {
     if (!token || !mobile.organizationId) return;
