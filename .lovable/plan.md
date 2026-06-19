@@ -1,114 +1,39 @@
-# Unified Recording Intelligence + Live CDR Sync
+## Multi-Platform Bug Fix Plan
 
-Transcribe & analyze each recording exactly **once** server-side, persist the result, and stream it to every surface (mobile app, desktop app, admin portal, client portal). Add realtime sync indicators, richer per-range Home stats, and a robust CDR retry/refresh path.
+### Bug 1 — Live CDR sync
+- Migration: `ALTER PUBLICATION supabase_realtime ADD TABLE pbx_call_records, pbx_call_recordings, org_chat_messages, user_presence, pbx_softphone_users;` + `ALTER TABLE ... REPLICA IDENTITY FULL`.
+- `useRealtimeCDR.ts` (mobile) & `useRealtimeSync.ts` (desktop): start in `connecting` state; only surface "temporarily unavailable" after first failed subscribe attempt (not on mount).
+- Portal: add `useOrgRealtime` subscriptions on `pbx_call_records` in `TelephonyRecordings.tsx` and admin CDR pages.
+- Auto-sync after call end: in `useSoftphone` end-call handler, `setTimeout(8000)` → invoke `fusionpbx-proxy` `sync-cdrs` → dispatch `lemtel:phone-sync-complete`.
 
-## 1. Transcribe-once + analyze-once pipeline (shared backend)
+### Bug 2 — Recordings + AI analysis
+- Create bucket via `supabase--storage_create_bucket` (`call-recordings`, private).
+- Rewrite `fusionpbx-proxy` `get-recording` action: PHP login flow (CSRF → POST login → GET `xml_cdr/download.php?id={uuid}` with PHPSESSID) → stream `audio/mpeg`. No bucket-first lookup.
+- Idempotent pipeline already exists in `ai-transcribe-call` + `ai-analyze-call`; ensure they write `transcription`, `summary`, `sentiment`, `coaching_score`, `coaching_notes` to `pbx_ai_insights` (single source of truth).
+- Add unified `CallIntelligencePanel` rendering (transcript expandable, summary, sentiment badge, score /10, coaching bullets) in: mobile `CallDetailScreen`, desktop `RecordingsView`, portal `TelephonyRecordings`, user portal call detail. All subscribe to `pbx_ai_insights` realtime → auto-update.
 
-**Storage of truth:** `pbx_call_records` already has `transcribed`, `ai_summary`, `ai_score`, etc. Add (migration):
-- `transcript_text` (text)
-- `transcript_json` (jsonb — segments + speakers)
-- `ai_sentiment` (text), `ai_topics` (text[]), `ai_action_items` (text[])
-- `ai_coaching_notes` (jsonb — array of `{ category, severity, note }`)
-- `ai_score` (already present) + `ai_score_breakdown` (jsonb)
-- `ai_status` enum: `idle | queued | running | done | failed`
-- `ai_error` (text), `ai_started_at`, `ai_completed_at`
+### Bug 3 — Domain chat `deleted_at`
+- Migration: `ALTER TABLE org_chat_messages ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ` + RLS policy `SELECT USING (deleted_at IS NULL)` + update existing queries to filter.
+- Standardize channel name `org-chat-${organization_id}` on table `org_chat_messages` across desktop `OrgChatView`, mobile `ChatScreen`, portal `OrgChat`, user portal `Chat`.
+- Sidebar: load members from `profiles` + `user_roles` joined with `user_presence` (online if `last_seen_at > now() - 5min`). Click member → open/create private channel via existing `create_group_chat` RPC with 2 members.
+- Presence ping: every 60s call `upsert_user_presence('online', ...)` on all platforms (already exists in `usePresencePing` — extend to desktop + portal).
 
-**Edge function `ai-analyze-call` (existing) becomes idempotent:**
-1. Lock row (`ai_status='running'` only if currently `idle|failed`). If `done` → return cached result immediately. If `running` → return `{status:'running'}`.
-2. Pull recording bytes via the existing `fusionpbx-proxy get-recording` path.
-3. Transcribe via Lovable AI STT (`openai/gpt-4o-mini-transcribe`).
-4. Analyze via Lovable AI chat (`google/gemini-3-flash-preview`): summary, sentiment, topics, action items, coaching notes, score 0–100 with breakdown.
-5. Persist everything to `pbx_call_records`, set `ai_status='done'`, broadcast via Realtime.
+### Bug 4 — Desktop Admin wide mode
+- In `AdminView.tsx` wide layout: left = domains list (existing), right = tabbed panel (Extensions / IVRs / Ring Groups / Queues / Registrations / Call History) for selected domain.
+- Reuse hooks/actions from `src/pages/lemtel/admin/` (extensions CRUD via `fusionpbx-proxy` actions `create-extension`, `update-extension`, `delete-extension`, `list-active-calls`, `list-registrations`).
+- New components under `apps/ava-softphone-desktop/src/components/console/admin/`: `DomainExtensionsPanel`, `DomainIVRsPanel`, `DomainRingGroupsPanel`, `DomainQueuesPanel`, `DomainRegistrationsPanel`, `DomainCallHistoryPanel`.
 
-**Realtime fan-out:** ensure `pbx_call_records` is in `supabase_realtime` publication (it already is). All clients subscribe; updates dispatch instantly.
+### Cross-platform realtime guarantee
+Single migration enables realtime on `pbx_call_records`, `pbx_ai_insights`, `org_chat_messages`, `user_presence`, `pbx_softphone_users`. All UIs subscribe via existing `useOrgRealtime` / dedicated hooks → ≤2s propagation.
 
-## 2. Auto-load recordings (no second tap)
+### Files touched (no edits to vite.config / electron-builder / .github)
+- Migrations (realtime + `deleted_at` + RLS)
+- `supabase/functions/fusionpbx-proxy/index.ts` (get-recording PHP flow)
+- Storage bucket create
+- Mobile: `useRealtimeCDR.ts`, `RealtimeStatusPill.tsx`, `ChatScreen.tsx`, `CallDetailScreen.tsx`, `useSoftphone.ts`
+- Desktop: `useRealtimeSync.ts`, `AdminView.tsx`, `ConsoleLayout.tsx`, `OrgChatView.tsx`, new admin panels, `RecordingsView.tsx`
+- Portal: `TelephonyRecordings.tsx`, `OrgChat` page, `CallIntelligencePanel.tsx`
+- User portal: chat + call detail pages
 
-- **Mobile `CallDetailScreen` / `RecordingsScreen`:** prefetch the signed URL the moment the row mounts (or list opens) so Play is instant. Show a small "loading audio" spinner inline; if `RECORDING_NOT_FOUND` (already returns 200+fallback), show the friendly badge.
-- **Desktop `RecentsList`:** same prefetch when the row is hovered/selected.
-- **Portal call-detail drawer:** prefetch via existing `loadPbxRecordingAudio`.
-
-## 3. One-tap Transcribe action
-
-- **Mobile recordings list:** add a `Transcribe` chip on each row.
-  - If `ai_status='done'` → chip becomes `View AI` (opens detail with transcript + score + coaching).
-  - If `running|queued` → shows animated progress chip with elapsed seconds.
-  - If `failed` → red chip with `ai_error` tooltip + Retry.
-- **Desktop `RecentsList` + Portal recordings table:** same chip states.
-- All three surfaces call the same `ai-analyze-call` function — cached result returns instantly, no re-transcription, no token burn.
-
-## 4. Realtime sync status indicator
-
-Tiny pill in the header of each surface:
-- 🟢 `Live` — Realtime channel `SUBSCRIBED` and last event < 60s
-- 🟡 `Reconnecting` — channel `CHANNEL_ERROR` / `TIMED_OUT`, auto-retrying
-- 🔴 `Offline` — no socket; manual Retry button
-- Click pill → expanded popover with last-event timestamp, channel name, and `Force resync` button.
-
-Implementation: shared `useRealtimeHealth(channelName)` hook in each app, reading `channel.state` + heartbeat timestamps.
-
-## 5. CDR sync retry (manual + auto)
-
-- **Auto:** on `visibilitychange → visible`, on app foreground (Capacitor `App.appStateChange`), on Realtime reconnect → refetch last 24h CDRs.
-- **Backoff:** if a CDR insert event references a row not yet readable (replication lag), retry the row fetch with 250ms → 500ms → 1s → 2s backoff (max 4 tries).
-- **Manual:** existing Refresh button stays; add `Force PBX pull` secondary action that invokes `cron-pbx-sync` for the user's domain (single-flight guarded — already implemented per prior change).
-
-## 6. Home screen — richer per-range stats
-
-`mobile-domain-stats` already supports `today | 7d | 30d`. Extend response with:
-- `missedCalls`, `answeredCalls`, `outboundCalls`
-- `avgDurationSec`, `totalTalkSec`
-- `dialSuccessRate` (answered / total outbound), `dialFailedCount`
-- `peakHour`, `perDay[]` (already present)
-
-New tiles on `DashboardScreen.tsx`: Missed, Avg Duration, Dial Success %, Failed Dials. Same data surfaced on the desktop Home pane.
-
-## 7. Playback debug checklist (dev-only mobile drawer)
-
-Behind a long-press on the audio waveform (or `?debug=1`), show:
-1. Signed URL issued ✓ / ✗  (+ expiry countdown)
-2. `HEAD` request reachable ✓ / ✗  (status code)
-3. Content-Type starts with `audio/` ✓ / ✗
-4. `<audio>` `canplaythrough` fired ✓ / ✗
-5. First `timeupdate` fired ✓ / ✗
-6. PBX path source (xml_cdr / call_recordings / fallback)
-
-Surfaces the exact failure point without needing remote logs.
-
-## Files touched
-
-**Backend (edge functions + migration):**
-- `supabase/migrations/<new>.sql` — add AI columns + status enum
-- `supabase/functions/ai-analyze-call/index.ts` — idempotent transcribe+analyze+coach
-- `supabase/functions/mobile-domain-stats/index.ts` — extended metrics
-- `supabase/functions/mobile-recordings/index.ts` — include `ai_status`, `ai_score`
-
-**Mobile (`apps/ava-softphone-mobile/`):**
-- `src/screens/RecordingsScreen.tsx` — Transcribe chip, prefetch, status badges
-- `src/screens/CallDetailScreen.tsx` — auto-load audio, coaching panel, debug drawer
-- `src/screens/DashboardScreen.tsx` — new stat tiles
-- `src/components/RealtimeStatusPill.tsx` (new)
-- `src/hooks/useRealtimeHealth.ts` (new)
-- `src/hooks/useRealtimeCDR.ts` — backoff retry on row-not-found
-- `src/MobileApp.tsx` — mount pill in header
-
-**Desktop (`apps/ava-softphone-desktop/`):**
-- `src/components/RecentsList.tsx` — Transcribe chip + prefetch + AI panel
-- `src/components/RealtimeStatusPill.tsx` (new)
-- `src/hooks/useRealtimeHealth.ts` (new)
-- `src/lib/avaApi.ts` — `analyzeCall`, `getCallAi` helpers
-
-**Portal (`src/`):**
-- `src/hooks/usePbxData.ts` — surface `ai_*` columns
-- `src/hooks/useRealtimeHealth.ts` (new)
-- `src/components/pbx/RecordingsTable.tsx` — Transcribe chip + AI badge
-- `src/components/pbx/CallDetailDrawer.tsx` (or equivalent) — transcript + coaching + score panel
-- Header: realtime pill
-
-## Out of scope (this plan)
-
-- No changes to `Landing.tsx` / `landing/**` (locked).
-- No changes to CI/CD, electron-builder, or Capacitor native configs.
-- No new storage buckets (reuses `lemtel-recordings`).
-
-After approval I will execute the migration first, then ship backend, then the three UI layers.
+### Confirm before build
+This is a large change set across 4 platforms + backend. Approve to proceed, or tell me which bug(s) to tackle first (recommend order: Bug 3 schema → Bug 1 realtime → Bug 2 recordings/AI → Bug 4 desktop admin).
