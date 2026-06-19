@@ -182,7 +182,7 @@ export default function MessagesScreen({ haptic }: { haptic: (s?: ImpactStyle) =
       {threads && threads.length === 0 && (
         <EmptyState icon="✉" title="Inbox is clear" hint="New SMS threads will appear here. Use AVA templates to start a conversation." />
       )}
-      {threads?.map((t) => (
+      {filteredThreads?.map((t) => (
         <button key={t.id} onClick={() => { haptic(); setActive(t); }} style={{
           display: 'flex', alignItems: 'center', gap: 12, width: '100%',
           padding: '14px', marginBottom: 8, borderRadius: radius.lg,
