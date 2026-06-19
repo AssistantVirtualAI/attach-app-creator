@@ -114,6 +114,23 @@ Deno.serve(async (req) => {
       }
     }
 
+    const persistTranscriptOnCall = async (text: string, provider: string) => {
+      const { data: existingCall } = await admin.from("pbx_call_records")
+        .select("raw_data")
+        .eq("id", call_record_id)
+        .maybeSingle();
+      await admin.from("pbx_call_records").update({
+        transcribed: !provider.startsWith("stub"),
+        ai_processing: false,
+        raw_data: {
+          ...((existingCall?.raw_data as Record<string, unknown>) || {}),
+          transcript_text: text,
+          transcript_provider: provider,
+          transcript_updated_at: new Date().toISOString(),
+        },
+      }).eq("id", call_record_id).then(() => {}, () => {});
+    };
+
     if (body?.force !== true) {
       const { data: existingTranscript } = await admin.from("pbx_call_transcripts")
         .select("transcript_text, provider, created_at")
@@ -124,6 +141,7 @@ Deno.serve(async (req) => {
       const provider = String((existingTranscript as any)?.provider || "");
       const text = String((existingTranscript as any)?.transcript_text || "").trim();
       if (text && !provider.startsWith("stub")) {
+        await persistTranscriptOnCall(text, provider);
         await audit("cached", { provider, message: "Transcript already exists — skipped re-transcription", metadata: { cached_at: (existingTranscript as any)?.created_at } });
         return json({ transcript_text: text, cached: true, stub: false, provider, skipped_reason: "Transcript already exists — no STT tokens used." });
       }
@@ -142,7 +160,7 @@ Deno.serve(async (req) => {
       await admin.from("pbx_call_transcripts").insert({
         organization_id, call_record_id, transcript_text: text, provider, language: "fr",
       });
-      await admin.from("pbx_call_records").update({ transcribed: !provider.startsWith("stub") }).eq("id", call_record_id).then(() => {}, () => {});
+      await persistTranscriptOnCall(text, provider);
     };
 
     // Try to fetch audio. Order: FusionPBX first (recordings live on PBX) → direct URL → Twilio
