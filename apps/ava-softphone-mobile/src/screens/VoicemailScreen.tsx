@@ -1,12 +1,27 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ImpactStyle } from '@capacitor/haptics';
+import { Search, RefreshCw, Voicemail as VmIcon } from 'lucide-react';
+import { createClient } from '@supabase/supabase-js';
 import { colors, font, radius, gradients } from '../lib/theme';
 import { mobileApi, VoicemailEntry } from '../lib/mobileApi';
 import { Card, Chip, EmptyState, GhostButton, AIPanel, Skeleton } from '../components/ui/Primitives';
 import { audit } from '../lib/audit';
+import { getCredentials } from '../lib/creds';
+
+const SUPABASE_URL = 'https://gejxisrqtvxavbrfcoxz.supabase.co';
+const SUPABASE_ANON =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdlanhpc3JxdHZ4YXZicmZjb3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1MDMxNzQsImV4cCI6MjA3NzA3OTE3NH0.kaO-GslE99OCNrZ4_AMnbzGqya2azqz_UMZR34zZvvo';
+let _vmClient: ReturnType<typeof createClient> | null = null;
+function vmClient(token?: string | null) {
+  if (!_vmClient) _vmClient = createClient(SUPABASE_URL, SUPABASE_ANON, { auth: { persistSession: false, autoRefreshToken: false } });
+  if (token) _vmClient.realtime.setAuth(token);
+  return _vmClient;
+}
 
 export default function VoicemailScreen({ haptic }: { haptic?: (s?: ImpactStyle) => Promise<void> }) {
   const [items, setItems] = useState<VoicemailEntry[] | null>(null);
+  const [q, setQ] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [playing, setPlaying] = useState<string | null>(null);
   const [loadingId, setLoadingId] = useState<string | null>(null);
@@ -19,8 +34,34 @@ export default function VoicemailScreen({ haptic }: { haptic?: (s?: ImpactStyle)
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const urlCache = useRef<Map<string, string>>(new Map());
 
-  useEffect(() => { mobileApi.voicemails().then(setItems); }, []);
+  const reload = async () => {
+    setRefreshing(true);
+    try { setItems(await mobileApi.voicemails()); } catch {}
+    setRefreshing(false);
+  };
+
+  useEffect(() => { reload(); }, []);
   useEffect(() => () => { audioRef.current?.pause(); audioRef.current = null; }, []);
+
+  // Realtime: refresh list on any change to pbx_voicemails for this domain/extension.
+  useEffect(() => {
+    let channel: any = null;
+    let cancelled = false;
+    (async () => {
+      const c = await getCredentials();
+      if (!c?.accessToken) return;
+      const client = vmClient(c.accessToken);
+      const domainUuid = (c as any).domainUuid || c.fusionpbxDomainUuid;
+      const filter = domainUuid ? `domain_uuid=eq.${domainUuid}` : undefined;
+      channel = client
+        .channel('vm-mobile')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'pbx_voicemails', ...(filter ? { filter } : {}) } as any,
+          () => { if (!cancelled) reload(); })
+        .subscribe();
+    })();
+    return () => { cancelled = true; try { channel && _vmClient?.removeChannel(channel); } catch {} };
+  }, []);
+
 
   const fmt = (s: number) => {
     if (!Number.isFinite(s) || s < 0) s = 0;
