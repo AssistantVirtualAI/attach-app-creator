@@ -77,7 +77,7 @@ export default function CallsView({ scope = 'mine' }: { scope?: 'mine' | 'org' }
     if (!silent) setLoading(true);
     setError(null); setSyncing(true);
     try {
-      const apiOpts = { scope, extension: scope === 'org' ? (extensionQuery.trim() || null) : null, rangeDays };
+      const apiOpts: { scope: 'mine' | 'org'; extension: string | null; rangeDays: 7 | 30 } = { scope, extension: scope === 'org' ? (extensionQuery.trim() || null) : null, rangeDays };
       const scopedCalls = force ? await ava.refreshCalls(500, apiOpts) : await ava.calls(500, apiOpts);
       setCalls(scopedCalls);
       setSel((current) => current ? scopedCalls.find((cr) => cr.id === current.id) || current : current);
