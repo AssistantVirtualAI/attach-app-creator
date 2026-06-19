@@ -42,16 +42,22 @@ export default function TeamChatScreen(_props: { accessToken?: string | null; us
     // Pull every softphone row for the user's domain AND/OR org (fallback for rows missing domain_uuid).
     const domainFilter = mobile.domainUuid ? `domain_uuid=eq.${encodeURIComponent(mobile.domainUuid)}` : null;
     const orgFilter = mobile.organizationId ? `organization_id=eq.${encodeURIComponent(mobile.organizationId)}` : null;
-    const [domainRows, orgRows, directory] = await Promise.all([
+    const [domainRows, orgRows, extensionRows, directory] = await Promise.all([
       domainFilter ? restGet<any[]>(`/rest/v1/pbx_softphone_users_safe?select=id,portal_user_id,extension,display_name,status,last_seen_at&${domainFilter}&order=extension.asc`, token).catch(() => []) : Promise.resolve([]),
       orgFilter ? restGet<any[]>(`/rest/v1/pbx_softphone_users_safe?select=id,portal_user_id,extension,display_name,status,last_seen_at&${orgFilter}&order=extension.asc`, token).catch(() => []) : Promise.resolve([]),
+      // ALL extensions in the domain (covers users without the mobile app)
+      restGet<any[]>(`/rest/v1/pbx_extensions_directory?select=id,portal_user_id,extension,display_name&${domainFilter || orgFilter}&enabled=eq.true&order=extension.asc`, token).catch(() => []),
       chatCall('list_directory', {}).catch(() => ({ members: [] })),
     ]);
-    // Merge softphone rows (use extension as fallback key when not linked to a portal user).
     const byKey = new Map<string, any>();
     for (const r of [...(domainRows || []), ...(orgRows || [])]) {
       const key = r.portal_user_id || `ext:${r.extension}`;
       byKey.set(key, { ...byKey.get(key), key, portal_user_id: r.portal_user_id || null, extension: r.extension, display_name: r.display_name, status: r.status, last_seen_at: r.last_seen_at });
+    }
+    for (const r of (extensionRows || [])) {
+      const key = r.portal_user_id || `ext:${r.extension}`;
+      if (byKey.has(key)) continue;
+      byKey.set(key, { key, portal_user_id: r.portal_user_id || null, extension: r.extension, display_name: r.display_name, status: null, last_seen_at: null });
     }
     (directory.members || []).forEach((m: any) => {
       if (!m.user_id) return;
