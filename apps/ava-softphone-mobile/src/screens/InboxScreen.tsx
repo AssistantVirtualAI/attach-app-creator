@@ -85,6 +85,7 @@ export default function InboxScreen({
       </div>
 
       <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        {tab === 'team'       && <TeamChatScreen accessToken={creds?.accessToken || null} userId={creds?.userId} />}
         {tab === 'voicemail'  && <VoicemailScreen haptic={haptic} />}
         {tab === 'recordings' && <RecordingsScreen />}
         {tab === 'sms'        && <MessagesScreen haptic={haptic} />}
