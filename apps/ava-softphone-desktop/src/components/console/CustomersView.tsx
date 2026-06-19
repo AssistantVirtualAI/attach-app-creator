@@ -179,9 +179,9 @@ export default function CustomersView() {
             <div key={r.domain_uuid} style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 70px 70px 70px 90px 200px', padding: '12px 14px', borderBottom: `1px solid ${c.border}`, fontSize: 12.5, color: c.textIce, alignItems: 'center' }}>
               <span style={{ fontFamily: 'JetBrains Mono, monospace' }}>{r.domain_name}</span>
               <span style={{ color: r.org_name ? c.textIce : c.mutedSilver }}>{r.org_name || '— not linked —'}</span>
-              <span style={{ fontFamily: 'JetBrains Mono, monospace' }}>{r.extensions}</span>
-              <span style={{ fontFamily: 'JetBrains Mono, monospace' }}>{r.numbers}</span>
-              <span style={{ fontFamily: 'JetBrains Mono, monospace' }}>{r.queues}</span>
+              <span style={{ fontFamily: 'JetBrains Mono, monospace', color: r.org_id || r.extensions ? c.textIce : c.mutedSilver }}>{r.extensions || (r.org_id ? '0' : '—')}</span>
+              <span style={{ fontFamily: 'JetBrains Mono, monospace', color: r.org_id || r.numbers ? c.textIce : c.mutedSilver }}>{r.numbers || (r.org_id ? '0' : '—')}</span>
+              <span style={{ fontFamily: 'JetBrains Mono, monospace', color: r.org_id || r.queues ? c.textIce : c.mutedSilver }}>{r.queues || (r.org_id ? '0' : '—')}</span>
               <span style={{ color: r.domain_enabled === 'true' || r.domain_enabled === true ? c.success : c.mutedSilver, fontSize: 11 }}>
                 ● {r.domain_enabled === 'true' || r.domain_enabled === true ? 'Enabled' : 'Disabled'}
               </span>
