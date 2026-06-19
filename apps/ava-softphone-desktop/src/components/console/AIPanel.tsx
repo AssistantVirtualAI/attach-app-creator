@@ -65,17 +65,16 @@ export default function AIPanel({ open, onToggle }: { open: boolean; onToggle: (
   
 
   const runAttempt = async (history: ChatMessage[]) => {
-    const me = await getMeContext();
-    const orgId = me.organization_id ?? '71755d33-ed64-4ad5-a828-61c9d2029eb7';
-    const { data, error: invokeErr } = await supabase.functions.invoke('telecom-admin-ai-agent', {
+    // Unified ava-assistant: full PBX tool catalog (read + analyze + report
+    // + confirmed mutating actions) across mobile, desktop and web.
+    const { data, error: invokeErr } = await supabase.functions.invoke('ava-assistant', {
       body: {
-        organization_id: orgId,
         messages: history.map((m) => ({ role: m.role, content: m.content })),
       },
     });
     const bodyMsg = (data as any)?.error || (data as any)?.message;
     if (invokeErr) throw new Error(bodyMsg || invokeErr.message || 'AI service unavailable');
-    return String((data as any)?.response ?? (data as any)?.message ?? '').trim() || '(no response)';
+    return String((data as any)?.answer ?? (data as any)?.response ?? (data as any)?.message ?? '').trim() || '(no response)';
   };
 
   const runWithBackoff = async (history: ChatMessage[]) => {
