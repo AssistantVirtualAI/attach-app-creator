@@ -59,11 +59,7 @@ export default function MoreScreen({
       <SectionTitle eyebrow="Communications" title="More features" />
       <Card padded={false}>
         <SettingsRow label="Calling features" icon="☎" value="Hold, transfer, record, DND…" onPress={() => setSub('features')} />
-        <SettingsRow label="Call recordings" icon="◉" value="With AI transcribe" onPress={() => setSub('recordings')} />
-        <SettingsRow label="Voicemail" icon="✉" value="Inbox & greetings" onPress={() => setSub('voicemail')} />
-        <SettingsRow label="Messages" icon="💬" value="SMS conversations" onPress={() => setSub('messages')} />
         <SettingsRow label="Queues" icon="⇉" value="Live queues & agents" onPress={() => setSub('queues')} />
-        <SettingsRow label="Contacts" icon="👥" value="Directory" onPress={() => setSub('contacts')} />
       </Card>
 
       <SectionTitle eyebrow="Account" title="Settings & privacy" />
