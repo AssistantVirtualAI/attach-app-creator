@@ -8,16 +8,19 @@ export type Creds = {
   displayName?: string;
   sipDomain?: string;
   wssUrl?: string;
+  sipPassword?: string;
   accessToken?: string;
   refreshToken?: string;
   userId?: string;
   organizationId?: string;
   organizationName?: string;
   fusionpbxDomainUuid?: string;
+  domainUuid?: string;
   role?: 'super_admin' | 'org_admin' | 'manager' | 'agent' | 'viewer';
   dataScope?: 'domain_admin' | 'extension_user';
   permissions?: { admin: boolean; canManageNumbers?: boolean; canManageAgents?: boolean; canManageUsers?: boolean; canManageRouting?: boolean; canViewDomainReports?: boolean };
 };
+
 
 const KEY = 'lemtel.creds.v1';
 
