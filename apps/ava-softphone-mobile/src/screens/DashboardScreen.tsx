@@ -1,10 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { ImpactStyle } from '@capacitor/haptics';
+import { Moon, Sun } from 'lucide-react';
 import { colors, font, gradients, radius } from '../lib/theme';
 import { mobileApi, DomainStats, MeResponse, StatsRange } from '../lib/mobileApi';
 import { Card, Chip, SectionTitle, Skeleton, StatusDot, AIPanel, GhostButton } from '../components/ui/Primitives';
 import { LemtelMark, AvaBadge, HeroGradient } from '../components/Brand';
 import { useAutoSync } from '../hooks/useAutoSync';
+import { useTheme } from '../lib/ThemeContext';
 import type { Tab } from '../components/BottomTabs';
 
 const RANGE_LABELS: Record<StatsRange, string> = { today: 'Today', '7d': '7 days', '30d': '30 days' };
