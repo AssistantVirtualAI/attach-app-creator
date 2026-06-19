@@ -69,6 +69,20 @@ export default function DashboardScreen({
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {s ? <StatusDot state="registered" /> : <Skeleton w={40} h={14} />}
             <button
+              onClick={() => { haptic(); toggle(); }}
+              aria-label="Toggle theme"
+              title={mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              style={{
+                width: 38, height: 38, borderRadius: '50%',
+                background: 'rgba(255,255,255,0.10)',
+                border: '1px solid rgba(255,255,255,0.18)',
+                color: colors.textIce, cursor: 'pointer',
+                display: 'grid', placeItems: 'center',
+              }}
+            >
+              {mode === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
+            <button
               onClick={onOpenProfile}
               aria-label="My profile"
               style={{
