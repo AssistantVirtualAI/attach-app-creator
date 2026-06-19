@@ -233,6 +233,7 @@ export default function DashboardScreen({
         </div>
       )}
       <div style={{ height: 80 }} />
+      <NotificationsSheet open={notifOpen} onClose={() => setNotifOpen(false)} onNavigate={onNavigate} />
     </div>
   );
 }
