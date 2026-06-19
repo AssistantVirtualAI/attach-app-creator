@@ -1,39 +1,33 @@
-## Multi-Platform Bug Fix Plan
+Plan de correction ciblé
 
-### Bug 1 — Live CDR sync
-- Migration: `ALTER PUBLICATION supabase_realtime ADD TABLE pbx_call_records, pbx_call_recordings, org_chat_messages, user_presence, pbx_softphone_users;` + `ALTER TABLE ... REPLICA IDENTITY FULL`.
-- `useRealtimeCDR.ts` (mobile) & `useRealtimeSync.ts` (desktop): start in `connecting` state; only surface "temporarily unavailable" after first failed subscribe attempt (not on mount).
-- Portal: add `useOrgRealtime` subscriptions on `pbx_call_records` in `TelephonyRecordings.tsx` and admin CDR pages.
-- Auto-sync after call end: in `useSoftphone` end-call handler, `setTimeout(8000)` → invoke `fusionpbx-proxy` `sync-cdrs` → dispatch `lemtel:phone-sync-complete`.
+1. Desktop admin Customers
+- Corriger les compteurs Extensions / Numbers / Queues pour qu’ils ne restent pas à 0 quand les données existent.
+- Compter par `domain_uuid` quand disponible, puis fallback par `organization_id`.
+- Afficher clairement `— not linked —` seulement pour le lien customer, pas pour les compteurs PBX réels.
+- Remplacer le petit modal “Edit customer” par un vrai panneau d’édition type admin portal avec tous les champs PBX domaine disponibles : domain name, description, enabled, org/customer link, notes/métadonnées utiles, plus actions Sync/Refresh.
 
-### Bug 2 — Recordings + AI analysis
-- Create bucket via `supabase--storage_create_bucket` (`call-recordings`, private).
-- Rewrite `fusionpbx-proxy` `get-recording` action: PHP login flow (CSRF → POST login → GET `xml_cdr/download.php?id={uuid}` with PHPSESSID) → stream `audio/mpeg`. No bucket-first lookup.
-- Idempotent pipeline already exists in `ai-transcribe-call` + `ai-analyze-call`; ensure they write `transcription`, `summary`, `sentiment`, `coaching_score`, `coaching_notes` to `pbx_ai_insights` (single source of truth).
-- Add unified `CallIntelligencePanel` rendering (transcript expandable, summary, sentiment badge, score /10, coaching bullets) in: mobile `CallDetailScreen`, desktop `RecordingsView`, portal `TelephonyRecordings`, user portal call detail. All subscribe to `pbx_ai_insights` realtime → auto-update.
+2. Sidebar Admin desktop visible sur tous viewports
+- Garder une sidebar Admin accessible quel que soit le viewport.
+- Sur largeur réduite : afficher une mini-sidebar/collapse rail au lieu de cacher complètement l’admin dans un bottom nav.
+- Ajouter overflow/scroll horizontal/vertical propre pour éviter que les items admin soient coupés.
+- Ne pas toucher `vite.config.ts`, `electron-builder.yml`, ni `.github/workflows/*`.
 
-### Bug 3 — Domain chat `deleted_at`
-- Migration: `ALTER TABLE org_chat_messages ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ` + RLS policy `SELECT USING (deleted_at IS NULL)` + update existing queries to filter.
-- Standardize channel name `org-chat-${organization_id}` on table `org_chat_messages` across desktop `OrgChatView`, mobile `ChatScreen`, portal `OrgChat`, user portal `Chat`.
-- Sidebar: load members from `profiles` + `user_roles` joined with `user_presence` (online if `last_seen_at > now() - 5min`). Click member → open/create private channel via existing `create_group_chat` RPC with 2 members.
-- Presence ping: every 60s call `upsert_user_presence('online', ...)` on all platforms (already exists in `usePresencePing` — extend to desktop + portal).
+3. Mobile `/m` CDR réel et à jour
+- Corriger la requête `mobile-calls` pour inclure les CDR récents même si le champ `extension` n’est pas rempli mais que le numéro est dans `source_number`, `destination`, `caller_number`, `destination_number`.
+- Lancer un sync CDR manuel depuis le header/pill mobile quand l’utilisateur refresh/retry, puis recharger les calls.
+- Afficher date + heure lisibles dans les listes `/m` et les détails, avec “last synced”.
+- Réduire les cas où `/m` reste sur cache/polling sans forcer un vrai refresh.
 
-### Bug 4 — Desktop Admin wide mode
-- In `AdminView.tsx` wide layout: left = domains list (existing), right = tabbed panel (Extensions / IVRs / Ring Groups / Queues / Registrations / Call History) for selected domain.
-- Reuse hooks/actions from `src/pages/lemtel/admin/` (extensions CRUD via `fusionpbx-proxy` actions `create-extension`, `update-extension`, `delete-extension`, `list-active-calls`, `list-registrations`).
-- New components under `apps/ava-softphone-desktop/src/components/console/admin/`: `DomainExtensionsPanel`, `DomainIVRsPanel`, `DomainRingGroupsPanel`, `DomainQueuesPanel`, `DomainRegistrationsPanel`, `DomainCallHistoryPanel`.
+4. Mobile recordings playback
+- Corriger `mobile-recordings` pour retourner les bons champs audio (`recording_path`, `recording_name`, `domain_uuid`, `pbx_uuid/xml_cdr_uuid`, `organization_id`) afin que le lecteur mobile demande la bonne signed URL.
+- Dans la liste recordings, afficher le statut réel : recording trouvée, fichier PBX manquant, transcript cached, AI cached.
+- Dans le détail, améliorer le message d’erreur pour distinguer : CDR présent, signed URL OK/KO, fichier PBX introuvable, audio load/playback failed.
 
-### Cross-platform realtime guarantee
-Single migration enables realtime on `pbx_call_records`, `pbx_ai_insights`, `org_chat_messages`, `user_presence`, `pbx_softphone_users`. All UIs subscribe via existing `useOrgRealtime` / dedicated hooks → ≤2s propagation.
+5. Home mobile plus complet + AVA summary
+- Enrichir le Home avec stats daily / weekly / monthly et plage custom simple.
+- Ajouter un panneau “AVA summary” qui résume les appels de la période : volume, missed calls, answer rate, top extensions, recordings/transcripts/AI notes.
+- Éviter toute retranscription : utiliser uniquement CDR + insights/transcripts déjà en cache.
 
-### Files touched (no edits to vite.config / electron-builder / .github)
-- Migrations (realtime + `deleted_at` + RLS)
-- `supabase/functions/fusionpbx-proxy/index.ts` (get-recording PHP flow)
-- Storage bucket create
-- Mobile: `useRealtimeCDR.ts`, `RealtimeStatusPill.tsx`, `ChatScreen.tsx`, `CallDetailScreen.tsx`, `useSoftphone.ts`
-- Desktop: `useRealtimeSync.ts`, `AdminView.tsx`, `ConsoleLayout.tsx`, `OrgChatView.tsx`, new admin panels, `RecordingsView.tsx`
-- Portal: `TelephonyRecordings.tsx`, `OrgChat` page, `CallIntelligencePanel.tsx`
-- User portal: chat + call detail pages
-
-### Confirm before build
-This is a large change set across 4 platforms + backend. Approve to proceed, or tell me which bug(s) to tackle first (recommend order: Bug 3 schema → Bug 1 realtime → Bug 2 recordings/AI → Bug 4 desktop admin).
+6. Vérification multi-plateforme
+- Vérifier les chemins desktop app, `/m` mobile preview, mobile app code partagé, admin portal/user portal data paths concernés.
+- Contrôler que les données viennent des mêmes tables backend et que les timestamps/last-sync sont visibles partout.
