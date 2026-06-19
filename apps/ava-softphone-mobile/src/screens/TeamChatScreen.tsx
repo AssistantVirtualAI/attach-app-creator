@@ -329,7 +329,7 @@ export default function TeamChatScreen({ accessToken, userId }: { accessToken: s
 
         {view === 'members' && (
           <>
-            {members.filter((m) => !m.is_self).map((m) => (
+            {members.filter((m) => !m.is_self && (!channelQuery.trim() || (m.full_name || m.email || m.extension || '').toLowerCase().includes(channelQuery.trim().toLowerCase()))).map((m) => (
               <button key={m.user_id} onClick={() => openDm(m)}
                 style={{
                   width: '100%', display: 'flex', alignItems: 'center', gap: 12,
