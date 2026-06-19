@@ -153,14 +153,17 @@ export default function DashboardScreen({
           <Skeleton w="100%" h={42} />
         ) : (
           <div style={{ fontSize: font.base, lineHeight: 1.55, color: colors.textIce }}>
-            <p style={{ margin: '0 0 8px' }}>
-              {total === 0
-                ? `No calls in this range yet — refresh once new CDRs land.`
-                : `Across ${RANGE_LABELS[range].toLowerCase()}, your team handled ${total} calls · ${answered} answered, ${missed} missed, ${voicemails} voicemails. Answer rate ${s.answerRate ?? 0}%${s.peakHour != null ? `, peak at ${s.peakHour}:00` : ''}.`}
-            </p>
-            {s.topExtensions?.length > 0 && (
-              <p style={{ margin: 0, color: colors.textSub, fontSize: font.sm }}>
-                Top extension #{s.topExtensions[0].extension}{s.topExtensions[0].name ? ` (${s.topExtensions[0].name})` : ''} with {s.topExtensions[0].calls} calls.
+            {aiLoading && !aiSummary ? (
+              <Skeleton w="100%" h={42} />
+            ) : aiError && !aiSummary ? (
+              <p style={{ margin: '0 0 8px', color: colors.danger, fontSize: font.sm }}>{aiError}</p>
+            ) : aiSummary ? (
+              <p style={{ margin: '0 0 8px' }}>{aiSummary}</p>
+            ) : (
+              <p style={{ margin: '0 0 8px' }}>
+                {total === 0
+                  ? `No calls in this range yet — refresh once new CDRs land.`
+                  : `Across ${RANGE_LABELS[range].toLowerCase()}, ${total} calls · ${answered} answered, ${missed} missed.`}
               </p>
             )}
             <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
