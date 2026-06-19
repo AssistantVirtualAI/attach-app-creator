@@ -90,6 +90,7 @@ export interface CallRecord {
   status: 'answered' | 'missed' | 'voicemail';
   from: string;
   to: string;
+  extension?: string;
   customer?: string;
   startedAt: string;
   durationSec: number;
