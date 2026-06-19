@@ -9,6 +9,7 @@ import VoicemailScreen from './VoicemailScreen';
 import RecordingsScreen from './RecordingsScreen';
 import { useRealtimeCDR } from '../hooks/useRealtimeCDR';
 import type { Creds } from '../lib/creds';
+import { showMobileToast } from '../lib/mobileToast';
 
 type SubTab = 'recents' | 'recordings' | 'voicemail' | 'dial';
 
@@ -17,6 +18,9 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
   const [selected, setSelected] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'missed' | 'recorded'>('all');
   const [number, setNumber] = useState('');
+  const [dialError, setDialError] = useState<string | null>(null);
+  const [dialDebug, setDialDebug] = useState<string | null>(null);
+  const [dialing, setDialing] = useState(false);
 
   // Real-time CDR via Supabase Realtime (postgres_changes) with automatic
   // 15s polling fallback + visible warning if the realtime channel fails.
@@ -31,8 +35,32 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
   const startCall = async (to: string) => {
     if (!to) return;
     await haptic(ImpactStyle.Medium);
-    try { await mobileApi.startCall(to); } catch {}
-    if (sp?.call) sp.call(to);
+    setDialing(true);
+    setDialError(null);
+    const stamp = new Date().toISOString();
+    try {
+      if (sp?.snap?.status === 'registered' && sp?.call) {
+        const ok = sp.call(to);
+        if (ok !== false) {
+          console.info('[AVA keypad] SIP call started', { to, sipStatus: sp?.snap?.status, stamp });
+          setDialDebug(`SIP call started · ${stamp}`);
+          return;
+        }
+      }
+      const res = await mobileApi.startCall(to, 'click_to_call');
+      console.info('[AVA keypad] click-to-call requested', { to, res, sipStatus: sp?.snap?.status, stamp });
+      setDialDebug(`Click-to-call OK · from ${res?.from || 'extension'} to ${res?.to || to}`);
+      showMobileToast('Deskphone call requested.', 'success');
+    } catch (e: any) {
+      const msg = e?.message || 'Unable to start call';
+      const detail = { message: msg, status: e?.status, detail: e?.detail, path: e?.path, to, sipStatus: sp?.snap?.status, sipError: sp?.snap?.error, stamp };
+      console.error('[AVA keypad] call failed', detail);
+      setDialError(msg);
+      setDialDebug(JSON.stringify(detail));
+      showMobileToast(msg, 'error');
+    } finally {
+      setDialing(false);
+    }
   };
 
   return (
