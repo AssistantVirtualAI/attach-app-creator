@@ -1,27 +1,53 @@
-import React from 'react';
-import { colors, font } from '../lib/theme';
+import React, { useEffect, useState } from 'react';
+import { colors } from '../lib/theme';
 import type { CDRTransport } from '../hooks/useRealtimeCDR';
 
 /**
- * Compact realtime-status pill shown in the app header.
- *  - 🟢 Live       — Realtime channel SUBSCRIBED
- *  - 🟡 Polling    — fell back to 15s polling
- *  - ⚪ Idle       — no creds yet
- *
- * Tap to trigger a forced refresh.
+ * Compact realtime-status pill. Shows live transport, last sync timestamp,
+ * and (when polling/retrying) the next backoff tick. Tap to force a refresh
+ * and reset the backoff.
  */
+function fmtAgo(ts: number | null) {
+  if (!ts) return '—';
+  const s = Math.max(0, Math.round((Date.now() - ts) / 1000));
+  if (s < 5) return 'just now';
+  if (s < 60) return `${s}s ago`;
+  if (s < 3600) return `${Math.round(s / 60)}m ago`;
+  return `${Math.round(s / 3600)}h ago`;
+}
+
 export default function RealtimeStatusPill({
-  transport, warning, onRefresh,
-}: { transport: CDRTransport; warning?: string | null; onRefresh?: () => void }) {
+  transport, warning, lastSyncAt, nextRetryAt, onRefresh,
+}: {
+  transport: CDRTransport;
+  warning?: string | null;
+  lastSyncAt?: number | null;
+  nextRetryAt?: number | null;
+  onRefresh?: () => void;
+}) {
+  // Re-render once a second so the "Xs ago" label stays fresh.
+  const [, force] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => force((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+
   const tone =
-    transport === 'realtime' ? { dot: colors.success, label: 'Live', text: 'Realtime CDR sync is healthy.' } :
-    transport === 'polling'  ? { dot: colors.signalGold, label: 'Polling', text: warning || 'Polling every 15s.' } :
-                               { dot: colors.mutedSilver, label: 'Idle', text: 'Connecting…' };
+    transport === 'realtime' ? { dot: colors.success, label: 'Live' } :
+    transport === 'polling'  ? { dot: colors.signalGold, label: 'Polling' } :
+                               { dot: colors.mutedSilver, label: 'Idle' };
+  const retryIn = nextRetryAt ? Math.max(0, Math.round((nextRetryAt - Date.now()) / 1000)) : 0;
+  const title = [
+    warning,
+    lastSyncAt ? `Last sync ${fmtAgo(lastSyncAt)}` : null,
+    nextRetryAt && retryIn > 0 ? `Retry in ${retryIn}s` : null,
+    'Tap to retry now',
+  ].filter(Boolean).join(' • ');
 
   return (
     <button
       onClick={onRefresh}
-      title={tone.text}
+      title={title}
       style={{
         display: 'inline-flex', alignItems: 'center', gap: 6,
         padding: '4px 10px', borderRadius: 999,
@@ -37,6 +63,10 @@ export default function RealtimeStatusPill({
         animation: transport === 'realtime' ? 'pulse-rt 2s ease-in-out infinite' : 'none',
       }} />
       {tone.label}
+      <span style={{ opacity: 0.7, fontWeight: 600, textTransform: 'none', letterSpacing: 0 }}>
+        · {fmtAgo(lastSyncAt ?? null)}
+        {nextRetryAt && retryIn > 0 ? ` · retry ${retryIn}s` : ''}
+      </span>
       <style>{`@keyframes pulse-rt { 0%,100%{opacity:1} 50%{opacity:.45} }`}</style>
     </button>
   );
