@@ -50,9 +50,7 @@ export function waitForJsSIP(timeoutMs = 8000, intervalMs = 100): Promise<any> {
       return;
     }
     if (!hasWebRTC()) {
-      reject(new JsSIPUnavailableError(
-        'WebRTC not supported in this browser. Open in Chrome or Safari, or use the native mobile app.'
-      ));
+      reject(new JsSIPUnavailableError(WEBRTC_UNAVAILABLE_MESSAGE));
       return;
     }
     if (window.JsSIP) {
