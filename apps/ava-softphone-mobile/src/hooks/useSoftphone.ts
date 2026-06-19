@@ -236,11 +236,12 @@ export function useSoftphone(
   const reconnect = useCallback(() => {
     setSipError('');
     setSipStatus('connecting');
-    if (reconnectRef.current && reconnectRef.current !== (() => {})) {
+    if (reconnectRef.current) {
       reconnectRef.current();
-    } else {
-      setReconnectTick((t) => t + 1);
     }
+    // Always bump the tick so a fresh effect runs if the previous one
+    // was cancelled (e.g. WebRTC missing on first mount, then enabled).
+    setReconnectTick((t) => t + 1);
   }, []);
 
   return {
