@@ -320,6 +320,7 @@ export function useSoftphone(
     try {
       uaRef.current.call(`sip:${number}@${config.domain}`, {
         mediaConstraints: { audio: true, video: false },
+        rtcOfferConstraints: { offerToReceiveAudio: true, offerToReceiveVideo: false },
         // Force PCMU/PCMA + strip DTLS so FusionPBX accepts the offer.
         sessionDescriptionHandlerModifiers: [sdpModifier],
         rtcOfferConstraints: { offerToReceiveAudio: true, offerToReceiveVideo: false },
