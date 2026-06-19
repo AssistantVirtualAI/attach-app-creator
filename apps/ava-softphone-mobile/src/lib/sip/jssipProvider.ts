@@ -187,12 +187,14 @@ export async function createSIPUA(config: SIPConfig, timeoutMs = 8000) {
   const wssUrls = buildWssFallbackList(config);
   const sockets = wssUrls.map((url) => new JsSIP.WebSocketInterface(url));
   sockets.forEach((s: any) => { try { s.via_transport = 'wss'; } catch {} });
+  // IMPORTANT: config must match portal/desktop exactly to avoid SIP 403
+  // portal src/lib/softphone/jssipProvider.ts works — copy same params
   return new JsSIP.UA({
     sockets,
     uri: `sip:${config.extension}@${config.domain}`,
     password: config.password,
-    authorization_user: config.authUsername || config.extension,
-    realm: config.domain,
+    authorization_user: config.extension,  // do NOT use authUsername — must match extension
+    // NO realm field — portal doesn't set it, FusionPBX auto-negotiates
     contact_uri: `sip:${config.extension}@${config.domain};transport=wss`,
     display_name: config.displayName || config.extension,
     register: true,
@@ -202,10 +204,6 @@ export async function createSIPUA(config: SIPConfig, timeoutMs = 8000) {
     connection_recovery_max_interval: 30,
     no_answer_timeout: 60,
     use_preloaded_route: false,
-    user_agent: 'Lemtel-Softphone-Mobile/2.3.5',
-    hackWssInTransport: true,
-    hackIpInContact: true,
-    hackViaBranch: true,
     pcConfig: {
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
