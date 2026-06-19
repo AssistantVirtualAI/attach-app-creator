@@ -152,17 +152,6 @@ export interface QueueRow {
   slaPct: number;
 }
 
-export interface RecordingEntry {
-  id: string;
-  from: string;
-  to: string;
-  customer?: string;
-  startedAt: string;
-  durationSec: number;
-  hasTranscript: boolean;
-  summary?: string;
-}
-
 export type StatsRange = 'today' | '7d' | '30d';
 export interface DomainStats {
   // legacy
@@ -410,12 +399,6 @@ export const mobileApi = {
     { id: 'q1', name: 'Sales',       extension: '600', strategy: 'ring-all',     waiting: 2, agentsOnline: 4, callsToday: 38, avgWaitSec: 42, slaPct: 88 },
     { id: 'q2', name: 'Support',     extension: '601', strategy: 'longest-idle', waiting: 5, agentsOnline: 3, callsToday: 51, avgWaitSec: 78, slaPct: 71 },
     { id: 'q3', name: 'After-hours', extension: '602', strategy: 'fewest-calls', waiting: 0, agentsOnline: 0, callsToday: 4,  avgWaitSec: 0,  slaPct: 0 },
-  ]),
-
-  // Recordings — calls with audio available.
-  recordings: () => call<RecordingEntry[]>('/mobile-recordings', undefined, [
-    { id: 'c1', from: '+1 514 555 0123', to: '+1 514 555 0100', customer: 'Marie Tremblay', startedAt: new Date(Date.now() - 36e5).toISOString(),    durationSec: 245, hasTranscript: true, summary: 'Renewal call, positive sentiment.' },
-    { id: 'c2', from: '+1 514 555 0100', to: '+1 438 555 9988', customer: 'Acme Corp',      startedAt: new Date(Date.now() - 5*36e5).toISOString(),  durationSec: 412, hasTranscript: true, summary: 'Demo reschedule discussion.' },
   ]),
 
   // Chatbot endpoint (Lovable AI Gateway via edge function).

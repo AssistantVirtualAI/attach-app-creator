@@ -26,7 +26,7 @@ function Toggle() {
 
 describe('useThemeColors re-render guarantee', () => {
   it('updates every consumer atomically when data-theme flips to light', () => {
-    const screens = ['home', 'history', 'chat', 'settings', 'bottomNav', 'recordings', 'contacts'];
+    const screens = ['home', 'history', 'chat', 'settings', 'bottomNav', 'contacts'];
     const log: Record<string, string[]> = {};
 
     const { getByTestId } = render(
