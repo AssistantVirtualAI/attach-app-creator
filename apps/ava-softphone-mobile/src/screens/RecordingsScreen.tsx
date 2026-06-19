@@ -134,12 +134,21 @@ export default function RecordingsScreen() {
       {filtered.map((r) => {
         const state = busy[r.id];
         const label = r.caller_name || r.caller_number || r.destination_number || 'Unknown';
+        const url = audioUrls[r.id];
+        const audErr = audioErrors[r.id];
         return <Card key={r.id} style={{ marginBottom: 8 }} padded={true} onPress={() => setOpen(r.id)}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <button onClick={(e) => { e.stopPropagation(); play(r); }} disabled={loadingAudio === r.id} style={{ width: 38, height: 38, borderRadius: '50%', border: 'none', display: 'grid', placeItems: 'center', background: 'linear-gradient(135deg, #0023e6, #21d4fd)', color: '#fff', cursor: 'pointer', flexShrink: 0 }}>{loadingAudio === r.id ? <Loader2 size={15} className="spin" /> : playing === r.id ? <Pause size={15} /> : <Play size={15} />}</button>
-            <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: font.base, fontWeight: 800, color: colors.textIce, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</div><div style={{ fontSize: font.xs, color: colors.mutedSilver, marginTop: 2, fontFamily: 'JetBrains Mono, monospace' }}>{r.start_at ? new Date(r.start_at).toLocaleString() : '—'} · {fmtDuration(Number(r.duration_seconds || 0))}</div></div>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}><Chip tone="gold" size="xs">REC</Chip>{r.transcribed ? <Chip tone="violet" size="xs">AI ✓</Chip> : <button onClick={(e) => { e.stopPropagation(); transcribe(r.id); }} disabled={state === 'running'} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 999, border: 'none', background: state === 'failed' ? 'rgba(239,68,68,0.18)' : `linear-gradient(135deg, ${colors.avaViolet}, ${colors.avaCyan})`, color: state === 'failed' ? colors.danger : '#fff', fontSize: 10, fontWeight: 800, cursor: state === 'running' ? 'default' : 'pointer' }}>{state === 'running' ? <Loader2 size={10} className="spin" /> : <Sparkles size={10} />}{state === 'running' ? 'WORKING' : state === 'failed' ? 'RETRY' : 'AI'}</button>}</div>
+            <button onClick={(e) => { e.stopPropagation(); loadAudio(r); }} disabled={loadingAudio === r.id || !!url} style={{ width: 38, height: 38, borderRadius: '50%', border: 'none', display: 'grid', placeItems: 'center', background: audErr ? 'rgba(239,68,68,0.2)' : 'linear-gradient(135deg, #0023e6, #21d4fd)', color: '#fff', cursor: 'pointer', flexShrink: 0 }}>{loadingAudio === r.id ? <Loader2 size={15} className="spin" /> : <Play size={15} />}</button>
+            <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: font.base, fontWeight: 800, color: colors.textIce, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</div><div style={{ fontSize: font.xs, color: colors.mutedSilver, marginTop: 2, fontFamily: 'JetBrains Mono, monospace' }}>{r.start_at ? new Date(r.start_at).toLocaleString() : '—'} · {fmtDuration(Number(r.duration_seconds || 0))}{r.extension ? ` · ext ${r.extension}` : ''}</div></div>
+            <div onClick={(e) => e.stopPropagation()} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}><Chip tone="gold" size="xs">REC</Chip>{r.transcribed ? <Chip tone="violet" size="xs">AI ✓</Chip> : <button onClick={(e) => { e.stopPropagation(); transcribe(r.id); }} disabled={state === 'running'} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 999, border: 'none', background: state === 'failed' ? 'rgba(239,68,68,0.18)' : `linear-gradient(135deg, ${colors.avaViolet}, ${colors.avaCyan})`, color: state === 'failed' ? colors.danger : '#fff', fontSize: 10, fontWeight: 800, cursor: state === 'running' ? 'default' : 'pointer' }}>{state === 'running' ? <Loader2 size={10} className="spin" /> : <Sparkles size={10} />}{state === 'running' ? 'WORKING' : state === 'failed' ? 'RETRY' : 'AI'}</button>}</div>
           </div>
+          {url && (
+            <div onClick={(e) => e.stopPropagation()} style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <audio controls autoPlay src={url} style={{ flex: 1, height: 32 }} />
+              <a href={url} download={r.recording_name || `${r.pbx_uuid || r.id}.mp3`} style={{ fontSize: 11, color: colors.lemtelBlue, fontWeight: 700, textDecoration: 'none', padding: '4px 8px', borderRadius: 8, border: `1px solid ${colors.border}` }}>↓</a>
+            </div>
+          )}
+          {audErr && <div style={{ marginTop: 6, fontSize: 11, color: colors.danger, lineHeight: 1.4 }}>{audErr}</div>}
           {r.ai_summary && <p style={{ fontSize: font.sm, color: colors.textSub, margin: '8px 0 0', lineHeight: 1.4 }}>{r.ai_summary}</p>}
         </Card>;
       })}
