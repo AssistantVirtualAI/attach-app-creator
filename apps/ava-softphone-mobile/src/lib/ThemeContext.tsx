@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { darkColors, lightColors, type ColorTokens } from './theme';
 
 type Mode = 'dark' | 'light';
 type Ctx = { mode: Mode; toggle: () => void; setMode: (m: Mode) => void };
