@@ -224,6 +224,11 @@ Deno.serve(async (req) => {
       insights = stubInsights();
       aiModel = "stub";
     }
+    insights.coaching_notes = Array.isArray(insights.coaching_notes)
+      ? insights.coaching_notes
+      : insights.coaching ? [String(insights.coaching)] : [];
+    insights.coaching_score = insights.coaching_score ?? null;
+    delete insights.coaching;
 
     await admin.from("pbx_ai_insights").delete().eq("call_record_id", call_record_id);
     const { error: insightError } = await admin.from("pbx_ai_insights").insert({
