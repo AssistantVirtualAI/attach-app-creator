@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { createSIPUA, JsSIPUnavailableError, SIPConfig } from '../lib/sip/jssipProvider';
+import { createSIPUA, JsSIPUnavailableError, SIPConfig, sdpModifier, classifySipFailure } from '../lib/sip/jssipProvider';
 
 export type SIPStatus = 'idle' | 'connecting' | 'registered' | 'error';
 export type CallState = 'idle' | 'ringing' | 'active' | 'ended';
