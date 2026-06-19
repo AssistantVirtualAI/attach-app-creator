@@ -159,6 +159,7 @@ const ORG_GROUPS: NavGroup[] = [
       { nameKey: 'Registrations', href: '/org/lemtel/admin/registrations', icon: Network },
       { nameKey: 'System Status', href: '/org/lemtel/admin/system-status', icon: Activity },
       { nameKey: 'PBX Sync Health', href: '/org/lemtel/admin/sync-health', icon: Activity },
+      { nameKey: 'AI Actions Audit', href: '/org/lemtel/admin/ai-actions', icon: Shield },
     ],
   },
   {

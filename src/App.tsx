@@ -173,6 +173,7 @@ import AdminVoicemailSettings from "./pages/lemtel/admin/AdminVoicemailSettings"
 import AdminActiveCalls from "./pages/lemtel/admin/AdminActiveCalls";
 import AdminRegistrations from "./pages/lemtel/admin/AdminRegistrations";
 import AdminSystemStatus from "./pages/lemtel/admin/AdminSystemStatus";
+import AdminAIActions from "./pages/lemtel/admin/AdminAIActions";
 import MySettings from "./pages/lemtel/my/MySettings";
 import MyForwarding from "./pages/lemtel/my/MyForwarding";
 import MyDevices from "./pages/lemtel/my/MyDevices";
@@ -734,6 +735,7 @@ const App = () => (
                 <Route path="/org/lemtel/admin/active-calls" element={<LemtelAdminPage><AdminActiveCalls /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/registrations" element={<LemtelAdminPage><AdminRegistrations /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/system-status" element={<LemtelAdminPage><AdminSystemStatus /></LemtelAdminPage>} />
+                <Route path="/org/lemtel/admin/ai-actions" element={<LemtelAdminPage><AdminAIActions /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/sip-profiles" element={<LemtelAdminPage><AdminSipProfiles /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/dialplans" element={<LemtelAdminPage><AdminDialplans /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/feature-codes" element={<LemtelAdminPage><AdminFeatureCodes /></LemtelAdminPage>} />
