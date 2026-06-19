@@ -6,20 +6,21 @@ import { Card, Chip, SectionTitle, Skeleton, EmptyState, PrimaryButton, GhostBut
 import CallDetailScreen from './CallDetailScreen';
 import Dialpad from '../components/Dialpad';
 import VoicemailScreen from './VoicemailScreen';
-import RecordingsScreen from './RecordingsScreen';
 import { useRealtimeCDR } from '../hooks/useRealtimeCDR';
 import type { Creds } from '../lib/creds';
 import { showMobileToast } from '../lib/mobileToast';
+import { restGet } from '../lib/mobileSupabase';
 
-type SubTab = 'recents' | 'recordings' | 'voicemail' | 'dial';
+type SubTab = 'recents' | 'voicemail' | 'dial';
 
 export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s?: ImpactStyle) => Promise<void>; creds?: Creds | null }) {
   const [sub, setSub] = useState<SubTab>('recents');
   const [selected, setSelected] = useState<string | null>(null);
-  const [filter, setFilter] = useState<'all' | 'missed' | 'recorded'>('all');
+  const [filter, setFilter] = useState<'all' | 'missed'>('all');
   const [extFilter, setExtFilter] = useState<string>('all');
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [myExt, setMyExt] = useState<string | null>(null);
+  const [domainExtensions, setDomainExtensions] = useState<string[]>([]);
   const [number, setNumber] = useState('');
   const [dialError, setDialError] = useState<string | null>(null);
   const [dialDebug, setDialDebug] = useState<string | null>(null);
@@ -42,13 +43,21 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
     return () => { cancelled = true; };
   }, [creds?.accessToken]);
 
+  useEffect(() => {
+    const domainUuid = creds?.domainUuid || creds?.fusionpbxDomainUuid;
+    if (!creds?.accessToken || !domainUuid || !isAdmin) return;
+    restGet<{ extension: string }[]>(`/rest/v1/pbx_extensions_directory?select=extension&domain_uuid=eq.${encodeURIComponent(domainUuid)}&enabled=eq.true&order=extension.asc`, creds.accessToken)
+      .then((rows) => setDomainExtensions((rows || []).map((r) => String(r.extension)).filter(Boolean)))
+      .catch(() => setDomainExtensions([]));
+  }, [creds?.accessToken, creds?.domainUuid, creds?.fusionpbxDomainUuid, isAdmin]);
+
   if (selected) return <CallDetailScreen id={selected} onBack={() => setSelected(null)} />;
 
   const matchExt = (c: CallRecord, ext: string) =>
     c.extension === ext || c.from === ext || c.to === ext;
 
   const filtered = (calls || []).filter((c) => {
-    const statusOk = filter === 'all' ? true : filter === 'missed' ? c.status === 'missed' : c.hasRecording;
+    const statusOk = filter === 'all' ? true : c.status === 'missed';
     if (!statusOk) return false;
     if (isAdmin === false && myExt) return matchExt(c, myExt);
     if (isAdmin && extFilter !== 'all') return matchExt(c, extFilter);
@@ -57,10 +66,11 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
 
   const extensionOptions = useMemo(() => {
     const set = new Set<string>();
+    for (const e of domainExtensions) set.add(e);
     for (const c of calls || []) if (c.extension) set.add(c.extension);
     if (myExt) set.add(myExt);
     return Array.from(set).sort();
-  }, [calls, myExt]);
+  }, [calls, domainExtensions, myExt]);
 
 
   const startCall = async (to: string) => {
@@ -147,7 +157,7 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
       {sub === 'recents' && (
         <>
           <div style={{ display: 'flex', gap: 6, margin: '12px 0 10px' }}>
-            {(['all', 'missed', 'recorded'] as const).map((f) => (
+            {(['all', 'missed'] as const).map((f) => (
               <button key={f} onClick={() => setFilter(f)} style={{
                 padding: '6px 12px', borderRadius: 999,
                 background: filter === f ? colors.signalGold + '1a' : 'transparent',
@@ -181,7 +191,6 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
         </>
       )}
 
-      {sub === 'recordings' && <div style={{ marginTop: 12 }}><RecordingsScreen /></div>}
       {sub === 'voicemail' && <div style={{ marginTop: 12 }}><VoicemailScreen haptic={haptic} /></div>}
 
       <div style={{ height: 80 }} />
@@ -192,7 +201,6 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
 function SegmentedControl({ value, onChange }: { value: SubTab; onChange: (v: SubTab) => void }) {
   const items: { id: SubTab; label: string }[] = [
     { id: 'recents', label: 'History' },
-    { id: 'recordings', label: 'Recordings' },
     { id: 'voicemail', label: 'Voicemail' },
     { id: 'dial', label: 'Keypad' },
   ];

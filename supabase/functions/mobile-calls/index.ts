@@ -15,12 +15,19 @@ function mapCall(r: any) {
   const status = r.missed_call ? "missed" : r.call_status === "voicemail" ? "voicemail" : "answered";
   return {
     id: r.id, direction, status,
+    pbx_uuid: r.pbx_uuid || undefined,
+    organization_id: r.organization_id || undefined,
+    domain_uuid: r.domain_uuid || undefined,
+    domain_name: r.domain_name || undefined,
     from: r.caller_number || r.source_number || "",
     to: r.destination_number || r.destination || r.extension || "",
     extension: r.extension || undefined,
     customer: r.caller_name || undefined,
     startedAt: r.start_at, durationSec: r.duration_seconds || 0,
     hasRecording: !!(r.has_recording || r.recording_path || r.recording_name || r.recording_url), hasTranscript: !!r.transcribed,
+    recording_path: r.recording_path || undefined,
+    recording_name: r.recording_name || undefined,
+    recording_url: r.recording_url || undefined,
   };
 }
 
@@ -120,7 +127,7 @@ Deno.serve(async (req) => {
 
     const limit = Math.min(Number(url.searchParams.get("limit")) || 50, 200);
     let listQ = admin.from("pbx_call_records")
-      .select("id, direction, call_status, caller_name, caller_number, source_number, destination, destination_number, extension, start_at, duration_seconds, missed_call, has_recording, recording_path, recording_name, recording_url, transcribed")
+      .select("id, pbx_uuid, organization_id, domain_uuid, domain_name, direction, call_status, caller_name, caller_number, source_number, destination, destination_number, extension, start_at, duration_seconds, missed_call, has_recording, recording_path, recording_name, recording_url, transcribed")
       .eq("organization_id", sp.organization_id);
     if (!isDomainAdmin) listQ = listQ.or(extFilter);
     if (sp.domain_uuid) listQ = listQ.or(`domain_uuid.eq.${sp.domain_uuid},domain_uuid.is.null`);

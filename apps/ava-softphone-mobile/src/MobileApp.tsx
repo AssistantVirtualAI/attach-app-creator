@@ -10,7 +10,6 @@ import AVAChatScreen from './screens/AVAChatScreen';
 import TeamChatScreen from './screens/TeamChatScreen';
 import MoreScreen from './screens/MoreScreen';
 import VoicemailScreen from './screens/VoicemailScreen';
-// RecordingsScreen is rendered as a sub-tab inside CallsScreen, not as a standalone tab.
 import ContactsScreen from './screens/ContactsScreen';
 import MessagesScreen from './screens/MessagesScreen';
 import MessagesHubScreen from './screens/MessagesHubScreen';
@@ -35,6 +34,7 @@ import { bootNative, onAppStateChange } from './lib/nativeBoot';
 import { registerDeepLinkHandler } from './lib/deepLink';
 import { configureMobileApi } from './lib/mobileApi';
 import { configureAudit, audit } from './lib/audit';
+import { edgeCall } from './lib/mobileSupabase';
 
 const isPreviewMode = (() => {
   try { return new URLSearchParams(window.location.search).get('preview') === '1'; }
@@ -88,6 +88,7 @@ function AuthenticatedShell({
 
   const [permsGateDone, setPermsGateDone] = useState<boolean | null>(isPreviewMode ? true : null);
   const [profileOpen, setProfileOpen] = useState(false);
+  const passwordHealRef = useRef('');
 
   // Decide whether to show the onboarding permission gate.
   useEffect(() => {
@@ -126,6 +127,18 @@ function AuthenticatedShell({
       }
     : null;
   const softphone = useSoftphone(sipConfig);
+
+  useEffect(() => {
+    if (!creds.accessToken || !creds.extension || !softphone.sipError) return;
+    if (!/authentication failed|403|401|407|forbidden|unauthor/i.test(softphone.sipError)) return;
+    const key = `${creds.userId || creds.email}:${creds.extension}:${softphone.sipError}`;
+    if (passwordHealRef.current === key) return;
+    passwordHealRef.current = key;
+    edgeCall('softphone-sync-password', creds.accessToken, { force_local_to_pbx: true })
+      .then(() => hydrateSoftphoneCredentials('mobile'))
+      .then((next) => { if (next) setCreds(next); })
+      .catch((e) => console.warn('[SIP] password auto-sync failed', e?.message || e));
+  }, [creds.accessToken, creds.email, creds.extension, creds.userId, setCreds, softphone.sipError]);
 
   const sp = useMemo(() => {
     const richCallState = softphone.callState === 'ringing' ? 'ringing-out' : softphone.callState;

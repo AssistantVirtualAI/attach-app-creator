@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { ImpactStyle } from '@capacitor/haptics';
 import Dialpad from '../components/Dialpad';
 import { audit } from '../lib/audit';
+import { mobileApi } from '../lib/mobileApi';
+import { showMobileToast } from '../lib/mobileToast';
 
 export default function DialerScreen({
   sp,
@@ -11,10 +13,34 @@ export default function DialerScreen({
   haptic: (s?: ImpactStyle) => Promise<void>;
 }) {
   const [num, setNum] = useState('');
+  const [dialing, setDialing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const statusColor =
     sp.snap.status === 'registered' ? 'var(--success)' :
     sp.snap.status === 'error' ? 'var(--danger)' : 'var(--warning)';
+
+  const startCall = async () => {
+    if (!num || dialing) return;
+    await haptic(ImpactStyle.Medium);
+    audit('call.originated', null, { destination: num, sipStatus: sp.snap.status });
+    setDialing(true);
+    setError(null);
+    try {
+      if (sp.snap.status === 'registered') {
+        const ok = sp.call(num);
+        if (ok !== false) return;
+      }
+      const res = await mobileApi.startCall(num, 'click_to_call');
+      showMobileToast(`Deskphone call requested: ${res?.from || 'extension'} → ${res?.to || num}`, 'success');
+    } catch (e: any) {
+      const msg = e?.message || 'Unable to start call';
+      setError(msg);
+      showMobileToast(msg, 'error');
+    } finally {
+      setDialing(false);
+    }
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -50,16 +76,16 @@ export default function DialerScreen({
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-evenly', padding: '24px 24px 8px' }}>
           <div style={{ width: 64 }} />
           <button
-            disabled={!num || sp.snap.status !== 'registered'}
-            onClick={() => { haptic(ImpactStyle.Medium); audit('call.originated', null, { destination: num }); sp.call(num); }}
+            disabled={!num || dialing}
+            onClick={startCall}
             style={{
               width: 72, height: 72, borderRadius: '50%',
-              background: !num ? 'rgba(34, 197, 94, 0.3)' : 'linear-gradient(135deg, #22c55e, #15803d)',
+              background: !num || dialing ? 'rgba(34, 197, 94, 0.3)' : 'linear-gradient(135deg, #22c55e, #15803d)',
               border: 'none', cursor: 'pointer', color: 'white', fontSize: 30,
               boxShadow: '0 10px 30px rgba(34, 197, 94, 0.4)',
             }}
           >
-            ☏
+            {dialing ? '…' : '☏'}
           </button>
           <button
             onClick={() => { haptic(); setNum((n) => n.slice(0, -1)); }}
@@ -73,6 +99,7 @@ export default function DialerScreen({
             ⌫
           </button>
         </div>
+        {error && <div style={{ color: 'var(--danger)', textAlign: 'center', fontSize: 12, padding: '0 24px 10px' }}>{error}</div>}
       </div>
     </div>
   );

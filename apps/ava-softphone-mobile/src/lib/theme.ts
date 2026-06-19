@@ -9,7 +9,7 @@ import type React from 'react';
  * every screen import. Components that need reactive re-render on theme
  * toggle should additionally call `useThemeColors()` from ThemeContext.
  */
-export const darkColors = {
+export const darkColors: Record<string, string> = {
   // Dark foundation
   midnight:   '#0A1429',
   midnight2:  '#0E1B3D',
@@ -35,7 +35,7 @@ export const darkColors = {
   danger:     '#EF4444',
   success:    '#10B981',
   warning:    '#F59E0B',
-} as const;
+};
 
 export type ColorTokens = typeof darkColors;
 

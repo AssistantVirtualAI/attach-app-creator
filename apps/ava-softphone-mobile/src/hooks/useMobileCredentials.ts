@@ -37,6 +37,7 @@ export function useMobileCredentials() {
     extension: creds?.extension || null,
     sipDomain: creds?.sipDomain || null,
     domainUuid: (creds?.domainUuid || creds?.fusionpbxDomainUuid) ?? null,
+    fusionpbxDomainUuid: creds?.fusionpbxDomainUuid || creds?.domainUuid || null,
     organizationId: creds?.organizationId || null,
     wssUrl: creds?.wssUrl || null,
     userId: creds?.userId || null,

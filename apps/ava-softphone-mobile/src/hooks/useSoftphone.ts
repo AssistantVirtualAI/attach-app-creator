@@ -158,7 +158,7 @@ export function useSoftphone(
       try { uaRef.current?.stop(); } catch {}
       uaRef.current = null;
     };
-  }, [config?.extension, config?.wssUrl, config?.domain, opts.jsSipTimeoutMs]);
+  }, [config?.extension, config?.wssUrl, config?.domain, config?.password, opts.jsSipTimeoutMs]);
 
   const call = (number: string) => {
     if (!uaRef.current || !config || sipStatus !== 'registered') return false;

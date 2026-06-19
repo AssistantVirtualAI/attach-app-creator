@@ -190,10 +190,17 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
       displayName: data.display_name,
       sipDomain: data.sip_domain,
       wssUrl: data.wss_url,
+      sipPassword: data.sip_password || data.password || password,
       accessToken: data.access_token,
       refreshToken: data.refresh_token,
       userId: data.user_id,
       organizationId: data.organization_id,
+      organizationName: data.organization_name,
+      fusionpbxDomainUuid: data.fusionpbx_domain_uuid,
+      domainUuid: data.fusionpbx_domain_uuid,
+      role: data.role,
+      dataScope: data.data_scope,
+      permissions: data.permissions,
     });
   };
 

@@ -4,7 +4,6 @@ import { colors, font, radius, gradients } from '../lib/theme';
 import type { Creds } from '../lib/creds';
 import { Card, SectionTitle, SettingsRow } from '../components/ui/Primitives';
 import { LemtelMark, AvaBadge } from '../components/Brand';
-import RecordingsScreen from './RecordingsScreen';
 import VoicemailScreen from './VoicemailScreen';
 import MessagesScreen from './MessagesScreen';
 import ContactsScreen from './ContactsScreen';
@@ -18,14 +17,13 @@ import AIAuditScreen from './AIAuditScreen';
 import QueuesScreen from './QueuesScreen';
 import FeaturesScreen from './FeaturesScreen';
 
-type Sub = null | 'recordings' | 'voicemail' | 'messages' | 'contacts' | 'settings' | 'delete' | 'privacy' | 'datasafety' | 'permissions' | 'support' | 'aiaudit' | 'queues' | 'features';
+type Sub = null | 'voicemail' | 'messages' | 'contacts' | 'settings' | 'delete' | 'privacy' | 'datasafety' | 'permissions' | 'support' | 'aiaudit' | 'queues' | 'features';
 
 export default function MoreScreen({
   creds, sp, onSignOut, haptic,
 }: { creds: Creds; sp: any; onSignOut: () => void; haptic: (s?: ImpactStyle) => Promise<void> }) {
   const [sub, setSub] = useState<Sub>(null);
 
-  if (sub === 'recordings')  return <SubPage onBack={() => setSub(null)} title="Recordings"><RecordingsScreen /></SubPage>;
   if (sub === 'voicemail')   return <SubPage onBack={() => setSub(null)} title="Voicemail"><VoicemailScreen haptic={haptic} /></SubPage>;
   if (sub === 'messages')    return <SubPage onBack={() => setSub(null)} title="Messages"><MessagesScreen haptic={haptic} /></SubPage>;
   if (sub === 'contacts')    return <SubPage onBack={() => setSub(null)} title="Contacts"><ContactsScreen sp={sp} /></SubPage>;
@@ -59,7 +57,6 @@ export default function MoreScreen({
       <SectionTitle eyebrow="Communications" title="More features" />
       <Card padded={false}>
         <SettingsRow label="Calling features" icon="☎" value="Hold, transfer, record, DND…" onPress={() => setSub('features')} />
-        <SettingsRow label="Call recordings" icon="◉" value="With AI transcribe" onPress={() => setSub('recordings')} />
         <SettingsRow label="Voicemail" icon="✉" value="Inbox & greetings" onPress={() => setSub('voicemail')} />
         <SettingsRow label="Messages" icon="💬" value="SMS conversations" onPress={() => setSub('messages')} />
         <SettingsRow label="Queues" icon="⇉" value="Live queues & agents" onPress={() => setSub('queues')} />
