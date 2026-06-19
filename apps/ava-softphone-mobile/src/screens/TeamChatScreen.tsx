@@ -1,9 +1,18 @@
 // Team chat for mobile: list members of same PBX domain, DMs, group channels, presence live.
 // Reuses the desktop `org-chat` edge function so all platforms share the same data.
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Send, Users, MessageCircle, Plus, ArrowLeft, Circle } from 'lucide-react';
+import { Send, Users, MessageCircle, Plus, ArrowLeft, Circle, Search } from 'lucide-react';
+import { createClient } from '@supabase/supabase-js';
 import { colors, radius, font } from '../lib/theme';
 import { MOBILE_DEFAULT_PORTAL } from '../lib/mobileApi';
+
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdlanhpc3JxdHZ4YXZicmZjb3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1MDMxNzQsImV4cCI6MjA3NzA3OTE3NH0.kaO-GslE99OCNrZ4_AMnbzGqya2azqz_UMZR34zZvvo';
+let _chatRT: ReturnType<typeof createClient> | null = null;
+function chatRT(token?: string | null) {
+  if (!_chatRT) _chatRT = createClient(MOBILE_DEFAULT_PORTAL, SUPABASE_ANON, { auth: { persistSession: false, autoRefreshToken: false } });
+  if (token) _chatRT.realtime.setAuth(token);
+  return _chatRT;
+}
 
 type Channel = { id: string; name: string; channel_type: string; members: string[] | null };
 type Message = { id: string; channel_id: string; sender_id: string; sender_name: string | null; content: string; created_at: string };
@@ -47,6 +56,9 @@ export default function TeamChatScreen({ accessToken, userId }: { accessToken: s
   const [groupPicks, setGroupPicks] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<number | null>(null);
+  const [channelQuery, setChannelQuery] = useState('');
+  const [msgQuery, setMsgQuery] = useState('');
+  const [showMsgSearch, setShowMsgSearch] = useState(false);
 
   // Load channels + members + heartbeat presence
   useEffect(() => {
@@ -84,13 +96,13 @@ export default function TeamChatScreen({ accessToken, userId }: { accessToken: s
     return () => clearInterval(id);
   }, [accessToken]);
 
-  // Load messages on channel change + poll
+  // Load messages on channel change + realtime subscribe + 30s safety poll
   useEffect(() => {
     if (!activeChannel || !accessToken) return;
     let cancelled = false;
     const fetchMsgs = async () => {
       try {
-        const r = await chatCall('list_messages', { channel_id: activeChannel.id, limit: 60 }, accessToken);
+        const r = await chatCall('list_messages', { channel_id: activeChannel.id, limit: 80 }, accessToken);
         if (!cancelled) {
           setMessages(r.messages || []);
           requestAnimationFrame(() => {
@@ -100,8 +112,18 @@ export default function TeamChatScreen({ accessToken, userId }: { accessToken: s
       } catch {}
     };
     fetchMsgs();
-    pollRef.current = window.setInterval(fetchMsgs, 4000) as unknown as number;
-    return () => { cancelled = true; if (pollRef.current) clearInterval(pollRef.current); };
+    const client = chatRT(accessToken);
+    const channel = client
+      .channel(`chat-${activeChannel.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'org_chat_messages', filter: `channel_id=eq.${activeChannel.id}` } as any,
+        () => { if (!cancelled) fetchMsgs(); })
+      .subscribe();
+    pollRef.current = window.setInterval(fetchMsgs, 30000) as unknown as number;
+    return () => {
+      cancelled = true;
+      if (pollRef.current) clearInterval(pollRef.current);
+      try { _chatRT?.removeChannel(channel); } catch {}
+    };
   }, [activeChannel, accessToken]);
 
   const openDm = async (m: Member) => {
@@ -170,17 +192,26 @@ export default function TeamChatScreen({ accessToken, userId }: { accessToken: s
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
         <header style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          <button onClick={() => { setView('channels'); setActiveChannel(null); }}
+          <button onClick={() => { setView('channels'); setActiveChannel(null); setShowMsgSearch(false); setMsgQuery(''); }}
             style={{ background: 'none', border: 'none', color: colors.textIce, cursor: 'pointer' }}>
             <ArrowLeft size={20} />
           </button>
-          <div style={{ flex: 1, fontWeight: 700, color: colors.textIce, fontSize: 15 }}>
-            {channelDisplay(activeChannel)}
-          </div>
+          {showMsgSearch ? (
+            <input autoFocus value={msgQuery} onChange={(e) => setMsgQuery(e.target.value)} placeholder="Search messages…"
+              style={{ flex: 1, padding: '6px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', color: colors.textIce, fontSize: 13, outline: 'none' }} />
+          ) : (
+            <div style={{ flex: 1, fontWeight: 700, color: colors.textIce, fontSize: 15 }}>
+              {channelDisplay(activeChannel)}
+            </div>
+          )}
+          <button onClick={() => { setShowMsgSearch((v) => !v); if (showMsgSearch) setMsgQuery(''); }}
+            style={{ background: 'none', border: 'none', color: showMsgSearch ? '#21d4fd' : colors.mutedSilver, cursor: 'pointer' }}>
+            <Search size={18} />
+          </button>
         </header>
 
         <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {messages.map((m) => {
+          {(msgQuery.trim() ? messages.filter((m) => m.content.toLowerCase().includes(msgQuery.trim().toLowerCase()) || (m.sender_name || '').toLowerCase().includes(msgQuery.trim().toLowerCase())) : messages).map((m) => {
             const mine = m.sender_id === userId;
             return (
               <div key={m.id} style={{ alignSelf: mine ? 'flex-end' : 'flex-start', maxWidth: '78%' }}>
@@ -255,6 +286,15 @@ export default function TeamChatScreen({ accessToken, userId }: { accessToken: s
       {error && <div style={{ padding: '0 14px 8px', color: '#ff8a3d', fontSize: 12 }}>{error}</div>}
       {loading && <div style={{ padding: 24, textAlign: 'center', color: colors.mutedSilver, fontSize: 13 }}>Loading…</div>}
 
+      <div style={{ padding: '0 14px 8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <Search size={14} color={colors.mutedSilver} />
+          <input value={channelQuery} onChange={(e) => setChannelQuery(e.target.value)}
+            placeholder={view === 'channels' ? 'Search channels…' : 'Search teammates…'}
+            style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 13, color: colors.textIce }} />
+        </div>
+      </div>
+
       <div style={{ flex: 1, overflowY: 'auto', padding: '4px 12px 16px' }}>
         {view === 'channels' && (
           <>
@@ -267,7 +307,7 @@ export default function TeamChatScreen({ accessToken, userId }: { accessToken: s
               }}>
               <Plus size={16} /> New group chat
             </button>
-            {channels.map((ch) => (
+            {channels.filter((ch) => !channelQuery.trim() || channelDisplay(ch).toLowerCase().includes(channelQuery.trim().toLowerCase())).map((ch) => (
               <button key={ch.id} onClick={() => { setActiveChannel(ch); setView('chat'); }}
                 style={{
                   width: '100%', display: 'flex', alignItems: 'center', gap: 10,
@@ -289,7 +329,7 @@ export default function TeamChatScreen({ accessToken, userId }: { accessToken: s
 
         {view === 'members' && (
           <>
-            {members.filter((m) => !m.is_self).map((m) => (
+            {members.filter((m) => !m.is_self && (!channelQuery.trim() || (m.full_name || m.email || m.extension || '').toLowerCase().includes(channelQuery.trim().toLowerCase()))).map((m) => (
               <button key={m.user_id} onClick={() => openDm(m)}
                 style={{
                   width: '100%', display: 'flex', alignItems: 'center', gap: 12,
