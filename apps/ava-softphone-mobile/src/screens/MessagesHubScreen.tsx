@@ -8,12 +8,13 @@ import ContactsScreen from './ContactsScreen';
 type Sub = 'team' | 'sms' | 'contacts';
 
 export default function MessagesHubScreen({
-  accessToken, userId, sp, haptic,
+  accessToken, userId, sp, haptic, channelUnread,
 }: {
   accessToken: string | null;
   userId: string | undefined;
   sp: any;
   haptic: (s?: ImpactStyle) => Promise<void>;
+  channelUnread?: Record<string, number>;
 }) {
   const [sub, setSub] = useState<Sub>('team');
 
@@ -23,7 +24,7 @@ export default function MessagesHubScreen({
         <Segmented value={sub} onChange={(v) => { haptic(); setSub(v); }} />
       </div>
       <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        {sub === 'team' && <TeamChatScreen accessToken={accessToken} userId={userId} />}
+        {sub === 'team' && <TeamChatScreen accessToken={accessToken} userId={userId} channelUnread={channelUnread} />}
         {sub === 'sms' && <MessagesScreen haptic={haptic} />}
         {sub === 'contacts' && <ContactsScreen sp={sp} />}
       </div>
