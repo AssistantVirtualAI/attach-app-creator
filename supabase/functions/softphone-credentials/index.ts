@@ -177,6 +177,14 @@ Deno.serve(async (req) => {
 
     let password = "";
     let passwordSource: "encrypted_softphone_user" | "plain_softphone_user" | "extension_password" | "extension_raw_data" | "fusionpbx_proxy" | "none" = "none";
+    const rawSipPwd: string | null = sp.sip_password || null;
+    if (rawSipPwd) {
+      const decrypted = await decryptSecret(rawSipPwd);
+      if (decrypted) {
+        password = decrypted;
+        passwordSource = rawSipPwd.startsWith("aesgcm:") ? "encrypted_softphone_user" : "plain_softphone_user";
+      }
+    }
     const { data: ext } = await supabaseAdmin
       .from("pbx_extensions")
       .select("id, password, raw_data")
@@ -184,18 +192,9 @@ Deno.serve(async (req) => {
       .eq("extension", sp.extension)
       .maybeSingle();
     const extPwd = (ext as any)?.password || (ext?.raw_data as any)?.password || (ext?.raw_data as any)?.sip_password || "";
-    if (extPwd) {
+    if (!password && extPwd) {
       password = extPwd;
       passwordSource = (ext as any)?.password ? "extension_password" : "extension_raw_data";
-    }
-
-    const rawSipPwd: string | null = sp.sip_password || null;
-    if (!password && rawSipPwd) {
-      const decrypted = await decryptSecret(rawSipPwd);
-      if (decrypted) {
-        password = decrypted;
-        passwordSource = rawSipPwd.startsWith("aesgcm:") ? "encrypted_softphone_user" : "plain_softphone_user";
-      }
     }
 
     // Fallback: ask FusionPBX directly via proxy, then persist for next time.
