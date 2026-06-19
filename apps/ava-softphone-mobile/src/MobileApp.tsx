@@ -155,6 +155,7 @@ function AuthenticatedShell({
         contacts: [],
         recents: [],
       },
+      sipConfig,
       call: softphone.call,
       addCall: softphone.call,
       hangup: softphone.hangup,
@@ -173,7 +174,8 @@ function AuthenticatedShell({
       startRecord: () => {},
       stopRecord: () => {},
     };
-  }, [softphone]);
+  }, [softphone, sipConfig]);
+
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   useEffect(() => { sp.setAudioEl(audioRef.current); }, [sp]);
