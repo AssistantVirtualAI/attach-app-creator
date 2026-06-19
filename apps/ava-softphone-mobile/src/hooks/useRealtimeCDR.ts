@@ -63,7 +63,7 @@ export type SyncLogEntry = {
   source: 'realtime' | 'polling' | 'manual' | 'snapshot';
 };
 
-export function useRealtimeCDR(creds: Creds | null, rangeDays: 7 | 30 = 7) {
+export function useRealtimeCDR(creds: Creds | null, rangeDays: 7 | 30 = 7, extensionFilter?: string | null) {
   const [calls, setCalls] = useState<CallRecord[] | null>(null);
   const [transport, setTransport] = useState<CDRTransport>('idle');
   const [warning, setWarning] = useState<string | null>(null);
@@ -78,7 +78,7 @@ export function useRealtimeCDR(creds: Creds | null, rangeDays: 7 | 30 = 7) {
 
   const load = useCallback(async () => {
     try {
-      const d = await mobileApi.calls({ rangeDays });
+      const d = await mobileApi.calls({ rangeDays, extension: extensionFilter });
       setCalls(d);
       setLastSyncAt(Date.now());
       pushLog({ status: 'success', source: 'snapshot', reason: `Snapshot loaded (${Array.isArray(d) ? d.length : 0} CDRs)` });
@@ -87,7 +87,7 @@ export function useRealtimeCDR(creds: Creds | null, rangeDays: 7 | 30 = 7) {
       setWarning(reason);
       pushLog({ status: 'failed', source: 'snapshot', reason });
     }
-  }, [pushLog, rangeDays]);
+  }, [pushLog, rangeDays, extensionFilter]);
 
   useEffect(() => {
     let cancelled = false;
@@ -216,7 +216,7 @@ export function useRealtimeCDR(creds: Creds | null, rangeDays: 7 | 30 = 7) {
       window.removeEventListener('focus', load);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [creds?.extension, creds?.accessToken, creds?.organizationId, rangeDays]);
+  }, [creds?.extension, creds?.accessToken, creds?.organizationId, rangeDays, extensionFilter]);
 
   return {
     calls,
