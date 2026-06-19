@@ -87,19 +87,22 @@ export default function DashboardScreen({
             >
               {mode === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             </button>
-            <button
-              onClick={onOpenProfile}
-              aria-label="My profile"
-              style={{
-                width: 38, height: 38, borderRadius: '50%',
-                background: `linear-gradient(135deg, ${colors.lemtelBlue}, ${colors.avaCyan})`,
-                color: '#fff', fontWeight: 800, fontSize: 13, border: '2px solid rgba(255,255,255,0.85)',
-                cursor: 'pointer', display: 'grid', placeItems: 'center',
-                boxShadow: '0 8px 18px -8px rgba(7,22,168,0.45)',
-              }}
-            >
-              {(m?.user?.name || m?.user?.email || 'U').split(/[\s@]/)[0].slice(0, 2).toUpperCase()}
-            </button>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+              <button
+                onClick={onOpenProfile}
+                aria-label="My profile"
+                style={{
+                  width: 38, height: 38, borderRadius: '50%',
+                  background: `linear-gradient(135deg, ${colors.lemtelBlue}, ${colors.avaCyan})`,
+                  color: '#fff', fontWeight: 800, fontSize: 13, border: '2px solid rgba(255,255,255,0.85)',
+                  cursor: 'pointer', display: 'grid', placeItems: 'center',
+                  boxShadow: '0 8px 18px -8px rgba(7,22,168,0.45)',
+                }}
+              >
+                {(m?.user?.name || m?.user?.email || 'U').split(/[\s@]/)[0].slice(0, 2).toUpperCase()}
+              </button>
+              <NotificationBell onClick={() => setNotifOpen(true)} count={notifCounts.total} />
+            </div>
           </div>
         </div>
 
