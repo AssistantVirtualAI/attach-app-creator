@@ -40,6 +40,13 @@ function mapRow(r: any): CallRecord {
     durationSec: billsec,
     hasRecording: !!(r.has_recording || r.recording_path || r.recording_name),
     hasTranscript: false,
+    pbx_uuid: r.pbx_uuid ?? undefined,
+    organization_id: r.organization_id ?? undefined,
+    domain_uuid: r.domain_uuid ?? undefined,
+    domain_name: r.domain_name ?? undefined,
+    recording_path: r.recording_path ?? undefined,
+    recording_name: r.recording_name ?? undefined,
+    recording_url: r.recording_url ?? undefined,
     sentiment: undefined,
   };
 }
@@ -110,8 +117,9 @@ export function useRealtimeCDR(creds: Creds | null) {
       const sb = client(token);
       // Prefer extension scope; fall back to organization scope when the user
       // signed in via email and has no extension bound (e.g. org admins).
-      const filter = ext ? `extension=eq.${ext}` : `organization_id=eq.${orgId}`;
-      const chanKey = ext ? `cdr-ext-${ext}` : `cdr-org-${orgId}`;
+      const adminScope = creds?.dataScope === 'domain_admin' || !!creds?.permissions?.admin;
+      const filter = adminScope && orgId ? `organization_id=eq.${orgId}` : ext ? `extension=eq.${ext}` : `organization_id=eq.${orgId}`;
+      const chanKey = adminScope && orgId ? `cdr-org-${orgId}` : ext ? `cdr-ext-${ext}` : `cdr-org-${orgId}`;
       watchdog = setTimeout(() => {
         startPolling('Realtime unavailable — polling every 15s.');
       }, 8_000);

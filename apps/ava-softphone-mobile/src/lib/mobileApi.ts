@@ -96,16 +96,17 @@ export interface CallRecord {
   durationSec: number;
   hasRecording: boolean;
   hasTranscript: boolean;
-  sentiment?: 'positive' | 'neutral' | 'negative';
-}
-
-export interface CallDetail extends CallRecord {
   pbx_uuid?: string | null;
   organization_id?: string | null;
   domain_uuid?: string | null;
   domain_name?: string | null;
   recording_path?: string | null;
   recording_name?: string | null;
+  recording_url?: string | null;
+  sentiment?: 'positive' | 'neutral' | 'negative';
+}
+
+export interface CallDetail extends CallRecord {
   record_path?: string | null;
   record_name?: string | null;
   transcript: { speaker: 'agent' | 'customer'; text: string; t: number }[];
