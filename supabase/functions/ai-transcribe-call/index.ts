@@ -116,11 +116,14 @@ Deno.serve(async (req) => {
 
     const persistTranscriptOnCall = async (text: string, provider: string) => {
       const { data: existingCall } = await admin.from("pbx_call_records")
-        .select("raw_data")
+        .select("raw_data, ai_summary, sentiment, call_score, coaching_points")
         .eq("id", call_record_id)
         .maybeSingle();
+      // Save transcript to ALL columns so every platform sees it via Realtime
       await admin.from("pbx_call_records").update({
         transcribed: !provider.startsWith("stub"),
+        transcription: text,
+        analyzed: false,
         ai_processing: false,
         raw_data: {
           ...((existingCall?.raw_data as Record<string, unknown>) || {}),

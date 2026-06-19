@@ -270,8 +270,14 @@ Deno.serve(async (req) => {
       .select("raw_data").eq("id", call_record_id).maybeSingle();
     await admin.from("pbx_call_records").update({
       analyzed: aiModel !== "stub",
+      analyzed_at: new Date().toISOString(),
       ai_processing: false,
       ai_summary: insights?.summary || null,
+      sentiment: insights?.sentiment || null,
+      call_score: insights?.quality_score || insights?.coaching_score || null,
+      coaching_points: insights?.coaching_notes?.length
+        ? JSON.stringify(insights.coaching_notes)
+        : null,
       raw_data: {
         ...((existingCall?.raw_data as Record<string, unknown>) || {}),
         ai: { ...insights, ai_model: aiModel, prompt_version: "v1" },
