@@ -61,10 +61,10 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
         },
         body: JSON.stringify({
           action: 'get-recording',
-          xml_cdr_uuid: id,
-          recording_name: (data?.record_name || id) + '.mp3',
-          recording_path: data?.record_path || '',
-          domain_uuid: mobile.fusionpbxDomainUuid || '2936594e-17b7-42a9-9165-95be48627923',
+          xml_cdr_uuid: data?.pbx_uuid || id,
+          recording_name: data?.record_name || data?.recording_name || `${data?.pbx_uuid || id}.mp3`,
+          recording_path: data?.record_path || data?.recording_path || '',
+          domain_uuid: data?.domain_uuid || mobile.fusionpbxDomainUuid || '2936594e-17b7-42a9-9165-95be48627923',
         }),
       });
       const contentType = response.headers.get('content-type') || '';
