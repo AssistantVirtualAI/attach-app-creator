@@ -68,3 +68,92 @@ export const glass = {
     borderRadius: radius.lg,
   } as React.CSSProperties,
 } as const;
+
+/* ─────────────────────────────────────────────────────────────
+   LIGHT THEME TOKENS
+   Components can opt-in via useThemeTokens() but the bulk of
+   light-mode visibility is handled by global CSS overrides in
+   styles.css (body[data-theme="light"] selectors).
+   ───────────────────────────────────────────────────────────── */
+export const lightTheme = {
+  background: '#f0f4ff',
+  backgroundSecondary: '#e8eeff',
+  surface: '#ffffff',
+  surfaceHover: '#f5f7ff',
+
+  textPrimary: '#0d1426',
+  textSecondary: '#3a4560',
+  textMuted: '#6b7a99',
+  textDisabled: '#a0aabb',
+
+  border: 'rgba(0,0,0,0.10)',
+  borderFocus: '#0023e6',
+  divider: 'rgba(0,0,0,0.06)',
+
+  accent: '#0023e6',
+  accentLight: '#e8eeff',
+  accentText: '#ffffff',
+
+  statusOnline: '#16a34a',
+  statusBusy: '#dc2626',
+  statusAway: '#d97706',
+  statusOffline: '#9ca3af',
+
+  cardBg: '#ffffff',
+  cardBorder: 'rgba(0,35,230,0.12)',
+  cardShadow: '0 2px 12px rgba(0,0,0,0.08)',
+
+  inputBg: '#ffffff',
+  inputBorder: 'rgba(0,0,0,0.15)',
+  inputBorderFocus: '#0023e6',
+  inputText: '#0d1426',
+  inputPlaceholder: '#9ca3af',
+
+  navBg: '#ffffff',
+  navBorder: 'rgba(0,0,0,0.08)',
+  navIconActive: '#0023e6',
+  navIconInactive: '#6b7a99',
+  navLabelActive: '#0023e6',
+  navLabelInactive: '#6b7a99',
+  navActiveBg: 'rgba(0,35,230,0.08)',
+
+  btnPrimaryBg: '#0023e6',
+  btnPrimaryText: '#ffffff',
+  btnSecondaryBg: 'rgba(0,35,230,0.10)',
+  btnSecondaryText: '#0023e6',
+  btnSecondaryBorder: 'rgba(0,35,230,0.25)',
+  btnDangerBg: '#fee2e2',
+  btnDangerText: '#dc2626',
+
+  headerBg: '#ffffff',
+  headerBorder: 'rgba(0,0,0,0.08)',
+  headerText: '#0d1426',
+  headerShadow: '0 1px 8px rgba(0,0,0,0.08)',
+
+  pillBg: 'rgba(0,35,230,0.10)',
+  pillText: '#0023e6',
+  pillBorder: 'rgba(0,35,230,0.20)',
+
+  badgeSuccessBg: '#dcfce7', badgeSuccessText: '#16a34a',
+  badgeErrorBg:   '#fee2e2', badgeErrorText:   '#dc2626',
+  badgeWarningBg: '#fef9c3', badgeWarningText: '#854d0e',
+  badgeInfoBg:    '#dbeafe', badgeInfoText:    '#1d4ed8',
+
+  listItemBg: '#ffffff',
+  listItemBorder: 'rgba(0,0,0,0.06)',
+  listItemHover: '#f5f7ff',
+
+  liveBadgeBg: '#dcfce7',
+  liveBadgeText: '#16a34a',
+  liveBadgeDot: '#16a34a',
+
+  statTotal: '#0023e6',
+  statAnswered: '#16a34a',
+  statMissed: '#dc2626',
+  statVoicemail: '#d97706',
+  statRate: '#7c3aed',
+  statDuration: '#0891b2',
+  statActive: '#ea580c',
+  statOnline: '#0d9488',
+} as const;
+export type LightTheme = typeof lightTheme;
