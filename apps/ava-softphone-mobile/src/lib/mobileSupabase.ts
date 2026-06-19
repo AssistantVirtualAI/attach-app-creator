@@ -136,23 +136,20 @@ export async function loadPbxRecordingAudioMobile(recording: RecordingMeta, toke
     body: JSON.stringify({ action: 'get-recording', ...payload }),
   });
 
-  if (!res.ok) {
+  const contentType = res.headers.get('content-type') || '';
+  const isJson = contentType.includes('application/json');
+
+  if (!res.ok || isJson) {
     const text = await res.text().catch(() => '');
-    try {
-      const parsed = JSON.parse(text);
-      if (parsed?.error === 'RECORDING_NOT_FOUND') throw new Error('PBX recording file is not reachable.');
-      throw new Error(parsed?.message || parsed?.error || `Recording unavailable (${res.status})`);
-    } catch (err) {
-      if (err instanceof Error && !err.message.startsWith('Unexpected')) throw err;
-      throw new Error(text.slice(0, 220) || `Recording unavailable (${res.status})`);
-    }
+    let parsed: any = null;
+    try { parsed = JSON.parse(text); } catch { /* not json */ }
+    const code = parsed?.error || '';
+    if (code === 'RECORDING_NOT_FOUND') throw new Error('File deleted from PBX storage.');
+    if (code === 'LOGIN_FAILED') throw new Error('PBX authentication failed.');
+    if (code === 'Forbidden') throw new Error('You do not have access to this recording.');
+    throw new Error(parsed?.message || parsed?.error || text.slice(0, 200) || `Recording unavailable (${res.status})`);
   }
 
-  const contentType = res.headers.get('content-type') || '';
-  if (contentType.includes('application/json')) {
-    const parsed = await res.json().catch(() => null);
-    throw new Error(parsed?.message || parsed?.error || 'PBX did not return audio');
-  }
   const blob = await res.blob();
   if (!blob.size) throw new Error('Empty recording');
   return URL.createObjectURL(blob);

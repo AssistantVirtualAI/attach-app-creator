@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Loader2, Pause, Play, Search, Sparkles } from 'lucide-react';
+import { Loader2, Play, Search, Sparkles } from 'lucide-react';
 import { colors, font, radius } from '../lib/theme';
 import { Card, Chip, EmptyState, SectionTitle, Skeleton } from '../components/ui/Primitives';
 import { useMobileCredentials } from '../hooks/useMobileCredentials';
@@ -21,15 +21,14 @@ export default function RecordingsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState('');
   const [open, setOpen] = useState<string | null>(null);
-  const [playing, setPlaying] = useState<string | null>(null);
   const [loadingAudio, setLoadingAudio] = useState<string | null>(null);
+  const [audioUrls, setAudioUrls] = useState<Record<string, string>>({});
+  const [audioErrors, setAudioErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<Record<string, 'running' | 'failed' | undefined>>({});
   const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
   const [extFilter, setExtFilter] = useState<string>('all');
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [myExt, setMyExt] = useState<string | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const urlCache = useRef<Map<string, string>>(new Map());
   const objectUrls = useRef<Set<string>>(new Set());
 
   // Resolve admin role + own extension once
@@ -59,7 +58,7 @@ export default function RecordingsScreen() {
     load().then(() => setError(null)).catch((e) => { setError(e?.message || 'Recordings failed'); setData([]); });
   }, [load, mobile.loading, mobile.accessToken, mobile.domainUuid]);
 
-  useEffect(() => () => { audioRef.current?.pause(); objectUrls.current.forEach((u) => URL.revokeObjectURL(u)); }, []);
+  useEffect(() => () => { objectUrls.current.forEach((u) => URL.revokeObjectURL(u)); }, []);
 
   useEffect(() => {
     if (!mobile.accessToken || !mobile.domainUuid) return;
@@ -76,30 +75,21 @@ export default function RecordingsScreen() {
     return (data || []).filter((r) => [r.caller_name, r.caller_number, r.destination_number, r.extension, r.ai_summary].filter(Boolean).some((v) => String(v).toLowerCase().includes(t)));
   }, [data, q]);
 
-  const play = async (r: Recording) => {
-    if (playing === r.id) { audioRef.current?.pause(); setPlaying(null); return; }
-    audioRef.current?.pause();
-    audioRef.current = null;
-    let url = urlCache.current.get(r.id) || '';
-    if (!url) {
-      setLoadingAudio(r.id);
-      try {
-        url = await loadPbxRecordingAudioMobile(r, mobile.accessToken, mobile.organizationId);
-        urlCache.current.set(r.id, url);
-        if (url.startsWith('blob:')) objectUrls.current.add(url);
-      } catch (e: any) {
-        showMobileToast(e?.message || 'Playback failed', 'error');
-        setLoadingAudio(null);
-        return;
-      }
+  const loadAudio = async (r: Recording) => {
+    if (audioUrls[r.id]) return;
+    setAudioErrors((e) => { const n = { ...e }; delete n[r.id]; return n; });
+    setLoadingAudio(r.id);
+    try {
+      const url = await loadPbxRecordingAudioMobile(r, mobile.accessToken, mobile.organizationId);
+      if (url.startsWith('blob:')) objectUrls.current.add(url);
+      setAudioUrls((u) => ({ ...u, [r.id]: url }));
+    } catch (e: any) {
+      const msg = e?.message || 'Playback failed';
+      setAudioErrors((errs) => ({ ...errs, [r.id]: msg }));
+      showMobileToast(msg, 'error');
+    } finally {
       setLoadingAudio(null);
     }
-    const audio = new Audio(url);
-    audio.onended = () => setPlaying(null);
-    audio.onerror = () => { setPlaying(null); showMobileToast('Playback failed', 'error'); };
-    audioRef.current = audio;
-    setPlaying(r.id);
-    audio.play().catch(() => { setPlaying(null); showMobileToast('Playback failed', 'error'); });
   };
 
   const transcribe = async (id: string) => {
@@ -144,12 +134,21 @@ export default function RecordingsScreen() {
       {filtered.map((r) => {
         const state = busy[r.id];
         const label = r.caller_name || r.caller_number || r.destination_number || 'Unknown';
+        const url = audioUrls[r.id];
+        const audErr = audioErrors[r.id];
         return <Card key={r.id} style={{ marginBottom: 8 }} padded={true} onPress={() => setOpen(r.id)}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <button onClick={(e) => { e.stopPropagation(); play(r); }} disabled={loadingAudio === r.id} style={{ width: 38, height: 38, borderRadius: '50%', border: 'none', display: 'grid', placeItems: 'center', background: 'linear-gradient(135deg, #0023e6, #21d4fd)', color: '#fff', cursor: 'pointer', flexShrink: 0 }}>{loadingAudio === r.id ? <Loader2 size={15} className="spin" /> : playing === r.id ? <Pause size={15} /> : <Play size={15} />}</button>
-            <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: font.base, fontWeight: 800, color: colors.textIce, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</div><div style={{ fontSize: font.xs, color: colors.mutedSilver, marginTop: 2, fontFamily: 'JetBrains Mono, monospace' }}>{r.start_at ? new Date(r.start_at).toLocaleString() : '—'} · {fmtDuration(Number(r.duration_seconds || 0))}</div></div>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}><Chip tone="gold" size="xs">REC</Chip>{r.transcribed ? <Chip tone="violet" size="xs">AI ✓</Chip> : <button onClick={(e) => { e.stopPropagation(); transcribe(r.id); }} disabled={state === 'running'} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 999, border: 'none', background: state === 'failed' ? 'rgba(239,68,68,0.18)' : `linear-gradient(135deg, ${colors.avaViolet}, ${colors.avaCyan})`, color: state === 'failed' ? colors.danger : '#fff', fontSize: 10, fontWeight: 800, cursor: state === 'running' ? 'default' : 'pointer' }}>{state === 'running' ? <Loader2 size={10} className="spin" /> : <Sparkles size={10} />}{state === 'running' ? 'WORKING' : state === 'failed' ? 'RETRY' : 'AI'}</button>}</div>
+            <button onClick={(e) => { e.stopPropagation(); loadAudio(r); }} disabled={loadingAudio === r.id || !!url} style={{ width: 38, height: 38, borderRadius: '50%', border: 'none', display: 'grid', placeItems: 'center', background: audErr ? 'rgba(239,68,68,0.2)' : 'linear-gradient(135deg, #0023e6, #21d4fd)', color: '#fff', cursor: 'pointer', flexShrink: 0 }}>{loadingAudio === r.id ? <Loader2 size={15} className="spin" /> : <Play size={15} />}</button>
+            <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: font.base, fontWeight: 800, color: colors.textIce, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</div><div style={{ fontSize: font.xs, color: colors.mutedSilver, marginTop: 2, fontFamily: 'JetBrains Mono, monospace' }}>{r.start_at ? new Date(r.start_at).toLocaleString() : '—'} · {fmtDuration(Number(r.duration_seconds || 0))}{r.extension ? ` · ext ${r.extension}` : ''}</div></div>
+            <div onClick={(e) => e.stopPropagation()} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}><Chip tone="gold" size="xs">REC</Chip>{r.transcribed ? <Chip tone="violet" size="xs">AI ✓</Chip> : <button onClick={(e) => { e.stopPropagation(); transcribe(r.id); }} disabled={state === 'running'} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 999, border: 'none', background: state === 'failed' ? 'rgba(239,68,68,0.18)' : `linear-gradient(135deg, ${colors.avaViolet}, ${colors.avaCyan})`, color: state === 'failed' ? colors.danger : '#fff', fontSize: 10, fontWeight: 800, cursor: state === 'running' ? 'default' : 'pointer' }}>{state === 'running' ? <Loader2 size={10} className="spin" /> : <Sparkles size={10} />}{state === 'running' ? 'WORKING' : state === 'failed' ? 'RETRY' : 'AI'}</button>}</div>
           </div>
+          {url && (
+            <div onClick={(e) => e.stopPropagation()} style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <audio controls autoPlay src={url} style={{ flex: 1, height: 32 }} />
+              <a href={url} download={r.recording_name || `${r.pbx_uuid || r.id}.mp3`} style={{ fontSize: 11, color: colors.lemtelBlue, fontWeight: 700, textDecoration: 'none', padding: '4px 8px', borderRadius: 8, border: `1px solid ${colors.border}` }}>↓</a>
+            </div>
+          )}
+          {audErr && <div style={{ marginTop: 6, fontSize: 11, color: colors.danger, lineHeight: 1.4 }}>{audErr}</div>}
           {r.ai_summary && <p style={{ fontSize: font.sm, color: colors.textSub, margin: '8px 0 0', lineHeight: 1.4 }}>{r.ai_summary}</p>}
         </Card>;
       })}
