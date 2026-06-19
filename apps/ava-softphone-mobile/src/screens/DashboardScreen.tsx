@@ -71,7 +71,7 @@ export default function DashboardScreen({
               Call history · {RANGE_LABELS[range]}
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
             {s ? <StatusDot state="registered" /> : <Skeleton w={40} h={14} />}
             <button
               onClick={() => { haptic(); toggle(); }}
