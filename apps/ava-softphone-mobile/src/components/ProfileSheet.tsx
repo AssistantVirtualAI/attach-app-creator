@@ -7,14 +7,19 @@ const SUPABASE_URL = 'https://gejxisrqtvxavbrfcoxz.supabase.co';
 const SUPABASE_ANON =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdlanhpc3JxdHZ4YXZicmZjb3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1MDMxNzQsImV4cCI6MjA3NzA3OTE3NH0.kaO-GslE99OCNrZ4_AMnbzGqya2azqz_UMZR34zZvvo';
 
-type Status = 'available' | 'busy' | 'dnd' | 'away' | 'on_call';
+type Status = 'available' | 'busy' | 'on_call' | 'meeting' | 'lunch' | 'break' | 'dnd' | 'away' | 'out_of_office' | 'offline';
 
 const STATUS_OPTIONS: { id: Status; label: string; color: string }[] = [
-  { id: 'available', label: 'Available', color: '#22c55e' },
-  { id: 'busy',      label: 'Busy',      color: '#f59e0b' },
-  { id: 'dnd',       label: 'Do not disturb', color: '#ef4444' },
-  { id: 'away',      label: 'Away',      color: '#94a3b8' },
-  { id: 'on_call',   label: 'On a call', color: '#3b82f6' },
+  { id: 'available',     label: 'Available',       color: '#22c55e' },
+  { id: 'busy',          label: 'Busy',            color: '#f59e0b' },
+  { id: 'on_call',       label: 'On a call',       color: '#3b82f6' },
+  { id: 'meeting',       label: 'In a meeting',    color: '#8b5cf6' },
+  { id: 'lunch',         label: 'Lunch',           color: '#f97316' },
+  { id: 'break',         label: 'On a break',      color: '#14b8a6' },
+  { id: 'dnd',           label: 'Do not disturb',  color: '#ef4444' },
+  { id: 'away',          label: 'Away',            color: '#94a3b8' },
+  { id: 'out_of_office', label: 'Out of office',   color: '#6366f1' },
+  { id: 'offline',       label: 'Appear offline',  color: '#64748b' },
 ];
 
 async function rest(path: string, init: RequestInit & { token?: string }) {
