@@ -41,6 +41,14 @@ function cleanText(v: any): string {
   return s && s.toLowerCase() !== 'null' && s.toLowerCase() !== 'undefined' ? s : '';
 }
 
+function rangeStartIso(days?: 7 | 30 | null): string | null {
+  if (!days) return null;
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  d.setHours(0, 0, 0, 0);
+  return d.toISOString();
+}
+
 /** A CDR row counts as a voicemail when the PBX attached a voicemail message or marked it as such. */
 function isVoicemailLike(r: any): boolean {
   if (!r) return false;
@@ -489,7 +497,8 @@ async function readCallRecordRows(limit = 100, opts?: { scope?: 'mine' | 'org'; 
       : scopedExtension
       ? `&or=(extension.eq.${encodeURIComponent(scopedExtension)},caller_number.eq.${encodeURIComponent(scopedExtension)},destination_number.eq.${encodeURIComponent(scopedExtension)},source_number.eq.${encodeURIComponent(scopedExtension)})`
       : '&id=is.null';
-  const sinceFilter = opts?.rangeDays ? `&start_at=gte.${encodeURIComponent(new Date(Date.now() - opts.rangeDays * 864e5).toISOString())}` : '';
+  const rangeStart = rangeStartIso(opts?.rangeDays);
+  const sinceFilter = rangeStart ? `&start_at=gte.${encodeURIComponent(rangeStart)}` : '';
   const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,organization_id,extension,extension_uuid,pbx_uuid,domain_uuid,domain_name,caller_name,caller_number,destination,source_number,destination_number,start_at,duration_seconds,billsec,direction,call_status,missed_call,has_recording,recording_path,recording_name,hangup_cause,voicemail_message,transcribed,analyzed,mos,raw_data,notes,tags${orgFilter}${extFilter}${sinceFilter}&order=start_at.desc&limit=${limit}`;
 
   const res = await fetch(url, {
@@ -794,7 +803,8 @@ export const ava = {
       const orgFilter = me.organization_id ? `&organization_id=eq.${me.organization_id}` : '';
       const scopeOrg = opts?.scope === 'org';
       const scopedExtension = cleanText(opts?.extension || me.extension);
-      const sinceFilter = opts?.rangeDays ? `&start_at=gte.${encodeURIComponent(new Date(Date.now() - opts.rangeDays * 864e5).toISOString())}` : '';
+      const rangeStart = rangeStartIso(opts?.rangeDays);
+      const sinceFilter = rangeStart ? `&start_at=gte.${encodeURIComponent(rangeStart)}` : '';
       const extFilter = opts?.extension
         ? `&or=(extension.eq.${encodeURIComponent(cleanText(opts.extension))},caller_number.eq.${encodeURIComponent(cleanText(opts.extension))},destination_number.eq.${encodeURIComponent(cleanText(opts.extension))},source_number.eq.${encodeURIComponent(cleanText(opts.extension))})`
         : scopeOrg
