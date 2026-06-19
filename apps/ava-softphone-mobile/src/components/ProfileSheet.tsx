@@ -318,3 +318,9 @@ const rowBtn: React.CSSProperties = {
   background: 'rgba(255,255,255,0.04)', border: `1px solid ${colors.border}`,
   color: colors.textIce, cursor: 'pointer', fontSize: 14, fontWeight: 600,
 };
+
+const pwInput: React.CSSProperties = {
+  padding: '10px 12px', borderRadius: 10,
+  background: 'rgba(255,255,255,0.06)', border: `1px solid ${colors.border}`,
+  color: colors.textIce, fontSize: 13, outline: 'none',
+};
