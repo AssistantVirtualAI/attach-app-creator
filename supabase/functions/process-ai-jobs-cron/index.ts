@@ -1,4 +1,4 @@
-// process-ai-jobs-cron: drains pending pbx_ai_jobs of type 'process_recording'
+// process-ai-jobs-cron: drains pending pbx_ai_jobs of kind 'process_recording'
 // and invokes process-call-recording with service-role auth. Designed to be called
 // by a Supabase pg_cron schedule (every minute).
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -18,14 +18,14 @@ Deno.serve(async (req) => {
   const { data: jobs } = await admin
     .from("pbx_ai_jobs")
     .select("id, call_record_id")
-    .eq("job_type", "process_recording")
+    .eq("kind", "process_recording")
     .eq("status", "pending")
     .order("created_at", { ascending: true })
     .limit(10);
 
   const results: any[] = [];
   for (const job of jobs ?? []) {
-    await admin.from("pbx_ai_jobs").update({ status: "processing", started_at: new Date().toISOString() }).eq("id", job.id);
+    await admin.from("pbx_ai_jobs").update({ status: "processing", updated_at: new Date().toISOString() }).eq("id", job.id);
     try {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/process-call-recording`, {
         method: "POST",
@@ -40,7 +40,7 @@ Deno.serve(async (req) => {
       const ok = res.ok || res.status === 202 || res.status === 409;
       await admin.from("pbx_ai_jobs").update({
         status: ok ? "completed" : "failed",
-        finished_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
         result: out,
         error: ok ? null : (out?.error ?? `http_${res.status}`),
       }).eq("id", job.id);
@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
     } catch (e) {
       await admin.from("pbx_ai_jobs").update({
         status: "failed",
-        finished_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
         error: String(e).slice(0, 500),
       }).eq("id", job.id);
       results.push({ id: job.id, error: String(e) });
