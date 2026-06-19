@@ -151,13 +151,19 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
           )}
           {sp?.snap?.status !== 'registered' && (
             <Card style={{ marginTop: 14 }} accent="gold">
-              <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 1.4, color: colors.signalGold, textTransform: 'uppercase' }}>WebRTC unavailable</div>
+              <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 1.4, color: colors.signalGold, textTransform: 'uppercase' }}>SIP not registered</div>
               <p style={{ fontSize: font.sm, color: colors.mutedSilver, margin: '6px 0 10px', lineHeight: 1.5 }}>
-                Your SIP is not registered yet. You can still place a click-to-call request that rings your deskphone.
+                {sp?.snap?.error || 'The SIP client is still connecting. Tap retry to reconnect now.'}
               </p>
-              <PrimaryButton onClick={() => startCall(number)} disabled={!number || dialing}>{dialing ? 'Dialing…' : 'Click-to-call deskphone'}</PrimaryButton>
+              <PrimaryButton onClick={() => sp?.reconnect?.()}>Retry connection</PrimaryButton>
             </Card>
           )}
+        </div>
+      )}
+
+      {sub === 'recordings' && (
+        <div style={{ marginTop: 6 }}>
+          <RecordingsScreen creds={creds || null} isAdmin={!!isAdmin} myExtension={myExt} />
         </div>
       )}
 
