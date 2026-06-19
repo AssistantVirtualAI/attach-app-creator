@@ -23,6 +23,15 @@ export class JsSIPUnavailableError extends Error {
   }
 }
 
+function hasWebRTC(): boolean {
+  if (typeof window === 'undefined') return false;
+  return !!(
+    (window as any).RTCPeerConnection ||
+    (window as any).webkitRTCPeerConnection ||
+    (window as any).mozRTCPeerConnection
+  );
+}
+
 function bundledJsSIP() {
   const mod: any = JsSIPModule as any;
   return mod?.UA && mod?.WebSocketInterface ? mod : mod?.default || null;
@@ -35,6 +44,12 @@ export function waitForJsSIP(timeoutMs = 8000, intervalMs = 100): Promise<any> {
       const bundled = bundledJsSIP();
       if (bundled) resolve(bundled);
       else reject(new JsSIPUnavailableError('No window (SSR/non-browser)'));
+      return;
+    }
+    if (!hasWebRTC()) {
+      reject(new JsSIPUnavailableError(
+        'WebRTC not supported in this browser. Open in Chrome or Safari, or use the native mobile app.'
+      ));
       return;
     }
     if (window.JsSIP) {
@@ -54,7 +69,9 @@ export function waitForJsSIP(timeoutMs = 8000, intervalMs = 100): Promise<any> {
         resolve(window.JsSIP);
       } else if (Date.now() - start >= timeoutMs) {
         clearInterval(id);
-        reject(new JsSIPUnavailableError());
+        reject(new JsSIPUnavailableError(
+          'Phone library failed to load. SIP calls require a WebRTC-compatible browser (Chrome or Safari) or the native mobile app.'
+        ));
       }
     }, intervalMs);
   });
@@ -64,6 +81,7 @@ export function getJsSIP() {
   if (typeof window !== 'undefined' && window.JsSIP) return window.JsSIP;
   return bundledJsSIP();
 }
+
 
 /* ============================================================
    SDP rewriter — forces audio-only PCMU/PCMA, plain RTP
