@@ -58,7 +58,9 @@ describe('useSoftphone', () => {
   it('reports error when JsSIP never loads (short timeout)', async () => {
     const { result } = renderHook(() => useSoftphone(cfg, { jsSipTimeoutMs: 50 }));
     expect(result.current.sipStatus).toBe('connecting');
-    await waitFor(() => expect(result.current.sipStatus).toBe('error'), { timeout: 1500 });
+    // After the load failure the hook surfaces the error message and
+    // schedules a back-off retry, so status becomes 'retrying'.
+    await waitFor(() => expect(result.current.sipStatus).toBe('retrying'), { timeout: 1500 });
     expect(result.current.sipError).toMatch(/library failed to load/i);
   });
 
@@ -71,12 +73,12 @@ describe('useSoftphone', () => {
     expect(result.current.sipError).toBe('');
   });
 
-  it('transitions to error on registrationFailed', async () => {
+  it('transitions to retrying on registrationFailed and surfaces the cause', async () => {
     const ua = installFakeJsSIP();
     const { result } = renderHook(() => useSoftphone(cfg));
     await waitFor(() => expect(ua.start).toHaveBeenCalled());
     act(() => ua.emit('registrationFailed', { cause: 'Forbidden' }));
-    expect(result.current.sipStatus).toBe('error');
+    expect(result.current.sipStatus).toBe('retrying');
     expect(result.current.sipError).toBe('Forbidden');
   });
 
