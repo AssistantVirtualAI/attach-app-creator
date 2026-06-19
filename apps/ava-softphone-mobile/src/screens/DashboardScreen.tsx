@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { ImpactStyle } from '@capacitor/haptics';
 import { colors, font, gradients, radius } from '../lib/theme';
 import { mobileApi, DomainStats, MeResponse, StatsRange } from '../lib/mobileApi';
@@ -8,6 +8,7 @@ import { useAutoSync } from '../hooks/useAutoSync';
 import type { Tab } from '../components/BottomTabs';
 
 const RANGE_LABELS: Record<StatsRange, string> = { today: 'Today', '7d': '7 days', '30d': '30 days' };
+const AI_CACHE_KEY = (range: string) => `ava.aisummary.${range}`;
 
 export default function DashboardScreen({
   onNavigate, haptic,
@@ -16,6 +17,31 @@ export default function DashboardScreen({
   const me = useAutoSync<MeResponse>(() => mobileApi.me(), { intervalMs: 5 * 60_000 });
   const stats = useAutoSync<DomainStats>(() => mobileApi.domainStats(range), { intervalMs: 60_000, deps: [range] });
   const m = me.data; const s = stats.data;
+
+  const [aiSummary, setAiSummary] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const lastKeyRef = useRef<string>('');
+
+  useEffect(() => {
+    if (!s) return;
+    const sig = `${range}|${s.totalCalls ?? s.callsToday ?? 0}|${s.answered ?? 0}|${s.missed ?? 0}|${s.peakHour ?? ''}`;
+    if (lastKeyRef.current === sig) return;
+    lastKeyRef.current = sig;
+    try {
+      const cached = localStorage.getItem(AI_CACHE_KEY(sig));
+      if (cached) { setAiSummary(cached); return; }
+    } catch {}
+    setAiLoading(true); setAiError(null);
+    mobileApi.aiSummary(range, s, RANGE_LABELS[range])
+      .then((r) => {
+        setAiSummary(r.summary || '');
+        try { localStorage.setItem(AI_CACHE_KEY(sig), r.summary || ''); } catch {}
+      })
+      .catch((e) => setAiError(e?.message || 'AVA summary failed'))
+      .finally(() => setAiLoading(false));
+  }, [s, range]);
+
 
   const total = s?.totalCalls ?? s?.callsToday ?? 0;
   const answered = s?.answered ?? s?.answeredToday ?? 0;
@@ -127,14 +153,17 @@ export default function DashboardScreen({
           <Skeleton w="100%" h={42} />
         ) : (
           <div style={{ fontSize: font.base, lineHeight: 1.55, color: colors.textIce }}>
-            <p style={{ margin: '0 0 8px' }}>
-              {total === 0
-                ? `No calls in this range yet — refresh once new CDRs land.`
-                : `Across ${RANGE_LABELS[range].toLowerCase()}, your team handled ${total} calls · ${answered} answered, ${missed} missed, ${voicemails} voicemails. Answer rate ${s.answerRate ?? 0}%${s.peakHour != null ? `, peak at ${s.peakHour}:00` : ''}.`}
-            </p>
-            {s.topExtensions?.length > 0 && (
-              <p style={{ margin: 0, color: colors.textSub, fontSize: font.sm }}>
-                Top extension #{s.topExtensions[0].extension}{s.topExtensions[0].name ? ` (${s.topExtensions[0].name})` : ''} with {s.topExtensions[0].calls} calls.
+            {aiLoading && !aiSummary ? (
+              <Skeleton w="100%" h={42} />
+            ) : aiError && !aiSummary ? (
+              <p style={{ margin: '0 0 8px', color: colors.danger, fontSize: font.sm }}>{aiError}</p>
+            ) : aiSummary ? (
+              <p style={{ margin: '0 0 8px' }}>{aiSummary}</p>
+            ) : (
+              <p style={{ margin: '0 0 8px' }}>
+                {total === 0
+                  ? `No calls in this range yet — refresh once new CDRs land.`
+                  : `Across ${RANGE_LABELS[range].toLowerCase()}, ${total} calls · ${answered} answered, ${missed} missed.`}
               </p>
             )}
             <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>

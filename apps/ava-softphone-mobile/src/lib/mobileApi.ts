@@ -406,4 +406,12 @@ export const mobileApi = {
   deleteAccount: () => call<{ ok: true }>(
     '/mobile-delete-account', { method: 'POST', body: '{}' }, { ok: true },
   ),
+
+  // AVA AI summary for the dashboard (Lovable AI Gateway via edge function).
+  aiSummary: (range: StatsRange | 'custom', stats: any, periodLabel?: string) =>
+    call<{ ok: boolean; summary: string; range: string }>(
+      '/ai-summary',
+      { method: 'POST', body: JSON.stringify({ range, stats, periodLabel }) },
+      { ok: true, summary: 'Mock: 24 calls, 75% answered, peak 14:00, top ext 101.', range: String(range) },
+    ),
 };

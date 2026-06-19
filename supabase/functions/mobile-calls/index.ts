@@ -47,11 +47,13 @@ Deno.serve(async (req) => {
     const url = new URL(req.url);
     const id = url.searchParams.get("id");
 
+    const ext = sp.extension;
+    const extFilter = `extension.eq.${ext},caller_number.eq.${ext},source_number.eq.${ext},destination_number.eq.${ext},destination.eq.${ext},caller_id_number.eq.${ext}`;
+
     if (id) {
-      const ext = sp.extension;
       let detailQ = sb.from("pbx_call_records").select("*")
         .eq("id", id).eq("organization_id", sp.organization_id)
-        .or(`extension.eq.${ext},caller_number.eq.${ext},destination_number.eq.${ext}`);
+        .or(extFilter);
       const { data: r } = await detailQ.maybeSingle();
       if (!r) return json({ error: "not_found" }, 404);
 
@@ -96,11 +98,10 @@ Deno.serve(async (req) => {
     }
 
     const limit = Math.min(Number(url.searchParams.get("limit")) || 50, 200);
-    const ext = sp.extension;
     const { data: rows, error } = await sb.from("pbx_call_records")
       .select("id, direction, call_status, caller_name, caller_number, source_number, destination, destination_number, extension, start_at, duration_seconds, missed_call, has_recording, transcribed")
       .eq("organization_id", sp.organization_id)
-      .or(`extension.eq.${ext},caller_number.eq.${ext},destination_number.eq.${ext}`)
+      .or(extFilter)
       .order("start_at", { ascending: false })
       .limit(limit);
     if (error) throw error;
