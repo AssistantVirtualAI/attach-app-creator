@@ -93,17 +93,17 @@ export function getJsSIP() {
 export function rewriteSdpForFusionPBX(sdp: string): string {
   let out = sdp;
   out = out.replace(/m=video[\s\S]*?(?=\r\nm=|$)/g, '');
-  out = out.replace(/m=audio (\d+) [A-Z\/]+ [^\r\n]+/g, 'm=audio $1 RTP/AVP 0 8 101');
+  out = out.replace(/m=audio (\d+) [A-Z\/]+ [^\r\n]+/g, 'm=audio $1 RTP/AVP 0');
   out = out.replace(/^a=fingerprint:.*$/gm, '');
   out = out.replace(/^a=setup:.*$/gm, '');
   out = out.replace(/^a=dtls[-a-z]*:.*$/gm, '');
   out = out.replace(/^a=crypto:.*$/gm, '');
   out = out.replace(/^a=ice-options:.*$/gm, '');
   out = out.replace(/^a=rtpmap:(\d+) [^\r\n]+$/gm, (line, pt) =>
-    pt === '0' || pt === '8' || pt === '101' ? line : '',
+    pt === '0' ? line : '',
   );
   out = out.replace(/^a=fmtp:(\d+) [^\r\n]+$/gm, (line, pt) =>
-    pt === '0' || pt === '8' || pt === '101' ? line : '',
+    pt === '0' ? line : '',
   );
   out = out.replace(/^a=rtcp-fb:.*$/gm, '');
   out = out.replace(/^a=extmap:.*$/gm, '');
@@ -179,8 +179,8 @@ export function buildWssFallbackList(config: SIPConfig): string[] {
   // pbxnode.lemtel.tel has the matching Let's Encrypt cert (CN=pbxnode.lemtel.tel)
   // node.lemtelcloud.net resolves to same server but cert CN mismatch may cause SIP 403
   return [
-    'wss://pbxnode.lemtel.tel:7443',
-    'wss://node.lemtelcloud.net:7443',
+    'wss://pbxnode.lemtel.tel:7444',
+    'wss://node.lemtelcloud.net:7444',
   ];
 }
 
