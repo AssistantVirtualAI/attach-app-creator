@@ -10,7 +10,7 @@ import AVAChatScreen from './screens/AVAChatScreen';
 import TeamChatScreen from './screens/TeamChatScreen';
 import MoreScreen from './screens/MoreScreen';
 import VoicemailScreen from './screens/VoicemailScreen';
-import RecordingsScreen from './screens/RecordingsScreen';
+// RecordingsScreen is rendered as a sub-tab inside CallsScreen, not as a standalone tab.
 import ContactsScreen from './screens/ContactsScreen';
 import MessagesScreen from './screens/MessagesScreen';
 import MessagesHubScreen from './screens/MessagesHubScreen';
@@ -43,7 +43,7 @@ const isPreviewMode = (() => {
 
 export default function MobileApp() {
   const { creds, setCreds, clearCreds, loading } = useStoredCreds();
-  const ALL_TABS: Tab[] = ['home','calls','ava','messages','more','voicemail','recordings','contacts','sms','queues','settings'];
+  const ALL_TABS: Tab[] = ['home','calls','ava','messages','more','voicemail','contacts','sms','queues','settings'];
   const initialTab = (() => {
     try {
       const t = new URLSearchParams(window.location.search).get('tab') as Tab | null;
@@ -281,8 +281,8 @@ function AuthenticatedShell({
         {/* legacy deep-link routes */}
         {tab === 'more'       && <MoreScreen creds={creds} sp={sp} onSignOut={onSignOut} haptic={haptic} />}
         {tab === 'voicemail'  && <VoicemailScreen haptic={haptic} />}
-        {tab === 'recordings' && <RecordingsScreen />}
         {tab === 'contacts'   && <ContactsScreen sp={sp} />}
+
         {tab === 'sms'        && <MessagesScreen haptic={haptic} />}
         {tab === 'queues'     && <QueuesScreen />}
       </div>

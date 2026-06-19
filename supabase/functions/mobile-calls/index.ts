@@ -17,6 +17,7 @@ function mapCall(r: any) {
     id: r.id, direction, status,
     from: r.caller_number || r.source_number || "",
     to: r.destination_number || r.destination || r.extension || "",
+    extension: r.extension || undefined,
     customer: r.caller_name || undefined,
     startedAt: r.start_at, durationSec: r.duration_seconds || 0,
     hasRecording: !!(r.has_recording || r.recording_path || r.recording_name || r.recording_url), hasTranscript: !!r.transcribed,

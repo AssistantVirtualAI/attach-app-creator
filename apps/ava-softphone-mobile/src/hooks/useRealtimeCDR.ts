@@ -34,6 +34,7 @@ function mapRow(r: any): CallRecord {
     status: (r.voicemail_message ? 'voicemail' : missed ? 'missed' : 'answered') as any,
     from: r.caller_number ?? '',
     to: r.destination_number ?? '',
+    extension: r.extension ?? undefined,
     customer: r.caller_name ?? undefined,
     startedAt: r.start_at ?? new Date().toISOString(),
     durationSec: billsec,

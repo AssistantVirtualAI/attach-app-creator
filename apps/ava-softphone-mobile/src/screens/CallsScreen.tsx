@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ImpactStyle } from '@capacitor/haptics';
 import { colors, font, radius, gradients } from '../lib/theme';
 import { mobileApi, CallRecord } from '../lib/mobileApi';
@@ -17,6 +17,9 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
   const [sub, setSub] = useState<SubTab>('recents');
   const [selected, setSelected] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'missed' | 'recorded'>('all');
+  const [extFilter, setExtFilter] = useState<string>('all');
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const [myExt, setMyExt] = useState<string | null>(null);
   const [number, setNumber] = useState('');
   const [dialError, setDialError] = useState<string | null>(null);
   const [dialDebug, setDialDebug] = useState<string | null>(null);
@@ -26,11 +29,39 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
   // 15s polling fallback + visible warning if the realtime channel fails.
   const { calls, transport, warning, dismissWarning } = useRealtimeCDR(creds || null);
 
+  // Resolve admin + own extension to scope/filter the History list.
+  useEffect(() => {
+    let cancelled = false;
+    mobileApi.me().then((m) => {
+      if (cancelled) return;
+      const admin = !!m?.permissions?.admin;
+      setIsAdmin(admin);
+      setMyExt(m?.extension?.number || null);
+      if (!admin && m?.extension?.number) setExtFilter(m.extension.number);
+    }).catch(() => { if (!cancelled) setIsAdmin(false); });
+    return () => { cancelled = true; };
+  }, [creds?.accessToken]);
+
   if (selected) return <CallDetailScreen id={selected} onBack={() => setSelected(null)} />;
 
-  const filtered = (calls || []).filter((c) =>
-    filter === 'all' ? true : filter === 'missed' ? c.status === 'missed' : c.hasRecording
-  );
+  const matchExt = (c: CallRecord, ext: string) =>
+    c.extension === ext || c.from === ext || c.to === ext;
+
+  const filtered = (calls || []).filter((c) => {
+    const statusOk = filter === 'all' ? true : filter === 'missed' ? c.status === 'missed' : c.hasRecording;
+    if (!statusOk) return false;
+    if (isAdmin === false && myExt) return matchExt(c, myExt);
+    if (isAdmin && extFilter !== 'all') return matchExt(c, extFilter);
+    return true;
+  });
+
+  const extensionOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const c of calls || []) if (c.extension) set.add(c.extension);
+    if (myExt) set.add(myExt);
+    return Array.from(set).sort();
+  }, [calls, myExt]);
+
 
   const startCall = async (to: string) => {
     if (!to) return;
@@ -126,6 +157,21 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
               }}>{f}</button>
             ))}
           </div>
+
+          {isAdmin && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '0 2px 10px' }}>
+              <label style={{ fontSize: font.xs, color: colors.mutedSilver, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>Extension</label>
+              <select value={extFilter} onChange={(e) => setExtFilter(e.target.value)} style={{ flex: 1, padding: '7px 10px', borderRadius: 10, border: `1px solid ${colors.border}`, background: 'rgba(255,255,255,0.06)', color: colors.textIce, fontSize: 12, fontWeight: 700 }}>
+                <option value="all">All extensions (domain)</option>
+                {myExt && <option value={myExt}>Mine ({myExt})</option>}
+                {extensionOptions.filter((e) => e !== myExt).map((e) => <option key={e} value={e}>{e}</option>)}
+              </select>
+            </div>
+          )}
+          {isAdmin === false && myExt && (
+            <div style={{ fontSize: font.xs, color: colors.mutedSilver, margin: '0 2px 10px' }}>Showing your extension {myExt} only.</div>
+          )}
+
 
           {!calls && <ListSkeleton rows={6} />}
           {calls && filtered.length === 0 && (
