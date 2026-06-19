@@ -1,3 +1,5 @@
+import * as JsSIPModule from 'jssip';
+
 declare global {
   interface Window {
     JsSIP: any;
@@ -21,11 +23,24 @@ export class JsSIPUnavailableError extends Error {
   }
 }
 
-/** Polls for window.JsSIP until found or timeout (default 8s). */
+function bundledJsSIP() {
+  const mod: any = JsSIPModule as any;
+  return mod?.UA && mod?.WebSocketInterface ? mod : mod?.default || null;
+}
+
+/** Resolves the bundled JsSIP module, falling back to window.JsSIP if present. */
 export function waitForJsSIP(timeoutMs = 8000, intervalMs = 100): Promise<any> {
   return new Promise((resolve, reject) => {
     if (typeof window === 'undefined') {
-      reject(new JsSIPUnavailableError('No window (SSR/non-browser)'));
+      const bundled = bundledJsSIP();
+      if (bundled) resolve(bundled);
+      else reject(new JsSIPUnavailableError('No window (SSR/non-browser)'));
+      return;
+    }
+    const bundled = bundledJsSIP();
+    if (bundled) {
+      window.JsSIP = window.JsSIP || bundled;
+      resolve(bundled);
       return;
     }
     if (window.JsSIP) {
@@ -47,7 +62,7 @@ export function waitForJsSIP(timeoutMs = 8000, intervalMs = 100): Promise<any> {
 
 export function getJsSIP() {
   if (typeof window !== 'undefined' && window.JsSIP) return window.JsSIP;
-  return null;
+  return bundledJsSIP();
 }
 
 /* ============================================================
@@ -132,9 +147,13 @@ export function classifySipFailure(input: {
 
 /** Build the list of WSS URLs to try, primary first. */
 export function buildWssFallbackList(config: SIPConfig): string[] {
-  const list = [config.wssUrl, ...(config.wssUrls || []),
+  const list = [
+    config.wssUrl,
+    ...(config.wssUrls || []),
     'wss://node.lemtelcloud.net:7443',
     'wss://lemtel.lemtel.tel:7443',
+    'wss://pbxnode.lemtel.tel:7443',
+    'wss://170.39.199.132:7443',
   ];
   return Array.from(new Set(list.filter(Boolean)));
 }
@@ -143,16 +162,25 @@ export async function createSIPUA(config: SIPConfig, timeoutMs = 8000) {
   const JsSIP = await waitForJsSIP(timeoutMs);
   const wssUrls = buildWssFallbackList(config);
   const sockets = wssUrls.map((url) => new JsSIP.WebSocketInterface(url));
+  sockets.forEach((s: any) => { try { s.via_transport = 'wss'; } catch {} });
   return new JsSIP.UA({
     sockets,
     uri: `sip:${config.extension}@${config.domain}`,
     password: config.password,
+    authorization_user: config.extension,
+    realm: config.domain,
+    contact_uri: `sip:${config.extension}@${config.domain};transport=wss`,
     display_name: config.displayName || config.extension,
     register: true,
     session_timers: false,
     register_expires: 300,
+    connection_recovery_min_interval: 2,
+    connection_recovery_max_interval: 30,
     use_preloaded_route: false,
-    user_agent: 'Lemtel Telecom Mobile 1.0',
+    user_agent: 'Lemtel-Softphone-Mobile/2.3.5',
+    hackWssInTransport: true,
+    hackIpInContact: true,
+    hackViaBranch: true,
     pcConfig: {
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
