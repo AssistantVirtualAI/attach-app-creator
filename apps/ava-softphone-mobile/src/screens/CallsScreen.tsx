@@ -22,6 +22,7 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [myExt, setMyExt] = useState<string | null>(null);
   const [domainExtensions, setDomainExtensions] = useState<string[]>([]);
+  const [fallbackDomainUuid, setFallbackDomainUuid] = useState<string | null>(null);
   const [number, setNumber] = useState('');
   const [dialError, setDialError] = useState<string | null>(null);
   const [dialDebug, setDialDebug] = useState<string | null>(null);
@@ -39,18 +40,19 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
       const admin = !!m?.permissions?.admin;
       setIsAdmin(admin);
       setMyExt(m?.extension?.number || null);
+      setFallbackDomainUuid(m?.domain?.fusionpbxDomainUuid || m?.organization?.fusionpbxDomainUuid || null);
       if (!admin && m?.extension?.number) setExtFilter(m.extension.number);
     }).catch(() => { if (!cancelled) setIsAdmin(false); });
     return () => { cancelled = true; };
   }, [creds?.accessToken]);
 
   useEffect(() => {
-    const domainUuid = creds?.domainUuid || creds?.fusionpbxDomainUuid;
+    const domainUuid = creds?.domainUuid || creds?.fusionpbxDomainUuid || fallbackDomainUuid;
     if (!creds?.accessToken || !domainUuid || !isAdmin) return;
     restGet<{ extension: string }[]>(`/rest/v1/pbx_extensions_directory?select=extension&domain_uuid=eq.${encodeURIComponent(domainUuid)}&enabled=eq.true&order=extension.asc`, creds.accessToken)
       .then((rows) => setDomainExtensions((rows || []).map((r) => String(r.extension)).filter(Boolean)))
       .catch(() => setDomainExtensions([]));
-  }, [creds?.accessToken, creds?.domainUuid, creds?.fusionpbxDomainUuid, isAdmin]);
+  }, [creds?.accessToken, creds?.domainUuid, creds?.fusionpbxDomainUuid, fallbackDomainUuid, isAdmin]);
 
   if (selected) return <CallDetailScreen id={selected} onBack={() => setSelected(null)} />;
 
