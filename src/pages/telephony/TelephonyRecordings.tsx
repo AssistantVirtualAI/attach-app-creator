@@ -43,6 +43,7 @@ export default function TelephonyRecordings({ scope = 'org' }: { scope?: 'org' |
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [extFilter, setExtFilter] = useState('');
+  const [rangeDays, setRangeDays] = useState<7 | 30>(7);
   usePbxRealtime(['pbx_call_records', 'pbx_call_recordings'], ['pbx'], {
     throttleMs: 30_000,
     shouldInvalidate: isRecordingListChange,
@@ -61,6 +62,7 @@ export default function TelephonyRecordings({ scope = 'org' }: { scope?: 'org' |
   const queryExt = scope === 'mine' ? myExt : (extFilter.trim() || undefined);
   const { data: cdrs = [], isLoading } = usePbxCallRecords(200, {
     extension: queryExt,
+    rangeDays,
     enabled: scope !== 'mine' || !!myExt,
   });
   const allRecordings = (cdrs as any[]).filter(c => c.has_recording || c.recording_url);
@@ -149,6 +151,13 @@ export default function TelephonyRecordings({ scope = 'org' }: { scope?: 'org' |
               className="max-w-[180px] font-mono"
             />
           )}
+          <div className="flex rounded-md border border-border overflow-hidden">
+            {([7, 30] as const).map((days) => (
+              <Button key={days} type="button" size="sm" variant={rangeDays === days ? 'default' : 'ghost'} className="rounded-none" onClick={() => setRangeDays(days)}>
+                {days} days
+              </Button>
+            ))}
+          </div>
           <span className="text-xs text-muted-foreground ml-auto">
             {recordings.length} of {allRecordings.length} recordings
           </span>
