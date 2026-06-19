@@ -87,12 +87,13 @@ Deno.serve(async (req) => {
     }
 
     const limit = Math.min(Number(url.searchParams.get("limit")) || 50, 200);
-    let listQ = sb.from("pbx_call_records")
+    const ext = sp.extension;
+    const { data: rows, error } = await sb.from("pbx_call_records")
       .select("id, direction, call_status, caller_name, caller_number, source_number, destination, destination_number, extension, start_at, duration_seconds, missed_call, has_recording, transcribed")
-      .eq("organization_id", sp.organization_id);
-    listQ = listQ.eq("extension", sp.extension);
-    const { data: rows, error } = await listQ
-      .order("start_at", { ascending: false }).limit(limit);
+      .eq("organization_id", sp.organization_id)
+      .or(`extension.eq.${ext},caller_number.eq.${ext},destination_number.eq.${ext}`)
+      .order("start_at", { ascending: false })
+      .limit(limit);
     if (error) throw error;
     return json((rows || []).map(mapCall));
   } catch (e) {
