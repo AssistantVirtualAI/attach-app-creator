@@ -1,12 +1,27 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ImpactStyle } from '@capacitor/haptics';
+import { Search, RefreshCw, Voicemail as VmIcon } from 'lucide-react';
+import { createClient } from '@supabase/supabase-js';
 import { colors, font, radius, gradients } from '../lib/theme';
 import { mobileApi, VoicemailEntry } from '../lib/mobileApi';
 import { Card, Chip, EmptyState, GhostButton, AIPanel, Skeleton } from '../components/ui/Primitives';
 import { audit } from '../lib/audit';
+import { getCredentials } from '../lib/creds';
+
+const SUPABASE_URL = 'https://gejxisrqtvxavbrfcoxz.supabase.co';
+const SUPABASE_ANON =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdlanhpc3JxdHZ4YXZicmZjb3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1MDMxNzQsImV4cCI6MjA3NzA3OTE3NH0.kaO-GslE99OCNrZ4_AMnbzGqya2azqz_UMZR34zZvvo';
+let _vmClient: ReturnType<typeof createClient> | null = null;
+function vmClient(token?: string | null) {
+  if (!_vmClient) _vmClient = createClient(SUPABASE_URL, SUPABASE_ANON, { auth: { persistSession: false, autoRefreshToken: false } });
+  if (token) _vmClient.realtime.setAuth(token);
+  return _vmClient;
+}
 
 export default function VoicemailScreen({ haptic }: { haptic?: (s?: ImpactStyle) => Promise<void> }) {
   const [items, setItems] = useState<VoicemailEntry[] | null>(null);
+  const [q, setQ] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [playing, setPlaying] = useState<string | null>(null);
   const [loadingId, setLoadingId] = useState<string | null>(null);
@@ -19,8 +34,34 @@ export default function VoicemailScreen({ haptic }: { haptic?: (s?: ImpactStyle)
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const urlCache = useRef<Map<string, string>>(new Map());
 
-  useEffect(() => { mobileApi.voicemails().then(setItems); }, []);
+  const reload = async () => {
+    setRefreshing(true);
+    try { setItems(await mobileApi.voicemails()); } catch {}
+    setRefreshing(false);
+  };
+
+  useEffect(() => { reload(); }, []);
   useEffect(() => () => { audioRef.current?.pause(); audioRef.current = null; }, []);
+
+  // Realtime: refresh list on any change to pbx_voicemails for this domain/extension.
+  useEffect(() => {
+    let channel: any = null;
+    let cancelled = false;
+    (async () => {
+      const c = await getCredentials();
+      if (!c?.accessToken) return;
+      const client = vmClient(c.accessToken);
+      const domainUuid = (c as any).domainUuid || c.fusionpbxDomainUuid;
+      const filter = domainUuid ? `domain_uuid=eq.${domainUuid}` : undefined;
+      channel = client
+        .channel('vm-mobile')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'pbx_voicemails', ...(filter ? { filter } : {}) } as any,
+          () => { if (!cancelled) reload(); })
+        .subscribe();
+    })();
+    return () => { cancelled = true; try { channel && _vmClient?.removeChannel(channel); } catch {} };
+  }, []);
+
 
   const fmt = (s: number) => {
     if (!Number.isFinite(s) || s < 0) s = 0;
@@ -106,25 +147,83 @@ export default function VoicemailScreen({ haptic }: { haptic?: (s?: ImpactStyle)
     audioRef.current.currentTime = Math.max(0, Math.min(dur, pct * dur));
   };
 
+  const filtered = useMemo(() => {
+    if (!items) return null;
+    const k = q.trim().toLowerCase();
+    if (!k) return items;
+    return items.filter((v) =>
+      (v.customer || '').toLowerCase().includes(k) ||
+      (v.from || '').toLowerCase().includes(k) ||
+      (v.transcript || '').toLowerCase().includes(k) ||
+      (v.summary || '').toLowerCase().includes(k)
+    );
+  }, [items, q]);
+
+  const Header = (
+    <div style={{ padding: '12px 14px 8px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ position: 'relative', flex: 1 }}>
+          <Search size={15} color={colors.mutedSilver} style={{ position: 'absolute', top: '50%', left: 12, transform: 'translateY(-50%)' }} />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search voicemails"
+            style={{
+              width: '100%', height: 40, padding: '0 14px 0 34px', borderRadius: radius.lg,
+              background: 'rgba(255,255,255,0.06)', border: `1px solid ${colors.border}`,
+              color: colors.textIce, fontSize: 13, outline: 'none', boxSizing: 'border-box',
+            }}
+          />
+        </div>
+        <button onClick={reload} disabled={refreshing} aria-label="Refresh" style={{
+          width: 40, height: 40, borderRadius: radius.lg, border: `1px solid ${colors.border}`,
+          background: 'rgba(255,255,255,0.05)', color: colors.lemtelBlue, cursor: 'pointer',
+          display: 'grid', placeItems: 'center', opacity: refreshing ? 0.6 : 1,
+        }}>
+          <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
+        </button>
+      </div>
+      <div style={{ fontSize: 11, color: colors.mutedSilver, padding: '0 4px' }}>
+        {items ? `${filtered?.length ?? 0} of ${items.length} · live sync` : 'Loading…'}
+      </div>
+    </div>
+  );
+
   if (!items) {
     return (
-      <div style={{ padding: 14 }}>
-        {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} style={{ padding: 14, marginBottom: 8, borderRadius: radius.lg, background: gradients.card, border: `1px solid ${colors.border}` }}>
-            <Skeleton w="55%" h={12} /><div style={{ height: 6 }} /><Skeleton w="80%" h={10} />
-          </div>
-        ))}
+      <div>
+        {Header}
+        <div style={{ padding: 14 }}>
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} style={{ padding: 14, marginBottom: 8, borderRadius: radius.lg, background: gradients.card, border: `1px solid ${colors.border}` }}>
+              <Skeleton w="55%" h={12} /><div style={{ height: 6 }} /><Skeleton w="80%" h={10} />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
 
-  if (items.length === 0) {
-    return <div style={{ padding: 14 }}><EmptyState icon="📭" title="No voicemails" hint="When callers leave a message, AVA will transcribe and summarize it here." /></div>;
+  if (!filtered || filtered.length === 0) {
+    return (
+      <div>
+        {Header}
+        <div style={{ padding: 14 }}>
+          <EmptyState
+            icon={<VmIcon size={28} />}
+            title={q ? 'No matching voicemails' : 'No voicemails'}
+            hint={q ? 'Try a different search term.' : 'When callers leave a message, AVA will transcribe and summarize it here.'}
+          />
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div>
-      {items.map((v) => {
+    <div style={{ height: '100%', overflowY: 'auto' }}>
+      {Header}
+      <div style={{ padding: '0 14px 24px' }}>
+      {filtered.map((v) => {
         const isOpen = openId === v.id;
         const isPlaying = playing === v.id;
         const p = progress?.id === v.id ? progress : null;
@@ -237,6 +336,7 @@ export default function VoicemailScreen({ haptic }: { haptic?: (s?: ImpactStyle)
           </Card>
         );
       })}
+      </div>
     </div>
   );
 }
