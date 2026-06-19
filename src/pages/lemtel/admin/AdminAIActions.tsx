@@ -100,7 +100,7 @@ export default function AdminAIActions() {
     <div className="space-y-4">
       <AdminPageHeader
         title="AI Actions Audit"
-        description="Every read, action and denial performed by the AVA Assistant across the platform."
+        subtitle="Every read, action and denial performed by the AVA Assistant across the platform."
         icon={ShieldAlert}
       />
 
