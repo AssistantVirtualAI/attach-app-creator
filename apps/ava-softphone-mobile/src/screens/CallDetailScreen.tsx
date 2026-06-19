@@ -204,11 +204,6 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
                   </div>
                 </div>
               )}
-                  <button onClick={retry} style={{ background: 'transparent', border: `1px solid ${colors.danger}`, color: colors.danger, borderRadius: 6, padding: '4px 8px', fontSize: 11, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                    <RefreshCw size={11} /> Retry
-                  </button>
-                </div>
-              )}
             </Card>
           )}
 
