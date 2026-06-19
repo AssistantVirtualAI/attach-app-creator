@@ -52,9 +52,11 @@ export default function OrgChat() {
     if (!activeId && channels.length) setActiveId(channels[0].id);
   }, [channels, activeId]);
 
+  const [unlinked, setUnlinked] = useState<DirectoryMember | null>(null);
+
   const openDm = async (m: DirectoryMember) => {
     if (!m.user_id || String(m.user_id).startsWith("ext:")) {
-      toast.error("This teammate hasn't activated their portal yet — DM unavailable.");
+      setUnlinked(m);
       return;
     }
     try {
