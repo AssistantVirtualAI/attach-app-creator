@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { colors, font, radius } from '../lib/theme';
 import { mobileApi } from '../lib/mobileApi';
-import { getCredentials } from '../lib/creds';
+import { getCredentials, ensureStoredOrganizationId } from '../lib/creds';
 import { Card } from '../components/ui/Primitives';
+
 
 type Step = {
   label: string;
