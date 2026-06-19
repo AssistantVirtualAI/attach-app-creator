@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Loader2, Pause, Play, Search, Sparkles } from 'lucide-react';
+import { Loader2, Play, Search, Sparkles } from 'lucide-react';
 import { colors, font, radius } from '../lib/theme';
 import { Card, Chip, EmptyState, SectionTitle, Skeleton } from '../components/ui/Primitives';
 import { useMobileCredentials } from '../hooks/useMobileCredentials';
