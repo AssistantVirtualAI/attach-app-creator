@@ -136,7 +136,13 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
     setTranscribeError(null);
     setAiStage('transcribing');
     try {
-      const t = await mobileApi.transcribeCall(id);
+      const t = await mobileApi.transcribeCall(id, {
+        recording_path: (data as any)?.recording_path,
+        recording_name: (data as any)?.recording_name,
+        domain_uuid: (data as any)?.domain_uuid,
+        xml_cdr_uuid: (data as any)?.pbx_uuid || id,
+        organization_id: (data as any)?.organization_id,
+      });
       if (t?.stub || t?.error) {
         const detail = [t.error || t.reason || 'transcription unavailable', ...(t.fetchErrors || [])].filter(Boolean).join(' · ');
         throw new Error(detail);
