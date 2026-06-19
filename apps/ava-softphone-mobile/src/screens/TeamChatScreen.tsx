@@ -286,6 +286,15 @@ export default function TeamChatScreen({ accessToken, userId }: { accessToken: s
       {error && <div style={{ padding: '0 14px 8px', color: '#ff8a3d', fontSize: 12 }}>{error}</div>}
       {loading && <div style={{ padding: 24, textAlign: 'center', color: colors.mutedSilver, fontSize: 13 }}>Loading…</div>}
 
+      <div style={{ padding: '0 14px 8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <Search size={14} color={colors.mutedSilver} />
+          <input value={channelQuery} onChange={(e) => setChannelQuery(e.target.value)}
+            placeholder={view === 'channels' ? 'Search channels…' : 'Search teammates…'}
+            style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 13, color: colors.textIce }} />
+        </div>
+      </div>
+
       <div style={{ flex: 1, overflowY: 'auto', padding: '4px 12px 16px' }}>
         {view === 'channels' && (
           <>
@@ -298,7 +307,7 @@ export default function TeamChatScreen({ accessToken, userId }: { accessToken: s
               }}>
               <Plus size={16} /> New group chat
             </button>
-            {channels.map((ch) => (
+            {channels.filter((ch) => !channelQuery.trim() || channelDisplay(ch).toLowerCase().includes(channelQuery.trim().toLowerCase())).map((ch) => (
               <button key={ch.id} onClick={() => { setActiveChannel(ch); setView('chat'); }}
                 style={{
                   width: '100%', display: 'flex', alignItems: 'center', gap: 10,
