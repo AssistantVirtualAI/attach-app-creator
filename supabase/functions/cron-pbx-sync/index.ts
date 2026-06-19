@@ -53,9 +53,12 @@ Deno.serve(async (req) => {
       cdrs_tail: await parse(cdrTailRes),
       voicemails: await parse(vmRes),
     };
-    const ok = data.cdrs.ok && data.voicemails.ok;
+    // Manual/mobile refresh should never blank the app just because one PBX
+    // resource failed. Return 200 when any sync lane succeeded; detailed per-lane
+    // status remains in the payload for the sync log.
+    const ok = data.cdrs.ok || data.cdrs_priority.ok || data.cdrs_tail.ok || data.voicemails.ok;
     return new Response(JSON.stringify({ ok, duration_ms: Date.now() - t0, data }), {
-      status: ok ? 200 : 502,
+      status: ok ? 200 : 207,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
