@@ -79,7 +79,68 @@ export default function SettingsScreen({
         <SettingsRow label="WSS URL" icon="↔" value={sp?.sipConfig?.wssUrl || '—'} />
         <SettingsRow label="Extension + domain" icon="☎" value={`${sp?.sipConfig?.extension || creds.extension || '—'}@${sp?.sipConfig?.domain || creds.sipDomain || '—'}`} />
         <SettingsRow label="Last error" icon="!" value={sp?.snap?.error || 'None'} />
+        <SettingsRow
+          label="Retry attempts"
+          icon="↻"
+          value={sp?.retryAttempt ? `${sp.retryAttempt} (auto-backoff)` : '0'}
+        />
         <SettingsRow label="Retry Registration" icon="↻" onPress={() => sp?.reconnect?.()} />
+      </Card>
+
+      {sp?.lastPersistedError && (
+        <>
+          <SectionTitle eyebrow="SIP" title="Last error (persisted)" />
+          <Card padded={false}>
+            <SettingsRow label="Message" icon="!" value={sp.lastPersistedError.error} />
+            <SettingsRow label="Extension" icon="☎" value={sp.lastPersistedError.extension || '—'} />
+            <SettingsRow label="Domain" icon="🌐" value={sp.lastPersistedError.domain || '—'} />
+            <SettingsRow
+              label="When"
+              icon="🕒"
+              value={new Date(sp.lastPersistedError.time).toLocaleString()}
+            />
+          </Card>
+        </>
+      )}
+
+      <SectionTitle eyebrow="SIP" title="Event log" />
+      <Card padded={true}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <span style={{ fontSize: 11, color: colors.mutedSilver }}>
+            {(sp?.sipLog?.length || 0)} events (latest first)
+          </span>
+          <button
+            onClick={() => sp?.clearSipLog?.()}
+            style={{
+              background: 'transparent', border: `1px solid ${colors.border}`,
+              color: colors.textIce, fontSize: 11, padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
+            }}
+          >
+            Clear log
+          </button>
+        </div>
+        <div style={{
+          maxHeight: 260, overflowY: 'auto', fontFamily: 'JetBrains Mono, monospace',
+          fontSize: 10.5, background: 'rgba(0,0,0,0.35)', border: `1px solid ${colors.border}`,
+          borderRadius: 8, padding: 8, lineHeight: 1.5,
+        }}>
+          {(sp?.sipLog || []).length === 0 ? (
+            <div style={{ color: colors.mutedSilver }}>No SIP events recorded yet.</div>
+          ) : (
+            [...(sp?.sipLog || [])].reverse().map((e: any, i: number) => {
+              const c = e.level === 'error' ? '#ef4444' : e.level === 'warn' ? '#f59e0b' : '#93c5fd';
+              return (
+                <div key={i} style={{ marginBottom: 4, color: '#e5e7eb' }}>
+                  <span style={{ color: colors.mutedSilver }}>
+                    {new Date(e.time).toLocaleTimeString()}
+                  </span>{' '}
+                  <span style={{ color: c, fontWeight: 700 }}>{e.event}</span>
+                  {e.detail && <span style={{ color: '#cbd5e1' }}> — {e.detail}</span>}
+                </div>
+              );
+            })
+          )}
+        </div>
       </Card>
 
       {me?.permissions.admin && (
