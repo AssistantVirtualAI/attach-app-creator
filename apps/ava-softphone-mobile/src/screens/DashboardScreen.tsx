@@ -75,6 +75,10 @@ export default function DashboardScreen({
         <Metric label="Avg duration" value={s?.avgDurationSec != null ? `${s.avgDurationSec}s` : undefined} tone="violet" />
         <Metric label="Total talk" value={s?.totalTalkSec != null ? fmtTalk(s.totalTalkSec) : undefined} tone="cyan" />
         <Metric label="Peak hour" value={s?.peakHour != null ? `${s.peakHour}:00` : undefined} tone="gold" />
+        <Metric label="Outbound" value={s?.outboundCalls ?? undefined} tone="cyan" />
+        <Metric label="Failed dials" value={s?.dialFailedCount ?? undefined} tone="danger" />
+        <Metric label="Dial success" value={s?.dialSuccessRate != null ? `${s.dialSuccessRate}%` : undefined} tone="success" />
+        <Metric label="Active ext." value={s?.activeExtensions ?? undefined} tone="violet" />
       </div>
 
       <SectionTitle eyebrow={RANGE_LABELS[range]} title="Calls per day" />
