@@ -31,11 +31,18 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
     setLoadingAudio(true);
     try {
       const creds = await getCredentials();
-      const res = await mobileApi.voicemailAudio({
+      const res: any = await mobileApi.voicemailAudio({
         xml_cdr_uuid: id,
         organization_id: creds?.organizationId,
       });
-      if (!res?.url) throw new Error('No recording URL returned');
+      if (res?.ok === false || !res?.url) {
+        const msg = res?.error === 'RECORDING_NOT_FOUND'
+          ? 'Recording file is no longer on the PBX server.'
+          : res?.error === 'RECORDING_EMPTY'
+            ? 'Recording file is empty.'
+            : 'No recording available for this call.';
+        throw new Error(msg);
+      }
       return res.url;
     } catch (e: any) {
       setAudioError(e?.message || 'Unable to load recording');
