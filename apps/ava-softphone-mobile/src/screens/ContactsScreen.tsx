@@ -26,10 +26,12 @@ export default function ContactsScreen({ sp }: { sp: any }) {
     if (!mobile.accessToken || !rows?.length) { setPresence({}); return; }
     const ids = rows.map((c) => c.user_id).filter(Boolean) as string[];
     if (!ids.length) { setPresence({}); return; }
-    const pres = await restGet<Presence[]>(`/rest/v1/user_presence?select=user_id,status,call_state,last_seen_at&user_id=in.(${ids.map((id) => `"${id}"`).join(',')})`, mobile.accessToken);
-    const map: Record<string, Presence> = {};
-    (pres || []).forEach((p) => { map[p.user_id] = p; });
-    setPresence(map);
+    try {
+      const pres = await restGet<Presence[]>(`/rest/v1/user_presence?select=user_id,status,call_state,last_seen_at&user_id=in.(${ids.join(',')})`, mobile.accessToken);
+      const map: Record<string, Presence> = {};
+      (pres || []).forEach((p) => { map[p.user_id] = p; });
+      setPresence(map);
+    } catch { /* presence is optional, never break the directory */ }
   }, [mobile.accessToken]);
 
   const loadContacts = useCallback(async () => {
@@ -101,13 +103,13 @@ export default function ContactsScreen({ sp }: { sp: any }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pbx_softphone_users', filter: softphoneFilter } as any, () => loadContacts().catch(() => {}))
       .subscribe();
     const presenceChannel = client.channel(`presence-domain-${mobile.organizationId || mobile.domainUuid}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_presence', ...(mobile.organizationId ? { filter: `organization_id=eq.${mobile.organizationId}` } : {}) } as any, () => loadPresence(contacts).catch(() => {}))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_presence' } as any, () => loadContacts().catch(() => {}))
       .subscribe();
     const orgContactsChannel = mobile.organizationId ? client.channel(`org-contacts-${mobile.organizationId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'org_contacts', filter: `organization_id=eq.${mobile.organizationId}` } as any, () => loadContacts().catch(() => {}))
       .subscribe() : null;
     return () => { client.removeChannel(softphoneChannel); client.removeChannel(presenceChannel); if (orgContactsChannel) client.removeChannel(orgContactsChannel); };
-  }, [loadContacts, loadPresence, mobile.accessToken, mobile.domainUuid, mobile.organizationId, contacts]);
+  }, [loadContacts, mobile.accessToken, mobile.domainUuid, mobile.organizationId]);
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
