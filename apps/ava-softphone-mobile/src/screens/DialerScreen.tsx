@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ImpactStyle } from '@capacitor/haptics';
 import Dialpad from '../components/Dialpad';
 import WssDiagnostics from '../components/WssDiagnostics';
@@ -6,11 +6,10 @@ import { audit } from '../lib/audit';
 import { showMobileToast } from '../lib/mobileToast';
 import { mobileApi } from '../lib/mobileApi';
 
-// Click-to-call via FusionPBX server-side originate is currently NOT permitted
-// for the mobile-calls-start function (the PBX API user lacks command_add/
-// command_edit). Flip this to true only after the admin grants the permission.
-const CLICK_TO_CALL_ENABLED = false;
-const CLICK_TO_CALL_DISABLED_REASON =
+// Click-to-call availability is gated server-side by
+// /functions/v1/mobile-click-to-call-status. Default OFF until the PBX admin
+// grants command_add/command_edit and flips CLICK_TO_CALL_ENABLED=1.
+const CLICK_TO_CALL_FALLBACK_REASON =
   'Server-side originate is disabled: the FusionPBX API user lacks the ' +
   '“command_add / command_edit” permission. Ask the PBX admin to grant it, ' +
   'then enable click-to-call.';
@@ -26,6 +25,18 @@ export default function DialerScreen({
   const [dialing, setDialing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [diagOpen, setDiagOpen] = useState(false);
+  const [c2c, setC2c] = useState<{ enabled: boolean; reason: string | null }>({
+    enabled: false,
+    reason: CLICK_TO_CALL_FALLBACK_REASON,
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    mobileApi.clickToCallStatus()
+      .then((r) => { if (!cancelled) setC2c({ enabled: !!r.enabled, reason: r.reason || null }); })
+      .catch((e) => { if (!cancelled) setC2c({ enabled: false, reason: e?.message || CLICK_TO_CALL_FALLBACK_REASON }); });
+    return () => { cancelled = true; };
+  }, []);
 
   const status: string = sp.snap.status || 'connecting';
   const sipError: string = sp.snap.error || '';
@@ -77,7 +88,7 @@ export default function DialerScreen({
   };
 
   const startClickToCall = async () => {
-    if (!num || !CLICK_TO_CALL_ENABLED) return;
+    if (!num || !c2c.enabled) return;
     await haptic(ImpactStyle.Medium);
     setError(null);
     try {
@@ -189,22 +200,22 @@ export default function DialerScreen({
           <div style={{ padding: '0 24px 8px' }}>
             <button
               onClick={startClickToCall}
-              disabled={!num || !CLICK_TO_CALL_ENABLED}
-              title={!CLICK_TO_CALL_ENABLED ? CLICK_TO_CALL_DISABLED_REASON : 'Ring your desk phone, then connect'}
+              disabled={!num || !c2c.enabled}
+              title={!c2c.enabled ? (c2c.reason || CLICK_TO_CALL_FALLBACK_REASON) : 'Ring your desk phone, then connect'}
               style={{
                 width: '100%', padding: '12px 14px', borderRadius: 12,
                 border: '1px solid rgba(255,255,255,0.16)',
-                background: CLICK_TO_CALL_ENABLED && num ? 'rgba(59,130,246,0.18)' : 'rgba(255,255,255,0.06)',
-                color: CLICK_TO_CALL_ENABLED ? '#93c5fd' : 'rgba(255,255,255,0.55)',
+                background: c2c.enabled && num ? 'rgba(59,130,246,0.18)' : 'rgba(255,255,255,0.06)',
+                color: c2c.enabled ? '#93c5fd' : 'rgba(255,255,255,0.55)',
                 fontWeight: 700, fontSize: 13,
-                cursor: CLICK_TO_CALL_ENABLED && num ? 'pointer' : 'not-allowed',
+                cursor: c2c.enabled && num ? 'pointer' : 'not-allowed',
               }}
             >
-              {CLICK_TO_CALL_ENABLED ? 'Use click-to-call instead' : 'Click-to-call unavailable'}
+              {c2c.enabled ? 'Use click-to-call instead' : 'Click-to-call unavailable'}
             </button>
-            {!CLICK_TO_CALL_ENABLED && (
+            {!c2c.enabled && (
               <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.4 }}>
-                {CLICK_TO_CALL_DISABLED_REASON}
+                {c2c.reason || CLICK_TO_CALL_FALLBACK_REASON}
               </div>
             )}
           </div>

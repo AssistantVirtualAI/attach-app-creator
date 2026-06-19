@@ -316,6 +316,14 @@ export const mobileApi = {
     { callId: 'call-' + Date.now(), mode: 'webrtc' },
   ),
 
+  // Server-side gate: is the FusionPBX `originate-click-to-call` permission
+  // available right now? Used by the dialer to enable/disable the fallback
+  // button and surface the exact reason if disabled.
+  clickToCallStatus: () => call<{ enabled: boolean; reason: string | null; required?: string[]; source?: string }>(
+    '/mobile-click-to-call-status', { method: 'GET' },
+    { enabled: false, reason: 'Mock mode' },
+  ),
+
   // Recents: scoped server-side to the caller's org + extension via mobile-calls.
   calls: () => call<CallRecord[] | any>('/mobile-calls', undefined, callsMock).then((raw: any) => {
     if (isMockMode()) return raw as CallRecord[];
