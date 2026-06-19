@@ -2024,10 +2024,10 @@ Deno.serve(async (req) => {
         const ct = selfRes.headers.get("content-type") || "";
         if (!selfRes.ok || (!ct.startsWith("audio/") && !ct.includes("octet-stream"))) {
           const detail = await selfRes.text().catch(() => "");
-          return json({ ok: false, error: "RECORDING_NOT_FOUND", detail: detail.slice(0, 240) }, 404);
+          return json({ ok: false, error: "RECORDING_NOT_FOUND", fallback: true, detail: detail.slice(0, 240) }, 200);
         }
         const bytes = new Uint8Array(await selfRes.arrayBuffer());
-        if (!bytes.byteLength) return json({ ok: false, error: "RECORDING_EMPTY" }, 404);
+        if (!bytes.byteLength) return json({ ok: false, error: "RECORDING_EMPTY", fallback: true }, 200);
 
         const lower = String((params as any).record_name || "").toLowerCase();
         const ext = lower.endsWith(".mp3") ? "mp3"
