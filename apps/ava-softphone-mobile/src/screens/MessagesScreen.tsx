@@ -1,21 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ImpactStyle } from '@capacitor/haptics';
 import { Search } from 'lucide-react';
-import { createClient } from '@supabase/supabase-js';
 import { colors, font, radius, gradients } from '../lib/theme';
 import { mobileApi, SmsThread, SmsMessage } from '../lib/mobileApi';
 import { Card, Chip, EmptyState, GhostButton, SectionTitle, Skeleton } from '../components/ui/Primitives';
 import { audit } from '../lib/audit';
 import { useMobileCredentials } from '../hooks/useMobileCredentials';
-
-const SUPABASE_URL = 'https://gejxisrqtvxavbrfcoxz.supabase.co';
-const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdlanhpc3JxdHZ4YXZicmZjb3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1MDMxNzQsImV4cCI6MjA3NzA3OTE3NH0.kaO-GslE99OCNrZ4_AMnbzGqya2azqz_UMZR34zZvvo';
-let _smsClient: ReturnType<typeof createClient> | null = null;
-function smsClient(token?: string | null) {
-  if (!_smsClient) _smsClient = createClient(SUPABASE_URL, SUPABASE_ANON, { auth: { persistSession: false, autoRefreshToken: false } });
-  if (token) _smsClient.realtime.setAuth(token);
-  return _smsClient;
-}
+import { authedRealtime } from '../lib/mobileSupabase';
 
 export default function MessagesScreen({ haptic }: { haptic: (s?: ImpactStyle) => Promise<void> }) {
   const mobile = useMobileCredentials();
