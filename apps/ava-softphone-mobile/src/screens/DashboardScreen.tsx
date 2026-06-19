@@ -10,6 +10,7 @@ import { useTheme } from '../lib/ThemeContext';
 import { useMobileCredentials } from '../hooks/useMobileCredentials';
 import { restGet } from '../lib/mobileSupabase';
 import type { Tab } from '../components/BottomTabs';
+import NotificationsSheet, { NotificationBell, useNotificationCounts } from '../components/NotificationsSheet';
 
 const RANGE_LABELS: Record<StatsRange, string> = { today: 'Today', '7d': '7 days', '30d': '30 days' };
 const AI_CACHE_KEY = (range: string) => `ava.aisummary.${range}`;
@@ -19,6 +20,8 @@ export default function DashboardScreen({
 }: { onNavigate: (t: Tab) => void; haptic: (s?: ImpactStyle) => Promise<void>; onOpenProfile?: () => void }) {
   const { mode, toggle } = useTheme();
   const [range, setRange] = useState<StatsRange>('today');
+  const [notifOpen, setNotifOpen] = useState(false);
+  const notifCounts = useNotificationCounts();
   const me = useAutoSync<MeResponse>(() => mobileApi.me(), { intervalMs: 5 * 60_000 });
   const stats = useAutoSync<DomainStats>(() => mobileApi.domainStats(range), { intervalMs: 60_000, deps: [range] });
   const m = me.data; const s = stats.data;
@@ -68,7 +71,7 @@ export default function DashboardScreen({
               Call history · {RANGE_LABELS[range]}
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
             {s ? <StatusDot state="registered" /> : <Skeleton w={40} h={14} />}
             <button
               onClick={() => { haptic(); toggle(); }}
@@ -84,19 +87,22 @@ export default function DashboardScreen({
             >
               {mode === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             </button>
-            <button
-              onClick={onOpenProfile}
-              aria-label="My profile"
-              style={{
-                width: 38, height: 38, borderRadius: '50%',
-                background: `linear-gradient(135deg, ${colors.lemtelBlue}, ${colors.avaCyan})`,
-                color: '#fff', fontWeight: 800, fontSize: 13, border: '2px solid rgba(255,255,255,0.85)',
-                cursor: 'pointer', display: 'grid', placeItems: 'center',
-                boxShadow: '0 8px 18px -8px rgba(7,22,168,0.45)',
-              }}
-            >
-              {(m?.user?.name || m?.user?.email || 'U').split(/[\s@]/)[0].slice(0, 2).toUpperCase()}
-            </button>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+              <button
+                onClick={onOpenProfile}
+                aria-label="My profile"
+                style={{
+                  width: 38, height: 38, borderRadius: '50%',
+                  background: `linear-gradient(135deg, ${colors.lemtelBlue}, ${colors.avaCyan})`,
+                  color: '#fff', fontWeight: 800, fontSize: 13, border: '2px solid rgba(255,255,255,0.85)',
+                  cursor: 'pointer', display: 'grid', placeItems: 'center',
+                  boxShadow: '0 8px 18px -8px rgba(7,22,168,0.45)',
+                }}
+              >
+                {(m?.user?.name || m?.user?.email || 'U').split(/[\s@]/)[0].slice(0, 2).toUpperCase()}
+              </button>
+              <NotificationBell onClick={() => setNotifOpen(true)} count={notifCounts.total} />
+            </div>
           </div>
         </div>
 
@@ -227,6 +233,7 @@ export default function DashboardScreen({
         </div>
       )}
       <div style={{ height: 80 }} />
+      <NotificationsSheet open={notifOpen} onClose={() => setNotifOpen(false)} onNavigate={onNavigate} />
     </div>
   );
 }
