@@ -38,21 +38,33 @@ export default function CustomersView() {
     setLoading(true); setError(null);
     try {
       const domains = await ava.domains();
-      const [{ data: orgs }, { data: exts }, { data: nums }, { data: queues }] = await Promise.all([
+      const [{ data: orgs }, { data: exts }, { data: nums }, { data: queues }, { data: phones }] = await Promise.all([
         supabase.from('organizations').select('id,name,fusionpbx_domain_uuid'),
-        supabase.from('pbx_extensions').select('organization_id'),
+        supabase.from('pbx_extensions').select('organization_id, domain_uuid'),
         supabase.from('pbx_phone_number_assignments').select('organization_id'),
         supabase.from('pbx_call_queues').select('organization_id'),
+        supabase.from('phone_numbers').select('organization_id, domain_uuid'),
       ]);
       const orgByDomain = new Map<string, { id: string; name: string }>();
       for (const o of (orgs || [])) {
         if (o.fusionpbx_domain_uuid) orgByDomain.set(o.fusionpbx_domain_uuid, { id: o.id, name: o.name });
       }
-      const countBy = (arr: any[] | null, orgId?: string | null) =>
+      const countByOrg = (arr: any[] | null, orgId?: string | null) =>
         orgId ? (arr || []).filter((r) => r.organization_id === orgId).length : 0;
+      const countByDomainOrOrg = (arr: any[] | null, domainUuid: string, orgId?: string | null) => {
+        const list = arr || [];
+        const byDomain = list.filter((r) => r.domain_uuid === domainUuid).length;
+        if (byDomain > 0) return byDomain;
+        return countByOrg(list, orgId);
+      };
 
       const mapped: Row[] = (domains || []).map((d: any) => {
         const org = orgByDomain.get(d.domain_uuid);
+        const extCount = countByDomainOrOrg(exts, d.domain_uuid, org?.id);
+        const numCount = Math.max(
+          countByDomainOrOrg(phones, d.domain_uuid, org?.id),
+          countByOrg(nums, org?.id),
+        );
         return {
           domain_uuid: d.domain_uuid,
           domain_name: d.domain_name,
@@ -60,9 +72,9 @@ export default function CustomersView() {
           domain_enabled: d.domain_enabled,
           org_id: org?.id || null,
           org_name: org?.name || null,
-          extensions: countBy(exts, org?.id),
-          numbers: countBy(nums, org?.id),
-          queues: countBy(queues, org?.id),
+          extensions: extCount,
+          numbers: numCount,
+          queues: countByOrg(queues, org?.id),
         };
       });
       mapped.sort((a, b) => a.domain_name.localeCompare(b.domain_name));
