@@ -6,8 +6,7 @@
  *   2. `sp.call()` places an outbound INVITE *directly via JsSIP* — i.e. it
  *      goes through the WebSocket transport and never asks the backend to
  *      perform a FusionPBX `originate-click-to-call`.
- *   3. The only backend call made during dialling is the informational
- *      `mobile-calls-start` POST with `mode: "webrtc"`.
+ *   3. Dialling never calls the backend `mobile-calls-start` fallback.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
@@ -69,9 +68,9 @@ describe('mobile softphone end-to-end flow', () => {
     const [target] = (ua.call as any).mock.calls[0];
     expect(target).toBe('sip:15145550100@lemtel.lemtel.tel');
 
-    // Make sure NO backend call hit an originate / click-to-call endpoint.
+    // Make sure NO backend call hit any originate / mobile fallback endpoint.
     const originateCalls = fetchSpy.mock.calls.filter(([url]) =>
-      typeof url === 'string' && /originate|click.to.call/i.test(url),
+      typeof url === 'string' && /originate|click.to.call|mobile-calls-start/i.test(url),
     );
     expect(originateCalls).toHaveLength(0);
 
