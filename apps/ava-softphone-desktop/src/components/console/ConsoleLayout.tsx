@@ -73,7 +73,7 @@ export default function ConsoleLayout({
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncNote, setSyncNote] = useState<string | null>(null);
-  const [compact, setCompact] = useState(() => typeof window !== 'undefined' && window.innerWidth < 640);
+  const [compact, setCompact] = useState(() => typeof window !== 'undefined' && window.innerWidth < 520);
   const [isWide, setIsWide] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 1100);
   const [tourOpen, setTourOpen] = useState(false);
   const [auditOpen, setAuditOpen] = useState(false);
