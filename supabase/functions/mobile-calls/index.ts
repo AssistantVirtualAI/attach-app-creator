@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
     const id = url.searchParams.get("id");
 
     const ext = sp.extension;
-    const extFilter = `extension.eq.${ext},caller_number.eq.${ext},source_number.eq.${ext},destination_number.eq.${ext},destination.eq.${ext},caller_id_number.eq.${ext}`;
+    const extFilter = `extension.eq.${ext},caller_number.eq.${ext},source_number.eq.${ext},destination_number.eq.${ext},destination.eq.${ext}`;
 
     if (id) {
       let detailQ = sb.from("pbx_call_records").select("*")
