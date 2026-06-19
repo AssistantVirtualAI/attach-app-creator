@@ -473,80 +473,26 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
         </div>
       )}
 
-      {/* SIP credential inspector */}
-      <div className="rounded-md border border-border/60 bg-muted/30 text-[11px] overflow-hidden">
-        <button
-          type="button"
-          onClick={() => setShowCredInspector((v) => !v)}
-          className="w-full flex items-center justify-between px-2.5 py-1.5 hover:bg-muted/60 transition"
-          aria-expanded={showCredInspector}
-        >
-          <span className="flex items-center gap-1.5 font-medium">
-            <Settings className="w-3 h-3" /> SIP credential inspector
-          </span>
-          <ChevronDown className={cn("w-3 h-3 transition-transform", showCredInspector && "rotate-180")} />
-        </button>
-        {showCredInspector && (
-          <dl className="px-2.5 py-2 space-y-1.5 border-t border-border/60">
-            <div className="flex items-start justify-between gap-2">
-              <dt className="text-muted-foreground shrink-0">SIP URI</dt>
-              <dd className="font-mono text-right break-all">
-                {sp.config?.sipUri || (sp.config?.extension ? `sip:${sp.config.extension}@${sp.config.sipDomain}` : "—")}
-              </dd>
-            </div>
-            <div className="flex items-start justify-between gap-2">
-              <dt className="text-muted-foreground shrink-0">Auth username</dt>
-              <dd className="font-mono text-right break-all">{sp.config?.authUsername || sp.config?.extension || "—"}</dd>
-            </div>
-            <div className="flex items-start justify-between gap-2">
-              <dt className="text-muted-foreground shrink-0">Domain</dt>
-              <dd className="font-mono text-right break-all">{sp.config?.sipDomain || "—"}</dd>
-            </div>
-            <div className="flex items-start justify-between gap-2">
-              <dt className="text-muted-foreground shrink-0">WSS</dt>
-              <dd className="font-mono text-right break-all text-[10px]">{sp.config?.wssUrl || "—"}</dd>
-            </div>
-            <div className="flex items-start justify-between gap-2">
-              <dt className="text-muted-foreground shrink-0">Password</dt>
-              <dd className="font-mono text-right">
-                {sp.config?.password
-                  ? `•••• (${sp.config.password.length} chars)`
-                  : <span className="text-rose-500">missing</span>}
-              </dd>
-            </div>
-            <div className="flex items-start justify-between gap-2">
-              <dt className="text-muted-foreground shrink-0">Password source</dt>
-              <dd className="text-right">
-                <Badge variant="outline" className="text-[10px] font-normal">
-                  {sp.config?.passwordSource || "unknown"}
-                </Badge>
-              </dd>
-            </div>
-            <div className="flex items-start justify-between gap-2">
-              <dt className="text-muted-foreground shrink-0">Registration</dt>
-              <dd className="text-right capitalize">{sipStatus}{sp.snap.errorCause ? ` · ${sp.snap.errorCause}` : ""}</dd>
-            </div>
-          </dl>
-        )}
-      </div>
+      {/* Number display */}
       <div className={cn(
-        "h-14 rounded-lg bg-muted/40 flex items-center justify-center font-mono text-2xl tabular-nums px-3 truncate",
+        "h-16 rounded-xl bg-gradient-to-br from-muted/60 to-muted/30 border border-border/60 flex items-center justify-center font-mono text-3xl font-semibold tabular-nums px-3 truncate text-foreground shadow-inner",
         shake && "animate-[shake_0.4s]",
       )}>
-        {number || <span className="text-muted-foreground/40 text-base">Enter number</span>}
+        {number || <span className="text-muted-foreground/60 text-base font-sans font-normal">Enter number</span>}
       </div>
-      <div className="grid grid-cols-3 gap-1.5">
+      <div className="grid grid-cols-3 gap-2">
         {DIALPAD.map(({ k, sub }) => (
           <button
             key={k}
             onClick={() => dialPress(k)}
-            className="h-12 rounded-lg bg-muted/40 hover:bg-muted active:scale-95 transition flex flex-col items-center justify-center"
+            className="h-14 rounded-xl bg-card border border-border/70 hover:bg-muted hover:border-primary/40 active:scale-95 transition shadow-sm flex flex-col items-center justify-center text-foreground"
           >
-            <span className="text-lg font-medium leading-none">{k}</span>
-            {sub && <span className="text-[9px] text-muted-foreground mt-0.5">{sub}</span>}
+            <span className="text-xl font-semibold leading-none">{k}</span>
+            {sub && <span className="text-[10px] font-medium text-muted-foreground mt-0.5 tracking-wider">{sub}</span>}
           </button>
         ))}
       </div>
+
       <div className="flex items-center gap-2">
         <Button variant="outline" size="icon" className="h-11 w-11" onClick={() => setNumber((n) => n.slice(0, -1))}>
           <Delete className="w-4 h-4" />
