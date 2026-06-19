@@ -124,7 +124,7 @@ export function MyAIChat({
       if (data?.error === "rate_limited") { toast.error("Rate limit reached. Try again in a moment."); return; }
       if (data?.error === "ai_credits_exhausted") { toast.error("AI credits exhausted — please add credits."); return; }
       if (data?.error) { toast.error(data.error); return; }
-      setMessages([...newMsgs, { role: "assistant", content: data?.answer ?? data?.message ?? "(no response)" }]);
+      setMessages([...newMsgs, { role: "assistant", content: data?.answer ?? data?.message ?? "(no response)", attachments: data?.attachments }]);
     } catch (e: any) {
       toast.error(e?.message ?? "Failed to reach assistant");
     } finally { setLoading(false); }
