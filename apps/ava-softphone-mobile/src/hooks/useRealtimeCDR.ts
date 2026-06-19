@@ -88,6 +88,7 @@ export function useRealtimeCDR(creds: Creds | null) {
     let attempt = 0;
     let channel: ReturnType<SupabaseClient['channel']> | null = null;
     let watchdog: ReturnType<typeof setTimeout> | null = null;
+    let removingChannel = false;
 
     const startPolling = (reason?: string) => {
       if (pollId) return;
@@ -151,9 +152,13 @@ export function useRealtimeCDR(creds: Creds | null) {
     };
 
     const scheduleReconnect = () => {
-      if (cancelled || backoffTimer) return;
-      try { if (channel) client().removeChannel(channel); } catch {}
+      if (cancelled || backoffTimer || removingChannel) return;
+      const oldChannel = channel;
       channel = null;
+      if (oldChannel) {
+        removingChannel = true;
+        Promise.resolve(client().removeChannel(oldChannel)).finally(() => { removingChannel = false; });
+      }
       const delay = BACKOFF_MS[Math.min(attempt, BACKOFF_MS.length - 1)];
       attempt += 1;
       const at = Date.now() + delay;
