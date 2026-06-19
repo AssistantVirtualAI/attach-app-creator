@@ -308,7 +308,7 @@ export const mobileApi = {
 
   webphoneToken: () => call<{ token: string; expiresAt: string; wssUrl: string }>(
     '/softphone-credentials', { method: 'POST' },
-    { token: 'mock', expiresAt: new Date(Date.now() + 30*60e3).toISOString(), wssUrl: 'wss://lemtel.lemtel.tel:7443' },
+    { token: 'mock', expiresAt: new Date(Date.now() + 30*60e3).toISOString(), wssUrl: 'wss://node.lemtelcloud.net:7443' },
   ),
 
   startCall: (to: string, mode?: 'webrtc' | 'click_to_call') => call<{ callId: string; mode: 'webrtc' | 'click_to_call'; to?: string; from?: string }>(
