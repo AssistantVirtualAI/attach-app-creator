@@ -63,22 +63,36 @@ function CallControlGridImpl({ organizationId, onDial, onTransfer }: Props) {
     let timer: any;
     let cancelled = false;
     let failures = 0;
+    let inFlight = false; // single-flight guard — prevents overlapping polls
     const tick = async () => {
       if (cancelled) return;
       if (typeof document !== 'undefined' && document.hidden) {
         timer = setTimeout(tick, 8000);
         return;
       }
+      if (inFlight) {
+        console.debug('[AVA] call-state poll skipped — previous request still in flight');
+        timer = setTimeout(tick, 2000);
+        return;
+      }
+      inFlight = true;
+      const startedAt = Date.now();
       let delay = 4000;
       try {
         const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', { body: { action: 'call-state' } });
         if (error) throw error;
         setActiveLines(data?.active || []);
         setParked(data?.parked || []);
+        const tookMs = Date.now() - startedAt;
+        if (tookMs > 1500) console.warn('[AVA] call-state poll slow', { tookMs, active: data?.active?.length, parked: data?.parked?.length });
+        else console.debug('[AVA] call-state poll ok', { tookMs, active: data?.active?.length, parked: data?.parked?.length });
         failures = 0;
-      } catch {
+      } catch (err) {
         failures = Math.min(failures + 1, 6);
         delay = Math.min(4000 * 2 ** failures, 60_000); // exponential backoff, cap 60s
+        console.warn('[AVA] call-state poll failed', { failures, nextDelayMs: delay, err });
+      } finally {
+        inFlight = false;
       }
       if (!cancelled) timer = setTimeout(tick, delay);
     };

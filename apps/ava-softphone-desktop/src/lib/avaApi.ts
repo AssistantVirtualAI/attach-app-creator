@@ -502,30 +502,41 @@ async function readCallRecordRows(limit = 100, opts?: { scope?: 'mine' | 'org'; 
 
 let cdrSyncInFlight: Promise<void> | null = null;
 let lastCdrSyncAt = 0;
+// Auto-retry state for NO_CDR_ENDPOINT — when the PBX live-CDR endpoint is
+// unreachable we keep showing cached rows but schedule a background retry
+// with exponential backoff so the dialer recovers without manual refresh.
+let cdrEndpointDownSince = 0;
+let cdrRetryAttempt = 0;
+let cdrRetryTimer: ReturnType<typeof setTimeout> | null = null;
 
-async function invokeFusionSync(body: Record<string, unknown>) {
-  const res = await fetch(`${BACKEND.url}/functions/v1/fusionpbx-proxy`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'apikey': BACKEND.anonKey,
-      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-    },
-    body: JSON.stringify(body),
-  });
-  const text = await res.text().catch(() => '');
-  let data: any = null;
-  try { data = text ? JSON.parse(text) : null; } catch { data = null; }
-  if (!res.ok) throw new Error(data?.error || text.slice(0, 180) || `FusionPBX sync failed (${res.status})`);
-  if (data?.error) throw new Error(String(data.error));
-  return data;
+function scheduleCdrEndpointRetry(limit: number) {
+  if (cdrRetryTimer) return;
+  cdrRetryAttempt = Math.min(cdrRetryAttempt + 1, 8);
+  const delay = Math.min(15_000 * 2 ** (cdrRetryAttempt - 1), 5 * 60_000); // 15s → 5m cap
+  console.info('[AVA] CDR endpoint retry scheduled', { attempt: cdrRetryAttempt, delayMs: delay });
+  cdrRetryTimer = setTimeout(() => {
+    cdrRetryTimer = null;
+    void bestEffortCdrSync(limit, 0, true).then(() => {
+      if (cdrEndpointDownSince === 0) {
+        console.info('[AVA] CDR endpoint recovered after retry');
+        cdrRetryAttempt = 0;
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('lemtel:cdr-endpoint-recovered'));
+        }
+      }
+    }).catch(() => { /* will reschedule via bestEffortCdrSync */ });
+  }, delay);
 }
 
 async function bestEffortCdrSync(limit = 200, minIntervalMs = 30_000, force = false) {
   const now = Date.now();
-  if (cdrSyncInFlight) return cdrSyncInFlight;
+  if (cdrSyncInFlight) {
+    console.debug('[AVA] CDR sync coalesced — request already in flight');
+    return cdrSyncInFlight;
+  }
   if (!force && now - lastCdrSyncAt < minIntervalMs) return;
   lastCdrSyncAt = now;
+  console.debug('[AVA] CDR sync start', { limit, force });
   cdrSyncInFlight = (async () => {
     try {
       const me = await getMeContext();
@@ -537,18 +548,26 @@ async function bestEffortCdrSync(limit = 200, minIntervalMs = 30_000, force = fa
         max_pages: 2,
         from_beginning: true,
       });
+      if (cdrEndpointDownSince) {
+        console.info('[AVA] CDR endpoint back online', { downForMs: Date.now() - cdrEndpointDownSince });
+        cdrEndpointDownSince = 0;
+        cdrRetryAttempt = 0;
+        if (cdrRetryTimer) { clearTimeout(cdrRetryTimer); cdrRetryTimer = null; }
+      }
     } catch (e: any) {
       const msg = String(e?.message || e || '');
-      // NO_CDR_ENDPOINT means the PBX live-CDR endpoint is unreachable. Keep
-      // the cached Supabase rows usable instead of failing the whole refresh.
       if (/NO_CDR_ENDPOINT/i.test(msg)) {
-        console.warn('[AVA] CDR sync skipped — PBX endpoint unavailable, showing cached records.');
+        if (!cdrEndpointDownSince) cdrEndpointDownSince = Date.now();
+        console.warn('[AVA] CDR sync skipped — PBX endpoint unavailable; scheduling auto-retry', { attempt: cdrRetryAttempt + 1 });
+        scheduleCdrEndpointRetry(limit);
+        if (force) throw new Error('NO_CDR_ENDPOINT — PBX live-CDR endpoint is unreachable. Showing cached records; will retry automatically.');
       } else {
         console.warn('[AVA] CDR sync failed', e);
         if (force) throw new Error('Live CDR sync is temporarily unavailable — showing cached records.');
       }
     } finally {
       cdrSyncInFlight = null;
+      console.debug('[AVA] CDR sync done');
     }
   })();
   return cdrSyncInFlight;
