@@ -1170,15 +1170,12 @@ Deno.serve(async (req) => {
 
       for (const ep of ordered) {
         const isPhp = ep.endsWith(".php");
-        // FusionPBX xml_cdr API expects BOTH `order_by` and `order` (asc|desc). When only
-        // one of them is omitted the handler injects a default `order` filter into the SQL
-        // WHERE clause and crashes with: syntax error at or near "order". We always send
-        // both so the handler treats them as ORDER BY metadata, not as filter columns.
+        // The FusionPBX v7 generic API treats unknown query params as SQL filters.
+        // Sending `order`/`order_by` creates `AND order = $1`, which crashes because
+        // `order` is reserved. Keep this request to supported paging/filter fields.
         const qp = new URLSearchParams({
-          domain_uuid: FUSIONPBX_DOMAIN_UUID,
+          domain_uuid: requestedDomain || FUSIONPBX_DOMAIN_UUID,
           limit: "100",
-          order_by: "start_stamp",
-          order: "desc",
           ...extraQp,
         });
         if (isPhp) {
