@@ -132,6 +132,29 @@ export default function TelephonyRecordings({ scope = 'org' }: { scope?: 'org' |
         <SyncEverythingButton />
       </div>
 
+      <Card>
+        <CardContent className="py-3 flex flex-wrap gap-2 items-center">
+          <Input
+            placeholder="Search by name, number, transcript…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="max-w-sm"
+          />
+          {scope !== 'mine' && (
+            <Input
+              placeholder="Filter by extension #"
+              value={extFilter}
+              onChange={(e) => setExtFilter(e.target.value.replace(/[^0-9*]/g, ''))}
+              inputMode="numeric"
+              className="max-w-[180px] font-mono"
+            />
+          )}
+          <span className="text-xs text-muted-foreground ml-auto">
+            {recordings.length} of {allRecordings.length} recordings
+          </span>
+        </CardContent>
+      </Card>
+
       <PendingSyncMetricsCard organizationId={LEMTEL_ORG} />
 
       {recordings.length === 0 ? (
