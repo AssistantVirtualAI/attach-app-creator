@@ -115,14 +115,15 @@ export function MyAIChat({
     setMessages(newMsgs);
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("my-ai-assistant", {
+      // Unified ava-assistant: full PBX tool catalog across mobile / desktop / web.
+      const { data, error } = await supabase.functions.invoke("ava-assistant", {
         body: { messages: newMsgs, pageContext },
       });
       if (error) throw error;
       if (data?.error === "rate_limited") { toast.error("Rate limit reached. Try again in a moment."); return; }
       if (data?.error === "ai_credits_exhausted") { toast.error("AI credits exhausted — please add credits."); return; }
       if (data?.error) { toast.error(data.error); return; }
-      setMessages([...newMsgs, { role: "assistant", content: data?.message ?? "(no response)" }]);
+      setMessages([...newMsgs, { role: "assistant", content: data?.answer ?? data?.message ?? "(no response)" }]);
     } catch (e: any) {
       toast.error(e?.message ?? "Failed to reach assistant");
     } finally { setLoading(false); }
