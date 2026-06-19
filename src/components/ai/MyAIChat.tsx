@@ -112,6 +112,12 @@ export function MyAIChat({
     return SUGGESTIONS;
   }, [pageContext]);
 
+  const [pendingConfirm, setPendingConfirm] = useState<{ name: string; preview: any } | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [rDays, setRDays] = useState<"7" | "30">("7");
+  const [rGroup, setRGroup] = useState<"day" | "extension">("day");
+  const [rExt, setRExt] = useState("");
+
   const send = useCallback(async (textOverride?: string) => {
     const text = (textOverride ?? input).trim();
     if (!text || loading) return;
@@ -122,17 +128,49 @@ export function MyAIChat({
     try {
       // Unified ava-assistant: full PBX tool catalog across mobile / desktop / web.
       const { data, error } = await supabase.functions.invoke("ava-assistant", {
-        body: { messages: newMsgs, pageContext },
+        body: { messages: newMsgs.map(({ role, content }) => ({ role, content })), pageContext },
       });
       if (error) throw error;
       if (data?.error === "rate_limited") { toast.error("Rate limit reached. Try again in a moment."); return; }
       if (data?.error === "ai_credits_exhausted") { toast.error("AI credits exhausted — please add credits."); return; }
       if (data?.error) { toast.error(data.error); return; }
-      setMessages([...newMsgs, { role: "assistant", content: data?.answer ?? data?.message ?? "(no response)", attachments: data?.attachments }]);
+      const toolResults: ToolResult[] = data?.toolResults ?? [];
+      setMessages([...newMsgs, {
+        role: "assistant",
+        content: data?.answer ?? data?.message ?? "(no response)",
+        attachments: data?.attachments,
+        toolResults,
+      }]);
+      // Detect a pending confirmation request from any mutating tool
+      const confirmTr = toolResults.find((t) => t?.output?.requires_confirmation);
+      if (confirmTr) {
+        setPendingConfirm({ name: confirmTr.name, preview: confirmTr.output.preview });
+      }
     } catch (e: any) {
       toast.error(e?.message ?? "Failed to reach assistant");
     } finally { setLoading(false); }
   }, [input, loading, messages, pageContext]);
+
+  const submitReport = useCallback(() => {
+    const ext = rExt.trim();
+    const prompt = `Generate a downloadable PDF call report for the last ${rDays} days, grouped by ${rGroup}${ext ? `, for extension ${ext}` : ""}. Use the generate_report_pdf tool and return the download link.`;
+    setReportOpen(false);
+    send(prompt);
+  }, [rDays, rGroup, rExt, send]);
+
+  const confirmAction = useCallback(() => {
+    const c = pendingConfirm;
+    setPendingConfirm(null);
+    if (!c) return;
+    send(`Yes, confirm. Re-call ${c.name} with confirm:true and the exact same parameters now.`);
+  }, [pendingConfirm, send]);
+
+  const cancelAction = useCallback(() => {
+    const c = pendingConfirm;
+    setPendingConfirm(null);
+    if (!c) return;
+    send(`Cancel — do not execute ${c.name}. Acknowledge in one sentence.`);
+  }, [pendingConfirm, send]);
 
   // Auto-send a one-shot prompt requested by the launcher (e.g. on auto-answer open)
   const consumedRef = useRef<string | null>(null);
