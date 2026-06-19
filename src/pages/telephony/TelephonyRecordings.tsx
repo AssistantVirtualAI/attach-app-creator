@@ -64,11 +64,13 @@ export default function TelephonyRecordings({ scope = 'org' }: { scope?: 'org' |
   const [playing, setPlaying] = useState<string | null>(null);
   const [working, setWorking] = useState<string | null>(null);
   const [stages, setStages] = useState<Record<string, { stage: TranscriptStage; detail?: string }>>({});
+  const [inlineErrors, setInlineErrors] = useState<Record<string, string | null>>({});
   const [pendingSync, setPendingSync] = useState<Record<string, { attempt: number; total: number; nextRetryAt: number } | null>>({});
   const retryNowRefs = (window as any).__retryRefs ||= {} as Record<string, { current: (() => void) | null }>;
 
   const transcribeAndAnalyze = async (id: string) => {
     setWorking(id);
+    setInlineErrors((m) => ({ ...m, [id]: null }));
     setStages((s) => ({ ...s, [id]: { stage: 'downloading' } }));
     retryNowRefs[id] = { current: null };
     const result = await runTranscribeAndAnalyze({
@@ -79,10 +81,13 @@ export default function TelephonyRecordings({ scope = 'org' }: { scope?: 'org' |
       onStage: (stage, detail) => setStages((s) => ({ ...s, [id]: { stage, detail } })),
       onPendingSync: (p) => setPendingSync((m) => ({ ...m, [id]: p ? { attempt: p.attempt, total: p.total, nextRetryAt: p.nextRetryAt } : null })),
     });
-    if (result.stage === 'failed') toast.error(result.reason || 'Échec de la transcription');
-    else if (result.stage === 'unavailable') toast.message('Enregistrement indisponible', { description: result.reason || 'Audio non récupérable' });
+    if (result.stage === 'failed') {
+      const msg = result.reason || 'Échec de la transcription/scoring';
+      setInlineErrors((m) => ({ ...m, [id]: msg }));
+      toast.error('Transcription/scoring failed', { description: msg, action: { label: 'Voir erreur', onClick: () => { setExpanded(id); setTimeout(() => document.getElementById(`ai-error-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80); } } });
+    } else if (result.stage === 'unavailable') toast.message('Enregistrement indisponible', { description: result.reason || 'Audio non récupérable' });
     else if (result.stage === 'pending_sync') toast.message('En attente de la synchro PBX', { description: `Abandonné après ${result.pendingSyncAttempts} tentatives` });
-    else toast.success('Transcrit et analysé');
+    else toast.success('AI analysis: déjà traité et mis en cache');
 
     qc.setQueriesData({ queryKey: ['pbx'] }, (old: any) => {
       if (!Array.isArray(old)) return old;
