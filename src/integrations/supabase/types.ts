@@ -5291,6 +5291,13 @@ export type Database = {
             foreignKeyName: "pbx_devices_assigned_extension_id_fkey"
             columns: ["assigned_extension_id"]
             isOneToOne: false
+            referencedRelation: "pbx_extensions_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pbx_devices_assigned_extension_id_fkey"
+            columns: ["assigned_extension_id"]
+            isOneToOne: false
             referencedRelation: "pbx_extensions_real"
             referencedColumns: ["id"]
           },
@@ -6392,6 +6399,13 @@ export type Database = {
             foreignKeyName: "pbx_queue_agents_extension_id_fkey"
             columns: ["extension_id"]
             isOneToOne: false
+            referencedRelation: "pbx_extensions_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pbx_queue_agents_extension_id_fkey"
+            columns: ["extension_id"]
+            isOneToOne: false
             referencedRelation: "pbx_extensions_real"
             referencedColumns: ["id"]
           },
@@ -6998,6 +7012,13 @@ export type Database = {
             columns: ["extension_id"]
             isOneToOne: false
             referencedRelation: "pbx_extensions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pbx_softphone_users_extension_id_fkey"
+            columns: ["extension_id"]
+            isOneToOne: false
+            referencedRelation: "pbx_extensions_directory"
             referencedColumns: ["id"]
           },
           {
@@ -9486,6 +9507,13 @@ export type Database = {
             foreignKeyName: "pbx_devices_assigned_extension_id_fkey"
             columns: ["assigned_extension_id"]
             isOneToOne: false
+            referencedRelation: "pbx_extensions_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pbx_devices_assigned_extension_id_fkey"
+            columns: ["assigned_extension_id"]
+            isOneToOne: false
             referencedRelation: "pbx_extensions_real"
             referencedColumns: ["id"]
           },
@@ -9519,6 +9547,53 @@ export type Database = {
           },
           {
             foreignKeyName: "pbx_devices_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pbx_extensions_directory: {
+        Row: {
+          description: string | null
+          display_name: string | null
+          domain_uuid: string | null
+          enabled: boolean | null
+          extension: string | null
+          extension_type: string | null
+          id: string | null
+          last_pbx_seen_at: string | null
+          organization_id: string | null
+          portal_user_id: string | null
+        }
+        Insert: {
+          description?: string | null
+          display_name?: string | null
+          domain_uuid?: string | null
+          enabled?: boolean | null
+          extension?: string | null
+          extension_type?: string | null
+          id?: string | null
+          last_pbx_seen_at?: string | null
+          organization_id?: string | null
+          portal_user_id?: string | null
+        }
+        Update: {
+          description?: string | null
+          display_name?: string | null
+          domain_uuid?: string | null
+          enabled?: boolean | null
+          extension?: string | null
+          extension_type?: string | null
+          id?: string | null
+          last_pbx_seen_at?: string | null
+          organization_id?: string | null
+          portal_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pbx_extensions_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -10272,6 +10347,13 @@ export type Database = {
             columns: ["extension_id"]
             isOneToOne: false
             referencedRelation: "pbx_extensions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pbx_softphone_users_extension_id_fkey"
+            columns: ["extension_id"]
+            isOneToOne: false
+            referencedRelation: "pbx_extensions_directory"
             referencedColumns: ["id"]
           },
           {
