@@ -1,9 +1,21 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ImpactStyle } from '@capacitor/haptics';
+import { Search } from 'lucide-react';
+import { createClient } from '@supabase/supabase-js';
 import { colors, font, radius, gradients } from '../lib/theme';
 import { mobileApi, SmsThread, SmsMessage } from '../lib/mobileApi';
 import { Card, Chip, EmptyState, GhostButton, SectionTitle, Skeleton } from '../components/ui/Primitives';
 import { audit } from '../lib/audit';
+import { getCredentials } from '../lib/creds';
+
+const SUPABASE_URL = 'https://gejxisrqtvxavbrfcoxz.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdlanhpc3JxdHZ4YXZicmZjb3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1MDMxNzQsImV4cCI6MjA3NzA3OTE3NH0.kaO-GslE99OCNrZ4_AMnbzGqya2azqz_UMZR34zZvvo';
+let _smsClient: ReturnType<typeof createClient> | null = null;
+function smsClient(token?: string | null) {
+  if (!_smsClient) _smsClient = createClient(SUPABASE_URL, SUPABASE_ANON, { auth: { persistSession: false, autoRefreshToken: false } });
+  if (token) _smsClient.realtime.setAuth(token);
+  return _smsClient;
+}
 
 export default function MessagesScreen({ haptic }: { haptic: (s?: ImpactStyle) => Promise<void> }) {
   const [threads, setThreads] = useState<SmsThread[] | null>(null);
@@ -11,9 +23,48 @@ export default function MessagesScreen({ haptic }: { haptic: (s?: ImpactStyle) =
   const [msgs, setMsgs] = useState<SmsMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [aiBusy, setAiBusy] = useState(false);
+  const [q, setQ] = useState('');
 
-  useEffect(() => { mobileApi.threads().then(setThreads); }, []);
-  useEffect(() => { if (active) mobileApi.thread(active.id).then(setMsgs); }, [active?.id]);
+  const loadThreads = async () => { try { setThreads(await mobileApi.threads()); } catch {} };
+  const loadMsgs = async (id: string) => { try { setMsgs(await mobileApi.thread(id)); } catch {} };
+
+  useEffect(() => { loadThreads(); }, []);
+  useEffect(() => { if (active) loadMsgs(active.id); }, [active?.id]);
+
+  // Realtime threads (org-wide)
+  useEffect(() => {
+    let channel: any = null;
+    let cancelled = false;
+    (async () => {
+      const c = await getCredentials();
+      if (!c?.accessToken) return;
+      const orgId = (c as any).organizationId;
+      const filter = orgId ? `organization_id=eq.${orgId}` : undefined;
+      const client = smsClient(c.accessToken);
+      channel = client.channel('sms-threads-mobile')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'pbx_sms_threads', ...(filter ? { filter } : {}) } as any,
+          () => { if (!cancelled) loadThreads(); })
+        .subscribe();
+    })();
+    return () => { cancelled = true; try { channel && _smsClient?.removeChannel(channel); } catch {} };
+  }, []);
+
+  // Realtime messages for active thread
+  useEffect(() => {
+    if (!active) return;
+    let channel: any = null;
+    let cancelled = false;
+    (async () => {
+      const c = await getCredentials();
+      if (!c?.accessToken) return;
+      const client = smsClient(c.accessToken);
+      channel = client.channel(`sms-msgs-${active.id}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'pbx_sms_messages', filter: `thread_id=eq.${active.id}` } as any,
+          () => { if (!cancelled) loadMsgs(active.id); })
+        .subscribe();
+    })();
+    return () => { cancelled = true; try { channel && _smsClient?.removeChannel(channel); } catch {} };
+  }, [active?.id]);
 
   const send = async () => {
     if (!draft.trim() || !active) return;
@@ -24,6 +75,13 @@ export default function MessagesScreen({ haptic }: { haptic: (s?: ImpactStyle) =
     await mobileApi.sendMessage(active.id, m.body);
     audit('sms.sent', active.id, { len: m.body.length });
   };
+
+  const filteredThreads = useMemo(() => {
+    if (!threads) return threads;
+    const t = q.trim().toLowerCase();
+    if (!t) return threads;
+    return threads.filter((x) => (x.contact || '').toLowerCase().includes(t) || (x.number || '').includes(t) || (x.lastMessage || '').toLowerCase().includes(t));
+  }, [threads, q]);
 
   const aiAction = async (action: 'rewrite' | 'professional' | 'shorten' | 'translate') => {
     if (!draft.trim()) return;
