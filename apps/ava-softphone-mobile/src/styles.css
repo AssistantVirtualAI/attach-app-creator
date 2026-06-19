@@ -261,3 +261,69 @@ body[data-theme="light"] .badge-info    { background:#dbeafe !important; color:#
 
 /* Dividers */
 body[data-theme="light"] hr { border-color: rgba(0,0,0,0.08) !important; }
+
+/* ------------------------------------------------------------------
+   LIGHT MODE — extended visibility fixes
+   Catch dark-theme inline styles that bleed into light mode.
+   ------------------------------------------------------------------ */
+
+/* White text becomes dark on light bg (except inside gradient/colored buttons) */
+body[data-theme="light"] [style*="color: #fff"]:not([style*="background: linear-gradient"]):not([style*="background:linear-gradient"]):not([style*="background: #0023e6"]):not([data-bubble="me"]):not(button),
+body[data-theme="light"] [style*="color:#fff"]:not([style*="background: linear-gradient"]):not([style*="background:linear-gradient"]):not([style*="background: #0023e6"]):not([data-bubble="me"]):not(button),
+body[data-theme="light"] [style*="color: #FFFFFF"]:not([style*="background: linear-gradient"]):not([style*="background:linear-gradient"]):not([data-bubble="me"]):not(button),
+body[data-theme="light"] [style*="color: #ffffff"]:not([style*="background: linear-gradient"]):not([style*="background:linear-gradient"]):not([data-bubble="me"]):not(button) {
+  color: #0d1426 !important;
+}
+
+/* Translucent white surfaces (cards, rows, inputs) → solid white */
+body[data-theme="light"] [style*="rgba(255,255,255,0.06)"],
+body[data-theme="light"] [style*="rgba(255,255,255,0.08)"],
+body[data-theme="light"] [style*="rgba(255,255,255,0.10)"],
+body[data-theme="light"] [style*="rgba(255, 255, 255, 0.06)"],
+body[data-theme="light"] [style*="rgba(255, 255, 255, 0.08)"],
+body[data-theme="light"] [style*="rgba(255, 255, 255, 0.10)"] {
+  background: #ffffff !important;
+  color: #0d1426 !important;
+  border-color: rgba(0,0,0,0.10) !important;
+}
+
+/* Translucent white borders → subtle dark border */
+body[data-theme="light"] [style*="border: 1px solid rgba(255,255,255"],
+body[data-theme="light"] [style*="border:1px solid rgba(255,255,255"],
+body[data-theme="light"] [style*="border-color: rgba(255,255,255"] {
+  border-color: rgba(0,0,0,0.10) !important;
+}
+
+/* Midnight/navy inline backgrounds → light surface */
+body[data-theme="light"] [style*="#0A1429"],
+body[data-theme="light"] [style*="#0a1429"],
+body[data-theme="light"] [style*="#0E1B3D"],
+body[data-theme="light"] [style*="#0e1b3d"],
+body[data-theme="light"] [style*="#060C1C"],
+body[data-theme="light"] [style*="#060c1c"] {
+  background-color: #ffffff !important;
+  color: #0d1426 !important;
+}
+
+/* All buttons that aren't gradients/branded get dark text */
+body[data-theme="light"] button:not([style*="linear-gradient"]):not([style*="#0023e6"]):not([style*="#dc2626"]):not([style*="#EF4444"]):not([style*="#ef4444"]) {
+  color: #0d1426;
+}
+
+/* Bottom nav / tab bar surfaces */
+body[data-theme="light"] nav,
+body[data-theme="light"] [role="tablist"],
+body[data-theme="light"] [data-bottom-nav="true"] {
+  background: #ffffff !important;
+  border-color: rgba(0,0,0,0.08) !important;
+  color: #0d1426 !important;
+}
+
+/* Generic <a> readability */
+body[data-theme="light"] a { color: #0023e6; }
+
+/* Empty state / muted hint helpers */
+body[data-theme="light"] [data-muted="true"],
+body[data-theme="light"] .muted {
+  color: #6b7a99 !important;
+}
