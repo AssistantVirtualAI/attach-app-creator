@@ -378,8 +378,17 @@ autoPlay
 
             {r.summary && (
               <div style={{ marginTop: 8, padding: 8, background: 'rgba(0,0,0,0.25)', borderRadius: 8, fontSize: 11, color: c.textSub, lineHeight: 1.4 }}>
+                <div style={{ fontSize: 9, color: c.aiLight, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Summary</div>
                 {r.summary}
               </div>
+            )}
+            {r.transcript_text && (
+              <details style={{ marginTop: 8 }}>
+                <summary style={{ fontSize: 10, color: c.aiLight, cursor: 'pointer', letterSpacing: 1, textTransform: 'uppercase' }}>Transcript</summary>
+                <div style={{ marginTop: 6, padding: 8, background: 'rgba(0,0,0,0.25)', borderRadius: 8, fontSize: 11, color: c.text, lineHeight: 1.5, maxHeight: 220, overflowY: 'auto', whiteSpace: 'pre-wrap' }}>
+                  {r.transcript_text}
+                </div>
+              </details>
             )}
           </div>
         );
