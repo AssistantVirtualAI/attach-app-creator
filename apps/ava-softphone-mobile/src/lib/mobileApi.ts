@@ -156,6 +156,9 @@ export interface RecordingEntry {
   domain_uuid?: string;
   domain_name?: string;
   organization_id?: string;
+}
+
+
 
 export interface QueueRow {
   id: string;
