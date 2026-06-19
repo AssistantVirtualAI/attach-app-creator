@@ -795,9 +795,11 @@ export const ava = {
       const scopeOrg = opts?.scope === 'org';
       const scopedExtension = cleanText(opts?.extension || me.extension);
       const sinceFilter = opts?.rangeDays ? `&start_at=gte.${encodeURIComponent(new Date(Date.now() - opts.rangeDays * 864e5).toISOString())}` : '';
-      const extFilter = scopeOrg
-        ? ''
-        : scopedExtension
+      const extFilter = opts?.extension
+        ? `&or=(extension.eq.${encodeURIComponent(cleanText(opts.extension))},caller_number.eq.${encodeURIComponent(cleanText(opts.extension))},destination_number.eq.${encodeURIComponent(cleanText(opts.extension))},source_number.eq.${encodeURIComponent(cleanText(opts.extension))})`
+        : scopeOrg
+          ? ''
+          : scopedExtension
           ? `&or=(extension.eq.${encodeURIComponent(scopedExtension)},caller_number.eq.${encodeURIComponent(scopedExtension)},destination_number.eq.${encodeURIComponent(scopedExtension)},source_number.eq.${encodeURIComponent(scopedExtension)})`
           : '&id=is.null';
       const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,organization_id,extension,extension_uuid,pbx_uuid,domain_uuid,domain_name,caller_name,caller_number,destination,destination_number,source_number,start_at,billsec,duration_seconds,has_recording,recording_path,recording_name,mos,raw_data,transcribed&has_recording=eq.true${orgFilter}${extFilter}${sinceFilter}&order=start_at.desc&limit=${limit}`;
