@@ -208,6 +208,16 @@ export function MyAIChat({
               {m.role === "assistant"
                 ? <div className="prose prose-sm dark:prose-invert max-w-none [&_p]:my-1 [&_ul]:my-1 [&_h3]:my-1"><ReactMarkdown>{m.content}</ReactMarkdown></div>
                 : <span className="whitespace-pre-wrap">{m.content}</span>}
+              {m.attachments && m.attachments.length > 0 && (
+                <div className="mt-2 flex flex-col gap-1">
+                  {m.attachments.map((a, j) => (
+                    <a key={j} href={a.url} target="_blank" rel="noopener noreferrer" download={a.filename}
+                       className="text-xs inline-flex items-center gap-1.5 px-2 py-1 rounded border bg-background hover:bg-accent">
+                      📄 {a.title || a.filename || "Download"}
+                    </a>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         ))}
