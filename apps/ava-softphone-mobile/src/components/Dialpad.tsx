@@ -22,13 +22,20 @@ export default function Dialpad({
   onPress: (d: string) => void;
   onLongPressZero?: () => void;
 }) {
+  // Touch devices fire BOTH `touchstart` and a synthetic `click`. Without
+  // this guard the digit is registered twice (the "22" bug). We mark a
+  // short window after touchstart and have onClick bail out.
+  const touchedAtRef = React.useRef(0);
+
   return (
     <div style={gridStyle}>
       {KEYS.map((k) => (
         <button
           key={k.d}
+          type="button"
           onTouchStart={(e) => {
-            e.preventDefault();
+            e.preventDefault(); // suppress the synthetic mouse event chain
+            touchedAtRef.current = Date.now();
             onPress(k.d);
             if (k.d === '0' && onLongPressZero) {
               (e.currentTarget as any)._lt = setTimeout(() => onLongPressZero(), 600);
@@ -38,7 +45,12 @@ export default function Dialpad({
             const lt = (e.currentTarget as any)._lt;
             if (lt) clearTimeout(lt);
           }}
-          onClick={() => onPress(k.d)}
+          onClick={() => {
+            // Skip the click if a touchstart fired in the last 500 ms —
+            // it has already registered the digit.
+            if (Date.now() - touchedAtRef.current < 500) return;
+            onPress(k.d);
+          }}
           style={keyStyle}
         >
           <span style={{ fontSize: 30, fontWeight: 300 }}>{k.d}</span>
