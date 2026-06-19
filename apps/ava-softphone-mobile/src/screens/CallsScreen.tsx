@@ -64,8 +64,8 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
   const filtered = (calls || []).filter((c) => {
     const statusOk = filter === 'all' ? true : c.status === 'missed';
     if (!statusOk) return false;
-    if (isAdmin === false && myExt) return matchExt(c, myExt);
-    if (isAdmin && extFilter !== 'all') return matchExt(c, extFilter);
+    if (isAdmin === false && myExt && !matchExt(c, myExt)) return false;
+    if (isAdmin && extFilter !== 'all' && !matchExt(c, extFilter)) return false;
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       return [c.customer, c.from, c.to, c.extension, c.status, c.direction].filter(Boolean).join(' ').toLowerCase().includes(q);
