@@ -82,9 +82,17 @@ export default function SettingsScreen({
         <SettingsRow
           label="Retry attempts"
           icon="↻"
-          value={sp?.retryAttempt ? `${sp.retryAttempt} (auto-backoff)` : '0'}
+          value={sp?.retryLimitReached
+            ? `${sp.retryAttempt} — limit reached`
+            : sp?.retryAttempt ? `${sp.retryAttempt} (auto-backoff)` : '0'}
         />
         <SettingsRow label="Retry Registration" icon="↻" onPress={() => sp?.reconnect?.()} />
+        <SettingsRow
+          label="Clear SIP status"
+          icon="✕"
+          onPress={() => sp?.clearSipState?.()}
+          value="Reset persisted state"
+        />
       </Card>
 
       {sp?.lastPersistedError && (
@@ -105,19 +113,44 @@ export default function SettingsScreen({
 
       <SectionTitle eyebrow="SIP" title="Event log" />
       <Card padded={true}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 11, color: colors.mutedSilver }}>
             {(sp?.sipLog?.length || 0)} events (latest first)
           </span>
-          <button
-            onClick={() => sp?.clearSipLog?.()}
-            style={{
-              background: 'transparent', border: `1px solid ${colors.border}`,
-              color: colors.textIce, fontSize: 11, padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
-            }}
-          >
-            Clear log
-          </button>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button
+              onClick={async () => {
+                const text = (sp?.sipLog || [])
+                  .map((e: any) => `${new Date(e.time).toISOString()} [${e.level}] ${e.event}${e.detail ? ' — ' + e.detail : ''}`)
+                  .join('\n');
+                const payload = `# AVA SIP log\nExt: ${sp?.sipConfig?.extension || '—'}@${sp?.sipConfig?.domain || '—'}\nWSS: ${sp?.sipConfig?.wssUrl || '—'}\nStatus: ${sp?.snap?.status}\n\n${text}`;
+                try {
+                  if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(payload);
+                  else {
+                    const ta = document.createElement('textarea');
+                    ta.value = payload; document.body.appendChild(ta); ta.select();
+                    document.execCommand('copy'); document.body.removeChild(ta);
+                  }
+                  alert('SIP log copied to clipboard');
+                } catch { alert('Copy failed'); }
+              }}
+              style={{
+                background: 'transparent', border: `1px solid ${colors.border}`,
+                color: colors.textIce, fontSize: 11, padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
+              }}
+            >
+              Copy SIP log
+            </button>
+            <button
+              onClick={() => sp?.clearSipLog?.()}
+              style={{
+                background: 'transparent', border: `1px solid ${colors.border}`,
+                color: colors.textIce, fontSize: 11, padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
+              }}
+            >
+              Clear log
+            </button>
+          </div>
         </div>
         <div style={{
           maxHeight: 260, overflowY: 'auto', fontFamily: 'JetBrains Mono, monospace',
