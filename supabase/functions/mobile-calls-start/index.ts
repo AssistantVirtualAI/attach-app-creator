@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
     const target = e164(to);
 
     const { data: sp } = await admin.from("pbx_softphone_users")
-      .select("organization_id, extension, sip_domain, dnd_enabled")
+      .select("organization_id, extension, sip_domain, domain_uuid, dnd_enabled")
       .eq("portal_user_id", u.user.id).maybeSingle();
     if (!sp) return json({ error: "NO_SOFTPHONE_ACCOUNT" }, 404);
     if (!sp.extension || !sp.sip_domain) return json({ error: "NO_DIAL_EXTENSION" }, 403);
@@ -52,6 +52,8 @@ Deno.serve(async (req) => {
     // Log call attempt
     const { data: rec } = await admin.from("pbx_call_records").insert({
       organization_id: sp.organization_id,
+      domain_uuid: sp.domain_uuid,
+      extension: sp.extension,
       direction: "outbound",
       caller_number: sp.extension,
       destination_number: target,
