@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Sparkles, Loader2 } from 'lucide-react';
 import { colors, font, radius, gradients } from '../lib/theme';
 import { mobileApi, RecordingEntry } from '../lib/mobileApi';
 import { Card, Chip, SectionTitle, EmptyState, Skeleton } from '../components/ui/Primitives';
