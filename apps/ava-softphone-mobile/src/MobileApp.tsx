@@ -10,7 +10,7 @@ import AVAChatScreen from './screens/AVAChatScreen';
 import TeamChatScreen from './screens/TeamChatScreen';
 import MoreScreen from './screens/MoreScreen';
 import VoicemailScreen from './screens/VoicemailScreen';
-import RecordingsScreen from './screens/RecordingsScreen';
+// RecordingsScreen is rendered as a sub-tab inside CallsScreen, not as a standalone tab.
 import ContactsScreen from './screens/ContactsScreen';
 import MessagesScreen from './screens/MessagesScreen';
 import MessagesHubScreen from './screens/MessagesHubScreen';
