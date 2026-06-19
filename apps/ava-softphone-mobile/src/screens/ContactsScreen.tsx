@@ -84,10 +84,11 @@ export default function ContactsScreen({ sp }: { sp: any }) {
   }, [loadContacts, mobile.loading, mobile.accessToken, mobile.domainUuid, mobile.organizationId]);
 
   useEffect(() => {
-    if (!mobile.accessToken || !mobile.domainUuid) return;
+    if (!mobile.accessToken || (!mobile.domainUuid && !mobile.organizationId)) return;
     const client = authedRealtime(mobile.accessToken);
-    const softphoneChannel = client.channel(`contacts-domain-${mobile.domainUuid}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pbx_softphone_users', filter: `domain_uuid=eq.${mobile.domainUuid}` } as any, () => loadContacts().catch(() => {}))
+    const softphoneFilter = mobile.domainUuid ? `domain_uuid=eq.${mobile.domainUuid}` : `organization_id=eq.${mobile.organizationId}`;
+    const softphoneChannel = client.channel(`contacts-${mobile.domainUuid || mobile.organizationId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pbx_softphone_users', filter: softphoneFilter } as any, () => loadContacts().catch(() => {}))
       .subscribe();
     const presenceChannel = client.channel(`presence-domain-${mobile.organizationId || mobile.domainUuid}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'user_presence', ...(mobile.organizationId ? { filter: `organization_id=eq.${mobile.organizationId}` } : {}) } as any, () => loadPresence(contacts).catch(() => {}))
