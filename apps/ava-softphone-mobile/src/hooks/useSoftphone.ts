@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createSIPUA, JsSIPUnavailableError, SIPConfig, sdpModifier, classifySipFailure, hasWebRTC, WEBRTC_UNAVAILABLE_MESSAGE } from '../lib/sip/jssipProvider';
 import {
-  appendSipLog, clearSipLog as clearPersistedLog, loadPersistedError, loadPersistedStatus,
-  loadSipLog, PersistedSipError, RETRY_BACKOFF_MS, savePersistedError, savePersistedStatus,
+  appendSipLog, clearSipLog as clearPersistedLog, clearPersistedStatus, loadPersistedError, loadPersistedStatus,
+  loadSipLog, MAX_AUTO_RETRIES, PersistedSipError, probeWss, RETRY_BACKOFF_MS, savePersistedError, savePersistedStatus,
   SipLogEntry,
 } from '../lib/sip/sipPersistence';
 
@@ -32,10 +32,14 @@ export interface UseSoftphoneReturn {
   /** Rolling buffer of SIP-related events (latest last). */
   sipLog: SipLogEntry[];
   clearSipLog: () => void;
+  /** Clear persisted sipStatus + last sipError (also resets retry cap). */
+  clearSipState: () => void;
   /** Current retry attempt counter (0 = none). */
   retryAttempt: number;
   /** When the next auto-retry is scheduled (epoch ms) or null. */
   nextRetryAt: number | null;
+  /** True once auto-retry budget is exhausted — requires manual reconnect. */
+  retryLimitReached: boolean;
 }
 
 export function useSoftphone(
@@ -53,6 +57,7 @@ export function useSoftphone(
   const [sipLog, setSipLog] = useState<SipLogEntry[]>(() => loadSipLog());
   const [retryAttempt, setRetryAttempt] = useState(0);
   const [nextRetryAt, setNextRetryAt] = useState<number | null>(null);
+  const [retryLimitReached, setRetryLimitReached] = useState(false);
 
   const uaRef = useRef<any>(null);
   const sessionRef = useRef<any>(null);
