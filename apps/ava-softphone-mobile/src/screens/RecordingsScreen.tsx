@@ -29,6 +29,7 @@ export default function RecordingsScreen() {
   const [extFilter, setExtFilter] = useState<string>('all');
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [myExt, setMyExt] = useState<string | null>(null);
+  const [domainExtensions, setDomainExtensions] = useState<string[]>([]);
   const objectUrls = useRef<Set<string>>(new Set());
 
   // Resolve admin role + own extension once
@@ -40,6 +41,15 @@ export default function RecordingsScreen() {
       if (!m?.permissions?.admin && m?.extension?.number) setExtFilter(m.extension.number);
     }).catch(() => { setIsAdmin(false); });
   }, [mobile.accessToken]);
+
+  // Load every extension in the PBX domain so the filter dropdown lists them all
+  // (not just the ones already present in the last 100 recordings).
+  useEffect(() => {
+    if (!mobile.accessToken || !mobile.domainUuid || !isAdmin) return;
+    restGet<{ extension: string }[]>(`/rest/v1/pbx_extensions_directory?select=extension&domain_uuid=eq.${encodeURIComponent(mobile.domainUuid)}&enabled=eq.true&order=extension.asc`, mobile.accessToken)
+      .then((rows) => setDomainExtensions((rows || []).map((r) => String(r.extension)).filter(Boolean)))
+      .catch(() => setDomainExtensions([]));
+  }, [mobile.accessToken, mobile.domainUuid, isAdmin]);
 
   const load = useCallback(async () => {
     if (!mobile.accessToken || !mobile.domainUuid) return;
