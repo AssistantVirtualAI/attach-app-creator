@@ -26,7 +26,7 @@ export function useSyncStatus() {
       const d = (e as CustomEvent).detail;
       if (d && typeof d.connected === 'boolean') {
         setSyncConnected(d.connected);
-        setLastSyncAt(d.connected ? d.at || Date.now() : (prev) => prev);
+        if (d.connected) setLastSyncAt(d.at || Date.now());
         setNextRetryAt(d.nextRetryAt ?? null);
         setAttempt(Number(d.attempt || 0));
       }
