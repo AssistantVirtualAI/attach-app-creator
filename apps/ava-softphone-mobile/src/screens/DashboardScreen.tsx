@@ -7,6 +7,8 @@ import { Card, Chip, SectionTitle, Skeleton, StatusDot, AIPanel, GhostButton } f
 import { LemtelMark, AvaBadge, HeroGradient } from '../components/Brand';
 import { useAutoSync } from '../hooks/useAutoSync';
 import { useTheme } from '../lib/ThemeContext';
+import { useMobileCredentials } from '../hooks/useMobileCredentials';
+import { restGet } from '../lib/mobileSupabase';
 import type { Tab } from '../components/BottomTabs';
 
 const RANGE_LABELS: Record<StatsRange, string> = { today: 'Today', '7d': '7 days', '30d': '30 days' };
