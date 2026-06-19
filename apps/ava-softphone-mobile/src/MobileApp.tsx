@@ -161,7 +161,13 @@ function AuthenticatedShell({
     });
     configureAudit(async () => creds.accessToken || null);
     if (creds.accessToken) audit('softphone.signed_in', creds.userId, { extension: creds.extension });
+    // Backfill organizationId on legacy sessions that signed in before the
+    // user_roles resolver was added — keeps Recording debug + CDR realtime working.
+    if (creds.accessToken && creds.userId && !creds.organizationId) {
+      ensureStoredOrganizationId().catch(() => {});
+    }
   }, [creds]);
+
 
   // Once the permission gate is dismissed, finalize permissions + push.
   useEffect(() => {
