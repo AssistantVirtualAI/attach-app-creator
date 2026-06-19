@@ -18,7 +18,7 @@ export function Card({
     accent === 'blue'   ? colors.blueGlow : null;
 
   return (
-    <div onClick={onPress} style={{
+    <div onClick={onPress} className="lemtel-card" style={{
       position: 'relative',
       background: gradients.card,
       border: `1px solid ${accentColor ? accentColor + '44' : colors.border}`,

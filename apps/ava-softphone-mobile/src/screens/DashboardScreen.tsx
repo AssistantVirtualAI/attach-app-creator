@@ -7,6 +7,8 @@ import { Card, Chip, SectionTitle, Skeleton, StatusDot, AIPanel, GhostButton } f
 import { LemtelMark, AvaBadge, HeroGradient } from '../components/Brand';
 import { useAutoSync } from '../hooks/useAutoSync';
 import { useTheme } from '../lib/ThemeContext';
+import { useMobileCredentials } from '../hooks/useMobileCredentials';
+import { restGet } from '../lib/mobileSupabase';
 import type { Tab } from '../components/BottomTabs';
 
 const RANGE_LABELS: Record<StatsRange, string> = { today: 'Today', '7d': '7 days', '30d': '30 days' };
@@ -139,6 +141,13 @@ export default function DashboardScreen({
         <Metric label="Active ext." value={s?.activeExtensions ?? undefined} tone="violet" />
       </div>
 
+      {m?.extension?.number && (
+        <>
+          <SectionTitle eyebrow="My extension" title={`Ext ${m.extension.number} · ${RANGE_LABELS[range]}`} />
+          <MyExtensionStats range={range} extension={m.extension.number} domainUuid={m.domain.fusionpbxDomainUuid} />
+        </>
+      )}
+
       <SectionTitle eyebrow={RANGE_LABELS[range]} title="Calls per day" />
       <Card padded={true}>
         <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(1, buckets.length)}, 1fr)`, gap: range === '30d' ? 2 : 6, alignItems: 'end', height: 90 }}>
@@ -243,5 +252,46 @@ function Metric({ label, value, tone }: { label: string; value?: number | string
         {value ?? <Skeleton w={40} h={22} />}
       </div>
     </Card>
+  );
+}
+
+function MyExtensionStats({ range, extension, domainUuid }: { range: StatsRange; extension: string; domainUuid?: string | null }) {
+  const mobile = useMobileCredentials();
+  const [s, setS] = React.useState<{ total: number; answered: number; missed: number; voicemails: number; recordings: number; avgSec: number } | null>(null);
+  const [err, setErr] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (!mobile.accessToken || !domainUuid) return;
+    const now = new Date();
+    const since = new Date(now);
+    if (range === 'today') since.setHours(0, 0, 0, 0);
+    else if (range === '7d') since.setDate(now.getDate() - 7);
+    else since.setDate(now.getDate() - 30);
+    const sinceIso = since.toISOString();
+    const url = `/rest/v1/pbx_call_records?select=id,call_status,duration_seconds,has_recording,direction&domain_uuid=eq.${encodeURIComponent(domainUuid)}&extension=eq.${encodeURIComponent(extension)}&start_at=gte.${encodeURIComponent(sinceIso)}&limit=1000`;
+    restGet<any[]>(url, mobile.accessToken)
+      .then((rows) => {
+        const r = rows || [];
+        const total = r.length;
+        const answered = r.filter((x) => (x.call_status || '').toLowerCase() === 'answered').length;
+        const missed = r.filter((x) => ['missed', 'no_answer', 'noanswer'].includes(String(x.call_status || '').toLowerCase())).length;
+        const voicemails = r.filter((x) => String(x.call_status || '').toLowerCase().includes('voicemail')).length;
+        const recordings = r.filter((x) => !!x.has_recording).length;
+        const dur = r.reduce((a, x) => a + (Number(x.duration_seconds) || 0), 0);
+        setS({ total, answered, missed, voicemails, recordings, avgSec: total ? Math.round(dur / total) : 0 });
+      })
+      .catch((e) => setErr(e?.message || 'Failed'));
+  }, [mobile.accessToken, domainUuid, extension, range]);
+
+  if (err) return <Card accent="gold"><div style={{ fontSize: font.sm, color: colors.danger }}>{err}</div></Card>;
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+      <Metric label="My calls" value={s?.total} tone="cyan" />
+      <Metric label="My answered" value={s?.answered} tone="success" />
+      <Metric label="My missed" value={s?.missed} tone="danger" />
+      <Metric label="My voicemails" value={s?.voicemails} tone="gold" />
+      <Metric label="My recordings" value={s?.recordings} tone="violet" />
+      <Metric label="My avg duration" value={s != null ? `${s.avgSec}s` : undefined} tone="cyan" />
+    </div>
   );
 }

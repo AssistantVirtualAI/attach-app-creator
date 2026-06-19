@@ -25,16 +25,33 @@ export default function RecordingsScreen() {
   const [loadingAudio, setLoadingAudio] = useState<string | null>(null);
   const [busy, setBusy] = useState<Record<string, 'running' | 'failed' | undefined>>({});
   const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
+  const [extFilter, setExtFilter] = useState<string>('all');
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const [myExt, setMyExt] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const urlCache = useRef<Map<string, string>>(new Map());
   const objectUrls = useRef<Set<string>>(new Set());
 
+  // Resolve admin role + own extension once
+  useEffect(() => {
+    if (!mobile.accessToken) return;
+    mobileApi.me().then((m) => {
+      setIsAdmin(!!m?.permissions?.admin);
+      setMyExt(m?.extension?.number || null);
+      if (!m?.permissions?.admin && m?.extension?.number) setExtFilter(m.extension.number);
+    }).catch(() => { setIsAdmin(false); });
+  }, [mobile.accessToken]);
+
   const load = useCallback(async () => {
     if (!mobile.accessToken || !mobile.domainUuid) return;
-    const rows = await restGet<Recording[]>(`/rest/v1/pbx_call_records?select=id,pbx_uuid,organization_id,domain_uuid,domain_name,caller_name,caller_number,destination_number,extension,start_at,duration_seconds,transcribed,ai_summary,recording_path,recording_name,recording_url&domain_uuid=eq.${encodeURIComponent(mobile.domainUuid)}&or=(has_recording.eq.true,recording_path.not.is.null,recording_url.not.is.null)&order=start_at.desc&limit=100`, mobile.accessToken);
+    if (isAdmin === null) return; // wait until role resolved
+    const scopedExt = !isAdmin ? (myExt || '__none__') : (extFilter !== 'all' ? extFilter : null);
+    const extClause = scopedExt ? `&extension=eq.${encodeURIComponent(scopedExt)}` : '';
+    const rows = await restGet<Recording[]>(`/rest/v1/pbx_call_records?select=id,pbx_uuid,organization_id,domain_uuid,domain_name,caller_name,caller_number,destination_number,extension,start_at,duration_seconds,transcribed,ai_summary,recording_path,recording_name,recording_url&domain_uuid=eq.${encodeURIComponent(mobile.domainUuid)}${extClause}&or=(has_recording.eq.true,recording_path.not.is.null,recording_url.not.is.null)&order=start_at.desc&limit=100`, mobile.accessToken);
     setData(rows || []);
     setLastSyncedAt(Date.now());
-  }, [mobile.accessToken, mobile.domainUuid]);
+  }, [mobile.accessToken, mobile.domainUuid, isAdmin, myExt, extFilter]);
+
 
   useEffect(() => {
     if (mobile.loading) return;
@@ -110,7 +127,17 @@ export default function RecordingsScreen() {
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, padding: '8px 10px', borderRadius: 12, background: 'rgba(255,255,255,0.7)', border: `1px solid ${colors.border}` }}><Search size={14} color={colors.mutedSilver} /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search recordings…" style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 13, color: colors.textIce }} /></div>
         <button onClick={() => load().catch((e) => setError(e?.message || 'Refresh failed'))} disabled={mobile.loading} style={{ padding: '8px 12px', borderRadius: 999, border: `1px solid ${colors.border}`, background: 'rgba(255,255,255,0.7)', color: colors.lemtelBlue, fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>{mobile.loading ? '…' : '↻'}</button>
       </div>
-      <div style={{ fontSize: font.xs, color: colors.mutedSilver, margin: '0 2px 10px' }}>{filtered.length} of {data?.length ?? 0} · live sync {lastSyncedAt ? `· ${new Date(lastSyncedAt).toLocaleTimeString()}` : ''}</div>
+      {isAdmin && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '0 2px 10px' }}>
+          <label style={{ fontSize: font.xs, color: colors.mutedSilver, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>Extension</label>
+          <select value={extFilter} onChange={(e) => setExtFilter(e.target.value)} style={{ flex: 1, padding: '7px 10px', borderRadius: 10, border: `1px solid ${colors.border}`, background: 'rgba(255,255,255,0.7)', color: colors.textIce, fontSize: 12, fontWeight: 700 }}>
+            <option value="all">All extensions</option>
+            {myExt && <option value={myExt}>Mine ({myExt})</option>}
+            {Array.from(new Set((data || []).map((r) => r.extension).filter(Boolean) as string[])).sort().filter((e) => e !== myExt).map((e) => <option key={e} value={e}>{e}</option>)}
+          </select>
+        </div>
+      )}
+      <div style={{ fontSize: font.xs, color: colors.mutedSilver, margin: '0 2px 10px' }}>{filtered.length} of {data?.length ?? 0} · {isAdmin ? (extFilter === 'all' ? 'all extensions' : `ext ${extFilter}`) : `ext ${myExt || '—'} only`} · live sync {lastSyncedAt ? `· ${new Date(lastSyncedAt).toLocaleTimeString()}` : ''}</div>
       {error && <Card accent="gold"><div style={{ fontSize: font.sm, color: colors.danger }}>{error}</div></Card>}
       {!data && !error && [1, 2, 3, 4].map((i) => <Card key={i} style={{ marginBottom: 8 }}><Skeleton w="65%" h={14} /><div style={{ height: 6 }} /><Skeleton w="35%" h={10} /></Card>)}
       {data && data.length === 0 && <EmptyState icon="◉" title="No recordings yet" hint="Recorded calls from your SIP domain will appear here." />}
