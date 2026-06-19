@@ -224,7 +224,12 @@ function RecordingsTab({ orgId, extension, search }: { orgId: string; extension:
         ...row,
         transcribed: result.stage === 'complete',
         ai_summary: result.data?.summary ?? row.ai_summary,
-        ai_sentiment: result.data?.sentiment ?? row.ai_sentiment,
+        raw_data: {
+          ...(row.raw_data || {}),
+          transcript_text: result.data?.transcript_text || result.data?.transcript || row.raw_data?.transcript_text,
+          transcript_provider: result.data?.transcript_provider || row.raw_data?.transcript_provider,
+          ai: result.data?.insights || result.data?.analysis || row.raw_data?.ai,
+        },
       } : row);
     });
     setWorking(null);
