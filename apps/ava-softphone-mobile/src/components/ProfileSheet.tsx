@@ -42,8 +42,12 @@ export default function ProfileSheet({
   const [savingStatus, setSavingStatus] = useState<Status | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [pwOpen, setPwOpen] = useState(false);
+  const [pwNew, setPwNew] = useState('');
+  const [pwConfirm, setPwConfirm] = useState('');
   const [pwBusy, setPwBusy] = useState(false);
   const [pwMsg, setPwMsg] = useState<string | null>(null);
+  const [pwError, setPwError] = useState(false);
 
   // Load current status + avatar
   useEffect(() => {
