@@ -4798,13 +4798,17 @@ export type Database = {
       pbx_call_records: {
         Row: {
           ai_processing: boolean | null
+          ai_summary: string | null
           analyzed: boolean | null
+          analyzed_at: string | null
           answer_at: string | null
           billsec: number | null
+          call_score: number | null
           call_status: string | null
           caller_name: string | null
           caller_number: string | null
           client_id: string | null
+          coaching_points: Json | null
           codec: string | null
           created_at: string | null
           crm_synced: boolean | null
@@ -4835,24 +4839,30 @@ export type Database = {
           recording_path: string | null
           recording_url: string | null
           ring_group_uuid: string | null
+          sentiment: string | null
           sip_call_id: string | null
           source_number: string | null
           start_at: string | null
           tags: string[] | null
           transcribed: boolean | null
+          transcription: string | null
           tta: number | null
           voicemail_message: string | null
           waitsec: number | null
         }
         Insert: {
           ai_processing?: boolean | null
+          ai_summary?: string | null
           analyzed?: boolean | null
+          analyzed_at?: string | null
           answer_at?: string | null
           billsec?: number | null
+          call_score?: number | null
           call_status?: string | null
           caller_name?: string | null
           caller_number?: string | null
           client_id?: string | null
+          coaching_points?: Json | null
           codec?: string | null
           created_at?: string | null
           crm_synced?: boolean | null
@@ -4883,24 +4893,30 @@ export type Database = {
           recording_path?: string | null
           recording_url?: string | null
           ring_group_uuid?: string | null
+          sentiment?: string | null
           sip_call_id?: string | null
           source_number?: string | null
           start_at?: string | null
           tags?: string[] | null
           transcribed?: boolean | null
+          transcription?: string | null
           tta?: number | null
           voicemail_message?: string | null
           waitsec?: number | null
         }
         Update: {
           ai_processing?: boolean | null
+          ai_summary?: string | null
           analyzed?: boolean | null
+          analyzed_at?: string | null
           answer_at?: string | null
           billsec?: number | null
+          call_score?: number | null
           call_status?: string | null
           caller_name?: string | null
           caller_number?: string | null
           client_id?: string | null
+          coaching_points?: Json | null
           codec?: string | null
           created_at?: string | null
           crm_synced?: boolean | null
@@ -4931,11 +4947,13 @@ export type Database = {
           recording_path?: string | null
           recording_url?: string | null
           ring_group_uuid?: string | null
+          sentiment?: string | null
           sip_call_id?: string | null
           source_number?: string | null
           start_at?: string | null
           tags?: string[] | null
           transcribed?: boolean | null
+          transcription?: string | null
           tta?: number | null
           voicemail_message?: string | null
           waitsec?: number | null
