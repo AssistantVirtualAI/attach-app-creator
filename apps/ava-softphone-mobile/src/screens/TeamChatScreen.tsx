@@ -56,6 +56,9 @@ export default function TeamChatScreen({ accessToken, userId }: { accessToken: s
   const [groupPicks, setGroupPicks] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<number | null>(null);
+  const [channelQuery, setChannelQuery] = useState('');
+  const [msgQuery, setMsgQuery] = useState('');
+  const [showMsgSearch, setShowMsgSearch] = useState(false);
 
   // Load channels + members + heartbeat presence
   useEffect(() => {
