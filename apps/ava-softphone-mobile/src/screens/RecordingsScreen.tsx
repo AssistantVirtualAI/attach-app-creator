@@ -1,17 +1,57 @@
-import React, { useState } from 'react';
-import { Sparkles, Loader2 } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Sparkles, Loader2, Search } from 'lucide-react';
+import { createClient } from '@supabase/supabase-js';
 import { colors, font, radius, gradients } from '../lib/theme';
 import { mobileApi, RecordingEntry } from '../lib/mobileApi';
 import { Card, Chip, SectionTitle, EmptyState, Skeleton } from '../components/ui/Primitives';
 import { useAutoSync } from '../hooks/useAutoSync';
 import CallDetailScreen from './CallDetailScreen';
 import { showMobileToast } from '../lib/mobileToast';
+import { getCredentials } from '../lib/creds';
+
+const SUPABASE_URL = 'https://gejxisrqtvxavbrfcoxz.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdlanhpc3JxdHZ4YXZicmZjb3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1MDMxNzQsImV4cCI6MjA3NzA3OTE3NH0.kaO-GslE99OCNrZ4_AMnbzGqya2azqz_UMZR34zZvvo';
+let _recClient: ReturnType<typeof createClient> | null = null;
+function recClient(token?: string | null) {
+  if (!_recClient) _recClient = createClient(SUPABASE_URL, SUPABASE_ANON, { auth: { persistSession: false, autoRefreshToken: false } });
+  if (token) _recClient.realtime.setAuth(token);
+  return _recClient;
+}
 
 export default function RecordingsScreen() {
   const { data, loading, refresh, lastSyncedAt, error } =
     useAutoSync<RecordingEntry[]>(() => mobileApi.recordings(), { intervalMs: 60_000 });
   const [open, setOpen] = useState<string | null>(null);
   const [busy, setBusy] = useState<Record<string, 'running' | 'failed' | undefined>>({});
+  const [q, setQ] = useState('');
+
+  // Realtime: refresh on any change to pbx_call_recordings for this domain.
+  useEffect(() => {
+    let channel: any = null;
+    let cancelled = false;
+    (async () => {
+      const c = await getCredentials();
+      if (!c?.accessToken) return;
+      const client = recClient(c.accessToken);
+      const domainUuid = (c as any).domainUuid || (c as any).fusionpbxDomainUuid;
+      const filter = domainUuid ? `domain_uuid=eq.${domainUuid}` : undefined;
+      channel = client
+        .channel('rec-mobile')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'pbx_call_recordings', ...(filter ? { filter } : {}) } as any,
+          () => { if (!cancelled) refresh(); })
+        .subscribe();
+    })();
+    return () => { cancelled = true; try { channel && _recClient?.removeChannel(channel); } catch {} };
+  }, []);
+
+  const filtered = useMemo(() => {
+    if (!data) return data;
+    const t = q.trim().toLowerCase();
+    if (!t) return data;
+    return data.filter((r) =>
+      [r.customer, r.from, r.summary].filter(Boolean).some((v: any) => String(v).toLowerCase().includes(t))
+    );
+  }, [data, q]);
 
   const transcribe = async (id: string) => {
     if (busy[id] === 'running') return;
