@@ -37,14 +37,14 @@ export function waitForJsSIP(timeoutMs = 8000, intervalMs = 100): Promise<any> {
       else reject(new JsSIPUnavailableError('No window (SSR/non-browser)'));
       return;
     }
-    const bundled = bundledJsSIP();
-    if (bundled) {
-      window.JsSIP = window.JsSIP || bundled;
-      resolve(bundled);
-      return;
-    }
     if (window.JsSIP) {
       resolve(window.JsSIP);
+      return;
+    }
+    const bundled = bundledJsSIP();
+    if (bundled) {
+      window.JsSIP = bundled;
+      resolve(bundled);
       return;
     }
     const start = Date.now();
