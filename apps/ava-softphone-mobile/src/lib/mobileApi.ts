@@ -342,6 +342,10 @@ export const mobileApi = {
     '/ai-analyze-call', { method: 'POST', body: JSON.stringify({ call_record_id: callId }) },
     { jobId: 'job-' + Date.now() },
   ),
+  transcribeCall: (callId: string) => call<{ transcript_text?: string; stub?: boolean; reason?: string; error?: string; details?: string; fetchErrors?: string[] }>(
+    '/ai-transcribe-call', { method: 'POST', body: JSON.stringify({ call_record_id: callId }) },
+    { transcript_text: 'Mock transcript', stub: false },
+  ),
   generateGreeting: (prompt: string) => call<{ text: string; audioUrl?: string }>(
     '/elevenlabs-generate-greeting', { method: 'POST', body: JSON.stringify({ prompt }) },
     { text: `Thanks for calling Lemtel. Leave a message and we'll call you back. ${prompt ? `(${prompt})` : ''}` },
