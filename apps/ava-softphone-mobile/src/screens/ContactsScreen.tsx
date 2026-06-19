@@ -150,4 +150,20 @@ function statusFor(pres: Presence | null, c: Contact) {
   return pres?.status || c.status || 'available';
 }
 
+function AddContactSheet({ value, setValue, onClose, onSave }: { value: { name: string; phone: string; email: string; company: string }; setValue: (v: any) => void; onClose: () => void; onSave: () => void }) {
+  const set = (key: keyof typeof value, next: string) => setValue((v: typeof value) => ({ ...v, [key]: next }));
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 40, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'flex-end' }}>
+      <div style={{ width: '100%', padding: '14px', borderTopLeftRadius: 18, borderTopRightRadius: 18, background: '#0d1426', border: `1px solid ${colors.border}` }}>
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
+          <div style={{ flex: 1, color: colors.textIce, fontWeight: 900, fontSize: 18 }}>New contact</div>
+          <button onClick={onClose} style={{ width: 34, height: 34, borderRadius: 17, border: `1px solid ${colors.border}`, background: 'rgba(255,255,255,0.04)', color: colors.textIce }}><X size={16} /></button>
+        </div>
+        {(['name', 'phone', 'email', 'company'] as const).map((k) => <input key={k} value={value[k]} onChange={(e) => set(k, e.target.value)} placeholder={k === 'phone' ? 'Phone or extension' : k[0].toUpperCase() + k.slice(1)} style={{ width: '100%', height: 42, boxSizing: 'border-box', marginBottom: 8, padding: '0 12px', borderRadius: radius.md, border: `1px solid ${colors.border}`, background: 'rgba(255,255,255,0.06)', color: colors.textIce, outline: 'none' }} />)}
+        <button onClick={onSave} disabled={!value.name.trim() || !value.phone.trim()} style={{ width: '100%', height: 44, borderRadius: radius.md, border: 'none', background: value.name.trim() && value.phone.trim() ? `linear-gradient(135deg, ${colors.lemtelBlue}, ${colors.avaCyan})` : 'rgba(255,255,255,0.08)', color: colors.textIce, fontWeight: 900 }}>Save contact</button>
+      </div>
+    </div>
+  );
+}
+
 const STATUS_COLOR: Record<string, string> = { available: '#22c55e', online: '#22c55e', busy: '#f59e0b', dnd: '#ef4444', on_call: '#3b82f6', away: '#94a3b8', offline: '#64748b', meeting: '#a855f7', lunch: '#eab308', break: '#f97316', out_of_office: '#64748b' };
