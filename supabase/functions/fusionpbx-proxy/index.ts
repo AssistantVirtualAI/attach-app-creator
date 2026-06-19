@@ -162,7 +162,7 @@ Deno.serve(async (req) => {
   // domain_uuid is being acted upon. This lets each customer's admin manage
   // their own phone system through the proxy.
   if (!isServiceCall && userId) {
-    const readOnly = new Set(["ping", "debug-raw", "resolve-domain", "diagnostics", "list-extensions", "list-domains", "list-cdrs", "get-cdrs", "sync-cdrs", "backfill-cdrs", "sync-domains", "sync-voicemail-messages", "sync-ivr-options", "sync-all", "get-recording", "get-recording-signed-url", "list-queues", "list-ivrs", "list-ring-groups", "list-moh", "list-recordings", "list-devices", "list-destinations", "list-voicemails", "list-voicemail-messages", "list-registrations", "get-registrations", "get-registrations-live", "list-gateways", "list-gateways-all-domains", "list-gateways-merged", "get-gateways", "list-sip-profiles", "list-conferences", "list-hold-music", "list-dialplans", "get-extension", "sync_status", "sync-status", "list-active-calls", "get-active-calls-live", "system-status", "get-system-health-live", "desktop-audit"]);
+    const readOnly = new Set(["ping", "debug-raw", "resolve-domain", "diagnostics", "list-extensions", "list-domains", "list-cdrs", "get-cdrs", "sync-cdrs", "backfill-cdrs", "sync-domains", "sync-voicemail-messages", "sync-ivr-options", "sync-all", "get-recording", "get-recording-signed-url", "list-queues", "queue-login", "queue-logout", "queue-pause", "list-ivrs", "list-ring-groups", "list-moh", "list-recordings", "list-devices", "list-destinations", "list-voicemails", "list-voicemail-messages", "list-registrations", "get-registrations", "get-registrations-live", "list-gateways", "list-gateways-all-domains", "list-gateways-merged", "get-gateways", "list-sip-profiles", "list-conferences", "list-hold-music", "list-dialplans", "get-extension", "sync_status", "sync-status", "list-active-calls", "get-active-calls-live", "system-status", "get-system-health-live", "desktop-audit"]);
     const isRead = readOnly.has(_earlyAction);
     const rpcName = isRead ? "is_lemtel_member" : "is_lemtel_admin";
     const { data: allowed } = await admin.rpc(rpcName, { _user_id: userId });
@@ -696,6 +696,21 @@ Deno.serve(async (req) => {
 
     async function writeCollection(path: string, key: string, payload: any) {
       return pbxWrite(path, "POST", { [key]: [{ ...payload, domain_uuid: payload?.domain_uuid || requestedDomain || FUSIONPBX_DOMAIN_UUID }] });
+    }
+
+    if (action === "queue-login" || action === "queue-logout" || action === "queue-pause") {
+      const ext = String(params.extension || body.extension || "").trim();
+      const queueName = String(params.queue_name || params.queue_extension || params.queue_id || body.queue || "").trim();
+      if (!ext || !queueName) return json({ error: "extension and queue required" }, 400);
+      const paused = params.paused === true || params.paused === "true";
+      const status = action === "queue-logout" ? "Logged Out" : action === "queue-pause" && paused ? "On Break" : "Available";
+      const r = await pbxWrite("fifo_agent_status", "POST", {
+        action: action === "queue-login" ? "add" : action === "queue-logout" ? "remove" : "set-status",
+        agent: `${ext}@${params.sip_domain || body.sip_domain || ""}`.replace(/@$/, ""),
+        queue: queueName,
+        status,
+      });
+      return json({ ok: r.ok, status: r.status, data: r.data, message: r.message ?? null });
     }
 
     // ---- DOMAIN management (multi-tenant provisioning) ----

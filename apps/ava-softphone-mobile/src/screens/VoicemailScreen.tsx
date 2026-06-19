@@ -6,7 +6,8 @@ import { colors, font, radius, gradients } from '../lib/theme';
 import { mobileApi, VoicemailEntry } from '../lib/mobileApi';
 import { Card, Chip, EmptyState, GhostButton, AIPanel, Skeleton } from '../components/ui/Primitives';
 import { audit } from '../lib/audit';
-import { getCredentials } from '../lib/creds';
+import { useMobileCredentials } from '../hooks/useMobileCredentials';
+import { edgeCall } from '../lib/mobileSupabase';
 
 const SUPABASE_URL = 'https://gejxisrqtvxavbrfcoxz.supabase.co';
 const SUPABASE_ANON =
@@ -19,6 +20,7 @@ function vmClient(token?: string | null) {
 }
 
 export default function VoicemailScreen({ haptic }: { haptic?: (s?: ImpactStyle) => Promise<void> }) {
+  const mobile = useMobileCredentials();
   const [items, setItems] = useState<VoicemailEntry[] | null>(null);
   const [q, setQ] = useState('');
   const [refreshing, setRefreshing] = useState(false);
@@ -33,6 +35,11 @@ export default function VoicemailScreen({ haptic }: { haptic?: (s?: ImpactStyle)
   const [transcribeError, setTranscribeError] = useState<Record<string, string>>({});
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const urlCache = useRef<Map<string, string>>(new Map());
+  const [voices, setVoices] = useState<{ id: string; name: string }[]>([]);
+  const [greetingText, setGreetingText] = useState('');
+  const [voiceId, setVoiceId] = useState('EXAVITQu4vr4xnSDxMaL');
+  const [greetingBusy, setGreetingBusy] = useState(false);
+  const [greetingMsg, setGreetingMsg] = useState<string | null>(null);
 
   const reload = async () => {
     setRefreshing(true);
@@ -43,15 +50,45 @@ export default function VoicemailScreen({ haptic }: { haptic?: (s?: ImpactStyle)
   useEffect(() => { reload(); }, []);
   useEffect(() => () => { audioRef.current?.pause(); audioRef.current = null; }, []);
 
+  useEffect(() => {
+    if (!mobile.accessToken) return;
+    edgeCall<any>('user-voicemail-greeting', mobile.accessToken, { action: 'get_settings', payload: {} })
+      .then((r) => {
+        setVoices(r.voices || []);
+        setGreetingText(r.settings?.greeting_tts_text || '');
+        setVoiceId(r.settings?.greeting_voice_id || 'EXAVITQu4vr4xnSDxMaL');
+      })
+      .catch(() => {});
+  }, [mobile.accessToken]);
+
+  const saveGreeting = async () => {
+    if (!mobile.accessToken || !greetingText.trim()) return;
+    setGreetingBusy(true); setGreetingMsg(null);
+    try {
+      const created = await edgeCall<any>('user-voicemail-greeting', mobile.accessToken, {
+        action: 'create_greeting',
+        payload: { name: `Mobile greeting ${new Date().toLocaleDateString()}`, text: greetingText.trim(), voice_id: voiceId, extension: mobile.extension },
+      });
+      const id = created?.greeting?.id;
+      if (id) await edgeCall<any>('user-voicemail-greeting', mobile.accessToken, { action: 'activate_greeting', payload: { id } });
+      await edgeCall<any>('user-voicemail-greeting', mobile.accessToken, {
+        action: 'save_settings',
+        payload: { greeting_type: 'tts', greeting_tts_text: greetingText.trim(), greeting_voice_id: voiceId, greeting_voice_name: voices.find((v) => v.id === voiceId)?.name || null, transcription_enabled: true, ai_summary_enabled: true },
+      });
+      setGreetingMsg('Greeting updated with ElevenLabs voice.');
+    } catch (e: any) {
+      setGreetingMsg(e?.message || 'Greeting update failed');
+    } finally { setGreetingBusy(false); }
+  };
+
   // Realtime: refresh list on any change to pbx_voicemails for this domain/extension.
   useEffect(() => {
     let channel: any = null;
     let cancelled = false;
     (async () => {
-      const c = await getCredentials();
-      if (!c?.accessToken) return;
-      const client = vmClient(c.accessToken);
-      const domainUuid = (c as any).domainUuid || c.fusionpbxDomainUuid;
+      if (!mobile.accessToken) return;
+      const client = vmClient(mobile.accessToken);
+      const domainUuid = mobile.domainUuid;
       const filter = domainUuid ? `domain_uuid=eq.${domainUuid}` : undefined;
       channel = client
         .channel('vm-mobile')
@@ -60,7 +97,7 @@ export default function VoicemailScreen({ haptic }: { haptic?: (s?: ImpactStyle)
         .subscribe();
     })();
     return () => { cancelled = true; try { channel && _vmClient?.removeChannel(channel); } catch {} };
-  }, []);
+  }, [mobile.accessToken, mobile.domainUuid]);
 
 
   const fmt = (s: number) => {
@@ -189,10 +226,27 @@ export default function VoicemailScreen({ haptic }: { haptic?: (s?: ImpactStyle)
     </div>
   );
 
+  const GreetingEditor = (
+    <div style={{ padding: '0 14px 12px' }}>
+      <Card accent="violet">
+        <div style={{ fontSize: 11, color: colors.avaCyan, fontWeight: 800, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 8 }}>ElevenLabs greeting</div>
+        <textarea value={greetingText} onChange={(e) => setGreetingText(e.target.value)} placeholder="Type your voicemail greeting…" rows={3} style={{ width: '100%', boxSizing: 'border-box', padding: 10, borderRadius: radius.md, background: colors.graphite, border: `1px solid ${colors.border}`, color: colors.textIce, fontSize: font.sm, outline: 'none', resize: 'vertical', fontFamily: 'inherit' }} />
+        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+          <select value={voiceId} onChange={(e) => setVoiceId(e.target.value)} style={{ flex: 1, padding: '8px 10px', borderRadius: radius.md, background: colors.graphite, border: `1px solid ${colors.border}`, color: colors.textIce, fontSize: font.sm }}>
+            {(voices.length ? voices : [{ id: 'EXAVITQu4vr4xnSDxMaL', name: 'Sarah' }]).map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+          </select>
+          <button onClick={saveGreeting} disabled={greetingBusy || !greetingText.trim()} style={{ padding: '8px 12px', borderRadius: radius.md, border: 'none', background: greetingText.trim() ? gradients.call : 'rgba(255,255,255,0.08)', color: '#fff', fontSize: 12, fontWeight: 800, cursor: greetingBusy ? 'default' : 'pointer' }}>{greetingBusy ? '…' : 'Save'}</button>
+        </div>
+        {greetingMsg && <div style={{ marginTop: 8, fontSize: 11, color: greetingMsg.includes('failed') ? colors.danger : colors.success }}>{greetingMsg}</div>}
+      </Card>
+    </div>
+  );
+
   if (!items) {
     return (
       <div>
         {Header}
+        {GreetingEditor}
         <div style={{ padding: 14 }}>
           {Array.from({ length: 3 }).map((_, i) => (
             <div key={i} style={{ padding: 14, marginBottom: 8, borderRadius: radius.lg, background: gradients.card, border: `1px solid ${colors.border}` }}>
@@ -208,6 +262,7 @@ export default function VoicemailScreen({ haptic }: { haptic?: (s?: ImpactStyle)
     return (
       <div>
         {Header}
+        {GreetingEditor}
         <div style={{ padding: 14 }}>
           <EmptyState
             icon={<VmIcon size={28} />}
@@ -222,6 +277,7 @@ export default function VoicemailScreen({ haptic }: { haptic?: (s?: ImpactStyle)
   return (
     <div style={{ height: '100%', overflowY: 'auto' }}>
       {Header}
+      {GreetingEditor}
       <div style={{ padding: '0 14px 24px' }}>
       {filtered.map((v) => {
         const isOpen = openId === v.id;

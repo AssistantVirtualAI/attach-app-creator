@@ -3,13 +3,14 @@ import { Play, Pause, Loader2, Sparkles, RefreshCw, Stethoscope } from 'lucide-r
 import { colors, font, radius, gradients } from '../lib/theme';
 import { mobileApi, CallDetail } from '../lib/mobileApi';
 import { Card, Chip, AIPanel, Skeleton, GhostButton } from '../components/ui/Primitives';
-import { getCredentials, ensureStoredOrganizationId } from '../lib/creds';
 import RecordingDebugScreen from './RecordingDebugScreen';
 import { showMobileToast } from '../lib/mobileToast';
+import { useMobileCredentials } from '../hooks/useMobileCredentials';
 
 type AiStage = 'idle' | 'transcribing' | 'analyzing' | 'done' | 'error';
 
 export default function CallDetailScreen({ id, onBack }: { id: string; onBack: () => void }) {
+  const mobile = useMobileCredentials();
   const [debugOpen, setDebugOpen] = useState(false);
   const [data, setData] = useState<CallDetail | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -47,11 +48,9 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
     setAudioError(null);
     setLoadingAudio(true);
     try {
-      const creds = await getCredentials();
-      const orgId = creds?.organizationId || (await ensureStoredOrganizationId());
       const res: any = await mobileApi.voicemailAudio({
         xml_cdr_uuid: id,
-        organization_id: orgId || undefined,
+        organization_id: mobile.organizationId || undefined,
       });
       if (res?.ok === false || !res?.url) {
         const msg = res?.error === 'RECORDING_NOT_FOUND'
@@ -68,7 +67,7 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
     } finally {
       setLoadingAudio(false);
     }
-  }, [id]);
+  }, [id, mobile.organizationId]);
 
 
   const togglePlay = useCallback(async () => {

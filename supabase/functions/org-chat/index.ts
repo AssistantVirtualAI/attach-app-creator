@@ -266,7 +266,10 @@ Deno.serve(async (req) => {
       // Verify other user belongs to the same org
       const { data: other } = await admin.from("organization_members").select("user_id").eq("organization_id", orgId).eq("user_id", otherId).maybeSingle();
       const { data: other2 } = await admin.from("org_members").select("user_id").eq("org_id", orgId).eq("user_id", otherId).maybeSingle();
-      if (!other && !other2) return json({ error: "not_in_org" }, 403);
+      const { data: other3 } = (!other && !other2)
+        ? await admin.from("pbx_softphone_users").select("portal_user_id").eq("organization_id", orgId).eq("portal_user_id", otherId).maybeSingle()
+        : { data: null };
+      if (!other && !other2 && !other3) return json({ error: "not_in_org" }, 403);
       const pair = [userId, otherId].sort();
       const dmKey = `dm:${pair[0].slice(0, 8)}:${pair[1].slice(0, 8)}`;
       const { data: existing } = await admin
@@ -311,7 +314,12 @@ Deno.serve(async (req) => {
     if (action === "create_group") {
       const name = String(payload?.name ?? "").trim() || "group";
       const memberIds: string[] = Array.isArray(payload?.member_ids) ? payload.member_ids : [];
-      const { data, error } = await admin.rpc("create_group_chat", { _name: name, _member_ids: memberIds });
+      const members = Array.from(new Set([userId, ...memberIds]));
+      const { data, error } = await admin
+        .from("org_chat_channels")
+        .insert({ organization_id: orgId, name, channel_type: "private", created_by: userId, members, description: "Group chat" })
+        .select()
+        .single();
       if (error) throw error;
       return json({ channel: data });
     }
