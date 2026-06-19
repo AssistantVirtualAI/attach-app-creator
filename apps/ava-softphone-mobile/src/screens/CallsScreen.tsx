@@ -99,6 +99,7 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
         </>
       )}
 
+      {sub === 'recordings' && <div style={{ marginTop: 12 }}><RecordingsScreen /></div>}
       {sub === 'voicemail' && <div style={{ marginTop: 12 }}><VoicemailScreen haptic={haptic} /></div>}
 
       <div style={{ height: 80 }} />
