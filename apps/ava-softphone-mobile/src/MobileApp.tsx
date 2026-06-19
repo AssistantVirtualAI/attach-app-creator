@@ -108,10 +108,14 @@ function AuthenticatedShell({
     return () => { cancelled = true; };
   }, []);
 
-  // Build SIP config. Use known-working WSS / domain fallbacks so SIP can
-  // register even before the async credential hydration has completed.
+  // Build SIP config. ALWAYS use the known-working WSS endpoint as primary
+  // because mobile browsers refuse self-signed certs on wss://lemtel.lemtel.tel
+  // and wss://170.39.199.132. Desktop/Electron is more permissive, but mobile
+  // MUST use a CA-signed host. The fallback list inside jssipProvider also
+  // includes pbxnode.lemtel.tel for redundancy.
   const sipPassword = creds.sipPassword || (creds as any).sipPassword;
-  const wssUrl = creds.wssUrl || 'wss://node.lemtelcloud.net:7443';
+  const WORKING_WSS = 'wss://node.lemtelcloud.net:7443';
+  const wssUrl = WORKING_WSS; // hard-pin — backend may still return the broken host
   const sipDomain = creds.sipDomain || 'lemtel.lemtel.tel';
 
   const sipConfig = creds.extension && sipPassword
