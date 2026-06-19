@@ -25,6 +25,7 @@ export default function InboxScreen({
   initial?: SubTab;
 }) {
   const [tab, setTab] = useState<SubTab>(initial);
+  const { creds } = useStoredCreds();
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -38,7 +39,7 @@ export default function InboxScreen({
       </header>
 
       <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8,
+        display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6,
         padding: '0 14px 12px',
       }}>
         {TABS.map(({ id, label, Icon, accent }) => {
