@@ -255,7 +255,7 @@ function AuthenticatedShell({
         {tab === 'home'     && <DashboardScreen onNavigate={setTab as any} haptic={haptic} />}
         {tab === 'calls'    && <CallsScreen sp={sp} haptic={haptic} creds={creds} />}
         {tab === 'ava'      && <AVAChatScreen />}
-        {tab === 'messages' && <InboxScreen haptic={haptic} />}
+        {tab === 'messages' && <TeamChatScreen accessToken={creds.accessToken || null} userId={creds.userId} />}
         {tab === 'more'     && <MoreScreen creds={creds} sp={sp} onSignOut={onSignOut} haptic={haptic} />}
       </div>
 
