@@ -161,12 +161,18 @@ function AuthenticatedShell({
     });
     configureAudit(async () => creds.accessToken || null);
     if (creds.accessToken) audit('softphone.signed_in', creds.userId, { extension: creds.extension });
-    // Backfill organizationId on legacy sessions that signed in before the
-    // user_roles resolver was added — keeps Recording debug + CDR realtime working.
-    if (creds.accessToken && creds.userId && !creds.organizationId) {
-      ensureStoredOrganizationId().catch(() => {});
+    // Hydrate full SIP credentials (extension, sip_domain, wss_url, password,
+    // org, role) from softphone-credentials so Settings displays real data and
+    // SIP can register — covers email-only sign-ins and legacy sessions.
+    const missing = !creds.organizationId || !creds.extension || !creds.sipDomain || !creds.wssUrl || !creds.sipPassword;
+    if (creds.accessToken && missing) {
+      hydrateSoftphoneCredentials('mobile').then((next) => {
+        if (next) setCreds(next);
+        else if (!creds.organizationId) ensureStoredOrganizationId().catch(() => {});
+      }).catch(() => {});
     }
   }, [creds]);
+
 
 
   // Once the permission gate is dismissed, finalize permissions + push.
