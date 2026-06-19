@@ -25,16 +25,33 @@ export default function RecordingsScreen() {
   const [loadingAudio, setLoadingAudio] = useState<string | null>(null);
   const [busy, setBusy] = useState<Record<string, 'running' | 'failed' | undefined>>({});
   const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
+  const [extFilter, setExtFilter] = useState<string>('all');
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const [myExt, setMyExt] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const urlCache = useRef<Map<string, string>>(new Map());
   const objectUrls = useRef<Set<string>>(new Set());
 
+  // Resolve admin role + own extension once
+  useEffect(() => {
+    if (!mobile.accessToken) return;
+    mobileApi.me().then((m) => {
+      setIsAdmin(!!m?.permissions?.admin);
+      setMyExt(m?.extension?.number || null);
+      if (!m?.permissions?.admin && m?.extension?.number) setExtFilter(m.extension.number);
+    }).catch(() => { setIsAdmin(false); });
+  }, [mobile.accessToken]);
+
   const load = useCallback(async () => {
     if (!mobile.accessToken || !mobile.domainUuid) return;
-    const rows = await restGet<Recording[]>(`/rest/v1/pbx_call_records?select=id,pbx_uuid,organization_id,domain_uuid,domain_name,caller_name,caller_number,destination_number,extension,start_at,duration_seconds,transcribed,ai_summary,recording_path,recording_name,recording_url&domain_uuid=eq.${encodeURIComponent(mobile.domainUuid)}&or=(has_recording.eq.true,recording_path.not.is.null,recording_url.not.is.null)&order=start_at.desc&limit=100`, mobile.accessToken);
+    if (isAdmin === null) return; // wait until role resolved
+    const scopedExt = !isAdmin ? (myExt || '__none__') : (extFilter !== 'all' ? extFilter : null);
+    const extClause = scopedExt ? `&extension=eq.${encodeURIComponent(scopedExt)}` : '';
+    const rows = await restGet<Recording[]>(`/rest/v1/pbx_call_records?select=id,pbx_uuid,organization_id,domain_uuid,domain_name,caller_name,caller_number,destination_number,extension,start_at,duration_seconds,transcribed,ai_summary,recording_path,recording_name,recording_url&domain_uuid=eq.${encodeURIComponent(mobile.domainUuid)}${extClause}&or=(has_recording.eq.true,recording_path.not.is.null,recording_url.not.is.null)&order=start_at.desc&limit=100`, mobile.accessToken);
     setData(rows || []);
     setLastSyncedAt(Date.now());
-  }, [mobile.accessToken, mobile.domainUuid]);
+  }, [mobile.accessToken, mobile.domainUuid, isAdmin, myExt, extFilter]);
+
 
   useEffect(() => {
     if (mobile.loading) return;
