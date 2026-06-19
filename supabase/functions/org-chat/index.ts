@@ -245,13 +245,12 @@ Deno.serve(async (req) => {
       ])).filter(Boolean);
       const linkedMembers: any[] = [];
       if (ids.length) {
-        const [{ data: profs }, { data: pres }, { data: spu }] = await Promise.all([
+        const [{ data: profs }, { data: pres }] = await Promise.all([
           admin.from("profiles").select("id, full_name, email, avatar_url").in("id", ids),
           admin.from("user_presence").select("user_id, status, status_message, call_state, last_seen_at").in("user_id", ids),
-          admin.from("pbx_softphone_users").select("portal_user_id, extension, display_name").in("portal_user_id", ids),
         ]);
         const presenceMap = new Map((pres ?? []).map((p: any) => [p.user_id, p]));
-        const extMap = new Map((spu ?? []).map((s: any) => [s.portal_user_id, s]));
+        const extMap = new Map(domainRows.filter((s: any) => s.portal_user_id).map((s: any) => [s.portal_user_id, s]));
         const profileMap = new Map((profs ?? []).map((p: any) => [p.id, p]));
         for (const id of ids) {
           const p = profileMap.get(id) as any;
