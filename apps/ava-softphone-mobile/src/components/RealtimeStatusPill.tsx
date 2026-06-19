@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { colors } from '../lib/theme';
-import type { CDRTransport } from '../hooks/useRealtimeCDR';
+import type { CDRTransport, SyncLogEntry } from '../hooks/useRealtimeCDR';
 
 /**
  * Compact realtime-status pill. Shows live transport, last sync timestamp,
@@ -17,12 +17,13 @@ function fmtAgo(ts: number | null) {
 }
 
 export default function RealtimeStatusPill({
-  transport, warning, lastSyncAt, nextRetryAt, onRefresh,
+  transport, warning, lastSyncAt, nextRetryAt, syncLog = [], onRefresh,
 }: {
   transport: CDRTransport;
   warning?: string | null;
   lastSyncAt?: number | null;
   nextRetryAt?: number | null;
+  syncLog?: SyncLogEntry[];
   onRefresh?: () => void;
 }) {
   // Re-render once a second so the "Xs ago" label stays fresh.
@@ -45,29 +46,45 @@ export default function RealtimeStatusPill({
   ].filter(Boolean).join(' • ');
 
   return (
-    <button
-      onClick={onRefresh}
-      title={title}
-      style={{
-        display: 'inline-flex', alignItems: 'center', gap: 6,
-        padding: '4px 10px', borderRadius: 999,
-        background: 'rgba(255,255,255,0.06)',
-        border: `1px solid ${tone.dot}55`,
-        color: colors.textIce, fontSize: 10.5, fontWeight: 700, letterSpacing: 0.6,
-        textTransform: 'uppercase', cursor: onRefresh ? 'pointer' : 'default',
-      }}
-    >
-      <span style={{
-        width: 7, height: 7, borderRadius: 999, background: tone.dot,
-        boxShadow: `0 0 8px ${tone.dot}`,
-        animation: transport === 'realtime' ? 'pulse-rt 2s ease-in-out infinite' : 'none',
-      }} />
-      {tone.label}
-      <span style={{ opacity: 0.7, fontWeight: 600, textTransform: 'none', letterSpacing: 0 }}>
-        · {fmtAgo(lastSyncAt ?? null)}
-        {nextRetryAt && retryIn > 0 ? ` · retry ${retryIn}s` : ''}
-      </span>
-      <style>{`@keyframes pulse-rt { 0%,100%{opacity:1} 50%{opacity:.45} }`}</style>
-    </button>
+    <details style={{ position: 'relative' }}>
+      <summary
+        title={title}
+        onClick={(e) => { if ((e.target as HTMLElement).closest('[data-refresh]')) e.preventDefault(); }}
+        style={{
+          listStyle: 'none', display: 'inline-flex', alignItems: 'center', gap: 6,
+          padding: '4px 10px', borderRadius: 999,
+          background: 'rgba(255,255,255,0.06)',
+          border: `1px solid ${tone.dot}55`,
+          color: colors.textIce, fontSize: 10.5, fontWeight: 700, letterSpacing: 0.6,
+          textTransform: 'uppercase', cursor: 'pointer',
+        }}
+      >
+        <span style={{
+          width: 7, height: 7, borderRadius: 999, background: tone.dot,
+          boxShadow: `0 0 8px ${tone.dot}`,
+          animation: transport === 'realtime' ? 'pulse-rt 2s ease-in-out infinite' : 'none',
+        }} />
+        {tone.label}
+        <span style={{ opacity: 0.7, fontWeight: 600, textTransform: 'none', letterSpacing: 0 }}>
+          · {fmtAgo(lastSyncAt ?? null)}
+          {nextRetryAt && retryIn > 0 ? ` · retry ${retryIn}s` : ''}
+        </span>
+        {onRefresh && <button data-refresh onClick={onRefresh} style={{ marginLeft: 2, border: 'none', background: 'transparent', color: colors.textIce, cursor: 'pointer', fontSize: 11 }}>↻</button>}
+      </summary>
+      <div style={{
+        position: 'absolute', right: 0, top: 30, width: 320, maxWidth: 'calc(100vw - 24px)',
+        background: colors.midnight2, border: `1px solid ${colors.border}`, borderRadius: 12,
+        boxShadow: '0 18px 50px -18px rgba(0,0,0,.75)', padding: 10, zIndex: 50,
+      }}>
+        <div style={{ fontSize: 11, fontWeight: 800, color: colors.textIce, marginBottom: 6 }}>CDR sync attempts</div>
+        {syncLog.length === 0 ? <div style={{ fontSize: 10, color: colors.mutedSilver }}>No attempts logged yet.</div> : syncLog.slice(0, 8).map((l) => (
+          <div key={l.id} style={{ padding: '6px 0', borderTop: `1px solid ${colors.border}`, fontSize: 10, color: l.status === 'failed' ? colors.danger : l.status === 'success' ? colors.success : colors.mutedSilver }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}><strong>{l.status.toUpperCase()}</strong><span>{new Date(l.at).toLocaleTimeString()}</span></div>
+            <div style={{ color: colors.textSub, marginTop: 2 }}>{l.source}{l.attempt ? ` · attempt ${l.attempt}` : ''} — {l.reason}</div>
+          </div>
+        ))}
+      </div>
+      <style>{`details summary::-webkit-details-marker{display:none}@keyframes pulse-rt { 0%,100%{opacity:1} 50%{opacity:.45} }`}</style>
+    </details>
   );
 }
