@@ -242,10 +242,34 @@ export function useSoftphone(
         });
     };
 
-    const scheduleRetry = () => {
+    const scheduleRetry = async () => {
       if (cancelled) return;
       if (authBlockedRef.current) return;
+
       const attempt = retryAttemptRef.current;
+      if (attempt >= MAX_AUTO_RETRIES) {
+        const msg = `Auto-retry limit reached (${MAX_AUTO_RETRIES} attempts). Tap “Retry connection” to try again.`;
+        setSipStatus('error');
+        setSipError(msg, ctx);
+        setRetryLimitReached(true);
+        setNextRetryAt(null);
+        log('retry.limit-reached', `${MAX_AUTO_RETRIES} attempts`, 'error');
+        return;
+      }
+
+      // Quick WSS reachability probe — if the server is unreachable, skip the
+      // back-off wait and surface the error immediately. The user can retry manually.
+      log('probe.start', config.wssUrl);
+      const probe = await probeWss(config.wssUrl, 3500);
+      if (cancelled) return;
+      log(probe.ok ? 'probe.ok' : 'probe.fail', `${config.wssUrl} ${probe.reason || ''} ${probe.ms}ms`, probe.ok ? 'info' : 'warn');
+      if (!probe.ok) {
+        setSipStatus('error');
+        setSipError(`Phone server unreachable (${probe.reason || 'no response'}). Check network / WSS endpoint.`, ctx);
+        setNextRetryAt(null);
+        return;
+      }
+
       const delay = RETRY_BACKOFF_MS[Math.min(attempt, RETRY_BACKOFF_MS.length - 1)];
       retryAttemptRef.current = attempt + 1;
       setRetryAttempt(attempt + 1);
@@ -253,7 +277,7 @@ export function useSoftphone(
       setSipStatus('retrying');
       const fireAt = Date.now() + delay;
       setNextRetryAt(fireAt);
-      log('retry.scheduled', `attempt=${attempt + 1} delay=${Math.round(delay / 1000)}s`);
+      log('retry.scheduled', `attempt=${attempt + 1}/${MAX_AUTO_RETRIES} delay=${Math.round(delay / 1000)}s`);
       retryTimerRef.current = setTimeout(() => {
         if (cancelled) return;
         log('retry.fire', `attempt=${attempt + 1}`);
@@ -268,6 +292,7 @@ export function useSoftphone(
       clearRetry();
       retryAttemptRef.current = 0;
       setRetryAttempt(0);
+      setRetryLimitReached(false);
       authBlockedRef.current = false;
       log('reconnect.manual', 'user-initiated');
       try { uaRef.current?.stop(); } catch {}
