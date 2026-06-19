@@ -50,10 +50,12 @@ export function useRealtimeSync(orgId: string | null) {
   const retryRef = useRef<(() => void) | null>(null);
 
   const pushLog = useCallback((entry: Omit<SyncLogEntry, 'id' | 'at'> & { at?: number }) => {
+    const row = { id: `${Date.now()}-${Math.random()}`, at: entry.at ?? Date.now(), ...entry } as SyncLogEntry;
     setState((s) => ({
       ...s,
-      log: [{ id: `${Date.now()}-${Math.random()}`, at: entry.at ?? Date.now(), ...entry }, ...s.log].slice(0, 40),
+      log: [row, ...s.log].slice(0, 40),
     }));
+    try { window.dispatchEvent(new CustomEvent('lemtel:sync-log', { detail: row })); } catch {}
   }, []);
 
   useEffect(() => {
@@ -116,9 +118,9 @@ export function useRealtimeSync(orgId: string | null) {
               ...s,
               lastEvent: evt,
               lastSyncAt: evt.at,
-              log: [{ id: `${evt.at}-${Math.random()}`, at: evt.at, status: 'success', source: 'realtime', reason: `${evt.action} ${table}${evt.recordId ? ` · ${String(evt.recordId).slice(0, 8)}…` : ''}` }, ...s.log].slice(0, 40),
               countsToday: { ...s.countsToday, [table]: s.countsToday[table] + 1 },
             }));
+            pushLog({ status: 'success', source: 'realtime', reason: `${evt.action} ${table}${evt.recordId ? ` · ${String(evt.recordId).slice(0, 8)}…` : ''}`, at: evt.at });
             window.dispatchEvent(new CustomEvent('lemtel:sync', { detail: evt }));
             emitDebouncedPhoneSync(evt);
           }
