@@ -441,10 +441,12 @@ export const mobileApi = {
     { id: 'q3', name: 'After-hours', extension: '602', strategy: 'fewest-calls', waiting: 0, agentsOnline: 0, callsToday: 4,  avgWaitSec: 0,  slaPct: 0 },
   ]),
 
-  // Chatbot endpoint (Lovable AI Gateway via edge function).
+  // Chatbot endpoint — unified ava-assistant with full PBX tool catalog
+  // (calls, recordings, voicemail, SMS, contacts, presence, extensions,
+  // reports, and confirmed actions like send_sms / click_to_call).
   chat: (message: string, history: { role: 'user' | 'assistant'; content: string }[] = []) =>
     call<ChatReply>(
-      '/mobile-chat',
+      '/ava-assistant',
       { method: 'POST', body: JSON.stringify({ message, history }) },
       { answer: "I'm running in mock mode — connect to your AVA workspace to ask live questions about your PBX." },
     ),
