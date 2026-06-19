@@ -245,26 +245,29 @@ Deno.serve(async (req) => {
       const [{ data: profs }, { data: pres }, { data: spu }] = await Promise.all([
         admin.from("profiles").select("id, full_name, email, avatar_url").in("id", ids),
         admin.from("user_presence").select("user_id, status, status_message, call_state, last_seen_at").in("user_id", ids),
-        admin.from("pbx_softphone_users").select("portal_user_id, extension").in("portal_user_id", ids),
+        admin.from("pbx_softphone_users").select("portal_user_id, extension, display_name").in("portal_user_id", ids),
       ]);
       const presenceMap = new Map((pres ?? []).map((p: any) => [p.user_id, p]));
-      const extMap = new Map((spu ?? []).map((s: any) => [s.portal_user_id, s.extension]));
-      const members = (profs ?? []).map((p: any) => {
-        const pr = presenceMap.get(p.id) as any;
+      const extMap = new Map((spu ?? []).map((s: any) => [s.portal_user_id, s]));
+      const profileMap = new Map((profs ?? []).map((p: any) => [p.id, p]));
+      const members = ids.map((id: string) => {
+        const p = profileMap.get(id) as any;
+        const sp = extMap.get(id) as any;
+        const pr = presenceMap.get(id) as any;
         const lastSeen = pr?.last_seen_at ? new Date(pr.last_seen_at).getTime() : 0;
         const stale = !lastSeen || Date.now() - lastSeen > 5 * 60 * 1000;
         let status = pr?.status || "offline";
         if (stale && status !== "offline") status = "away";
         if (pr?.call_state && pr.call_state !== "idle") status = "on_call";
         return {
-          user_id: p.id,
-          full_name: p.full_name,
-          email: p.email,
-          avatar_url: p.avatar_url,
-          extension: extMap.get(p.id) ?? null,
+          user_id: id,
+          full_name: p?.full_name || sp?.display_name || (sp?.extension ? `Ext ${sp.extension}` : null),
+          email: p?.email ?? null,
+          avatar_url: p?.avatar_url ?? null,
+          extension: sp?.extension ?? null,
           status,
           status_message: pr?.status_message ?? null,
-          is_self: p.id === userId,
+          is_self: id === userId,
         };
       }).sort((a: any, b: any) => (a.full_name || a.email || "").localeCompare(b.full_name || b.email || ""));
       return json({ members });
