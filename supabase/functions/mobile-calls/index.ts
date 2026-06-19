@@ -72,6 +72,7 @@ Deno.serve(async (req) => {
 
     const url = new URL(req.url);
     const id = url.searchParams.get("id");
+    const extParam = url.searchParams.get("extension");
 
     const ext = sp.extension;
     const extFilter = `extension.eq.${ext},caller_number.eq.${ext},source_number.eq.${ext},destination_number.eq.${ext},destination.eq.${ext}`;
@@ -136,6 +137,7 @@ Deno.serve(async (req) => {
       .eq("organization_id", sp.organization_id)
       .gte("start_at", since);
     if (!isDomainAdmin) listQ = listQ.or(extFilter);
+    else if (extParam && extParam !== "all") listQ = listQ.or(`extension.eq.${extParam},caller_number.eq.${extParam},source_number.eq.${extParam},destination_number.eq.${extParam},destination.eq.${extParam}`);
     if (sp.domain_uuid) listQ = listQ.or(`domain_uuid.eq.${sp.domain_uuid},domain_uuid.is.null`);
     const { data: rows, error } = await listQ
       .order("start_at", { ascending: false })
