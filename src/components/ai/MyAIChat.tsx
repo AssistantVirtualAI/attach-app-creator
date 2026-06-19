@@ -241,28 +241,37 @@ export function MyAIChat({
             </div>
           </div>
         )}
-        {messages.map((m, i) => (
-          <div key={i} className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}>
-            <div className={cn(
-              "max-w-[85%] rounded-lg px-3 py-2 text-sm",
-              m.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted",
-            )}>
-              {m.role === "assistant"
-                ? <div className="prose prose-sm dark:prose-invert max-w-none [&_p]:my-1 [&_ul]:my-1 [&_h3]:my-1"><ReactMarkdown>{m.content}</ReactMarkdown></div>
-                : <span className="whitespace-pre-wrap">{m.content}</span>}
-              {m.attachments && m.attachments.length > 0 && (
-                <div className="mt-2 flex flex-col gap-1">
-                  {m.attachments.map((a, j) => (
-                    <a key={j} href={a.url} target="_blank" rel="noopener noreferrer" download={a.filename}
-                       className="text-xs inline-flex items-center gap-1.5 px-2 py-1 rounded border bg-background hover:bg-accent">
-                      📄 {a.title || a.filename || "Download"}
-                    </a>
-                  ))}
+        {messages.map((m, i) => {
+          const denials = (m.toolResults ?? []).filter((t) => t?.output?.error);
+          return (
+            <div key={i} className={cn("flex flex-col gap-1", m.role === "user" ? "items-end" : "items-start")}>
+              <div className={cn(
+                "max-w-[85%] rounded-lg px-3 py-2 text-sm",
+                m.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted",
+              )}>
+                {m.role === "assistant"
+                  ? <div className="prose prose-sm dark:prose-invert max-w-none [&_p]:my-1 [&_ul]:my-1 [&_h3]:my-1"><ReactMarkdown>{m.content}</ReactMarkdown></div>
+                  : <span className="whitespace-pre-wrap">{m.content}</span>}
+                {m.attachments && m.attachments.length > 0 && (
+                  <div className="mt-2 flex flex-col gap-1">
+                    {m.attachments.map((a, j) => (
+                      <a key={j} href={a.url} target="_blank" rel="noopener noreferrer" download={a.filename}
+                         className="text-xs inline-flex items-center gap-1.5 px-2 py-1 rounded border bg-background hover:bg-accent">
+                        📄 {a.title || a.filename || "Download"}
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {denials.map((d, j) => (
+                <div key={j} className="max-w-[85%] text-[11px] flex items-start gap-1.5 px-2 py-1.5 rounded border border-destructive/30 bg-destructive/5 text-destructive">
+                  <ShieldAlert className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                  <span><b>{d.name}</b> blocked: {friendlyDenial(d.output)}</span>
                 </div>
-              )}
+              ))}
             </div>
-          </div>
-        ))}
+          );
+        })}
         {loading && (
           <div className="flex justify-start">
             <div className="bg-muted rounded-lg px-3 py-2 text-sm flex items-center gap-2">
@@ -274,13 +283,94 @@ export function MyAIChat({
 
       <form onSubmit={(e) => { e.preventDefault(); send(); }}
         className="flex items-center gap-2 p-3 border-t">
+        <Popover open={reportOpen} onOpenChange={setReportOpen}>
+          <PopoverTrigger asChild>
+            <Button type="button" size="icon" variant="ghost" title="Generate PDF report" disabled={loading}>
+              <FileText className="h-4 w-4" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-72 space-y-2">
+            <div className="text-xs font-semibold">Generate PDF report</div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-[11px] text-muted-foreground">Range</label>
+                <Select value={rDays} onValueChange={(v) => setRDays(v as "7" | "30")}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="7">Last 7 days</SelectItem>
+                    <SelectItem value="30">Last 30 days</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-[11px] text-muted-foreground">Group by</label>
+                <Select value={rGroup} onValueChange={(v) => setRGroup(v as "day" | "extension")}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="day">Day</SelectItem>
+                    <SelectItem value="extension">Extension</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div>
+              <label className="text-[11px] text-muted-foreground">Extension (optional)</label>
+              <Input value={rExt} onChange={(e) => setRExt(e.target.value)} className="h-8 text-xs" placeholder="e.g. 1001" />
+            </div>
+            <Button type="button" size="sm" className="w-full" onClick={submitReport}>
+              <FileText className="h-3.5 w-3.5 mr-1.5" /> Generate report
+            </Button>
+          </PopoverContent>
+        </Popover>
         <Input value={input} onChange={(e) => setInput(e.target.value)} placeholder="Ask AVA…" disabled={loading} />
         <Button type="submit" size="icon" disabled={loading || !input.trim()}>
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
         </Button>
       </form>
+
+      <Dialog open={!!pendingConfirm} onOpenChange={(o) => !o && cancelAction()}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {pendingConfirm?.name === "click_to_call" ? <Phone className="h-4 w-4" /> : <MessageSquare className="h-4 w-4" />}
+              Confirm {pendingConfirm?.name === "click_to_call" ? "outbound call" : "SMS send"}
+            </DialogTitle>
+            <DialogDescription>
+              AVA needs your explicit approval before this action runs on the PBX.
+            </DialogDescription>
+          </DialogHeader>
+          {pendingConfirm && (
+            <div className="rounded-md border bg-muted/40 p-3 text-sm space-y-1">
+              {Object.entries(pendingConfirm.preview ?? {}).map(([k, v]) => (
+                <div key={k} className="flex gap-2">
+                  <span className="text-xs font-medium text-muted-foreground w-28 shrink-0">{k}</span>
+                  <span className="text-xs break-all">{String(v)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={cancelAction}>Cancel</Button>
+            <Button onClick={confirmAction}>Confirm & execute</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
+}
+
+const DENIAL_MESSAGES: Record<string, string> = {
+  no_pbx_domain: "Your account is not linked to a PBX domain.",
+  no_extension_linked: "This action needs a linked extension on your softphone profile.",
+  forbidden: "This item is outside your PBX domain.",
+  forbidden_cross_domain: "This item belongs to a different organization.",
+  not_found: "The target item could not be found in your domain.",
+  no_recording: "No recording is available for this call.",
+};
+
+function friendlyDenial(output: any): string {
+  const code = String(output?.reason || output?.error || "");
+  return DENIAL_MESSAGES[code] || code || "Unknown reason.";
 }
 
 export function MyAIChatLauncher() {
