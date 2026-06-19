@@ -436,6 +436,14 @@ export default function RecordingsView({ scope = 'mine' }: { scope?: 'mine' | 'o
                   preload="auto"
                   src={audioUrl}
                   style={{ width: '100%', height: 36 }}
+                  onEnded={() => {
+                    // Auto-trigger AI when listening completes — the analyze
+                    // endpoint is idempotent so cached transcripts/insights
+                    // return without re-burning tokens.
+                    if (!aiLoading && aiStage !== 'done') {
+                      try { runTranscribeAnalyze(); } catch { /* surfaces in aiStage */ }
+                    }
+                  }}
                   onError={() => {
                     setPlaybackError('PBX recording file is not reachable yet. Sync the phone system and try again.');
                     if (sel) { const u = audioBlobCache.get(sel.id); if (u) { URL.revokeObjectURL(u); audioBlobCache.delete(sel.id); } }
