@@ -17,7 +17,7 @@ import DialerFab from './components/DialerFab';
 import RealtimeStatusPill from './components/RealtimeStatusPill';
 import { useRealtimeCDR } from './hooks/useRealtimeCDR';
 import { initBackgroundSync } from './lib/backgroundSync';
-import { useStoredCreds, Creds } from './lib/creds';
+import { useStoredCreds, Creds, ensureStoredOrganizationId } from './lib/creds';
 import { gradients, colors } from './lib/theme';
 import { requestAllPermissions, checkAllPermissions } from './lib/permissions';
 import { registerPush, sendPushTokenToBackend } from './lib/pushNotifications';
