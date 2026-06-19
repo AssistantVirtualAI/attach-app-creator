@@ -153,7 +153,7 @@ Deno.serve(async (req) => {
       const pendingInsights = {
         sentiment: null, satisfaction_score: null, intent: null,
         topics: [], action_items: [], risks: [], sales_opportunities: [],
-        quality_score: null, escalation_needed: false, key_phrases: [],
+        quality_score: null, coaching_score: null, coaching_notes: [], escalation_needed: false, key_phrases: [],
         summary: "Transcript not yet available — the call recording could not be retrieved. Click Retry transcription once the recording is synced.",
       };
       await admin.from("pbx_ai_insights").delete().eq("call_record_id", call_record_id);
@@ -182,13 +182,13 @@ Deno.serve(async (req) => {
     const stubInsights = () => ({
       sentiment: "neutral", satisfaction_score: 3, intent: "unknown",
       topics: [], action_items: [], risks: [], sales_opportunities: [],
-      quality_score: 5, escalation_needed: false, key_phrases: [],
+      quality_score: 5, coaching_score: 0, coaching_notes: [], escalation_needed: false, key_phrases: [],
       summary: aiReason
         ? `AI analysis unavailable (${aiReason}). Showing call metadata only — verify the recording was retrieved and that AI credits are available.`
         : "AI analysis unavailable — showing call metadata only.",
     });
 
-    const prompt = `Analyze this call transcript. Return ONLY valid JSON:\n{"sentiment":"positive|neutral|negative","satisfaction_score":1-5,"intent":"string","topics":["..."],"action_items":["..."],"risks":["..."],"sales_opportunities":["..."],"quality_score":1-10,"escalation_needed":true|false,"key_phrases":["..."],"summary":"2 sentences max","coaching":"1-2 sentences of agent coaching feedback"}\n\nTranscript:\n${transcript_text}`;
+    const prompt = `Analyze this call transcript. Return ONLY valid JSON:\n{"sentiment":"positive|neutral|negative","satisfaction_score":1-5,"intent":"string","topics":["..."],"action_items":["..."],"risks":["..."],"sales_opportunities":["..."],"quality_score":1-10,"coaching_score":1-5,"coaching_notes":["..."],"escalation_needed":true|false,"key_phrases":["..."],"summary":"2 sentences max"}\n\nTranscript:\n${transcript_text}`;
 
     try {
       // Always route through Lovable AI Gateway — no upstream Anthropic call
