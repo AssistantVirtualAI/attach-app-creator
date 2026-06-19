@@ -140,6 +140,23 @@ export interface VoicemailEntry {
   organization_id?: string;
 }
 
+export interface RecordingEntry {
+  id: string;
+  from: string;
+  to: string;
+  extension?: string;
+  customer?: string;
+  startedAt: string;
+  durationSec: number;
+  hasTranscript: boolean;
+  summary?: string;
+  xml_cdr_uuid?: string;
+  record_path?: string;
+  record_name?: string;
+  domain_uuid?: string;
+  domain_name?: string;
+  organization_id?: string;
+
 export interface QueueRow {
   id: string;
   name: string;
