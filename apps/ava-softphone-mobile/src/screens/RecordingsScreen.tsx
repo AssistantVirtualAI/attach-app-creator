@@ -5,6 +5,7 @@ import { mobileApi, RecordingEntry } from '../lib/mobileApi';
 import { Card, Chip, SectionTitle, EmptyState, Skeleton } from '../components/ui/Primitives';
 import { useAutoSync } from '../hooks/useAutoSync';
 import CallDetailScreen from './CallDetailScreen';
+import { showMobileToast } from '../lib/mobileToast';
 
 export default function RecordingsScreen() {
   const { data, loading, refresh, lastSyncedAt, error } =
@@ -16,11 +17,17 @@ export default function RecordingsScreen() {
     if (busy[id] === 'running') return;
     setBusy((b) => ({ ...b, [id]: 'running' }));
     try {
+      const t = await mobileApi.transcribeCall(id);
+      if (t?.stub || t?.error) {
+        throw new Error([t.error || t.reason || 'transcription unavailable', ...(t.fetchErrors || [])].filter(Boolean).join(' · '));
+      }
       await mobileApi.analyzeCall(id);
       setBusy((b) => { const n = { ...b }; delete n[id]; return n; });
+      showMobileToast('AI analysis: déjà traité et mis en cache.', 'success');
       refresh();
-    } catch {
+    } catch (e: any) {
       setBusy((b) => ({ ...b, [id]: 'failed' }));
+      showMobileToast(`Transcription/scoring failed — ${e?.message || 'unknown error'}`, 'error');
     }
   };
 

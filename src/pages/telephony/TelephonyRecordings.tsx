@@ -64,11 +64,13 @@ export default function TelephonyRecordings({ scope = 'org' }: { scope?: 'org' |
   const [playing, setPlaying] = useState<string | null>(null);
   const [working, setWorking] = useState<string | null>(null);
   const [stages, setStages] = useState<Record<string, { stage: TranscriptStage; detail?: string }>>({});
+  const [inlineErrors, setInlineErrors] = useState<Record<string, string | null>>({});
   const [pendingSync, setPendingSync] = useState<Record<string, { attempt: number; total: number; nextRetryAt: number } | null>>({});
   const retryNowRefs = (window as any).__retryRefs ||= {} as Record<string, { current: (() => void) | null }>;
 
   const transcribeAndAnalyze = async (id: string) => {
     setWorking(id);
+    setInlineErrors((m) => ({ ...m, [id]: null }));
     setStages((s) => ({ ...s, [id]: { stage: 'downloading' } }));
     retryNowRefs[id] = { current: null };
     const result = await runTranscribeAndAnalyze({
@@ -79,10 +81,13 @@ export default function TelephonyRecordings({ scope = 'org' }: { scope?: 'org' |
       onStage: (stage, detail) => setStages((s) => ({ ...s, [id]: { stage, detail } })),
       onPendingSync: (p) => setPendingSync((m) => ({ ...m, [id]: p ? { attempt: p.attempt, total: p.total, nextRetryAt: p.nextRetryAt } : null })),
     });
-    if (result.stage === 'failed') toast.error(result.reason || 'Échec de la transcription');
-    else if (result.stage === 'unavailable') toast.message('Enregistrement indisponible', { description: result.reason || 'Audio non récupérable' });
+    if (result.stage === 'failed') {
+      const msg = result.reason || 'Échec de la transcription/scoring';
+      setInlineErrors((m) => ({ ...m, [id]: msg }));
+      toast.error('Transcription/scoring failed', { description: msg, action: { label: 'Voir erreur', onClick: () => { setExpanded(id); setTimeout(() => document.getElementById(`ai-error-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80); } } });
+    } else if (result.stage === 'unavailable') toast.message('Enregistrement indisponible', { description: result.reason || 'Audio non récupérable' });
     else if (result.stage === 'pending_sync') toast.message('En attente de la synchro PBX', { description: `Abandonné après ${result.pendingSyncAttempts} tentatives` });
-    else toast.success('Transcrit et analysé');
+    else toast.success('AI analysis: déjà traité et mis en cache');
 
     qc.setQueriesData({ queryKey: ['pbx'] }, (old: any) => {
       if (!Array.isArray(old)) return old;
@@ -174,6 +179,9 @@ export default function TelephonyRecordings({ scope = 'org' }: { scope?: 'org' |
                         {!stubT && c.transcribed && (
                           <Badge variant="outline" className="text-[10px]">Quality {q.total}/100</Badge>
                         )}
+                        <Badge variant="outline" className={stage === 'complete' ? 'text-emerald-600' : stage === 'failed' ? 'text-red-600' : 'text-muted-foreground'}>
+                          {stage === 'complete' ? 'AI analysis: déjà traité' : stage === 'failed' ? 'AI analysis: échec' : working === c.id ? 'AI analysis: en cours' : 'AI analysis: non traité'}
+                        </Badge>
                       </div>
                       <div className="flex items-center justify-end">
                         <Button size="sm" variant={c.transcribed ? 'ghost' : 'outline'} onClick={() => transcribeAndAnalyze(c.id)} disabled={working === c.id}>
@@ -188,6 +196,12 @@ export default function TelephonyRecordings({ scope = 'org' }: { scope?: 'org' |
                       )}
                       {expanded === c.id && (
                         <div className="space-y-2 text-sm border-t pt-3">
+                          {inlineErrors[c.id] && (
+                            <div id={`ai-error-${c.id}`} className="rounded-md border border-red-500/40 bg-red-500/10 p-2 text-xs text-red-600 dark:text-red-300">
+                              <div className="font-semibold">Erreur transcription/scoring exacte</div>
+                              <div className="mt-1 break-words">{inlineErrors[c.id]}</div>
+                            </div>
+                          )}
                           {stubT ? (
                             <div className="text-amber-600 dark:text-amber-300 text-xs">Transcript not yet available — the recording could not be retrieved. Use Retry once it has synced.</div>
                           ) : (

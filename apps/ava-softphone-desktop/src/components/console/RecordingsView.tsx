@@ -4,6 +4,7 @@ import { ava, RecordingItem, Feedback } from '../../lib/avaApi';
 import { supabase } from '../../lib/supabaseClient';
 import { useRealtimeRefresh } from '../../lib/useRealtimeRefresh';
 import { useOrgId } from '../../lib/useOrgId';
+import { toast } from '../../lib/toast';
 import PageHeader, { EmptyState, ListSkeleton } from './PageHeader';
 
 const LEMTEL_ORG = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
@@ -263,7 +264,10 @@ export default function RecordingsView({ scope = 'mine' }: { scope?: 'mine' | 'o
           body: { callId, call_record_id: callId, organization_id,
                   recording_path: (sel as any).recording_path, recording_name: (sel as any).recording_name },
         });
-        if (r1.error) throw r1.error;
+      if (r1.error) throw r1.error;
+      if ((r1.data as any)?.stub || (r1.data as any)?.error) {
+        throw new Error([((r1.data as any)?.error || (r1.data as any)?.reason || 'transcription unavailable'), ...(((r1.data as any)?.fetchErrors || []) as string[])].filter(Boolean).join(' · '));
+      }
         txt = String((r1.data as any)?.transcript_text || '').trim();
         if (txt) setTranscript(txt);
       }
@@ -278,8 +282,11 @@ export default function RecordingsView({ scope = 'mine' }: { scope?: 'mine' | 'o
       setAnalysis(ai);
       if (ai?.summary) updateItem(sel.id, { summary: ai.summary, topics: ai.topics || sel.topics, sentiment: ai.sentiment || sel.sentiment });
       setAiStage('done');
+      toast.success((r2.data as any)?.cached ? 'AI analysis: déjà traité — cache réutilisé' : 'Transcrit, scoré et analysé');
     } catch (e: any) {
-      setAiError(aiErr(e));
+      const msg = aiErr(e);
+      setAiError(msg);
+      toast.error(`Transcription/scoring failed — ${msg}`);
       setAiStage('error');
     } finally {
       setAiLoading(false);
@@ -479,6 +486,9 @@ export default function RecordingsView({ scope = 'mine' }: { scope?: 'mine' | 'o
                   : (transcript ? '↻ Re-analyze' : '✨ Transcribe & Analyze')}
               </button>
             </div>
+            <div style={{ marginBottom: 12, padding: '8px 10px', borderRadius: 8, background: analysis ? 'rgba(16,185,129,0.08)' : aiLoading ? 'rgba(35,214,255,0.08)' : 'rgba(255,255,255,0.04)', border: `1px solid ${analysis ? c.success + '55' : c.border}`, color: analysis ? c.success : c.mutedSilver, fontSize: 11, fontWeight: 700 }}>
+              {aiLoading ? 'AI analysis: en cours' : analysis ? 'AI analysis: déjà traité — cache réutilisé' : 'AI analysis: non traité'}
+            </div>
             {aiLoading && (
               <div style={{ marginBottom: 12 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: c.mutedSilver, marginBottom: 4 }}>
@@ -516,7 +526,14 @@ export default function RecordingsView({ scope = 'mine' }: { scope?: 'mine' | 'o
               <Panel title="AI Analysis" accent={c.avaViolet}>
                 <div style={{ fontSize: 12, color: c.textIce, display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {analysis.sentiment && <div><span style={{ color: c.mutedSilver }}>Sentiment:</span> {analysis.sentiment}</div>}
+                  {analysis.quality_score != null && <div><span style={{ color: c.mutedSilver }}>Score:</span> {analysis.quality_score}/10</div>}
+                  {analysis.coaching_score != null && <div><span style={{ color: c.mutedSilver }}>Coaching:</span> {analysis.coaching_score}/5</div>}
                   {analysis.summary && <div>{analysis.summary}</div>}
+                  {Array.isArray(analysis.coaching_notes) && analysis.coaching_notes.length > 0 && (
+                    <ul style={{ margin: '4px 0 0 14px', padding: 0 }}>
+                      {analysis.coaching_notes.map((n: string, i: number) => <li key={i} style={{ fontSize: 11.5 }}>{n}</li>)}
+                    </ul>
+                  )}
                   {Array.isArray(analysis.action_items) && analysis.action_items.length > 0 && (
                     <ul style={{ margin: '4px 0 0 14px', padding: 0 }}>
                       {analysis.action_items.map((a: string, i: number) => <li key={i} style={{ fontSize: 11.5 }}>{a}</li>)}

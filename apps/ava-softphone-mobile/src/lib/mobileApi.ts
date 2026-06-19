@@ -99,6 +99,11 @@ export interface CallDetail extends CallRecord {
   topics: string[];
   actionItems: string[];
   qualityScore: number;
+  coachingScore?: number | null;
+  coachingNotes?: string[];
+  aiStatus?: 'cached' | 'processing' | 'failed' | 'missing';
+  aiError?: string | null;
+  aiCached?: boolean;
   intent: string;
   tags: string[];
 }
@@ -336,6 +341,10 @@ export const mobileApi = {
   analyzeCall: (callId: string) => call<{ jobId?: string; transcript?: string; transcript_text?: string; summary?: string; sentiment?: string; topics?: string[]; action_items?: string[]; analysis?: any }>(
     '/ai-analyze-call', { method: 'POST', body: JSON.stringify({ call_record_id: callId }) },
     { jobId: 'job-' + Date.now() },
+  ),
+  transcribeCall: (callId: string) => call<{ transcript_text?: string; stub?: boolean; reason?: string; error?: string; details?: string; fetchErrors?: string[] }>(
+    '/ai-transcribe-call', { method: 'POST', body: JSON.stringify({ call_record_id: callId }) },
+    { transcript_text: 'Mock transcript', stub: false },
   ),
   generateGreeting: (prompt: string) => call<{ text: string; audioUrl?: string }>(
     '/elevenlabs-generate-greeting', { method: 'POST', body: JSON.stringify({ prompt }) },

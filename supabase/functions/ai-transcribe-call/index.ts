@@ -65,6 +65,13 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     let { call_record_id, recording_url, organization_id, recording_path, recording_name } = body || {};
     if (!call_record_id) call_record_id = body?.callId;
+    if (!organization_id) {
+      const { data: sp } = await admin.from("pbx_softphone_users")
+        .select("organization_id")
+        .eq("portal_user_id", user.id)
+        .maybeSingle();
+      organization_id = sp?.organization_id || null;
+    }
     if (!call_record_id || !organization_id) {
       await audit("bad-request", { error_code: "missing-fields", http_status: 400 });
       return json({ error: "call_record_id and organization_id required" }, 400);
@@ -100,6 +107,21 @@ Deno.serve(async (req) => {
         call = r2.data || { ...r.data, start_at: r.data.recorded_at };
       } else if (r.data) {
         call = { ...r.data, start_at: r.data.recorded_at };
+      }
+    }
+
+    if (body?.force !== true) {
+      const { data: existingTranscript } = await admin.from("pbx_call_transcripts")
+        .select("transcript_text, provider, created_at")
+        .eq("call_record_id", call_record_id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const provider = String((existingTranscript as any)?.provider || "");
+      const text = String((existingTranscript as any)?.transcript_text || "").trim();
+      if (text && !provider.startsWith("stub")) {
+        await audit("cached", { provider, message: "Transcript already exists — skipped re-transcription", metadata: { cached_at: (existingTranscript as any)?.created_at } });
+        return json({ transcript_text: text, cached: true, stub: false, provider, skipped_reason: "Transcript already exists — no STT tokens used." });
       }
     }
 

@@ -9,12 +9,21 @@ export type SyncEvent = {
   recordId?: string;
   hasRecording?: boolean;
 };
+export type SyncLogEntry = {
+  id: string;
+  at: number;
+  status: 'success' | 'failed' | 'retrying' | 'info';
+  reason: string;
+  attempt?: number;
+  source: 'realtime' | 'manual';
+};
 export type SyncState = {
   connected: boolean;
   lastEvent: SyncEvent | null;
   lastSyncAt: number | null;
   nextRetryAt: number | null;
   attempt: number;
+  log: SyncLogEntry[];
   countsToday: Record<SyncTable, number>;
 };
 
@@ -32,12 +41,22 @@ export function useRealtimeSync(orgId: string | null) {
   const [state, setState] = useState<SyncState>({
     connected: false, lastEvent: null,
     lastSyncAt: null, nextRetryAt: null, attempt: 0,
+    log: [],
     countsToday: {
       pbx_call_records: 0, pbx_voicemails: 0,
       pbx_call_recordings: 0, pbx_sms_messages: 0,
     },
   });
   const retryRef = useRef<(() => void) | null>(null);
+
+  const pushLog = useCallback((entry: Omit<SyncLogEntry, 'id' | 'at'> & { at?: number }) => {
+    const row = { id: `${Date.now()}-${Math.random()}`, at: entry.at ?? Date.now(), ...entry } as SyncLogEntry;
+    setState((s) => ({
+      ...s,
+      log: [row, ...s.log].slice(0, 40),
+    }));
+    try { window.dispatchEvent(new CustomEvent('lemtel:sync-log', { detail: row })); } catch {}
+  }, []);
 
   useEffect(() => {
     if (!orgId) return;
@@ -73,6 +92,7 @@ export function useRealtimeSync(orgId: string | null) {
       const at = Date.now() + delay;
       setState((s) => ({ ...s, connected: false, nextRetryAt: at, attempt }));
       broadcastStatus(false, at);
+      pushLog({ status: 'retrying', source: 'realtime', reason: `Realtime reconnect scheduled in ${Math.round(delay / 1000)}s`, attempt });
       backoffTimer = setTimeout(() => { backoffTimer = null; connect(); }, delay);
     };
 
@@ -100,6 +120,7 @@ export function useRealtimeSync(orgId: string | null) {
               lastSyncAt: evt.at,
               countsToday: { ...s.countsToday, [table]: s.countsToday[table] + 1 },
             }));
+            pushLog({ status: 'success', source: 'realtime', reason: `${evt.action} ${table}${evt.recordId ? ` · ${String(evt.recordId).slice(0, 8)}…` : ''}`, at: evt.at });
             window.dispatchEvent(new CustomEvent('lemtel:sync', { detail: evt }));
             emitDebouncedPhoneSync(evt);
           }
@@ -112,6 +133,7 @@ export function useRealtimeSync(orgId: string | null) {
           attempt = 0;
           setState((s) => ({ ...s, connected: true, attempt: 0, nextRetryAt: null, lastSyncAt: Date.now() }));
           broadcastStatus(true, null);
+          pushLog({ status: 'success', source: 'realtime', reason: 'Realtime CDR stream connected' });
         } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
           scheduleReconnect();
         }
@@ -124,6 +146,7 @@ export function useRealtimeSync(orgId: string | null) {
       if (backoffTimer) { clearTimeout(backoffTimer); backoffTimer = null; }
       attempt = 0;
       setState((s) => ({ ...s, attempt: 0, nextRetryAt: null }));
+      pushLog({ status: 'info', source: 'manual', reason: 'Manual CDR realtime retry requested' });
       connect();
     };
 
@@ -135,7 +158,7 @@ export function useRealtimeSync(orgId: string | null) {
       if (backoffTimer) clearTimeout(backoffTimer);
       try { if (channel) supabase.removeChannel(channel); } catch {}
     };
-  }, [orgId]);
+  }, [orgId, pushLog]);
 
   const retryNow = useCallback(() => retryRef.current?.(), []);
   return { ...state, retryNow };

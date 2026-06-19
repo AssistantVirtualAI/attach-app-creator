@@ -46,6 +46,14 @@ function mapRow(r: any): CallRecord {
 const BACKOFF_MS = [1_000, 2_000, 4_000, 8_000, 15_000];
 
 export type CDRTransport = 'realtime' | 'polling' | 'idle';
+export type SyncLogEntry = {
+  id: string;
+  at: number;
+  status: 'success' | 'failed' | 'retrying' | 'info';
+  reason: string;
+  attempt?: number;
+  source: 'realtime' | 'polling' | 'manual' | 'snapshot';
+};
 
 export function useRealtimeCDR(creds: Creds | null) {
   const [calls, setCalls] = useState<CallRecord[] | null>(null);
@@ -53,15 +61,25 @@ export function useRealtimeCDR(creds: Creds | null) {
   const [warning, setWarning] = useState<string | null>(null);
   const [lastSyncAt, setLastSyncAt] = useState<number | null>(null);
   const [nextRetryAt, setNextRetryAt] = useState<number | null>(null);
+  const [syncLog, setSyncLog] = useState<SyncLogEntry[]>([]);
   const retryTickRef = useRef<(() => void) | null>(null);
+
+  const pushLog = useCallback((entry: Omit<SyncLogEntry, 'id' | 'at'> & { at?: number }) => {
+    setSyncLog((cur) => [{ id: `${Date.now()}-${Math.random()}`, at: entry.at ?? Date.now(), ...entry }, ...cur].slice(0, 30));
+  }, []);
 
   const load = useCallback(async () => {
     try {
       const d = await mobileApi.calls();
       setCalls(d);
       setLastSyncAt(Date.now());
-    } catch { /* swallow — pill stays in warning state */ }
-  }, []);
+      pushLog({ status: 'success', source: 'snapshot', reason: `Snapshot loaded (${Array.isArray(d) ? d.length : 0} CDRs)` });
+    } catch (e: any) {
+      const reason = e?.message || 'Snapshot load failed';
+      setWarning(reason);
+      pushLog({ status: 'failed', source: 'snapshot', reason });
+    }
+  }, [pushLog]);
 
   useEffect(() => {
     let cancelled = false;
@@ -75,6 +93,7 @@ export function useRealtimeCDR(creds: Creds | null) {
       if (pollId) return;
       setTransport('polling');
       if (reason) setWarning(reason);
+      pushLog({ status: reason ? 'retrying' : 'info', source: 'polling', reason: reason || 'Polling fallback started' });
       pollId = setInterval(load, 15_000);
     };
     const stopPolling = () => { if (pollId) { clearInterval(pollId); pollId = null; } };
@@ -101,11 +120,13 @@ export function useRealtimeCDR(creds: Creds | null) {
             return [row, ...list].slice(0, 200);
           });
           setLastSyncAt(Date.now());
+          pushLog({ status: 'success', source: 'realtime', reason: `INSERT ${row.id.slice(0, 8)}…` });
         })
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pbx_call_records', filter }, (payload) => {
           const row = mapRow(payload.new);
           setCalls((prev) => (prev || []).map((c) => (c.id === row.id ? { ...c, ...row } : c)));
           setLastSyncAt(Date.now());
+          pushLog({ status: 'success', source: 'realtime', reason: `UPDATE ${row.id.slice(0, 8)}…` });
         })
         .subscribe((status) => {
           if (cancelled) return;
@@ -116,6 +137,7 @@ export function useRealtimeCDR(creds: Creds | null) {
             setTransport('realtime');
             setWarning(null);
             setNextRetryAt(null);
+            pushLog({ status: 'success', source: 'realtime', reason: 'Realtime CDR stream connected' });
             load();
           } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
             scheduleReconnect();
@@ -132,6 +154,7 @@ export function useRealtimeCDR(creds: Creds | null) {
       const at = Date.now() + delay;
       setNextRetryAt(at);
       startPolling(`Realtime dropped — retrying in ${Math.round(delay / 1000)}s (attempt ${attempt}).`);
+      pushLog({ status: 'retrying', source: 'realtime', reason: `Realtime reconnect scheduled in ${Math.round(delay / 1000)}s`, attempt });
       backoffTimer = setTimeout(() => { backoffTimer = null; connect(); }, delay);
     };
 
@@ -139,6 +162,7 @@ export function useRealtimeCDR(creds: Creds | null) {
       if (backoffTimer) { clearTimeout(backoffTimer); backoffTimer = null; }
       attempt = 0;
       setNextRetryAt(null);
+      pushLog({ status: 'info', source: 'manual', reason: 'Manual CDR retry requested' });
       load();
       connect();
     };
@@ -168,6 +192,7 @@ export function useRealtimeCDR(creds: Creds | null) {
     warning,
     lastSyncAt,
     nextRetryAt,
+    syncLog,
     dismissWarning: () => setWarning(null),
     refresh: load,
     retryNow: () => retryTickRef.current?.(),

@@ -41,11 +41,11 @@ interface Props {
 function StatusIndicator({ status, lastProcessedAt }: { status: AnalysisStatus; lastProcessedAt: string | null }) {
   const map: Record<AnalysisStatus, { label: string; cls: string; Icon: typeof Clock }> = {
     queued:        { label: "Queued",        cls: "text-slate-500 border-slate-500/40 bg-slate-500/10", Icon: Clock },
-    processing:    { label: "Processing",    cls: "text-blue-500 border-blue-500/40 bg-blue-500/10",     Icon: Loader2 },
-    analyzed:      { label: "Analyzed",      cls: "text-emerald-500 border-emerald-500/40 bg-emerald-500/10", Icon: CheckCircle2 },
+    processing:    { label: "AI analysis: en cours",    cls: "text-blue-500 border-blue-500/40 bg-blue-500/10",     Icon: Loader2 },
+    analyzed:      { label: "AI analysis: déjà traité",      cls: "text-emerald-500 border-emerald-500/40 bg-emerald-500/10", Icon: CheckCircle2 },
     pending_sync:  { label: "Pending sync",  cls: "text-amber-500 border-amber-500/40 bg-amber-500/10",  Icon: Clock },
-    failed:        { label: "Failed",        cls: "text-red-500 border-red-500/40 bg-red-500/10",        Icon: XCircle },
-    missing:       { label: "Not analyzed",  cls: "text-muted-foreground border-border bg-muted/40",     Icon: AlertCircle },
+    failed:        { label: "AI analysis: échec",        cls: "text-red-500 border-red-500/40 bg-red-500/10",        Icon: XCircle },
+    missing:       { label: "AI analysis: non traité",  cls: "text-muted-foreground border-border bg-muted/40",     Icon: AlertCircle },
   };
   const { label, cls, Icon } = map[status];
   return (
@@ -109,7 +109,7 @@ export function CallIntelligencePanel({ callId, canRegenerate = false }: Props) 
         {isCached && data.skipped_reason && (
           <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs space-y-2">
             <div className="flex items-center gap-2 text-emerald-600 font-medium">
-              <ShieldCheck className="h-4 w-4" /> Re-analysis skipped
+              <ShieldCheck className="h-4 w-4" /> AI analysis: déjà traité — cache réutilisé
             </div>
             <p className="text-muted-foreground">{data.skipped_reason}</p>
             <div className="flex gap-2">

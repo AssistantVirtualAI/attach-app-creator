@@ -32,6 +32,7 @@ async function withRetry<T>(label: SyncAction, fn: () => Promise<T>, onAttempt?:
       lastErr = e?.message || String(e);
       console.warn(`[sync] ${label} attempt ${attempt + 1} failed:`, lastErr);
       if (attempt < BACKOFF_MS.length) {
+        onAttempt?.(attempt + 1);
         // Add a small jitter to avoid thundering herd.
         const jitter = Math.floor(Math.random() * 400);
         await new Promise((r) => setTimeout(r, BACKOFF_MS[attempt] + jitter));
@@ -56,6 +57,7 @@ async function reportFailure(orgId: string, extension: string | null | undefined
   }
   try {
     window.dispatchEvent(new CustomEvent('ava:sync-alert', { detail: { action, extension, error } }));
+    window.dispatchEvent(new CustomEvent('lemtel:sync-log', { detail: { id: `${Date.now()}-${action}`, at: Date.now(), status: 'failed', source: 'manual', reason: `${SYNC_ACTION_LABELS[action]} failed: ${error}` } }));
   } catch {}
 }
 
@@ -70,6 +72,9 @@ async function reportSuccess(orgId: string, extension: string | null | undefined
       consecutive_failures: 0,
       metadata: { extension: extension || null, origin: 'useExtensionDataSync' },
     }, { onConflict: 'organization_id,source' });
+  } catch {}
+  try {
+    window.dispatchEvent(new CustomEvent('lemtel:sync-log', { detail: { id: `${Date.now()}-${action}`, at: Date.now(), status: 'success', source: 'manual', reason: `${SYNC_ACTION_LABELS[action]} synced successfully` } }));
   } catch {}
 }
 
@@ -144,6 +149,7 @@ export function useExtensionDataSync(
         if ((data as any)?.error) throw new Error(String((data as any).error));
         return data;
       }).then((res) => {
+        if (res.ok && !cancelled) reportSuccess(orgId, extension, action);
         if (!res.ok && !cancelled) reportFailure(orgId, extension, action, res.error);
         return res;
       });

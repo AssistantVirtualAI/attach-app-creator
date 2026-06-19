@@ -5,6 +5,9 @@ import { mobileApi, CallDetail } from '../lib/mobileApi';
 import { Card, Chip, AIPanel, Skeleton, GhostButton } from '../components/ui/Primitives';
 import { getCredentials } from '../lib/creds';
 import RecordingDebugScreen from './RecordingDebugScreen';
+import { showMobileToast } from '../lib/mobileToast';
+
+type AiStage = 'idle' | 'transcribing' | 'analyzing' | 'done' | 'error';
 
 export default function CallDetailScreen({ id, onBack }: { id: string; onBack: () => void }) {
   const [debugOpen, setDebugOpen] = useState(false);
@@ -17,6 +20,8 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
   const [dur, setDur] = useState(0);
   const [transcribing, setTranscribing] = useState(false);
   const [transcribeError, setTranscribeError] = useState<string | null>(null);
+  const [aiStage, setAiStage] = useState<AiStage>('idle');
+  const errorRef = useRef<HTMLDivElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const load = useCallback(() => { mobileApi.callDetail(id).then(setData).catch(() => {}); }, [id]);
@@ -111,13 +116,25 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
     if (transcribing) return;
     setTranscribing(true);
     setTranscribeError(null);
+    setAiStage('transcribing');
     try {
+      const t = await mobileApi.transcribeCall(id);
+      if (t?.stub || t?.error) {
+        const detail = [t.error || t.reason || 'transcription unavailable', ...(t.fetchErrors || [])].filter(Boolean).join(' · ');
+        throw new Error(detail);
+      }
+      setAiStage('analyzing');
       await mobileApi.analyzeCall(id);
       // Poll once for the freshly written transcript/insights
       await new Promise((r) => setTimeout(r, 1500));
       load();
+      setAiStage('done');
+      showMobileToast('AI analysis: déjà traité et mis en cache.', 'success');
     } catch (e: any) {
-      setTranscribeError(e?.message || 'Transcription failed');
+      const msg = e?.message || 'Transcription failed';
+      setTranscribeError(msg);
+      setAiStage('error');
+      showMobileToast(`Transcription/scoring failed — tap to view error`, 'error', () => errorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
     } finally {
       setTranscribing(false);
     }
@@ -132,6 +149,12 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
 
   const fmt = (s: number) => `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
   const hasTranscript = (data?.transcript?.length || 0) > 0;
+  const aiDone = hasTranscript && !!data?.summary;
+  const statusText = transcribing
+    ? aiStage === 'analyzing' ? 'AI analysis: en cours — scoring/coaching' : 'AI analysis: en cours — transcription'
+    : aiDone || data?.aiCached ? 'AI analysis: déjà traité — cache réutilisé'
+    : transcribeError || data?.aiError ? 'AI analysis: échec'
+    : 'AI analysis: non traité';
 
   if (debugOpen) return <RecordingDebugScreen callId={id} onBack={() => setDebugOpen(false)} />;
 
@@ -215,7 +238,7 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: font.base, fontWeight: 700, color: colors.textIce }}>No transcript yet</div>
                   <div style={{ fontSize: font.xs, color: colors.mutedSilver, marginTop: 2 }}>
-                    Run AVA to transcribe, summarize and tag this call.
+                    {statusText}
                   </div>
                 </div>
                 <button onClick={transcribe} disabled={transcribing} style={{
@@ -229,7 +252,33 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
                 </button>
               </div>
               {transcribeError && (
-                <div style={{ marginTop: 8, fontSize: 11, color: colors.danger }}>⚠ {transcribeError}</div>
+                <div ref={errorRef} id="ai-error" style={{ marginTop: 8, fontSize: 11, color: colors.danger }}>⚠ {transcribeError}</div>
+              )}
+            </Card>
+          )}
+
+          {data.hasRecording && hasTranscript && (
+            <Card style={{ marginBottom: 14 }} accent={transcribeError || data.aiError ? 'gold' : 'violet'}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                <div>
+                  <div style={{ fontSize: 10, color: colors.avaViolet, letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 800 }}>{statusText}</div>
+                  <div style={{ marginTop: 4, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <Chip tone="success" size="xs">Transcript cached</Chip>
+                    {data.summary && <Chip tone="violet" size="xs">Insight cached</Chip>}
+                    {data.qualityScore > 0 && <Chip tone="gold" size="xs">Score {data.qualityScore}/100</Chip>}
+                    {data.coachingScore != null && <Chip tone="cyan" size="xs">Coaching {data.coachingScore}/5</Chip>}
+                  </div>
+                </div>
+                <button onClick={transcribe} disabled={transcribing} style={{
+                  padding: '7px 11px', borderRadius: 999, border: `1px solid ${colors.borderAI}`,
+                  background: transcribing ? 'rgba(255,255,255,0.06)' : gradients.ai,
+                  color: colors.textIce, fontSize: 11, fontWeight: 800, cursor: transcribing ? 'wait' : 'pointer',
+                }}>{transcribing ? 'Running…' : 'Re-launch'}</button>
+              </div>
+              {(transcribeError || data.aiError) && (
+                <div ref={errorRef} id="ai-error" style={{ marginTop: 10, padding: 8, borderRadius: radius.md, border: `1px solid ${colors.danger}55`, color: colors.danger, fontSize: 11 }}>
+                  ⚠ {transcribeError || data.aiError}
+                </div>
               )}
             </Card>
           )}
@@ -240,9 +289,18 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
               <p style={{ fontSize: font.base, lineHeight: 1.55, color: colors.textIce, margin: 0 }}>{data.summary}</p>
               <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
                 {data.qualityScore > 0 && <Chip tone="gold">Quality {data.qualityScore}/100</Chip>}
+                {data.coachingScore != null && <Chip tone="cyan">Coaching {data.coachingScore}/5</Chip>}
                 {data.sentiment && <Chip tone={data.sentiment === 'positive' ? 'success' : data.sentiment === 'negative' ? 'danger' : 'neutral'}>{data.sentiment}</Chip>}
                 {data.intent && <Chip tone="cyan">{data.intent}</Chip>}
               </div>
+            </AIPanel>
+          )}
+
+          {data.coachingNotes && data.coachingNotes.length > 0 && (
+            <AIPanel title="Coaching notes" accent={colors.avaCyan}>
+              {data.coachingNotes.map((note, i) => (
+                <div key={i} style={{ fontSize: font.base, color: colors.textIce, lineHeight: 1.45, padding: '5px 0' }}>✦ {note}</div>
+              ))}
             </AIPanel>
           )}
 

@@ -255,7 +255,7 @@ function AuthenticatedShell({
 }
 
 function RealtimeHeader({ creds }: { creds: Creds }) {
-  const { transport, warning, lastSyncAt, nextRetryAt, retryNow } = useRealtimeCDR(creds);
+  const { transport, warning, lastSyncAt, nextRetryAt, syncLog, retryNow } = useRealtimeCDR(creds);
   return (
     <div style={{
       display: 'flex', justifyContent: 'flex-end', alignItems: 'center',
@@ -266,6 +266,7 @@ function RealtimeHeader({ creds }: { creds: Creds }) {
         warning={warning}
         lastSyncAt={lastSyncAt}
         nextRetryAt={nextRetryAt}
+        syncLog={syncLog}
         onRefresh={retryNow}
       />
     </div>
