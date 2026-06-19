@@ -185,6 +185,11 @@ const refreshBtn: React.CSSProperties = {
   color: '#FFD700', borderRadius: 8, width: 28, height: 28,
   cursor: 'pointer', fontSize: 13,
 };
+const reloadCdrBtn: React.CSSProperties = {
+  background: 'rgba(255,215,0,0.08)', border: '1px solid rgba(255,215,0,0.25)',
+  color: '#FFD700', borderRadius: 8, padding: '4px 10px',
+  cursor: 'pointer', fontSize: 11, fontWeight: 600, letterSpacing: 0.4,
+};
 
 export default React.memo(RecentsListImpl);
 
