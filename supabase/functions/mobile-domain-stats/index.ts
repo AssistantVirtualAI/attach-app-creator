@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
     since.setDate(since.getDate() - (days - 1));
 
     const { data: rows } = await sb.from("pbx_call_records")
-      .select("id, call_status, missed_call, duration_seconds, voicemail_message, extension, start_at")
+      .select("id, call_status, missed_call, duration_seconds, voicemail_message, extension, start_at, direction, hangup_cause")
       .eq("organization_id", orgId)
       .gte("start_at", since.toISOString());
 
@@ -61,6 +61,17 @@ Deno.serve(async (req) => {
     const durations = list.map((r: any) => Number(r.duration_seconds || 0)).filter((n: number) => n > 0);
     const avgDurationSec = durations.length ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length) : 0;
     const answerRate = totalCalls ? Math.round((answered / totalCalls) * 100) : 0;
+
+    // Outbound dial stats
+    const outboundCalls = list.filter((r: any) => r.direction === "outbound" || r.direction === "out").length;
+    const dialFailedCount = list.filter((r: any) => {
+      const isOut = r.direction === "outbound" || r.direction === "out";
+      if (!isOut) return false;
+      const cause = String(r.hangup_cause || "").toUpperCase();
+      const failed = ["NO_ANSWER","USER_BUSY","CALL_REJECTED","NO_ROUTE_DESTINATION","NORMAL_TEMPORARY_FAILURE","RECOVERY_ON_TIMER_EXPIRE","ORIGINATOR_CANCEL"].includes(cause);
+      return failed || Number(r.duration_seconds || 0) === 0;
+    }).length;
+    const dialSuccessRate = outboundCalls ? Math.round(((outboundCalls - dialFailedCount) / outboundCalls) * 100) : 0;
 
     // Peak hour (0-23)
     const hourMap = Array(24).fill(0);
