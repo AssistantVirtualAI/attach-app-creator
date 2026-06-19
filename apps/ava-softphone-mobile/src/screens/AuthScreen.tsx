@@ -127,6 +127,18 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
     if (!data?.access_token) {
       throw new AuthError({ step: 'token', code: 'no_token', message: 'Auth succeeded but no access_token returned' });
     }
+    // Resolve organizationId via user_roles so downstream screens (recordings,
+    // CDR realtime, debug) don't fall over with "No organizationId in stored credentials".
+    let organizationId: string | undefined;
+    try {
+      const r = await fetch(
+        `${SUPABASE_URL}/rest/v1/user_roles?user_id=eq.${data.user.id}&select=organization_id&limit=1`,
+        { headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${data.access_token}` } },
+      );
+      const rows = await r.json().catch(() => []);
+      organizationId = rows?.[0]?.organization_id || undefined;
+    } catch { /* non-fatal — ensureStoredOrganizationId will retry later */ }
+
     onAuthenticated({
       portalUrl,
       email: data?.user?.email || email.trim(),
@@ -134,8 +146,10 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
       userId: data?.user?.id,
       accessToken: data?.access_token,
       refreshToken: data?.refresh_token,
+      organizationId,
     });
   };
+
 
   const submitExtension = async () => {
     let res: Response;
