@@ -1,26 +1,16 @@
 import React from 'react';
-import { Phone, Mic, Voicemail, Sparkles, Users, MessageSquare, MoreHorizontal, type LucideIcon } from 'lucide-react';
+import { Home, Phone, MessageSquare, MoreHorizontal, Sparkles, type LucideIcon } from 'lucide-react';
 import { colors, gradients, radius } from '../lib/theme';
 
-export type Tab =
-  | 'home'
-  | 'calls'
-  | 'recordings'
-  | 'voicemail'
-  | 'ava'
-  | 'contacts'
-  | 'messages'
-  | 'more';
+export type Tab = 'home' | 'calls' | 'ava' | 'messages' | 'more';
 
 type Item = { id: Tab; label: string; Icon: LucideIcon };
 
 const SIDE_LEFT: Item[] = [
-  { id: 'calls',      label: 'Calls',      Icon: Phone },
-  { id: 'recordings', label: 'Recordings', Icon: Mic },
-  { id: 'voicemail',  label: 'Voicemail',  Icon: Voicemail },
+  { id: 'home',  label: 'Home',  Icon: Home },
+  { id: 'calls', label: 'Calls', Icon: Phone },
 ];
 const SIDE_RIGHT: Item[] = [
-  { id: 'contacts', label: 'Contacts', Icon: Users },
   { id: 'messages', label: 'Messages', Icon: MessageSquare },
   { id: 'more',     label: 'More',     Icon: MoreHorizontal },
 ];
@@ -33,10 +23,10 @@ export default function BottomTabs({
       style={{
         position: 'relative',
         display: 'grid',
-        gridTemplateColumns: 'repeat(3, 1fr) 76px repeat(3, 1fr)',
+        gridTemplateColumns: '1fr 1fr 88px 1fr 1fr',
         alignItems: 'center',
-        margin: '0 8px calc(8px + var(--safe-bottom))',
-        padding: '8px 6px',
+        margin: '0 10px calc(10px + var(--safe-bottom))',
+        padding: '10px 8px',
         background:
           'linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(244,247,255,0.86) 100%)',
         backdropFilter: 'blur(28px) saturate(180%)',
@@ -58,9 +48,9 @@ export default function BottomTabs({
           aria-label="AVA assistant"
           style={{
             position: 'absolute',
-            top: -32,
-            width: 60,
-            height: 60,
+            top: -36,
+            width: 68,
+            height: 68,
             borderRadius: '50%',
             background: gradients.ai,
             border: '3px solid rgba(255,255,255,0.96)',
@@ -74,15 +64,15 @@ export default function BottomTabs({
             transition: 'transform .25s cubic-bezier(.34,1.56,.64,1), box-shadow .25s ease',
           }}
         >
-          <Sparkles size={24} strokeWidth={2.4} />
+          <Sparkles size={28} strokeWidth={2.4} />
         </button>
         <span
           style={{
             position: 'absolute',
-            top: 34,
-            fontSize: 9,
+            top: 40,
+            fontSize: 10,
             fontWeight: 800,
-            letterSpacing: 1.2,
+            letterSpacing: 1.4,
             color: active === 'ava' ? colors.avaViolet : colors.mutedSilver,
             transition: 'color .2s ease',
           }}
@@ -106,13 +96,13 @@ function TabBtn({ item, active, onPress }: { item: Item; active: boolean; onPres
       onClick={onPress}
       style={{
         position: 'relative',
-        minHeight: 50,
+        minHeight: 54,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 2,
-        padding: '6px 2px',
+        gap: 4,
+        padding: '8px 4px',
         borderRadius: radius.xl,
         background: active
           ? `linear-gradient(180deg, ${accent}22 0%, rgba(255,255,255,0.4) 100%)`
@@ -131,27 +121,27 @@ function TabBtn({ item, active, onPress }: { item: Item; active: boolean; onPres
         style={{
           display: 'grid',
           placeItems: 'center',
-          width: 28,
-          height: 28,
-          borderRadius: 10,
+          width: 32,
+          height: 32,
+          borderRadius: 12,
           background: active
             ? `radial-gradient(circle at 30% 30%, ${accent}33, ${accent}11 70%)`
             : 'transparent',
           transition: 'background .22s ease',
         }}
       >
-        <Icon size={18} strokeWidth={active ? 2.6 : 2} />
+        <Icon size={20} strokeWidth={active ? 2.6 : 2} />
       </span>
-      <span style={{ fontSize: 9, fontWeight: active ? 800 : 600, letterSpacing: 0.3, whiteSpace: 'nowrap' }}>
+      <span style={{ fontSize: 10, fontWeight: active ? 800 : 600, letterSpacing: 0.4 }}>
         {label}
       </span>
       {active && (
         <span
           style={{
             position: 'absolute',
-            bottom: 2,
-            width: 14,
-            height: 2,
+            bottom: 4,
+            width: 18,
+            height: 3,
             borderRadius: 2,
             background: `linear-gradient(90deg, ${accent}, ${colors.avaCyan})`,
             boxShadow: `0 0 8px ${accent}88`,

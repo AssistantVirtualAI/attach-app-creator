@@ -143,7 +143,9 @@ export interface RecordingEntry {
   summary?: string;
 }
 
+export type StatsRange = 'today' | '7d' | '30d';
 export interface DomainStats {
+  // legacy
   callsToday: number;
   answeredToday: number;
   missedToday: number;
@@ -152,6 +154,16 @@ export interface DomainStats {
   activeExtensions: number;
   last7Days: number[];
   topExtensions: { extension: string; name?: string; calls: number }[];
+  // range-aware (added)
+  range?: StatsRange;
+  totalCalls?: number;
+  answered?: number;
+  missed?: number;
+  voicemails?: number;
+  totalTalkSec?: number;
+  answerRate?: number;
+  peakHour?: number | null;
+  buckets?: number[];
 }
 
 export interface ChatReply { answer: string }
@@ -338,17 +350,24 @@ export const mobileApi = {
     '/mobile-settings-dnd', { method: 'POST', body: JSON.stringify({ enabled }) }, { ok: true },
   ),
 
-  // Domain-wide stats for the mobile dashboard (read-only).
-  domainStats: () => call<DomainStats>('/mobile-domain-stats', undefined, {
-    callsToday: 24, answeredToday: 18, missedToday: 6, voicemailsToday: 3,
-    avgDurationSec: 142, activeExtensions: 8,
-    last7Days: [12, 18, 9, 22, 30, 14, 24],
-    topExtensions: [
-      { extension: '101', name: 'Marie T.',  calls: 12 },
-      { extension: '102', name: 'Alex M.',   calls: 9  },
-      { extension: '110', name: 'Reception', calls: 7  },
-    ],
-  }),
+  // Domain-wide stats for the mobile dashboard (read-only). Range: today|7d|30d.
+  domainStats: (range: StatsRange = 'today') => call<DomainStats>(
+    `/mobile-domain-stats?range=${range}`,
+    undefined,
+    {
+      callsToday: 24, answeredToday: 18, missedToday: 6, voicemailsToday: 3,
+      avgDurationSec: 142, activeExtensions: 8,
+      last7Days: [12, 18, 9, 22, 30, 14, 24],
+      topExtensions: [
+        { extension: '101', name: 'Marie T.',  calls: 12 },
+        { extension: '102', name: 'Alex M.',   calls: 9  },
+        { extension: '110', name: 'Reception', calls: 7  },
+      ],
+      range, totalCalls: 24, answered: 18, missed: 6, voicemails: 3,
+      totalTalkSec: 3400, answerRate: 75, peakHour: 14,
+      buckets: [12, 18, 9, 22, 30, 14, 24],
+    },
+  ),
 
   // Call queues — read-only list with live stats.
   queues: () => call<QueueRow[]>('/mobile-queues', undefined, [

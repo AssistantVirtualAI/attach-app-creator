@@ -1,97 +1,75 @@
-# Mobile app `/m` — Pre-launch data sync + new bottom navigation
-
-Two goals:
-1. Make sure CDRs, recordings, voicemail, and contacts always show real, fresh data for the signed-in extension — so beta testers on App Store / Play Store don't see empty screens.
-2. Add dedicated **Contacts**, **Voicemail**, and **Recordings** buttons to the bottom tab bar (instead of being buried in "More").
+# Mobile playback + transcribe + live CDR (mobile / desktop / portal) + richer home stats
 
 No changes to `vite.config.ts`, `electron-builder.yml`, or `.github/workflows/`.
 
 ---
 
-## Part A — Auto-sync correctness (so `/m` is never empty)
+## 1. Fix recording playback + transcribe (CallDetailScreen — mobile)
 
-### A1. Resolve extension → organization on sign-in
-- On successful sign-in (`AuthScreen`), call a small `mobile-bootstrap` edge function that:
-  - Looks up the user in `pbx_softphone_users` by `portal_user_id` (or `extension` for ext-login).
-  - Returns `{ organization_id, extension, displayName, sipDomain }`.
-  - Persists the resolved IDs into `creds` so every screen uses the same scope.
-- Today some screens silently return `[]` when no softphone link is found — we'll surface a clear "Extension not linked" banner with a "Retry sync" button instead of an empty list.
+Today the **Play** button in `apps/ava-softphone-mobile/src/screens/CallDetailScreen.tsx` is a static `<button>` with no `onClick` — nothing plays, nothing transcribes. Rewire it:
 
-### A2. Real-time CDRs for the signed-in extension
-- `useRealtimeCDR` already subscribes to `pbx_call_records`, but the filter is too loose. Tighten it to `organization_id = <org>` AND (`extension = <ext>` OR `caller_number = <ext>` OR `destination_number = <ext>`).
-- Verify `pbx_call_records` is in `supabase_realtime` publication; if not, add it via migration.
-- On Realtime reconnect, re-fetch the last 50 rows via `mobile-recents` to fill any gap.
+- Add a single `audioRef` with proper lifecycle (pause/cleanup on unmount and on switch).
+- On **Play**: call existing `mobileApi.voicemailAudio({ xml_cdr_uuid: callId, organization_id })` (same endpoint already issues signed URLs for both voicemail and call recordings). Cache the URL per call id. Show loading / error states + a "Retry in 3s" button.
+- Real progress bar driven by `audio.ontimeupdate`; click-to-seek on the waveform.
+- **Transcribe**: when the call has no transcript, show a "Transcribe with AVA" button that calls `mobileApi.analyzeCall(callId)` and then re-fetches `callDetail`. Auto-trigger after playback ends if `hasTranscript` is false.
+- Surface transcript + summary + action items live as they arrive.
 
-### A3. Recordings auto-sync
-- `mobile-recordings` edge function already filters by org but not by extension. Add extension filter and order by `start_at desc`.
-- Subscribe to Realtime updates on `pbx_call_records` where `has_recording = true` and update the recordings list live.
-- On row click, fetch a signed URL via existing recording storage helper.
+This same screen is rendered from Recordings tab today, so the fix covers both entry points.
 
-### A4. Voicemail auto-sync
-- Hook `useMyVoicemail` (web) works via Realtime on `pbx_voicemails`. Port the same pattern into the mobile app as `useMobileVoicemail` that filters by `extension`.
-- Trigger `voicemail-sync` edge function on app foreground + every 60s via existing `useAutoSync`.
+## 2. Broaden CDR fetch so "yesterday/today" calls always appear
 
-### A5. Device contacts
-- `syncDeviceContacts()` exists but is only called from `MobileApp` once. We'll:
-  - Re-run on app foreground.
-  - Merge device contacts with `org_contacts` (org directory) via a new `mobile-contacts` edge function.
-  - Show empty-state with an "Allow contacts access" CTA when permission is denied (web preview shows a stub message).
-
-### A6. Sync health indicator
-- Small dot in the header (green / amber / red) showing last successful sync time per data source (CDR, voicemail, recordings, contacts). Tap → opens a Sync Status sheet with "Retry all".
-
-### A7. Pre-launch verification checklist (added to `apps/ava-softphone-mobile/RELEASE.md`)
-- Sign in as a test extension → CDRs appear within 3s.
-- Place a test call → new row appears live without refresh.
-- Recording finishes → appears in Recordings tab within 5s.
-- Leave a voicemail → appears in Voicemail tab.
-- Contacts permission granted → device contacts searchable in dialer + Contacts tab.
-
----
-
-## Part B — New bottom tab bar
-
-Replace the current 5-tab layout (`Home / Calls / AVA / Messages / More`) with a 6-button bar that keeps the centered AVA orb:
+`supabase/functions/mobile-calls/index.ts` filters with a hard `.eq("extension", sp.extension)`. Calls written by FreeSWITCH where `extension` is null but `caller_number` or `destination_number` matches the user's extension are silently dropped. Change list query to:
 
 ```text
-[ Home ]  [ Calls ]  [ Recordings ]  ( AVA )  [ Voicemail ]  [ Contacts ]  [ More ]
+organization_id = sp.organization_id
+AND (extension = sp.extension
+     OR caller_number = sp.extension
+     OR destination_number = sp.extension)
+ORDER BY start_at DESC
+LIMIT 200
 ```
 
-Because 6 + AVA is too cramped on small screens, we go with this final layout:
+Apply the same OR to the detail query so deep links never 404. Same broadening already applied to the mobile realtime CDR client filter — no further change needed there.
 
-```text
-[ Calls ]  [ Recordings ]  [ Voicemail ]  ( AVA )  [ Contacts ]  [ Messages ]  [ More ]
-```
+## 3. Live CDR sync — verify across mobile, desktop, portal
 
-- Home moves into the AVA tab's dashboard header (already shows domain stats).
-- `BottomTabs.tsx` grid becomes `1fr 1fr 1fr 88px 1fr 1fr 1fr`.
-- Tab IDs extended: `'calls' | 'recordings' | 'voicemail' | 'ava' | 'contacts' | 'messages' | 'more'`.
-- `MobileApp` routes each tab to the existing screen (`RecordingsScreen`, `VoicemailScreen`, `ContactsScreen` are already implemented under `screens/`).
-- "More" keeps Settings, Queues, Features, AI audit, Privacy, Support, Delete account, Sign out — items promoted to the bar are removed from More.
-- On very narrow widths (<360px) labels hide and only icons show (already supported pattern).
+- **Mobile** — already has `useRealtimeCDR` (tightened last turn) + Recordings live refresh. Add the same realtime subscription to the home **Calls** tab so new rows appear without a manual reload.
+- **Desktop** (`apps/ava-softphone-desktop`) — `RecentsList` already uses `useRealtimeRefresh` on `pbx_call_records`. Add the same OR-on-extension filter on its initial load query so existing data appears even when `extension` column is empty, and on realtime INSERT/UPDATE re-pull a fresh page.
+- **Portal** (`src/hooks/usePbxRealtime.ts` / call lists) — add a subscription to `pbx_call_records` for the current org that invalidates the calls list query. Already publishes to `supabase_realtime` (migration done last turn).
+
+No changes to RLS — existing `pbx_call_records` policies already scope per org/extension.
+
+## 4. Home dashboard: Today / 7 days / 30 days with richer stats
+
+- Add a segmented control (Today / 7d / 30d) at the top of `DashboardScreen.tsx`.
+- Extend `mobile-domain-stats` to accept `?range=today|7d|30d` and return:
+  - total calls, answered, missed, voicemails
+  - total talk time (sum of `duration_seconds`)
+  - average duration
+  - average answer rate %
+  - peak hour bucket
+  - per-day bar chart (1/7/30 buckets)
+  - top 5 extensions by call volume
+- Client-side: replace today-only metrics + 7-day chart with the new range-aware payload. Loading skeletons preserved.
+
+## 5. Physical mobile app parity
+
+The native app on iOS/Android **is** the same codebase under `apps/ava-softphone-mobile`, wrapped by Capacitor. No native code change is required — the bottom tabs, dashboard, recordings, voicemail, contacts, playback, and transcribe will all ship on device. After pulling, the user runs `npx cap sync` once before the next native build (already documented in `apps/ava-softphone-mobile/RELEASE.md`; I'll add a one-line reminder for this batch).
 
 ---
 
-## Technical notes
+## Files touched
 
-- Files touched:
-  - `apps/ava-softphone-mobile/src/components/BottomTabs.tsx` — new layout + icons.
-  - `apps/ava-softphone-mobile/src/MobileApp.tsx` — tab routing + bootstrap call.
-  - `apps/ava-softphone-mobile/src/hooks/useRealtimeCDR.ts` — tighter filter, reconnect refresh.
-  - `apps/ava-softphone-mobile/src/hooks/useMobileVoicemail.ts` *(new)*.
-  - `apps/ava-softphone-mobile/src/hooks/useMobileRecordings.ts` *(new)* with Realtime.
-  - `apps/ava-softphone-mobile/src/screens/{RecordingsScreen,VoicemailScreen,ContactsScreen}.tsx` — use new hooks.
-  - `apps/ava-softphone-mobile/src/screens/MoreScreen.tsx` — remove promoted entries.
-  - `apps/ava-softphone-mobile/src/lib/contacts.ts` — foreground re-sync.
-  - `apps/ava-softphone-mobile/RELEASE.md` — verification checklist.
-- New edge functions: `mobile-bootstrap`, `mobile-contacts` (`mobile-recordings` updated).
-- Migration: ensure `pbx_call_records`, `pbx_voicemails` are in `supabase_realtime` publication (no-op if already added).
-- No changes to desktop, portal, or AVA org pages.
-- No build-system files touched.
+- `apps/ava-softphone-mobile/src/screens/CallDetailScreen.tsx` — real Play + Transcribe wiring.
+- `apps/ava-softphone-mobile/src/screens/DashboardScreen.tsx` — range tabs + new metrics rendering.
+- `apps/ava-softphone-mobile/src/screens/CallsScreen.tsx` — realtime subscription on calls list (small hook reuse).
+- `supabase/functions/mobile-calls/index.ts` — broaden list + detail filter.
+- `supabase/functions/mobile-domain-stats/index.ts` — range support + extra fields.
+- `apps/ava-softphone-desktop/src/components/RecentsList.tsx` — broaden initial CDR query + realtime invalidation.
+- `src/hooks/usePbxRealtime.ts` (or `src/hooks/usePbxData.ts`) — subscribe to `pbx_call_records` for live portal CDR.
+- `apps/ava-softphone-mobile/RELEASE.md` — note `npx cap sync` for this update.
 
----
+## Out of scope (will not change)
 
-## What I will NOT do (unless you ask)
-- No PWA / service worker changes.
-- No changes to AVA org pages or the landing page.
-- No changes to billing / RLS beyond verifying mobile reads use existing safe scopes.
+- AVA org pages, landing page, billing, RLS schema, native build configs.
+- No new edge functions beyond the existing ones above.

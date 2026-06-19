@@ -9,9 +9,6 @@ import CallsScreen from './screens/CallsScreen';
 import AVAChatScreen from './screens/AVAChatScreen';
 import InboxScreen from './screens/InboxScreen';
 import MoreScreen from './screens/MoreScreen';
-import RecordingsScreen from './screens/RecordingsScreen';
-import VoicemailScreen from './screens/VoicemailScreen';
-import ContactsScreen from './screens/ContactsScreen';
 import BottomTabs, { Tab } from './components/BottomTabs';
 import ActiveCallSheet from './components/ActiveCallSheet';
 import SplashAva from './components/SplashAva';
@@ -38,10 +35,9 @@ export default function MobileApp() {
   const initialTab = (() => {
     try {
       const t = new URLSearchParams(window.location.search).get('tab');
-      const allowed: Tab[] = ['home','calls','recordings','voicemail','ava','contacts','messages','more'];
-      if (t && allowed.includes(t as Tab)) return t as Tab;
+      if (t === 'home' || t === 'calls' || t === 'ava' || t === 'messages' || t === 'more') return t as Tab;
     } catch {}
-    return 'calls' as Tab;
+    return 'home' as Tab;
   })();
   const [tab, setTab] = useState<Tab>(initialTab);
   const [booting, setBooting] = useState(!isPreviewMode);
@@ -197,14 +193,9 @@ function AuthenticatedShell({
       }
     })();
 
-    // Re-register SIP + refresh device contacts when app comes back to foreground.
+    // Re-register SIP when app comes back to foreground.
     let unsub: () => void = () => {};
-    onAppStateChange((active) => {
-      if (active) {
-        sp.reconnect?.();
-        syncDeviceContacts().catch(() => {});
-      }
-    }).then((u) => { unsub = u; });
+    onAppStateChange((active) => { if (active) sp.reconnect?.(); }).then((u) => { unsub = u; });
 
     return () => { cancelled = true; unsub(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -244,14 +235,11 @@ function AuthenticatedShell({
       <audio ref={audioRef} autoPlay playsInline />
 
       <div key={tab} className="lemtel-page-enter" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        {tab === 'home'       && <DashboardScreen onNavigate={setTab as any} haptic={haptic} />}
-        {tab === 'calls'      && <CallsScreen sp={sp} haptic={haptic} creds={creds} />}
-        {tab === 'recordings' && <RecordingsScreen />}
-        {tab === 'voicemail'  && <VoicemailScreen haptic={haptic} />}
-        {tab === 'ava'        && <AVAChatScreen />}
-        {tab === 'contacts'   && <ContactsScreen sp={sp} />}
-        {tab === 'messages'   && <InboxScreen haptic={haptic} />}
-        {tab === 'more'       && <MoreScreen creds={creds} sp={sp} onSignOut={onSignOut} haptic={haptic} />}
+        {tab === 'home'     && <DashboardScreen onNavigate={setTab as any} haptic={haptic} />}
+        {tab === 'calls'    && <CallsScreen sp={sp} haptic={haptic} creds={creds} />}
+        {tab === 'ava'      && <AVAChatScreen />}
+        {tab === 'messages' && <InboxScreen haptic={haptic} />}
+        {tab === 'more'     && <MoreScreen creds={creds} sp={sp} onSignOut={onSignOut} haptic={haptic} />}
       </div>
 
       <BottomTabs active={tab} onChange={(t) => { haptic(ImpactStyle.Light); setTab(t); }} />

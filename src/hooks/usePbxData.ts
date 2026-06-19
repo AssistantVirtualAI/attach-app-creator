@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -77,14 +78,29 @@ export const usePbxIvrAudio = (ivrId: string | null) => useQuery({
 });
 export const usePbxQueues = () => usePbxTable('pbx_call_queues', { order: 'name', ascending: true });
 export const usePbxRingGroups = () => usePbxTable('pbx_ring_groups', { order: 'name', ascending: true });
-export const usePbxCallRecords = (limit = 100, opts?: { extension?: string | null; enabled?: boolean }) => usePbxTable('pbx_call_records', {
-  order: 'start_at',
-  limit,
-  enabled: opts?.enabled,
-  orFilter: opts?.extension
-    ? `extension.eq.${opts.extension},caller_number.eq.${opts.extension},destination_number.eq.${opts.extension},source_number.eq.${opts.extension}`
-    : undefined,
-});
+export const usePbxCallRecords = (limit = 100, opts?: { extension?: string | null; enabled?: boolean }) => {
+  const qc = useQueryClient();
+  const q = usePbxTable('pbx_call_records', {
+    order: 'start_at',
+    limit,
+    enabled: opts?.enabled,
+    orFilter: opts?.extension
+      ? `extension.eq.${opts.extension},caller_number.eq.${opts.extension},destination_number.eq.${opts.extension},source_number.eq.${opts.extension}`
+      : undefined,
+  });
+  // Live CDR sync: invalidate on any insert/update for this org.
+  useEffect(() => {
+    if (opts?.enabled === false) return;
+    const ch = supabase
+      .channel(`portal-cdr-${LEMTEL_ORG}`)
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'pbx_call_records', filter: `organization_id=eq.${LEMTEL_ORG}` },
+        () => { qc.invalidateQueries({ queryKey: ['pbx', 'pbx_call_records'] }); })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [qc, opts?.enabled]);
+  return q;
+};
 export const usePbxSmsThreads = () => usePbxTable('pbx_sms_threads', { order: 'last_message_at' });
 export const usePbxSmsMessages = (threadId: string | null) => useQuery({
   queryKey: ['pbx', 'pbx_sms_messages', threadId],
