@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
 import type { ImpactStyle } from '@capacitor/haptics';
-import { Voicemail, Disc3, MessageSquareText } from 'lucide-react';
+import { Voicemail, Disc3, MessageSquareText, Users } from 'lucide-react';
 import { colors, radius, font } from '../lib/theme';
 import VoicemailScreen from './VoicemailScreen';
 import RecordingsScreen from './RecordingsScreen';
 import MessagesScreen from './MessagesScreen';
+import TeamChatScreen from './TeamChatScreen';
+import { useStoredCreds } from '../lib/creds';
 
-type SubTab = 'voicemail' | 'recordings' | 'sms';
+type SubTab = 'voicemail' | 'recordings' | 'sms' | 'team';
 
 const TABS: { id: SubTab; label: string; Icon: typeof Voicemail; accent: string }[] = [
+  { id: 'team',       label: 'Team',       Icon: Users,             accent: '#21D4FD' },
   { id: 'voicemail',  label: 'Voicemail',  Icon: Voicemail,         accent: '#FFD86B' },
   { id: 'recordings', label: 'Recordings', Icon: Disc3,             accent: '#7CD4FF' },
   { id: 'sms',        label: 'SMS',        Icon: MessageSquareText, accent: '#B79CFF' },
@@ -22,6 +25,7 @@ export default function InboxScreen({
   initial?: SubTab;
 }) {
   const [tab, setTab] = useState<SubTab>(initial);
+  const { creds } = useStoredCreds();
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -35,7 +39,7 @@ export default function InboxScreen({
       </header>
 
       <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8,
+        display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6,
         padding: '0 14px 12px',
       }}>
         {TABS.map(({ id, label, Icon, accent }) => {
@@ -81,6 +85,7 @@ export default function InboxScreen({
       </div>
 
       <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        {tab === 'team'       && <TeamChatScreen accessToken={creds?.accessToken || null} userId={creds?.userId} />}
         {tab === 'voicemail'  && <VoicemailScreen haptic={haptic} />}
         {tab === 'recordings' && <RecordingsScreen />}
         {tab === 'sms'        && <MessagesScreen haptic={haptic} />}

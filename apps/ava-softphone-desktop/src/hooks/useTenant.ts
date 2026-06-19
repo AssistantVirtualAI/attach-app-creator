@@ -47,12 +47,13 @@ export function useTenant() {
         if (resolvedOrg) {
           const { data: org } = await supabase
             .from('organizations')
-            .select('name,fusionpbx_domain_uuid')
+            .select('name,fusionpbx_domain_uuid,fusionpbx_domain_name')
             .eq('id', resolvedOrg)
             .maybeSingle();
           if (!cancelled) {
             setOrgName(org?.name ?? null);
-            if (!spu?.domain_uuid && org?.fusionpbx_domain_uuid) setDomainUuid(org.fusionpbx_domain_uuid);
+            if (org?.fusionpbx_domain_uuid) setDomainUuid(org.fusionpbx_domain_uuid);
+            if (org?.fusionpbx_domain_name) setDomainName(org.fusionpbx_domain_name);
           }
         }
 

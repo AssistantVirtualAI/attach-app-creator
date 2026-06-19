@@ -78,8 +78,9 @@ export default function ConsoleLayout({
   const [tourOpen, setTourOpen] = useState(false);
   const [auditOpen, setAuditOpen] = useState(false);
   const isAuditChild = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('audit') === 'child';
-  const { orgId, orgName } = useTenant();
+  const { orgId, orgName, domainName, domainUuid } = useTenant();
   const { isAdmin, isSuperAdmin, isSupervisor } = useDesktopRole(orgId);
+  const domainLabel = domainName || (domainUuid ? domainUuid.slice(0, 8) : null);
 
   // Redirect non-admins away from admin-only views
   useEffect(() => {
@@ -174,6 +175,21 @@ export default function ConsoleLayout({
         flex: 1, minWidth: 0, minHeight: 0, overflow: 'hidden', position: 'relative',
         paddingBottom: compact ? 78 : 0, paddingTop: compact ? 54 : 0, display: 'flex', flexDirection: 'column',
       }}>
+        {!compact && (orgName || domainLabel) && (
+          <div style={{
+            position: 'absolute', top: 10, right: 16, zIndex: 5,
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '5px 10px', borderRadius: 999,
+            background: 'rgba(255,255,255,0.7)', border: `1px solid ${c.border}`,
+            backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
+            fontSize: 11, fontWeight: 600, color: c.textSub, letterSpacing: 0.2,
+            boxShadow: '0 4px 14px -4px rgba(0,35,230,0.18)',
+          }}>
+            <span style={{ width: 6, height: 6, borderRadius: 3, background: '#22d39a' }} />
+            {orgName && <span style={{ color: c.textIce }}>{orgName}</span>}
+            {domainLabel && <span style={{ opacity: 0.7 }}>· {domainLabel}</span>}
+          </div>
+        )}
         {compact && (
           <div
             className="ava-glass"
@@ -196,8 +212,8 @@ export default function ConsoleLayout({
             }} />
             <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, lineHeight: 1.15 }}>
               <span style={{ fontSize: 12, color: c.textIce, fontWeight: 700, letterSpacing: 0.2, fontFamily: "'Space Grotesk', sans-serif" }}>AVA Statistic</span>
-              <span style={{ fontSize: 10, color: c.mutedSilver, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 220 }}>
-                Ext {creds.extension}{orgName ? ` · ${orgName}` : ''}
+              <span style={{ fontSize: 10, color: c.mutedSilver, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 240 }}>
+                Ext {creds.extension}{orgName ? ` · ${orgName}` : ''}{domainLabel ? ` · ${domainLabel}` : ''}
               </span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, WebkitAppRegion: 'no-drag' as any }}>
