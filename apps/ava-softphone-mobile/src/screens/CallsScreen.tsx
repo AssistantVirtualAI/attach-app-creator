@@ -16,7 +16,7 @@ type SubTab = 'recents' | 'voicemail' | 'dial';
 export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s?: ImpactStyle) => Promise<void>; creds?: Creds | null }) {
   const [sub, setSub] = useState<SubTab>('recents');
   const [selected, setSelected] = useState<string | null>(null);
-  const [filter, setFilter] = useState<'all' | 'missed' | 'recorded'>('all');
+  const [filter, setFilter] = useState<'all' | 'missed'>('all');
   const [extFilter, setExtFilter] = useState<string>('all');
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [myExt, setMyExt] = useState<string | null>(null);
@@ -57,7 +57,7 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
     c.extension === ext || c.from === ext || c.to === ext;
 
   const filtered = (calls || []).filter((c) => {
-    const statusOk = filter === 'all' ? true : filter === 'missed' ? c.status === 'missed' : c.hasRecording;
+    const statusOk = filter === 'all' ? true : c.status === 'missed';
     if (!statusOk) return false;
     if (isAdmin === false && myExt) return matchExt(c, myExt);
     if (isAdmin && extFilter !== 'all') return matchExt(c, extFilter);
@@ -157,7 +157,7 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
       {sub === 'recents' && (
         <>
           <div style={{ display: 'flex', gap: 6, margin: '12px 0 10px' }}>
-            {(['all', 'missed', 'recorded'] as const).map((f) => (
+            {(['all', 'missed'] as const).map((f) => (
               <button key={f} onClick={() => setFilter(f)} style={{
                 padding: '6px 12px', borderRadius: 999,
                 background: filter === f ? colors.signalGold + '1a' : 'transparent',
