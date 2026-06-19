@@ -125,7 +125,15 @@ function RecentsListImpl({ extension, onCall }: Props) {
         <span style={{ fontSize: 10, opacity: 0.5, letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 600 }}>
           {rows.length} call{rows.length > 1 ? 's' : ''}{lastUpdated ? ` · ${lastUpdated}` : ''}
         </span>
-        <button onClick={() => load(true, true)} disabled={refreshing} style={{ ...refreshBtn, opacity: refreshing ? 0.55 : 1 }} title="Refresh live CDRs">{refreshing ? '…' : '↻'}</button>
+        <button
+          onClick={() => load(true, true)}
+          disabled={refreshing}
+          style={{ ...reloadCdrBtn, opacity: refreshing ? 0.55 : 1 }}
+          title="Force-refresh call records from the PBX"
+          aria-label="Reload CDR"
+        >
+          {refreshing ? 'Reloading…' : '↻ Reload CDR'}
+        </button>
       </div>
       {rows.map((r) => {
         const outbound = r.direction === 'out';
