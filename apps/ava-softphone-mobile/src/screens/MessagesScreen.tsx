@@ -31,13 +31,13 @@ export default function MessagesScreen({ haptic }: { haptic: (s?: ImpactStyle) =
       if (!mobile.accessToken) return;
       const orgId = mobile.organizationId;
       const filter = orgId ? `organization_id=eq.${orgId}` : undefined;
-      const client = smsClient(mobile.accessToken);
+      const client = authedRealtime(mobile.accessToken);
       channel = client.channel('sms-threads-mobile')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'pbx_sms_threads', ...(filter ? { filter } : {}) } as any,
           () => { if (!cancelled) loadThreads(); })
         .subscribe();
     })();
-    return () => { cancelled = true; try { channel && _smsClient?.removeChannel(channel); } catch {} };
+    return () => { cancelled = true; try { channel && authedRealtime(mobile.accessToken).removeChannel(channel); } catch {} };
   }, [mobile.accessToken, mobile.organizationId]);
 
   // Realtime messages for active thread
@@ -47,13 +47,13 @@ export default function MessagesScreen({ haptic }: { haptic: (s?: ImpactStyle) =
     let cancelled = false;
     (async () => {
       if (!mobile.accessToken) return;
-      const client = smsClient(mobile.accessToken);
+      const client = authedRealtime(mobile.accessToken);
       channel = client.channel(`sms-msgs-${active.id}`)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'pbx_sms_messages', filter: `thread_id=eq.${active.id}` } as any,
           () => { if (!cancelled) loadMsgs(active.id); })
         .subscribe();
     })();
-    return () => { cancelled = true; try { channel && _smsClient?.removeChannel(channel); } catch {} };
+    return () => { cancelled = true; try { channel && authedRealtime(mobile.accessToken).removeChannel(channel); } catch {} };
   }, [active?.id, mobile.accessToken]);
 
   const send = async () => {
