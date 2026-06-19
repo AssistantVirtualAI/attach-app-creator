@@ -107,11 +107,20 @@ function AuthenticatedShell({
     return () => { cancelled = true; };
   }, []);
 
-  const sipConfig = creds.extension && creds.wssUrl && creds.sipDomain && (creds as any).sipPassword
+  // Debug: log SIP credentials availability
+  const sipPassword = creds.sipPassword || (creds as any).sipPassword;
+  if (creds.extension && !sipPassword) {
+    console.warn('[SIP] Extension found but sipPassword missing - waiting for hydration');
+  }
+  if (creds.extension && sipPassword) {
+    console.log('[SIP] Config ready:', creds.extension, creds.sipDomain, creds.wssUrl);
+  }
+
+  const sipConfig = creds.extension && creds.wssUrl && creds.sipDomain && sipPassword
     ? {
         extension: creds.extension,
-        displayName: creds.displayName,
-        password: (creds as any).sipPassword,
+        displayName: creds.displayName || creds.email,
+        password: sipPassword,
         domain: creds.sipDomain,
         wssUrl: creds.wssUrl,
       }
