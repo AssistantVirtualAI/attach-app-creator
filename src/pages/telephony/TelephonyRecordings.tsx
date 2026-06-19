@@ -130,7 +130,20 @@ export default function TelephonyRecordings({ scope = 'org' }: { scope?: 'org' |
               </CardHeader>
               <CardContent className="space-y-3 flex-1 flex flex-col">
                 {c.recording_url ? (
-                  <audio controls src={c.recording_url} className="w-full" onPlay={() => setPlaying(c.id)} onPause={() => setPlaying(null)} />
+                  <audio
+                    controls
+                    src={c.recording_url}
+                    className="w-full"
+                    onPlay={() => setPlaying(c.id)}
+                    onPause={() => setPlaying(null)}
+                    onEnded={() => {
+                      // Auto-analyze once playback finishes so coaching notes
+                      // and scores show up without a manual second tap. The
+                      // ai-analyze-call edge function is idempotent — cached
+                      // results return instantly and no tokens are re-burned.
+                      if (!c.transcribed && working !== c.id) transcribeAndAnalyze(c.id);
+                    }}
+                  />
                 ) : (
                   <div className="text-xs text-muted-foreground text-center py-2 border rounded">Recording URL not available</div>
                 )}

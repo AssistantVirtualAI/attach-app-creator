@@ -1,10 +1,11 @@
 /**
  * Real-time CDR subscription for the mobile softphone.
- * Uses Supabase Realtime (postgres_changes) on pbx_call_records,
- * filtered to the user's extension. Falls back to the polling API for
- * the initial snapshot and on visibility regain.
+ * - Realtime postgres_changes on pbx_call_records (filtered to extension).
+ * - Snapshot via mobileApi.calls() on mount, focus, visibility, retry.
+ * - Exponential backoff reconnect (1s → 2s → 4s → 8s → 15s cap) on channel error.
+ * - Exposes lastSyncAt + nextRetryAt for the UI sync pill and a manual retryNow().
  */
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { mobileApi, CallRecord } from '../lib/mobileApi';
 import type { Creds } from '../lib/creds';
@@ -42,97 +43,133 @@ function mapRow(r: any): CallRecord {
   };
 }
 
+const BACKOFF_MS = [1_000, 2_000, 4_000, 8_000, 15_000];
+
 export type CDRTransport = 'realtime' | 'polling' | 'idle';
 
 export function useRealtimeCDR(creds: Creds | null) {
   const [calls, setCalls] = useState<CallRecord[] | null>(null);
   const [transport, setTransport] = useState<CDRTransport>('idle');
   const [warning, setWarning] = useState<string | null>(null);
-  const callsRef = useRef<CallRecord[] | null>(null);
-  callsRef.current = calls;
+  const [lastSyncAt, setLastSyncAt] = useState<number | null>(null);
+  const [nextRetryAt, setNextRetryAt] = useState<number | null>(null);
+  const retryTickRef = useRef<(() => void) | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const d = await mobileApi.calls();
+      setCalls(d);
+      setLastSyncAt(Date.now());
+    } catch { /* swallow — pill stays in warning state */ }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     let pollId: ReturnType<typeof setInterval> | null = null;
-
-    const load = () => {
-      mobileApi.calls().then((d) => { if (!cancelled) setCalls(d); }).catch(() => {});
-    };
-    load();
+    let backoffTimer: ReturnType<typeof setTimeout> | null = null;
+    let attempt = 0;
+    let channel: ReturnType<SupabaseClient['channel']> | null = null;
+    let watchdog: ReturnType<typeof setTimeout> | null = null;
 
     const startPolling = (reason?: string) => {
       if (pollId) return;
       setTransport('polling');
       if (reason) setWarning(reason);
-      pollId = setInterval(load, 15_000); // resilient fallback: 15s polling
+      pollId = setInterval(load, 15_000);
     };
-    const stopPolling = () => {
-      if (pollId) { clearInterval(pollId); pollId = null; }
+    const stopPolling = () => { if (pollId) { clearInterval(pollId); pollId = null; } };
+
+    const connect = () => {
+      if (cancelled) return;
+      const ext = creds?.extension;
+      const token = creds?.accessToken || null;
+      if (!ext || !token) { startPolling(); return; }
+
+      const sb = client(token);
+      const filter = `extension=eq.${ext}`;
+      watchdog = setTimeout(() => {
+        startPolling('Realtime unavailable — polling every 15s.');
+      }, 8_000);
+
+      channel = sb
+        .channel(`cdr-ext-${ext}-${attempt}`)
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pbx_call_records', filter }, (payload) => {
+          const row = mapRow(payload.new);
+          setCalls((prev) => {
+            const list = prev || [];
+            if (list.some((c) => c.id === row.id)) return list;
+            return [row, ...list].slice(0, 200);
+          });
+          setLastSyncAt(Date.now());
+        })
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pbx_call_records', filter }, (payload) => {
+          const row = mapRow(payload.new);
+          setCalls((prev) => (prev || []).map((c) => (c.id === row.id ? { ...c, ...row } : c)));
+          setLastSyncAt(Date.now());
+        })
+        .subscribe((status) => {
+          if (cancelled) return;
+          if (status === 'SUBSCRIBED') {
+            if (watchdog) { clearTimeout(watchdog); watchdog = null; }
+            stopPolling();
+            attempt = 0;
+            setTransport('realtime');
+            setWarning(null);
+            setNextRetryAt(null);
+            load();
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+            scheduleReconnect();
+          }
+        });
     };
 
-    const onVis = () => document.visibilityState === 'visible' && load();
+    const scheduleReconnect = () => {
+      if (cancelled || backoffTimer) return;
+      try { if (channel) client().removeChannel(channel); } catch {}
+      channel = null;
+      const delay = BACKOFF_MS[Math.min(attempt, BACKOFF_MS.length - 1)];
+      attempt += 1;
+      const at = Date.now() + delay;
+      setNextRetryAt(at);
+      startPolling(`Realtime dropped — retrying in ${Math.round(delay / 1000)}s (attempt ${attempt}).`);
+      backoffTimer = setTimeout(() => { backoffTimer = null; connect(); }, delay);
+    };
+
+    retryTickRef.current = () => {
+      if (backoffTimer) { clearTimeout(backoffTimer); backoffTimer = null; }
+      attempt = 0;
+      setNextRetryAt(null);
+      load();
+      connect();
+    };
+
+    load();
+    connect();
+
+    const onVis = () => { if (document.visibilityState === 'visible') { load(); if (transport !== 'realtime') retryTickRef.current?.(); } };
     document.addEventListener('visibilitychange', onVis);
     window.addEventListener('focus', load);
-
-    const ext = creds?.extension;
-    const token = creds?.accessToken || null;
-    if (!ext || !token) {
-      startPolling();
-      return () => {
-        cancelled = true; stopPolling();
-        document.removeEventListener('visibilitychange', onVis);
-        window.removeEventListener('focus', load);
-      };
-    }
-
-    const sb = client(token);
-    const filter = `extension=eq.${ext}`;
-    let watchdog: ReturnType<typeof setTimeout> | null = setTimeout(() => {
-      // If we haven't reached SUBSCRIBED in 8s, fall back.
-      startPolling('Realtime CDR unavailable — switched to 15s polling.');
-    }, 8_000);
-
-    const channel = sb
-      .channel(`cdr-ext-${ext}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pbx_call_records', filter }, (payload) => {
-        const row = mapRow(payload.new);
-        setCalls((prev) => {
-          const list = prev || [];
-          if (list.some((c) => c.id === row.id)) return list;
-          return [row, ...list].slice(0, 200);
-        });
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pbx_call_records', filter }, (payload) => {
-        const row = mapRow(payload.new);
-        setCalls((prev) => (prev || []).map((c) => (c.id === row.id ? { ...c, ...row } : c)));
-      })
-      .subscribe((status) => {
-        if (cancelled) return;
-        if (status === 'SUBSCRIBED') {
-          if (watchdog) { clearTimeout(watchdog); watchdog = null; }
-          stopPolling();
-          setTransport('realtime');
-          setWarning(null);
-        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-          startPolling('Realtime CDR disconnected — using 15s polling.');
-        }
-      });
 
     return () => {
       cancelled = true;
       if (watchdog) clearTimeout(watchdog);
+      if (backoffTimer) clearTimeout(backoffTimer);
       stopPolling();
-      try { sb.removeChannel(channel); } catch {}
+      try { if (channel) client().removeChannel(channel); } catch {}
       document.removeEventListener('visibilitychange', onVis);
       window.removeEventListener('focus', load);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [creds?.extension, creds?.accessToken]);
 
   return {
     calls,
     transport,
     warning,
+    lastSyncAt,
+    nextRetryAt,
     dismissWarning: () => setWarning(null),
-    refresh: () => mobileApi.calls().then(setCalls).catch(() => {}),
+    refresh: load,
+    retryNow: () => retryTickRef.current?.(),
   };
 }

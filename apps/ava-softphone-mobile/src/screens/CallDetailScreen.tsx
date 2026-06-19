@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Play, Pause, Loader2, Sparkles, RefreshCw } from 'lucide-react';
+import { Play, Pause, Loader2, Sparkles, RefreshCw, Stethoscope } from 'lucide-react';
 import { colors, font, radius, gradients } from '../lib/theme';
 import { mobileApi, CallDetail } from '../lib/mobileApi';
 import { Card, Chip, AIPanel, Skeleton, GhostButton } from '../components/ui/Primitives';
 import { getCredentials } from '../lib/creds';
+import RecordingDebugScreen from './RecordingDebugScreen';
 
 export default function CallDetailScreen({ id, onBack }: { id: string; onBack: () => void }) {
+  const [debugOpen, setDebugOpen] = useState(false);
   const [data, setData] = useState<CallDetail | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [loadingAudio, setLoadingAudio] = useState(false);
@@ -131,8 +133,12 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
   const fmt = (s: number) => `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
   const hasTranscript = (data?.transcript?.length || 0) > 0;
 
+  if (debugOpen) return <RecordingDebugScreen callId={id} onBack={() => setDebugOpen(false)} />;
+
   return (
     <div style={{ height: '100%', overflowY: 'auto', padding: '14px 14px 20px' }}>
+
+
       <button onClick={onBack} style={{
         display: 'inline-flex', alignItems: 'center', gap: 6,
         padding: '8px 12px', marginBottom: 12,
@@ -186,11 +192,16 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
                 <span style={{ fontSize: 11, color: colors.mutedSilver, fontFamily: 'JetBrains Mono, monospace' }}>{fmt(dur || data.durationSec)}</span>
               </div>
               {audioError && (
-                <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 8, background: 'rgba(239,68,68,0.1)', border: `1px solid ${colors.danger}55`, fontSize: 12, color: colors.danger, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 8, background: 'rgba(239,68,68,0.1)', border: `1px solid ${colors.danger}55`, fontSize: 12, color: colors.danger, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <span>⚠ {audioError}</span>
-                  <button onClick={retry} style={{ background: 'transparent', border: `1px solid ${colors.danger}`, color: colors.danger, borderRadius: 6, padding: '4px 8px', fontSize: 11, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                    <RefreshCw size={11} /> Retry
-                  </button>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button onClick={retry} style={{ background: 'transparent', border: `1px solid ${colors.danger}`, color: colors.danger, borderRadius: 6, padding: '4px 8px', fontSize: 11, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <RefreshCw size={11} /> Retry
+                    </button>
+                    <button onClick={() => setDebugOpen(true)} style={{ background: 'transparent', border: `1px solid ${colors.mutedSilver}`, color: colors.mutedSilver, borderRadius: 6, padding: '4px 8px', fontSize: 11, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <Stethoscope size={11} /> Debug
+                    </button>
+                  </div>
                 </div>
               )}
             </Card>

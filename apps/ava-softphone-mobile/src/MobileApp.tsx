@@ -255,13 +255,19 @@ function AuthenticatedShell({
 }
 
 function RealtimeHeader({ creds }: { creds: Creds }) {
-  const { transport, warning, refresh } = useRealtimeCDR(creds);
+  const { transport, warning, lastSyncAt, nextRetryAt, retryNow } = useRealtimeCDR(creds);
   return (
     <div style={{
       display: 'flex', justifyContent: 'flex-end', alignItems: 'center',
       padding: '4px 12px 0',
     }}>
-      <RealtimeStatusPill transport={transport} warning={warning} onRefresh={refresh} />
+      <RealtimeStatusPill
+        transport={transport}
+        warning={warning}
+        lastSyncAt={lastSyncAt}
+        nextRetryAt={nextRetryAt}
+        onRefresh={retryNow}
+      />
     </div>
   );
 }
