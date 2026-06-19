@@ -103,7 +103,7 @@ export default function RecordingsScreen() {
         <EmptyState icon="◉" title="No recordings yet" hint="Recorded calls will appear here with AI transcripts and summaries." />
       )}
 
-      {data && data.map((r) => {
+      {filtered && filtered.map((r) => {
         const state = busy[r.id];
         return (
         <Card key={r.id} style={{ marginBottom: 8 }} padded={true} onPress={() => setOpen(r.id)}>
