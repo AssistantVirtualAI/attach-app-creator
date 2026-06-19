@@ -126,7 +126,10 @@ Deno.serve(async (req) => {
     }
 
     const days = Math.min(Math.max(Number(url.searchParams.get("days")) || 7, 1), 30);
-    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+    const sinceDate = new Date();
+    sinceDate.setDate(sinceDate.getDate() - days);
+    sinceDate.setHours(0, 0, 0, 0);
+    const since = sinceDate.toISOString();
     const limit = Math.min(Number(url.searchParams.get("limit")) || 50, 200);
     let listQ = admin.from("pbx_call_records")
       .select("id, pbx_uuid, organization_id, domain_uuid, domain_name, direction, call_status, caller_name, caller_number, source_number, destination, destination_number, extension, start_at, duration_seconds, missed_call, has_recording, recording_path, recording_name, recording_url, transcribed")
