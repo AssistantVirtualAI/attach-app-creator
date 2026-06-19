@@ -208,6 +208,21 @@ Deno.serve(async (req) => {
         }
       }
     }
+    if (!permitted && _earlyAction === "originate-click-to-call") {
+      const targetOrg = _bodyEarly?.organization_id;
+      const fromExtension = String(_bodyEarly?.params?.from_extension || _bodyEarly?.from_extension || "");
+      if (targetOrg && fromExtension) {
+        const { data: spu } = await admin
+          .from("pbx_softphone_users")
+          .select("id")
+          .eq("portal_user_id", userId)
+          .eq("organization_id", targetOrg)
+          .eq("extension", fromExtension)
+          .limit(1)
+          .maybeSingle();
+        if (spu?.id) permitted = true;
+      }
+    }
     if (!permitted && !isRead) {
       const targetOrg = _bodyEarly?.organization_id;
       if (targetOrg) {
