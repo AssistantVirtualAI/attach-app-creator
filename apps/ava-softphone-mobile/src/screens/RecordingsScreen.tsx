@@ -109,11 +109,22 @@ export default function RecordingsScreen() {
     }
   };
 
-  const transcribe = async (id: string) => {
+  const transcribe = async (rec: Recording) => {
+    const id = rec.id;
     if (busy[id] === 'running') return;
+    if (!rec.recording_name && !rec.recording_path) {
+      showMobileToast('Recording pending sync — please retry in a moment.', 'warning');
+      return;
+    }
     setBusy((b) => ({ ...b, [id]: 'running' }));
     try {
-      const t = await mobileApi.transcribeCall(id);
+      const t = await mobileApi.transcribeCall(id, {
+        recording_path: rec.recording_path,
+        recording_name: rec.recording_name,
+        domain_uuid: rec.domain_uuid,
+        xml_cdr_uuid: rec.pbx_uuid || id,
+        organization_id: rec.organization_id,
+      });
       if (t?.stub || t?.error) throw new Error([t.error || t.reason || 'transcription unavailable', ...(t.fetchErrors || [])].filter(Boolean).join(' · '));
       await mobileApi.analyzeCall(id);
       setBusy((b) => { const n = { ...b }; delete n[id]; return n; });
