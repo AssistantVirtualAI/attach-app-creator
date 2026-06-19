@@ -17,7 +17,7 @@ import DialerFab from './components/DialerFab';
 import RealtimeStatusPill from './components/RealtimeStatusPill';
 import { useRealtimeCDR } from './hooks/useRealtimeCDR';
 import { initBackgroundSync } from './lib/backgroundSync';
-import { useStoredCreds, Creds } from './lib/creds';
+import { useStoredCreds, Creds, ensureStoredOrganizationId } from './lib/creds';
 import { gradients, colors } from './lib/theme';
 import { requestAllPermissions, checkAllPermissions } from './lib/permissions';
 import { registerPush, sendPushTokenToBackend } from './lib/pushNotifications';
@@ -161,7 +161,13 @@ function AuthenticatedShell({
     });
     configureAudit(async () => creds.accessToken || null);
     if (creds.accessToken) audit('softphone.signed_in', creds.userId, { extension: creds.extension });
+    // Backfill organizationId on legacy sessions that signed in before the
+    // user_roles resolver was added — keeps Recording debug + CDR realtime working.
+    if (creds.accessToken && creds.userId && !creds.organizationId) {
+      ensureStoredOrganizationId().catch(() => {});
+    }
   }, [creds]);
+
 
   // Once the permission gate is dismissed, finalize permissions + push.
   useEffect(() => {

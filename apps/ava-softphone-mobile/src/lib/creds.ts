@@ -78,3 +78,37 @@ export function useStoredCreds() {
 
   return { creds, setCreds, clearCreds, loading };
 }
+
+/**
+ * Best-effort resolver for the user's organizationId. Falls back to user_roles
+ * via the Supabase REST API when stored credentials are missing the field
+ * (e.g. legacy sessions or email-only sign-in before this fix).
+ * Persists the resolved value back into Store so subsequent calls are instant.
+ */
+const SUPABASE_URL_DEF = 'https://gejxisrqtvxavbrfcoxz.supabase.co';
+const SUPABASE_ANON_DEF = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdlanhpc3JxdHZ4YXZicmZjb3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1MDMxNzQsImV4cCI6MjA3NzA3OTE3NH0.kaO-GslE99OCNrZ4_AMnbzGqya2azqz_UMZR34zZvvo';
+
+export async function fetchOrganizationIdForUser(accessToken: string, userId: string): Promise<string | null> {
+  if (!accessToken || !userId) return null;
+  try {
+    const url = `${SUPABASE_URL_DEF}/rest/v1/user_roles?user_id=eq.${userId}&select=organization_id&limit=1`;
+    const res = await fetch(url, {
+      headers: { apikey: SUPABASE_ANON_DEF, Authorization: `Bearer ${accessToken}` },
+    });
+    if (!res.ok) return null;
+    const rows = await res.json().catch(() => []);
+    return rows?.[0]?.organization_id || null;
+  } catch { return null; }
+}
+
+/** Resolve + persist organizationId for the currently stored creds. Returns the resolved id. */
+export async function ensureStoredOrganizationId(): Promise<string | null> {
+  const c = await Store.get();
+  if (!c) return null;
+  if (c.organizationId) return c.organizationId;
+  if (!c.accessToken || !c.userId) return null;
+  const orgId = await fetchOrganizationIdForUser(c.accessToken, c.userId);
+  if (orgId) await Store.set({ ...c, organizationId: orgId });
+  return orgId;
+}
+

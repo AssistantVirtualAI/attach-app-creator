@@ -101,17 +101,22 @@ export function useRealtimeCDR(creds: Creds | null) {
     const connect = () => {
       if (cancelled) return;
       const ext = creds?.extension;
+      const orgId = creds?.organizationId;
       const token = creds?.accessToken || null;
-      if (!ext || !token) { startPolling(); return; }
+      if (!token || (!ext && !orgId)) { startPolling('Missing credentials for realtime — polling.'); return; }
 
       const sb = client(token);
-      const filter = `extension=eq.${ext}`;
+      // Prefer extension scope; fall back to organization scope when the user
+      // signed in via email and has no extension bound (e.g. org admins).
+      const filter = ext ? `extension=eq.${ext}` : `organization_id=eq.${orgId}`;
+      const chanKey = ext ? `cdr-ext-${ext}` : `cdr-org-${orgId}`;
       watchdog = setTimeout(() => {
         startPolling('Realtime unavailable — polling every 15s.');
       }, 8_000);
 
       channel = sb
-        .channel(`cdr-ext-${ext}-${attempt}`)
+        .channel(`${chanKey}-${attempt}`)
+
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pbx_call_records', filter }, (payload) => {
           const row = mapRow(payload.new);
           setCalls((prev) => {
@@ -197,7 +202,7 @@ export function useRealtimeCDR(creds: Creds | null) {
       window.removeEventListener('focus', load);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [creds?.extension, creds?.accessToken]);
+  }, [creds?.extension, creds?.accessToken, creds?.organizationId]);
 
   return {
     calls,
