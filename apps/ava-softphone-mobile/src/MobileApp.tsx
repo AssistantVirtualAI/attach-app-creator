@@ -236,6 +236,8 @@ function AuthenticatedShell({
     }}>
       <audio ref={audioRef} autoPlay playsInline />
 
+      <RealtimeHeader creds={creds} />
+
       <div key={tab} className="lemtel-page-enter" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         {tab === 'home'     && <DashboardScreen onNavigate={setTab as any} haptic={haptic} />}
         {tab === 'calls'    && <CallsScreen sp={sp} haptic={haptic} creds={creds} />}
@@ -248,6 +250,18 @@ function AuthenticatedShell({
 
       {!inCall && <DialerFab sp={sp} haptic={haptic} />}
       {inCall && <ActiveCallSheet sp={sp} haptic={haptic} />}
+    </div>
+  );
+}
+
+function RealtimeHeader({ creds }: { creds: Creds }) {
+  const { transport, warning, refresh } = useRealtimeCDR(creds);
+  return (
+    <div style={{
+      display: 'flex', justifyContent: 'flex-end', alignItems: 'center',
+      padding: '4px 12px 0',
+    }}>
+      <RealtimeStatusPill transport={transport} warning={warning} onRefresh={refresh} />
     </div>
   );
 }
