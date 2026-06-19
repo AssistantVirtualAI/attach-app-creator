@@ -1,5 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createSIPUA, JsSIPUnavailableError, SIPConfig, sdpModifier, classifySipFailure, hasWebRTC, WEBRTC_UNAVAILABLE_MESSAGE } from '../lib/sip/jssipProvider';
+import {
+  appendSipLog, clearSipLog as clearPersistedLog, loadPersistedError, loadPersistedStatus,
+  loadSipLog, PersistedSipError, RETRY_BACKOFF_MS, savePersistedError, savePersistedStatus,
+  SipLogEntry,
+} from '../lib/sip/sipPersistence';
 
 export type SIPStatus = 'idle' | 'connecting' | 'registered' | 'retrying' | 'error';
 export type CallState = 'idle' | 'ringing' | 'active' | 'ended';
@@ -22,19 +27,32 @@ export interface UseSoftphoneReturn {
   sendDTMF: (key: string) => void;
   setStatus: (status: string) => void;
   reconnect: () => void;
+  /** Last persisted error (from prior session if app was restarted). */
+  lastPersistedError: PersistedSipError | null;
+  /** Rolling buffer of SIP-related events (latest last). */
+  sipLog: SipLogEntry[];
+  clearSipLog: () => void;
+  /** Current retry attempt counter (0 = none). */
+  retryAttempt: number;
+  /** When the next auto-retry is scheduled (epoch ms) or null. */
+  nextRetryAt: number | null;
 }
 
 export function useSoftphone(
   config: SIPConfig | null,
   opts: { jsSipTimeoutMs?: number } = {},
 ): UseSoftphoneReturn {
-  const [sipStatus, setSipStatus] = useState<SIPStatus>('idle');
-  const [sipError, setSipError] = useState('');
+  const [sipStatus, setSipStatusState] = useState<SIPStatus>('idle');
+  const [sipError, setSipErrorState] = useState('');
   const [callState, setCallState] = useState<CallState>('idle');
   const [callTimer, setCallTimer] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [isOnHold, setIsOnHold] = useState(false);
   const [activeCallNumber, setActiveCallNumber] = useState('');
+  const [lastPersistedError, setLastPersistedError] = useState<PersistedSipError | null>(() => loadPersistedError());
+  const [sipLog, setSipLog] = useState<SipLogEntry[]>(() => loadSipLog());
+  const [retryAttempt, setRetryAttempt] = useState(0);
+  const [nextRetryAt, setNextRetryAt] = useState<number | null>(null);
 
   const uaRef = useRef<any>(null);
   const sessionRef = useRef<any>(null);
@@ -45,6 +63,47 @@ export function useSoftphone(
   const retryAttemptRef = useRef(0);
   const reconnectRef = useRef<() => void>(() => {});
   const [reconnectTick, setReconnectTick] = useState(0);
+
+  // --- logging helpers ---
+  const log = useCallback((event: string, detail?: string, level: 'info' | 'warn' | 'error' = 'info') => {
+    const entry: SipLogEntry = { time: Date.now(), level, event, detail };
+    const next = appendSipLog(entry);
+    setSipLog(next);
+    // Mirror to console for live debugging.
+    const tag = `[SIP][${level}] ${event}`;
+    if (level === 'error') console.error(tag, detail || '');
+    else if (level === 'warn') console.warn(tag, detail || '');
+    else console.log(tag, detail || '');
+  }, []);
+
+  const setSipStatus = useCallback((s: SIPStatus) => {
+    setSipStatusState(s);
+    savePersistedStatus(s);
+  }, []);
+
+  const setSipError = useCallback((msg: string, ctx?: { extension?: string; domain?: string }) => {
+    setSipErrorState(msg);
+    if (msg && (ctx?.extension || ctx?.domain)) {
+      const persisted: PersistedSipError = {
+        error: msg,
+        extension: ctx?.extension || '',
+        domain: ctx?.domain || '',
+        time: Date.now(),
+      };
+      savePersistedError(persisted);
+      setLastPersistedError(persisted);
+    }
+  }, []);
+
+  const clearSipLog = useCallback(() => { clearPersistedLog(); setSipLog([]); }, []);
+
+  // Restore persisted status on mount so UI doesn't flash "idle" on cold start.
+  useEffect(() => {
+    const prior = loadPersistedStatus();
+    if (prior === 'error' || prior === 'retrying') {
+      setSipStatusState('connecting');
+    }
+  }, []);
 
   // WebRTC capability check on mount — surfaces clear error immediately so
   // UI doesn't sit on "connecting…" for ever.
