@@ -35,7 +35,7 @@ export default function ContactsScreen({ sp }: { sp: any }) {
   const loadContacts = useCallback(async () => {
     if (!mobile.accessToken || !mobile.domainUuid) return;
     const [domainRows, manualRows] = await Promise.all([
-      restGet<any[]>(`/rest/v1/pbx_softphone_users_safe?select=id,portal_user_id,extension,display_name,sip_domain,status,last_seen_at&domain_uuid=eq.${safe(mobile.domainUuid)}&order=extension.asc`, mobile.accessToken).catch(() => []),
+      restGet<any[]>(`/rest/v1/pbx_softphone_users_safe?select=id,portal_user_id,extension,display_name,sip_domain,status,last_seen_at&organization_id=eq.${safe(mobile.organizationId)}&order=extension.asc`, mobile.accessToken).catch(() => []),
       mobile.organizationId ? restGet<any[]>(`/rest/v1/org_contacts?select=id,name,phone,email,company,source,owner_user_id&organization_id=eq.${safe(mobile.organizationId)}&order=name.asc`, mobile.accessToken).catch(() => []) : Promise.resolve([]),
     ]);
     const domain = (domainRows || []).map((r) => ({ id: r.id, kind: 'domain' as const, user_id: r.portal_user_id, extension: r.extension, phone: r.extension, display_name: r.display_name, sip_domain: r.sip_domain, status: r.status, last_seen_at: r.last_seen_at }));
@@ -68,7 +68,7 @@ export default function ContactsScreen({ sp }: { sp: any }) {
 
   useEffect(() => {
     if (mobile.loading) return;
-    if (!mobile.accessToken || !mobile.domainUuid) { setContacts([]); return; }
+    if (!mobile.accessToken || !mobile.organizationId) { setContacts([]); return; }
     let cancelled = false;
     syncDeviceContacts().then(() => loadContacts()).catch(() => {});
     loadContacts().then(() => !cancelled && setError(null)).catch((e) => {

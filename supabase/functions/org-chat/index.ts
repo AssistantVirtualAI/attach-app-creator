@@ -33,7 +33,7 @@ Deno.serve(async (req) => {
     const { data: m2 } = m?.organization_id ? { data: null } : await admin.from("org_members").select("org_id").eq("user_id", userId).limit(1).maybeSingle();
     const { data: sp } = (m?.organization_id || m2?.org_id) ? { data: null } : await admin.from("pbx_softphone_users").select("organization_id").eq("portal_user_id", userId).limit(1).maybeSingle();
     const { data: role } = (m?.organization_id || m2?.org_id || sp?.organization_id) ? { data: null } : await admin.from("user_roles").select("organization_id").eq("user_id", userId).limit(1).maybeSingle();
-    const orgId: string | null = m?.organization_id ?? m2?.org_id ?? sp?.organization_id ?? role?.organization_id ?? null;
+    const orgId: string | null = payload?.organization_id ?? m?.organization_id ?? m2?.org_id ?? sp?.organization_id ?? role?.organization_id ?? null;
     if (!orgId) return json({ error: "no_org" }, 400);
 
     // profile (sender_name)
