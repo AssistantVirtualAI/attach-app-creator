@@ -28,13 +28,27 @@ Deno.serve(async (req) => {
     const { action, payload } = await req.json().catch(() => ({}));
     if (!action) return json({ error: "missing_action" }, 400);
 
-    // org of caller (single workspace; support admin, portal and softphone users)
-    const { data: m } = await admin.from("organization_members").select("organization_id").eq("user_id", userId).limit(1).maybeSingle();
-    const { data: m2 } = m?.organization_id ? { data: null } : await admin.from("org_members").select("org_id").eq("user_id", userId).limit(1).maybeSingle();
-    const { data: sp } = (m?.organization_id || m2?.org_id) ? { data: null } : await admin.from("pbx_softphone_users").select("organization_id").eq("portal_user_id", userId).limit(1).maybeSingle();
-    const { data: role } = (m?.organization_id || m2?.org_id || sp?.organization_id) ? { data: null } : await admin.from("user_roles").select("organization_id").eq("user_id", userId).limit(1).maybeSingle();
-    const orgId: string | null = m?.organization_id ?? m2?.org_id ?? sp?.organization_id ?? role?.organization_id ?? null;
-    if (!orgId) return json({ error: "no_org" }, 400);
+    // Chat scope is the caller's PBX domain + extension. organization_id is only a
+    // storage partition for the existing chat tables and is resolved from that PBX domain.
+    const { data: callerSoftphones } = await admin
+      .from("pbx_softphone_users")
+      .select("organization_id, domain_uuid, sip_domain, extension")
+      .eq("portal_user_id", userId);
+    const { data: callerExtensions } = await admin
+      .from("pbx_extensions_directory")
+      .select("organization_id, domain_uuid, extension")
+      .eq("portal_user_id", userId);
+    const callerRows = [...(callerSoftphones ?? []), ...(callerExtensions ?? [])];
+    const callerDomainKeys = Array.from(new Set(callerRows
+      .map((r: any) => String(r.domain_uuid || r.sip_domain || "").trim())
+      .filter(Boolean)));
+    const callerExtensionsSet = new Set(callerRows.map((r: any) => String(r.extension || "").trim()).filter(Boolean));
+    if (callerDomainKeys.length === 0 || callerExtensionsSet.size === 0) return json({ error: "no_domain_extension" }, 400);
+    const storageOrgId = callerRows.find((r: any) => callerDomainKeys.includes(String(r.domain_uuid || r.sip_domain || "").trim()))?.organization_id ?? null;
+    const orgId: string | null = storageOrgId;
+    if (!orgId) return json({ error: "no_domain_storage" }, 400);
+
+    const sameDomainFilter = (rows: any[]) => (rows ?? []).filter((r: any) => callerDomainKeys.includes(String(r.domain_uuid || r.sip_domain || "").trim()));
 
     // profile (sender_name)
     const { data: prof } = await admin.from("profiles").select("full_name, email").eq("id", userId).maybeSingle();
