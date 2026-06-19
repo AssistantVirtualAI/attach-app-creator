@@ -34,11 +34,13 @@ jobs:
       - name: Create Release with files
         working-directory: apps/ava-softphone-desktop
         run: |
-          TAG=${{ github.ref_name }}
+          TAG="${{ github.ref_name }}"
           gh release delete "$TAG" --yes 2>/dev/null || true
           sleep 3
-          FILES=$(ls dist-electron/*.dmg dist-electron/*.exe dist-electron/*-mac.zip 2>/dev/null | tr '\n' ' ')
-          gh release create "$TAG" $FILES \
+          gh release create "$TAG" \
             --title "Lemtel Telecom $TAG" \
             --notes "Release $TAG" \
             --latest
+          find dist-electron -maxdepth 1 \( -name "*.dmg" -o -name "*.exe" -o -name "*.zip" \) | while read f; do
+            gh release upload "$TAG" "$f" --clobber
+          done
