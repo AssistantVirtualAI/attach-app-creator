@@ -27,12 +27,21 @@ export default function DialerScreen({
     setDialing(true);
     setError(null);
     try {
-      if (sp.snap.status === 'registered') {
-        const ok = sp.call(num);
-        if (ok !== false) return;
+      if (sp.snap.status !== 'registered') {
+        const msg = sp.snap.error || 'SIP not registered yet — wait for the green status or check your network.';
+        setError(msg);
+        showMobileToast(msg, 'error');
+        return;
       }
-      const res = await mobileApi.startCall(num, 'click_to_call');
-      showMobileToast(`Deskphone call requested: ${res?.from || 'extension'} → ${res?.to || num}`, 'success');
+      const ok = sp.call(num);
+      if (ok === false) {
+        const msg = 'Unable to start call via SIP';
+        setError(msg);
+        showMobileToast(msg, 'error');
+        return;
+      }
+      // Log attempt to backend (no PBX originate — purely informational).
+      mobileApi.startCall(num, 'webrtc').catch(() => {});
     } catch (e: any) {
       const msg = e?.message || 'Unable to start call';
       setError(msg);
@@ -41,6 +50,7 @@ export default function DialerScreen({
       setDialing(false);
     }
   };
+
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
