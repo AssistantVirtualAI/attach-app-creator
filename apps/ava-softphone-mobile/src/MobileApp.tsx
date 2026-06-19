@@ -43,7 +43,7 @@ const isPreviewMode = (() => {
 
 export default function MobileApp() {
   const { creds, setCreds, clearCreds, loading } = useStoredCreds();
-  const ALL_TABS: Tab[] = ['home','calls','ava','messages','more','voicemail','recordings','contacts','sms','queues','settings'];
+  const ALL_TABS: Tab[] = ['home','calls','ava','messages','more','voicemail','contacts','sms','queues','settings'];
   const initialTab = (() => {
     try {
       const t = new URLSearchParams(window.location.search).get('tab') as Tab | null;
