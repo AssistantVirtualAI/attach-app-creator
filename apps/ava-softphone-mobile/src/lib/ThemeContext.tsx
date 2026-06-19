@@ -35,3 +35,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 export function useTheme() {
   return useContext(ThemeCtx);
 }
+
+/**
+ * Returns the active color palette and re-renders the component when the
+ * user toggles dark ↔ light. Prefer this over importing `colors` directly
+ * when you need reactive style updates on theme change.
+ */
+export function useThemeColors(): ColorTokens {
+  const { mode } = useTheme();
+  return mode === 'light' ? lightColors : darkColors;
+}
