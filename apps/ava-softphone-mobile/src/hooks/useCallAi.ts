@@ -46,7 +46,6 @@ export function useCallAi(callId: string | null, meta: CallAiMeta | undefined, o
 
   const run = useCallback(async () => {
     if (!callId || running) return;
-    if (ranRef.current === callId) {/* allow re-run */ }
     setRunning(true);
     setError(null);
     setStage('transcribing');
@@ -63,9 +62,39 @@ export function useCallAi(callId: string | null, meta: CallAiMeta | undefined, o
         throw new Error(detail);
       }
       setStage('analyzing');
-      await mobileApi.analyzeCall(callId);
-      await new Promise((r) => setTimeout(r, 1200));
-      await load();
+      const a: any = await mobileApi.analyzeCall(callId);
+      if (a?.ok === false || a?.error) {
+        throw new Error(a?.error || a?.reason || 'analysis failed');
+      }
+      // Merge analyze response directly so the UI updates even if the
+      // downstream callDetail roundtrip is slow or eventually consistent.
+      const ai = a?.insights || a?.analysis || a || {};
+      const transcriptText: string = a?.transcript_text || a?.transcript || (t as any)?.transcript_text || '';
+      const transcriptLines = transcriptText
+        ? transcriptText.split(/\r?\n/).filter(Boolean).map((ln: string, i: number) => {
+            const m = ln.match(/^\s*(agent|caller|customer|client|user)\s*[:\-]\s*(.+)$/i);
+            const speaker = (m?.[1] || '').toLowerCase();
+            return {
+              speaker: speaker === 'agent' ? 'agent' : speaker ? 'customer' : (i % 2 === 0 ? 'customer' : 'agent'),
+              text: m?.[2] || ln,
+              t: i,
+            } as { speaker: 'agent' | 'customer'; text: string; t: number };
+          })
+        : [];
+      setData((prev) => ({
+        ...(prev || {} as any),
+        transcript: transcriptLines.length ? transcriptLines : (prev?.transcript || []),
+        summary: ai.summary || prev?.summary || '',
+        topics: ai.topics || prev?.topics || [],
+        actionItems: ai.action_items || ai.actionItems || prev?.actionItems || [],
+        qualityScore: ai.quality_score ?? ai.qualityScore ?? prev?.qualityScore ?? 0,
+        coachingScore: ai.coaching_score ?? ai.coachingScore ?? prev?.coachingScore ?? null,
+        coachingNotes: ai.coaching_notes || ai.coachingNotes || prev?.coachingNotes || [],
+        sentiment: ai.sentiment || prev?.sentiment,
+        intent: ai.intent || prev?.intent || '',
+      } as any));
+      // Best-effort: refresh from server but don't block UI on it.
+      load().catch(() => {});
       ranRef.current = callId;
       setStage('done');
     } catch (e: any) {
@@ -75,6 +104,7 @@ export function useCallAi(callId: string | null, meta: CallAiMeta | undefined, o
       setRunning(false);
     }
   }, [callId, running, meta, load]);
+
 
   return { data, loading, running, stage, error, load, run, setData };
 }
