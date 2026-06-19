@@ -33,12 +33,18 @@ export default function ContactsScreen({ sp }: { sp: any }) {
   }, [mobile.accessToken]);
 
   const loadContacts = useCallback(async () => {
-    if (!mobile.accessToken || !mobile.domainUuid) return;
-    const [domainRows, manualRows] = await Promise.all([
-      restGet<any[]>(`/rest/v1/pbx_softphone_users_safe?select=id,portal_user_id,extension,display_name,sip_domain,status,last_seen_at&domain_uuid=eq.${safe(mobile.domainUuid)}&order=extension.asc`, mobile.accessToken).catch(() => []),
-      mobile.organizationId ? restGet<any[]>(`/rest/v1/org_contacts?select=id,name,phone,email,company,source,owner_user_id&domain_uuid=eq.${safe(mobile.domainUuid)}&order=name.asc`, mobile.accessToken).catch(() => []) : Promise.resolve([]),
+    if (!mobile.accessToken || (!mobile.domainUuid && !mobile.organizationId)) return;
+    const domainFilter = mobile.domainUuid ? `domain_uuid=eq.${safe(mobile.domainUuid)}` : null;
+    const orgFilter = mobile.organizationId ? `organization_id=eq.${safe(mobile.organizationId)}` : null;
+    const primaryFilter = domainFilter || orgFilter!;
+    const [primaryRows, fallbackRows, manualRows] = await Promise.all([
+      restGet<any[]>(`/rest/v1/pbx_softphone_users_safe?select=id,portal_user_id,extension,display_name,sip_domain,status,last_seen_at&${primaryFilter}&order=extension.asc`, mobile.accessToken).catch(() => []),
+      (domainFilter && orgFilter) ? restGet<any[]>(`/rest/v1/pbx_softphone_users_safe?select=id,portal_user_id,extension,display_name,sip_domain,status,last_seen_at&${orgFilter}&order=extension.asc`, mobile.accessToken).catch(() => []) : Promise.resolve([]),
+      mobile.organizationId ? restGet<any[]>(`/rest/v1/org_contacts?select=id,name,phone,email,company,source,owner_user_id&organization_id=eq.${safe(mobile.organizationId)}&order=name.asc`, mobile.accessToken).catch(() => []) : Promise.resolve([]),
     ]);
-    const domain = (domainRows || []).map((r) => ({ id: r.id, kind: 'domain' as const, user_id: r.portal_user_id, extension: r.extension, phone: r.extension, display_name: r.display_name, sip_domain: r.sip_domain, status: r.status, last_seen_at: r.last_seen_at }));
+    const merged = new Map<string, any>();
+    for (const r of [...(primaryRows || []), ...(fallbackRows || [])]) if (r?.id) merged.set(r.id, r);
+    const domain = Array.from(merged.values()).map((r) => ({ id: r.id, kind: 'domain' as const, user_id: r.portal_user_id, extension: r.extension, phone: r.extension, display_name: r.display_name, sip_domain: r.sip_domain, status: r.status, last_seen_at: r.last_seen_at }));
     const manual = (manualRows || []).map((r) => ({ id: r.id, kind: 'manual' as const, user_id: null, extension: r.phone || '', phone: r.phone, email: r.email, display_name: r.name, sip_domain: null, status: null, last_seen_at: null }));
     const device = loadCachedContacts().map((c) => ({ id: `mobile-${c.id}`, kind: 'mobile' as const, user_id: null, extension: c.numbers[0] || '', phone: c.numbers[0], email: c.emails?.[0], display_name: c.name, sip_domain: null, status: null, last_seen_at: null }));
     const mapped = [...domain, ...manual, ...device];
