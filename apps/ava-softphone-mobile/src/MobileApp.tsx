@@ -7,7 +7,7 @@ import AuthScreen from './screens/AuthScreen';
 import DashboardScreen from './screens/DashboardScreen';
 import CallsScreen from './screens/CallsScreen';
 import AVAChatScreen from './screens/AVAChatScreen';
-import InboxScreen from './screens/InboxScreen';
+import TeamChatScreen from './screens/TeamChatScreen';
 import MoreScreen from './screens/MoreScreen';
 import BottomTabs, { Tab } from './components/BottomTabs';
 import ActiveCallSheet from './components/ActiveCallSheet';
