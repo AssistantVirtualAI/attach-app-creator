@@ -10,6 +10,7 @@ import { useTheme } from '../lib/ThemeContext';
 import { useMobileCredentials } from '../hooks/useMobileCredentials';
 import { restGet } from '../lib/mobileSupabase';
 import type { Tab } from '../components/BottomTabs';
+import NotificationsSheet, { NotificationBell, useNotificationCounts } from '../components/NotificationsSheet';
 
 const RANGE_LABELS: Record<StatsRange, string> = { today: 'Today', '7d': '7 days', '30d': '30 days' };
 const AI_CACHE_KEY = (range: string) => `ava.aisummary.${range}`;
