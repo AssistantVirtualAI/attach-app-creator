@@ -32,7 +32,8 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
 
   // Real-time CDR via Supabase Realtime (postgres_changes) with automatic
   // 15s polling fallback + visible warning if the realtime channel fails.
-  const { calls, transport, warning, dismissWarning } = useRealtimeCDR(creds || null, rangeDays);
+  const queryExt = isAdmin && extFilter !== 'all' ? extFilter : null;
+  const { calls, transport, warning, dismissWarning } = useRealtimeCDR(creds || null, rangeDays, queryExt);
 
   // Resolve admin + own extension to scope/filter the History list.
   useEffect(() => {
