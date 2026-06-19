@@ -33,16 +33,34 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
       { global: { headers: { Authorization: authHeader } } },
     );
+    const admin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
     const { data: u } = await sb.auth.getUser();
     if (!u?.user) return json({ error: "unauthorized" }, 401);
     const { data: __mobileAllowed } = await sb.rpc("my_platform_access_allowed", { _platform: "mobile" });
     if (__mobileAllowed === false) return json({ error: "MOBILE_ACCESS_DISABLED", message: "Mobile access not granted by Lemtel administrators." }, 403);
 
-    const { data: sp } = await sb.from("pbx_softphone_users")
+    const { data: sp } = await admin.from("pbx_softphone_users")
       .select("organization_id, extension, domain_uuid")
       .eq("portal_user_id", u.user.id).maybeSingle();
     if (!sp) return json({ error: "NO_SOFTPHONE_ACCOUNT" }, 404);
     if (!sp.extension) return json({ error: "NO_EXTENSION_ASSIGNED" }, 403);
+
+    const [{ data: roleRow }, { data: orgMember }, { data: superAdmin }, { data: lemtelAdmin }] = await Promise.all([
+      admin.from("user_roles").select("role").eq("user_id", u.user.id).eq("organization_id", sp.organization_id).maybeSingle(),
+      admin.from("org_members").select("role, can_manage_extensions, can_listen_calls").eq("user_id", u.user.id).eq("org_id", sp.organization_id).maybeSingle(),
+      admin.rpc("is_super_admin", { _user_id: u.user.id }).maybeSingle().catch(() => ({ data: false } as any)),
+      admin.rpc("is_lemtel_admin", { _user_id: u.user.id }).maybeSingle().catch(() => ({ data: false } as any)),
+    ]);
+    const orgMemberRole = (orgMember as any)?.role || "";
+    const appRole = (roleRow as any)?.role || "agent";
+    const isDomainAdmin = !!superAdmin || !!lemtelAdmin
+      || ["master_admin", "ava_admin", "reseller_admin", "customer_admin"].includes(orgMemberRole)
+      || ["super_admin", "admin", "org_admin", "manager"].includes(appRole)
+      || !!(orgMember as any)?.can_manage_extensions
+      || !!(orgMember as any)?.can_listen_calls;
 
     const url = new URL(req.url);
     const id = url.searchParams.get("id");
@@ -51,9 +69,9 @@ Deno.serve(async (req) => {
     const extFilter = `extension.eq.${ext},caller_number.eq.${ext},source_number.eq.${ext},destination_number.eq.${ext},destination.eq.${ext}`;
 
     if (id) {
-      let detailQ = sb.from("pbx_call_records").select("*")
-        .eq("id", id).eq("organization_id", sp.organization_id)
-        .or(extFilter);
+      let detailQ = admin.from("pbx_call_records").select("*")
+        .eq("id", id).eq("organization_id", sp.organization_id);
+      if (!isDomainAdmin) detailQ = detailQ.or(extFilter);
       // Allow rows where domain_uuid is NULL (older CDRs) OR matches the user's domain.
       if (sp.domain_uuid) detailQ = detailQ.or(`domain_uuid.eq.${sp.domain_uuid},domain_uuid.is.null`);
       const { data: r } = await detailQ.maybeSingle();
@@ -100,10 +118,10 @@ Deno.serve(async (req) => {
     }
 
     const limit = Math.min(Number(url.searchParams.get("limit")) || 50, 200);
-    let listQ = sb.from("pbx_call_records")
+    let listQ = admin.from("pbx_call_records")
       .select("id, direction, call_status, caller_name, caller_number, source_number, destination, destination_number, extension, start_at, duration_seconds, missed_call, has_recording, transcribed")
-      .eq("organization_id", sp.organization_id)
-      .or(extFilter);
+      .eq("organization_id", sp.organization_id);
+    if (!isDomainAdmin) listQ = listQ.or(extFilter);
     if (sp.domain_uuid) listQ = listQ.or(`domain_uuid.eq.${sp.domain_uuid},domain_uuid.is.null`);
     const { data: rows, error } = await listQ
       .order("start_at", { ascending: false })
