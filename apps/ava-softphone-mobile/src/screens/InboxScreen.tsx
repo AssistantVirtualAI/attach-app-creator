@@ -37,7 +37,7 @@ export default function InboxScreen({
       </header>
 
       <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6,
+        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6,
         padding: '0 14px 12px',
       }}>
         {TABS.map(({ id, label, Icon, accent }) => {
