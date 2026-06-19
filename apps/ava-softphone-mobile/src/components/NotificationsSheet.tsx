@@ -58,7 +58,7 @@ export default function NotificationsSheet({
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          width: '100%', maxWidth: 480, background: colors.bg, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl,
+          width: '100%', maxWidth: 480, background: colors.midnight, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl,
           padding: 16, boxShadow: '0 -12px 32px rgba(0,0,0,0.4)',
         }}
       >
@@ -128,7 +128,7 @@ export function NotificationBell({ onClick, count }: { onClick: () => void; coun
         <span style={{
           position: 'absolute', top: -4, right: -4, minWidth: 16, height: 16, padding: '0 4px',
           borderRadius: 8, background: '#ff3b3b', color: '#fff', fontSize: 10, fontWeight: 800,
-          display: 'grid', placeItems: 'center', border: `2px solid ${colors.bg}`,
+          display: 'grid', placeItems: 'center', border: `2px solid ${colors.midnight}`,
         }}>{count > 9 ? '9+' : count}</span>
       )}
     </button>
