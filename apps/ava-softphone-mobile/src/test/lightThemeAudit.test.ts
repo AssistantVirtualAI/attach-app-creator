@@ -30,13 +30,15 @@ function walk(dir: string, out: string[] = []): string[] {
 const SCAN_DIRS = ['screens', 'components'].map((d) => join(srcRoot, d));
 const FILES = SCAN_DIRS.flatMap((d) => walk(d));
 
-const DARK_HEX = [
-  { hex: '#0A1429', allow: [] as string[] },
-  { hex: '#0E1B3D', allow: [] },
-  { hex: '#E8EEFB', allow: [] },
+const DARK_HEX: ReadonlyArray<{ hex: string; allow: string[] }> = [
+  // Fullscreen branded surfaces stay dark by design (auth splash, active
+  // call sheet). Everything else must go through the theme module.
+  { hex: '#0A1429', allow: ['screens/AuthScreen.tsx', 'components/ActiveCallSheet.tsx'] },
+  { hex: '#0E1B3D', allow: ['components/ActiveCallSheet.tsx'] },
+  { hex: '#E8EEFB', allow: ['screens/AuthScreen.tsx'] },
   { hex: '#B0BACC', allow: [] },
   { hex: '#7C8AA8', allow: [] },
-] as const;
+];
 
 describe('light-mode token audit', () => {
   it('no source file imports `darkColors` directly', () => {
