@@ -281,8 +281,8 @@ function AuthenticatedShell({
         {/* legacy deep-link routes */}
         {tab === 'more'       && <MoreScreen creds={creds} sp={sp} onSignOut={onSignOut} haptic={haptic} />}
         {tab === 'voicemail'  && <VoicemailScreen haptic={haptic} />}
-        {tab === 'recordings' && <RecordingsScreen />}
         {tab === 'contacts'   && <ContactsScreen sp={sp} />}
+
         {tab === 'sms'        && <MessagesScreen haptic={haptic} />}
         {tab === 'queues'     && <QueuesScreen />}
       </div>
