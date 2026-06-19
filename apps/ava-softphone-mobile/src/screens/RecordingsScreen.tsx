@@ -210,12 +210,24 @@ function RecordingAiPanel({ rec }: { rec: RecordingEntry }) {
   const { data, loading, running, stage, error, run } = useCallAi(rec.id, meta);
 
   const hasTranscript = (data?.transcript?.length || 0) > 0;
+  const hasAi = !!data?.summary || (data?.coachingNotes?.length || 0) > 0;
+
+  // Auto-trigger AI on first expand if nothing is cached and no prior error.
+  const autoStartedRef = useRef(false);
+  useEffect(() => {
+    if (autoStartedRef.current) return;
+    if (loading || running) return;
+    if (hasTranscript || hasAi || error) return;
+    autoStartedRef.current = true;
+    run();
+  }, [loading, running, hasTranscript, hasAi, error, run]);
+
   const statusText = running
-    ? stage === 'analyzing' ? 'AI: scoring & coaching…' : 'AI: transcribing audio…'
-    : data?.summary ? 'AI ready · cached'
-    : error ? 'AI failed'
+    ? stage === 'analyzing' ? 'Analyzing call · coaching & sentiment…' : 'Transcribing audio with AI…'
+    : error ? 'AI run failed'
+    : hasAi ? 'AI ready · cached'
     : hasTranscript ? 'Transcript ready'
-    : 'No AI analysis yet';
+    : 'Preparing AI…';
 
   return (
     <div style={{ margin: '8px 0 0', padding: 12, borderRadius: radius.lg, border: `1px solid ${colors.borderAI}`, background: 'rgba(122,76,255,0.05)' }}>
@@ -232,12 +244,24 @@ function RecordingAiPanel({ rec }: { rec: RecordingEntry }) {
               display: 'inline-flex', alignItems: 'center', gap: 4,
             }}>
               {running ? <Loader2 size={11} className="spin" /> : <Sparkles size={11} />}
-              {running ? 'Working…' : hasTranscript ? 'Re-run' : 'Transcribe & analyze'}
+              {running ? 'Working…' : error ? 'Retry' : (hasTranscript || hasAi) ? 'Re-run AI' : 'Transcribe & analyze'}
             </button>
           </div>
 
+          {/* Progress stepper */}
+          {(running || (!hasAi && !error)) && (
+            <ProgressStepper stage={running ? stage : (hasTranscript ? 'analyzing' : 'transcribing')} />
+          )}
+
           {error && (
-            <div style={{ marginBottom: 8, padding: 8, borderRadius: radius.md, border: `1px solid ${colors.danger}55`, color: colors.danger, fontSize: 11 }}>⚠ {error}</div>
+            <div style={{ marginBottom: 8, padding: 10, borderRadius: radius.md, border: `1px solid ${colors.danger}55`, background: `${colors.danger}10` }}>
+              <div style={{ color: colors.danger, fontSize: 11, fontWeight: 800, marginBottom: 4 }}>⚠ Transcription failed</div>
+              <div style={{ color: colors.mutedSilver, fontSize: 11, marginBottom: 8, wordBreak: 'break-word' }}>{error}</div>
+              <button onClick={run} disabled={running} style={{
+                padding: '5px 10px', borderRadius: 8, border: `1px solid ${colors.danger}80`,
+                background: 'transparent', color: colors.danger, fontSize: 10.5, fontWeight: 800, cursor: 'pointer',
+              }}>↻ Retry AI run</button>
+            </div>
           )}
 
           {data?.summary && (
@@ -278,6 +302,9 @@ function RecordingAiPanel({ rec }: { rec: RecordingEntry }) {
                     alignItems: line.speaker === 'agent' ? 'flex-end' : 'flex-start',
                     marginBottom: 6,
                   }}>
+                    <div style={{ fontSize: 9, color: colors.mutedSilver, marginBottom: 2, letterSpacing: 0.6, textTransform: 'uppercase', fontWeight: 700 }}>
+                      {line.speaker === 'agent' ? 'Agent' : line.speaker === 'customer' ? 'Caller' : 'Speaker'}
+                    </div>
                     <div style={{
                       maxWidth: '88%', padding: '6px 10px', borderRadius: 12,
                       fontSize: font.sm, lineHeight: 1.4,
@@ -291,6 +318,37 @@ function RecordingAiPanel({ rec }: { rec: RecordingEntry }) {
           )}
         </>
       )}
+    </div>
+  );
+}
+
+function ProgressStepper({ stage }: { stage: 'idle' | 'transcribing' | 'analyzing' | 'done' | 'error' }) {
+  const steps = [
+    { id: 'transcribing', label: 'Transcribe' },
+    { id: 'analyzing', label: 'Analyze' },
+    { id: 'done', label: 'Ready' },
+  ];
+  const activeIdx = stage === 'analyzing' ? 1 : stage === 'done' ? 2 : 0;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '4px 0 10px' }}>
+      {steps.map((s, i) => (
+        <React.Fragment key={s.id}>
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            padding: '3px 8px', borderRadius: 999,
+            background: i <= activeIdx ? `${colors.avaViolet}25` : 'rgba(255,255,255,0.04)',
+            border: `1px solid ${i <= activeIdx ? colors.avaViolet : colors.border}`,
+            fontSize: 10, fontWeight: 800, letterSpacing: 0.4,
+            color: i <= activeIdx ? colors.avaViolet : colors.mutedSilver,
+          }}>
+            {i === activeIdx && stage !== 'done' ? <Loader2 size={10} className="spin" /> : i < activeIdx || stage === 'done' ? '✓' : i + 1}
+            {s.label}
+          </div>
+          {i < steps.length - 1 && (
+            <div style={{ flex: 1, height: 2, background: i < activeIdx ? colors.avaViolet : colors.border, borderRadius: 2 }} />
+          )}
+        </React.Fragment>
+      ))}
     </div>
   );
 }
