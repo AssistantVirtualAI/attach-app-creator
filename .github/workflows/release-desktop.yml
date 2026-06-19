@@ -31,12 +31,14 @@ jobs:
       - name: Package Windows
         working-directory: apps/ava-softphone-desktop
         run: npx electron-builder --win --x64 --publish never
-      - name: List dist files
-        working-directory: apps/ava-softphone-desktop
-        run: ls -la dist-electron/
-      - name: Upload files to release
+      - name: Create Release with files
         working-directory: apps/ava-softphone-desktop
         run: |
-          for f in dist-electron/*.dmg dist-electron/*.exe dist-electron/*.zip; do
-            [ -f "$f" ] && gh release upload ${{ github.ref_name }} "$f" --clobber && echo "Uploaded $f" || true
-          done
+          TAG=${{ github.ref_name }}
+          gh release delete "$TAG" --yes 2>/dev/null || true
+          sleep 3
+          FILES=$(ls dist-electron/*.dmg dist-electron/*.exe dist-electron/*-mac.zip 2>/dev/null | tr '\n' ' ')
+          gh release create "$TAG" $FILES \
+            --title "Lemtel Telecom $TAG" \
+            --notes "Release $TAG" \
+            --latest
