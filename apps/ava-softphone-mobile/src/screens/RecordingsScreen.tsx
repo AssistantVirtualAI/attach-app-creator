@@ -51,7 +51,9 @@ export default function RecordingsScreen() {
         <EmptyState icon="◉" title="No recordings yet" hint="Recorded calls will appear here with AI transcripts and summaries." />
       )}
 
-      {data && data.map((r) => (
+      {data && data.map((r) => {
+        const state = busy[r.id];
+        return (
         <Card key={r.id} style={{ marginBottom: 8 }} padded={true} onPress={() => setOpen(r.id)}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -64,7 +66,29 @@ export default function RecordingsScreen() {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
               <Chip tone="gold" size="xs">REC</Chip>
-              {r.hasTranscript && <Chip tone="violet" size="xs">AI</Chip>}
+              {r.hasTranscript ? (
+                <Chip tone="violet" size="xs">AI ✓</Chip>
+              ) : (
+                <button
+                  onClick={(e) => { e.stopPropagation(); transcribe(r.id); }}
+                  disabled={state === 'running'}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                    padding: '3px 8px', borderRadius: 999, border: 'none',
+                    background: state === 'failed'
+                      ? 'rgba(239,68,68,0.18)'
+                      : `linear-gradient(135deg, ${colors.avaViolet}, ${colors.avaCyan})`,
+                    color: state === 'failed' ? colors.danger : '#fff',
+                    fontSize: 10, fontWeight: 800, letterSpacing: 0.6,
+                    cursor: state === 'running' ? 'default' : 'pointer',
+                    opacity: state === 'running' ? 0.7 : 1,
+                  }}
+                  title={state === 'failed' ? 'Tap to retry transcription' : 'Transcribe & analyze with AVA'}
+                >
+                  {state === 'running' ? <Loader2 size={10} className="spin" /> : <Sparkles size={10} />}
+                  {state === 'running' ? 'WORKING' : state === 'failed' ? 'RETRY' : 'TRANSCRIBE'}
+                </button>
+              )}
             </div>
           </div>
           {r.summary && (
@@ -73,7 +97,8 @@ export default function RecordingsScreen() {
             </p>
           )}
         </Card>
-      ))}
+        );
+      })}
 
       <div style={{ height: 80 }} />
     </div>
