@@ -167,6 +167,14 @@ Deno.serve(async (req) => {
     const rpcName = isRead ? "is_lemtel_member" : "is_lemtel_admin";
     const { data: allowed } = await admin.rpc(rpcName, { _user_id: userId });
     let permitted = !!allowed;
+    if (!permitted && _earlyAction === "originate-click-to-call") {
+      const targetOrg = _bodyEarly?.organization_id;
+      const fromExtension = String(_bodyEarly?.params?.from_extension || _bodyEarly?.from_extension || "");
+      if (targetOrg && fromExtension) {
+        const { data: spu } = await admin.from("pbx_softphone_users").select("id").eq("portal_user_id", userId).eq("organization_id", targetOrg).eq("extension", fromExtension).limit(1).maybeSingle();
+        if (spu?.id) permitted = true;
+      }
+    }
     if (!permitted) {
       // Fallback: is caller an org_admin of the tenant tied to the requested domain?
       const targetDomain = _bodyEarly?.domain_uuid || _bodyEarly?.params?.domain_uuid;
@@ -2201,6 +2209,16 @@ Deno.serve(async (req) => {
           metadata: { uuid, destination, context, ok: r?.ok },
         });
       }
+      return json(r, r?.ok ? 200 : 500);
+    }
+
+    if (action === "originate-click-to-call") {
+      const fromExtension = String(body.from_extension || params.from_extension || "").replace(/[^0-9*#+]/g, "");
+      const destination = String(body.destination || params.destination || "").replace(/[^0-9*#+]/g, "");
+      const domainName = String(body.domain_name || params.domain_name || "").trim();
+      if (!fromExtension || !destination || !domainName) return json({ error: "from_extension, destination, domain_name required" }, 400);
+      const args = `{origination_caller_id_name='AVA Mobile',origination_caller_id_number=${fromExtension}}user/${fromExtension}@${domainName} ${destination} XML ${domainName}`;
+      const r = await pbxWrite(`commands`, "POST", { commands: [{ command: "originate", arguments: args }] });
       return json(r, r?.ok ? 200 : 500);
     }
 
