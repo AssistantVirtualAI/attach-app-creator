@@ -11,8 +11,8 @@ const RANGE_LABELS: Record<StatsRange, string> = { today: 'Today', '7d': '7 days
 const AI_CACHE_KEY = (range: string) => `ava.aisummary.${range}`;
 
 export default function DashboardScreen({
-  onNavigate, haptic,
-}: { onNavigate: (t: Tab) => void; haptic: (s?: ImpactStyle) => Promise<void> }) {
+  onNavigate, haptic, onOpenProfile,
+}: { onNavigate: (t: Tab) => void; haptic: (s?: ImpactStyle) => Promise<void>; onOpenProfile?: () => void }) {
   const [range, setRange] = useState<StatsRange>('today');
   const me = useAutoSync<MeResponse>(() => mobileApi.me(), { intervalMs: 5 * 60_000 });
   const stats = useAutoSync<DomainStats>(() => mobileApi.domainStats(range), { intervalMs: 60_000, deps: [range] });
@@ -63,7 +63,22 @@ export default function DashboardScreen({
               Call history · {RANGE_LABELS[range]}
             </div>
           </div>
-          {s ? <StatusDot state="registered" /> : <Skeleton w={60} h={14} />}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {s ? <StatusDot state="registered" /> : <Skeleton w={40} h={14} />}
+            <button
+              onClick={onOpenProfile}
+              aria-label="My profile"
+              style={{
+                width: 38, height: 38, borderRadius: '50%',
+                background: `linear-gradient(135deg, ${colors.lemtelBlue}, ${colors.avaCyan})`,
+                color: '#fff', fontWeight: 800, fontSize: 13, border: '2px solid rgba(255,255,255,0.85)',
+                cursor: 'pointer', display: 'grid', placeItems: 'center',
+                boxShadow: '0 8px 18px -8px rgba(7,22,168,0.45)',
+              }}
+            >
+              {(m?.user?.name || m?.user?.email || 'U').split(/[\s@]/)[0].slice(0, 2).toUpperCase()}
+            </button>
+          </div>
         </div>
 
         <div style={{ marginTop: 16 }}>

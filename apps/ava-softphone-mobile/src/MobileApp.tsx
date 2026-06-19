@@ -9,12 +9,19 @@ import CallsScreen from './screens/CallsScreen';
 import AVAChatScreen from './screens/AVAChatScreen';
 import TeamChatScreen from './screens/TeamChatScreen';
 import MoreScreen from './screens/MoreScreen';
+import VoicemailScreen from './screens/VoicemailScreen';
+import RecordingsScreen from './screens/RecordingsScreen';
+import ContactsScreen from './screens/ContactsScreen';
+import MessagesScreen from './screens/MessagesScreen';
+import QueuesScreen from './screens/QueuesScreen';
+import SettingsScreen from './screens/SettingsScreen';
 import BottomTabs, { Tab } from './components/BottomTabs';
 import ActiveCallSheet from './components/ActiveCallSheet';
 import SplashAva from './components/SplashAva';
 import PermissionGate from './components/PermissionGate';
 import DialerFab from './components/DialerFab';
 import RealtimeStatusPill from './components/RealtimeStatusPill';
+import ProfileSheet from './components/ProfileSheet';
 import { useRealtimeCDR } from './hooks/useRealtimeCDR';
 import { initBackgroundSync } from './lib/backgroundSync';
 import { useStoredCreds, Creds, ensureStoredOrganizationId, hydrateSoftphoneCredentials } from './lib/creds';
@@ -34,10 +41,11 @@ const isPreviewMode = (() => {
 
 export default function MobileApp() {
   const { creds, setCreds, clearCreds, loading } = useStoredCreds();
+  const ALL_TABS: Tab[] = ['home','calls','ava','messages','more','voicemail','recordings','contacts','sms','queues','settings'];
   const initialTab = (() => {
     try {
-      const t = new URLSearchParams(window.location.search).get('tab');
-      if (t === 'home' || t === 'calls' || t === 'ava' || t === 'messages' || t === 'more') return t as Tab;
+      const t = new URLSearchParams(window.location.search).get('tab') as Tab | null;
+      if (t && ALL_TABS.includes(t)) return t;
     } catch {}
     return 'home' as Tab;
   })();
@@ -239,6 +247,8 @@ function AuthenticatedShell({
   }
 
 
+  const [profileOpen, setProfileOpen] = useState(false);
+
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', height: '100vh',
@@ -252,17 +262,32 @@ function AuthenticatedShell({
       <RealtimeHeader creds={creds} />
 
       <div key={tab} className="lemtel-page-enter" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        {tab === 'home'     && <DashboardScreen onNavigate={setTab as any} haptic={haptic} />}
-        {tab === 'calls'    && <CallsScreen sp={sp} haptic={haptic} creds={creds} />}
-        {tab === 'ava'      && <AVAChatScreen />}
-        {tab === 'messages' && <TeamChatScreen accessToken={creds.accessToken || null} userId={creds.userId} />}
-        {tab === 'more'     && <MoreScreen creds={creds} sp={sp} onSignOut={onSignOut} haptic={haptic} />}
+        {tab === 'home'       && <DashboardScreen onNavigate={setTab as any} haptic={haptic} onOpenProfile={() => setProfileOpen(true)} />}
+        {tab === 'calls'      && <CallsScreen sp={sp} haptic={haptic} creds={creds} />}
+        {tab === 'ava'        && <AVAChatScreen />}
+        {tab === 'messages'   && <TeamChatScreen accessToken={creds.accessToken || null} userId={creds.userId} />}
+        {tab === 'more'       && <MoreScreen creds={creds} sp={sp} onSignOut={onSignOut} haptic={haptic} />}
+        {tab === 'voicemail'  && <VoicemailScreen haptic={haptic} />}
+        {tab === 'recordings' && <RecordingsScreen />}
+        {tab === 'contacts'   && <ContactsScreen sp={sp} />}
+        {tab === 'sms'        && <MessagesScreen haptic={haptic} />}
+        {tab === 'queues'     && <QueuesScreen />}
+        {tab === 'settings'   && <SettingsScreen creds={creds} sp={sp} onSignOut={onSignOut} />}
       </div>
 
       <BottomTabs active={tab} onChange={(t) => { haptic(ImpactStyle.Light); setTab(t); }} />
 
       {!inCall && <DialerFab sp={sp} haptic={haptic} />}
       {inCall && <ActiveCallSheet sp={sp} haptic={haptic} />}
+
+      {profileOpen && (
+        <ProfileSheet
+          creds={creds}
+          onClose={() => setProfileOpen(false)}
+          onSignOut={() => { setProfileOpen(false); onSignOut(); }}
+          onCredsUpdate={setCreds}
+        />
+      )}
     </div>
   );
 }
