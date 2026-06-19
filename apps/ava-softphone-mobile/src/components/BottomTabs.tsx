@@ -23,10 +23,8 @@ const RIGHT: Item[] = [
 ];
 
 export default function BottomTabs({
-  active, onChange,
-}: { active: Tab; onChange: (t: Tab) => void }) {
-  const accent = colors.lemtelBlue;
-
+  active, onChange, badges,
+}: { active: Tab; onChange: (t: Tab) => void; badges?: Partial<Record<Tab, number>> }) {
   return (
     <nav
       style={{
@@ -52,7 +50,7 @@ export default function BottomTabs({
         }}
       >
         {LEFT.map((it) => (
-          <TabBtn key={it.id} item={it} active={active === it.id} onPress={() => onChange(it.id)} />
+          <TabBtn key={it.id} item={it} active={active === it.id} onPress={() => onChange(it.id)} badge={badges?.[it.id]} />
         ))}
 
         <div style={{ position: 'relative', display: 'flex', justifyContent: 'center' }}>
@@ -83,14 +81,14 @@ export default function BottomTabs({
         </div>
 
         {RIGHT.map((it) => (
-          <TabBtn key={it.id} item={it} active={active === it.id} onPress={() => onChange(it.id)} />
+          <TabBtn key={it.id} item={it} active={active === it.id} onPress={() => onChange(it.id)} badge={badges?.[it.id]} />
         ))}
       </div>
     </nav>
   );
 }
 
-function TabBtn({ item, active, onPress }: { item: Item; active: boolean; onPress: () => void }) {
+function TabBtn({ item, active, onPress, badge }: { item: Item; active: boolean; onPress: () => void; badge?: number }) {
   const { Icon, label } = item;
   const accent = colors.lemtelBlue;
   return (
@@ -115,6 +113,7 @@ function TabBtn({ item, active, onPress }: { item: Item; active: boolean; onPres
     >
       <span
         style={{
+          position: 'relative',
           display: 'grid', placeItems: 'center', width: 28, height: 28, borderRadius: 10,
           background: active
             ? `radial-gradient(circle at 30% 30%, ${accent}33, ${accent}11 70%)`
@@ -122,6 +121,22 @@ function TabBtn({ item, active, onPress }: { item: Item; active: boolean; onPres
         }}
       >
         <Icon size={18} strokeWidth={active ? 2.6 : 2} />
+        {badge && badge > 0 ? (
+          <span
+            aria-label={`${badge} new`}
+            style={{
+              position: 'absolute', top: -4, right: -6,
+              minWidth: 16, height: 16, padding: '0 4px',
+              borderRadius: 8, background: '#ff3b30',
+              color: '#fff', fontSize: 10, fontWeight: 800,
+              display: 'grid', placeItems: 'center',
+              boxShadow: '0 2px 6px rgba(255,59,48,0.45), 0 0 0 2px #fff',
+              lineHeight: 1,
+            }}
+          >
+            {badge > 99 ? '99+' : badge}
+          </span>
+        ) : null}
       </span>
       <span style={{ fontSize: 9.5, fontWeight: active ? 800 : 600, letterSpacing: 0.3 }}>
         {label}
