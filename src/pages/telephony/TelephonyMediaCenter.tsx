@@ -185,7 +185,7 @@ function RecordingsTab({ orgId, extension, search }: { orgId: string; extension:
     queryKey: ["media", "recordings", orgId, extension],
     queryFn: async () => {
       let q = (supabase as any).from("pbx_call_records")
-        .select("id,organization_id,start_at,duration_seconds,caller_number,destination_number,extension,recording_path,recording_name,recording_url,transcript,ai_summary,ai_sentiment,transcribed,pbx_uuid,domain_uuid,domain_name")
+        .select("id,organization_id,start_at,duration_seconds,caller_number,destination_number,extension,recording_path,recording_name,recording_url,ai_summary,transcribed,pbx_uuid,domain_uuid,domain_name,raw_data")
         .eq("organization_id", orgId).not("recording_path", "is", null).order("start_at", { ascending: false }).limit(150);
       if (extension) q = q.or(`extension.eq.${extension},caller_number.eq.${extension},destination_number.eq.${extension},source_number.eq.${extension}`);
       const { data } = await q;
@@ -224,7 +224,12 @@ function RecordingsTab({ orgId, extension, search }: { orgId: string; extension:
         ...row,
         transcribed: result.stage === 'complete',
         ai_summary: result.data?.summary ?? row.ai_summary,
-        ai_sentiment: result.data?.sentiment ?? row.ai_sentiment,
+        raw_data: {
+          ...(row.raw_data || {}),
+          transcript_text: result.data?.transcript_text || result.data?.transcript || row.raw_data?.transcript_text,
+          transcript_provider: result.data?.transcript_provider || row.raw_data?.transcript_provider,
+          ai: result.data?.insights || result.data?.analysis || row.raw_data?.ai,
+        },
       } : row);
     });
     setWorking(null);
@@ -241,7 +246,7 @@ function RecordingsTab({ orgId, extension, search }: { orgId: string; extension:
     toast.success("Enregistrement supprimé");
   };
 
-  const filtered = rows.filter((r) => !search || `${r.caller_number ?? ""} ${r.destination_number ?? ""} ${r.transcript ?? ""}`.toLowerCase().includes(search.toLowerCase()));
+  const filtered = rows.filter((r) => !search || `${r.caller_number ?? ""} ${r.destination_number ?? ""} ${r.raw_data?.transcript_text ?? ""}`.toLowerCase().includes(search.toLowerCase()));
   if (isLoading) return <div className="flex justify-center py-8"><Loader2 className="animate-spin" /></div>;
 
   return (
@@ -251,6 +256,8 @@ function RecordingsTab({ orgId, extension, search }: { orgId: string; extension:
         {filtered.length === 0 && <p className="text-sm text-muted-foreground">Aucun enregistrement.</p>}
         {filtered.map((r) => {
           const url = signed[r.id] || r.recording_url;
+          const transcriptText = r.raw_data?.transcript_text || "";
+          const ai = r.raw_data?.ai || {};
           return (
             <div key={r.id} className="border rounded-lg p-3 space-y-2">
               <div className="flex items-center justify-between flex-wrap gap-2 text-sm">
@@ -261,7 +268,7 @@ function RecordingsTab({ orgId, extension, search }: { orgId: string; extension:
                 <div className="flex gap-1 items-center">
                   {(() => {
                     const live = stages[r.id];
-                    const transcript = { provider: r.transcript_provider, transcript_text: r.transcript };
+                    const transcript = { provider: r.raw_data?.transcript_provider, transcript_text: transcriptText };
                     const stubT = isStubTranscript(transcript);
                     const stage: TranscriptStage = live?.stage
                       ?? (working === r.id ? 'transcribing'
@@ -270,7 +277,7 @@ function RecordingsTab({ orgId, extension, search }: { orgId: string; extension:
                         : 'idle');
                     return <TranscriptStagePill stage={stage} detail={live?.detail} compact />;
                   })()}
-                  {r.ai_sentiment && <Badge variant="outline">{r.ai_sentiment}</Badge>}
+                  {ai.sentiment && <Badge variant="outline">{ai.sentiment}</Badge>}
                   <Button size="sm" variant="outline" onClick={() => transcribe(r.id)} disabled={working === r.id}>
                     {working === r.id ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Sparkles className="h-3 w-3 mr-1" />}
                     {r.transcribed ? 'Réessayer' : 'Transcrire'}
@@ -286,8 +293,8 @@ function RecordingsTab({ orgId, extension, search }: { orgId: string; extension:
                 </div>
               </div>
               {url && <RecordingWavePlayer url={url} />}
-              {r.transcript && <p className="text-xs text-muted-foreground italic bg-muted/30 rounded p-2">"{r.transcript}"</p>}
-              {r.ai_summary && <p className="text-xs"><strong>Résumé IA:</strong> {r.ai_summary}</p>}
+              {transcriptText && <p className="text-xs text-muted-foreground italic bg-muted/30 rounded p-2">"{transcriptText}"</p>}
+              {(r.ai_summary || ai.summary) && <p className="text-xs"><strong>Résumé IA:</strong> {r.ai_summary || ai.summary}</p>}
             </div>
           );
         })}

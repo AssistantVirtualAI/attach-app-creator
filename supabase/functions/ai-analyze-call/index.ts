@@ -107,9 +107,24 @@ Deno.serve(async (req) => {
         .order("created_at", { ascending: false }).limit(1).maybeSingle();
       const cachedModel = (cached as any)?.ai_model;
       if (cached && cachedModel && cachedModel !== "stub" && cachedModel !== "skipped-no-transcript") {
-        const { data: existingCall } = await admin.from("pbx_call_records")
-          .select("raw_data").eq("id", call_record_id).maybeSingle();
-        const cachedTranscript = (existingCall?.raw_data as any)?.transcript_text || "";
+        const [{ data: existingCall }, { data: existingTranscript }] = await Promise.all([
+          admin.from("pbx_call_records").select("raw_data").eq("id", call_record_id).maybeSingle(),
+          admin.from("pbx_call_transcripts").select("transcript_text").eq("call_record_id", call_record_id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+        ]);
+        const cachedTranscript = (existingTranscript as any)?.transcript_text || (existingCall?.raw_data as any)?.transcript_text || "";
+        await admin.from("pbx_call_records").update({
+          analyzed: true,
+          transcribed: !!cachedTranscript,
+          ai_processing: false,
+          ai_summary: (cached as any).summary || null,
+          raw_data: {
+            ...((existingCall?.raw_data as Record<string, unknown>) || {}),
+            ai: { ...(cached as Record<string, unknown>) },
+            ai_model: cachedModel,
+            transcript_text: cachedTranscript,
+            transcript_provider: (existingCall?.raw_data as any)?.transcript_provider || null,
+          },
+        }).eq("id", call_record_id);
         return new Response(JSON.stringify({
           ok: true, cached: true, stub: false, ai_model: cachedModel,
           ...cached, insights: cached, analysis: cached,
@@ -165,6 +180,21 @@ Deno.serve(async (req) => {
         summary: pendingInsights.summary,
         prompt_version: "v1", ai_model: "skipped-no-transcript",
       });
+      const { data: existingCall } = await admin.from("pbx_call_records")
+        .select("raw_data").eq("id", call_record_id).maybeSingle();
+      await admin.from("pbx_call_records").update({
+        analyzed: false,
+        ai_processing: false,
+        ai_summary: pendingInsights.summary,
+        raw_data: {
+          ...((existingCall?.raw_data as Record<string, unknown>) || {}),
+          ai: { ...pendingInsights, ai_model: "skipped-no-transcript" },
+          ai_model: "skipped-no-transcript",
+          transcript_provider: transcriptProvider,
+          transcript_text,
+          ai_reason: "no-transcript",
+        },
+      }).eq("id", call_record_id);
       return new Response(JSON.stringify({
         ok: true, stub: true, reason: "no-transcript",
         ...pendingInsights, insights: pendingInsights, analysis: pendingInsights,
@@ -241,9 +271,10 @@ Deno.serve(async (req) => {
     await admin.from("pbx_call_records").update({
       analyzed: aiModel !== "stub",
       ai_processing: false,
+      ai_summary: insights?.summary || null,
       raw_data: {
         ...((existingCall?.raw_data as Record<string, unknown>) || {}),
-        ai: insights,
+        ai: { ...insights, ai_model: aiModel, prompt_version: "v1" },
         ai_model: aiModel,
         transcript_provider: transcriptProvider,
         transcript_text,

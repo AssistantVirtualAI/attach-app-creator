@@ -145,6 +145,23 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (!force && existingInsight && existingTr?.transcript_text) {
+      const { data: existingCall } = await admin.from("pbx_call_records")
+        .select("raw_data")
+        .eq("id", call.id)
+        .maybeSingle();
+      await admin.from("pbx_call_records").update({
+        analyzed: true,
+        transcribed: true,
+        ai_processing: false,
+        ai_summary: (existingInsight as any).summary || null,
+        raw_data: {
+          ...((existingCall?.raw_data as Record<string, unknown>) || {}),
+          transcript_text: existingTr.transcript_text,
+          transcript_provider: (existingCall?.raw_data as any)?.transcript_provider || "cached",
+          ai: { ...(existingInsight as Record<string, unknown>) },
+          ai_model: (existingInsight as any).ai_model || null,
+        },
+      }).eq("id", call.id);
       await audit("skipped_cached", "skipped", {
         pipeline: "full",
         metadata: {
@@ -216,7 +233,19 @@ Deno.serve(async (req) => {
               provider: "elevenlabs",
               language: sttJson.language_code ?? "fr",
             });
-            await admin.from("pbx_call_records").update({ transcribed: true }).eq("id", call.id);
+            const { data: existingCall } = await admin.from("pbx_call_records")
+              .select("raw_data")
+              .eq("id", call.id)
+              .maybeSingle();
+            await admin.from("pbx_call_records").update({
+              transcribed: true,
+              raw_data: {
+                ...((existingCall?.raw_data as Record<string, unknown>) || {}),
+                transcript_text: transcript,
+                transcript_provider: "elevenlabs",
+                transcript_updated_at: new Date().toISOString(),
+              },
+            }).eq("id", call.id);
             await audit("transcribed", "processing", { pipeline: "transcribe", metadata: { chars: transcript.length } });
           }
         } catch (e) {
@@ -346,7 +375,23 @@ Deno.serve(async (req) => {
         await audit("failed", "failed", { pipeline: "analyze", error: insErr.message });
         return json({ error: "Failed to save insight" }, 500);
       }
-      await admin.from("pbx_call_records").update({ analyzed: true, transcribed: true }).eq("id", call.id);
+      const { data: existingCallForAi } = await admin.from("pbx_call_records")
+        .select("raw_data")
+        .eq("id", call.id)
+        .maybeSingle();
+      await admin.from("pbx_call_records").update({
+        analyzed: true,
+        transcribed: true,
+        ai_summary: row.summary,
+        raw_data: {
+          ...((existingCallForAi?.raw_data as Record<string, unknown>) || {}),
+          transcript_text: transcript,
+          transcript_provider: (existingCallForAi?.raw_data as any)?.transcript_provider || "elevenlabs",
+          ai: { ...row },
+          ai_model: row.ai_model,
+          ai_updated_at: new Date().toISOString(),
+        },
+      }).eq("id", call.id);
       await audit("analyzed", "analyzed", {
         pipeline: "analyze",
         ai_model: row.ai_model,

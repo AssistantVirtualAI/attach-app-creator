@@ -95,7 +95,7 @@ Deno.serve(async (req) => {
     let call: any = null;
     {
       const r = await admin.from("pbx_call_records")
-        .select("id, caller_number, caller_name, destination_number, destination, direction, start_at, duration_seconds, billsec, hangup_cause, recording_url, recording_path, recording_name, voicemail_message")
+        .select("id, caller_number, caller_name, destination_number, destination, direction, start_at, duration_seconds, billsec, hangup_cause, recording_url, recording_path, recording_name, voicemail_message, domain_uuid, domain_name")
         .eq("id", call_record_id).eq("organization_id", organization_id).maybeSingle();
       call = r.data;
     }
@@ -106,13 +106,30 @@ Deno.serve(async (req) => {
       if (r.data?.call_record_id) {
         call_record_id = r.data.call_record_id;
         const r2 = await admin.from("pbx_call_records")
-          .select("id, caller_number, caller_name, destination_number, destination, direction, start_at, duration_seconds, billsec, hangup_cause, recording_url, recording_path, recording_name, voicemail_message")
+          .select("id, caller_number, caller_name, destination_number, destination, direction, start_at, duration_seconds, billsec, hangup_cause, recording_url, recording_path, recording_name, voicemail_message, domain_uuid, domain_name")
           .eq("id", call_record_id).maybeSingle();
         call = r2.data || { ...r.data, start_at: r.data.recorded_at };
       } else if (r.data) {
         call = { ...r.data, start_at: r.data.recorded_at };
       }
     }
+
+    const persistTranscriptOnCall = async (text: string, provider: string) => {
+      const { data: existingCall } = await admin.from("pbx_call_records")
+        .select("raw_data")
+        .eq("id", call_record_id)
+        .maybeSingle();
+      await admin.from("pbx_call_records").update({
+        transcribed: !provider.startsWith("stub"),
+        ai_processing: false,
+        raw_data: {
+          ...((existingCall?.raw_data as Record<string, unknown>) || {}),
+          transcript_text: text,
+          transcript_provider: provider,
+          transcript_updated_at: new Date().toISOString(),
+        },
+      }).eq("id", call_record_id).then(() => {}, () => {});
+    };
 
     if (body?.force !== true) {
       const { data: existingTranscript } = await admin.from("pbx_call_transcripts")
@@ -124,6 +141,7 @@ Deno.serve(async (req) => {
       const provider = String((existingTranscript as any)?.provider || "");
       const text = String((existingTranscript as any)?.transcript_text || "").trim();
       if (text && !provider.startsWith("stub")) {
+        await persistTranscriptOnCall(text, provider);
         await audit("cached", { provider, message: "Transcript already exists — skipped re-transcription", metadata: { cached_at: (existingTranscript as any)?.created_at } });
         return json({ transcript_text: text, cached: true, stub: false, provider, skipped_reason: "Transcript already exists — no STT tokens used." });
       }
@@ -142,7 +160,7 @@ Deno.serve(async (req) => {
       await admin.from("pbx_call_transcripts").insert({
         organization_id, call_record_id, transcript_text: text, provider, language: "fr",
       });
-      await admin.from("pbx_call_records").update({ transcribed: !provider.startsWith("stub") }).eq("id", call_record_id).then(() => {}, () => {});
+      await persistTranscriptOnCall(text, provider);
     };
 
     // Try to fetch audio. Order: FusionPBX first (recordings live on PBX) → direct URL → Twilio
@@ -173,7 +191,8 @@ Deno.serve(async (req) => {
             xml_cdr_uuid: call_record_id,
             record_path: effectiveRecPath || "",
             record_name: recName,
-            domain_uuid: domain_uuid || undefined,
+            domain_uuid: domain_uuid || call?.domain_uuid || undefined,
+            domain_name: call?.domain_name || undefined,
             recorded_at: call?.start_at || undefined,
             local_recording_url: sourceUrl || undefined,
             expires_in: 300,

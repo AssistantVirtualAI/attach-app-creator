@@ -24,13 +24,37 @@ export function useCallAi(callId: string | null, meta: CallAiMeta | undefined, o
   const [stage, setStage] = useState<AiStage>('idle');
   const [error, setError] = useState<string | null>(null);
   const ranRef = useRef<string | null>(null);
+  const runSeqRef = useRef(0);
+
+  const mergeDetail = useCallback((fresh: CallDetail | null, preferFresh = false) => {
+    if (!fresh) return;
+    setData((prev) => {
+      const p: any = prev || {};
+      const f: any = fresh || {};
+      return {
+        ...(preferFresh ? p : f),
+        ...(preferFresh ? f : p),
+        transcript: (f.transcript?.length ? f.transcript : p.transcript) || [],
+        summary: f.summary || p.summary || '',
+        topics: f.topics?.length ? f.topics : (p.topics || []),
+        actionItems: f.actionItems?.length ? f.actionItems : (p.actionItems || []),
+        qualityScore: f.qualityScore ?? p.qualityScore ?? 0,
+        coachingScore: f.coachingScore ?? p.coachingScore ?? null,
+        coachingNotes: f.coachingNotes?.length ? f.coachingNotes : (p.coachingNotes || []),
+        sentiment: f.sentiment || p.sentiment,
+        intent: f.intent || p.intent || '',
+      };
+    });
+  }, []);
 
   const load = useCallback(async () => {
     if (!callId) return null;
+    const seq = runSeqRef.current;
     setLoading(true);
     try {
       const d = await mobileApi.callDetail(callId);
-      setData(d);
+      // A stale fetch must never wipe transcript/AI data produced by a newer run.
+      mergeDetail(d, seq === runSeqRef.current);
       return d;
     } catch (e: any) {
       setError(e?.message || 'Failed to load call');
@@ -38,7 +62,7 @@ export function useCallAi(callId: string | null, meta: CallAiMeta | undefined, o
     } finally {
       setLoading(false);
     }
-  }, [callId]);
+  }, [callId, mergeDetail]);
 
   useEffect(() => {
     if (autoLoad && callId) { load(); }
@@ -46,6 +70,8 @@ export function useCallAi(callId: string | null, meta: CallAiMeta | undefined, o
 
   const run = useCallback(async () => {
     if (!callId || running) return;
+    const seq = runSeqRef.current + 1;
+    runSeqRef.current = seq;
     setRunning(true);
     setError(null);
     setStage('transcribing');
@@ -81,6 +107,7 @@ export function useCallAi(callId: string | null, meta: CallAiMeta | undefined, o
             } as { speaker: 'agent' | 'customer'; text: string; t: number };
           })
         : [];
+      if (runSeqRef.current !== seq) return;
       setData((prev) => ({
         ...(prev || {} as any),
         transcript: transcriptLines.length ? transcriptLines : (prev?.transcript || []),
@@ -96,6 +123,7 @@ export function useCallAi(callId: string | null, meta: CallAiMeta | undefined, o
       // Best-effort: refresh from server but merge — never wipe AI fields we
       // just produced if the server view hasn't caught up yet.
       mobileApi.callDetail(callId).then((fresh) => {
+        if (runSeqRef.current !== seq) return;
         setData((prev) => {
           const p: any = prev || {};
           const f: any = fresh || {};
