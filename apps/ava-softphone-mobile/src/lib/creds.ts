@@ -115,3 +115,40 @@ export async function ensureStoredOrganizationId(): Promise<string | null> {
   return orgId;
 }
 
+/**
+ * Hydrate full SIP credentials from softphone-credentials edge function.
+ * Used after email-only login (no extension) and on boot for legacy sessions
+ * missing extension/sipDomain/wssUrl/sipPassword. Returns the updated creds
+ * (or null if hydration failed / user has no softphone account).
+ */
+export async function hydrateSoftphoneCredentials(platform: 'mobile' | 'desktop' = 'mobile'): Promise<Creds | null> {
+  const c = await Store.get();
+  if (!c?.accessToken) return null;
+  try {
+    const res = await fetch(`${SUPABASE_URL_DEF}/functions/v1/softphone-credentials?platform=${platform}`, {
+      headers: { apikey: SUPABASE_ANON_DEF, Authorization: `Bearer ${c.accessToken}` },
+    });
+    if (!res.ok) return null;
+    const d = await res.json().catch(() => null) as any;
+    if (!d || d.error || !d.extension) return null;
+    const next: Creds = {
+      ...c,
+      extension: d.extension || c.extension || '',
+      displayName: d.display_name || d.displayName || c.displayName,
+      sipDomain: d.sip_domain || d.sipDomain || c.sipDomain,
+      wssUrl: d.wss_url || d.wssUrl || c.wssUrl,
+      sipPassword: d.sip_password || d.password || c.sipPassword,
+      organizationId: d.organization_id || c.organizationId,
+      organizationName: d.organization_name || c.organizationName,
+      fusionpbxDomainUuid: d.fusionpbx_domain_uuid || c.fusionpbxDomainUuid,
+      domainUuid: d.fusionpbx_domain_uuid || c.domainUuid,
+      role: d.role || c.role,
+      dataScope: d.data_scope || c.dataScope,
+      portalUrl: d.portal_url || c.portalUrl,
+    };
+    await Store.set(next);
+    return next;
+  } catch { return null; }
+}
+
+
