@@ -48,15 +48,16 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
     setLoadingAudio(true);
     try {
       const creds = await getCredentials();
+      const orgId = creds?.organizationId || (await ensureStoredOrganizationId());
       const res: any = await mobileApi.voicemailAudio({
         xml_cdr_uuid: id,
-        organization_id: creds?.organizationId,
+        organization_id: orgId || undefined,
       });
       if (res?.ok === false || !res?.url) {
         const msg = res?.error === 'RECORDING_NOT_FOUND'
-          ? 'Recording file is no longer on the PBX server.'
+          ? 'Recording not available — file may have been deleted from the PBX after the retention period.'
           : res?.error === 'RECORDING_EMPTY'
-            ? 'Recording file is empty.'
+            ? 'Recording file is empty on the PBX.'
             : 'No recording available for this call.';
         throw new Error(msg);
       }
@@ -68,6 +69,7 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
       setLoadingAudio(false);
     }
   }, [id]);
+
 
   const togglePlay = useCallback(async () => {
     if (playing && audioRef.current) {
