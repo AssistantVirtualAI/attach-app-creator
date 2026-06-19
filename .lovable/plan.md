@@ -1,47 +1,39 @@
-**Plan**
+## Goal
+Add per-recording AI (transcription + summary + coaching) on the mobile Recordings screen, and make sure the extension filter is visible on both Recordings and Call History.
 
-1. **SIP provider + WebRTC capability**
-   - Export a WebRTC capability helper from `jssipProvider.ts`.
-   - On app start, detect missing `RTCPeerConnection` and pass a detailed user-facing error into the softphone state immediately.
-   - Keep JsSIP loading guarded so unsupported browsers fail with the detailed WebRTC message, not a generic library error.
+## 1. Recordings screen — AI transcription, coaching, notes, summary
 
-2. **WSS SSL/handshake warning + retry**
-   - Improve SIP failure classification to distinguish:
-     - WSS/transport/SSL certificate handshake failure
-     - timeout
-     - auth
-     - DNS
-   - Add a real reconnect/retry method in `useSoftphone` that restarts registration immediately.
-   - Show a warning with a retry button when the WSS failure likely comes from browser TLS/certificate rejection.
+File: `apps/ava-softphone-mobile/src/screens/RecordingsScreen.tsx`
 
-3. **DialerScreen registration banner**
-   - Add a clear banner at the top of the dialer showing `Registered`, `Connecting/Retrying`, or `Failed`.
-   - Include the exact failure reason from the SIP hook.
-   - Remove any remaining click-to-call fallback from the in-history keypad; outbound calls will only use `sp.call()` + informational `mobile-calls-start` logging with `mode: "webrtc"`.
+- Each recording row becomes expandable. Tapping reveals an inline panel with:
+  - ▶ Audio player (already loads via `fusionpbx-proxy`).
+  - "Transcribe with AI" button (only if no transcript yet) → calls existing `mobileApi.transcribeCall(id, meta)` (backed by edge function `ai-transcribe-call`, Lovable AI `openai/gpt-4o-mini-transcribe`).
+  - Once transcript exists, auto-trigger `mobileApi.analyzeCall(id)` (backed by `ai-analyze-call`, Lovable AI `google/gemini-3-flash-preview`) to produce: summary, coaching score, coaching notes, action items, sentiment, topics.
+  - Render: summary paragraph, coaching score chip, coaching notes list, action items, full transcript (collapsible).
+- Status pills: "Transcribing…", "Analyzing…", "AI ready", error banner with retry.
+- Cache results: read `transcript`/`summary`/`coachingScore`/`coachingNotes` from `mobileApi.callDetail(id)` first; only run AI if missing. Same pattern already used in `CallDetailScreen.tsx` — extract a shared `useCallAi(callId, meta)` hook in `apps/ava-softphone-mobile/src/hooks/useCallAi.ts` and reuse it in both screens to avoid duplication.
 
-4. **Restore Recordings beside History**
-   - Recreate `RecordingsScreen.tsx` and add a `Recordings` segment beside `History` inside the Calls page.
-   - Use the existing `mobile-recordings` edge function + `fusionpbx-proxy` signed URL flow for playback.
-   - Add extension filtering for recordings.
-   - Admins see all domain recordings; non-admins see only their own extension recordings.
+## 2. Extension filter — Recordings
 
-5. **Backend recording scoping**
-   - Update `mobile-recordings` so admin detection matches `mobile-calls`.
-   - For admins: return domain-wide recordings scoped to organization/domain.
-   - For non-admins: restrict to their own extension only.
-   - Support optional extension filter query param.
+File: `apps/ava-softphone-mobile/src/screens/RecordingsScreen.tsx`
 
-6. **End-to-end-style test coverage**
-   - Add a Vitest flow that simulates JsSIP loading, registration success, outbound `sp.call()`, and verifies no FusionPBX originate/click-to-call mode is used.
-   - Add/adjust tests for WebRTC missing, WSS/SSL failure messaging, retry behavior, and recordings tab/filter visibility.
+- Filter is currently shown only when `isAdmin === true`. It is not appearing because:
+  - `isAdmin` is passed in from `CallsScreen` and resolves to `false` for non-admin users — by design end-users only see their own extension.
+- Confirm behaviour with admin user. If the admin still sees no filter, the cause is `domainUuid` missing on `creds` — add a fallback that derives `domain_uuid` from `mobileApi.me()` and refetches `pbx_extensions_directory`. Also surface "Loading extensions…" / "No other extensions" hints so the dropdown is never silently empty.
 
-**Files expected to change**
-- `apps/ava-softphone-mobile/src/lib/sip/jssipProvider.ts`
-- `apps/ava-softphone-mobile/src/hooks/useSoftphone.ts`
-- `apps/ava-softphone-mobile/src/MobileApp.tsx`
-- `apps/ava-softphone-mobile/src/screens/DialerScreen.tsx`
-- `apps/ava-softphone-mobile/src/screens/CallsScreen.tsx`
+## 3. Extension filter — Call History
+
+File: `apps/ava-softphone-mobile/src/screens/CallsScreen.tsx`
+
+- Filter already renders for admins (lines 184–193). Apply the same `domainUuid` fallback so it never disappears for admins whose creds lack `domainUuid`.
+- Keep end-user scoping (own extension only) — that is a security requirement.
+
+## 4. No backend changes required
+- `ai-transcribe-call` and `ai-analyze-call` already exist and are wired through `mobileApi`.
+- No DB migration, no new edge function.
+
+## Files touched
+- `apps/ava-softphone-mobile/src/hooks/useCallAi.ts` (new)
 - `apps/ava-softphone-mobile/src/screens/RecordingsScreen.tsx`
-- `apps/ava-softphone-mobile/src/lib/mobileApi.ts`
-- `supabase/functions/mobile-recordings/index.ts`
-- focused mobile tests under `apps/ava-softphone-mobile/src/**`
+- `apps/ava-softphone-mobile/src/screens/CallsScreen.tsx`
+- `apps/ava-softphone-mobile/src/screens/CallDetailScreen.tsx` (refactor to use the new hook)
