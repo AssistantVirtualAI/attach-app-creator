@@ -6,10 +6,11 @@ import { Card, Chip, SectionTitle, Skeleton, EmptyState, PrimaryButton, GhostBut
 import CallDetailScreen from './CallDetailScreen';
 import Dialpad from '../components/Dialpad';
 import VoicemailScreen from './VoicemailScreen';
+import RecordingsScreen from './RecordingsScreen';
 import { useRealtimeCDR } from '../hooks/useRealtimeCDR';
 import type { Creds } from '../lib/creds';
 
-type SubTab = 'recents' | 'dial' | 'voicemail';
+type SubTab = 'recents' | 'recordings' | 'voicemail' | 'dial';
 
 export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s?: ImpactStyle) => Promise<void>; creds?: Creds | null }) {
   const [sub, setSub] = useState<SubTab>('recents');
