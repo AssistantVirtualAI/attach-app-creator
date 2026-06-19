@@ -164,10 +164,18 @@ export function useSoftphone(
     try {
       uaRef.current.call(`sip:${number}@${config.domain}`, {
         mediaConstraints: { audio: true, video: false },
+        // Force PCMU/PCMA + strip DTLS so FusionPBX accepts the offer.
+        sessionDescriptionHandlerModifiers: [sdpModifier],
+        rtcOfferConstraints: { offerToReceiveAudio: true, offerToReceiveVideo: false },
         eventHandlers: {
           failed: (e: any) => {
+            const msg = classifySipFailure({
+              cause: e?.cause,
+              status_code: e?.message?.status_code,
+              reason_phrase: e?.message?.reason_phrase,
+            });
             console.error('[AVA keypad] SIP call failed', e);
-            setSipError(e?.cause || 'SIP call failed');
+            setSipError(msg);
           },
         },
       });
@@ -176,7 +184,7 @@ export function useSoftphone(
       console.error('[AVA keypad] SIP call exception', err);
       setCallState('idle');
       setActiveCallNumber('');
-      setSipError(err?.message || 'SIP call failed');
+      setSipError(classifySipFailure({ cause: err?.message }));
       return false;
     }
   };
@@ -188,7 +196,10 @@ export function useSoftphone(
     setActiveCallNumber('');
   };
   const answer = () =>
-    sessionRef.current?.answer({ mediaConstraints: { audio: true, video: false } });
+    sessionRef.current?.answer({
+      mediaConstraints: { audio: true, video: false },
+      sessionDescriptionHandlerModifiers: [sdpModifier],
+    });
   const mute = () => { sessionRef.current?.mute({ audio: true }); setIsMuted(true); };
   const unmute = () => { sessionRef.current?.unmute({ audio: true }); setIsMuted(false); };
   const hold = () => { sessionRef.current?.hold(); setIsOnHold(true); };
