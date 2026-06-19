@@ -81,18 +81,24 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
     setDialError(null);
     const stamp = new Date().toISOString();
     try {
-      if (sp?.snap?.status === 'registered' && sp?.call) {
-        const ok = sp.call(to);
-        if (ok !== false) {
-          console.info('[AVA keypad] SIP call started', { to, sipStatus: sp?.snap?.status, stamp });
-          setDialDebug(`SIP call started · ${stamp}`);
-          return;
-        }
+      if (sp?.snap?.status !== 'registered' || !sp?.call) {
+        const msg = sp?.snap?.error || 'SIP not registered yet — tap Retry on the dialer to reconnect.';
+        setDialError(msg);
+        setDialDebug(JSON.stringify({ message: msg, sipStatus: sp?.snap?.status, stamp }));
+        showMobileToast(msg, 'error');
+        return;
       }
-      const res = await mobileApi.startCall(to, 'click_to_call');
-      console.info('[AVA keypad] click-to-call requested', { to, res, sipStatus: sp?.snap?.status, stamp });
-      setDialDebug(`Click-to-call OK · from ${res?.from || 'extension'} to ${res?.to || to}`);
-      showMobileToast('Deskphone call requested.', 'success');
+      const ok = sp.call(to);
+      if (ok === false) {
+        const msg = 'Unable to start call via SIP';
+        setDialError(msg);
+        showMobileToast(msg, 'error');
+        return;
+      }
+      console.info('[AVA keypad] SIP call started', { to, sipStatus: sp?.snap?.status, stamp });
+      setDialDebug(`SIP call started · ${stamp}`);
+      // Informational log only — no FusionPBX originate.
+      mobileApi.startCall(to, 'webrtc').catch(() => {});
     } catch (e: any) {
       const msg = e?.message || 'Unable to start call';
       const detail = { message: msg, status: e?.status, detail: e?.detail, path: e?.path, to, sipStatus: sp?.snap?.status, sipError: sp?.snap?.error, stamp };
