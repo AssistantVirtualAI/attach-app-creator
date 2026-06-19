@@ -188,13 +188,6 @@ export default function OrgChatView() {
     let cancelled = false;
     setTypingNames([]);
 
-
-  // Messages
-  useEffect(() => {
-    if (!activeId) return;
-    let cancelled = false;
-    setTypingNames([]);
-
     // Hydrate immediately from module-level cache so the UI never appears empty.
     const cached = cacheGet(activeId);
     if (cached.length) setMessages(cached);
