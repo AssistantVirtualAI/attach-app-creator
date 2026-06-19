@@ -238,7 +238,7 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: font.base, fontWeight: 700, color: colors.textIce }}>No transcript yet</div>
                   <div style={{ fontSize: font.xs, color: colors.mutedSilver, marginTop: 2 }}>
-                    Run AVA to transcribe, summarize and tag this call.
+                    {statusText}
                   </div>
                 </div>
                 <button onClick={transcribe} disabled={transcribing} style={{
@@ -252,7 +252,33 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
                 </button>
               </div>
               {transcribeError && (
-                <div style={{ marginTop: 8, fontSize: 11, color: colors.danger }}>⚠ {transcribeError}</div>
+                <div ref={errorRef} id="ai-error" style={{ marginTop: 8, fontSize: 11, color: colors.danger }}>⚠ {transcribeError}</div>
+              )}
+            </Card>
+          )}
+
+          {data.hasRecording && hasTranscript && (
+            <Card style={{ marginBottom: 14 }} accent={transcribeError || data.aiError ? 'gold' : 'violet'}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                <div>
+                  <div style={{ fontSize: 10, color: colors.avaViolet, letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 800 }}>{statusText}</div>
+                  <div style={{ marginTop: 4, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <Chip tone="success" size="xs">Transcript cached</Chip>
+                    {data.summary && <Chip tone="violet" size="xs">Insight cached</Chip>}
+                    {data.qualityScore > 0 && <Chip tone="gold" size="xs">Score {data.qualityScore}/100</Chip>}
+                    {data.coachingScore != null && <Chip tone="cyan" size="xs">Coaching {data.coachingScore}/5</Chip>}
+                  </div>
+                </div>
+                <button onClick={transcribe} disabled={transcribing} style={{
+                  padding: '7px 11px', borderRadius: 999, border: `1px solid ${colors.borderAI}`,
+                  background: transcribing ? 'rgba(255,255,255,0.06)' : gradients.ai,
+                  color: colors.textIce, fontSize: 11, fontWeight: 800, cursor: transcribing ? 'wait' : 'pointer',
+                }}>{transcribing ? 'Running…' : 'Re-launch'}</button>
+              </div>
+              {(transcribeError || data.aiError) && (
+                <div ref={errorRef} id="ai-error" style={{ marginTop: 10, padding: 8, borderRadius: radius.md, border: `1px solid ${colors.danger}55`, color: colors.danger, fontSize: 11 }}>
+                  ⚠ {transcribeError || data.aiError}
+                </div>
               )}
             </Card>
           )}
@@ -263,9 +289,18 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
               <p style={{ fontSize: font.base, lineHeight: 1.55, color: colors.textIce, margin: 0 }}>{data.summary}</p>
               <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
                 {data.qualityScore > 0 && <Chip tone="gold">Quality {data.qualityScore}/100</Chip>}
+                {data.coachingScore != null && <Chip tone="cyan">Coaching {data.coachingScore}/5</Chip>}
                 {data.sentiment && <Chip tone={data.sentiment === 'positive' ? 'success' : data.sentiment === 'negative' ? 'danger' : 'neutral'}>{data.sentiment}</Chip>}
                 {data.intent && <Chip tone="cyan">{data.intent}</Chip>}
               </div>
+            </AIPanel>
+          )}
+
+          {data.coachingNotes && data.coachingNotes.length > 0 && (
+            <AIPanel title="Coaching notes" accent={colors.avaCyan}>
+              {data.coachingNotes.map((note, i) => (
+                <div key={i} style={{ fontSize: font.base, color: colors.textIce, lineHeight: 1.45, padding: '5px 0' }}>✦ {note}</div>
+              ))}
             </AIPanel>
           )}
 
