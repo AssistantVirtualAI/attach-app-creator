@@ -93,8 +93,26 @@ export function useCallAi(callId: string | null, meta: CallAiMeta | undefined, o
         sentiment: ai.sentiment || prev?.sentiment,
         intent: ai.intent || prev?.intent || '',
       } as any));
-      // Best-effort: refresh from server but don't block UI on it.
-      load().catch(() => {});
+      // Best-effort: refresh from server but merge — never wipe AI fields we
+      // just produced if the server view hasn't caught up yet.
+      mobileApi.callDetail(callId).then((fresh) => {
+        setData((prev) => {
+          const p: any = prev || {};
+          const f: any = fresh || {};
+          return {
+            ...f,
+            transcript: (f.transcript?.length ? f.transcript : p.transcript) || [],
+            summary: f.summary || p.summary || '',
+            topics: f.topics?.length ? f.topics : (p.topics || []),
+            actionItems: f.actionItems?.length ? f.actionItems : (p.actionItems || []),
+            qualityScore: f.qualityScore ?? p.qualityScore ?? 0,
+            coachingScore: f.coachingScore ?? p.coachingScore ?? null,
+            coachingNotes: f.coachingNotes?.length ? f.coachingNotes : (p.coachingNotes || []),
+            sentiment: f.sentiment || p.sentiment,
+            intent: f.intent || p.intent || '',
+          };
+        });
+      }).catch(() => {});
       ranRef.current = callId;
       setStage('done');
     } catch (e: any) {
