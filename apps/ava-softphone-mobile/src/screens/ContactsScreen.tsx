@@ -103,13 +103,13 @@ export default function ContactsScreen({ sp }: { sp: any }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pbx_softphone_users', filter: softphoneFilter } as any, () => loadContacts().catch(() => {}))
       .subscribe();
     const presenceChannel = client.channel(`presence-domain-${mobile.organizationId || mobile.domainUuid}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_presence', ...(mobile.organizationId ? { filter: `organization_id=eq.${mobile.organizationId}` } : {}) } as any, () => loadPresence(contacts).catch(() => {}))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_presence' } as any, () => loadContacts().catch(() => {}))
       .subscribe();
     const orgContactsChannel = mobile.organizationId ? client.channel(`org-contacts-${mobile.organizationId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'org_contacts', filter: `organization_id=eq.${mobile.organizationId}` } as any, () => loadContacts().catch(() => {}))
       .subscribe() : null;
     return () => { client.removeChannel(softphoneChannel); client.removeChannel(presenceChannel); if (orgContactsChannel) client.removeChannel(orgContactsChannel); };
-  }, [loadContacts, loadPresence, mobile.accessToken, mobile.domainUuid, mobile.organizationId, contacts]);
+  }, [loadContacts, mobile.accessToken, mobile.domainUuid, mobile.organizationId]);
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
