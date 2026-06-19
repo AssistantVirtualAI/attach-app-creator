@@ -145,10 +145,7 @@ Deno.serve(async (req) => {
       await admin.from("pbx_call_records").update({ transcribed: !provider.startsWith("stub") }).eq("id", call_record_id).then(() => {}, () => {});
     };
 
-    // Try to fetch audio. Order: direct URL → Supabase Storage path → fusionpbx-proxy → twilio-recording-proxy
-    let audioBytes: Uint8Array | null = null;
-    let audioMime = "audio/wav";
-    let audioSource: string | null = null;
+    // Try to fetch audio. Order: FusionPBX first (recordings live on PBX) → direct URL → Twilio
     let audioBytes: Uint8Array | null = null;
     let audioMime = "audio/wav";
     let audioSource: string | null = null;
