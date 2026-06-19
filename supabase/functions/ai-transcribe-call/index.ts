@@ -157,53 +157,91 @@ Deno.serve(async (req) => {
     const effectiveRecPath = recording_path || call?.recording_path;
 
     try {
-      // 1. FusionPBX FIRST — recordings live on PBX, not Supabase Storage
-      if (!isTwilio && (effectiveRecName || effectiveRecPath)) {
+      // 1. FusionPBX FIRST — recordings live on PBX, not Supabase Storage.
+      // IMPORTANT: fusionpbx-proxy reads from body.params (same shape the
+      // mobile app uses via loadPbxRecordingAudioMobile). Sending flat fields
+      // makes the proxy resolve nothing and return RECORDING_NOT_FOUND.
+      if (!isTwilio && (effectiveRecName || effectiveRecPath || call_record_id)) {
+        const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+        const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+        const recName = effectiveRecName
+          ? (/\.(mp3|wav|ogg|m4a|webm)$/i.test(effectiveRecName) ? effectiveRecName : `${effectiveRecName}.mp3`)
+          : "";
+        const proxyPayload = {
+          organization_id,
+          params: {
+            xml_cdr_uuid: call_record_id,
+            record_path: effectiveRecPath || "",
+            record_name: recName,
+            domain_uuid: domain_uuid || undefined,
+            recorded_at: call?.start_at || undefined,
+            local_recording_url: sourceUrl || undefined,
+            expires_in: 300,
+          },
+        };
+
+        // 1a. Try signed-url first (matches mobile path that's known to work).
         try {
-          const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-          const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-          const recName = effectiveRecName ? (effectiveRecName.endsWith(".mp3") || effectiveRecName.endsWith(".wav") ? effectiveRecName : `${effectiveRecName}.mp3`) : "";
-          const proxyRes = await fetch(`${SUPABASE_URL}/functions/v1/fusionpbx-proxy`, {
+          const signed = await fetch(`${SUPABASE_URL}/functions/v1/fusionpbx-proxy`, {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${SERVICE_KEY}`,
-              "apikey": SERVICE_KEY,
-            },
-            body: JSON.stringify({
-              action: "get-recording",
-              organization_id,
-              xml_cdr_uuid: call_record_id,
-              recording_name: recName,
-              recording_path: effectiveRecPath || "",
-              domain_uuid: domain_uuid || undefined,
-            }),
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${SERVICE_KEY}`, "apikey": SERVICE_KEY },
+            body: JSON.stringify({ action: "get-recording-signed-url", ...proxyPayload }),
           });
-          const ct = proxyRes.headers.get("content-type") || "";
-          if (proxyRes.ok && /audio\//i.test(ct)) {
-            audioBytes = new Uint8Array(await proxyRes.arrayBuffer());
-            audioMime = ct.split(";")[0];
-            audioSource = "fusionpbx-proxy";
-          } else if (proxyRes.ok && /json/i.test(ct)) {
-            // legacy: base64 wrapper
-            const j = await proxyRes.json().catch(() => null);
-            const b64 = (j as any)?.audio_base64 || (j as any)?.recording_base64;
-            if (b64) {
-              const bin = atob(b64);
-              const arr = new Uint8Array(bin.length);
-              for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-              audioBytes = arr;
-              audioMime = detectMime(recName);
-              audioSource = "fusionpbx-proxy";
+          if (signed.ok) {
+            const j = await signed.json().catch(() => null);
+            const url = (j as any)?.url;
+            if (url) {
+              const r = await fetch(url);
+              if (r.ok) {
+                audioBytes = new Uint8Array(await r.arrayBuffer());
+                audioMime = detectMime(url, r.headers.get("content-type"));
+                audioSource = "fusionpbx-signed-url";
+              } else {
+                fetchErrors.push(`fusion-signed:${r.status}`);
+              }
             } else {
-              fetchErrors.push(`fusion:${(j as any)?.error || "no-audio"}`);
+              fetchErrors.push(`fusion-signed:${(j as any)?.error || "no-url"}`);
             }
           } else {
-            const errTxt = await proxyRes.text().catch(() => "");
-            fetchErrors.push(`fusion:${proxyRes.status}:${errTxt.slice(0, 120)}`);
+            const errTxt = await signed.text().catch(() => "");
+            fetchErrors.push(`fusion-signed:${signed.status}:${errTxt.slice(0, 120)}`);
           }
-        } catch (e: any) { fetchErrors.push(`fusion:${e?.message || "err"}`); }
+        } catch (e: any) { fetchErrors.push(`fusion-signed:${e?.message || "err"}`); }
+
+        // 1b. Fall back to binary get-recording.
+        if (!audioBytes) {
+          try {
+            const proxyRes = await fetch(`${SUPABASE_URL}/functions/v1/fusionpbx-proxy`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "Authorization": `Bearer ${SERVICE_KEY}`, "apikey": SERVICE_KEY },
+              body: JSON.stringify({ action: "get-recording", ...proxyPayload }),
+            });
+            const ct = proxyRes.headers.get("content-type") || "";
+            if (proxyRes.ok && /audio\//i.test(ct)) {
+              audioBytes = new Uint8Array(await proxyRes.arrayBuffer());
+              audioMime = ct.split(";")[0];
+              audioSource = "fusionpbx-proxy";
+            } else if (proxyRes.ok && /json/i.test(ct)) {
+              const j = await proxyRes.json().catch(() => null);
+              const b64 = (j as any)?.audio_base64 || (j as any)?.recording_base64;
+              if (b64) {
+                const bin = atob(b64);
+                const arr = new Uint8Array(bin.length);
+                for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+                audioBytes = arr;
+                audioMime = detectMime(recName);
+                audioSource = "fusionpbx-proxy";
+              } else {
+                fetchErrors.push(`fusion:${(j as any)?.error || "no-audio"}`);
+              }
+            } else {
+              const errTxt = await proxyRes.text().catch(() => "");
+              fetchErrors.push(`fusion:${proxyRes.status}:${errTxt.slice(0, 120)}`);
+            }
+          } catch (e: any) { fetchErrors.push(`fusion:${e?.message || "err"}`); }
+        }
       }
+
 
       // 2. Direct URL fallback
       if (!audioBytes && sourceUrl && !isTwilio) {
