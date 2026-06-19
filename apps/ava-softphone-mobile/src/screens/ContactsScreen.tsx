@@ -17,7 +17,7 @@ export default function ContactsScreen({ sp }: { sp: any }) {
   const [presence, setPresence] = useState<Record<string, Presence>>({});
   const [error, setError] = useState<string | null>(null);
 
-  const loadPresence = useCallback(async (rows: Contact[] | null = contacts) => {
+  const loadPresence = useCallback(async (rows: Contact[] | null) => {
     if (!mobile.accessToken || !rows?.length) { setPresence({}); return; }
     const ids = rows.map((c) => c.user_id).filter(Boolean) as string[];
     if (!ids.length) { setPresence({}); return; }
@@ -25,7 +25,7 @@ export default function ContactsScreen({ sp }: { sp: any }) {
     const map: Record<string, Presence> = {};
     (pres || []).forEach((p) => { map[p.user_id] = p; });
     setPresence(map);
-  }, [contacts, mobile.accessToken]);
+  }, [mobile.accessToken]);
 
   const loadContacts = useCallback(async () => {
     if (!mobile.accessToken || !mobile.domainUuid) return;
@@ -52,7 +52,7 @@ export default function ContactsScreen({ sp }: { sp: any }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pbx_softphone_users', filter: `domain_uuid=eq.${mobile.domainUuid}` } as any, () => loadContacts().catch(() => {}))
       .subscribe();
     const presenceChannel = client.channel(`presence-domain-${mobile.organizationId || mobile.domainUuid}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_presence', ...(mobile.organizationId ? { filter: `organization_id=eq.${mobile.organizationId}` } : {}) } as any, () => loadPresence().catch(() => {}))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_presence', ...(mobile.organizationId ? { filter: `organization_id=eq.${mobile.organizationId}` } : {}) } as any, () => loadPresence(contacts).catch(() => {}))
       .subscribe();
     return () => { client.removeChannel(softphoneChannel); client.removeChannel(presenceChannel); };
   }, [loadContacts, loadPresence, mobile.accessToken, mobile.domainUuid, mobile.organizationId]);
