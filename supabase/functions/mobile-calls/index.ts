@@ -14,12 +14,15 @@ function mapCall(r: any) {
   const direction = r.direction === "outbound" ? "out" : "in";
   const status = r.missed_call ? "missed" : r.call_status === "voicemail" ? "voicemail" : "answered";
   return {
-    id: r.id, direction, status,
+    id: r.id, pbx_uuid: r.pbx_uuid || null, organization_id: r.organization_id || null, domain_uuid: r.domain_uuid || null, domain_name: r.domain_name || null,
+    direction, status,
     from: r.caller_number || r.source_number || "",
     to: r.destination_number || r.destination || r.extension || "",
+    extension: r.extension || null,
     customer: r.caller_name || undefined,
     startedAt: r.start_at, durationSec: r.duration_seconds || 0,
     hasRecording: !!(r.has_recording || r.recording_path || r.recording_name || r.recording_url), hasTranscript: !!r.transcribed,
+    recording_path: r.recording_path || null, recording_name: r.recording_name || null, recording_url: r.recording_url || null,
   };
 }
 
@@ -118,10 +121,15 @@ Deno.serve(async (req) => {
     }
 
     const limit = Math.min(Number(url.searchParams.get("limit")) || 50, 200);
+    const extensionParam = (url.searchParams.get("extension") || "").trim();
+    const statusParam = (url.searchParams.get("status") || "all").trim();
     let listQ = admin.from("pbx_call_records")
-      .select("id, direction, call_status, caller_name, caller_number, source_number, destination, destination_number, extension, start_at, duration_seconds, missed_call, has_recording, recording_path, recording_name, recording_url, transcribed")
+      .select("id, pbx_uuid, organization_id, domain_uuid, domain_name, direction, call_status, caller_name, caller_number, source_number, destination, destination_number, extension, start_at, duration_seconds, missed_call, has_recording, recording_path, recording_name, recording_url, transcribed")
       .eq("organization_id", sp.organization_id);
+    if (isDomainAdmin && extensionParam && extensionParam !== "all") listQ = listQ.eq("extension", extensionParam);
     if (!isDomainAdmin) listQ = listQ.or(extFilter);
+    if (statusParam === "missed") listQ = listQ.eq("missed_call", true);
+    if (statusParam === "recorded") listQ = listQ.or("has_recording.eq.true,recording_path.not.is.null,recording_name.not.is.null,recording_url.not.is.null");
     if (sp.domain_uuid) listQ = listQ.or(`domain_uuid.eq.${sp.domain_uuid},domain_uuid.is.null`);
     const { data: rows, error } = await listQ
       .order("start_at", { ascending: false })

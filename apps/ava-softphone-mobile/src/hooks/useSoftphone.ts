@@ -109,12 +109,18 @@ export function useSoftphone(
   }, [config?.extension, config?.wssUrl, config?.domain, opts.jsSipTimeoutMs]);
 
   const call = (number: string) => {
-    if (!uaRef.current || !config) return;
+    if (!uaRef.current || !config || sipStatus !== 'registered') return;
     setActiveCallNumber(number);
     setCallState('ringing');
-    uaRef.current.call(`sip:${number}@${config.domain}`, {
-      mediaConstraints: { audio: true, video: false },
-    });
+    try {
+      uaRef.current.call(`sip:${number}@${config.domain}`, {
+        mediaConstraints: { audio: true, video: false },
+      });
+    } catch (err: any) {
+      setCallState('idle');
+      setActiveCallNumber('');
+      setSipError(err?.message || 'Call failed');
+    }
   };
   const hangup = () => {
     sessionRef.current?.terminate();

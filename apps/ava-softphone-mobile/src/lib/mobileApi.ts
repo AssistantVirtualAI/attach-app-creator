@@ -81,16 +81,24 @@ export interface DashboardBrief {
 
 export interface CallRecord {
   id: string;
+  pbx_uuid?: string | null;
+  organization_id?: string | null;
+  domain_uuid?: string | null;
+  domain_name?: string | null;
   direction: 'in' | 'out';
   status: 'answered' | 'missed' | 'voicemail';
   from: string;
   to: string;
+  extension?: string | null;
   customer?: string;
   startedAt: string;
   durationSec: number;
   hasRecording: boolean;
   hasTranscript: boolean;
   sentiment?: 'positive' | 'neutral' | 'negative';
+  recording_path?: string | null;
+  recording_name?: string | null;
+  recording_url?: string | null;
 }
 
 export interface CallDetail extends CallRecord {
@@ -287,17 +295,24 @@ export const mobileApi = {
     { token: 'mock', expiresAt: new Date(Date.now() + 30*60e3).toISOString(), wssUrl: 'wss://lemtel.lemtel.tel:7443' },
   ),
 
-  startCall: (to: string) => call<{ callId: string; mode: 'webrtc' | 'click_to_call' }>(
-    '/mobile-calls-start', { method: 'POST', body: JSON.stringify({ to }) },
+  startCall: (to: string, mode?: 'webrtc' | 'click_to_call') => call<{ callId: string; mode: 'webrtc' | 'click_to_call'; to?: string; from?: string }>(
+    '/mobile-calls-start', { method: 'POST', body: JSON.stringify({ to, mode }) },
     { callId: 'call-' + Date.now(), mode: 'webrtc' },
   ),
 
   // Recents: scoped server-side to the caller's org + extension via mobile-calls.
-  calls: () => call<CallRecord[] | any>('/mobile-calls', undefined, callsMock).then((raw: any) => {
+  calls: (opts: { extension?: string | null; status?: 'all' | 'missed' | 'recorded'; limit?: number } = {}) => {
+    const qs = new URLSearchParams();
+    if (opts.extension && opts.extension !== 'all') qs.set('extension', opts.extension);
+    if (opts.status && opts.status !== 'all') qs.set('status', opts.status);
+    if (opts.limit) qs.set('limit', String(opts.limit));
+    const suffix = qs.toString() ? `?${qs}` : '';
+    return call<CallRecord[] | any>(`/mobile-calls${suffix}`, undefined, callsMock).then((raw: any) => {
     if (isMockMode()) return raw as CallRecord[];
     if (!Array.isArray(raw)) throw new Error('Invalid response from mobile-calls');
     return raw as CallRecord[];
-  }),
+    });
+  },
   callDetail: (id: string) => call<CallDetail>(`/mobile-calls?id=${encodeURIComponent(id)}`, undefined, callDetailMock(id)),
 
   threads:    () => call<SmsThread[]>('/mobile-sms', undefined, threadsMock),
