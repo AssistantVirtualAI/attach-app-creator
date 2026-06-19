@@ -40,6 +40,8 @@ function sentimentBadge(s?: string) {
 
 export default function TelephonyRecordings({ scope = 'org' }: { scope?: 'org' | 'mine' }) {
   const qc = useQueryClient();
+  const [search, setSearch] = useState('');
+  const [extFilter, setExtFilter] = useState('');
   usePbxRealtime(['pbx_call_records', 'pbx_call_recordings'], ['pbx'], {
     throttleMs: 30_000,
     shouldInvalidate: isRecordingListChange,
@@ -55,11 +57,18 @@ export default function TelephonyRecordings({ scope = 'org' }: { scope?: 'org' |
       return data?.extension ?? null;
     },
   });
+  const queryExt = scope === 'mine' ? myExt : (extFilter.trim() || undefined);
   const { data: cdrs = [], isLoading } = usePbxCallRecords(200, {
-    extension: scope === 'mine' ? myExt : undefined,
+    extension: queryExt,
     enabled: scope !== 'mine' || !!myExt,
   });
-  const recordings = (cdrs as any[]).filter(c => c.has_recording || c.recording_url);
+  const allRecordings = (cdrs as any[]).filter(c => c.has_recording || c.recording_url);
+  const recordings = allRecordings.filter((c) => {
+    if (!search.trim()) return true;
+    const s = search.trim().toLowerCase();
+    return [c.caller_number, c.caller_name, c.destination_number, c.extension, c.raw_data?.transcript_text, c.ai_summary]
+      .some((v) => String(v ?? '').toLowerCase().includes(s));
+  });
   const [expanded, setExpanded] = useState<string | null>(null);
   const [playing, setPlaying] = useState<string | null>(null);
   const [working, setWorking] = useState<string | null>(null);
