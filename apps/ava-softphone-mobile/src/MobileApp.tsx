@@ -41,10 +41,11 @@ const isPreviewMode = (() => {
 
 export default function MobileApp() {
   const { creds, setCreds, clearCreds, loading } = useStoredCreds();
+  const ALL_TABS: Tab[] = ['home','calls','ava','messages','more','voicemail','recordings','contacts','sms','queues','settings'];
   const initialTab = (() => {
     try {
-      const t = new URLSearchParams(window.location.search).get('tab');
-      if (t === 'home' || t === 'calls' || t === 'ava' || t === 'messages' || t === 'more') return t as Tab;
+      const t = new URLSearchParams(window.location.search).get('tab') as Tab | null;
+      if (t && ALL_TABS.includes(t)) return t;
     } catch {}
     return 'home' as Tab;
   })();
