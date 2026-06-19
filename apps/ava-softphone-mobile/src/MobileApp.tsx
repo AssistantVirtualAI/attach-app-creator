@@ -218,7 +218,7 @@ function AuthenticatedShell({
         if (next) setCreds(next);
         else if (!creds.organizationId) ensureStoredOrganizationId().catch(() => {});
         setFreshCredentialToken(creds.accessToken || '');
-      }).catch(() => {});
+      }).catch(() => { setFreshCredentialToken(creds.accessToken || ''); });
     }
   }, [creds]);
 
