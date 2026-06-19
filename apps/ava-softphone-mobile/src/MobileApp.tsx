@@ -118,7 +118,9 @@ function AuthenticatedShell({
     'wss://pbxnode.lemtel.tel:7443',
   ];
   const sipDomain = creds.sipDomain || 'lemtel.lemtel.tel';
-  const credentialsReady = !creds.accessToken || freshCredentialToken === creds.accessToken;
+  // credentialsReady: true once we have extension + password, regardless of token freshness
+  // The freshCredentialToken check was blocking SIP from ever starting
+  const credentialsReady = !!(creds.extension && sipPassword);
 
   const sipConfig = credentialsReady && creds.extension && sipPassword
     ? {
