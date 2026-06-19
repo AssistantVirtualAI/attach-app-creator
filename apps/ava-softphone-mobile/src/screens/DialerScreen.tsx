@@ -1,8 +1,19 @@
 import React, { useState } from 'react';
 import { ImpactStyle } from '@capacitor/haptics';
 import Dialpad from '../components/Dialpad';
+import WssDiagnostics from '../components/WssDiagnostics';
 import { audit } from '../lib/audit';
 import { showMobileToast } from '../lib/mobileToast';
+import { mobileApi } from '../lib/mobileApi';
+
+// Click-to-call via FusionPBX server-side originate is currently NOT permitted
+// for the mobile-calls-start function (the PBX API user lacks command_add/
+// command_edit). Flip this to true only after the admin grants the permission.
+const CLICK_TO_CALL_ENABLED = false;
+const CLICK_TO_CALL_DISABLED_REASON =
+  'Server-side originate is disabled: the FusionPBX API user lacks the ' +
+  '“command_add / command_edit” permission. Ask the PBX admin to grant it, ' +
+  'then enable click-to-call.';
 
 export default function DialerScreen({
   sp,
@@ -14,6 +25,7 @@ export default function DialerScreen({
   const [num, setNum] = useState('');
   const [dialing, setDialing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [diagOpen, setDiagOpen] = useState(false);
 
   const status: string = sp.snap.status || 'connecting';
   const sipError: string = sp.snap.error || '';
@@ -64,8 +76,23 @@ export default function DialerScreen({
     }
   };
 
+  const startClickToCall = async () => {
+    if (!num || !CLICK_TO_CALL_ENABLED) return;
+    await haptic(ImpactStyle.Medium);
+    setError(null);
+    try {
+      await mobileApi.startCall(num, 'click_to_call' as any);
+      showMobileToast('Click-to-call requested — your phone will ring.', 'success');
+    } catch (e: any) {
+      const msg = e?.message || 'Click-to-call failed';
+      setError(msg);
+      showMobileToast(msg, 'error');
+    }
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {diagOpen && <WssDiagnostics config={sp.sipConfig || null} onClose={() => setDiagOpen(false)} />}
       <div style={headerStyle}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ width: 8, height: 8, borderRadius: 4, background: bannerColor }} />
@@ -81,7 +108,19 @@ export default function DialerScreen({
       }}>
         <div style={{ fontWeight: 700, marginBottom: sipError || !isRegistered ? 4 : 0 }}>{bannerTitle}</div>
         {sipError && <div style={{ fontWeight: 400, opacity: 0.9, lineHeight: 1.4 }}>{sipError}</div>}
-        {(isFailed || sslLikely) && (
+        {sslLikely && (
+          <div style={{ marginTop: 8, padding: 8, background: 'rgba(0,0,0,0.25)', borderRadius: 8, color: '#fde68a', fontSize: 11, lineHeight: 1.45 }}>
+            <div style={{ fontWeight: 700, marginBottom: 4 }}>⚠ SSL certificate problem detected</div>
+            Mobile browsers refuse self-signed certificates on WSS. Admin: install a
+            CA-signed cert on port 7443, e.g.:
+            <pre style={{ margin: '4px 0 0', fontSize: 10, whiteSpace: 'pre-wrap' }}>
+{`sudo certbot certonly --standalone -d node.lemtelcloud.net
+# point WSS (FreeSWITCH/Kamailio :7443) to fullchain.pem + privkey.pem
+# then restart the service`}
+            </pre>
+          </div>
+        )}
+        {(isFailed || sslLikely || isRetrying) && (
           <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
             <button
               onClick={() => { haptic(); sp.reconnect?.(); }}
@@ -89,14 +128,16 @@ export default function DialerScreen({
             >
               Retry connection
             </button>
-            {sslLikely && (
-              <span style={{ fontSize: 11, opacity: 0.85 }}>
-                ⚠ Invalid SSL certificate on the WSS endpoint blocks browser registration.
-              </span>
-            )}
+            <button
+              onClick={() => { haptic(); setDiagOpen(true); }}
+              style={{ background: 'rgba(255,255,255,0.12)', color: '#fff', border: '1px solid rgba(255,255,255,0.18)', padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+            >
+              Run WSS diagnostics
+            </button>
           </div>
         )}
       </div>
+
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', paddingBottom: 16 }}>
         <div style={{ textAlign: 'center', padding: '24px 24px 16px', minHeight: 80 }}>
@@ -143,8 +184,35 @@ export default function DialerScreen({
             ⌫
           </button>
         </div>
+
+        {(!isRegistered || sslLikely) && (
+          <div style={{ padding: '0 24px 8px' }}>
+            <button
+              onClick={startClickToCall}
+              disabled={!num || !CLICK_TO_CALL_ENABLED}
+              title={!CLICK_TO_CALL_ENABLED ? CLICK_TO_CALL_DISABLED_REASON : 'Ring your desk phone, then connect'}
+              style={{
+                width: '100%', padding: '12px 14px', borderRadius: 12,
+                border: '1px solid rgba(255,255,255,0.16)',
+                background: CLICK_TO_CALL_ENABLED && num ? 'rgba(59,130,246,0.18)' : 'rgba(255,255,255,0.06)',
+                color: CLICK_TO_CALL_ENABLED ? '#93c5fd' : 'rgba(255,255,255,0.55)',
+                fontWeight: 700, fontSize: 13,
+                cursor: CLICK_TO_CALL_ENABLED && num ? 'pointer' : 'not-allowed',
+              }}
+            >
+              {CLICK_TO_CALL_ENABLED ? 'Use click-to-call instead' : 'Click-to-call unavailable'}
+            </button>
+            {!CLICK_TO_CALL_ENABLED && (
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.4 }}>
+                {CLICK_TO_CALL_DISABLED_REASON}
+              </div>
+            )}
+          </div>
+        )}
+
         {error && <div style={{ color: 'var(--danger)', textAlign: 'center', fontSize: 12, padding: '0 24px 10px' }}>{error}</div>}
       </div>
+
     </div>
   );
 }
