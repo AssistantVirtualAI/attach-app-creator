@@ -197,15 +197,6 @@ Deno.serve(async (req) => {
       return json({ ok: true, reactions: r });
     }
 
-    if (action === "mark_read") {
-      const channelId = payload?.channel_id;
-      const access = await isMember(channelId);
-      if (!access.ok) return json({ error: "forbidden" }, 403);
-      // append userId to read_by for last 100 unread messages of the channel
-      await admin.rpc("noop").catch(() => {}); // avoid heavy SQL; client just tracks last_read locally
-      return json({ ok: true });
-    }
-
     if (action === "upload_url") {
       const filename = String(payload?.filename ?? "file").replace(/[^A-Za-z0-9._-]/g, "_");
       const path = `${orgId}/${userId}/${Date.now()}-${filename}`;
