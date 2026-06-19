@@ -161,6 +161,15 @@ export function useSoftphone(
       }, delay);
     };
 
+    reconnectRef.current = () => {
+      if (cancelled) return;
+      clearRetry();
+      retryAttemptRef.current = 0;
+      try { uaRef.current?.stop(); } catch {}
+      uaRef.current = null;
+      start();
+    };
+
     start();
 
     return () => {
@@ -170,8 +179,9 @@ export function useSoftphone(
       if (timerRef.current) clearInterval(timerRef.current);
       try { uaRef.current?.stop(); } catch {}
       uaRef.current = null;
+      reconnectRef.current = () => {};
     };
-  }, [config?.extension, config?.wssUrl, config?.domain, config?.password, opts.jsSipTimeoutMs]);
+  }, [config?.extension, config?.wssUrl, config?.domain, config?.password, opts.jsSipTimeoutMs, reconnectTick]);
 
   const call = (number: string) => {
     if (!uaRef.current || !config || sipStatus !== 'registered') return false;
