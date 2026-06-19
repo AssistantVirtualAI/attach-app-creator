@@ -19,7 +19,6 @@ import { useLemtelAccess } from "@/hooks/useLemtelAccess";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
-import { SoftphoneDiagnostics } from "@/components/softphone/SoftphoneDiagnostics";
 import { useToast } from "@/hooks/use-toast";
 
 type Tab = "dial" | "recents" | "sms" | "contacts";
@@ -697,7 +696,6 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
         {content}
         {insightsStrip}
         {(callState === "idle") && tabBar}
-        <SoftphoneDiagnostics />
         {incomingOverlay}
       </div>
     );
@@ -714,7 +712,6 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
             {content}
             {insightsStrip}
             {(callState === "idle") && tabBar}
-            <SoftphoneDiagnostics />
             {incomingOverlay}
           </div>
         )}
