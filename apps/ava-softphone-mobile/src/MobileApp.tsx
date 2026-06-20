@@ -418,7 +418,7 @@ function AuthenticatedShell({
           {tab === 'messages'   && <MessagesHubScreen accessToken={creds.accessToken || null} userId={creds.userId} sp={sp} haptic={haptic} channelUnread={notif.channelUnread} />}
           {tab === 'settings'   && <SettingsScreen creds={creds} sp={sp} onSignOut={onSignOut} onNavigate={setTab as any} preferClickToCall={preferClickToCall} onTogglePreferC2C={onTogglePreferC2C} />}
           {/* legacy deep-link routes */}
-          {tab === 'more'       && <MoreScreen creds={creds} sp={sp} onSignOut={onSignOut} haptic={haptic} />}
+          {tab === 'more'       && <MoreScreen creds={creds} sp={sp} onSignOut={onSignOut} haptic={haptic} preferClickToCall={preferClickToCall} onTogglePreferC2C={onTogglePreferC2C} />}
           {tab === 'voicemail'  && <VoicemailScreen haptic={haptic} />}
           {tab === 'contacts'   && <ContactsScreen sp={sp} />}
           {tab === 'sms'        && <MessagesScreen haptic={haptic} />}
