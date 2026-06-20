@@ -66,7 +66,8 @@ async function call<T>(path: string, init: RequestInit | undefined, mockData: T)
     return mockData;
   }
   // Real users must see real errors, not fake records.
-  if (!authToken) {
+  const token = await getFreshToken();
+  if (!token) {
     throw new Error('Not authenticated');
   }
   return liveCall<T>(path, init);
