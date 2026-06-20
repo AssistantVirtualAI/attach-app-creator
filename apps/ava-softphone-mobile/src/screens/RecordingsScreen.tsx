@@ -31,6 +31,8 @@ export default function RecordingsScreen({
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const { lang } = useT();
+  const fr = lang === 'fr';
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Load recordings
