@@ -11,14 +11,16 @@ import { useMobileCredentials } from '../hooks/useMobileCredentials';
 import { restGet } from '../lib/mobileSupabase';
 import type { Tab } from '../components/BottomTabs';
 import NotificationsSheet, { NotificationBell, useNotificationCounts } from '../components/NotificationsSheet';
+import { useT } from '../lib/i18n';
 
-const RANGE_LABELS: Record<StatsRange, string> = { today: 'Today', '7d': '7 days', '30d': '30 days' };
 const AI_CACHE_KEY = (range: string) => `ava.aisummary.${range}`;
 
 export default function DashboardScreen({
   onNavigate, haptic, onOpenProfile,
 }: { onNavigate: (t: Tab) => void; haptic: (s?: ImpactStyle) => Promise<void>; onOpenProfile?: () => void }) {
   const { mode, toggle } = useTheme();
+  const { t, lang, toggle: toggleLang } = useT();
+  const RANGE_LABELS: Record<StatsRange, string> = { today: t('common.today'), '7d': t('common.range7d'), '30d': t('common.range30d') };
   const [range, setRange] = useState<StatsRange>('today');
   const [notifOpen, setNotifOpen] = useState(false);
   const notifCounts = useNotificationCounts();
@@ -68,25 +70,41 @@ export default function DashboardScreen({
               <AvaBadge />
             </div>
             <div style={{ fontSize: 10.5, color: colors.signalGold, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', marginTop: 2 }}>
-              Call history · {RANGE_LABELS[range]}
+              {t('header.callHistory')} · {RANGE_LABELS[range]}
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
             {s ? <StatusDot state="registered" /> : <Skeleton w={40} h={14} />}
-            <button
-              onClick={() => { haptic(); toggle(); }}
-              aria-label="Toggle theme"
-              title={mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-              style={{
-                width: 38, height: 38, borderRadius: '50%',
-                background: 'rgba(255,255,255,0.10)',
-                border: '1px solid rgba(255,255,255,0.18)',
-                color: colors.textIce, cursor: 'pointer',
-                display: 'grid', placeItems: 'center',
-              }}
-            >
-              {mode === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-            </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <button
+                onClick={() => { haptic(); toggle(); }}
+                aria-label={t('header.toggleTheme')}
+                title={t('header.toggleTheme')}
+                style={{
+                  width: 38, height: 38, borderRadius: '50%',
+                  background: 'rgba(255,255,255,0.10)',
+                  border: '1px solid rgba(255,255,255,0.18)',
+                  color: colors.textIce, cursor: 'pointer',
+                  display: 'grid', placeItems: 'center',
+                }}
+              >
+                {mode === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+              </button>
+              <button
+                onClick={() => { haptic(); toggleLang(); }}
+                aria-label={t('header.toggleLang')}
+                title={t('header.toggleLang')}
+                style={{
+                  width: 38, height: 38, borderRadius: '50%',
+                  background: 'rgba(255,255,255,0.10)',
+                  border: '1px solid rgba(255,255,255,0.18)',
+                  color: colors.textIce, cursor: 'pointer',
+                  fontSize: 11, fontWeight: 800, letterSpacing: 0.5,
+                }}
+              >
+                {lang.toUpperCase()}
+              </button>
+            </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
               <button
                 onClick={onOpenProfile}
@@ -111,10 +129,10 @@ export default function DashboardScreen({
             {m ? `${m.domain.sipDomain || m.organization.name}` : <Skeleton w="60%" h={10} />}
           </div>
           <h1 style={{ fontSize: font.xxl, color: colors.textIce, margin: '6px 0 4px', fontWeight: 800, letterSpacing: -0.5 }}>
-            {m ? `Hi, ${m.user.name.split(' ')[0]}` : <Skeleton w="60%" h={26} />}
+            {m ? `${t('dashboard.greeting')} ${m.user.name.split(' ')[0]}` : <Skeleton w="60%" h={26} />}
           </h1>
           <p style={{ fontSize: font.base, color: colors.textSub, margin: 0, lineHeight: 1.5 }}>
-            {s ? `${total} calls · ${answered} answered · ${missed} missed.` : <Skeleton w="100%" h={14} />}
+            {s ? t('dashboard.callsLine', { total, answered, missed }) : <Skeleton w="100%" h={14} />}
           </p>
         </div>
       </HeroGradient>
@@ -135,59 +153,47 @@ export default function DashboardScreen({
       {(() => {
         const isAdmin = !!m?.permissions?.admin || m?.dataScope === 'domain_admin';
         const inbound = Math.max(0, total - (s?.outboundCalls ?? 0));
+        const scopeLabel = isAdmin
+          ? (m?.domain?.sipDomain || m?.organization?.name || 'Domain')
+          : (m?.extension?.number ? `Ext ${m.extension.number}` : 'My activity');
+        const scopeEyebrow = isAdmin ? t('dashboard.domain') : t('dashboard.myActivity');
         return (
           <>
-            {isAdmin && (
+            <SectionTitle eyebrow={scopeEyebrow} title={`${scopeLabel} · ${RANGE_LABELS[range]}`} />
+            <AnswerRateHero
+              answered={s ? answered : undefined}
+              missed={s ? missed : undefined}
+              total={s ? total : undefined}
+              voicemails={s ? voicemails : undefined}
+              avgSec={s?.avgDurationSec}
+              rangeLabel={RANGE_LABELS[range]}
+            />
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
+              <DirectionDonut inbound={s ? inbound : undefined} outbound={s?.outboundCalls} />
+              <TalkTimeGauge totalSec={s?.totalTalkSec} avgSec={s?.avgDurationSec} />
+            </div>
+
+            <SectionTitle eyebrow={t('dashboard.breakdown')} title={isAdmin ? t('dashboard.domainMetrics') : t('dashboard.myMetrics')} />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+              <Metric label={t('m.totalCalls')} value={s ? total : undefined} tone="cyan" icon="☎" pct={100} />
+              <Metric label={t('m.answered')} value={s ? answered : undefined} tone="success" icon="↗" pct={total ? (answered / total) * 100 : 0} />
+              <Metric label={t('m.missed')} value={s ? missed : undefined} tone="danger" icon="↘" pct={total ? (missed / total) * 100 : 0} />
+              <Metric label={t('m.voicemails')} value={s ? voicemails : undefined} tone="gold" icon="✉" pct={total ? (voicemails / total) * 100 : 0} />
+              <Metric label={t('m.answerRate')} value={s?.answerRate != null ? `${s.answerRate}%` : undefined} tone="success" icon="◐" pct={s?.answerRate ?? 0} />
+              <Metric label={t('m.avgDuration')} value={s?.avgDurationSec != null ? `${s.avgDurationSec}s` : undefined} tone="violet" icon="◷" pct={Math.min(100, ((s?.avgDurationSec ?? 0) / 300) * 100)} />
+              <Metric label={t('m.totalTalk')} value={s?.totalTalkSec != null ? fmtTalk(s.totalTalkSec) : undefined} tone="cyan" icon="∿" pct={75} />
+              <Metric label={t('m.peakHour')} value={s?.peakHour != null ? `${s.peakHour}:00` : undefined} tone="gold" icon="◉" pct={((s?.peakHour ?? 0) / 24) * 100} />
+              <Metric label={t('m.outbound')} value={s?.outboundCalls ?? undefined} tone="cyan" icon="↗" pct={total ? ((s?.outboundCalls ?? 0) / total) * 100 : 0} />
+              <Metric label={t('m.failedDials')} value={s?.dialFailedCount ?? undefined} tone="danger" icon="✕" pct={total ? ((s?.dialFailedCount ?? 0) / total) * 100 : 0} />
+              <Metric label={t('m.dialSuccess')} value={s?.dialSuccessRate != null ? `${s.dialSuccessRate}%` : undefined} tone="success" icon="✓" pct={s?.dialSuccessRate ?? 0} />
+              {isAdmin && <Metric label={t('m.activeExt')} value={s?.activeExtensions ?? undefined} tone="violet" icon="◆" pct={Math.min(100, ((s?.activeExtensions ?? 0) / 20) * 100)} />}
+            </div>
+
+            {isAdmin && m?.extension?.number && (
               <>
-                <SectionTitle eyebrow="Domain" title={`${m?.domain?.sipDomain || m?.organization?.name || 'Domain'} · ${RANGE_LABELS[range]}`} />
-                <AnswerRateHero
-                  answered={s ? answered : undefined}
-                  missed={s ? missed : undefined}
-                  total={s ? total : undefined}
-                  voicemails={s ? voicemails : undefined}
-                  avgSec={s?.avgDurationSec}
-                  rangeLabel={RANGE_LABELS[range]}
-                />
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
-                  <DirectionDonut inbound={s ? inbound : undefined} outbound={s?.outboundCalls} />
-                  <TalkTimeGauge totalSec={s?.totalTalkSec} avgSec={s?.avgDurationSec} />
-                </div>
-
-                <SectionTitle eyebrow="Breakdown" title="Domain metrics" />
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
-                  <Metric label="Total calls" value={s ? total : undefined} tone="cyan" icon="☎" pct={100} />
-                  <Metric label="Answered" value={s ? answered : undefined} tone="success" icon="↗" pct={total ? (answered / total) * 100 : 0} />
-                  <Metric label="Missed" value={s ? missed : undefined} tone="danger" icon="↘" pct={total ? (missed / total) * 100 : 0} />
-                  <Metric label="Voicemails" value={s ? voicemails : undefined} tone="gold" icon="✉" pct={total ? (voicemails / total) * 100 : 0} />
-                  <Metric label="Answer rate" value={s?.answerRate != null ? `${s.answerRate}%` : undefined} tone="success" icon="◐" pct={s?.answerRate ?? 0} />
-                  <Metric label="Avg duration" value={s?.avgDurationSec != null ? `${s.avgDurationSec}s` : undefined} tone="violet" icon="◷" pct={Math.min(100, ((s?.avgDurationSec ?? 0) / 300) * 100)} />
-                  <Metric label="Total talk" value={s?.totalTalkSec != null ? fmtTalk(s.totalTalkSec) : undefined} tone="cyan" icon="∿" pct={75} />
-                  <Metric label="Peak hour" value={s?.peakHour != null ? `${s.peakHour}:00` : undefined} tone="gold" icon="◉" pct={((s?.peakHour ?? 0) / 24) * 100} />
-                  <Metric label="Outbound" value={s?.outboundCalls ?? undefined} tone="cyan" icon="↗" pct={total ? ((s?.outboundCalls ?? 0) / total) * 100 : 0} />
-                  <Metric label="Failed dials" value={s?.dialFailedCount ?? undefined} tone="danger" icon="✕" pct={total ? ((s?.dialFailedCount ?? 0) / total) * 100 : 0} />
-                  <Metric label="Dial success" value={s?.dialSuccessRate != null ? `${s.dialSuccessRate}%` : undefined} tone="success" icon="✓" pct={s?.dialSuccessRate ?? 0} />
-                  <Metric label="Active ext." value={s?.activeExtensions ?? undefined} tone="violet" icon="◆" pct={Math.min(100, ((s?.activeExtensions ?? 0) / 20) * 100)} />
-                </div>
-              </>
-            )}
-
-            {m?.extension?.number && (
-              <>
-                <SectionTitle eyebrow={isAdmin ? 'My extension' : 'My activity'} title={`Ext ${m.extension.number} · ${RANGE_LABELS[range]}`} />
-                {!isAdmin && (
-                  <AnswerRateHero
-                    answered={s ? answered : undefined}
-                    missed={s ? missed : undefined}
-                    total={s ? total : undefined}
-                    voicemails={s ? voicemails : undefined}
-                    avgSec={s?.avgDurationSec}
-                    rangeLabel={RANGE_LABELS[range]}
-                  />
-                )}
-                <div style={{ marginTop: isAdmin ? 0 : 10 }}>
-                  <MyExtensionStats range={range} extension={m.extension.number} domainUuid={m.domain.fusionpbxDomainUuid} />
-                </div>
+                <SectionTitle eyebrow={t('dashboard.myExtension')} title={`Ext ${m.extension.number} · ${RANGE_LABELS[range]}`} />
+                <MyExtensionStats range={range} extension={m.extension.number} domainUuid={m.domain.fusionpbxDomainUuid} />
               </>
             )}
           </>
@@ -195,7 +201,8 @@ export default function DashboardScreen({
       })()}
 
 
-      <SectionTitle eyebrow={RANGE_LABELS[range]} title="Calls per day" />
+
+      <SectionTitle eyebrow={RANGE_LABELS[range]} title={t('dashboard.callsPerDay')} />
       <Card padded={true}>
         <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(1, buckets.length)}, 1fr)`, gap: range === '30d' ? 2 : 6, alignItems: 'end', height: 90 }}>
           {(buckets.length ? buckets : Array(7).fill(0)).map((v, i) => {
@@ -217,10 +224,10 @@ export default function DashboardScreen({
         </div>
       </Card>
 
-      <SectionTitle eyebrow="Insights" title={`Top extensions · ${RANGE_LABELS[range]}`} />
+      <SectionTitle eyebrow={t('dashboard.insights')} title={`${t('dashboard.topExtensions')} · ${RANGE_LABELS[range]}`} />
       {!s && [1,2,3].map(i => <Card key={i} style={{ marginBottom: 8 }}><Skeleton w="60%" h={12} /></Card>)}
       {s && s.topExtensions.length === 0 && (
-        <Card><div style={{ fontSize: font.sm, color: colors.mutedSilver, textAlign: 'center' }}>No activity in this range.</div></Card>
+        <Card><div style={{ fontSize: font.sm, color: colors.mutedSilver, textAlign: 'center' }}>{t('dashboard.noActivity')}</div></Card>
       )}
       {s && s.topExtensions.map((ext, i) => (
         <Card key={ext.extension} style={{ marginBottom: 8 }} padded={true}>
@@ -230,13 +237,13 @@ export default function DashboardScreen({
               <div style={{ fontSize: font.base, fontWeight: 700, color: colors.textIce }}>Ext {ext.extension}</div>
               <div style={{ fontSize: font.xs, color: colors.mutedSilver }}>{ext.name || '—'}</div>
             </div>
-            <Chip tone="cyan">{ext.calls} calls</Chip>
+            <Chip tone="cyan">{ext.calls} {t('m.totalCalls').toLowerCase()}</Chip>
           </div>
         </Card>
       ))}
 
-      <SectionTitle eyebrow="AVA assistant" title={`AVA summary · ${RANGE_LABELS[range]}`} />
-      <AIPanel title="What AVA sees" accent={colors.avaViolet} right={<GhostButton tone="violet" style={{ padding: '6px 10px' }} onClick={() => onNavigate('ava')}>Open chat</GhostButton>}>
+      <SectionTitle eyebrow={t('dashboard.avaAssistant')} title={`${t('dashboard.avaSummary')} · ${RANGE_LABELS[range]}`} />
+      <AIPanel title={t('dashboard.avaSummary')} accent={colors.avaViolet} right={<GhostButton tone="violet" style={{ padding: '6px 10px' }} onClick={() => onNavigate('ava')}>{t('dashboard.openChat')}</GhostButton>}>
         {!s ? (
           <Skeleton w="100%" h={42} />
         ) : (
@@ -317,8 +324,11 @@ function Metric({ label, value, tone, icon, pct }: { label: string; value?: numb
 function AnswerRateHero({ answered, missed, total, voicemails, avgSec, rangeLabel }: {
   answered?: number; missed?: number; total?: number; voicemails?: number; avgSec?: number; rangeLabel: string;
 }) {
-  const a = answered ?? 0; const m = missed ?? 0; const t = total ?? (a + m);
-  const rate = t > 0 ? Math.round((a / t) * 100) : 0;
+  const { t, lang } = useT();
+  const a = answered ?? 0; const m = missed ?? 0; const tot = total ?? (a + m);
+  const rate = tot > 0 ? Math.round((a / tot) * 100) : 0;
+  const ofLbl = lang === 'fr' ? 'sur' : 'of';
+  const handledLbl = lang === 'fr' ? 'traités' : 'handled';
   const size = 92; const stroke = 10; const r = (size - stroke) / 2;
   const circ = 2 * Math.PI * r;
   const offset = circ - (rate / 100) * circ;
@@ -348,28 +358,28 @@ function AnswerRateHero({ answered, missed, total, voicemails, avgSec, rangeLabe
           </div>
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 1.6, color: colors.avaCyan, textTransform: 'uppercase' }}>Answer rate · {rangeLabel}</div>
-          <div style={{ fontSize: font.lg, fontWeight: 800, color: colors.textIce, marginTop: 2, letterSpacing: -0.3 }}>{a} of {t} handled</div>
+          <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 1.6, color: colors.avaCyan, textTransform: 'uppercase' }}>{t('m.answerRateLabel')} · {rangeLabel}</div>
+          <div style={{ fontSize: font.lg, fontWeight: 800, color: colors.textIce, marginTop: 2, letterSpacing: -0.3 }}>{a} {ofLbl} {tot} {handledLbl}</div>
           <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
-            <Chip tone="cyan">{a} answered</Chip>
-            <Chip tone="gold">{m} missed</Chip>
-            {voicemails != null && <Chip tone="violet">{voicemails} vm</Chip>}
+            <Chip tone="cyan">{a} {t('m.answered').toLowerCase()}</Chip>
+            <Chip tone="gold">{m} {t('m.missed').toLowerCase()}</Chip>
+            {voicemails != null && <Chip tone="violet">{voicemails} {lang === 'fr' ? 'msg' : 'vm'}</Chip>}
           </div>
         </div>
       </div>
 
       {/* Mini bar: answered vs missed vs voicemails */}
       <div style={{ marginTop: 14, height: 10, borderRadius: 999, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', display: 'flex', position: 'relative' }}>
-        <div style={{ width: `${t ? (a / t) * 100 : 0}%`, background: `linear-gradient(90deg, ${colors.avaCyan}, ${colors.avaCyan}cc)` }} />
-        <div style={{ width: `${t ? (m / t) * 100 : 0}%`, background: `linear-gradient(90deg, ${colors.signalGold}, ${colors.signalGold}cc)` }} />
-        <div style={{ width: `${t ? ((voicemails ?? 0) / t) * 100 : 0}%`, background: `linear-gradient(90deg, ${colors.avaViolet}, ${colors.avaViolet}cc)` }} />
+        <div style={{ width: `${tot ? (a / tot) * 100 : 0}%`, background: `linear-gradient(90deg, ${colors.avaCyan}, ${colors.avaCyan}cc)` }} />
+        <div style={{ width: `${tot ? (m / tot) * 100 : 0}%`, background: `linear-gradient(90deg, ${colors.signalGold}, ${colors.signalGold}cc)` }} />
+        <div style={{ width: `${tot ? ((voicemails ?? 0) / tot) * 100 : 0}%`, background: `linear-gradient(90deg, ${colors.avaViolet}, ${colors.avaViolet}cc)` }} />
       </div>
 
       {avgSec != null && (
         <div style={{ marginTop: 10, display: 'flex', gap: 12, fontSize: 10.5, color: colors.mutedSilver, fontWeight: 700, letterSpacing: 0.4 }}>
-          <span>⌀ {avgSec}s avg call</span>
+          <span>⌀ {avgSec}s {lang === 'fr' ? 'durée moy.' : 'avg call'}</span>
           <span style={{ opacity: 0.5 }}>·</span>
-          <span>{t} total interactions</span>
+          <span>{tot} {lang === 'fr' ? 'interactions' : 'total interactions'}</span>
         </div>
       )}
     </Card>
@@ -377,6 +387,7 @@ function AnswerRateHero({ answered, missed, total, voicemails, avgSec, rangeLabe
 }
 
 function MyExtensionStats({ range, extension, domainUuid }: { range: StatsRange; extension: string; domainUuid?: string | null }) {
+  const { t } = useT();
   const mobile = useMobileCredentials();
   const [s, setS] = React.useState<{ total: number; answered: number; missed: number; voicemails: number; recordings: number; avgSec: number } | null>(null);
   const [err, setErr] = React.useState<string | null>(null);
@@ -407,19 +418,20 @@ function MyExtensionStats({ range, extension, domainUuid }: { range: StatsRange;
   if (err) return <Card accent="gold"><div style={{ fontSize: font.sm, color: colors.danger }}>{err}</div></Card>;
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
-      <Metric label="My calls" value={s?.total} tone="cyan" />
-      <Metric label="My answered" value={s?.answered} tone="success" />
-      <Metric label="My missed" value={s?.missed} tone="danger" />
-      <Metric label="My voicemails" value={s?.voicemails} tone="gold" />
-      <Metric label="My recordings" value={s?.recordings} tone="violet" />
-      <Metric label="My avg duration" value={s != null ? `${s.avgSec}s` : undefined} tone="cyan" />
+      <Metric label={t('m.myCalls')} value={s?.total} tone="cyan" />
+      <Metric label={t('m.myAnswered')} value={s?.answered} tone="success" />
+      <Metric label={t('m.myMissed')} value={s?.missed} tone="danger" />
+      <Metric label={t('m.myVoicemails')} value={s?.voicemails} tone="gold" />
+      <Metric label={t('m.myRecordings')} value={s?.recordings} tone="violet" />
+      <Metric label={t('m.myAvgDuration')} value={s != null ? `${s.avgSec}s` : undefined} tone="cyan" />
     </div>
   );
 }
 
 function DirectionDonut({ inbound, outbound }: { inbound?: number; outbound?: number }) {
-  const i = inbound ?? 0; const o = outbound ?? 0; const t = i + o;
-  const ratio = t > 0 ? i / t : 0;
+  const { t } = useT();
+  const i = inbound ?? 0; const o = outbound ?? 0; const tot = i + o;
+  const ratio = tot > 0 ? i / tot : 0;
   const size = 84; const stroke = 11; const r = (size - stroke) / 2;
   const circ = 2 * Math.PI * r;
   return (
@@ -428,7 +440,7 @@ function DirectionDonut({ inbound, outbound }: { inbound?: number; outbound?: nu
       background: `linear-gradient(150deg, rgba(23,198,204,0.16), ${colors.graphite} 78%)`,
       border: '1px solid rgba(23,198,204,0.28)',
     }}>
-      <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 1.6, color: colors.avaCyan, textTransform: 'uppercase' }}>Direction</div>
+      <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 1.6, color: colors.avaCyan, textTransform: 'uppercase' }}>{t('m.direction')}</div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 8 }}>
         <svg width={size} height={size} style={{ transform: 'rotate(-90deg)', flexShrink: 0 }}>
           <circle cx={size/2} cy={size/2} r={r} stroke={`${colors.signalGold}55`} strokeWidth={stroke} fill="none" />
@@ -437,12 +449,12 @@ function DirectionDonut({ inbound, outbound }: { inbound?: number; outbound?: nu
         <div style={{ flex: 1, minWidth: 0, fontSize: 11, fontWeight: 700, color: colors.textIce }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
             <span style={{ width: 8, height: 8, borderRadius: 999, background: colors.avaCyan }} />
-            <span>Inbound</span>
+            <span>{t('m.inbound')}</span>
             <span style={{ marginLeft: 'auto', fontFamily: 'JetBrains Mono, monospace' }}>{inbound != null ? i : '·'}</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ width: 8, height: 8, borderRadius: 999, background: colors.signalGold }} />
-            <span>Outbound</span>
+            <span>{t('m.outboundLong')}</span>
             <span style={{ marginLeft: 'auto', fontFamily: 'JetBrains Mono, monospace' }}>{outbound != null ? o : '·'}</span>
           </div>
         </div>
@@ -452,6 +464,7 @@ function DirectionDonut({ inbound, outbound }: { inbound?: number; outbound?: nu
 }
 
 function TalkTimeGauge({ totalSec, avgSec }: { totalSec?: number; avgSec?: number }) {
+  const { t } = useT();
   const total = totalSec ?? 0;
   const targetH = 8; const targetSec = targetH * 3600;
   const pct = Math.min(100, (total / targetSec) * 100);
@@ -461,12 +474,12 @@ function TalkTimeGauge({ totalSec, avgSec }: { totalSec?: number; avgSec?: numbe
       background: `linear-gradient(150deg, rgba(106,77,255,0.18), ${colors.graphite} 78%)`,
       border: '1px solid rgba(106,77,255,0.28)',
     }}>
-      <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 1.6, color: colors.avaViolet, textTransform: 'uppercase' }}>Talk time</div>
+      <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 1.6, color: colors.avaViolet, textTransform: 'uppercase' }}>{t('m.talkTime')}</div>
       <div style={{ fontSize: 24, fontWeight: 800, color: colors.textIce, marginTop: 6, fontFamily: 'JetBrains Mono, monospace', letterSpacing: -0.5 }}>
         {totalSec != null ? fmtTalk(total) : <Skeleton w={50} h={22} />}
       </div>
       <div style={{ fontSize: 10, color: colors.mutedSilver, marginTop: 2, fontWeight: 700 }}>
-        avg {avgSec != null ? `${avgSec}s` : '—'} · target {targetH}h
+        {t('m.avg')} {avgSec != null ? `${avgSec}s` : '—'} · {t('m.target')} {targetH}h
       </div>
       <div style={{ marginTop: 10, height: 6, borderRadius: 999, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
         <div style={{ width: `${pct}%`, height: '100%', background: `linear-gradient(90deg, ${colors.avaViolet}, ${colors.avaCyan})`, borderRadius: 999, transition: 'width 600ms ease' }} />

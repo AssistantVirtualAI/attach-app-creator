@@ -28,6 +28,7 @@ import { useNotificationCounts } from './hooks/useNotificationCounts';
 import { useStoredCreds, Creds, ensureStoredOrganizationId, hydrateSoftphoneCredentials } from './lib/creds';
 import { gradients, colors } from './lib/theme';
 import { ThemeProvider } from './lib/ThemeContext';
+import { MobileI18nProvider } from './lib/i18n';
 import { requestAllPermissions, checkAllPermissions } from './lib/permissions';
 import { registerPush, sendPushTokenToBackend } from './lib/pushNotifications';
 import { syncDeviceContacts } from './lib/contacts';
@@ -78,9 +79,9 @@ export default function MobileApp() {
 
 
   if (loading || booting) return <SplashAva />;
-  if (!creds) return <ThemeProvider><AuthScreen onAuthenticated={setCreds} /></ThemeProvider>;
+  if (!creds) return <MobileI18nProvider><ThemeProvider><AuthScreen onAuthenticated={setCreds} /></ThemeProvider></MobileI18nProvider>;
 
-  return <ThemeProvider><AuthenticatedShell creds={creds} setCreds={setCreds} tab={tab} setTab={setTab} onSignOut={clearCreds} /></ThemeProvider>;
+  return <MobileI18nProvider><ThemeProvider><AuthenticatedShell creds={creds} setCreds={setCreds} tab={tab} setTab={setTab} onSignOut={clearCreds} /></ThemeProvider></MobileI18nProvider>;
 }
 
 function AuthenticatedShell({
@@ -323,7 +324,7 @@ function AuthenticatedShell({
         {tab === 'calls'      && <CallsScreen sp={sp} haptic={haptic} creds={creds} />}
         {tab === 'ava'        && <AVAChatScreen />}
         {tab === 'messages'   && <MessagesHubScreen accessToken={creds.accessToken || null} userId={creds.userId} sp={sp} haptic={haptic} channelUnread={notif.channelUnread} />}
-        {tab === 'settings'   && <SettingsScreen creds={creds} sp={sp} onSignOut={onSignOut} />}
+        {tab === 'settings'   && <SettingsScreen creds={creds} sp={sp} onSignOut={onSignOut} onNavigate={setTab as any} />}}
         {/* legacy deep-link routes */}
         {tab === 'more'       && <MoreScreen creds={creds} sp={sp} onSignOut={onSignOut} haptic={haptic} />}
         {tab === 'voicemail'  && <VoicemailScreen haptic={haptic} />}
