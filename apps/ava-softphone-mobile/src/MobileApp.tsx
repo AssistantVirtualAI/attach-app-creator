@@ -99,6 +99,10 @@ export default function MobileApp() {
   const [preferC2C, setPreferC2C] = useState<boolean | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+    getPreferClickToCall().then((val) => {
+      if (!cancelled) setPreferC2C(val);
+    });
     bootNative().finally(() => {
       setTimeout(() => setBooting(false), 700);
     });
@@ -116,6 +120,7 @@ export default function MobileApp() {
     };
     window.addEventListener('message', onMsg);
     return () => {
+      cancelled = true;
       window.removeEventListener('message', onMsg);
       unsubDeepLink?.();
     };
