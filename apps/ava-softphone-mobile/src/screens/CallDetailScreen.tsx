@@ -195,13 +195,13 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
         background: 'rgba(255,255,255,0.04)',
         border: `1px solid ${colors.border}`,
         borderRadius: 999, color: colors.textIce, fontSize: font.sm, cursor: 'pointer',
-      }}>← Back</button>
+      }}>← {fr ? 'Retour' : 'Back'}</button>
 
       {!data && <Skeleton w="60%" h={22} />}
       {data && (
         <>
           <div style={{ marginBottom: 4, fontSize: 10.5, fontWeight: 800, letterSpacing: 1.4, color: colors.signalGold, textTransform: 'uppercase' }}>
-            {data.direction === 'in' ? 'Inbound call' : 'Outbound call'}
+            {data.direction === 'in' ? (fr ? 'Appel entrant' : 'Inbound call') : (fr ? 'Appel sortant' : 'Outbound call')}
           </div>
           <h1 style={{ fontSize: font.xxl, color: colors.textIce, margin: '2px 0 6px', fontWeight: 800, letterSpacing: -0.3 }}>
             {data.customer || data.from}
