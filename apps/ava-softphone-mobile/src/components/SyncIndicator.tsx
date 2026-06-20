@@ -1,54 +1,69 @@
 import React, { useEffect, useState } from 'react';
-import { useSyncStatus } from '../lib/syncStatus';
+import { useSyncStatus, triggerSyncRefresh } from '../lib/syncStatus';
 import { useT } from '../lib/i18n';
 import { colors } from '../lib/theme';
 
 /**
- * Compact pill at the top of the screen showing global sync status:
- * loading (cyan, spinner), success (green, check) for 2.5s, error (red, !).
+ * Floating pill: shows current sync state and acts as a manual refresh button.
+ * Disabled (non-clickable) while a refresh is in flight to avoid duplicate requests.
  */
 export default function SyncIndicator() {
   const { t } = useT();
   const snap = useSyncStatus();
-  const [visible, setVisible] = useState(false);
+  const [hideSuccess, setHideSuccess] = useState(false);
 
   useEffect(() => {
-    if (snap.state === 'loading' || snap.state === 'error') {
-      setVisible(true);
-      return;
-    }
     if (snap.state === 'success') {
-      setVisible(true);
-      const id = setTimeout(() => setVisible(false), 2200);
+      setHideSuccess(false);
+      const id = setTimeout(() => setHideSuccess(true), 2200);
       return () => clearTimeout(id);
     }
-    setVisible(false);
-  }, [snap.state, snap.lastSuccessAt, snap.lastErrorAt]);
+    setHideSuccess(false);
+  }, [snap.state, snap.lastSuccessAt]);
 
-  if (!visible || snap.state === 'idle') return null;
+  // Always render so users can re-sync; only collapse to a tiny refresh chip when idle.
+  const isLoading = snap.state === 'loading';
+  const isError = snap.state === 'error';
+  const isSuccess = snap.state === 'success' && !hideSuccess;
 
-  const cfg =
-    snap.state === 'loading' ? { bg: 'rgba(36,178,255,0.16)', bd: '#24B2FF66', fg: '#7CD9FF', icon: <Spinner />, label: t('sync.loading') } :
-    snap.state === 'error'   ? { bg: 'rgba(255,77,103,0.16)', bd: `${colors.danger}66`, fg: '#FF8FA1', icon: <span>!</span>, label: t('sync.error') } :
-                               { bg: 'rgba(16,185,129,0.16)', bd: '#10B98166', fg: '#7FE8C2', icon: <span>✓</span>, label: t('sync.success') };
+  const cfg = isLoading
+    ? { bg: 'rgba(36,178,255,0.16)', bd: '#24B2FF66', fg: '#7CD9FF', label: t('sync.loading') }
+    : isError
+    ? { bg: 'rgba(255,77,103,0.16)', bd: `${colors.danger}66`, fg: '#FF8FA1', label: t('sync.error') }
+    : isSuccess
+    ? { bg: 'rgba(16,185,129,0.16)', bd: '#10B98166', fg: '#7FE8C2', label: t('sync.success') }
+    : { bg: 'rgba(255,255,255,0.06)', bd: 'rgba(255,255,255,0.12)', fg: '#B7C3D6', label: t('common.refresh') };
+
+  const onClick = () => { if (!isLoading) triggerSyncRefresh(); };
 
   return (
-    <div style={{
-      position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)',
-      display: 'inline-flex', alignItems: 'center', gap: 8,
-      padding: '6px 12px', borderRadius: 999,
-      background: cfg.bg, border: `1px solid ${cfg.bd}`, color: cfg.fg,
-      fontSize: 11.5, fontWeight: 700, letterSpacing: 0.4,
-      backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
-      zIndex: 50, pointerEvents: 'none',
-      boxShadow: '0 6px 18px rgba(0,0,0,0.25)',
-    }}>
-      <span style={{ display: 'inline-flex', width: 14, height: 14, alignItems: 'center', justifyContent: 'center' }}>{cfg.icon}</span>
+    <button
+      onClick={onClick}
+      disabled={isLoading}
+      aria-label={t('common.refresh')}
+      title={t('common.refresh')}
+      style={{
+        position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)',
+        display: 'inline-flex', alignItems: 'center', gap: 8,
+        padding: '6px 12px', borderRadius: 999,
+        background: cfg.bg, border: `1px solid ${cfg.bd}`, color: cfg.fg,
+        fontSize: 11.5, fontWeight: 700, letterSpacing: 0.4,
+        backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+        zIndex: 50,
+        cursor: isLoading ? 'not-allowed' : 'pointer',
+        opacity: isLoading ? 0.85 : 1,
+        boxShadow: '0 6px 18px rgba(0,0,0,0.25)',
+        userSelect: 'none',
+      }}
+    >
+      <span style={{ display: 'inline-flex', width: 14, height: 14, alignItems: 'center', justifyContent: 'center' }}>
+        {isLoading ? <Spinner /> : isError ? <span>!</span> : isSuccess ? <span>✓</span> : <span style={{ fontSize: 13 }}>↻</span>}
+      </span>
       <span>{cfg.label}</span>
-      {snap.totalLoaders > 0 && snap.state === 'loading' && (
+      {isLoading && snap.totalLoaders > 0 && (
         <span style={{ opacity: 0.75 }}>· {snap.readyLoaders}/{snap.totalLoaders}</span>
       )}
-    </div>
+    </button>
   );
 }
 
