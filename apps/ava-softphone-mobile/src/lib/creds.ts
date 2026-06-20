@@ -72,9 +72,12 @@ export function useStoredCreds() {
     Store.get().then((c) => { setCredsState(c); setLoading(false); });
   }, []);
 
-  const setCreds = useCallback((c: Creds) => {
-    setCredsState(c);
-    Store.set(c).catch(() => {});
+  const setCreds = useCallback((c: Creds | ((prev: Creds | null) => Creds)) => {
+    setCredsState((prev) => {
+      const next = typeof c === 'function' ? (c as any)(prev) : c;
+      Store.set(next).catch(() => {});
+      return next;
+    });
   }, []);
 
   const clearCreds = useCallback(() => {

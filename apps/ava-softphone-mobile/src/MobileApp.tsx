@@ -36,7 +36,7 @@ import { syncDeviceContacts } from './lib/contacts';
 import { bootNative, onAppStateChange } from './lib/nativeBoot';
 import { registerDeepLinkHandler } from './lib/deepLink';
 import { configureMobileApi, setAuthToken } from './lib/mobileApi';
-import { supabase } from '@/integrations/supabase/client';
+
 
 // Initialize immediately so API calls never go out without credentials
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdlanhpc3JxdHZ4YXZicmZjb3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1MDMxNzQsImV4cCI6MjA3NzA3OTE3NH0.kaO-GslE99OCNrZ4_AMnbzGqya2azqz_UMZR34zZvvo';
@@ -51,6 +51,7 @@ import PerfOverlay from './components/PerfOverlay';
 import ScreenSkeleton from './components/ScreenSkeleton';
 import SessionExpired from './components/SessionExpired';
 import { startPrefetch, prefetchForTab } from './lib/prefetch';
+import { getPreferClickToCall, setPreferClickToCall } from './lib/prefs';
 
 const isPreviewMode = (() => {
   try { return new URLSearchParams(window.location.search).get('preview') === '1'; }
@@ -95,8 +96,13 @@ export default function MobileApp() {
   })();
   const [tab, setTab] = useState<Tab>(initialTab);
   const [booting, setBooting] = useState(!isPreviewMode);
+  const [preferC2C, setPreferC2C] = useState<boolean | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+    getPreferClickToCall().then((val) => {
+      if (!cancelled) setPreferC2C(val);
+    });
     bootNative().finally(() => {
       setTimeout(() => setBooting(false), 700);
     });
@@ -114,21 +120,22 @@ export default function MobileApp() {
     };
     window.addEventListener('message', onMsg);
     return () => {
+      cancelled = true;
       window.removeEventListener('message', onMsg);
       unsubDeepLink?.();
     };
   }, []);
 
 
-  if (loading || booting) return <SplashAva />;
+  if (loading || booting || preferC2C === null) return <SplashAva />;
   if (!creds) return <MobileI18nProvider><ThemeProvider><AuthScreen onAuthenticated={setCreds} /><PerfOverlay /></ThemeProvider></MobileI18nProvider>;
 
-  return <MobileI18nProvider><ThemeProvider><AuthenticatedShell creds={creds} setCreds={setCreds} tab={tab} setTab={setTab} onSignOut={clearCreds} /><PerfOverlay /></ThemeProvider></MobileI18nProvider>;
+  return <MobileI18nProvider><ThemeProvider><AuthenticatedShell creds={creds} setCreds={setCreds} tab={tab} setTab={setTab} onSignOut={clearCreds} preferClickToCall={preferC2C} onTogglePreferC2C={() => { const next = !preferC2C; setPreferC2C(next); setPreferClickToCall(next); }} /><PerfOverlay /></ThemeProvider></MobileI18nProvider>;
 }
 
 function AuthenticatedShell({
-  creds, setCreds, tab, setTab, onSignOut,
-}: { creds: Creds; setCreds: (c: Creds) => void; tab: Tab; setTab: (t: Tab) => void; onSignOut: () => void }) {
+  creds, setCreds, tab, setTab, onSignOut, preferClickToCall, onTogglePreferC2C,
+}: { creds: Creds; setCreds: (c: Creds) => void; tab: Tab; setTab: (t: Tab) => void; onSignOut: () => void; preferClickToCall: boolean; onTogglePreferC2C: () => void }) {
 
   const [permsGateDone, setPermsGateDone] = useState<boolean | null>(isPreviewMode ? true : null);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -409,9 +416,9 @@ function AuthenticatedShell({
           {tab === 'calls'      && <CallsScreen sp={sp} haptic={haptic} creds={creds} />}
           {tab === 'ava'        && <AVAChatScreen />}
           {tab === 'messages'   && <MessagesHubScreen accessToken={creds.accessToken || null} userId={creds.userId} sp={sp} haptic={haptic} channelUnread={notif.channelUnread} />}
-          {tab === 'settings'   && <SettingsScreen creds={creds} sp={sp} onSignOut={onSignOut} onNavigate={setTab as any} />}
+          {tab === 'settings'   && <SettingsScreen creds={creds} sp={sp} onSignOut={onSignOut} onNavigate={setTab as any} preferClickToCall={preferClickToCall} onTogglePreferC2C={onTogglePreferC2C} />}
           {/* legacy deep-link routes */}
-          {tab === 'more'       && <MoreScreen creds={creds} sp={sp} onSignOut={onSignOut} haptic={haptic} />}
+          {tab === 'more'       && <MoreScreen creds={creds} sp={sp} onSignOut={onSignOut} haptic={haptic} preferClickToCall={preferClickToCall} onTogglePreferC2C={onTogglePreferC2C} />}
           {tab === 'voicemail'  && <VoicemailScreen haptic={haptic} />}
           {tab === 'contacts'   && <ContactsScreen sp={sp} />}
           {tab === 'sms'        && <MessagesScreen haptic={haptic} />}
@@ -435,7 +442,7 @@ function AuthenticatedShell({
         }}
       />
 
-      {!inCall && <DialerFab sp={sp} haptic={haptic} />}
+      {!inCall && <DialerFab sp={sp} haptic={haptic} preferClickToCall={preferClickToCall} />}
       {inCall && <ActiveCallSheet sp={sp} haptic={haptic} />}
 
       {profileOpen && (

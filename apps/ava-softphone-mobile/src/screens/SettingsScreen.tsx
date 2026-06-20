@@ -12,8 +12,8 @@ import type { Tab } from '../components/BottomTabs';
 const PORTAL_URL = 'https://avastatistic.ca';
 
 export default function SettingsScreen({
-  creds, sp, onSignOut, onNavigate,
-}: { creds: Creds; sp: any; onSignOut: () => void; onNavigate?: (t: Tab) => void }) {
+  creds, sp, onSignOut, onNavigate, preferClickToCall, onTogglePreferC2C,
+}: { creds: Creds; sp: any; onSignOut: () => void; onNavigate?: (t: Tab) => void; preferClickToCall?: boolean; onTogglePreferC2C?: () => void }) {
   const { t, lang, setLang } = useT();
   const { mode, toggle: toggleTheme } = useTheme();
   const [me, setMe] = useState<MeResponse | null>(null);
@@ -22,7 +22,7 @@ export default function SettingsScreen({
   const [perms, setPerms] = useState<AllPermissions | null>(null);
   const [haptics, setHaptics] = useState<boolean>(() => localStorage.getItem('ava.haptics') !== 'off');
   const [autoAnswer, setAutoAnswer] = useState<boolean>(() => localStorage.getItem('ava.autoAnswer') === 'on');
-  const [preferC2C, setPreferC2C] = useState<boolean>(() => localStorage.getItem('prefer_click_to_call') !== 'off');
+  
   const [ringtone, setRingtone] = useState<string>(() => localStorage.getItem('ava.ringtone') || 'AVA Default');
   const [audioOut, setAudioOut] = useState<string>(() => localStorage.getItem('ava.audioOut') || 'System default');
 
@@ -45,7 +45,7 @@ export default function SettingsScreen({
   };
   const toggleHaptics = () => { const next = !haptics; setHaptics(next); localStorage.setItem('ava.haptics', next ? 'on' : 'off'); };
   const toggleAutoAnswer = () => { const next = !autoAnswer; setAutoAnswer(next); localStorage.setItem('ava.autoAnswer', next ? 'on' : 'off'); };
-  const togglePreferC2C = () => { const next = !preferC2C; setPreferC2C(next); localStorage.setItem('prefer_click_to_call', next ? 'on' : 'off'); };
+  const togglePreferC2C = () => onTogglePreferC2C();
   const pickRingtone = () => {
     const opts = ['AVA Default', 'Classic', 'Pulse', 'Marimba', 'Silent'];
     const choice = prompt((lang === 'fr' ? 'Sonnerie' : 'Ringtone') + ` (${opts.join(', ')}):`, ringtone);
@@ -121,7 +121,7 @@ export default function SettingsScreen({
           value={lang === 'fr'
             ? 'FusionPBX connecte l\'appel via votre extension physique'
             : 'FusionPBX bridges the call via your physical extension'}
-          right={<Switch on={preferC2C} />}
+          right={<Switch on={preferClickToCall} />}
           onPress={togglePreferC2C}
         />
         <SettingsRow label={t('settings.callForwarding')} icon="↪" onPress={toggleFwd} value={forwarding || t('common.off')} right={<Switch on={!!forwarding} />} />

@@ -1,4 +1,4 @@
-import { supabase } from '@/integrations/supabase/client';
+
 /**
  * Real-time CDR subscription for the mobile softphone.
  * - Realtime postgres_changes on pbx_call_records (filtered to extension).
