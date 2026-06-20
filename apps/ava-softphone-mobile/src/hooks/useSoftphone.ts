@@ -77,6 +77,8 @@ export function useSoftphone(
   const samplerStateRef = useRef<SamplerState>({});
   const currentBitrateRef = useRef<number>(PROFILE_OPUS.auto.hardCapBitrate);
   const reRegisterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Last quality alert level shown, and when — used to throttle toasts. */
+  const lastAlertRef = useRef<{ level: number; at: number }>({ level: 4, at: 0 });
 
   useEffect(() => { audioProfileRef.current = audioProfile; }, [audioProfile]);
 
