@@ -101,7 +101,7 @@ export function useRealtimeCDR(creds: Creds | null, rangeDays: 7 | 30 = 7, exten
     };
     const stopPolling = () => { if (pollId) { clearInterval(pollId); pollId = null; } };
 
-    const connect = () => {
+    const connect = async () => {
       if (cancelled) return;
       const ext = creds?.extension;
       const orgId = creds?.organizationId;
