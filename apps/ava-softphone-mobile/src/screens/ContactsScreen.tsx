@@ -7,7 +7,7 @@ import { authedRealtime, restGet, restPost } from '../lib/mobileSupabase';
 import { loadCachedContacts, syncDeviceContacts } from '../lib/contacts';
 
 type Kind = 'domain' | 'manual' | 'mobile';
-type Contact = { id: string; kind: Kind; user_id: string | null; extension: string; phone?: string | null; email?: string | null; display_name: string | null; sip_domain: string | null; status: string | null; last_seen_at: string | null };
+type Contact = { id: string; kind: Kind; user_id: string | null; extension: string; phone?: string | null; email?: string | null; display_name: string | null; sip_domain: string | null; status: string | null; last_seen_at: string | null; numbers?: { label: string; number: string }[] };
 type Presence = { user_id: string; status: string; call_state?: string | null; last_seen_at: string | null };
 
 const safe = (v: string) => encodeURIComponent(v);
