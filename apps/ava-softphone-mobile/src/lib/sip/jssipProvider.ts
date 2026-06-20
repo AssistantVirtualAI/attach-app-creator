@@ -236,6 +236,10 @@ export async function createSIPUA(config: SIPConfig, timeoutMs = 8000) {
   // IMPORTANT: config must match portal/desktop exactly to avoid SIP 403
   // portal src/lib/softphone/jssipProvider.ts works — copy same params
   // EXACT same config as portal src/lib/softphone/jssipProvider.ts (confirmed working)
+  // EXACT same config as portal src/lib/softphone/jssipProvider.ts, plus
+  // Capacitor-native hacks so the Contact/Via headers carry a real IP when
+  // running inside the iOS/Android shell (where the WebView IP is unusable).
+  const isNative = (() => { try { return Capacitor.isNativePlatform(); } catch { return false; } })();
   return new JsSIP.UA({
     sockets,
     uri: `sip:${config.extension}@${config.domain}`,
@@ -249,5 +253,7 @@ export async function createSIPUA(config: SIPConfig, timeoutMs = 8000) {
     connection_recovery_min_interval: 2,
     connection_recovery_max_interval: 30,
     user_agent: "AVA Softphone 1.1",
-  });
+    hack_ip_in_contact: isNative,
+    hack_via_tcp: isNative,
+  } as any);
 }
