@@ -318,7 +318,7 @@ function RecordingAiPanel({ rec }: { rec: RecordingEntry }) {
                     marginBottom: 6,
                   }}>
                     <div style={{ fontSize: 9, color: colors.mutedSilver, marginBottom: 2, letterSpacing: 0.6, textTransform: 'uppercase', fontWeight: 700 }}>
-                      {line.speaker === 'agent' ? 'Agent' : line.speaker === 'customer' ? 'Caller' : 'Speaker'}
+                      {line.speaker === 'agent' ? 'Agent' : line.speaker === 'customer' ? (fr ? 'Appelant' : 'Caller') : (fr ? 'Interlocuteur' : 'Speaker')}
                     </div>
                     <div style={{
                       maxWidth: '88%', padding: '6px 10px', borderRadius: 12,
