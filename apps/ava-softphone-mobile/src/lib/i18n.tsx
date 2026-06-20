@@ -517,7 +517,12 @@ const DICT = {
     'data.error': 'Une erreur est survenue',
     'data.errorHint': 'Tirez pour actualiser ou réessayez.',
     'data.empty': 'Rien à afficher',
+
+    'sync.loading': 'Synchronisation…',
+    'sync.success': 'À jour',
+    'sync.error': 'Échec de la synchro',
   },
+
 } as const;
 
 type Key = keyof typeof DICT['en'];
