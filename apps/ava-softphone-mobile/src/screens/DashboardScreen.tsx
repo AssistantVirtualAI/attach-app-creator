@@ -75,20 +75,36 @@ export default function DashboardScreen({
           </div>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
             {s ? <StatusDot state="registered" /> : <Skeleton w={40} h={14} />}
-            <button
-              onClick={() => { haptic(); toggle(); }}
-              aria-label="Toggle theme"
-              title={mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-              style={{
-                width: 38, height: 38, borderRadius: '50%',
-                background: 'rgba(255,255,255,0.10)',
-                border: '1px solid rgba(255,255,255,0.18)',
-                color: colors.textIce, cursor: 'pointer',
-                display: 'grid', placeItems: 'center',
-              }}
-            >
-              {mode === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-            </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <button
+                onClick={() => { haptic(); toggle(); }}
+                aria-label={t('header.toggleTheme')}
+                title={t('header.toggleTheme')}
+                style={{
+                  width: 38, height: 38, borderRadius: '50%',
+                  background: 'rgba(255,255,255,0.10)',
+                  border: '1px solid rgba(255,255,255,0.18)',
+                  color: colors.textIce, cursor: 'pointer',
+                  display: 'grid', placeItems: 'center',
+                }}
+              >
+                {mode === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+              </button>
+              <button
+                onClick={() => { haptic(); toggleLang(); }}
+                aria-label={t('header.toggleLang')}
+                title={t('header.toggleLang')}
+                style={{
+                  width: 38, height: 38, borderRadius: '50%',
+                  background: 'rgba(255,255,255,0.10)',
+                  border: '1px solid rgba(255,255,255,0.18)',
+                  color: colors.textIce, cursor: 'pointer',
+                  fontSize: 11, fontWeight: 800, letterSpacing: 0.5,
+                }}
+              >
+                {lang.toUpperCase()}
+              </button>
+            </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
               <button
                 onClick={onOpenProfile}
