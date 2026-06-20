@@ -309,7 +309,7 @@ function RecordingAiPanel({ rec }: { rec: RecordingEntry }) {
           )}
 
           {hasTranscript && (
-            <AIPanel title="Transcript" accent={colors.signalGold}>
+            <AIPanel title={fr ? 'Transcription' : 'Transcript'} accent={colors.signalGold}>
               <div style={{ maxHeight: 220, overflowY: 'auto' }}>
                 {data!.transcript.map((line, i) => (
                   <div key={i} style={{
