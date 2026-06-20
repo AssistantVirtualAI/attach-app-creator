@@ -7,6 +7,7 @@ import {
 } from '../lib/sip/sipPersistence';
 import { AudioProfile, loadAudioProfile, saveAudioProfile, PROFILE_OPUS } from '../lib/sip/audioProfile';
 import { CallQuality, EMPTY_QUALITY, SamplerState, sampleCallQuality, chooseAdaptiveBitrate } from '../lib/sip/callQuality';
+import { showMobileToast } from '../lib/mobileToast';
 
 export type SIPStatus = 'idle' | 'connecting' | 'registered' | 'retrying' | 'error';
 export type CallState = 'idle' | 'ringing' | 'active' | 'ended';
@@ -76,6 +77,8 @@ export function useSoftphone(
   const samplerStateRef = useRef<SamplerState>({});
   const currentBitrateRef = useRef<number>(PROFILE_OPUS.auto.hardCapBitrate);
   const reRegisterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Last quality alert level shown, and when — used to throttle toasts. */
+  const lastAlertRef = useRef<{ level: number; at: number }>({ level: 4, at: 0 });
 
   useEffect(() => { audioProfileRef.current = audioProfile; }, [audioProfile]);
 
@@ -271,7 +274,45 @@ export function useSoftphone(
                 statsTimerRef.current = setInterval(async () => {
                   const q = await sampleCallQuality(pc, samplerStateRef.current);
                   setQuality(q);
-                  // Only AUTO profile adapts. HD / low-bandwidth stay fixed.
+                  // ---- Quality alerts (throttled, only when level worsens) ----
+                  const now = Date.now();
+                  const prev = lastAlertRef.current;
+                  const cooldown = 15000; // don't re-alert same band for 15s
+                  const profile = audioProfileRef.current;
+                  const switchToLowBw = () => {
+                    setAudioProfileState('low-bandwidth');
+                    saveAudioProfile('low-bandwidth');
+                    audioProfileRef.current = 'low-bandwidth';
+                    if (sender) {
+                      try {
+                        const p = sender.getParameters();
+                        p.encodings = p.encodings?.length ? p.encodings : [{}];
+                        p.encodings[0].maxBitrate = PROFILE_OPUS['low-bandwidth'].hardCapBitrate;
+                        currentBitrateRef.current = PROFILE_OPUS['low-bandwidth'].hardCapBitrate;
+                        sender.setParameters(p).catch(() => {});
+                      } catch {}
+                    }
+                    log('quality.profile.auto-switch', `→ low-bandwidth (loss=${q.lossPct}% rtt=${q.rtt}ms)`, 'warn');
+                  };
+                  if (q.level <= 1 && prev.level > 1 && now - prev.at > cooldown) {
+                    lastAlertRef.current = { level: q.level, at: now };
+                    if (profile !== 'low-bandwidth') {
+                      showMobileToast(
+                        `Réseau critique · perte ${q.lossPct}% · toucher pour activer le mode faible bande passante`,
+                        'error',
+                        switchToLowBw,
+                      );
+                    } else {
+                      showMobileToast(`Réseau critique · perte ${q.lossPct}%`, 'error');
+                    }
+                  } else if (q.level === 2 && prev.level > 2 && now - prev.at > cooldown) {
+                    lastAlertRef.current = { level: q.level, at: now };
+                    showMobileToast(`Qualité dégradée · perte ${q.lossPct}% · jitter ${q.jitter}ms`, 'warning');
+                  } else if (q.level >= 4 && prev.level < 3 && now - prev.at > cooldown) {
+                    lastAlertRef.current = { level: q.level, at: now };
+                    showMobileToast('Réseau rétabli · qualité optimale', 'success');
+                  }
+                  // ---- Adaptive bitrate (AUTO only) ----
                   if (audioProfileRef.current === 'auto' && sender) {
                     const cap = PROFILE_OPUS.auto.hardCapBitrate;
                     const target = chooseAdaptiveBitrate(q, cap, currentBitrateRef.current);
