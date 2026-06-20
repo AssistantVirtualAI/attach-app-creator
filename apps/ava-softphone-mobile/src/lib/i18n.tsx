@@ -257,7 +257,12 @@ const DICT = {
     'data.error': 'Something went wrong',
     'data.errorHint': 'Pull to refresh or try again.',
     'data.empty': 'Nothing to show',
+
+    'sync.loading': 'Syncing…',
+    'sync.success': 'Up to date',
+    'sync.error': 'Sync failed',
   },
+
   fr: {
     'common.signOut': 'Déconnexion',
     'common.on': 'Activé',
@@ -512,7 +517,12 @@ const DICT = {
     'data.error': 'Une erreur est survenue',
     'data.errorHint': 'Tirez pour actualiser ou réessayez.',
     'data.empty': 'Rien à afficher',
+
+    'sync.loading': 'Synchronisation…',
+    'sync.success': 'À jour',
+    'sync.error': 'Échec de la synchro',
   },
+
 } as const;
 
 type Key = keyof typeof DICT['en'];

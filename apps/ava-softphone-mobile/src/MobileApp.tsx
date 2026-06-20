@@ -20,7 +20,7 @@ import ActiveCallSheet from './components/ActiveCallSheet';
 import SplashAva from './components/SplashAva';
 import PermissionGate from './components/PermissionGate';
 import DialerFab from './components/DialerFab';
-import RealtimeStatusPill from './components/RealtimeStatusPill';
+import SyncIndicator from './components/SyncIndicator';
 import ProfileSheet from './components/ProfileSheet';
 import { useRealtimeCDR } from './hooks/useRealtimeCDR';
 import { initBackgroundSync } from './lib/backgroundSync';
@@ -314,8 +314,11 @@ function AuthenticatedShell({
       paddingTop: 'var(--safe-top)',
       paddingBottom: 'var(--safe-bottom)',
       color: colors.textIce,
+      position: 'relative',
     }}>
       <audio ref={audioRef} autoPlay playsInline />
+      <SyncIndicator />
+
 
       <div key={tab} className="lemtel-page-enter" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <Suspense fallback={<div style={{ flex: 1 }} />}>

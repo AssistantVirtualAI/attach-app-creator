@@ -9,6 +9,7 @@
  * - Aborts in-flight requests when deps change to avoid stale writes.
  */
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { nextSyncId, syncBegin, syncSuccess, syncError } from '../lib/syncStatus';
 
 const CACHE_PREFIX = 'ava.mobile.cache.';
 
@@ -25,11 +26,27 @@ function writeCache<T>(key: string | undefined, value: T) {
   try { localStorage.setItem(CACHE_PREFIX + key, JSON.stringify(value)); } catch {}
 }
 
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
 export function useAutoSync<T>(
   loader: (signal?: AbortSignal) => Promise<T>,
-  opts: { intervalMs?: number; deps?: unknown[]; cacheKey?: string } = {},
+  opts: {
+    intervalMs?: number;
+    deps?: unknown[];
+    cacheKey?: string;
+    timeoutMs?: number;
+    retries?: number;
+    retryBaseMs?: number;
+  } = {},
 ) {
-  const { intervalMs = 60_000, deps = [], cacheKey } = opts;
+  const {
+    intervalMs = 60_000,
+    deps = [],
+    cacheKey,
+    timeoutMs = 15_000,
+    retries = 2,
+    retryBaseMs = 800,
+  } = opts;
   const [data, setData] = useState<T | null>(() => readCache<T>(cacheKey));
   const [error, setError] = useState<Error | null>(null);
   const [loading, setLoading] = useState(false);
@@ -38,26 +55,57 @@ export function useAutoSync<T>(
   const loaderRef = useRef(loader);
   loaderRef.current = loader;
   const abortRef = useRef<AbortController | null>(null);
+  const syncIdRef = useRef<string>(cacheKey || nextSyncId());
 
   const refresh = useCallback(async () => {
     if (!mounted.current) return;
+    // Cancel any prior in-flight refresh (newer call supersedes older)
     abortRef.current?.abort();
-    const ac = new AbortController();
-    abortRef.current = ac;
+    const outer = new AbortController();
+    abortRef.current = outer;
     setLoading(true);
-    try {
-      const next = await loaderRef.current(ac.signal);
-      if (!mounted.current || ac.signal.aborted) return;
-      setData(next); setError(null); setLastSyncedAt(Date.now());
-      writeCache(cacheKey, next);
-    } catch (e: any) {
-      if (!mounted.current || ac.signal.aborted) return;
-      if (e?.name === 'AbortError') return;
-      setError(e instanceof Error ? e : new Error(String(e)));
-    } finally {
-      if (mounted.current && !ac.signal.aborted) setLoading(false);
+    const sid = syncIdRef.current;
+    syncBegin(sid);
+
+    let attempt = 0;
+    let lastErr: unknown = null;
+    while (attempt <= retries) {
+      // Bail if a newer refresh took over.
+      if (abortRef.current !== outer) { syncError(sid, 'aborted'); return; }
+      // Per-attempt controller that triggers timeout or piggybacks outer cancel.
+      const ac = new AbortController();
+      const onOuterAbort = () => ac.abort();
+      outer.signal.addEventListener('abort', onOuterAbort);
+      const timeout = setTimeout(() => ac.abort(), timeoutMs);
+      try {
+        const next = await loaderRef.current(ac.signal);
+        clearTimeout(timeout);
+        outer.signal.removeEventListener('abort', onOuterAbort);
+        if (!mounted.current || abortRef.current !== outer) { syncError(sid, 'aborted'); return; }
+        setData(next); setError(null); setLastSyncedAt(Date.now());
+        writeCache(cacheKey, next);
+        setLoading(false);
+        syncSuccess(sid);
+        return;
+      } catch (e: any) {
+        clearTimeout(timeout);
+        outer.signal.removeEventListener('abort', onOuterAbort);
+        lastErr = e;
+        if (!mounted.current) { syncError(sid, 'unmounted'); return; }
+        if (abortRef.current !== outer) { syncError(sid, 'aborted'); return; }
+        attempt++;
+        if (attempt > retries) break;
+        await sleep(retryBaseMs * Math.pow(2, attempt - 1));
+      }
     }
-  }, [cacheKey]);
+    if (!mounted.current) return;
+    const errObj = lastErr instanceof Error ? lastErr : new Error(String(lastErr));
+    setError(errObj);
+    setLoading(false);
+    syncError(sid, errObj.message || 'sync failed');
+  }, [cacheKey, timeoutMs, retries, retryBaseMs]);
+
+
 
   useEffect(() => {
     mounted.current = true;
