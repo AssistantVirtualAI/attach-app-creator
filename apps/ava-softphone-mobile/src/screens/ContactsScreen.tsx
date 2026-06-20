@@ -17,6 +17,8 @@ const safe = (v: string) => encodeURIComponent(v);
 
 export default function ContactsScreen({ sp }: { sp: any }) {
   const mobile = useMobileCredentials();
+  const { lang } = useT();
+  const fr = lang === 'fr';
   const [q, setQ] = useState('');
   const [contacts, setContacts] = useState<Contact[] | null>(null);
   const [selectedKind, setSelectedKind] = useState<'all' | Kind>('all');
@@ -24,6 +26,7 @@ export default function ContactsScreen({ sp }: { sp: any }) {
   const [newContact, setNewContact] = useState({ name: '', phone: '', email: '', company: '' });
   const [presence, setPresence] = useState<Record<string, Presence>>({});
   const [error, setError] = useState<string | null>(null);
+  const [picker, setPicker] = useState<{ title: string; options: NumberOption[] } | null>(null);
 
   const loadPresence = useCallback(async (rows: Contact[] | null) => {
     if (!mobile.accessToken || !rows?.length) { setPresence({}); return; }
