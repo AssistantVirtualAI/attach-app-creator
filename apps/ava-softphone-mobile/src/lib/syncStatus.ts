@@ -77,7 +77,7 @@ export function triggerSyncRefresh() { refreshSubs.forEach((fn) => { try { fn();
 import { useEffect, useState } from 'react';
 export function useSyncStatus() {
   const [snap, setSnap] = useState<SyncSnapshot>(() => snapshot());
-  useEffect(() => subscribeSync(setSnap), []);
+  useEffect(() => { const off = subscribeSync(setSnap); return () => { off(); }; }, []);
   return snap;
 }
 
