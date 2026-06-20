@@ -370,16 +370,16 @@ function AnswerRateHero({ answered, missed, total, voicemails, avgSec, rangeLabe
 
       {/* Mini bar: answered vs missed vs voicemails */}
       <div style={{ marginTop: 14, height: 10, borderRadius: 999, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', display: 'flex', position: 'relative' }}>
-        <div style={{ width: `${t ? (a / t) * 100 : 0}%`, background: `linear-gradient(90deg, ${colors.avaCyan}, ${colors.avaCyan}cc)` }} />
-        <div style={{ width: `${t ? (m / t) * 100 : 0}%`, background: `linear-gradient(90deg, ${colors.signalGold}, ${colors.signalGold}cc)` }} />
-        <div style={{ width: `${t ? ((voicemails ?? 0) / t) * 100 : 0}%`, background: `linear-gradient(90deg, ${colors.avaViolet}, ${colors.avaViolet}cc)` }} />
+        <div style={{ width: `${tot ? (a / tot) * 100 : 0}%`, background: `linear-gradient(90deg, ${colors.avaCyan}, ${colors.avaCyan}cc)` }} />
+        <div style={{ width: `${tot ? (m / tot) * 100 : 0}%`, background: `linear-gradient(90deg, ${colors.signalGold}, ${colors.signalGold}cc)` }} />
+        <div style={{ width: `${tot ? ((voicemails ?? 0) / tot) * 100 : 0}%`, background: `linear-gradient(90deg, ${colors.avaViolet}, ${colors.avaViolet}cc)` }} />
       </div>
 
       {avgSec != null && (
         <div style={{ marginTop: 10, display: 'flex', gap: 12, fontSize: 10.5, color: colors.mutedSilver, fontWeight: 700, letterSpacing: 0.4 }}>
-          <span>⌀ {avgSec}s avg call</span>
+          <span>⌀ {avgSec}s {lang === 'fr' ? 'durée moy.' : 'avg call'}</span>
           <span style={{ opacity: 0.5 }}>·</span>
-          <span>{t} total interactions</span>
+          <span>{tot} {lang === 'fr' ? 'interactions' : 'total interactions'}</span>
         </div>
       )}
     </Card>
