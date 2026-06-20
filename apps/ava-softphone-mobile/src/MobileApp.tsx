@@ -127,10 +127,10 @@ export default function MobileApp() {
   }, []);
 
 
-  if (loading || booting) return <SplashAva />;
+  if (loading || booting || preferC2C === null) return <SplashAva />;
   if (!creds) return <MobileI18nProvider><ThemeProvider><AuthScreen onAuthenticated={setCreds} /><PerfOverlay /></ThemeProvider></MobileI18nProvider>;
 
-  return <MobileI18nProvider><ThemeProvider><AuthenticatedShell creds={creds} setCreds={setCreds} tab={tab} setTab={setTab} onSignOut={clearCreds} /><PerfOverlay /></ThemeProvider></MobileI18nProvider>;
+  return <MobileI18nProvider><ThemeProvider><AuthenticatedShell creds={creds} setCreds={setCreds} tab={tab} setTab={setTab} onSignOut={clearCreds} preferClickToCall={preferC2C} onTogglePreferC2C={(next) => { setPreferC2C(next); setPreferClickToCall(next); }} /><PerfOverlay /></ThemeProvider></MobileI18nProvider>;
 }
 
 function AuthenticatedShell({
