@@ -246,10 +246,10 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
                   <span>⚠ {audioError}</span>
                   <div style={{ display: 'flex', gap: 6 }}>
                     <button onClick={retry} style={{ background: 'transparent', border: `1px solid ${colors.danger}`, color: colors.danger, borderRadius: 6, padding: '4px 8px', fontSize: 11, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                      <RefreshCw size={11} /> Retry
+                      <RefreshCw size={11} /> {fr ? 'Réessayer' : 'Retry'}
                     </button>
                     <button onClick={() => setDebugOpen(true)} style={{ background: 'transparent', border: `1px solid ${colors.mutedSilver}`, color: colors.mutedSilver, borderRadius: 6, padding: '4px 8px', fontSize: 11, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                      <Stethoscope size={11} /> Debug
+                      <Stethoscope size={11} /> {fr ? 'Diagnostic' : 'Debug'}
                     </button>
                   </div>
                 </div>
