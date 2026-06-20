@@ -426,8 +426,9 @@ function MyExtensionStats({ range, extension, domainUuid }: { range: StatsRange;
 }
 
 function DirectionDonut({ inbound, outbound }: { inbound?: number; outbound?: number }) {
-  const i = inbound ?? 0; const o = outbound ?? 0; const t = i + o;
-  const ratio = t > 0 ? i / t : 0;
+  const { t } = useT();
+  const i = inbound ?? 0; const o = outbound ?? 0; const tot = i + o;
+  const ratio = tot > 0 ? i / tot : 0;
   const size = 84; const stroke = 11; const r = (size - stroke) / 2;
   const circ = 2 * Math.PI * r;
   return (
@@ -436,7 +437,7 @@ function DirectionDonut({ inbound, outbound }: { inbound?: number; outbound?: nu
       background: `linear-gradient(150deg, rgba(23,198,204,0.16), ${colors.graphite} 78%)`,
       border: '1px solid rgba(23,198,204,0.28)',
     }}>
-      <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 1.6, color: colors.avaCyan, textTransform: 'uppercase' }}>Direction</div>
+      <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 1.6, color: colors.avaCyan, textTransform: 'uppercase' }}>{t('m.direction')}</div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 8 }}>
         <svg width={size} height={size} style={{ transform: 'rotate(-90deg)', flexShrink: 0 }}>
           <circle cx={size/2} cy={size/2} r={r} stroke={`${colors.signalGold}55`} strokeWidth={stroke} fill="none" />
@@ -445,12 +446,12 @@ function DirectionDonut({ inbound, outbound }: { inbound?: number; outbound?: nu
         <div style={{ flex: 1, minWidth: 0, fontSize: 11, fontWeight: 700, color: colors.textIce }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
             <span style={{ width: 8, height: 8, borderRadius: 999, background: colors.avaCyan }} />
-            <span>Inbound</span>
+            <span>{t('m.inbound')}</span>
             <span style={{ marginLeft: 'auto', fontFamily: 'JetBrains Mono, monospace' }}>{inbound != null ? i : '·'}</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ width: 8, height: 8, borderRadius: 999, background: colors.signalGold }} />
-            <span>Outbound</span>
+            <span>{t('m.outboundLong')}</span>
             <span style={{ marginLeft: 'auto', fontFamily: 'JetBrains Mono, monospace' }}>{outbound != null ? o : '·'}</span>
           </div>
         </div>
@@ -460,6 +461,7 @@ function DirectionDonut({ inbound, outbound }: { inbound?: number; outbound?: nu
 }
 
 function TalkTimeGauge({ totalSec, avgSec }: { totalSec?: number; avgSec?: number }) {
+  const { t } = useT();
   const total = totalSec ?? 0;
   const targetH = 8; const targetSec = targetH * 3600;
   const pct = Math.min(100, (total / targetSec) * 100);
@@ -469,12 +471,12 @@ function TalkTimeGauge({ totalSec, avgSec }: { totalSec?: number; avgSec?: numbe
       background: `linear-gradient(150deg, rgba(106,77,255,0.18), ${colors.graphite} 78%)`,
       border: '1px solid rgba(106,77,255,0.28)',
     }}>
-      <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 1.6, color: colors.avaViolet, textTransform: 'uppercase' }}>Talk time</div>
+      <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 1.6, color: colors.avaViolet, textTransform: 'uppercase' }}>{t('m.talkTime')}</div>
       <div style={{ fontSize: 24, fontWeight: 800, color: colors.textIce, marginTop: 6, fontFamily: 'JetBrains Mono, monospace', letterSpacing: -0.5 }}>
         {totalSec != null ? fmtTalk(total) : <Skeleton w={50} h={22} />}
       </div>
       <div style={{ fontSize: 10, color: colors.mutedSilver, marginTop: 2, fontWeight: 700 }}>
-        avg {avgSec != null ? `${avgSec}s` : '—'} · target {targetH}h
+        {t('m.avg')} {avgSec != null ? `${avgSec}s` : '—'} · {t('m.target')} {targetH}h
       </div>
       <div style={{ marginTop: 10, height: 6, borderRadius: 999, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
         <div style={{ width: `${pct}%`, height: '100%', background: `linear-gradient(90deg, ${colors.avaViolet}, ${colors.avaCyan})`, borderRadius: 999, transition: 'width 600ms ease' }} />
