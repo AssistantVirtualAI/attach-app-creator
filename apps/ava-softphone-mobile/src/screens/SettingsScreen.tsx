@@ -22,7 +22,7 @@ export default function SettingsScreen({
   const [perms, setPerms] = useState<AllPermissions | null>(null);
   const [haptics, setHaptics] = useState<boolean>(() => localStorage.getItem('ava.haptics') !== 'off');
   const [autoAnswer, setAutoAnswer] = useState<boolean>(() => localStorage.getItem('ava.autoAnswer') === 'on');
-  const [preferC2C, setPreferC2C] = useState<boolean>(() => localStorage.getItem('prefer_click_to_call') !== 'off');
+  
   const [ringtone, setRingtone] = useState<string>(() => localStorage.getItem('ava.ringtone') || 'AVA Default');
   const [audioOut, setAudioOut] = useState<string>(() => localStorage.getItem('ava.audioOut') || 'System default');
 
