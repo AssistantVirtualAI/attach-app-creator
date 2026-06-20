@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { createSIPUA, JsSIPUnavailableError, SIPConfig, sdpModifier, classifySipFailure, hasWebRTC, WEBRTC_UNAVAILABLE_MESSAGE } from '../lib/sip/jssipProvider';
+import { createSIPUA, JsSIPUnavailableError, SIPConfig, buildSdpModifier, classifySipFailure, hasWebRTC, WEBRTC_UNAVAILABLE_MESSAGE } from '../lib/sip/jssipProvider';
 import {
   appendSipLog, clearSipLog as clearPersistedLog, clearPersistedStatus, loadPersistedError, loadPersistedStatus,
   loadSipLog, MAX_AUTO_RETRIES, PersistedSipError, probeWss, RETRY_BACKOFF_MS, savePersistedError, savePersistedStatus,
   SipLogEntry,
 } from '../lib/sip/sipPersistence';
+import { AudioProfile, loadAudioProfile, saveAudioProfile, PROFILE_OPUS } from '../lib/sip/audioProfile';
+import { CallQuality, EMPTY_QUALITY, SamplerState, sampleCallQuality, chooseAdaptiveBitrate } from '../lib/sip/callQuality';
 
 export type SIPStatus = 'idle' | 'connecting' | 'registered' | 'retrying' | 'error';
 export type CallState = 'idle' | 'ringing' | 'active' | 'ended';
@@ -40,6 +42,11 @@ export interface UseSoftphoneReturn {
   nextRetryAt: number | null;
   /** True once auto-retry budget is exhausted — requires manual reconnect. */
   retryLimitReached: boolean;
+  /** Live call quality (RTT / jitter / loss / level). */
+  quality: CallQuality;
+  /** Active audio profile (hd / auto / low-bandwidth). */
+  audioProfile: AudioProfile;
+  setAudioProfile: (p: AudioProfile) => void;
 }
 
 export function useSoftphone(
