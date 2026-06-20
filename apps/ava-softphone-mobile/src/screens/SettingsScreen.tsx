@@ -13,7 +13,7 @@ const PORTAL_URL = 'https://avastatistic.ca';
 
 export default function SettingsScreen({
   creds, sp, onSignOut, onNavigate, preferClickToCall, onTogglePreferC2C,
-}: { creds: Creds; sp: any; onSignOut: () => void; onNavigate?: (t: Tab) => void; preferClickToCall: boolean; onTogglePreferC2C: () => void }) {
+}: { creds: Creds; sp: any; onSignOut: () => void; onNavigate?: (t: Tab) => void; preferClickToCall?: boolean; onTogglePreferC2C?: () => void }) {
   const { t, lang, setLang } = useT();
   const { mode, toggle: toggleTheme } = useTheme();
   const [me, setMe] = useState<MeResponse | null>(null);
