@@ -56,7 +56,14 @@ export async function syncDeviceContacts(): Promise<DeviceContact[]> {
 export function loadCachedContacts(): DeviceContact[] {
   try {
     const raw = sessionStorage.getItem(CACHE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    const list: any[] = raw ? JSON.parse(raw) : [];
+    // Migration : anciennes entrées sans `phones`.
+    return list.map((c) => ({
+      ...c,
+      phones: Array.isArray(c.phones) && c.phones.length
+        ? c.phones
+        : (Array.isArray(c.numbers) ? c.numbers.map((n: string) => ({ number: n })) : []),
+    })) as DeviceContact[];
   } catch { return []; }
 }
 
