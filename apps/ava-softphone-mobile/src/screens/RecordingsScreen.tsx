@@ -213,6 +213,8 @@ export default function RecordingsScreen({
 }
 
 function RecordingAiPanel({ rec }: { rec: RecordingEntry }) {
+  const { lang } = useT();
+  const fr = lang === 'fr';
   const meta = useMemo(() => ({
     recording_path: rec.record_path,
     recording_name: rec.record_name,
