@@ -285,35 +285,56 @@ function NumberDisplay({ value, placeholder, clearLabel, onClear, onBackspace }:
 }
 
 
-function CallRow({ c, onPress }: { c: CallRecord; onPress: () => void }) {
+function CallRow({ c, onPress, onCall }: { c: CallRecord; onPress: () => void; onCall: (num: string) => void }) {
   const arrow = c.status === 'missed' ? '↙' : c.direction === 'in' ? '↘' : '↗';
   const arrowColor = c.status === 'missed' ? colors.danger : c.direction === 'in' ? colors.success : colors.avaCyan;
+  const callbackNumber = c.direction === 'in' ? c.from : c.to;
   return (
-    <button onClick={onPress} style={{
-      display: 'flex', alignItems: 'center', gap: 12, width: '100%',
-      padding: '12px 14px', marginBottom: 8,
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+      padding: '10px 12px', marginBottom: 8,
       borderRadius: radius.lg,
       background: gradients.card,
       border: `1px solid ${colors.border}`,
-      color: colors.textIce, cursor: 'pointer', textAlign: 'left',
+      color: colors.textIce,
     }}>
-      <span style={{ color: arrowColor, fontSize: 18, width: 18, textAlign: 'center' }}>{arrow}</span>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: font.base, fontWeight: 600, color: colors.textIce, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {c.customer || (c.direction === 'in' ? c.from : c.to)}
+      <button onClick={onPress} style={{
+        flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 12,
+        background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', textAlign: 'left', padding: 0,
+      }}>
+        <span style={{ color: arrowColor, fontSize: 18, width: 18, textAlign: 'center' }}>{arrow}</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: font.base, fontWeight: 600, color: colors.textIce, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {c.customer || callbackNumber}
+          </div>
+          <div style={{ fontSize: font.xs, color: colors.mutedSilver, fontFamily: 'JetBrains Mono, monospace', marginTop: 2 }}>
+            {callbackNumber}
+          </div>
         </div>
-        <div style={{ fontSize: font.xs, color: colors.mutedSilver, fontFamily: 'JetBrains Mono, monospace', marginTop: 2 }}>
-          {c.direction === 'in' ? c.from : c.to}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+          <span style={{ fontSize: font.xs, color: colors.mutedSilver }}>{new Date(c.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+          <div style={{ display: 'flex', gap: 4 }}>
+            {c.hasRecording && <Chip tone="gold" size="xs">REC</Chip>}
+            {c.hasTranscript && <Chip tone="violet" size="xs">AI</Chip>}
+          </div>
         </div>
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-        <span style={{ fontSize: font.xs, color: colors.mutedSilver }}>{new Date(c.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-        <div style={{ display: 'flex', gap: 4 }}>
-          {c.hasRecording && <Chip tone="gold" size="xs">REC</Chip>}
-          {c.hasTranscript && <Chip tone="violet" size="xs">AI</Chip>}
-        </div>
-      </div>
-    </button>
+      </button>
+      <button
+        onClick={(e) => { e.stopPropagation(); if (callbackNumber) onCall(callbackNumber); }}
+        disabled={!callbackNumber}
+        aria-label={`Appeler ${callbackNumber || ''}`}
+        title={`Appeler ${callbackNumber || ''}`}
+        style={{
+          width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
+          border: 'none', cursor: callbackNumber ? 'pointer' : 'not-allowed',
+          background: callbackNumber ? 'linear-gradient(135deg, #22c55e, #16a34a)' : 'rgba(255,255,255,0.06)',
+          color: '#fff', display: 'grid', placeItems: 'center',
+          boxShadow: callbackNumber ? '0 4px 12px rgba(34,197,94,0.35)' : 'none',
+        }}
+      >
+        <span style={{ fontSize: 18 }}>☏</span>
+      </button>
+    </div>
   );
 }
 
