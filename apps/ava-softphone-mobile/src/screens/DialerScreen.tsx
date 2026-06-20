@@ -74,25 +74,28 @@ export default function DialerScreen({
         ? `⛔ Tentatives automatiques arrêtées après ${retryAttempt} essais${sipError ? ` — ${sipError}` : ''}. Touchez Réessayer.`
         : `❌ Erreur SIP${sipError ? ` — ${sipError}` : ''}`;
 
+  const preferClickToCall =
+    (typeof localStorage !== 'undefined' && localStorage.getItem('prefer_click_to_call') !== 'off');
+
   const startCall = async () => {
     if (!num || dialing) return;
     await haptic(ImpactStyle.Medium);
-    audit('call.originated', null, { destination: num, sipStatus: status });
+    audit('call.originated', null, { destination: num, sipStatus: status, preferClickToCall });
     setDialing(true);
     setError(null);
     try {
-      if (!isRegistered) {
-        const msg = sipError || 'SIP non enregistré — attendez le statut vert ou touchez Réessayer.';
-        setError(msg);
-        showMobileToast(msg, 'error');
-        return;
+      // Try SIP first if registered AND user hasn't forced click-to-call
+      if (!preferClickToCall && isRegistered) {
+        const ok = sp.call(num);
+        if (ok !== false) return;
       }
-      const ok = sp.call(num);
-      if (ok === false) {
-        const msg = "Impossible de lancer l'appel via SIP";
-        setError(msg);
-        showMobileToast(msg, 'error');
-      }
+      // Fallback (or primary) — Click-to-Call via FusionPBX originate
+      showMobileToast('Lancement via Click-to-Call…', 'info');
+      await mobileApi.startCall(num, 'click_to_call' as any);
+      showMobileToast(
+        `✅ FusionPBX va appeler votre extension ${sp.sipConfig?.extension || '300'}, puis connecter à ${num}`,
+        'success',
+      );
     } catch (e: any) {
       const msg = e?.message || "Impossible de lancer l'appel";
       setError(msg);
