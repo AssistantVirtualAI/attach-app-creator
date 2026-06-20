@@ -121,7 +121,7 @@ export default function SettingsScreen({
           value={lang === 'fr'
             ? 'FusionPBX connecte l\'appel via votre extension physique'
             : 'FusionPBX bridges the call via your physical extension'}
-          right={<Switch on={preferC2C} />}
+          right={<Switch on={preferClickToCall} />}
           onPress={togglePreferC2C}
         />
         <SettingsRow label={t('settings.callForwarding')} icon="↪" onPress={toggleFwd} value={forwarding || t('common.off')} right={<Switch on={!!forwarding} />} />
