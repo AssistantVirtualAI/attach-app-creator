@@ -174,6 +174,7 @@ function AuthenticatedShell({
         recording: false,
         contacts: [],
         recents: [],
+        quality: softphone.quality,
       },
       sipConfig,
       call: softphone.call,
