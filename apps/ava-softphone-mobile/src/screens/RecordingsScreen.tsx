@@ -7,6 +7,7 @@ import type { Creds } from '../lib/creds';
 import { restGet, loadPbxRecordingAudioMobile } from '../lib/mobileSupabase';
 import { showMobileToast } from '../lib/mobileToast';
 import { useCallAi } from '../hooks/useCallAi';
+import { useT } from '../lib/i18n';
 
 export default function RecordingsScreen({
   creds,
