@@ -324,7 +324,7 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
           )}
 
           {data.coachingNotes && data.coachingNotes.length > 0 && (
-            <AIPanel title="Coaching notes" accent={colors.avaCyan}>
+            <AIPanel title={fr ? 'Notes de coaching' : 'Coaching notes'} accent={colors.avaCyan}>
               {data.coachingNotes.map((note, i) => (
                 <div key={i} style={{ fontSize: font.base, color: colors.textIce, lineHeight: 1.45, padding: '5px 0' }}>✦ {note}</div>
               ))}
