@@ -115,6 +115,15 @@ export default function SettingsScreen({
       <SectionTitle eyebrow={t('settings.calling')} title={t('settings.availability')} />
       <Card padded={false}>
         <SettingsRow label={t('settings.dnd')} icon="🔕" onPress={toggleDnd} right={<Switch on={dnd} />} />
+        <SettingsRow
+          label={lang === 'fr' ? 'Utiliser Click-to-Call' : 'Use Click-to-Call'}
+          icon="📞"
+          value={lang === 'fr'
+            ? 'FusionPBX connecte l\'appel via votre extension physique'
+            : 'FusionPBX bridges the call via your physical extension'}
+          right={<Switch on={preferC2C} />}
+          onPress={togglePreferC2C}
+        />
         <SettingsRow label={t('settings.callForwarding')} icon="↪" onPress={toggleFwd} value={forwarding || t('common.off')} right={<Switch on={!!forwarding} />} />
         <SettingsRow label={t('settings.voicemailGreeting')} icon="🎙" value={t('settings.defaultGreeting')} onPress={() => onNavigate?.('voicemail' as Tab)} />
         <SettingsRow label={t('settings.autoAnswer')} icon="⚡" right={<Switch on={autoAnswer} />} onPress={toggleAutoAnswer} />
