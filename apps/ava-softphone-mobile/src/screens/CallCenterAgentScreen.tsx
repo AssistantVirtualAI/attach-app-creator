@@ -54,7 +54,7 @@ export default function CallCenterAgentScreen({ portalUrl, accessToken, extensio
   };
 
   const statusColor = { available: '#22c55e', paused: '#f59e0b', on_call: '#ef4444', offline: '#64748b' }[status];
-  const label = { available: 'Available', paused: `Paused${reason ? ` · ${reason}` : ''}`, on_call: 'On call', offline: 'Offline' }[status];
+  const label = { available: 'Disponible', paused: `En pause${reason ? ` · ${reason}` : ''}`, on_call: 'En appel', offline: 'Hors ligne' }[status];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: 20, color: colors.textIce, gap: 20 }}>
@@ -97,7 +97,7 @@ export default function CallCenterAgentScreen({ portalUrl, accessToken, extensio
             borderTopLeftRadius: 20, borderTopRightRadius: 20,
             paddingBottom: 'calc(20px + var(--safe-bottom))',
           }}>
-            <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>Pause reason</div>
+            <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>Raison de la pause</div>
             {reasons.map((r) => (
               <button key={r.id} onClick={() => call('agent-pause', { reason: r.reason })} style={{
                 display: 'flex', alignItems: 'center', gap: 10, width: '100%',
