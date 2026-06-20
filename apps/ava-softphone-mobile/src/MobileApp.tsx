@@ -384,6 +384,7 @@ function AuthenticatedShell({
       }} />
     );
   }
+  if (authExpired) return <SessionExpired onSignOut={onSignOut} />;
 
 
 
