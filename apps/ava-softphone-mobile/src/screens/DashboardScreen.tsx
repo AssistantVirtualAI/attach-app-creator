@@ -132,36 +132,68 @@ export default function DashboardScreen({
         ))}
       </div>
 
-      <AnswerRateHero
-        answered={s ? answered : undefined}
-        missed={s ? missed : undefined}
-        total={s ? total : undefined}
-        voicemails={s ? voicemails : undefined}
-        avgSec={s?.avgDurationSec}
-        rangeLabel={RANGE_LABELS[range]}
-      />
+      {(() => {
+        const isAdmin = !!m?.permissions?.admin || m?.dataScope === 'domain_admin';
+        const inbound = Math.max(0, total - (s?.outboundCalls ?? 0));
+        return (
+          <>
+            {isAdmin && (
+              <>
+                <SectionTitle eyebrow="Domain" title={`${m?.domain?.sipDomain || m?.organization?.name || 'Domain'} · ${RANGE_LABELS[range]}`} />
+                <AnswerRateHero
+                  answered={s ? answered : undefined}
+                  missed={s ? missed : undefined}
+                  total={s ? total : undefined}
+                  voicemails={s ? voicemails : undefined}
+                  avgSec={s?.avgDurationSec}
+                  rangeLabel={RANGE_LABELS[range]}
+                />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginTop: 10 }}>
-        <Metric label="Total calls" value={s ? total : undefined} tone="cyan" icon="☎" pct={100} />
-        <Metric label="Answered" value={s ? answered : undefined} tone="success" icon="↗" pct={total ? (answered / total) * 100 : 0} />
-        <Metric label="Missed" value={s ? missed : undefined} tone="danger" icon="↘" pct={total ? (missed / total) * 100 : 0} />
-        <Metric label="Voicemails" value={s ? voicemails : undefined} tone="gold" icon="✉" pct={total ? (voicemails / total) * 100 : 0} />
-        <Metric label="Answer rate" value={s?.answerRate != null ? `${s.answerRate}%` : undefined} tone="success" icon="◐" pct={s?.answerRate ?? 0} />
-        <Metric label="Avg duration" value={s?.avgDurationSec != null ? `${s.avgDurationSec}s` : undefined} tone="violet" icon="◷" pct={Math.min(100, ((s?.avgDurationSec ?? 0) / 300) * 100)} />
-        <Metric label="Total talk" value={s?.totalTalkSec != null ? fmtTalk(s.totalTalkSec) : undefined} tone="cyan" icon="∿" pct={75} />
-        <Metric label="Peak hour" value={s?.peakHour != null ? `${s.peakHour}:00` : undefined} tone="gold" icon="◉" pct={((s?.peakHour ?? 0) / 24) * 100} />
-        <Metric label="Outbound" value={s?.outboundCalls ?? undefined} tone="cyan" icon="↗" pct={total ? ((s?.outboundCalls ?? 0) / total) * 100 : 0} />
-        <Metric label="Failed dials" value={s?.dialFailedCount ?? undefined} tone="danger" icon="✕" pct={total ? ((s?.dialFailedCount ?? 0) / total) * 100 : 0} />
-        <Metric label="Dial success" value={s?.dialSuccessRate != null ? `${s.dialSuccessRate}%` : undefined} tone="success" icon="✓" pct={s?.dialSuccessRate ?? 0} />
-        <Metric label="Active ext." value={s?.activeExtensions ?? undefined} tone="violet" icon="◆" pct={Math.min(100, ((s?.activeExtensions ?? 0) / 20) * 100)} />
-      </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
+                  <DirectionDonut inbound={s ? inbound : undefined} outbound={s?.outboundCalls} />
+                  <TalkTimeGauge totalSec={s?.totalTalkSec} avgSec={s?.avgDurationSec} />
+                </div>
 
-      {m?.extension?.number && (
-        <>
-          <SectionTitle eyebrow="My extension" title={`Ext ${m.extension.number} · ${RANGE_LABELS[range]}`} />
-          <MyExtensionStats range={range} extension={m.extension.number} domainUuid={m.domain.fusionpbxDomainUuid} />
-        </>
-      )}
+                <SectionTitle eyebrow="Breakdown" title="Domain metrics" />
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+                  <Metric label="Total calls" value={s ? total : undefined} tone="cyan" icon="☎" pct={100} />
+                  <Metric label="Answered" value={s ? answered : undefined} tone="success" icon="↗" pct={total ? (answered / total) * 100 : 0} />
+                  <Metric label="Missed" value={s ? missed : undefined} tone="danger" icon="↘" pct={total ? (missed / total) * 100 : 0} />
+                  <Metric label="Voicemails" value={s ? voicemails : undefined} tone="gold" icon="✉" pct={total ? (voicemails / total) * 100 : 0} />
+                  <Metric label="Answer rate" value={s?.answerRate != null ? `${s.answerRate}%` : undefined} tone="success" icon="◐" pct={s?.answerRate ?? 0} />
+                  <Metric label="Avg duration" value={s?.avgDurationSec != null ? `${s.avgDurationSec}s` : undefined} tone="violet" icon="◷" pct={Math.min(100, ((s?.avgDurationSec ?? 0) / 300) * 100)} />
+                  <Metric label="Total talk" value={s?.totalTalkSec != null ? fmtTalk(s.totalTalkSec) : undefined} tone="cyan" icon="∿" pct={75} />
+                  <Metric label="Peak hour" value={s?.peakHour != null ? `${s.peakHour}:00` : undefined} tone="gold" icon="◉" pct={((s?.peakHour ?? 0) / 24) * 100} />
+                  <Metric label="Outbound" value={s?.outboundCalls ?? undefined} tone="cyan" icon="↗" pct={total ? ((s?.outboundCalls ?? 0) / total) * 100 : 0} />
+                  <Metric label="Failed dials" value={s?.dialFailedCount ?? undefined} tone="danger" icon="✕" pct={total ? ((s?.dialFailedCount ?? 0) / total) * 100 : 0} />
+                  <Metric label="Dial success" value={s?.dialSuccessRate != null ? `${s.dialSuccessRate}%` : undefined} tone="success" icon="✓" pct={s?.dialSuccessRate ?? 0} />
+                  <Metric label="Active ext." value={s?.activeExtensions ?? undefined} tone="violet" icon="◆" pct={Math.min(100, ((s?.activeExtensions ?? 0) / 20) * 100)} />
+                </div>
+              </>
+            )}
+
+            {m?.extension?.number && (
+              <>
+                <SectionTitle eyebrow={isAdmin ? 'My extension' : 'My activity'} title={`Ext ${m.extension.number} · ${RANGE_LABELS[range]}`} />
+                {!isAdmin && (
+                  <AnswerRateHero
+                    answered={s ? answered : undefined}
+                    missed={s ? missed : undefined}
+                    total={s ? total : undefined}
+                    voicemails={s ? voicemails : undefined}
+                    avgSec={s?.avgDurationSec}
+                    rangeLabel={RANGE_LABELS[range]}
+                  />
+                )}
+                <div style={{ marginTop: isAdmin ? 0 : 10 }}>
+                  <MyExtensionStats range={range} extension={m.extension.number} domainUuid={m.domain.fusionpbxDomainUuid} />
+                </div>
+              </>
+            )}
+          </>
+        );
+      })()}
+
 
       <SectionTitle eyebrow={RANGE_LABELS[range]} title="Calls per day" />
       <Card padded={true}>
@@ -236,11 +268,6 @@ export default function DashboardScreen({
         )}
       </AIPanel>
 
-      {stats.lastSyncedAt && (
-        <div style={{ textAlign: 'center', marginTop: 10, fontSize: font.xs, color: colors.mutedSilver }}>
-          Synced {new Date(stats.lastSyncedAt).toLocaleTimeString()} · auto-refresh every 60s
-        </div>
-      )}
       <div style={{ height: 80 }} />
       <NotificationsSheet open={notifOpen} onClose={() => setNotifOpen(false)} onNavigate={onNavigate} />
     </div>
@@ -387,5 +414,63 @@ function MyExtensionStats({ range, extension, domainUuid }: { range: StatsRange;
       <Metric label="My recordings" value={s?.recordings} tone="violet" />
       <Metric label="My avg duration" value={s != null ? `${s.avgSec}s` : undefined} tone="cyan" />
     </div>
+  );
+}
+
+function DirectionDonut({ inbound, outbound }: { inbound?: number; outbound?: number }) {
+  const i = inbound ?? 0; const o = outbound ?? 0; const t = i + o;
+  const ratio = t > 0 ? i / t : 0;
+  const size = 84; const stroke = 11; const r = (size - stroke) / 2;
+  const circ = 2 * Math.PI * r;
+  return (
+    <Card padded={true} style={{
+      padding: 14, position: 'relative', overflow: 'hidden',
+      background: `linear-gradient(150deg, rgba(23,198,204,0.16), ${colors.graphite} 78%)`,
+      border: '1px solid rgba(23,198,204,0.28)',
+    }}>
+      <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 1.6, color: colors.avaCyan, textTransform: 'uppercase' }}>Direction</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 8 }}>
+        <svg width={size} height={size} style={{ transform: 'rotate(-90deg)', flexShrink: 0 }}>
+          <circle cx={size/2} cy={size/2} r={r} stroke={`${colors.signalGold}55`} strokeWidth={stroke} fill="none" />
+          <circle cx={size/2} cy={size/2} r={r} stroke={colors.avaCyan} strokeWidth={stroke} fill="none" strokeLinecap="round" strokeDasharray={`${circ*ratio} ${circ}`} style={{ transition: 'stroke-dasharray 600ms ease' }} />
+        </svg>
+        <div style={{ flex: 1, minWidth: 0, fontSize: 11, fontWeight: 700, color: colors.textIce }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+            <span style={{ width: 8, height: 8, borderRadius: 999, background: colors.avaCyan }} />
+            <span>Inbound</span>
+            <span style={{ marginLeft: 'auto', fontFamily: 'JetBrains Mono, monospace' }}>{inbound != null ? i : '·'}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ width: 8, height: 8, borderRadius: 999, background: colors.signalGold }} />
+            <span>Outbound</span>
+            <span style={{ marginLeft: 'auto', fontFamily: 'JetBrains Mono, monospace' }}>{outbound != null ? o : '·'}</span>
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function TalkTimeGauge({ totalSec, avgSec }: { totalSec?: number; avgSec?: number }) {
+  const total = totalSec ?? 0;
+  const targetH = 8; const targetSec = targetH * 3600;
+  const pct = Math.min(100, (total / targetSec) * 100);
+  return (
+    <Card padded={true} style={{
+      padding: 14, position: 'relative', overflow: 'hidden',
+      background: `linear-gradient(150deg, rgba(106,77,255,0.18), ${colors.graphite} 78%)`,
+      border: '1px solid rgba(106,77,255,0.28)',
+    }}>
+      <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 1.6, color: colors.avaViolet, textTransform: 'uppercase' }}>Talk time</div>
+      <div style={{ fontSize: 24, fontWeight: 800, color: colors.textIce, marginTop: 6, fontFamily: 'JetBrains Mono, monospace', letterSpacing: -0.5 }}>
+        {totalSec != null ? fmtTalk(total) : <Skeleton w={50} h={22} />}
+      </div>
+      <div style={{ fontSize: 10, color: colors.mutedSilver, marginTop: 2, fontWeight: 700 }}>
+        avg {avgSec != null ? `${avgSec}s` : '—'} · target {targetH}h
+      </div>
+      <div style={{ marginTop: 10, height: 6, borderRadius: 999, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+        <div style={{ width: `${pct}%`, height: '100%', background: `linear-gradient(90deg, ${colors.avaViolet}, ${colors.avaCyan})`, borderRadius: 999, transition: 'width 600ms ease' }} />
+      </div>
+    </Card>
   );
 }

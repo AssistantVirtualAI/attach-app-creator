@@ -316,7 +316,7 @@ function AuthenticatedShell({
     }}>
       <audio ref={audioRef} autoPlay playsInline />
 
-      <RealtimeHeader creds={creds} />
+      {tab !== 'home' && <RealtimeHeader creds={creds} />}
 
       <div key={tab} className="lemtel-page-enter" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         {tab === 'home'       && <DashboardScreen onNavigate={setTab as any} haptic={haptic} onOpenProfile={() => setProfileOpen(true)} />}
