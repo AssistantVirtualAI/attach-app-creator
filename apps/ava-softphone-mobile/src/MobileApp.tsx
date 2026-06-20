@@ -134,8 +134,8 @@ export default function MobileApp() {
 }
 
 function AuthenticatedShell({
-  creds, setCreds, tab, setTab, onSignOut,
-}: { creds: Creds; setCreds: (c: Creds) => void; tab: Tab; setTab: (t: Tab) => void; onSignOut: () => void }) {
+  creds, setCreds, tab, setTab, onSignOut, preferClickToCall, onTogglePreferC2C,
+}: { creds: Creds; setCreds: (c: Creds) => void; tab: Tab; setTab: (t: Tab) => void; onSignOut: () => void; preferClickToCall: boolean; onTogglePreferC2C: () => void }) {
 
   const [permsGateDone, setPermsGateDone] = useState<boolean | null>(isPreviewMode ? true : null);
   const [profileOpen, setProfileOpen] = useState(false);
