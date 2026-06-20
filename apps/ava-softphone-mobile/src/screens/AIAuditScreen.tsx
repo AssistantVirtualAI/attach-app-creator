@@ -263,21 +263,21 @@ export default function AIAuditScreen() {
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <h3 style={{ margin: 0, fontSize: font.md, color: colors.textIce }}>
-                AI {selected.request_type}
+                {fr ? `IA ${selected.request_type === 'analyze' ? 'analyse' : 'transcription'}` : `AI ${selected.request_type}`}
               </h3>
               <button onClick={() => setSelected(null)} style={{
                 background: 'transparent', border: 'none', color: colors.mutedSilver,
                 fontSize: 22, cursor: 'pointer',
               }}>✕</button>
             </div>
-            <KV k="Status" v={selected.status} accent={STATUS_COLOR(selected.status)} />
-            <KV k="Call id" v={selected.call_record_id || '—'} mono />
-            <KV k="Workspace" v={selected.organization_id || '—'} mono />
-            <KV k="Error code" v={selected.error_code || '—'} mono accent={selected.error_code ? colors.danger : undefined} />
+            <KV k={fr ? 'Statut' : 'Status'} v={selected.status} accent={STATUS_COLOR(selected.status)} />
+            <KV k={fr ? 'Identifiant appel' : 'Call id'} v={selected.call_record_id || '—'} mono />
+            <KV k={fr ? 'Organisation' : 'Workspace'} v={selected.organization_id || '—'} mono />
+            <KV k={fr ? 'Code d’erreur' : 'Error code'} v={selected.error_code || '—'} mono accent={selected.error_code ? colors.danger : undefined} />
             <KV k="HTTP" v={selected.http_status?.toString() || '—'} />
-            <KV k="Provider" v={`${selected.provider || '—'}${selected.model ? ' · ' + selected.model : ''}`} />
-            <KV k="Latency" v={selected.latency_ms ? `${selected.latency_ms}ms` : '—'} />
-            <KV k="When" v={new Date(selected.created_at).toLocaleString()} />
+            <KV k={fr ? 'Fournisseur' : 'Provider'} v={`${selected.provider || '—'}${selected.model ? ' · ' + selected.model : ''}`} />
+            <KV k={fr ? 'Latence' : 'Latency'} v={selected.latency_ms ? `${selected.latency_ms}ms` : '—'} />
+            <KV k={fr ? 'Date' : 'When'} v={new Date(selected.created_at).toLocaleString()} />
             {selected.message && (
               <div style={{ marginTop: 10 }}>
                 <div style={{ fontSize: 10, color: colors.mutedSilver, textTransform: 'uppercase', letterSpacing: 0.6 }}>Message</div>
@@ -286,7 +286,7 @@ export default function AIAuditScreen() {
             )}
             {selected.metadata && Object.keys(selected.metadata).length > 0 && (
               <div style={{ marginTop: 12 }}>
-                <div style={{ fontSize: 10, color: colors.mutedSilver, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>Raw payload</div>
+                <div style={{ fontSize: 10, color: colors.mutedSilver, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>{fr ? 'Charge utile' : 'Raw payload'}</div>
                 <pre style={{
                   background: 'rgba(0,0,0,0.35)', padding: 10, borderRadius: 8,
                   fontSize: 10.5, color: colors.textIce, overflow: 'auto', margin: 0,
@@ -303,7 +303,8 @@ export default function AIAuditScreen() {
                 fontSize: font.sm, fontWeight: 700, cursor: 'pointer',
                 opacity: retrying === selected.id ? 0.5 : 1,
               }}
-            >{retrying === selected.id ? 'Retrying…' : '↻ Retry this request'}</button>
+            >{retrying === selected.id ? (fr ? 'Nouvelle tentative…' : 'Retrying…') : (fr ? '↻ Relancer cette requête' : '↻ Retry this request')}</button>
+
           </div>
         </div>
       )}
