@@ -1,99 +1,35 @@
-# AVA Assistant — Agentic Chatbot
+## Goal
+Light theme currently uses pure white surfaces (#FFF) with low-contrast borders and washed-out muted text. Goal: warmer tinted background, clear surface separation, stronger borders/inputs, darker muted text — without touching dark theme or component code.
 
-A single AI assistant available in Web, Desktop, and Mobile that can read PBX data, analyze recordings, run reports, and take actions (with confirmation) across the caller's PBX domain.
+## Changes (single file: `src/index.css`, `:root` block only)
 
-## Architecture
+**Surfaces — add depth instead of pure white**
+- `--background`: `0 0% 100%` → `220 20% 97%` (soft cool off-white)
+- `--card` / `--popover`: `0 0% 100%` → `0 0% 100%` kept, but cards now visibly lift against tinted bg
+- `--sidebar-background`: `0 0% 98%` → `220 18% 95%`
+- `--sidebar-accent`: `220 13% 95%` → `220 15% 90%`
 
-```text
-[Web /  Desktop / Mobile chat UI]
-          │  POST {messages, threadId}
-          ▼
-supabase/functions/ava-assistant   ← new edge function (verify JWT in code)
-  ├─ AI SDK streamText + Lovable AI Gateway (google/gemini-3-flash-preview)
-  ├─ Tools (Zod) → call existing edge functions + service-role queries
-  │    • read_calls / read_recordings / read_voicemails
-  │    • read_sms_threads / read_contacts / read_presence / read_extensions
-  │    • analyze_recording (transcript + summary)
-  │    • run_report  (volume, missed, talk-time, per-extension)
-  │    • send_sms     (needsApproval)
-  │    • click_to_call(needsApproval)
-  │    • blind_transfer(needsApproval)
-  │    • play_voicemail(returns signed URL)
-  └─ stopWhen: stepCountIs(50)
-          │
-          ▼
-[ava_chat_threads / ava_chat_messages] (per-user persistence)
-```
+**Text — stronger reading contrast**
+- `--foreground`: `0 0% 0%` → `222 25% 12%` (near-black, not harsh pure black)
+- `--card-foreground` / `--popover-foreground`: same as foreground
+- `--muted-foreground`: `220 9% 46%` → `220 12% 32%` (much darker for secondary text/labels/placeholders)
+- `--sidebar-foreground`: `240 5.3% 26.1%` → `222 25% 18%`
 
-Backend boundary stays in the edge function. `LOVABLE_API_KEY` and service-role calls never leave the server.
+**Borders & inputs — visible field outlines**
+- `--border`: `220 13% 91%` → `220 15% 80%`
+- `--input`: `220 13% 91%` → `220 15% 75%` (input borders pop against background)
+- `--sidebar-border`: same bump
 
-## Tools (server-side)
+**Muted surface**
+- `--muted`: `220 13% 96%` → `220 16% 92%` (badges/secondary buttons read clearly)
 
-| Tool | Action | Confirm |
-|---|---|---|
-| `read_calls` | pbx_call_records filtered by domain + range + extension | no |
-| `read_recordings` | pbx_call_records where has_recording, with transcript flags | no |
-| `analyze_recording` | fetch transcript + ai_summary; if missing, enqueue ai_job | no |
-| `read_voicemails` | pbx_voicemails, mark read on request | no |
-| `read_sms_threads` / `read_sms_messages` | pbx_sms_threads / pbx_sms_messages | no |
-| `read_contacts` | org_contacts (domain scope) | no |
-| `read_presence` | user_presence + pbx_softphone_users | no |
-| `read_extensions` | pbx_extensions_directory (domain scope) | no |
-| `run_report` | aggregate calls/missed/talk/handle by extension or day | no |
-| `send_sms` | proxies `pbx-sms-send` | **yes** |
-| `click_to_call` | proxies `pbx-click-to-call` | **yes** |
-| `blind_transfer` | proxies `pbx-call-transfer` | **yes** |
-| `get_voicemail_url` | signed URL from `softphone-recording-url` | no |
-
-All tools scope by `domain_uuid` resolved from `pbx_softphone_users` for `auth.uid()`.
-
-## Chat persistence
-
-New tables (one conversation per user, but with history):
-- `ava_chat_threads(id, user_id, title, created_at, updated_at)`
-- `ava_chat_messages(id, thread_id, role, parts jsonb, created_at)`
-
-RLS: user can read/write own threads only. GRANTs to `authenticated` + `service_role`.
-
-## Frontend
-
-Shared component `src/components/ava/AvaAssistant.tsx` (web), reused via thin wrappers:
-- Desktop: `apps/ava-softphone-desktop/src/components/AvaAssistant.tsx`
-- Mobile: `apps/ava-softphone-mobile/src/screens/AssistantScreen.tsx`
-
-Uses `@ai-sdk/react` `useChat` with `DefaultChatTransport` pointed at `${SUPABASE_URL}/functions/v1/ava-assistant`. Renders `message.parts` with `react-markdown`. Tool calls render as small cards; mutating tools show a Confirm/Cancel button before execution (`needsApproval` via AI SDK pattern).
-
-Entry points:
-- Web: floating button in `MyAppShell` → drawer.
-- Desktop: new sidebar item "Assistant".
-- Mobile: new bottom-tab "Assistant".
-
-## Technical details
-
-- Edge function: `supabase/functions/ava-assistant/index.ts` using `npm:ai` + `@ai-sdk/openai-compatible` via shared `_shared/ai-gateway.ts`.
-- JWT validated in code with `getClaims()`; resolve `domain_uuid` once per request.
-- Tool inputs validated with `zod`; results compact JSON, capped to 50 rows.
-- `stopWhen: stepCountIs(50)`.
-- Confirmation: assistant calls mutating tool with `needsApproval`; UI surfaces approval card before the tool `execute` runs.
-- Reports computed in SQL via `read_query`-style helpers (date_trunc, count, sum duration_seconds).
-
-## Files
-
-New:
-- `supabase/functions/ava-assistant/index.ts`
-- `supabase/functions/_shared/ai-gateway.ts` (if absent)
-- `supabase/migrations/<ts>_ava_assistant.sql` (tables, grants, RLS)
-- `src/components/ava/AvaAssistant.tsx`, `useAvaChat.ts`, `ToolCallCard.tsx`
-- `apps/ava-softphone-desktop/src/components/AvaAssistant.tsx`
-- `apps/ava-softphone-mobile/src/screens/AssistantScreen.tsx`
-
-Edited:
-- `src/components/my/MyAppShell.tsx` (floating button)
-- Desktop sidebar + router
-- Mobile tab navigator
+**Hero gradient** retune to match new bg:
+- `--gradient-hero`: end stop `hsl(231,100%,98%)` → `hsl(220,20%,97%)`
 
 ## Out of scope
+- Dark theme (`.dark` block) untouched.
+- No component edits — all changes flow through semantic tokens.
+- Primary/accent/destructive hues unchanged.
 
-- Cross-domain access (always domain-scoped).
-- Background/scheduled agent runs.
-- Voice input/output (text chat only for v1).
+## Verification
+After change: scan home, dashboard, settings, forms — confirm input borders visible, placeholder text readable, cards lift from background, sidebar separates from main content.
