@@ -5,9 +5,13 @@
  */
 import { Capacitor } from '@capacitor/core';
 
+export interface PhoneEntry { number: string; label?: string }
 export interface DeviceContact {
   id: string;
   name: string;
+  /** numéros (avec libellé : mobile, work, home…). */
+  phones: PhoneEntry[];
+  /** alias plat conservé pour compat ascendante. */
   numbers: string[];
   emails?: string[];
 }
