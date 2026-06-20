@@ -1,8 +1,9 @@
 /**
  * Unit tests for the FusionPBX SDP rewriter.
- * The rewriter now prefers Opus (with FEC/DTX) but keeps PCMU/PCMA as
- * fallbacks so FusionPBX continues to negotiate successfully even when
- * Opus is not enabled on the PBX side.
+ *
+ * The rewriter is now PCMU-only: FusionPBX (per PBX admin) rejects Opus/PCMA
+ * with 488 Not Acceptable. We also strip every WebRTC-ism (ICE, DTLS, msid,
+ * ssrc, rtcp-fb, extmap) so the SDP looks like classic RTP/AVP.
  */
 import { describe, it, expect } from 'vitest';
 import { rewriteSdpForFusionPBX } from './jssipProvider';
@@ -25,7 +26,14 @@ const RAW_SDP = [
   'a=setup:actpass',
   'a=dtls-id:1',
   'a=crypto:1 AES_CM_128_HMAC_SHA1_80 inline:abc',
+  'a=ice-ufrag:abc',
+  'a=ice-pwd:xyz',
   'a=ice-options:trickle',
+  'a=candidate:1 1 udp 2113937151 192.168.1.2 60000 typ host',
+  'a=end-of-candidates',
+  'a=mid:0',
+  'a=msid:stream track',
+  'a=ssrc:1234 cname:abc',
   'a=rtcp-fb:111 transport-cc',
   'a=extmap:1 urn:ietf:params:rtp-hdrext:ssrc-audio-level',
   'm=video 49172 UDP/TLS/RTP/SAVPF 96 97',
@@ -37,8 +45,8 @@ const RAW_SDP = [
 describe('rewriteSdpForFusionPBX', () => {
   const out = rewriteSdpForFusionPBX(RAW_SDP);
 
-  it('rewrites m=audio to plain RTP/AVP with Opus(111) preferred then PCMU/PCMA/telephone-event', () => {
-    expect(out).toMatch(/^m=audio \d+ RTP\/AVP 111 0 8 101$/m);
+  it('forces m=audio to plain RTP/AVP with PCMU (PT 0) only', () => {
+    expect(out).toMatch(/^m=audio \d+ RTP\/AVP 0$/m);
     expect(out).not.toMatch(/UDP\/TLS\/RTP\/SAVPF/);
   });
 
@@ -47,28 +55,34 @@ describe('rewriteSdpForFusionPBX', () => {
     expect(out).not.toMatch(/VP8/);
   });
 
-  it('removes DTLS fingerprint, setup, dtls-id, crypto and ice-options', () => {
+  it('removes DTLS / SRTP lines', () => {
     expect(out).not.toMatch(/a=fingerprint/);
     expect(out).not.toMatch(/a=setup/);
     expect(out).not.toMatch(/a=dtls-id/);
     expect(out).not.toMatch(/a=crypto/);
-    expect(out).not.toMatch(/a=ice-options/);
   });
 
-  it('keeps only Opus/PCMU/PCMA/telephone-event rtpmap entries', () => {
+  it('removes every ICE artifact', () => {
+    expect(out).not.toMatch(/a=ice-ufrag/);
+    expect(out).not.toMatch(/a=ice-pwd/);
+    expect(out).not.toMatch(/a=ice-options/);
+    expect(out).not.toMatch(/a=candidate:/);
+    expect(out).not.toMatch(/a=end-of-candidates/);
+  });
+
+  it('keeps only the PCMU rtpmap/fmtp entries', () => {
     const rtpmaps = out.match(/^a=rtpmap:(\d+) /gm) || [];
     const pts = rtpmaps.map((l) => l.match(/^a=rtpmap:(\d+) /)![1]);
-    expect(new Set(pts)).toEqual(new Set(['111', '0', '8', '101']));
+    expect(new Set(pts)).toEqual(new Set(['0']));
+    expect(out).not.toMatch(/a=rtpmap:111/);
+    expect(out).not.toMatch(/a=fmtp:111/);
   });
 
-  it('injects Opus FEC/DTX/maxaveragebitrate fmtp', () => {
-    expect(out).toMatch(/^a=fmtp:111 [^\r\n]*useinbandfec=1/m);
-    expect(out).toMatch(/^a=fmtp:111 [^\r\n]*usedtx=1/m);
-    expect(out).toMatch(/^a=fmtp:111 [^\r\n]*maxaveragebitrate=24000/m);
-  });
-
-  it('strips rtcp-fb and extmap lines', () => {
+  it('strips rtcp-fb, extmap, msid, ssrc and mid lines', () => {
     expect(out).not.toMatch(/a=rtcp-fb/);
     expect(out).not.toMatch(/a=extmap/);
+    expect(out).not.toMatch(/a=msid/);
+    expect(out).not.toMatch(/a=ssrc/);
+    expect(out).not.toMatch(/a=mid:/);
   });
 });
