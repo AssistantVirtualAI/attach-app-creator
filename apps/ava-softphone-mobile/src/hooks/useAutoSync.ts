@@ -59,9 +59,10 @@ export function useAutoSync<T>(
 
   const refresh = useCallback(async () => {
     if (!mounted.current) return;
+    // Cancel any prior in-flight refresh (newer call supersedes older)
     abortRef.current?.abort();
-    const ac = new AbortController();
-    abortRef.current = ac;
+    const outer = new AbortController();
+    abortRef.current = outer;
     setLoading(true);
     const sid = syncIdRef.current;
     syncBegin(sid);
@@ -69,11 +70,18 @@ export function useAutoSync<T>(
     let attempt = 0;
     let lastErr: unknown = null;
     while (attempt <= retries) {
+      // Bail if a newer refresh took over.
+      if (abortRef.current !== outer) { syncError(sid, 'aborted'); return; }
+      // Per-attempt controller that triggers timeout or piggybacks outer cancel.
+      const ac = new AbortController();
+      const onOuterAbort = () => ac.abort();
+      outer.signal.addEventListener('abort', onOuterAbort);
       const timeout = setTimeout(() => ac.abort(), timeoutMs);
       try {
         const next = await loaderRef.current(ac.signal);
         clearTimeout(timeout);
-        if (!mounted.current || ac.signal.aborted) { syncError(sid, 'aborted'); return; }
+        outer.signal.removeEventListener('abort', onOuterAbort);
+        if (!mounted.current || abortRef.current !== outer) { syncError(sid, 'aborted'); return; }
         setData(next); setError(null); setLastSyncedAt(Date.now());
         writeCache(cacheKey, next);
         setLoading(false);
@@ -81,16 +89,13 @@ export function useAutoSync<T>(
         return;
       } catch (e: any) {
         clearTimeout(timeout);
+        outer.signal.removeEventListener('abort', onOuterAbort);
         lastErr = e;
         if (!mounted.current) { syncError(sid, 'unmounted'); return; }
-        // user-initiated cancel via new refresh — bail silently
-        if (ac.signal.aborted && abortRef.current !== ac) { syncError(sid, 'aborted'); return; }
+        if (abortRef.current !== outer) { syncError(sid, 'aborted'); return; }
         attempt++;
         if (attempt > retries) break;
         await sleep(retryBaseMs * Math.pow(2, attempt - 1));
-        // If aborted by a newer refresh, bail.
-        if (ac.signal.aborted && abortRef.current !== ac) { syncError(sid, 'aborted'); return; }
-
       }
     }
     if (!mounted.current) return;
@@ -99,6 +104,7 @@ export function useAutoSync<T>(
     setLoading(false);
     syncError(sid, errObj.message || 'sync failed');
   }, [cacheKey, timeoutMs, retries, retryBaseMs]);
+
 
 
   useEffect(() => {
