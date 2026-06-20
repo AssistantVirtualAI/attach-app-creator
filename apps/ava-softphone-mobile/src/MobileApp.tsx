@@ -39,6 +39,7 @@ import { configureMobileApi } from './lib/mobileApi';
 import { configureAudit, audit } from './lib/audit';
 import { edgeCall } from './lib/mobileSupabase';
 import PerfOverlay from './components/PerfOverlay';
+import ScreenSkeleton from './components/ScreenSkeleton';
 import { startPrefetch, prefetchForTab } from './lib/prefetch';
 
 const isPreviewMode = (() => {
