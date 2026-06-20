@@ -291,7 +291,7 @@ function RecordingAiPanel({ rec }: { rec: RecordingEntry }) {
           )}
 
           {data?.coachingNotes && data.coachingNotes.length > 0 && (
-            <AIPanel title="Coaching notes" accent={colors.avaCyan}>
+            <AIPanel title={fr ? 'Notes de coaching' : 'Coaching notes'} accent={colors.avaCyan}>
               {data.coachingNotes.map((n, i) => (
                 <div key={i} style={{ fontSize: font.sm, color: colors.textIce, lineHeight: 1.45, padding: '4px 0' }}>✦ {n}</div>
               ))}
