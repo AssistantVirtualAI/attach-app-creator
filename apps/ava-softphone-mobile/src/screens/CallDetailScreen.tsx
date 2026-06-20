@@ -263,7 +263,7 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <Sparkles size={18} color={colors.avaViolet} />
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: font.base, fontWeight: 700, color: colors.textIce }}>No transcript yet</div>
+                  <div style={{ fontSize: font.base, fontWeight: 700, color: colors.textIce }}>{fr ? 'Aucune transcription' : 'No transcript yet'}</div>
                   <div style={{ fontSize: font.xs, color: colors.mutedSilver, marginTop: 2 }}>
                     {statusText}
                   </div>
@@ -275,7 +275,7 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
                   opacity: transcribing ? 0.6 : 1, display: 'inline-flex', alignItems: 'center', gap: 6,
                 }}>
                   {transcribing ? <Loader2 size={12} className="spin" /> : <Sparkles size={12} />}
-                  {transcribing ? 'Working…' : 'Transcribe'}
+                  {transcribing ? (fr ? 'Traitement…' : 'Working…') : (fr ? 'Transcrire' : 'Transcribe')}
                 </button>
               </div>
               {transcribeError && (
