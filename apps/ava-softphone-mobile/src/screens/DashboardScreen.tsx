@@ -129,10 +129,10 @@ export default function DashboardScreen({
             {m ? `${m.domain.sipDomain || m.organization.name}` : <Skeleton w="60%" h={10} />}
           </div>
           <h1 style={{ fontSize: font.xxl, color: colors.textIce, margin: '6px 0 4px', fontWeight: 800, letterSpacing: -0.5 }}>
-            {m ? `Hi, ${m.user.name.split(' ')[0]}` : <Skeleton w="60%" h={26} />}
+            {m ? `${t('dashboard.greeting')} ${m.user.name.split(' ')[0]}` : <Skeleton w="60%" h={26} />}
           </h1>
           <p style={{ fontSize: font.base, color: colors.textSub, margin: 0, lineHeight: 1.5 }}>
-            {s ? `${total} calls · ${answered} answered · ${missed} missed.` : <Skeleton w="100%" h={14} />}
+            {s ? t('dashboard.callsLine', { total, answered, missed }) : <Skeleton w="100%" h={14} />}
           </p>
         </div>
       </HeroGradient>
