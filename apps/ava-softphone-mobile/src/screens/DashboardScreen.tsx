@@ -132,19 +132,28 @@ export default function DashboardScreen({
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
-        <Metric label="Total calls" value={s ? total : undefined} tone="cyan" />
-        <Metric label="Answered" value={s ? answered : undefined} tone="success" />
-        <Metric label="Missed" value={s ? missed : undefined} tone="danger" />
-        <Metric label="Voicemails" value={s ? voicemails : undefined} tone="gold" />
-        <Metric label="Answer rate" value={s?.answerRate != null ? `${s.answerRate}%` : undefined} tone="success" />
-        <Metric label="Avg duration" value={s?.avgDurationSec != null ? `${s.avgDurationSec}s` : undefined} tone="violet" />
-        <Metric label="Total talk" value={s?.totalTalkSec != null ? fmtTalk(s.totalTalkSec) : undefined} tone="cyan" />
-        <Metric label="Peak hour" value={s?.peakHour != null ? `${s.peakHour}:00` : undefined} tone="gold" />
-        <Metric label="Outbound" value={s?.outboundCalls ?? undefined} tone="cyan" />
-        <Metric label="Failed dials" value={s?.dialFailedCount ?? undefined} tone="danger" />
-        <Metric label="Dial success" value={s?.dialSuccessRate != null ? `${s.dialSuccessRate}%` : undefined} tone="success" />
-        <Metric label="Active ext." value={s?.activeExtensions ?? undefined} tone="violet" />
+      <AnswerRateHero
+        answered={s ? answered : undefined}
+        missed={s ? missed : undefined}
+        total={s ? total : undefined}
+        voicemails={s ? voicemails : undefined}
+        avgSec={s?.avgDurationSec}
+        rangeLabel={RANGE_LABELS[range]}
+      />
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginTop: 10 }}>
+        <Metric label="Total calls" value={s ? total : undefined} tone="cyan" icon="☎" pct={100} />
+        <Metric label="Answered" value={s ? answered : undefined} tone="success" icon="↗" pct={total ? (answered / total) * 100 : 0} />
+        <Metric label="Missed" value={s ? missed : undefined} tone="danger" icon="↘" pct={total ? (missed / total) * 100 : 0} />
+        <Metric label="Voicemails" value={s ? voicemails : undefined} tone="gold" icon="✉" pct={total ? (voicemails / total) * 100 : 0} />
+        <Metric label="Answer rate" value={s?.answerRate != null ? `${s.answerRate}%` : undefined} tone="success" icon="◐" pct={s?.answerRate ?? 0} />
+        <Metric label="Avg duration" value={s?.avgDurationSec != null ? `${s.avgDurationSec}s` : undefined} tone="violet" icon="◷" pct={Math.min(100, ((s?.avgDurationSec ?? 0) / 300) * 100)} />
+        <Metric label="Total talk" value={s?.totalTalkSec != null ? fmtTalk(s.totalTalkSec) : undefined} tone="cyan" icon="∿" pct={75} />
+        <Metric label="Peak hour" value={s?.peakHour != null ? `${s.peakHour}:00` : undefined} tone="gold" icon="◉" pct={((s?.peakHour ?? 0) / 24) * 100} />
+        <Metric label="Outbound" value={s?.outboundCalls ?? undefined} tone="cyan" icon="↗" pct={total ? ((s?.outboundCalls ?? 0) / total) * 100 : 0} />
+        <Metric label="Failed dials" value={s?.dialFailedCount ?? undefined} tone="danger" icon="✕" pct={total ? ((s?.dialFailedCount ?? 0) / total) * 100 : 0} />
+        <Metric label="Dial success" value={s?.dialSuccessRate != null ? `${s.dialSuccessRate}%` : undefined} tone="success" icon="✓" pct={s?.dialSuccessRate ?? 0} />
+        <Metric label="Active ext." value={s?.activeExtensions ?? undefined} tone="violet" icon="◆" pct={Math.min(100, ((s?.activeExtensions ?? 0) / 20) * 100)} />
       </div>
 
       {m?.extension?.number && (
@@ -250,14 +259,92 @@ function fmtTalk(s: number) {
   return `${m}m`;
 }
 
-function Metric({ label, value, tone }: { label: string; value?: number | string; tone: 'success' | 'danger' | 'cyan' | 'gold' | 'violet' }) {
-  const c = tone === 'success' ? colors.success : tone === 'danger' ? colors.danger : tone === 'cyan' ? colors.avaCyan : tone === 'gold' ? colors.signalGold : colors.avaViolet;
+function toneHex(tone: 'success' | 'danger' | 'cyan' | 'gold' | 'violet') {
+  return tone === 'success' ? colors.success : tone === 'danger' ? colors.danger : tone === 'cyan' ? colors.avaCyan : tone === 'gold' ? colors.signalGold : colors.avaViolet;
+}
+
+function Metric({ label, value, tone, icon, pct }: { label: string; value?: number | string; tone: 'success' | 'danger' | 'cyan' | 'gold' | 'violet'; icon?: string; pct?: number }) {
+  const c = toneHex(tone);
+  const p = Math.max(0, Math.min(100, pct ?? 0));
   return (
-    <Card padded={true} style={{ padding: 14 }}>
-      <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 1.6, color: c, textTransform: 'uppercase' }}>{label}</div>
-      <div style={{ fontSize: 22, fontWeight: 800, color: colors.textIce, marginTop: 6, fontFamily: 'JetBrains Mono, monospace', letterSpacing: -0.5 }}>
+    <Card padded={true} style={{
+      padding: 14, position: 'relative', overflow: 'hidden',
+      background: `linear-gradient(155deg, ${c}1f, ${colors.graphite} 75%)`,
+      border: `1px solid ${c}33`,
+    }}>
+      <div style={{ position: 'absolute', inset: 0, background: `radial-gradient(120% 60% at 100% 0%, ${c}26, transparent 60%)`, pointerEvents: 'none' }} />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative' }}>
+        <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 1.6, color: c, textTransform: 'uppercase' }}>{label}</div>
+        <div style={{ width: 22, height: 22, borderRadius: 8, display: 'grid', placeItems: 'center', background: `${c}26`, color: c, fontSize: 12, fontWeight: 900 }}>{icon ?? '•'}</div>
+      </div>
+      <div style={{ fontSize: 24, fontWeight: 800, color: colors.textIce, marginTop: 6, fontFamily: 'JetBrains Mono, monospace', letterSpacing: -0.5, position: 'relative' }}>
         {value ?? <Skeleton w={40} h={22} />}
       </div>
+      <div style={{ marginTop: 10, height: 4, borderRadius: 999, background: 'rgba(255,255,255,0.06)', position: 'relative', overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', inset: 0, width: `${p}%`, background: `linear-gradient(90deg, ${c}, ${c}88)`, borderRadius: 999, transition: 'width 500ms ease' }} />
+      </div>
+    </Card>
+  );
+}
+
+function AnswerRateHero({ answered, missed, total, voicemails, avgSec, rangeLabel }: {
+  answered?: number; missed?: number; total?: number; voicemails?: number; avgSec?: number; rangeLabel: string;
+}) {
+  const a = answered ?? 0; const m = missed ?? 0; const t = total ?? (a + m);
+  const rate = t > 0 ? Math.round((a / t) * 100) : 0;
+  const size = 92; const stroke = 10; const r = (size - stroke) / 2;
+  const circ = 2 * Math.PI * r;
+  const offset = circ - (rate / 100) * circ;
+  return (
+    <Card padded={true} style={{
+      padding: 16, marginTop: 4,
+      background: `linear-gradient(135deg, rgba(0,35,230,0.28), rgba(23,198,204,0.12) 55%, rgba(10,15,32,0.92))`,
+      border: '1px solid rgba(23,198,204,0.32)',
+      position: 'relative', overflow: 'hidden',
+    }}>
+      <div style={{ position: 'absolute', right: -40, top: -40, width: 200, height: 200, background: 'radial-gradient(circle, rgba(23,198,204,0.22), transparent 70%)' }} />
+      <div style={{ position: 'absolute', left: -30, bottom: -50, width: 160, height: 160, background: 'radial-gradient(circle, rgba(106,77,255,0.18), transparent 70%)' }} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, position: 'relative' }}>
+        <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
+          <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+            <circle cx={size / 2} cy={size / 2} r={r} stroke="rgba(255,255,255,0.10)" strokeWidth={stroke} fill="none" />
+            <circle cx={size / 2} cy={size / 2} r={r} stroke="url(#answerHero)" strokeWidth={stroke} fill="none" strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={offset} style={{ transition: 'stroke-dashoffset 700ms ease' }} />
+            <defs>
+              <linearGradient id="answerHero" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stopColor={colors.avaCyan} />
+                <stop offset="100%" stopColor={colors.signalGold} />
+              </linearGradient>
+            </defs>
+          </svg>
+          <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', flexDirection: 'column' }}>
+            <div style={{ fontSize: 22, fontWeight: 800, color: colors.textIce, fontFamily: 'JetBrains Mono, monospace', lineHeight: 1 }}>{rate}%</div>
+          </div>
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 1.6, color: colors.avaCyan, textTransform: 'uppercase' }}>Answer rate · {rangeLabel}</div>
+          <div style={{ fontSize: font.lg, fontWeight: 800, color: colors.textIce, marginTop: 2, letterSpacing: -0.3 }}>{a} of {t} handled</div>
+          <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+            <Chip tone="cyan">{a} answered</Chip>
+            <Chip tone="gold">{m} missed</Chip>
+            {voicemails != null && <Chip tone="violet">{voicemails} vm</Chip>}
+          </div>
+        </div>
+      </div>
+
+      {/* Mini bar: answered vs missed vs voicemails */}
+      <div style={{ marginTop: 14, height: 10, borderRadius: 999, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', display: 'flex', position: 'relative' }}>
+        <div style={{ width: `${t ? (a / t) * 100 : 0}%`, background: `linear-gradient(90deg, ${colors.avaCyan}, ${colors.avaCyan}cc)` }} />
+        <div style={{ width: `${t ? (m / t) * 100 : 0}%`, background: `linear-gradient(90deg, ${colors.signalGold}, ${colors.signalGold}cc)` }} />
+        <div style={{ width: `${t ? ((voicemails ?? 0) / t) * 100 : 0}%`, background: `linear-gradient(90deg, ${colors.avaViolet}, ${colors.avaViolet}cc)` }} />
+      </div>
+
+      {avgSec != null && (
+        <div style={{ marginTop: 10, display: 'flex', gap: 12, fontSize: 10.5, color: colors.mutedSilver, fontWeight: 700, letterSpacing: 0.4 }}>
+          <span>⌀ {avgSec}s avg call</span>
+          <span style={{ opacity: 0.5 }}>·</span>
+          <span>{t} total interactions</span>
+        </div>
+      )}
     </Card>
   );
 }
