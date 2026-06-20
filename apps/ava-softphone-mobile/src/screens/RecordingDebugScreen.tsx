@@ -3,6 +3,8 @@ import { colors, font, radius } from '../lib/theme';
 import { mobileApi } from '../lib/mobileApi';
 import { Card } from '../components/ui/Primitives';
 import { useMobileCredentials } from '../hooks/useMobileCredentials';
+import { useT } from '../lib/i18n';
+
 
 
 type Step = {
