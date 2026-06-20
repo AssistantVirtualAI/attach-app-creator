@@ -86,27 +86,57 @@ export function getJsSIP() {
 
 
 /* ============================================================
-   SDP rewriter — forces audio-only PCMU/PCMA, plain RTP
-   (no DTLS/SRTP) so FusionPBX doesn't return 488 Not Acceptable.
-   Mirrors the desktop softphone provider exactly.
+   SDP rewriter — strip video, DTLS/SRTP (FusionPBX wants plain RTP),
+   then re-order audio codecs: Opus first (with FEC/DTX/HD bitrate
+   for resilience on weak networks), then PCMU/PCMA fallbacks, then
+   telephone-event for DTMF. This keeps backward compatibility with
+   FusionPBX (which still accepts PCMU) while letting the PBX pick
+   Opus when supported for much better quality + noise robustness.
    ============================================================ */
+function extractPt(sdp: string, codecRegex: RegExp): string | null {
+  const m = sdp.match(new RegExp(`a=rtpmap:(\\d+)\\s+${codecRegex.source}`, 'i'));
+  return m ? m[1] : null;
+}
+
 export function rewriteSdpForFusionPBX(sdp: string): string {
   let out = sdp;
   out = out.replace(/m=video[\s\S]*?(?=\r\nm=|$)/g, '');
-  out = out.replace(/m=audio (\d+) [A-Z\/]+ [^\r\n]+/g, 'm=audio $1 RTP/AVP 0');
   out = out.replace(/^a=fingerprint:.*$/gm, '');
   out = out.replace(/^a=setup:.*$/gm, '');
   out = out.replace(/^a=dtls[-a-z]*:.*$/gm, '');
   out = out.replace(/^a=crypto:.*$/gm, '');
   out = out.replace(/^a=ice-options:.*$/gm, '');
-  out = out.replace(/^a=rtpmap:(\d+) [^\r\n]+$/gm, (line, pt) =>
-    pt === '0' ? line : '',
-  );
-  out = out.replace(/^a=fmtp:(\d+) [^\r\n]+$/gm, (line, pt) =>
-    pt === '0' ? line : '',
-  );
   out = out.replace(/^a=rtcp-fb:.*$/gm, '');
   out = out.replace(/^a=extmap:.*$/gm, '');
+
+  const opusPt = extractPt(out, /opus\/48000/);
+  const pcmuPt = extractPt(out, /PCMU\/8000/) || '0';
+  const pcmaPt = extractPt(out, /PCMA\/8000/) || '8';
+  const tePt   = extractPt(out, /telephone-event\/8000/) || '101';
+
+  const ordered: string[] = [];
+  if (opusPt) ordered.push(opusPt);
+  ordered.push(pcmuPt, pcmaPt, tePt);
+  const ptList = Array.from(new Set(ordered)).join(' ');
+
+  out = out.replace(/m=audio (\d+) [A-Z\/]+ [^\r\n]+/g, `m=audio $1 RTP/AVP ${ptList}`);
+
+  const keep = new Set(ordered);
+  out = out.replace(/^a=rtpmap:(\d+) [^\r\n]+$/gm, (line, pt) => (keep.has(pt) ? line : ''));
+  out = out.replace(/^a=fmtp:(\d+) [^\r\n]+$/gm, (line, pt) => (keep.has(pt) ? line : ''));
+
+  if (opusPt) {
+    const opusFmtp = `a=fmtp:${opusPt} minptime=10;useinbandfec=1;usedtx=1;stereo=0;cbr=0;maxaveragebitrate=24000;maxplaybackrate=16000`;
+    if (new RegExp(`^a=fmtp:${opusPt} `, 'm').test(out)) {
+      out = out.replace(new RegExp(`^a=fmtp:${opusPt} [^\\r\\n]+$`, 'm'), opusFmtp);
+    } else {
+      out = out.replace(
+        new RegExp(`^(a=rtpmap:${opusPt} [^\\r\\n]+)$`, 'm'),
+        `$1\r\n${opusFmtp}`,
+      );
+    }
+  }
+
   out = out.replace(/\r?\n\r?\n+/g, '\r\n');
   return out;
 }
