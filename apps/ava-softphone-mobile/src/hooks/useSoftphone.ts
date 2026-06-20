@@ -420,21 +420,32 @@ export function useSoftphone(
       channelCount: 1,
       sampleRate: 16000,
       sampleSize: 16,
-      // @ts-expect-error — Chromium-specific hints, ignored elsewhere.
+      // Chromium-specific hints, ignored elsewhere.
       googEchoCancellation: true,
       googNoiseSuppression: true,
       googAutoGainControl: true,
       googHighpassFilter: true,
       googTypingNoiseDetection: true,
-    } as MediaTrackConstraints,
+    } as any,
     video: false,
+  };
+
+  const opusToSdpOpts = (p: AudioProfile) => {
+    const o = PROFILE_OPUS[p];
+    return {
+      opusMaxAverageBitrate: o.maxAverageBitrate,
+      opusMaxPlaybackRate: o.maxPlaybackRate,
+      opusUseInbandFec: o.useInbandFec,
+      opusUseDtx: o.useDtx,
+      opusPtime: o.ptime,
+    };
   };
 
   const call = (number: string) => {
     if (!uaRef.current || !config || sipStatus !== 'registered') return false;
     setActiveCallNumber(number);
     setCallState('ringing');
-    const modifier = buildSdpModifier(PROFILE_OPUS[audioProfileRef.current]);
+    const modifier = buildSdpModifier(opusToSdpOpts(audioProfileRef.current));
     try {
       uaRef.current.call(`sip:${number}@${config.domain}`, {
         mediaConstraints: HD_AUDIO_CONSTRAINTS,
