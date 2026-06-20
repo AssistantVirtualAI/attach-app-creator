@@ -138,27 +138,34 @@ export function useAutoSync<T>(
 
   const refresh = useCallback(async (force = true) => {
     if (!mounted.current) return;
+    const metricKey = cacheKey || 'anonymous';
     // Skip if cache is fresh enough.
     if (!force && cacheKey) {
       const entry = getCache<T>(cacheKey);
       if (entry && Date.now() - entry.at < staleTimeMs) {
+        perf.hit(metricKey);
         setData(entry.v); setLastSyncedAt(entry.at); setError(null);
         return;
       }
     }
+    perf.miss(metricKey);
     const sid = syncIdRef.current;
     syncBegin(sid);
     setLoading(true);
+    const startedAt = performance.now();
 
     // Dedupe by cacheKey across instances.
     if (cacheKey && inflight.has(cacheKey)) {
+      perf.dedupe();
       try {
         const v = (await inflight.get(cacheKey)) as T;
         if (!mounted.current) return;
+        perf.timing(metricKey, performance.now() - startedAt);
         setData(v); setLastSyncedAt(Date.now()); setError(null); setLoading(false);
         syncSuccess(sid);
       } catch (e: any) {
         if (!mounted.current) return;
+        perf.error();
         const err = e instanceof Error ? e : new Error(String(e));
         setError(err); setLoading(false); syncError(sid, err.message || 'sync failed');
       }
@@ -168,6 +175,7 @@ export function useAutoSync<T>(
     abortRef.current?.abort();
     const ac = new AbortController();
     abortRef.current = ac;
+    perf.request();
     const promise = runLoader(ac.signal);
     if (cacheKey) inflight.set(cacheKey, promise as Promise<unknown>);
     try {
@@ -175,12 +183,14 @@ export function useAutoSync<T>(
       if (cacheKey) inflight.delete(cacheKey);
       const entry = setCache(cacheKey, v);
       if (!mounted.current) return;
+      perf.timing(metricKey, performance.now() - startedAt);
       setData(entry.v); setLastSyncedAt(entry.at); setError(null); setLoading(false);
       syncSuccess(sid);
     } catch (e: any) {
       if (cacheKey) inflight.delete(cacheKey);
       if (!mounted.current) return;
       if (ac.signal.aborted) { syncError(sid, 'aborted'); setLoading(false); return; }
+      perf.error();
       const err = e instanceof Error ? e : new Error(String(e));
       setError(err); setLoading(false); syncError(sid, err.message || 'sync failed');
     }
