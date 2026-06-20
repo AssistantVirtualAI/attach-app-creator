@@ -124,18 +124,18 @@ export default function RecordingsScreen({
             flex: 1, padding: '7px 10px', borderRadius: 10, border: `1px solid ${colors.border}`,
             background: 'rgba(255,255,255,0.06)', color: colors.textIce, fontSize: 12, fontWeight: 700,
           }}>
-            <option value="all">All extensions (domain)</option>
-            {myExtension && <option value={myExtension}>Mine ({myExtension})</option>}
+            <option value="all">{fr ? 'Toutes les extensions (domaine)' : 'All extensions (domain)'}</option>
+            {myExtension && <option value={myExtension}>{fr ? `La mienne (${myExtension})` : `Mine (${myExtension})`}</option>}
             {extensionOptions.filter((e) => e !== myExtension).map((e) => <option key={e} value={e}>{e}</option>)}
           </select>
           {extensionOptions.length === 0 && (
-            <span style={{ fontSize: 10, color: colors.mutedSilver }}>Loading…</span>
+            <span style={{ fontSize: 10, color: colors.mutedSilver }}>{fr ? 'Chargement…' : 'Loading…'}</span>
           )}
         </div>
       ) : (
         myExtension && (
           <div style={{ fontSize: font.xs, color: colors.mutedSilver, margin: '6px 2px 10px' }}>
-            Showing recordings for your extension {myExtension}.
+            {fr ? `Enregistrements de votre extension ${myExtension}.` : `Showing recordings for your extension ${myExtension}.`}
           </div>
         )
       )}
