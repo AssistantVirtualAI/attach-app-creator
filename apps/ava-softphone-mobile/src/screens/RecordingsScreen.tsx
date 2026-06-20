@@ -338,10 +338,12 @@ function RecordingAiPanel({ rec }: { rec: RecordingEntry }) {
 }
 
 function ProgressStepper({ stage }: { stage: 'idle' | 'transcribing' | 'analyzing' | 'done' | 'error' }) {
+  const { lang } = useT();
+  const fr = lang === 'fr';
   const steps = [
-    { id: 'transcribing', label: 'Transcribe' },
-    { id: 'analyzing', label: 'Analyze' },
-    { id: 'done', label: 'Ready' },
+    { id: 'transcribing', label: fr ? 'Transcrire' : 'Transcribe' },
+    { id: 'analyzing', label: fr ? 'Analyser' : 'Analyze' },
+    { id: 'done', label: fr ? 'Prêt' : 'Ready' },
   ];
   const activeIdx = stage === 'analyzing' ? 1 : stage === 'done' ? 2 : 0;
   return (
