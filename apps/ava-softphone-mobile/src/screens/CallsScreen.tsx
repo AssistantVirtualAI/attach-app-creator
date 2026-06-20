@@ -180,7 +180,9 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
 
       {sub === 'recordings' && (
         <div style={{ marginTop: 6 }}>
-          <RecordingsScreen creds={creds || null} isAdmin={!!isAdmin} myExtension={myExt} rangeDays={rangeDays} onRangeDaysChange={setRangeDays} />
+          <Suspense fallback={<ListSkeleton rows={4} />}>
+            <RecordingsScreen creds={creds || null} isAdmin={!!isAdmin} myExtension={myExt} rangeDays={rangeDays} onRangeDaysChange={setRangeDays} />
+          </Suspense>
         </div>
       )}
 
