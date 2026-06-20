@@ -202,7 +202,7 @@ export default function DashboardScreen({
 
 
 
-      <SectionTitle eyebrow={RANGE_LABELS[range]} title="Calls per day" />
+      <SectionTitle eyebrow={RANGE_LABELS[range]} title={t('dashboard.callsPerDay')} />
       <Card padded={true}>
         <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(1, buckets.length)}, 1fr)`, gap: range === '30d' ? 2 : 6, alignItems: 'end', height: 90 }}>
           {(buckets.length ? buckets : Array(7).fill(0)).map((v, i) => {
@@ -224,10 +224,10 @@ export default function DashboardScreen({
         </div>
       </Card>
 
-      <SectionTitle eyebrow="Insights" title={`Top extensions · ${RANGE_LABELS[range]}`} />
+      <SectionTitle eyebrow={t('dashboard.insights')} title={`${t('dashboard.topExtensions')} · ${RANGE_LABELS[range]}`} />
       {!s && [1,2,3].map(i => <Card key={i} style={{ marginBottom: 8 }}><Skeleton w="60%" h={12} /></Card>)}
       {s && s.topExtensions.length === 0 && (
-        <Card><div style={{ fontSize: font.sm, color: colors.mutedSilver, textAlign: 'center' }}>No activity in this range.</div></Card>
+        <Card><div style={{ fontSize: font.sm, color: colors.mutedSilver, textAlign: 'center' }}>{t('dashboard.noActivity')}</div></Card>
       )}
       {s && s.topExtensions.map((ext, i) => (
         <Card key={ext.extension} style={{ marginBottom: 8 }} padded={true}>
@@ -237,13 +237,13 @@ export default function DashboardScreen({
               <div style={{ fontSize: font.base, fontWeight: 700, color: colors.textIce }}>Ext {ext.extension}</div>
               <div style={{ fontSize: font.xs, color: colors.mutedSilver }}>{ext.name || '—'}</div>
             </div>
-            <Chip tone="cyan">{ext.calls} calls</Chip>
+            <Chip tone="cyan">{ext.calls} {t('m.totalCalls').toLowerCase()}</Chip>
           </div>
         </Card>
       ))}
 
-      <SectionTitle eyebrow="AVA assistant" title={`AVA summary · ${RANGE_LABELS[range]}`} />
-      <AIPanel title="What AVA sees" accent={colors.avaViolet} right={<GhostButton tone="violet" style={{ padding: '6px 10px' }} onClick={() => onNavigate('ava')}>Open chat</GhostButton>}>
+      <SectionTitle eyebrow={t('dashboard.avaAssistant')} title={`${t('dashboard.avaSummary')} · ${RANGE_LABELS[range]}`} />
+      <AIPanel title={t('dashboard.avaSummary')} accent={colors.avaViolet} right={<GhostButton tone="violet" style={{ padding: '6px 10px' }} onClick={() => onNavigate('ava')}>{t('dashboard.openChat')}</GhostButton>}>
         {!s ? (
           <Skeleton w="100%" h={42} />
         ) : (
