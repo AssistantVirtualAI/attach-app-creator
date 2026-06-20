@@ -62,28 +62,29 @@ export default function MobileApp() {
 
   // Restore Supabase session on app launch so API calls are authenticated
   useEffect(() => {
-    if (creds.accessToken && creds.refreshToken) {
-      supabase.auth.setSession({
-        access_token: creds.accessToken,
-        refresh_token: creds.refreshToken,
-      }).then(({ data, error }) => {
-        if (error) {
-          console.warn('[Auth] Session restore failed:', error.message);
-          supabase.auth.refreshSession().then(({ data: r }) => {
-            if (r?.session) {
-              setCreds((prev: any) => ({ ...prev, accessToken: r.session!.access_token, refreshToken: r.session!.refresh_token }));
-              setAuthToken(r.session!.access_token);
-              configureMobileApi({ accessToken: r.session!.access_token });
-            }
-          });
-        } else if (data.session) {
-          setAuthToken(data.session.access_token);
-          configureMobileApi({ accessToken: data.session.access_token });
-          console.log('[Auth] Session restored ✅');
-        }
-      });
-    }
-  }, [creds.accessToken, creds.refreshToken]);
+    const token = creds?.accessToken;
+    const refresh = creds?.refreshToken;
+    if (!token || !refresh) return;
+    supabase.auth.setSession({
+      access_token: token,
+      refresh_token: refresh,
+    }).then(({ data, error }) => {
+      if (error) {
+        console.warn('[Auth] Session restore failed:', error.message);
+        supabase.auth.refreshSession().then(({ data: r }) => {
+          if (r?.session) {
+            setCreds((prev: any) => ({ ...prev, accessToken: r.session!.access_token, refreshToken: r.session!.refresh_token }));
+            setAuthToken(r.session!.access_token);
+            configureMobileApi({ accessToken: r.session!.access_token });
+          }
+        });
+      } else if (data?.session) {
+        setAuthToken(data.session.access_token);
+        configureMobileApi({ accessToken: data.session.access_token });
+        console.log('[Auth] Session restored ✅');
+      }
+    });
+  }, [creds?.accessToken, creds?.refreshToken]);
   const ALL_TABS: Tab[] = ['home','calls','ava','messages','more','voicemail','contacts','sms','queues','settings'];
   const initialTab = (() => {
     try {
