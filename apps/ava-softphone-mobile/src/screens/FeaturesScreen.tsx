@@ -5,45 +5,47 @@
 import React, { useState } from 'react';
 import { colors, font, radius, gradients, shadow } from '../lib/theme';
 import { SectionTitle } from '../components/ui/Primitives';
+import { useT } from '../lib/i18n';
 
 type Availability = 'always' | 'in-call' | 'on-hold' | 'idle' | 'admin' | 'soon';
 
 interface Feature {
   key: string;
-  label: string;
+  label: { en: string; fr: string };
   icon: string;
   tone: 'blue' | 'gold' | 'cyan' | 'violet' | 'danger';
-  description: string;
+  description: { en: string; fr: string };
   availability: Availability;
 }
 
 const FEATURES: Feature[] = [
-  { key: 'mute',       label: 'Mute / Unmute',     icon: '🎙', tone: 'blue',   description: 'Silence your microphone while you stay on the call. Tap again to unmute.', availability: 'in-call' },
-  { key: 'hold',       label: 'Hold',              icon: '⏸',  tone: 'gold',   description: 'Place the active call on hold with music. The other party cannot hear you.', availability: 'in-call' },
-  { key: 'resume',     label: 'Resume',            icon: '▶',  tone: 'blue',   description: 'Take the call back from hold and continue the conversation.', availability: 'on-hold' },
-  { key: 'transferB',  label: 'Blind Transfer',    icon: '↗',  tone: 'cyan',   description: 'Send the call to another extension or number without announcing it.', availability: 'in-call' },
-  { key: 'transferA',  label: 'Attended Transfer', icon: '↪',  tone: 'cyan',   description: 'Speak with the destination first, then complete the transfer.', availability: 'in-call' },
-  { key: 'conference', label: '3-Way Conference',  icon: '👥', tone: 'violet', description: 'Add a third participant to create a live conference bridge.', availability: 'in-call' },
-  { key: 'record',     label: 'Record',            icon: '●',  tone: 'danger', description: 'Start or stop on-demand recording. AVA can transcribe the audio after.', availability: 'in-call' },
-  { key: 'park',       label: 'Park',              icon: '🅿', tone: 'gold',   description: 'Park the call in a shared slot any teammate can pick up.', availability: 'in-call' },
-  { key: 'dtmf',       label: 'DTMF Keypad',       icon: '⌨',  tone: 'blue',   description: 'Send tones to navigate IVRs and phone menus.', availability: 'in-call' },
-  { key: 'dnd',        label: 'Do Not Disturb',    icon: '🌙', tone: 'violet', description: 'Block incoming ringing on this extension. Voicemail still works.', availability: 'always' },
-  { key: 'forward',    label: 'Call Forwarding',   icon: '⇢',  tone: 'cyan',   description: 'Redirect every incoming call to another number while you are away.', availability: 'always' },
-  { key: 'voicemail',  label: 'Voicemail',         icon: '✉',  tone: 'gold',   description: 'Listen to messages and get AI summaries + sentiment for each one.', availability: 'always' },
-  { key: 'cw',         label: 'Call Waiting',      icon: '⌛', tone: 'blue',   description: 'Get a soft beep when a second call arrives while you are talking.', availability: 'always' },
-  { key: 'blocklist',  label: 'Blocked Numbers',   icon: '🚫', tone: 'danger', description: 'Numbers on this list will hear a fast-busy tone — they never ring you.', availability: 'always' },
-  { key: 'ava',        label: 'AVA Live Assist',   icon: '✦',  tone: 'violet', description: 'Real-time coaching, objection handling and post-call summary.', availability: 'in-call' },
-  { key: 'queues',     label: 'Queue Pause',       icon: '⇉',  tone: 'gold',   description: 'Pause/unpause yourself in your assigned call-center queues.', availability: 'always' },
+  { key: 'mute',       label: { en: 'Mute / Unmute', fr: 'Couper / Activer micro' }, icon: '🎙', tone: 'blue',   description: { en: 'Silence your microphone while you stay on the call. Tap again to unmute.', fr: 'Coupez votre micro tout en restant en ligne. Touchez à nouveau pour réactiver.' }, availability: 'in-call' },
+  { key: 'hold',       label: { en: 'Hold', fr: 'Mise en attente' }, icon: '⏸',  tone: 'gold',   description: { en: 'Place the active call on hold with music. The other party cannot hear you.', fr: 'Mettez l’appel en attente avec musique. Votre interlocuteur ne vous entend plus.' }, availability: 'in-call' },
+  { key: 'resume',     label: { en: 'Resume', fr: 'Reprendre' }, icon: '▶',  tone: 'blue',   description: { en: 'Take the call back from hold and continue the conversation.', fr: 'Reprenez l’appel mis en attente et poursuivez la conversation.' }, availability: 'on-hold' },
+  { key: 'transferB',  label: { en: 'Blind Transfer', fr: 'Transfert aveugle' }, icon: '↗',  tone: 'cyan',   description: { en: 'Send the call to another extension or number without announcing it.', fr: 'Transférez l’appel vers une autre extension ou un numéro sans l’annoncer.' }, availability: 'in-call' },
+  { key: 'transferA',  label: { en: 'Attended Transfer', fr: 'Transfert supervisé' }, icon: '↪',  tone: 'cyan',   description: { en: 'Speak with the destination first, then complete the transfer.', fr: 'Parlez d’abord au destinataire, puis finalisez le transfert.' }, availability: 'in-call' },
+  { key: 'conference', label: { en: '3-Way Conference', fr: 'Conférence à 3' }, icon: '👥', tone: 'violet', description: { en: 'Add a third participant to create a live conference bridge.', fr: 'Ajoutez un troisième participant pour créer une conférence en direct.' }, availability: 'in-call' },
+  { key: 'record',     label: { en: 'Record', fr: 'Enregistrer' }, icon: '●',  tone: 'danger', description: { en: 'Start or stop on-demand recording. AVA can transcribe the audio after.', fr: 'Démarrez ou arrêtez l’enregistrement à la demande. AVA peut transcrire ensuite.' }, availability: 'in-call' },
+  { key: 'park',       label: { en: 'Park', fr: 'Parquer' }, icon: '🅿', tone: 'gold',   description: { en: 'Park the call in a shared slot any teammate can pick up.', fr: 'Parquez l’appel dans un emplacement partagé qu’un collègue peut reprendre.' }, availability: 'in-call' },
+  { key: 'dtmf',       label: { en: 'DTMF Keypad', fr: 'Clavier DTMF' }, icon: '⌨',  tone: 'blue',   description: { en: 'Send tones to navigate IVRs and phone menus.', fr: 'Envoyez des tonalités pour naviguer dans les SVI et menus téléphoniques.' }, availability: 'in-call' },
+  { key: 'dnd',        label: { en: 'Do Not Disturb', fr: 'Ne pas déranger' }, icon: '🌙', tone: 'violet', description: { en: 'Block incoming ringing on this extension. Voicemail still works.', fr: 'Bloquez la sonnerie entrante sur cette extension. La messagerie reste active.' }, availability: 'always' },
+  { key: 'forward',    label: { en: 'Call Forwarding', fr: 'Transfert d’appel' }, icon: '⇢',  tone: 'cyan',   description: { en: 'Redirect every incoming call to another number while you are away.', fr: 'Redirigez tous les appels entrants vers un autre numéro pendant votre absence.' }, availability: 'always' },
+  { key: 'voicemail',  label: { en: 'Voicemail', fr: 'Messagerie vocale' }, icon: '✉',  tone: 'gold',   description: { en: 'Listen to messages and get AI summaries + sentiment for each one.', fr: 'Écoutez les messages avec résumé IA et analyse de ton pour chacun.' }, availability: 'always' },
+  { key: 'cw',         label: { en: 'Call Waiting', fr: 'Appel en attente' }, icon: '⌛', tone: 'blue',   description: { en: 'Get a soft beep when a second call arrives while you are talking.', fr: 'Recevez un bip discret lorsqu’un second appel arrive pendant votre conversation.' }, availability: 'always' },
+  { key: 'blocklist',  label: { en: 'Blocked Numbers', fr: 'Numéros bloqués' }, icon: '🚫', tone: 'danger', description: { en: 'Numbers on this list will hear a fast-busy tone — they never ring you.', fr: 'Les numéros de cette liste entendent une tonalité d’occupation — ils ne vous joignent jamais.' }, availability: 'always' },
+  { key: 'ava',        label: { en: 'AVA Live Assist', fr: 'Assistance AVA en direct' }, icon: '✦',  tone: 'violet', description: { en: 'Real-time coaching, objection handling and post-call summary.', fr: 'Coaching en temps réel, gestion des objections et résumé post-appel.' }, availability: 'in-call' },
+  { key: 'queues',     label: { en: 'Queue Pause', fr: 'Pause de file d’attente' }, icon: '⇉',  tone: 'gold',   description: { en: 'Pause/unpause yourself in your assigned call-center queues.', fr: 'Mettez en pause ou reprenez votre activité dans vos files d’attente assignées.' }, availability: 'always' },
 ];
 
-function badgeFor(a: Availability) {
+function badgeFor(a: Availability, lang: 'en' | 'fr') {
+  const L = (en: string, fr: string) => (lang === 'fr' ? fr : en);
   switch (a) {
-    case 'always':  return { label: 'Always available', color: colors.success };
-    case 'in-call': return { label: 'Requires active call', color: colors.signalGold };
-    case 'on-hold': return { label: 'While on hold', color: colors.avaCyan };
-    case 'idle':    return { label: 'When idle', color: colors.mutedSilver };
-    case 'admin':   return { label: 'Admin only', color: colors.avaViolet };
-    case 'soon':    return { label: 'Coming soon', color: colors.mutedSilver };
+    case 'always':  return { label: L('Always available', 'Toujours disponible'), color: colors.success };
+    case 'in-call': return { label: L('Requires active call', 'Nécessite un appel actif'), color: colors.signalGold };
+    case 'on-hold': return { label: L('While on hold', 'Pendant la mise en attente'), color: colors.avaCyan };
+    case 'idle':    return { label: L('When idle', 'Au repos'), color: colors.mutedSilver };
+    case 'admin':   return { label: L('Admin only', 'Administrateur uniquement'), color: colors.avaViolet };
+    case 'soon':    return { label: L('Coming soon', 'Bientôt disponible'), color: colors.mutedSilver };
   }
 }
 
@@ -59,6 +61,7 @@ function toneAccent(t: Feature['tone']) {
 
 export default function FeaturesScreen({ sp }: { sp?: any }) {
   const [open, setOpen] = useState<Feature | null>(null);
+  const { lang } = useT();
   const inCall = sp?.snap?.callState === 'active' || sp?.snap?.callState === 'held';
   const onHold = sp?.snap?.callState === 'held';
 
@@ -71,9 +74,11 @@ export default function FeaturesScreen({ sp }: { sp?: any }) {
 
   return (
     <div style={{ height: '100%', overflowY: 'auto', padding: '14px 14px 32px' }}>
-      <SectionTitle eyebrow="Reference" title="Calling features" />
+      <SectionTitle eyebrow={lang === 'fr' ? 'Référence' : 'Reference'} title={lang === 'fr' ? "Fonctions d'appel" : 'Calling features'} />
       <p style={{ fontSize: font.sm, color: colors.mutedSilver, margin: '4px 0 14px', lineHeight: 1.55 }}>
-        Tap any tile to see how it works. Glowing tiles are available right now.
+        {lang === 'fr'
+          ? "Touchez une tuile pour voir son fonctionnement. Les tuiles lumineuses sont disponibles maintenant."
+          : 'Tap any tile to see how it works. Glowing tiles are available right now.'}
       </p>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
@@ -106,7 +111,7 @@ export default function FeaturesScreen({ sp }: { sp?: any }) {
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 20, color: enabled ? accent : colors.mutedSilver,
               }}>{f.icon}</span>
-              <span style={{ fontSize: 11, fontWeight: 700, textAlign: 'center', letterSpacing: 0.2 }}>{f.label}</span>
+              <span style={{ fontSize: 11, fontWeight: 700, textAlign: 'center', letterSpacing: 0.2 }}>{f.label[lang]}</span>
             </button>
           );
         })}
@@ -135,20 +140,20 @@ export default function FeaturesScreen({ sp }: { sp?: any }) {
                 fontSize: 24, color: toneAccent(open.tone),
               }}>{open.icon}</span>
               <div>
-                <div style={{ fontSize: font.md, fontWeight: 800 }}>{open.label}</div>
-                <div style={{ fontSize: 10.5, color: badgeFor(open.availability).color, fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase' }}>
-                  {badgeFor(open.availability).label}
+                <div style={{ fontSize: font.md, fontWeight: 800 }}>{open.label[lang]}</div>
+                <div style={{ fontSize: 10.5, color: badgeFor(open.availability, lang).color, fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase' }}>
+                  {badgeFor(open.availability, lang).label}
                 </div>
               </div>
             </div>
             <p style={{ fontSize: font.sm, color: colors.textSub, lineHeight: 1.55, margin: '8px 0 14px' }}>
-              {open.description}
+              {open.description[lang]}
             </p>
             <button onClick={() => setOpen(null)} style={{
               width: '100%', padding: '12px 14px', borderRadius: radius.md, border: 'none',
               background: gradients.shinyPrimary, color: '#fff', fontWeight: 800, letterSpacing: 0.4,
               cursor: 'pointer',
-            }}>Got it</button>
+            }}>{lang === 'fr' ? 'Compris' : 'Got it'}</button>
           </div>
         </div>
       )}

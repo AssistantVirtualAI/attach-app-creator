@@ -24,8 +24,8 @@ export default function DashboardScreen({
   const [range, setRange] = useState<StatsRange>('today');
   const [notifOpen, setNotifOpen] = useState(false);
   const notifCounts = useNotificationCounts();
-  const me = useAutoSync<MeResponse>(() => mobileApi.me(), { intervalMs: 5 * 60_000 });
-  const stats = useAutoSync<DomainStats>(() => mobileApi.domainStats(range), { intervalMs: 60_000, deps: [range] });
+  const me = useAutoSync<MeResponse>(() => mobileApi.me(), { intervalMs: 5 * 60_000, cacheKey: 'me', staleTimeMs: 60_000 });
+  const stats = useAutoSync<DomainStats>(() => mobileApi.domainStats(range), { intervalMs: 60_000, deps: [range], cacheKey: `domainStats:${range}`, staleTimeMs: 25_000 });
   const m = me.data; const s = stats.data;
 
   const [aiSummary, setAiSummary] = useState<string | null>(null);
@@ -257,8 +257,12 @@ export default function DashboardScreen({
             ) : (
               <p style={{ margin: '0 0 8px' }}>
                 {total === 0
-                  ? `No calls in this range yet — refresh once new CDRs land.`
-                  : `Across ${RANGE_LABELS[range].toLowerCase()}, ${total} calls · ${answered} answered, ${missed} missed.`}
+                  ? (lang === 'fr'
+                      ? "Aucun appel dans cette période — actualisez quand de nouveaux CDR arrivent."
+                      : `No calls in this range yet — refresh once new CDRs land.`)
+                  : (lang === 'fr'
+                      ? `Sur ${RANGE_LABELS[range].toLowerCase()}, ${total} appels · ${answered} répondus, ${missed} manqués.`
+                      : `Across ${RANGE_LABELS[range].toLowerCase()}, ${total} calls · ${answered} answered, ${missed} missed.`)}
               </p>
             )}
             <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>

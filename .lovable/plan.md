@@ -1,46 +1,65 @@
-## Goals
-1. Remove the "Live" sync status pill from every screen of the mobile app.
-2. Fully translate the mobile app (every tab + screen) to French, driven by the existing language toggle.
-3. Make the app load faster and keep data fresh in near real time.
+## Objectif
+1. Finaliser la traduction française des écrans secondaires restants.
+2. Accélérer significativement le chargement des données sur toutes les pages.
 
-## 1. Hide the live status everywhere
-- `MobileApp.tsx`: drop the `RealtimeHeader` render (line 320) and remove the helper component + `RealtimeStatusPill` import. No status pill on any tab.
-- `QueuesScreen.tsx`: remove the `live sync · HH:MM:SS` footer line (line 106). Keep silent background refresh.
-- Leave the underlying `useAutoSync` running so data stays fresh — just no UI chrome.
+## Partie 1 — Traduction française
 
-## 2. French translation for the whole app
-Currently only `DashboardScreen` + `SettingsScreen` use `useT()`. All other screens are hardcoded English. Plan:
+Écrans encore à traduire / vérifier :
+- `CallDetailScreen.tsx`
+- `CallsScreen.tsx`
+- `DashboardScreen.tsx`
+- `DataSafetyScreen.tsx`
+- `FeaturesScreen.tsx`
+- `MessagesHubScreen.tsx`
+- `MoreScreen.tsx`
+- `PrivacyScreen.tsx`
+- `QueuesScreen.tsx`
+- `RecordingsScreen.tsx`
+- `TeamChatScreen.tsx`
+- `VoicemailScreen.tsx`
 
-- Extend `src/lib/i18n.tsx` with a full dictionary covering: tabs/bottom-nav, Calls/Recents/Voicemail, Dialer, Messages hub + thread, Contacts, AVA chat, More, Auth, Permissions, Privacy, Data safety, Support, Features, Queues, Team chat, Call detail, Recordings, SIP config, AI screens, Delete account, error/empty states, button labels, toasts.
-- Refactor every screen listed below to import `useT` and replace every visible English string with `t('…')`. No business-logic changes:
-  - HomeScreen, CallsScreen, RecentsScreen, VoicemailScreen, DialerScreen, MessagesHubScreen, MessagesScreen, ContactsScreen, AVAChatScreen, MoreScreen, AuthScreen, PermissionsScreen, PrivacyScreen, DataSafetyScreen, SupportScreen, FeaturesScreen, QueuesScreen, TeamChatScreen, CallDetailScreen, RecordingsScreen, RecordingDebugScreen, SipConfigScreen, AIScreen, AIAuditScreen, DeleteAccountScreen, CallCenterAgentScreen, InboxScreen.
-- Translate shared UI: `BottomTabs` labels, `ProfileSheet`, `NotificationsSheet`, `IncomingCallSheet`, `ActiveCallSheet`, `PermissionGate`, `DemoModeBanner`, `DataError`, `WssDiagnostics`, `Dialpad` hints.
-- Language toggle already lives in Dashboard header + Settings — no UI change needed; it now flips the whole app.
+Approche : remplacer les libellés codés en dur, placeholders, aria-labels, états vides et messages d'erreur par `t(...)` ou des branches `lang === 'fr' ? ... : ...` cohérentes avec l'existant. Ajouter les clés manquantes dans `src/lib/i18n.tsx`.
 
-## 3. Faster load + live data sync
-- **Code-split heavy screens.** In `MobileApp.tsx`, convert every screen import (except `DashboardScreen` + `BottomTabs`) to `React.lazy` and wrap the active screen in `<Suspense fallback={<SplashAva mini />}>`. The home tab paints immediately; secondary tabs hydrate on demand.
-- **Defer non-critical work on boot:**
-  - Lazy-load Capacitor plugins inside `useAutoSync` (already done) — add the same pattern to `usePresencePing` and `useRealtimeCDR` so initial bundle stays small.
-  - Move the realtime CDR + presence subscriptions into a `useEffect` that runs after first paint (`requestIdleCallback` fallback `setTimeout(0)`).
-- **Cache last good payload** in `useAutoSync`:
-  - Read/write `localStorage` per loader key (`ava.mobile.cache.<key>`) so screens render instantly with cached data and refresh in the background.
-  - Add an optional `cacheKey` parameter; Dashboard passes `me` and `domainStats:<range>`.
-- **Tighten live sync** without spamming the backend:
-  - Dashboard `domainStats` interval drops from 60s → 20s while foregrounded; pauses when hidden (already supported).
-  - Subscribe to Supabase Realtime `pbx_cdr` inserts (existing `useRealtimeCDR` hook) and call `refresh()` on new rows so the dashboard reacts within ~1s of a new call instead of waiting for the poll.
-  - Calls/Recents/Voicemail screens follow the same Realtime-trigger pattern.
-- **Network/runtime polish:**
-  - Add `AbortController` to in-flight loader so tab switches cancel stale requests.
-  - Preconnect to the Supabase endpoint via `<link rel="preconnect">` in the mobile `index.html` shell.
-  - Wrap `DashboardScreen` metric grid in `React.memo` and memoize derived stats (`useMemo` on the heavy reduce blocks) to cut re-render cost on each tick.
+## Partie 2 — Performance du chargement des données
 
-## Technical notes
-- No schema changes, no new edge functions.
-- All edits are inside `apps/ava-softphone-mobile/src/**` plus the shared `i18n.tsx` dictionary.
-- The existing language preference key (`ava.mobile.lang`) is reused; first launch picks FR automatically when the browser/device locale is French.
-- No business-logic touched in any screen — only string extraction, lazy loading, and cache wiring.
+Problèmes identifiés :
+- `useAutoSync` exécute un `refresh()` immédiat à chaque montage, même quand le cache est frais → re-fetch à chaque navigation.
+- `intervalMs = 60s` redéclenche un fetch même hors focus utilisateur.
+- Pas de déduplication entre composants utilisant le même `cacheKey`.
+- `visibilitychange` re-fetch à chaque retour d'onglet sans seuil de fraîcheur.
+- Skeletons non systématiques pendant la première charge depuis le cache.
 
-## Out of scope
-- Web/admin portal (only the mobile app).
-- Login / billing / agent backend changes.
-- Adding new analytics — the dashboard stats added previously are kept as-is.
+Changements :
+
+1. **`useAutoSync.ts`**
+   - Ajouter `staleTimeMs` (par défaut 30 s). Si cache présent et `Date.now() - cachedAt < staleTimeMs`, ne pas refetch au mount — afficher direct le cache.
+   - Stocker `{value, at}` dans le cache au lieu de la valeur brute, exposer `lastSyncedAt` depuis le cache.
+   - **Déduplication globale** : map module-level `inflight: Map<cacheKey, Promise>` ; tous les hooks partageant la même clé attendent la même promesse.
+   - **Cache partagé en mémoire** : `Map<cacheKey, {value, at}>` consultée avant `localStorage` (évite JSON.parse répétés).
+   - **Broadcast** : quand un fetch réussit pour une clé, notifier tous les abonnés de cette clé via un EventTarget pour qu'ils mettent à jour leur state sans refetch.
+   - `visibilitychange` / `focus` → ne refresh que si `Date.now() - lastSyncedAt > staleTimeMs`.
+   - Réduire `timeoutMs` à 10 s, `retries` à 1 sur les pages secondaires, augmenter le backoff seulement sur erreurs réseau réelles.
+
+2. **`mobileApi.ts` / `mobileSupabase.ts`**
+   - Ajouter un cache mémoire court (5–10 s) sur les requêtes GET identiques pour absorber les doubles montages React 18 StrictMode.
+   - Limiter les colonnes sélectionnées (`select=...`) là où c'est encore `*`.
+
+3. **Écrans lourds** (`DashboardScreen`, `CallsScreen`, `VoicemailScreen`, `RecordingsScreen`, `QueuesScreen`, `CallDetailScreen`)
+   - Afficher immédiatement le cache si disponible (pas de spinner plein écran).
+   - Ajouter/uniformiser des skeletons légers pendant le premier fetch.
+   - Pagination/limit côté requête (ex: `limit(50)` au lieu de tout charger).
+
+4. **`MobileApp.tsx`**
+   - Précharger en parallèle au boot les caches des 3 écrans principaux (Home, Calls, Voicemail) via un seul `Promise.all`, pour que la navigation soit instantanée.
+
+## Détails techniques
+
+- Format cache : `{ v: T, at: number }` ; migration douce (si ancien format → ignorer et refetch).
+- Signature : `useAutoSync(loader, { cacheKey, staleTimeMs?, intervalMs?, timeoutMs?, retries?, deps? })`.
+- Aucun changement d'API publique pour les composants existants.
+- Pas de modification de la logique métier ni des Edge Functions.
+
+## Hors scope
+- Refactor des écrans qui n'utilisent pas `useAutoSync`.
+- Changements visuels au-delà des skeletons.
+- Logique d'authentification ou backend.
