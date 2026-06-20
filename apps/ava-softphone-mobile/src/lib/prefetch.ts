@@ -69,11 +69,11 @@ export function prefetchForTab(tab: string) {
     else setTimeout(cb, 0);
   };
   schedule(() => {
-    (async () => {
-      for (const t of tasks) {
+    Promise.all(
+      tasks.map(async (t) => {
         try { seedAutoSyncCache(t.key, await t.run()); } catch {}
-      }
-    })();
+      }),
+    );
   });
 }
 
