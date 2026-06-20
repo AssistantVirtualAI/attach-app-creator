@@ -13,12 +13,13 @@ import { seedAutoSyncCache } from '../hooks/useAutoSync';
 
 type Task = { key: string; run: () => Promise<unknown> };
 
-const TASKS: Task[] = [
+// Minimal startup payload: load only what the Home tab needs immediately.
+// SIP credentials, dashboard stats, and a tiny page of recent calls — all in
+// parallel via Promise.all so the first paint has data ready.
+const STARTUP_TASKS: Task[] = [
   { key: 'mobile.me',         run: () => mobileApi.me() },
   { key: 'mobile.dashboard',  run: () => mobileApi.dashboard() },
-  { key: 'mobile.calls.7',    run: () => mobileApi.calls({ rangeDays: 7 }) },
-  { key: 'mobile.voicemails', run: () => mobileApi.voicemails() },
-  { key: 'mobile.threads',    run: () => mobileApi.threads() },
+  { key: 'mobile.calls.7',    run: () => mobileApi.calls({ rangeDays: 7, limit: 10 }) },
 ];
 
 let started = false;
@@ -28,18 +29,15 @@ export function startPrefetch() {
   const schedule = (cb: () => void) => {
     const ric = (globalThis as any).requestIdleCallback as undefined | ((c: () => void, o?: { timeout: number }) => number);
     if (ric) ric(cb, { timeout: 2_000 });
-    else setTimeout(cb, 600);
+    else setTimeout(cb, 300);
   };
   schedule(() => {
-    // Exécute en série pour ne pas saturer le réseau mobile.
-    (async () => {
-      for (const t of TASKS) {
-        try {
-          const v = await t.run();
-          seedAutoSyncCache(t.key, v);
-        } catch { /* silencieux : pas critique */ }
-      }
-    })();
+    // Parallel: mobile data endpoints are independent.
+    Promise.all(
+      STARTUP_TASKS.map(async (t) => {
+        try { seedAutoSyncCache(t.key, await t.run()); } catch { /* silent */ }
+      }),
+    );
   });
 }
 
