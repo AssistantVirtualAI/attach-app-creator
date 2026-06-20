@@ -46,9 +46,10 @@ configureMobileApi({
   accessToken: null,
 });
 import { configureAudit, audit } from './lib/audit';
-import { edgeCall } from './lib/mobileSupabase';
+import { edgeCall, supabase } from './lib/mobileSupabase';
 import PerfOverlay from './components/PerfOverlay';
 import ScreenSkeleton from './components/ScreenSkeleton';
+import SessionExpired from './components/SessionExpired';
 import { startPrefetch, prefetchForTab } from './lib/prefetch';
 
 const isPreviewMode = (() => {
