@@ -161,18 +161,18 @@ Deno.serve(async (req) => {
     // Per-domain endpoints. A softphone user can override the SIP/WSS host, otherwise the organization/PBX domain is used.
     const sipDomain = sp.sip_domain || org?.fusionpbx_domain_name || org?.domain || Deno.env.get("FUSIONPBX_SIP_DOMAIN") || "lemtel.lemtel.tel";
     // Known-working WSS endpoints (CA-signed certs accepted by mobile browsers).
-    // We prefer node.lemtelcloud.net as the primary because wss://lemtel.lemtel.tel:7444
-    // and wss://170.39.199.132:7444 currently use a self-signed cert that mobile
+    // We prefer node.lemtelcloud.net as the primary because wss://lemtel.lemtel.tel:7443
+    // and wss://170.39.199.132:7443 currently use a self-signed cert that mobile
     // WebSocket clients refuse. Desktop/Electron is more permissive, but mobile
     // browsers MUST use a CA-signed host. Always include the working fallbacks.
-    const WORKING_PRIMARY = "wss://node.lemtelcloud.net:7444";
-    const WORKING_FALLBACK = "wss://pbxnode.lemtel.tel:7444";
+    const WORKING_PRIMARY = "wss://node.lemtelcloud.net:7443";
+    const WORKING_FALLBACK = "wss://pbxnode.lemtel.tel:7443";
     const wssUrl = sp.wss_url || Deno.env.get("FUSIONPBX_WSS_URL") || WORKING_PRIMARY;
     const wssUrls = Array.from(new Set([
       WORKING_PRIMARY,
       WORKING_FALLBACK,
       wssUrl,
-      `wss://${sipDomain}:7444`,
+      `wss://${sipDomain}:7443`,
     ].filter(Boolean)));
 
     let password = "";

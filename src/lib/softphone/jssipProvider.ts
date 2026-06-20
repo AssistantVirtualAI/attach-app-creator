@@ -246,8 +246,8 @@ class JsSipProvider {
       const fallbackUrls = Array.from(new Set([
         cfg.wssUrl,
         ...(cfg.wssUrls || []),
-        'wss://lemtel.lemtel.tel:7444',
-        'wss://pbxnode.lemtel.tel:7444',
+        'wss://lemtel.lemtel.tel:7443',
+        'wss://pbxnode.lemtel.tel:7443',
       ].filter(Boolean))) as string[];
 
       // Defer probe so it doesn't compete with the UA's own WS connection.
