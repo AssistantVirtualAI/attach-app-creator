@@ -200,12 +200,12 @@ export default function DialerScreen({
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-evenly', padding: '24px 24px 8px' }}>
           <div style={{ width: 64 }} />
           <button
-            disabled={!num || dialing || !isRegistered}
+            disabled={!num || dialing}
             onClick={startCall}
             style={{
               width: 72, height: 72, borderRadius: '50%',
-              background: !num || dialing || !isRegistered ? 'rgba(34, 197, 94, 0.3)' : 'linear-gradient(135deg, #22c55e, #15803d)',
-              border: 'none', cursor: !isRegistered ? 'not-allowed' : 'pointer', color: 'white', fontSize: 30,
+              background: !num || dialing ? 'rgba(34, 197, 94, 0.3)' : 'linear-gradient(135deg, #22c55e, #15803d)',
+              border: 'none', cursor: !num || dialing ? 'not-allowed' : 'pointer', color: 'white', fontSize: 30,
               boxShadow: '0 10px 30px rgba(34, 197, 94, 0.4)',
             }}
           >
