@@ -141,22 +141,22 @@ export default function RecordingsScreen({
       )}
 
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', margin: '0 2px 10px' }}>
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name, number, extension…" style={{ flex: 1, minWidth: 0, padding: '8px 10px', borderRadius: 10, border: `1px solid ${colors.border}`, background: 'rgba(255,255,255,0.06)', color: colors.textIce, fontSize: 12, outline: 'none' }} />
-        {([7, 30] as const).map((d) => <button key={d} onClick={() => onRangeDaysChange(d)} style={{ padding: '7px 9px', borderRadius: 10, border: `1px solid ${rangeDays === d ? colors.borderGold : colors.border}`, background: rangeDays === d ? colors.signalGold + '1a' : 'rgba(255,255,255,0.04)', color: rangeDays === d ? colors.signalGold : colors.mutedSilver, fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>{d}d</button>)}
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={fr ? 'Rechercher nom, numéro, extension…' : 'Search name, number, extension…'} style={{ flex: 1, minWidth: 0, padding: '8px 10px', borderRadius: 10, border: `1px solid ${colors.border}`, background: 'rgba(255,255,255,0.06)', color: colors.textIce, fontSize: 12, outline: 'none' }} />
+        {([7, 30] as const).map((d) => <button key={d} onClick={() => onRangeDaysChange(d)} style={{ padding: '7px 9px', borderRadius: 10, border: `1px solid ${rangeDays === d ? colors.borderGold : colors.border}`, background: rangeDays === d ? colors.signalGold + '1a' : 'rgba(255,255,255,0.04)', color: rangeDays === d ? colors.signalGold : colors.mutedSilver, fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>{d}{fr ? 'j' : 'd'}</button>)}
       </div>
 
       <audio ref={audioRef} onEnded={() => setPlayingId(null)} style={{ width: '100%', marginBottom: 10 }} controls />
 
       {error && (
         <Card accent="gold" style={{ marginBottom: 10 }}>
-          <div style={{ fontSize: font.sm, color: colors.danger, fontWeight: 700 }}>Failed to load recordings</div>
+          <div style={{ fontSize: font.sm, color: colors.danger, fontWeight: 700 }}>{fr ? 'Échec du chargement des enregistrements' : 'Failed to load recordings'}</div>
           <div style={{ fontSize: 11, color: colors.mutedSilver, marginTop: 4 }}>{error}</div>
         </Card>
       )}
 
       {!items && <ListSkeleton rows={5} />}
       {items && items.filter((r) => !search.trim() || [r.customer, r.from, r.to, r.extension, r.summary].filter(Boolean).join(' ').toLowerCase().includes(search.trim().toLowerCase())).length === 0 && (
-        <EmptyState icon="🎙" title="No recordings yet" hint={isAdmin ? 'No domain recordings match this filter.' : 'Recordings for your extension will appear here.'} />
+        <EmptyState icon="🎙" title={fr ? 'Aucun enregistrement' : 'No recordings yet'} hint={isAdmin ? (fr ? 'Aucun enregistrement du domaine ne correspond à ce filtre.' : 'No domain recordings match this filter.') : (fr ? 'Les enregistrements de votre extension apparaîtront ici.' : 'Recordings for your extension will appear here.')} />
       )}
       {items && items.filter((r) => !search.trim() || [r.customer, r.from, r.to, r.extension, r.summary].filter(Boolean).join(' ').toLowerCase().includes(search.trim().toLowerCase())).map((r) => (
         <div key={r.id} style={{ marginBottom: 8 }}>
