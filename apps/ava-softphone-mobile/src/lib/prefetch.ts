@@ -48,8 +48,9 @@ export function startPrefetch() {
  */
 const NAV_TASKS: Record<string, Task[]> = {
   home:     [{ key: 'mobile.dashboard',  run: () => mobileApi.dashboard() }],
-  calls:    [{ key: 'mobile.calls.7',    run: () => mobileApi.calls({ rangeDays: 7 }) }],
+  calls:    [{ key: 'mobile.calls.7',    run: () => mobileApi.calls({ rangeDays: 7, limit: 20 }) }],
   messages: [{ key: 'mobile.threads',    run: () => mobileApi.threads() }],
+  voicemail:[{ key: 'mobile.voicemails', run: () => mobileApi.voicemails() }],
   more:     [
     { key: 'mobile.voicemails', run: () => mobileApi.voicemails() },
     { key: 'mobile.threads',    run: () => mobileApi.threads() },
