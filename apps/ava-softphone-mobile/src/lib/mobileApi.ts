@@ -10,6 +10,7 @@
  */
 import { isMockMode } from './buildGuard';
 import { supabase } from '@/integrations/supabase/client';
+import { perf } from './perfMetrics';
 
 export const MOBILE_DEFAULT_PORTAL = 'https://gejxisrqtvxavbrfcoxz.supabase.co';
 
