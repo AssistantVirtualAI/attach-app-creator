@@ -30,8 +30,21 @@ Deno.serve(async (req) => {
       .select("organization_id, extension, sip_domain, display_name, status, status_updated_at, updated_at, forward_enabled, forward_to, dnd_enabled")
       .eq("portal_user_id", u.user.id)
       .maybeSingle();
-    if (!sp) return json({ error: "NO_SOFTPHONE_ACCOUNT" }, 404);
-    if (!sp.extension) return json({ error: "NO_EXTENSION_ASSIGNED" }, 403);
+    // Graceful empty dashboard when the user has no softphone account yet —
+    // avoids a 404 that blanks the mobile Home screen on first login.
+    if (!sp || !sp.extension) {
+      const hour = new Date().getHours();
+      const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+      return json({
+        greeting,
+        brief: "Your softphone extension is not configured yet.",
+        scope: { mode: "extension_user", label: "No extension", organizationId: null, sipDomain: undefined, extension: null, role: "agent" },
+        metrics: { missedCalls: 0, answeredCalls: 0, unreadSms: 0, voicemails: 0, actionItems: 0 },
+        needsAttention: [],
+        status: { sipState: "offline", doNotDisturb: false, forwarding: null, updatedAt: undefined },
+        provisioning: sp ? "NO_EXTENSION_ASSIGNED" : "NO_SOFTPHONE_ACCOUNT",
+      });
+    }
 
     const orgId = sp.organization_id;
     const since = new Date(Date.now() - 24 * 36e5).toISOString();
