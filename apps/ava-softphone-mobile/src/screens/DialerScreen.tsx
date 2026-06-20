@@ -167,6 +167,16 @@ export default function DialerScreen({
         )}
       </div>
 
+      {(!isRegistered || preferClickToCall) && (
+        <div style={{
+          margin: '8px 16px 0', padding: '8px 12px', borderRadius: 10,
+          background: 'rgba(59,130,246,0.10)', border: '1px solid rgba(59,130,246,0.35)',
+          color: '#93c5fd', fontSize: 11, lineHeight: 1.4,
+        }}>
+          ℹ️ Appels via Click-to-Call — FusionPBX sonnera votre téléphone, puis connectera l'appel.
+        </div>
+      )}
+
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', paddingBottom: 16 }}>
         <div style={{ textAlign: 'center', padding: '24px 24px 16px', minHeight: 80 }}>
