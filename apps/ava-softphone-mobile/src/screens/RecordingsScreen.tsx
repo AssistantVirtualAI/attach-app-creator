@@ -259,7 +259,7 @@ function RecordingAiPanel({ rec }: { rec: RecordingEntry }) {
               display: 'inline-flex', alignItems: 'center', gap: 4,
             }}>
               {running ? <Loader2 size={11} className="spin" /> : <Sparkles size={11} />}
-              {running ? 'Working…' : error ? 'Retry' : (hasTranscript || hasAi) ? 'Re-run AI' : 'Transcribe & analyze'}
+              {running ? (fr ? 'Traitement…' : 'Working…') : error ? (fr ? 'Réessayer' : 'Retry') : (hasTranscript || hasAi) ? (fr ? 'Relancer l\'IA' : 'Re-run AI') : (fr ? 'Transcrire et analyser' : 'Transcribe & analyze')}
             </button>
           </div>
 
