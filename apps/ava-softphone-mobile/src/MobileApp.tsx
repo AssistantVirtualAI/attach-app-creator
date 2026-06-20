@@ -38,7 +38,7 @@ import { configureMobileApi } from './lib/mobileApi';
 import { configureAudit, audit } from './lib/audit';
 import { edgeCall } from './lib/mobileSupabase';
 import PerfOverlay from './components/PerfOverlay';
-import { startPrefetch } from './lib/prefetch';
+import { startPrefetch, prefetchForTab } from './lib/prefetch';
 
 const isPreviewMode = (() => {
   try { return new URLSearchParams(window.location.search).get('preview') === '1'; }
