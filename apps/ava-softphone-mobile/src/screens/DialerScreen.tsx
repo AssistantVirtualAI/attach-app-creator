@@ -65,34 +65,37 @@ export default function DialerScreen({
 
   const retryLimitReached: boolean = !!sp.retryLimitReached;
   const bannerTitle = isRegistered
-    ? `✅ Enregistré — Extension ${sp.sipConfig?.extension || ''}`.trim()
+    ? `✅ SIP enregistré — Extension ${sp.sipConfig?.extension || ''}`.trim()
     : isRetrying
       ? (countdown !== null && retryAttempt > 0
-          ? `🔄 Nouvelle tentative dans ${countdown}s (essai ${retryAttempt})…`
-          : '🔄 Connexion…')
+          ? `🟡 SIP en connexion — nouvelle tentative dans ${countdown}s (essai ${retryAttempt})…`
+          : '🟡 SIP en connexion…')
       : retryLimitReached
-        ? `⛔ Tentatives automatiques arrêtées après ${retryAttempt} essais${sipError ? ` — ${sipError}` : ''}. Touchez Réessayer.`
-        : `❌ Erreur SIP${sipError ? ` — ${sipError}` : ''}`;
+        ? `🔴 SIP indisponible — Click-to-Call actif${sipError ? ` (${sipError})` : ''}`
+        : `🔴 SIP indisponible — Click-to-Call actif${sipError ? ` (${sipError})` : ''}`;
+
+  const preferClickToCall =
+    (typeof localStorage !== 'undefined' && localStorage.getItem('prefer_click_to_call') !== 'off');
 
   const startCall = async () => {
     if (!num || dialing) return;
     await haptic(ImpactStyle.Medium);
-    audit('call.originated', null, { destination: num, sipStatus: status });
+    audit('call.originated', null, { destination: num, sipStatus: status, preferClickToCall });
     setDialing(true);
     setError(null);
     try {
-      if (!isRegistered) {
-        const msg = sipError || 'SIP non enregistré — attendez le statut vert ou touchez Réessayer.';
-        setError(msg);
-        showMobileToast(msg, 'error');
-        return;
+      // Try SIP first if registered AND user hasn't forced click-to-call
+      if (!preferClickToCall && isRegistered) {
+        const ok = sp.call(num);
+        if (ok !== false) return;
       }
-      const ok = sp.call(num);
-      if (ok === false) {
-        const msg = "Impossible de lancer l'appel via SIP";
-        setError(msg);
-        showMobileToast(msg, 'error');
-      }
+      // Fallback (or primary) — Click-to-Call via FusionPBX originate
+      showMobileToast('Lancement via Click-to-Call…', 'info');
+      await mobileApi.startCall(num, 'click_to_call' as any);
+      showMobileToast(
+        `✅ FusionPBX va appeler votre extension ${sp.sipConfig?.extension || '300'}, puis connecter à ${num}`,
+        'success',
+      );
     } catch (e: any) {
       const msg = e?.message || "Impossible de lancer l'appel";
       setError(msg);
@@ -164,6 +167,16 @@ export default function DialerScreen({
         )}
       </div>
 
+      {(!isRegistered || preferClickToCall) && (
+        <div style={{
+          margin: '8px 16px 0', padding: '8px 12px', borderRadius: 10,
+          background: 'rgba(59,130,246,0.10)', border: '1px solid rgba(59,130,246,0.35)',
+          color: '#93c5fd', fontSize: 11, lineHeight: 1.4,
+        }}>
+          ℹ️ Appels via Click-to-Call — FusionPBX sonnera votre téléphone, puis connectera l'appel.
+        </div>
+      )}
+
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', paddingBottom: 16 }}>
         <div style={{ textAlign: 'center', padding: '24px 24px 16px', minHeight: 80 }}>
@@ -187,12 +200,12 @@ export default function DialerScreen({
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-evenly', padding: '24px 24px 8px' }}>
           <div style={{ width: 64 }} />
           <button
-            disabled={!num || dialing || !isRegistered}
+            disabled={!num || dialing}
             onClick={startCall}
             style={{
               width: 72, height: 72, borderRadius: '50%',
-              background: !num || dialing || !isRegistered ? 'rgba(34, 197, 94, 0.3)' : 'linear-gradient(135deg, #22c55e, #15803d)',
-              border: 'none', cursor: !isRegistered ? 'not-allowed' : 'pointer', color: 'white', fontSize: 30,
+              background: !num || dialing ? 'rgba(34, 197, 94, 0.3)' : 'linear-gradient(135deg, #22c55e, #15803d)',
+              border: 'none', cursor: !num || dialing ? 'not-allowed' : 'pointer', color: 'white', fontSize: 30,
               boxShadow: '0 10px 30px rgba(34, 197, 94, 0.4)',
             }}
           >

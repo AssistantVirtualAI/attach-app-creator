@@ -22,6 +22,7 @@ export default function SettingsScreen({
   const [perms, setPerms] = useState<AllPermissions | null>(null);
   const [haptics, setHaptics] = useState<boolean>(() => localStorage.getItem('ava.haptics') !== 'off');
   const [autoAnswer, setAutoAnswer] = useState<boolean>(() => localStorage.getItem('ava.autoAnswer') === 'on');
+  const [preferC2C, setPreferC2C] = useState<boolean>(() => localStorage.getItem('prefer_click_to_call') !== 'off');
   const [ringtone, setRingtone] = useState<string>(() => localStorage.getItem('ava.ringtone') || 'AVA Default');
   const [audioOut, setAudioOut] = useState<string>(() => localStorage.getItem('ava.audioOut') || 'System default');
 
@@ -44,6 +45,7 @@ export default function SettingsScreen({
   };
   const toggleHaptics = () => { const next = !haptics; setHaptics(next); localStorage.setItem('ava.haptics', next ? 'on' : 'off'); };
   const toggleAutoAnswer = () => { const next = !autoAnswer; setAutoAnswer(next); localStorage.setItem('ava.autoAnswer', next ? 'on' : 'off'); };
+  const togglePreferC2C = () => { const next = !preferC2C; setPreferC2C(next); localStorage.setItem('prefer_click_to_call', next ? 'on' : 'off'); };
   const pickRingtone = () => {
     const opts = ['AVA Default', 'Classic', 'Pulse', 'Marimba', 'Silent'];
     const choice = prompt((lang === 'fr' ? 'Sonnerie' : 'Ringtone') + ` (${opts.join(', ')}):`, ringtone);
@@ -113,6 +115,15 @@ export default function SettingsScreen({
       <SectionTitle eyebrow={t('settings.calling')} title={t('settings.availability')} />
       <Card padded={false}>
         <SettingsRow label={t('settings.dnd')} icon="🔕" onPress={toggleDnd} right={<Switch on={dnd} />} />
+        <SettingsRow
+          label={lang === 'fr' ? 'Utiliser Click-to-Call' : 'Use Click-to-Call'}
+          icon="📞"
+          value={lang === 'fr'
+            ? 'FusionPBX connecte l\'appel via votre extension physique'
+            : 'FusionPBX bridges the call via your physical extension'}
+          right={<Switch on={preferC2C} />}
+          onPress={togglePreferC2C}
+        />
         <SettingsRow label={t('settings.callForwarding')} icon="↪" onPress={toggleFwd} value={forwarding || t('common.off')} right={<Switch on={!!forwarding} />} />
         <SettingsRow label={t('settings.voicemailGreeting')} icon="🎙" value={t('settings.defaultGreeting')} onPress={() => onNavigate?.('voicemail' as Tab)} />
         <SettingsRow label={t('settings.autoAnswer')} icon="⚡" right={<Switch on={autoAnswer} />} onPress={toggleAutoAnswer} />
