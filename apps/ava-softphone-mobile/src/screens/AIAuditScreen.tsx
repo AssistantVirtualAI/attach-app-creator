@@ -120,7 +120,7 @@ export default function AIAuditScreen() {
 
   const retry = async (row: Row) => {
     if (!row.call_record_id || !row.organization_id) {
-      setToast('Cannot retry — missing call id or workspace.');
+      setToast(fr ? 'Impossible de réessayer — identifiant ou organisation manquant.' : 'Cannot retry — missing call id or workspace.');
       return;
     }
     setRetrying(row.id); setToast(null);
@@ -136,12 +136,12 @@ export default function AIAuditScreen() {
       });
       const body = await res.json().catch(() => ({}));
       setToast(res.ok
-        ? `Retry queued for ${row.request_type} · #${row.call_record_id.slice(0, 8)}`
-        : `Retry failed (${res.status}) ${body?.error || ''}`);
+        ? (fr ? `Nouvelle tentative envoyée pour ${row.request_type} · #${row.call_record_id.slice(0, 8)}` : `Retry queued for ${row.request_type} · #${row.call_record_id.slice(0, 8)}`)
+        : (fr ? `Échec (${res.status}) ${body?.error || ''}` : `Retry failed (${res.status}) ${body?.error || ''}`));
       // The edge function inserts its own audit row — reload.
       setTimeout(load, 800);
     } catch (e: any) {
-      setToast(`Retry failed: ${e?.message || 'network error'}`);
+      setToast((fr ? 'Échec : ' : 'Retry failed: ') + (e?.message || (fr ? 'erreur réseau' : 'network error')));
     } finally {
       setRetrying(null);
     }
@@ -149,12 +149,12 @@ export default function AIAuditScreen() {
 
   return (
     <div style={{ padding: 14, overflowY: 'auto', paddingBottom: 120 }}>
-      <SectionTitle eyebrow="Diagnostics" title="AI requests" />
+      <SectionTitle eyebrow={fr ? 'Diagnostics' : 'Diagnostics'} title={fr ? 'Requêtes IA' : 'AI requests'} />
       <Card padded={true} style={{ marginBottom: 10 }}>
         <p style={{ margin: 0, fontSize: font.sm, color: colors.textSub, lineHeight: 1.5 }}>
-          Every transcription and analysis request is logged here with timestamp,
-          status and error code. Tap a row for full details, or use <strong>Retry</strong>
-          to re-queue the same call.
+          {fr
+            ? <>Chaque requête de transcription et d’analyse est enregistrée ici avec son horodatage, statut et code d’erreur. Touchez une ligne pour les détails, ou utilisez <strong>Réessayer</strong> pour relancer le même appel.</>
+            : <>Every transcription and analysis request is logged here with timestamp, status and error code. Tap a row for full details, or use <strong>Retry</strong> to re-queue the same call.</>}
         </p>
       </Card>
 
@@ -167,11 +167,11 @@ export default function AIAuditScreen() {
             background: filter === f ? 'rgba(0,35,230,0.12)' : 'transparent',
             color: filter === f ? colors.textIce : colors.textSub,
             fontSize: 10.5, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase',
-          }}>{f}</button>
+          }}>{fr ? FILTER_FR[f] : f}</button>
         ))}
       </div>
       <input value={search} onChange={e => setSearch(e.target.value)}
-        placeholder="Search call id, error code, message…"
+        placeholder={fr ? 'Rechercher identifiant, code d’erreur, message…' : 'Search call id, error code, message…'}
         style={{
           width: '100%', padding: '8px 10px', borderRadius: radius.sm,
           border: `1px solid ${colors.border}`, background: 'rgba(255,255,255,0.04)',
@@ -187,10 +187,11 @@ export default function AIAuditScreen() {
       )}
 
       {loading ? (
-        <Card padded={true}><div style={{ color: colors.mutedSilver, fontSize: font.sm }}>Loading…</div></Card>
+        <Card padded={true}><div style={{ color: colors.mutedSilver, fontSize: font.sm }}>{t('common.loading')}</div></Card>
       ) : filtered.length === 0 ? (
-        <Card padded={true}><div style={{ color: colors.mutedSilver, fontSize: font.sm }}>No AI requests yet.</div></Card>
+        <Card padded={true}><div style={{ color: colors.mutedSilver, fontSize: font.sm }}>{fr ? 'Aucune requête IA.' : 'No AI requests yet.'}</div></Card>
       ) : (
+
         <Card padded={false}>
           {filtered.map((r, i) => (
             <div key={r.id} style={{
