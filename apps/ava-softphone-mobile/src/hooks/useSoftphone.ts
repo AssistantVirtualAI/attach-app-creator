@@ -490,8 +490,20 @@ export function useSoftphone(
     try {
       uaRef.current.call(`sip:${number}@${config.domain}`, {
         mediaConstraints: HD_AUDIO_CONSTRAINTS,
-        rtcOfferConstraints: { offerToReceiveAudio: true, offerToReceiveVideo: false },
+        rtcOfferConstraints: {
+          offerToReceiveAudio: true,
+          offerToReceiveVideo: false,
+          voiceActivityDetection: false,
+        },
         sessionDescriptionHandlerModifiers: [modifier],
+        // Empty iceServers + iceTransportPolicy:'none' makes WebRTC skip ICE
+        // gathering so the resulting SDP looks like classic RTP/AVP — exactly
+        // what FusionPBX expects (otherwise it answers 488 Not Acceptable).
+        pcConfig: {
+          iceServers: [],
+          iceTransportPolicy: 'none',
+          bundlePolicy: 'balanced',
+        },
         eventHandlers: {
           failed: (e: any) => {
             const msg = classifySipFailure({
