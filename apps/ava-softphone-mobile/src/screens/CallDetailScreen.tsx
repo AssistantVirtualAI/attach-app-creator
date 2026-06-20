@@ -6,6 +6,7 @@ import { Card, Chip, AIPanel, Skeleton, GhostButton } from '../components/ui/Pri
 import RecordingDebugScreen from './RecordingDebugScreen';
 import { showMobileToast } from '../lib/mobileToast';
 import { useMobileCredentials } from '../hooks/useMobileCredentials';
+import { useT } from '../lib/i18n';
 
 type AiStage = 'idle' | 'transcribing' | 'analyzing' | 'done' | 'error';
 
