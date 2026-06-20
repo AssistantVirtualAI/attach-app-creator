@@ -2,17 +2,28 @@ import React, { useEffect, useState } from 'react';
 import { colors, font, radius, gradients } from '../lib/theme';
 import type { Creds } from '../lib/creds';
 import { mobileApi, MeResponse } from '../lib/mobileApi';
-import { Card, Chip, SectionTitle, SettingsRow, StatusDot, GhostButton, AIPanel } from '../components/ui/Primitives';
+import { Card, Chip, SectionTitle, SettingsRow, StatusDot, AIPanel } from '../components/ui/Primitives';
 import { LemtelMark, AvaBadge } from '../components/Brand';
 import { checkAllPermissions, openAppSettings, type AllPermissions, type PermissionStatus } from '../lib/permissions';
+import { useTheme } from '../lib/ThemeContext';
+import { useT } from '../lib/i18n';
+import type { Tab } from '../components/BottomTabs';
+
+const PORTAL_URL = 'https://avastatistic.ca';
 
 export default function SettingsScreen({
-  creds, sp, onSignOut,
-}: { creds: Creds; sp: any; onSignOut: () => void }) {
+  creds, sp, onSignOut, onNavigate,
+}: { creds: Creds; sp: any; onSignOut: () => void; onNavigate?: (t: Tab) => void }) {
+  const { t, lang, setLang } = useT();
+  const { mode, toggle: toggleTheme } = useTheme();
   const [me, setMe] = useState<MeResponse | null>(null);
   const [dnd, setDnd] = useState(false);
   const [forwarding, setForwarding] = useState<string | null>(null);
   const [perms, setPerms] = useState<AllPermissions | null>(null);
+  const [haptics, setHaptics] = useState<boolean>(() => localStorage.getItem('ava.haptics') !== 'off');
+  const [autoAnswer, setAutoAnswer] = useState<boolean>(() => localStorage.getItem('ava.autoAnswer') === 'on');
+  const [ringtone, setRingtone] = useState<string>(() => localStorage.getItem('ava.ringtone') || 'AVA Default');
+  const [audioOut, setAudioOut] = useState<string>(() => localStorage.getItem('ava.audioOut') || 'System default');
 
   useEffect(() => {
     mobileApi.me().then((next) => {
@@ -25,9 +36,32 @@ export default function SettingsScreen({
 
   const toggleDnd = async () => { const next = !dnd; setDnd(next); try { await mobileApi.setDnd(next); } catch {} };
   const toggleFwd = async () => {
-    const next = forwarding ? null : '+1 514 555 0199';
-    setForwarding(next); try { await mobileApi.setForwarding(next); } catch {}
+    const cur = forwarding;
+    const next = cur ? null : prompt(lang === 'fr' ? 'Numéro de transfert (E.164):' : 'Forwarding number (E.164):', '+1');
+    if (next === undefined) return;
+    setForwarding(next || null);
+    try { await mobileApi.setForwarding(next || null); } catch {}
   };
+  const toggleHaptics = () => { const next = !haptics; setHaptics(next); localStorage.setItem('ava.haptics', next ? 'on' : 'off'); };
+  const toggleAutoAnswer = () => { const next = !autoAnswer; setAutoAnswer(next); localStorage.setItem('ava.autoAnswer', next ? 'on' : 'off'); };
+  const pickRingtone = () => {
+    const opts = ['AVA Default', 'Classic', 'Pulse', 'Marimba', 'Silent'];
+    const choice = prompt((lang === 'fr' ? 'Sonnerie' : 'Ringtone') + ` (${opts.join(', ')}):`, ringtone);
+    if (choice && opts.includes(choice)) { setRingtone(choice); localStorage.setItem('ava.ringtone', choice); }
+  };
+  const pickAudioOut = () => {
+    const opts = ['System default', 'Speaker', 'Earpiece', 'Bluetooth'];
+    const choice = prompt((lang === 'fr' ? 'Sortie audio' : 'Audio output') + ` (${opts.join(', ')}):`, audioOut);
+    if (choice && opts.includes(choice)) { setAudioOut(choice); localStorage.setItem('ava.audioOut', choice); }
+  };
+  const clearCache = () => {
+    if (!confirm(lang === 'fr' ? 'Vider le cache de l\'application ?' : 'Clear app cache?')) return;
+    Object.keys(localStorage)
+      .filter((k) => k.startsWith('ava.aisummary.') || k.startsWith('ava.cache.'))
+      .forEach((k) => localStorage.removeItem(k));
+    alert(lang === 'fr' ? 'Cache vidé.' : 'Cache cleared.');
+  };
+  const openPortal = (path = '') => window.open(`${PORTAL_URL}${path}`, '_blank', 'noopener');
 
   const s = sp?.snap?.status;
   const sipState: 'registered' | 'connecting' | 'retrying' | 'offline' =
@@ -50,173 +84,121 @@ export default function SettingsScreen({
             <div style={{ fontSize: font.xs, color: colors.mutedSilver, marginTop: 3, fontFamily: 'JetBrains Mono, monospace' }}>
               Ext {creds.extension} · {me?.client?.name ? `${me.client.name} · ` : ''}{me?.domain.sipDomain || me?.organization.name || creds.sipDomain || 'lemtel.tel'}
             </div>
-            <div style={{ marginTop: 6, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}><StatusDot state={sipState} /><Chip tone={me?.permissions.admin ? 'gold' : 'cyan'}>{me?.permissions.admin ? 'Admin domaine' : 'Utilisateur'}</Chip></div>
+            <div style={{ marginTop: 6, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <StatusDot state={sipState} />
+              <Chip tone={me?.permissions.admin ? 'gold' : 'cyan'}>{me?.permissions.admin ? t('settings.admin') : t('settings.user')}</Chip>
+            </div>
           </div>
         </div>
       </Card>
 
-      <SectionTitle eyebrow="Calling" title="Availability" />
+      {/* Appearance & language */}
+      <SectionTitle eyebrow={t('settings.appearance')} title={t('settings.appearance')} />
       <Card padded={false}>
-        <SettingsRow label="Do not disturb" icon="🔕" onPress={toggleDnd} right={<Switch on={dnd} />} />
-        <SettingsRow label="Call forwarding" icon="↪" onPress={toggleFwd} value={forwarding || 'Off'} right={<Switch on={!!forwarding} />} />
-        <SettingsRow label="Voicemail greeting" icon="🎙" value="Default · Lemtel AVA" onPress={() => {}} />
+        <SettingsRow
+          label={t('settings.theme')} icon="🌓"
+          value={mode === 'dark' ? t('settings.themeDark') : t('settings.themeLight')}
+          right={<Switch on={mode === 'dark'} />}
+          onPress={toggleTheme}
+        />
+        <SettingsRow
+          label={t('settings.language')} icon="🌐"
+          value={lang === 'fr' ? 'Français' : 'English'}
+          right={<LangPill lang={lang} />}
+          onPress={() => setLang(lang === 'fr' ? 'en' : 'fr')}
+        />
       </Card>
 
-      <SectionTitle eyebrow="Account" title="Extension & devices" />
+      {/* Calling */}
+      <SectionTitle eyebrow={t('settings.calling')} title={t('settings.availability')} />
       <Card padded={false}>
-        <SettingsRow label="Extension" icon="☎" value={me?.extension.number || creds.extension} />
-        <SettingsRow label="SIP domain" icon="🌐" value={me?.domain.sipDomain || me?.extension.sipDomain || creds.sipDomain || '—'} />
-        {me?.client && <SettingsRow label="Client" icon="◈" value={me.client.name} />}
-        <SettingsRow label="Data scope" icon="⌁" value={me?.dataScope === 'domain_admin' ? 'Domain-wide PBX' : 'Own extension only'} />
-        <SettingsRow label="Role" icon="◎" value={me?.role || creds.role || 'agent'} />
-        <SettingsRow label="Devices" icon="📱" value="This device · WebRTC" onPress={() => {}} />
-        <SettingsRow label="Notifications" icon="🔔" value="Push enabled" onPress={() => {}} />
+        <SettingsRow label={t('settings.dnd')} icon="🔕" onPress={toggleDnd} right={<Switch on={dnd} />} />
+        <SettingsRow label={t('settings.callForwarding')} icon="↪" onPress={toggleFwd} value={forwarding || t('common.off')} right={<Switch on={!!forwarding} />} />
+        <SettingsRow label={t('settings.voicemailGreeting')} icon="🎙" value={t('settings.defaultGreeting')} onPress={() => onNavigate?.('voicemail' as Tab)} />
+        <SettingsRow label={t('settings.autoAnswer')} icon="⚡" right={<Switch on={autoAnswer} />} onPress={toggleAutoAnswer} />
+        <SettingsRow label={t('settings.ringtone')} icon="🎵" value={ringtone} onPress={pickRingtone} />
+        <SettingsRow label={t('settings.audioOutput')} icon="🔊" value={audioOut} onPress={pickAudioOut} />
+        <SettingsRow label={t('settings.haptics')} icon="📳" right={<Switch on={haptics} />} onPress={toggleHaptics} />
       </Card>
 
-      <SectionTitle eyebrow="SIP" title="Debug" />
+      {/* Account */}
+      <SectionTitle eyebrow={t('settings.account')} title={t('settings.extDevices')} />
+      <Card padded={false}>
+        <SettingsRow label={t('settings.extension')} icon="☎" value={me?.extension.number || creds.extension} />
+        <SettingsRow label={t('settings.sipDomain')} icon="🌐" value={me?.domain.sipDomain || me?.extension.sipDomain || creds.sipDomain || '—'} />
+        {me?.client && <SettingsRow label={t('settings.client')} icon="◈" value={me.client.name} />}
+        <SettingsRow label={t('settings.dataScope')} icon="⌁" value={me?.dataScope === 'domain_admin' ? t('settings.scopeDomain') : t('settings.scopeOwn')} />
+        <SettingsRow label={t('settings.role')} icon="◎" value={me?.role || creds.role || 'agent'} />
+        <SettingsRow label={t('settings.devices')} icon="📱" value="This device · WebRTC" onPress={() => onNavigate?.('permissions' as Tab)} />
+        <SettingsRow label={t('settings.notifications')} icon="🔔" value={t('settings.pushEnabled')} onPress={() => openAppSettings()} />
+      </Card>
+
+      {/* Admin */}
+      {me?.permissions.admin && (
+        <>
+          <SectionTitle eyebrow={t('settings.workspace')} title={t('settings.adminTitle')} />
+          <Card padded={false}>
+            {me.permissions.canManageUsers && <SettingsRow label={t('settings.usersExt')} icon="👥" value={me.domain.sipDomain} onPress={() => openPortal('/dashboard/team')} />}
+            {me.permissions.canManageNumbers && <SettingsRow label={t('settings.phoneNumbers')} icon="#" value={t('settings.openPortal')} onPress={() => openPortal('/dashboard/phone-numbers')} />}
+            {me.permissions.canManageRouting && <SettingsRow label={t('settings.ivrs')} icon="🎛" value={t('settings.openPortal')} onPress={() => openPortal('/dashboard/routing')} />}
+            {me.permissions.canManageAgents && <SettingsRow label={t('settings.voiceAgents')} icon="🤖" value={t('settings.openPortal')} onPress={() => openPortal('/dashboard/agents')} />}
+            <SettingsRow label={t('settings.syncStatus')} icon="↻" value={s || 'idle'} onPress={() => sp?.reconnect?.()} />
+          </Card>
+        </>
+      )}
+
+      {/* SIP debug (collapsed, still useful) */}
+      <SectionTitle eyebrow="SIP" title={t('settings.diagnostics')} />
       <Card padded={false}>
         <SettingsRow label="Status" icon="●" value={sp?.snap?.status || 'idle'} />
         <SettingsRow label="WSS URL" icon="↔" value={sp?.sipConfig?.wssUrl || '—'} />
-        <SettingsRow label="Extension + domain" icon="☎" value={`${sp?.sipConfig?.extension || creds.extension || '—'}@${sp?.sipConfig?.domain || creds.sipDomain || '—'}`} />
-        <SettingsRow label="Last error" icon="!" value={sp?.snap?.error || 'None'} />
-        <SettingsRow
-          label="Retry attempts"
-          icon="↻"
-          value={sp?.retryLimitReached
-            ? `${sp.retryAttempt} — limit reached`
-            : sp?.retryAttempt ? `${sp.retryAttempt} (auto-backoff)` : '0'}
-        />
-        <SettingsRow label="Retry Registration" icon="↻" onPress={() => sp?.reconnect?.()} />
-        <SettingsRow
-          label="Clear SIP status"
-          icon="✕"
-          onPress={() => sp?.clearSipState?.()}
-          value="Reset persisted state"
-        />
+        <SettingsRow label="Last error" icon="!" value={sp?.snap?.error || t('common.none')} />
+        <SettingsRow label={lang === 'fr' ? "Relancer l'enregistrement" : 'Retry Registration'} icon="↻" onPress={() => sp?.reconnect?.()} />
+        <SettingsRow label={lang === 'fr' ? "Vider l'état SIP" : 'Clear SIP status'} icon="✕" onPress={() => sp?.clearSipState?.()} />
+        <SettingsRow label={lang === 'fr' ? 'Copier le journal SIP' : 'Copy SIP log'} icon="⧉" onPress={async () => {
+          const text = (sp?.sipLog || []).map((e: any) => `${new Date(e.time).toISOString()} [${e.level}] ${e.event}${e.detail ? ' — ' + e.detail : ''}`).join('\n');
+          try { await navigator.clipboard.writeText(text || ''); alert(lang === 'fr' ? 'Copié.' : 'Copied.'); } catch { alert('Copy failed'); }
+        }} />
       </Card>
 
-      {sp?.lastPersistedError && (
-        <>
-          <SectionTitle eyebrow="SIP" title="Last error (persisted)" />
-          <Card padded={false}>
-            <SettingsRow label="Message" icon="!" value={sp.lastPersistedError.error} />
-            <SettingsRow label="Extension" icon="☎" value={sp.lastPersistedError.extension || '—'} />
-            <SettingsRow label="Domain" icon="🌐" value={sp.lastPersistedError.domain || '—'} />
-            <SettingsRow
-              label="When"
-              icon="🕒"
-              value={new Date(sp.lastPersistedError.time).toLocaleString()}
-            />
-          </Card>
-        </>
-      )}
-
-      <SectionTitle eyebrow="SIP" title="Event log" />
-      <Card padded={true}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 11, color: colors.mutedSilver }}>
-            {(sp?.sipLog?.length || 0)} events (latest first)
-          </span>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button
-              onClick={async () => {
-                const text = (sp?.sipLog || [])
-                  .map((e: any) => `${new Date(e.time).toISOString()} [${e.level}] ${e.event}${e.detail ? ' — ' + e.detail : ''}`)
-                  .join('\n');
-                const payload = `# AVA SIP log\nExt: ${sp?.sipConfig?.extension || '—'}@${sp?.sipConfig?.domain || '—'}\nWSS: ${sp?.sipConfig?.wssUrl || '—'}\nStatus: ${sp?.snap?.status}\n\n${text}`;
-                try {
-                  if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(payload);
-                  else {
-                    const ta = document.createElement('textarea');
-                    ta.value = payload; document.body.appendChild(ta); ta.select();
-                    document.execCommand('copy'); document.body.removeChild(ta);
-                  }
-                  alert('SIP log copied to clipboard');
-                } catch { alert('Copy failed'); }
-              }}
-              style={{
-                background: 'transparent', border: `1px solid ${colors.border}`,
-                color: colors.textIce, fontSize: 11, padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
-              }}
-            >
-              Copy SIP log
-            </button>
-            <button
-              onClick={() => sp?.clearSipLog?.()}
-              style={{
-                background: 'transparent', border: `1px solid ${colors.border}`,
-                color: colors.textIce, fontSize: 11, padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
-              }}
-            >
-              Clear log
-            </button>
-          </div>
-        </div>
-        <div style={{
-          maxHeight: 260, overflowY: 'auto', fontFamily: 'JetBrains Mono, monospace',
-          fontSize: 10.5, background: 'rgba(0,0,0,0.35)', border: `1px solid ${colors.border}`,
-          borderRadius: 8, padding: 8, lineHeight: 1.5,
-        }}>
-          {(sp?.sipLog || []).length === 0 ? (
-            <div style={{ color: colors.mutedSilver }}>No SIP events recorded yet.</div>
-          ) : (
-            [...(sp?.sipLog || [])].reverse().map((e: any, i: number) => {
-              const c = e.level === 'error' ? '#ef4444' : e.level === 'warn' ? '#f59e0b' : '#93c5fd';
-              return (
-                <div key={i} style={{ marginBottom: 4, color: '#e5e7eb' }}>
-                  <span style={{ color: colors.mutedSilver }}>
-                    {new Date(e.time).toLocaleTimeString()}
-                  </span>{' '}
-                  <span style={{ color: c, fontWeight: 700 }}>{e.event}</span>
-                  {e.detail && <span style={{ color: '#cbd5e1' }}> — {e.detail}</span>}
-                </div>
-              );
-            })
-          )}
-        </div>
-      </Card>
-
-      {me?.permissions.admin && (
-        <>
-          <SectionTitle eyebrow="Admin" title="Workspace controls" />
-          <Card padded={false}>
-            {me.permissions.canManageUsers && <SettingsRow label="Users & extensions" icon="👥" value={me.domain.sipDomain} onPress={() => {}} />}
-            {me.permissions.canManageNumbers && <SettingsRow label="Phone numbers" icon="#" value="Domain inventory" onPress={() => {}} />}
-            {me.permissions.canManageRouting && <SettingsRow label="IVRs, queues & routing" icon="🎛" value="Editable in AVA portal" onPress={() => {}} />}
-            {me.permissions.canManageAgents && <SettingsRow label="Voice agents" icon="🤖" value="Domain agents" onPress={() => {}} />}
-            <SettingsRow label="Sync status" icon="↻" value="Live PBX scope" onPress={() => {}} />
-          </Card>
-        </>
-      )}
-
-      <SectionTitle eyebrow="Privacy" title="Permissions" />
+      {/* Permissions */}
+      <SectionTitle eyebrow={t('settings.privacy')} title={t('settings.permissions')} />
       <Card padded={false}>
         {PERMISSION_ITEMS.map((item) => (
           <SettingsRow
             key={item.key}
-            label={item.label}
+            label={lang === 'fr' ? PERMISSION_FR[item.key].label : item.label}
             icon={item.icon}
-            value={item.sublabel}
-            right={<PermBadge status={perms?.[item.key as keyof AllPermissions] ?? 'prompt'} />}
-            onPress={() => {
-              const s = perms?.[item.key as keyof AllPermissions];
-              if (s === 'denied') openAppSettings();
-            }}
+            value={lang === 'fr' ? PERMISSION_FR[item.key].sublabel : item.sublabel}
+            right={<PermBadge status={perms?.[item.key as keyof AllPermissions] ?? 'prompt'} lang={lang} />}
+            onPress={() => openAppSettings()}
           />
         ))}
-        <SettingsRow label="Open device settings" icon="⚙" onPress={() => openAppSettings()} />
+        <SettingsRow label={t('common.openSettings')} icon="⚙" onPress={() => openAppSettings()} />
       </Card>
 
-      <SectionTitle eyebrow="Privacy" title="Security & data" />
+      {/* Security & data */}
+      <SectionTitle eyebrow={t('settings.privacy')} title={t('settings.security')} />
       <Card padded={false}>
-        <SettingsRow label="Diagnostics" icon="📊" onPress={() => {}} />
-        <SettingsRow label="About" icon="ⓘ" value="v1.0.0" onPress={() => {}} />
+        <SettingsRow label={t('settings.dataSafety')} icon="🛡" onPress={() => openPortal('/data-safety')} />
+        <SettingsRow label={t('settings.privacyPolicy')} icon="📄" onPress={() => openPortal('/privacy')} />
+        <SettingsRow label={t('settings.termsOfService')} icon="📜" onPress={() => openPortal('/terms')} />
+        <SettingsRow label={t('settings.clearCache')} icon="🧹" onPress={clearCache} />
+        <SettingsRow label={t('settings.deleteAccount')} icon="⚠" onPress={() => openPortal('/account/delete')} />
       </Card>
 
+      {/* Support & about */}
+      <SectionTitle eyebrow={t('settings.about')} title={t('settings.helpSupport')} />
+      <Card padded={false}>
+        <SettingsRow label={t('settings.helpSupport')} icon="❓" onPress={() => window.open('mailto:support@lemtel.tel?subject=AVA%20Softphone%20support', '_blank')} />
+        <SettingsRow label={t('settings.about')} icon="ⓘ" value={`${t('settings.version')} 1.0.0`} onPress={() => alert('AVA Softphone v1.0.0\nPowered by Lemtel · AVA AI')} />
+      </Card>
 
-      <AIPanel title="AVA powers this app" accent={colors.avaCyan}>
+      <AIPanel title="AVA" accent={colors.avaCyan}>
         <p style={{ fontSize: font.sm, color: colors.textIce, margin: 0, lineHeight: 1.55 }}>
-          All telephony data is scoped by the authenticated AVA organization/domain. Standard users can access only their own extension, while domain admins can manage the phone system features enabled for their role. No PBX secrets are exposed on this device.
+          {lang === 'fr'
+            ? "Toutes les données téléphoniques sont limitées à l'organisation/domaine AVA authentifié. Les utilisateurs standard accèdent uniquement à leur extension; les admins gèrent ce que leur rôle permet."
+            : 'All telephony data is scoped by the authenticated AVA organization/domain. Standard users access only their own extension; domain admins manage what their role allows.'}
         </p>
       </AIPanel>
 
@@ -225,7 +207,7 @@ export default function SettingsScreen({
         background: 'rgba(255,77,103,0.12)', border: `1px solid ${colors.danger}55`,
         color: colors.danger, fontSize: font.base, fontWeight: 700, cursor: 'pointer',
       }}>
-        Sign out
+        {t('settings.signOut')}
       </button>
 
       <div style={{ textAlign: 'center', marginTop: 18, fontSize: 10, color: colors.mutedSilver, letterSpacing: 0.4 }}>
@@ -255,6 +237,17 @@ function Switch({ on }: { on: boolean }) {
   );
 }
 
+function LangPill({ lang }: { lang: 'en' | 'fr' }) {
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center',
+      padding: '3px 10px', borderRadius: 999,
+      background: `linear-gradient(135deg, ${colors.lemtelBlue}, ${colors.avaCyan})`,
+      color: '#fff', fontSize: 11, fontWeight: 800, letterSpacing: 0.8,
+    }}>{lang.toUpperCase()}</span>
+  );
+}
+
 const PERMISSION_ITEMS = [
   { key: 'microphone',    icon: '🎤', label: 'Microphone',    sublabel: 'Required for calls' },
   { key: 'speaker',       icon: '🔊', label: 'Speaker',       sublabel: 'For call audio' },
@@ -262,12 +255,20 @@ const PERMISSION_ITEMS = [
   { key: 'notifications', icon: '🔔', label: 'Notifications', sublabel: 'For incoming calls' },
 ] as const;
 
-function PermBadge({ status }: { status: PermissionStatus }) {
+const PERMISSION_FR: Record<string, { label: string; sublabel: string }> = {
+  microphone:    { label: 'Microphone',    sublabel: 'Requis pour les appels' },
+  speaker:       { label: 'Haut-parleur',  sublabel: 'Pour le son des appels' },
+  contacts:      { label: 'Contacts',      sublabel: 'Pour l\'identification' },
+  notifications: { label: 'Notifications', sublabel: 'Pour les appels entrants' },
+};
+
+function PermBadge({ status, lang }: { status: PermissionStatus; lang: 'en' | 'fr' }) {
+  const fr = lang === 'fr';
   const cfg =
-    status === 'granted' ? { dot: '#10B981', label: 'Granted' } :
-    status === 'denied'  ? { dot: colors.danger, label: 'Denied' } :
+    status === 'granted' ? { dot: '#10B981', label: fr ? 'Accordé' : 'Granted' } :
+    status === 'denied'  ? { dot: colors.danger, label: fr ? 'Refusé' : 'Denied' } :
     status === 'unsupported' ? { dot: colors.mutedSilver, label: 'N/A' } :
-                           { dot: colors.mutedSilver, label: 'Ask' };
+                           { dot: colors.mutedSilver, label: fr ? 'Demander' : 'Ask' };
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 6,
