@@ -38,9 +38,10 @@ export default function MoreScreen({
   if (sub === 'datasafety')  return <SubPage onBack={() => setSub(null)} title={tr.more.dataSafety}><DataSafetyScreen /></SubPage>;
   if (sub === 'permissions') return <SubPage onBack={() => setSub(null)} title={tr.more.permissions}><PermissionsScreen /></SubPage>;
   if (sub === 'support')     return <SubPage onBack={() => setSub(null)} title={tr.more.support}><SupportScreen /></SubPage>;
-  if (sub === 'aiaudit')     return <SubPage onBack={() => setSub(null)} title={tr.more.aiAudit}><AIAuditScreen /></SubPage>;
-  if (sub === 'queues')      return <SubPage onBack={() => setSub(null)} title={tr.more.queues}><QueuesScreen /></SubPage>;
-  if (sub === 'features')    return <SubPage onBack={() => setSub(null)} title={tr.more.callingFeatures}><FeaturesScreen sp={sp} /></SubPage>;
+  if (sub === 'aiaudit')     return <SubPage onBack={() => setSub(null)} title={tr.more.aiAudit}><Suspense fallback={<ScreenSkeleton />}><AIAuditScreen /></Suspense></SubPage>;
+  if (sub === 'queues')      return <SubPage onBack={() => setSub(null)} title={tr.more.queues}><Suspense fallback={<ScreenSkeleton />}><QueuesScreen /></Suspense></SubPage>;
+  if (sub === 'features')    return <SubPage onBack={() => setSub(null)} title={tr.more.callingFeatures}><Suspense fallback={<ScreenSkeleton />}><FeaturesScreen sp={sp} /></Suspense></SubPage>;
+
 
   return (
     <div style={{ height: '100%', overflowY: 'auto', padding: '14px 14px 20px' }}>
