@@ -280,7 +280,7 @@ function RecordingAiPanel({ rec }: { rec: RecordingEntry }) {
           )}
 
           {data?.summary && (
-            <AIPanel title="Summary" accent={colors.avaViolet}>
+            <AIPanel title={fr ? 'Résumé' : 'Summary'} accent={colors.avaViolet}>
               <p style={{ fontSize: font.sm, lineHeight: 1.5, color: colors.textIce, margin: 0 }}>{data.summary}</p>
               <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
                 {data.coachingScore != null && <Chip tone="cyan" size="xs">Coaching {data.coachingScore}/5</Chip>}
