@@ -6,11 +6,14 @@ import { Card, Chip, AIPanel, Skeleton, GhostButton } from '../components/ui/Pri
 import RecordingDebugScreen from './RecordingDebugScreen';
 import { showMobileToast } from '../lib/mobileToast';
 import { useMobileCredentials } from '../hooks/useMobileCredentials';
+import { useT } from '../lib/i18n';
 
 type AiStage = 'idle' | 'transcribing' | 'analyzing' | 'done' | 'error';
 
 export default function CallDetailScreen({ id, onBack }: { id: string; onBack: () => void }) {
   const mobile = useMobileCredentials();
+  const { lang } = useT();
+  const fr = lang === 'fr';
   const [debugOpen, setDebugOpen] = useState(false);
   const [data, setData] = useState<CallDetail | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -175,10 +178,10 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
   const hasTranscript = (data?.transcript?.length || 0) > 0;
   const aiDone = hasTranscript && !!data?.summary;
   const statusText = transcribing
-    ? aiStage === 'analyzing' ? 'AI analysis: en cours — scoring/coaching' : 'AI analysis: en cours — transcription'
-    : aiDone || data?.aiCached ? 'AI analysis: déjà traité — cache réutilisé'
-    : transcribeError || data?.aiError ? 'AI analysis: échec'
-    : 'AI analysis: non traité';
+    ? aiStage === 'analyzing' ? (fr ? 'Analyse IA : en cours — scoring/coaching' : 'AI analysis: in progress — scoring/coaching') : (fr ? 'Analyse IA : transcription en cours' : 'AI analysis: transcribing')
+    : aiDone || data?.aiCached ? (fr ? 'Analyse IA : déjà traité — cache réutilisé' : 'AI analysis: cached')
+    : transcribeError || data?.aiError ? (fr ? 'Analyse IA : échec' : 'AI analysis: failed')
+    : (fr ? 'Analyse IA : non traité' : 'AI analysis: not processed');
 
   if (debugOpen) return <RecordingDebugScreen callId={id} onBack={() => setDebugOpen(false)} />;
 
@@ -192,13 +195,13 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
         background: 'rgba(255,255,255,0.04)',
         border: `1px solid ${colors.border}`,
         borderRadius: 999, color: colors.textIce, fontSize: font.sm, cursor: 'pointer',
-      }}>← Back</button>
+      }}>← {fr ? 'Retour' : 'Back'}</button>
 
       {!data && <Skeleton w="60%" h={22} />}
       {data && (
         <>
           <div style={{ marginBottom: 4, fontSize: 10.5, fontWeight: 800, letterSpacing: 1.4, color: colors.signalGold, textTransform: 'uppercase' }}>
-            {data.direction === 'in' ? 'Inbound call' : 'Outbound call'}
+            {data.direction === 'in' ? (fr ? 'Appel entrant' : 'Inbound call') : (fr ? 'Appel sortant' : 'Outbound call')}
           </div>
           <h1 style={{ fontSize: font.xxl, color: colors.textIce, margin: '2px 0 6px', fontWeight: 800, letterSpacing: -0.3 }}>
             {data.customer || data.from}
@@ -234,7 +237,7 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
                   opacity: loadingAudio ? 0.6 : 1,
                 }}>
                   {loadingAudio ? <Loader2 size={14} className="spin" /> : playing ? <Pause size={14} /> : <Play size={14} />}
-                  {loadingAudio ? 'Loading' : playing ? 'Pause' : 'Play'}
+                  {loadingAudio ? (fr ? 'Chargement' : 'Loading') : playing ? (fr ? 'Pause' : 'Pause') : (fr ? 'Lire' : 'Play')}
                 </button>
                 <span style={{ fontSize: 11, color: colors.mutedSilver, fontFamily: 'JetBrains Mono, monospace' }}>{fmt(dur || data.durationSec)}</span>
               </div>
@@ -243,10 +246,10 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
                   <span>⚠ {audioError}</span>
                   <div style={{ display: 'flex', gap: 6 }}>
                     <button onClick={retry} style={{ background: 'transparent', border: `1px solid ${colors.danger}`, color: colors.danger, borderRadius: 6, padding: '4px 8px', fontSize: 11, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                      <RefreshCw size={11} /> Retry
+                      <RefreshCw size={11} /> {fr ? 'Réessayer' : 'Retry'}
                     </button>
                     <button onClick={() => setDebugOpen(true)} style={{ background: 'transparent', border: `1px solid ${colors.mutedSilver}`, color: colors.mutedSilver, borderRadius: 6, padding: '4px 8px', fontSize: 11, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                      <Stethoscope size={11} /> Debug
+                      <Stethoscope size={11} /> {fr ? 'Diagnostic' : 'Debug'}
                     </button>
                   </div>
                 </div>
@@ -260,7 +263,7 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <Sparkles size={18} color={colors.avaViolet} />
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: font.base, fontWeight: 700, color: colors.textIce }}>No transcript yet</div>
+                  <div style={{ fontSize: font.base, fontWeight: 700, color: colors.textIce }}>{fr ? 'Aucune transcription' : 'No transcript yet'}</div>
                   <div style={{ fontSize: font.xs, color: colors.mutedSilver, marginTop: 2 }}>
                     {statusText}
                   </div>
@@ -272,7 +275,7 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
                   opacity: transcribing ? 0.6 : 1, display: 'inline-flex', alignItems: 'center', gap: 6,
                 }}>
                   {transcribing ? <Loader2 size={12} className="spin" /> : <Sparkles size={12} />}
-                  {transcribing ? 'Working…' : 'Transcribe'}
+                  {transcribing ? (fr ? 'Traitement…' : 'Working…') : (fr ? 'Transcrire' : 'Transcribe')}
                 </button>
               </div>
               {transcribeError && (
@@ -287,17 +290,17 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
                 <div>
                   <div style={{ fontSize: 10, color: colors.avaViolet, letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 800 }}>{statusText}</div>
                   <div style={{ marginTop: 4, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    <Chip tone="success" size="xs">Transcript cached</Chip>
-                    {data.summary && <Chip tone="violet" size="xs">Insight cached</Chip>}
-                    {data.qualityScore > 0 && <Chip tone="gold" size="xs">Score {data.qualityScore}/100</Chip>}
-                    {data.coachingScore != null && <Chip tone="cyan" size="xs">Coaching {data.coachingScore}/5</Chip>}
+                    <Chip tone="success" size="xs">{fr ? 'Transcription en cache' : 'Transcript cached'}</Chip>
+                    {data.summary && <Chip tone="violet" size="xs">{fr ? 'Aperçu en cache' : 'Insight cached'}</Chip>}
+                    {data.qualityScore > 0 && <Chip tone="gold" size="xs">{fr ? 'Score' : 'Score'} {data.qualityScore}/100</Chip>}
+                    {data.coachingScore != null && <Chip tone="cyan" size="xs">{fr ? 'Coaching' : 'Coaching'} {data.coachingScore}/5</Chip>}
                   </div>
                 </div>
                 <button onClick={transcribe} disabled={transcribing} style={{
                   padding: '7px 11px', borderRadius: 999, border: `1px solid ${colors.borderAI}`,
                   background: transcribing ? 'rgba(255,255,255,0.06)' : gradients.ai,
                   color: colors.textIce, fontSize: 11, fontWeight: 800, cursor: transcribing ? 'wait' : 'pointer',
-                }}>{transcribing ? 'Running…' : 'Re-launch'}</button>
+                }}>{transcribing ? (fr ? 'En cours…' : 'Running…') : (fr ? 'Relancer' : 'Re-launch')}</button>
               </div>
               {(transcribeError || data.aiError) && (
                 <div ref={errorRef} id="ai-error" style={{ marginTop: 10, padding: 8, borderRadius: radius.md, border: `1px solid ${colors.danger}55`, color: colors.danger, fontSize: 11 }}>
@@ -309,10 +312,10 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
 
           {/* AI Summary */}
           {data.summary && (
-            <AIPanel title="AVA Summary" accent={colors.avaViolet}>
+            <AIPanel title={fr ? 'Résumé AVA' : 'AVA Summary'} accent={colors.avaViolet}>
               <p style={{ fontSize: font.base, lineHeight: 1.55, color: colors.textIce, margin: 0 }}>{data.summary}</p>
               <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
-                {data.qualityScore > 0 && <Chip tone="gold">Quality {data.qualityScore}/100</Chip>}
+                {data.qualityScore > 0 && <Chip tone="gold">{fr ? 'Qualité' : 'Quality'} {data.qualityScore}/100</Chip>}
                 {data.coachingScore != null && <Chip tone="cyan">Coaching {data.coachingScore}/5</Chip>}
                 {data.sentiment && <Chip tone={data.sentiment === 'positive' ? 'success' : data.sentiment === 'negative' ? 'danger' : 'neutral'}>{data.sentiment}</Chip>}
                 {data.intent && <Chip tone="cyan">{data.intent}</Chip>}
@@ -321,7 +324,7 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
           )}
 
           {data.coachingNotes && data.coachingNotes.length > 0 && (
-            <AIPanel title="Coaching notes" accent={colors.avaCyan}>
+            <AIPanel title={fr ? 'Notes de coaching' : 'Coaching notes'} accent={colors.avaCyan}>
               {data.coachingNotes.map((note, i) => (
                 <div key={i} style={{ fontSize: font.base, color: colors.textIce, lineHeight: 1.45, padding: '5px 0' }}>✦ {note}</div>
               ))}
@@ -330,7 +333,7 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
 
           {/* Action items */}
           {data.actionItems?.length > 0 && (
-            <AIPanel title="Action items" accent={colors.success}>
+            <AIPanel title={fr ? 'Actions à faire' : 'Action items'} accent={colors.success}>
               {data.actionItems.map((a, i) => (
                 <div key={i} style={{ display: 'flex', gap: 10, padding: '6px 0', borderBottom: i === data.actionItems.length - 1 ? 'none' : `1px solid ${colors.border}` }}>
                   <span style={{ color: colors.success }}>→</span>
@@ -342,7 +345,7 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
 
           {/* Topics */}
           {data.topics?.length > 0 && (
-            <AIPanel title="Topics" accent={colors.avaCyan}>
+            <AIPanel title={fr ? 'Sujets' : 'Topics'} accent={colors.avaCyan}>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {data.topics.map((t) => <Chip key={t} tone="cyan">{t}</Chip>)}
               </div>
@@ -351,7 +354,7 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
 
           {/* Transcript */}
           {hasTranscript && (
-            <AIPanel title="Transcript" accent={colors.signalGold}>
+            <AIPanel title={fr ? 'Transcription' : 'Transcript'} accent={colors.signalGold}>
               {data.transcript.map((line, i) => (
                 <div key={i} style={{
                   display: 'flex', flexDirection: 'column',
@@ -374,9 +377,9 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
           )}
 
           <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-            <GhostButton tone="gold" style={{ flex: 1 }}>Tag</GhostButton>
-            <GhostButton tone="cyan" style={{ flex: 1 }}>Share</GhostButton>
-            <GhostButton tone="violet" style={{ flex: 1 }} onClick={transcribe}>Re-analyze</GhostButton>
+            <GhostButton tone="gold" style={{ flex: 1 }}>{fr ? 'Étiqueter' : 'Tag'}</GhostButton>
+            <GhostButton tone="cyan" style={{ flex: 1 }}>{fr ? 'Partager' : 'Share'}</GhostButton>
+            <GhostButton tone="violet" style={{ flex: 1 }} onClick={transcribe}>{fr ? 'Ré-analyser' : 'Re-analyze'}</GhostButton>
           </div>
 
           <div style={{ height: 60 }} />

@@ -38,7 +38,7 @@ import { configureMobileApi } from './lib/mobileApi';
 import { configureAudit, audit } from './lib/audit';
 import { edgeCall } from './lib/mobileSupabase';
 import PerfOverlay from './components/PerfOverlay';
-import { startPrefetch } from './lib/prefetch';
+import { startPrefetch, prefetchForTab } from './lib/prefetch';
 
 const isPreviewMode = (() => {
   try { return new URLSearchParams(window.location.search).get('preview') === '1'; }
@@ -321,7 +321,8 @@ function AuthenticatedShell({
       position: 'relative',
     }}>
       <audio ref={audioRef} autoPlay playsInline />
-      <SyncIndicator />
+
+
 
 
       <div key={tab} className="lemtel-page-enter" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
@@ -346,6 +347,7 @@ function AuthenticatedShell({
           haptic(ImpactStyle.Light);
           if (t === 'calls') notif.markSeen('calls');
           if (t === 'voicemail') notif.markSeen('voicemail');
+          try { prefetchForTab(t); } catch {}
           setTab(t);
         }}
         badges={{

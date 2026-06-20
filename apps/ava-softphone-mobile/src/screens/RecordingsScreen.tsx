@@ -7,6 +7,7 @@ import type { Creds } from '../lib/creds';
 import { restGet, loadPbxRecordingAudioMobile } from '../lib/mobileSupabase';
 import { showMobileToast } from '../lib/mobileToast';
 import { useCallAi } from '../hooks/useCallAi';
+import { useT } from '../lib/i18n';
 
 export default function RecordingsScreen({
   creds,
@@ -30,6 +31,8 @@ export default function RecordingsScreen({
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const { lang } = useT();
+  const fr = lang === 'fr';
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Load recordings
@@ -121,39 +124,39 @@ export default function RecordingsScreen({
             flex: 1, padding: '7px 10px', borderRadius: 10, border: `1px solid ${colors.border}`,
             background: 'rgba(255,255,255,0.06)', color: colors.textIce, fontSize: 12, fontWeight: 700,
           }}>
-            <option value="all">All extensions (domain)</option>
-            {myExtension && <option value={myExtension}>Mine ({myExtension})</option>}
+            <option value="all">{fr ? 'Toutes les extensions (domaine)' : 'All extensions (domain)'}</option>
+            {myExtension && <option value={myExtension}>{fr ? `La mienne (${myExtension})` : `Mine (${myExtension})`}</option>}
             {extensionOptions.filter((e) => e !== myExtension).map((e) => <option key={e} value={e}>{e}</option>)}
           </select>
           {extensionOptions.length === 0 && (
-            <span style={{ fontSize: 10, color: colors.mutedSilver }}>Loading…</span>
+            <span style={{ fontSize: 10, color: colors.mutedSilver }}>{fr ? 'Chargement…' : 'Loading…'}</span>
           )}
         </div>
       ) : (
         myExtension && (
           <div style={{ fontSize: font.xs, color: colors.mutedSilver, margin: '6px 2px 10px' }}>
-            Showing recordings for your extension {myExtension}.
+            {fr ? `Enregistrements de votre extension ${myExtension}.` : `Showing recordings for your extension ${myExtension}.`}
           </div>
         )
       )}
 
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', margin: '0 2px 10px' }}>
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name, number, extension…" style={{ flex: 1, minWidth: 0, padding: '8px 10px', borderRadius: 10, border: `1px solid ${colors.border}`, background: 'rgba(255,255,255,0.06)', color: colors.textIce, fontSize: 12, outline: 'none' }} />
-        {([7, 30] as const).map((d) => <button key={d} onClick={() => onRangeDaysChange(d)} style={{ padding: '7px 9px', borderRadius: 10, border: `1px solid ${rangeDays === d ? colors.borderGold : colors.border}`, background: rangeDays === d ? colors.signalGold + '1a' : 'rgba(255,255,255,0.04)', color: rangeDays === d ? colors.signalGold : colors.mutedSilver, fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>{d}d</button>)}
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={fr ? 'Rechercher nom, numéro, extension…' : 'Search name, number, extension…'} style={{ flex: 1, minWidth: 0, padding: '8px 10px', borderRadius: 10, border: `1px solid ${colors.border}`, background: 'rgba(255,255,255,0.06)', color: colors.textIce, fontSize: 12, outline: 'none' }} />
+        {([7, 30] as const).map((d) => <button key={d} onClick={() => onRangeDaysChange(d)} style={{ padding: '7px 9px', borderRadius: 10, border: `1px solid ${rangeDays === d ? colors.borderGold : colors.border}`, background: rangeDays === d ? colors.signalGold + '1a' : 'rgba(255,255,255,0.04)', color: rangeDays === d ? colors.signalGold : colors.mutedSilver, fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>{d}{fr ? 'j' : 'd'}</button>)}
       </div>
 
       <audio ref={audioRef} onEnded={() => setPlayingId(null)} style={{ width: '100%', marginBottom: 10 }} controls />
 
       {error && (
         <Card accent="gold" style={{ marginBottom: 10 }}>
-          <div style={{ fontSize: font.sm, color: colors.danger, fontWeight: 700 }}>Failed to load recordings</div>
+          <div style={{ fontSize: font.sm, color: colors.danger, fontWeight: 700 }}>{fr ? 'Échec du chargement des enregistrements' : 'Failed to load recordings'}</div>
           <div style={{ fontSize: 11, color: colors.mutedSilver, marginTop: 4 }}>{error}</div>
         </Card>
       )}
 
       {!items && <ListSkeleton rows={5} />}
       {items && items.filter((r) => !search.trim() || [r.customer, r.from, r.to, r.extension, r.summary].filter(Boolean).join(' ').toLowerCase().includes(search.trim().toLowerCase())).length === 0 && (
-        <EmptyState icon="🎙" title="No recordings yet" hint={isAdmin ? 'No domain recordings match this filter.' : 'Recordings for your extension will appear here.'} />
+        <EmptyState icon="🎙" title={fr ? 'Aucun enregistrement' : 'No recordings yet'} hint={isAdmin ? (fr ? 'Aucun enregistrement du domaine ne correspond à ce filtre.' : 'No domain recordings match this filter.') : (fr ? 'Les enregistrements de votre extension apparaîtront ici.' : 'Recordings for your extension will appear here.')} />
       )}
       {items && items.filter((r) => !search.trim() || [r.customer, r.from, r.to, r.extension, r.summary].filter(Boolean).join(' ').toLowerCase().includes(search.trim().toLowerCase())).map((r) => (
         <div key={r.id} style={{ marginBottom: 8 }}>
@@ -177,7 +180,7 @@ export default function RecordingsScreen({
               textAlign: 'left', cursor: 'pointer', padding: 0,
             }}>
               <div style={{ fontSize: font.base, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {r.customer || r.from || r.to || 'Unknown caller'}
+                {r.customer || r.from || r.to || (fr ? 'Appelant inconnu' : 'Unknown caller')}
               </div>
               <div style={{ fontSize: font.xs, color: colors.mutedSilver, fontFamily: 'JetBrains Mono, monospace', marginTop: 2 }}>
                 {r.from} → {r.to}{r.extension ? ` · ext ${r.extension}` : ''}
@@ -195,7 +198,7 @@ export default function RecordingsScreen({
                   borderRadius: 8, padding: '2px 6px', fontSize: 10, fontWeight: 800, cursor: 'pointer',
                   display: 'inline-flex', alignItems: 'center', gap: 4,
                 }}>
-                  <Sparkles size={10} /> {expandedId === r.id ? 'Hide' : 'AI'}
+                  <Sparkles size={10} /> {expandedId === r.id ? (fr ? 'Masquer' : 'Hide') : 'AI'}
                 </button>
               </div>
             </div>
@@ -210,6 +213,8 @@ export default function RecordingsScreen({
 }
 
 function RecordingAiPanel({ rec }: { rec: RecordingEntry }) {
+  const { lang } = useT();
+  const fr = lang === 'fr';
   const meta = useMemo(() => ({
     recording_path: rec.record_path,
     recording_name: rec.record_name,
@@ -233,11 +238,11 @@ function RecordingAiPanel({ rec }: { rec: RecordingEntry }) {
   }, [loading, running, hasTranscript, hasAi, error, run]);
 
   const statusText = running
-    ? stage === 'analyzing' ? 'Analyzing call · coaching & sentiment…' : 'Transcribing audio with AI…'
-    : error ? 'AI run failed'
-    : hasAi ? 'AI ready · cached'
-    : hasTranscript ? 'Transcript ready'
-    : 'Preparing AI…';
+    ? stage === 'analyzing' ? (fr ? 'Analyse · coaching et sentiment…' : 'Analyzing call · coaching & sentiment…') : (fr ? 'Transcription audio par IA…' : 'Transcribing audio with AI…')
+    : error ? (fr ? 'Échec de l\'IA' : 'AI run failed')
+    : hasAi ? (fr ? 'IA prête · en cache' : 'AI ready · cached')
+    : hasTranscript ? (fr ? 'Transcription prête' : 'Transcript ready')
+    : (fr ? 'Préparation de l\'IA…' : 'Preparing AI…');
 
   return (
     <div style={{ margin: '8px 0 0', padding: 12, borderRadius: radius.lg, border: `1px solid ${colors.borderAI}`, background: 'rgba(122,76,255,0.05)' }}>
@@ -254,7 +259,7 @@ function RecordingAiPanel({ rec }: { rec: RecordingEntry }) {
               display: 'inline-flex', alignItems: 'center', gap: 4,
             }}>
               {running ? <Loader2 size={11} className="spin" /> : <Sparkles size={11} />}
-              {running ? 'Working…' : error ? 'Retry' : (hasTranscript || hasAi) ? 'Re-run AI' : 'Transcribe & analyze'}
+              {running ? (fr ? 'Traitement…' : 'Working…') : error ? (fr ? 'Réessayer' : 'Retry') : (hasTranscript || hasAi) ? (fr ? 'Relancer l\'IA' : 'Re-run AI') : (fr ? 'Transcrire et analyser' : 'Transcribe & analyze')}
             </button>
           </div>
 
@@ -265,28 +270,28 @@ function RecordingAiPanel({ rec }: { rec: RecordingEntry }) {
 
           {error && (
             <div style={{ marginBottom: 8, padding: 10, borderRadius: radius.md, border: `1px solid ${colors.danger}55`, background: `${colors.danger}10` }}>
-              <div style={{ color: colors.danger, fontSize: 11, fontWeight: 800, marginBottom: 4 }}>⚠ Transcription failed</div>
+              <div style={{ color: colors.danger, fontSize: 11, fontWeight: 800, marginBottom: 4 }}>⚠ {fr ? 'Échec de la transcription' : 'Transcription failed'}</div>
               <div style={{ color: colors.mutedSilver, fontSize: 11, marginBottom: 8, wordBreak: 'break-word' }}>{error}</div>
               <button onClick={run} disabled={running} style={{
                 padding: '5px 10px', borderRadius: 8, border: `1px solid ${colors.danger}80`,
                 background: 'transparent', color: colors.danger, fontSize: 10.5, fontWeight: 800, cursor: 'pointer',
-              }}>↻ Retry AI run</button>
+              }}>↻ {fr ? 'Relancer l\'IA' : 'Retry AI run'}</button>
             </div>
           )}
 
           {data?.summary && (
-            <AIPanel title="Summary" accent={colors.avaViolet}>
+            <AIPanel title={fr ? 'Résumé' : 'Summary'} accent={colors.avaViolet}>
               <p style={{ fontSize: font.sm, lineHeight: 1.5, color: colors.textIce, margin: 0 }}>{data.summary}</p>
               <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
                 {data.coachingScore != null && <Chip tone="cyan" size="xs">Coaching {data.coachingScore}/5</Chip>}
-                {data.qualityScore > 0 && <Chip tone="gold" size="xs">Quality {data.qualityScore}/100</Chip>}
+                {data.qualityScore > 0 && <Chip tone="gold" size="xs">{fr ? 'Qualité' : 'Quality'} {data.qualityScore}/100</Chip>}
                 {data.sentiment && <Chip tone={data.sentiment === 'positive' ? 'success' : data.sentiment === 'negative' ? 'danger' : 'neutral'} size="xs">{data.sentiment}</Chip>}
               </div>
             </AIPanel>
           )}
 
           {data?.coachingNotes && data.coachingNotes.length > 0 && (
-            <AIPanel title="Coaching notes" accent={colors.avaCyan}>
+            <AIPanel title={fr ? 'Notes de coaching' : 'Coaching notes'} accent={colors.avaCyan}>
               {data.coachingNotes.map((n, i) => (
                 <div key={i} style={{ fontSize: font.sm, color: colors.textIce, lineHeight: 1.45, padding: '4px 0' }}>✦ {n}</div>
               ))}
@@ -294,7 +299,7 @@ function RecordingAiPanel({ rec }: { rec: RecordingEntry }) {
           )}
 
           {data?.actionItems && data.actionItems.length > 0 && (
-            <AIPanel title="Action items" accent={colors.success}>
+            <AIPanel title={fr ? 'Actions à faire' : 'Action items'} accent={colors.success}>
               {data.actionItems.map((a, i) => (
                 <div key={i} style={{ display: 'flex', gap: 8, padding: '4px 0', fontSize: font.sm, color: colors.textIce }}>
                   <span style={{ color: colors.success }}>→</span><span>{a}</span>
@@ -304,7 +309,7 @@ function RecordingAiPanel({ rec }: { rec: RecordingEntry }) {
           )}
 
           {hasTranscript && (
-            <AIPanel title="Transcript" accent={colors.signalGold}>
+            <AIPanel title={fr ? 'Transcription' : 'Transcript'} accent={colors.signalGold}>
               <div style={{ maxHeight: 220, overflowY: 'auto' }}>
                 {data!.transcript.map((line, i) => (
                   <div key={i} style={{
@@ -313,7 +318,7 @@ function RecordingAiPanel({ rec }: { rec: RecordingEntry }) {
                     marginBottom: 6,
                   }}>
                     <div style={{ fontSize: 9, color: colors.mutedSilver, marginBottom: 2, letterSpacing: 0.6, textTransform: 'uppercase', fontWeight: 700 }}>
-                      {line.speaker === 'agent' ? 'Agent' : line.speaker === 'customer' ? 'Caller' : 'Speaker'}
+                      {line.speaker === 'agent' ? 'Agent' : line.speaker === 'customer' ? (fr ? 'Appelant' : 'Caller') : (fr ? 'Interlocuteur' : 'Speaker')}
                     </div>
                     <div style={{
                       maxWidth: '88%', padding: '6px 10px', borderRadius: 12,
@@ -333,10 +338,12 @@ function RecordingAiPanel({ rec }: { rec: RecordingEntry }) {
 }
 
 function ProgressStepper({ stage }: { stage: 'idle' | 'transcribing' | 'analyzing' | 'done' | 'error' }) {
+  const { lang } = useT();
+  const fr = lang === 'fr';
   const steps = [
-    { id: 'transcribing', label: 'Transcribe' },
-    { id: 'analyzing', label: 'Analyze' },
-    { id: 'done', label: 'Ready' },
+    { id: 'transcribing', label: fr ? 'Transcrire' : 'Transcribe' },
+    { id: 'analyzing', label: fr ? 'Analyser' : 'Analyze' },
+    { id: 'done', label: fr ? 'Prêt' : 'Ready' },
   ];
   const activeIdx = stage === 'analyzing' ? 1 : stage === 'done' ? 2 : 0;
   return (
