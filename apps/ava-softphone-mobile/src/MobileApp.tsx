@@ -63,6 +63,8 @@ export default function MobileApp() {
       setTimeout(() => setBooting(false), 700);
     });
     initBackgroundSync().catch(() => {});
+    // Préchargement opportuniste des écrans les plus consultés.
+    try { startPrefetch(); } catch {}
     let unsubDeepLink: (() => void) | undefined;
     registerDeepLinkHandler().then((u) => { unsubDeepLink = u; }).catch(() => {});
 
