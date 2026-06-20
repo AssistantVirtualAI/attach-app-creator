@@ -65,10 +65,35 @@ export function useSoftphone(
   const [retryAttempt, setRetryAttempt] = useState(0);
   const [nextRetryAt, setNextRetryAt] = useState<number | null>(null);
   const [retryLimitReached, setRetryLimitReached] = useState(false);
+  const [audioProfile, setAudioProfileState] = useState<AudioProfile>(() => loadAudioProfile());
+  const [quality, setQuality] = useState<CallQuality>(EMPTY_QUALITY);
 
   const uaRef = useRef<any>(null);
   const sessionRef = useRef<any>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const audioProfileRef = useRef<AudioProfile>(audioProfile);
+  const statsTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const samplerStateRef = useRef<SamplerState>({});
+  const currentBitrateRef = useRef<number>(PROFILE_OPUS.auto.hardCapBitrate);
+  const reRegisterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => { audioProfileRef.current = audioProfile; }, [audioProfile]);
+
+  const setAudioProfile = useCallback((p: AudioProfile) => {
+    setAudioProfileState(p);
+    saveAudioProfile(p);
+    try {
+      const pc: RTCPeerConnection | undefined = sessionRef.current?.connection;
+      const sender = pc?.getSenders().find((s) => s.track?.kind === 'audio');
+      if (sender) {
+        const params = sender.getParameters();
+        params.encodings = params.encodings?.length ? params.encodings : [{}];
+        params.encodings[0].maxBitrate = PROFILE_OPUS[p].hardCapBitrate;
+        currentBitrateRef.current = PROFILE_OPUS[p].hardCapBitrate;
+        sender.setParameters(params).catch(() => {});
+      }
+    } catch {}
+  }, []);
 
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const authBlockedRef = useRef(false);
