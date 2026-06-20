@@ -4,6 +4,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { colors, gradients, radius } from '../lib/theme';
+import { useT } from '../lib/i18n';
 
 export type Tab =
   | 'home' | 'calls' | 'ava' | 'messages' | 'settings'
@@ -11,20 +12,21 @@ export type Tab =
   | 'more' | 'voicemail' | 'contacts' | 'sms' | 'queues';
 
 
-type Item = { id: Tab; label: string; Icon: LucideIcon };
+type Item = { id: Tab; labelKey: 'tabs.home' | 'tabs.calls' | 'tabs.messages' | 'tabs.settings'; Icon: LucideIcon };
 
 const LEFT: Item[] = [
-  { id: 'home',  label: 'Home',  Icon: Home },
-  { id: 'calls', label: 'Calls', Icon: Phone },
+  { id: 'home',  labelKey: 'tabs.home',  Icon: Home },
+  { id: 'calls', labelKey: 'tabs.calls', Icon: Phone },
 ];
 const RIGHT: Item[] = [
-  { id: 'messages', label: 'Messages', Icon: MessageCircle },
-  { id: 'settings', label: 'Settings', Icon: SettingsIcon },
+  { id: 'messages', labelKey: 'tabs.messages', Icon: MessageCircle },
+  { id: 'settings', labelKey: 'tabs.settings', Icon: SettingsIcon },
 ];
 
 export default function BottomTabs({
   active, onChange, badges,
 }: { active: Tab; onChange: (t: Tab) => void; badges?: Partial<Record<Tab, number>> }) {
+  const { t } = useT();
   return (
     <nav
       style={{
@@ -50,13 +52,13 @@ export default function BottomTabs({
         }}
       >
         {LEFT.map((it) => (
-          <TabBtn key={it.id} item={it} active={active === it.id} onPress={() => onChange(it.id)} badge={badges?.[it.id]} />
+          <TabBtn key={it.id} label={t(it.labelKey)} Icon={it.Icon} active={active === it.id} onPress={() => onChange(it.id)} badge={badges?.[it.id]} />
         ))}
 
         <div style={{ position: 'relative', display: 'flex', justifyContent: 'center' }}>
           <button
             onClick={() => onChange('ava')}
-            aria-label="AVA assistant"
+            aria-label={t('tabs.ava')}
             style={{
               position: 'absolute', top: -34, width: 62, height: 62,
               borderRadius: '50%', background: gradients.ai,
@@ -81,15 +83,14 @@ export default function BottomTabs({
         </div>
 
         {RIGHT.map((it) => (
-          <TabBtn key={it.id} item={it} active={active === it.id} onPress={() => onChange(it.id)} badge={badges?.[it.id]} />
+          <TabBtn key={it.id} label={t(it.labelKey)} Icon={it.Icon} active={active === it.id} onPress={() => onChange(it.id)} badge={badges?.[it.id]} />
         ))}
       </div>
     </nav>
   );
 }
 
-function TabBtn({ item, active, onPress, badge }: { item: Item; active: boolean; onPress: () => void; badge?: number }) {
-  const { Icon, label } = item;
+function TabBtn({ label, Icon, active, onPress, badge }: { label: string; Icon: LucideIcon; active: boolean; onPress: () => void; badge?: number }) {
   const accent = colors.lemtelBlue;
   return (
     <button

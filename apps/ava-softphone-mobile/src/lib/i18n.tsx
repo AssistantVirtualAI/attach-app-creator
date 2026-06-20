@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState, ReactNode } from 'react';
 
 export type Lang = 'en' | 'fr';
 
@@ -13,6 +13,10 @@ const DICT = {
     'common.openSettings': 'Open device settings',
     'common.cancel': 'Cancel',
     'common.save': 'Save',
+    'common.retry': 'Retry',
+    'common.refresh': 'Refresh',
+    'common.search': 'Search',
+    'common.loading': 'Loading…',
     'common.today': 'Today',
     'common.range7d': '7 days',
     'common.range30d': '30 days',
@@ -20,6 +24,12 @@ const DICT = {
     'header.callHistory': 'Call history',
     'header.toggleTheme': 'Toggle theme',
     'header.toggleLang': 'Switch language',
+
+    'tabs.home': 'Home',
+    'tabs.calls': 'Calls',
+    'tabs.messages': 'Messages',
+    'tabs.settings': 'Settings',
+    'tabs.ava': 'AVA assistant',
 
     'dashboard.domain': 'Domain',
     'dashboard.myActivity': 'My activity',
@@ -115,6 +125,138 @@ const DICT = {
     'settings.pushEnabled': 'Push enabled',
     'settings.pushDisabled': 'Push disabled',
     'settings.defaultGreeting': 'Default · Lemtel AVA',
+
+    'more.eyebrowComms': 'Communications',
+    'more.moreFeatures': 'More features',
+    'more.callingFeatures': 'Calling features',
+    'more.callingFeaturesHint': 'Hold, transfer, record, DND…',
+    'more.voicemail': 'Voicemail',
+    'more.voicemailHint': 'Inbox & greetings',
+    'more.messages': 'Messages',
+    'more.messagesHint': 'SMS conversations',
+    'more.queues': 'Queues',
+    'more.queuesHint': 'Live queues & agents',
+    'more.contacts': 'Contacts',
+    'more.contactsHint': 'Directory',
+    'more.eyebrowAccount': 'Account',
+    'more.settingsPrivacy': 'Settings & privacy',
+    'more.settings': 'Settings',
+    'more.permissions': 'Permissions',
+    'more.permissionsHint': 'Mic, notifications, contacts',
+    'more.privacy': 'Privacy',
+    'more.privacyHint': 'How we use your data',
+    'more.dataSafety': 'Data safety',
+    'more.dataSafetyHint': 'Store disclosures',
+    'more.aiAudit': 'AI requests audit',
+    'more.aiAuditHint': 'Transcription & analysis log',
+    'more.terms': 'Terms of service',
+    'more.support': 'Support',
+    'more.eyebrowDanger': 'Danger zone',
+    'more.accountControl': 'Account control',
+    'more.signOut': 'Sign out',
+    'more.deleteAccount': 'Delete my account',
+    'more.back': 'Back',
+
+    'calls.history': 'History',
+    'calls.recordings': 'Recordings',
+    'calls.voicemail': 'Voicemail',
+    'calls.keypad': 'Keypad',
+    'calls.all': 'All',
+    'calls.missed': 'Missed',
+    'calls.extension': 'Extension',
+    'calls.allExtensions': 'All extensions (domain)',
+    'calls.mine': 'Mine ({ext})',
+    'calls.showingMine': 'Showing your extension {ext} only.',
+    'calls.searchPlaceholder': 'Search name, number, extension…',
+    'calls.enterNumber': 'Enter number',
+    'calls.dialing': 'Dialing…',
+    'calls.call': 'Call',
+    'calls.live': 'SIP · Live',
+    'calls.offline': 'Offline',
+    'calls.noCalls': 'No calls yet',
+    'calls.noCallsHint': 'Your call history will appear here. Tap the keypad to start one.',
+    'calls.openDialer': 'Open dialer',
+    'calls.keypadError': 'Keypad error',
+    'calls.sipNotReg': 'SIP not registered',
+    'calls.sipConnecting': 'The SIP client is still connecting. Tap retry to reconnect now.',
+    'calls.retryConnect': 'Retry connection',
+
+    'messages.team': 'Team Chat',
+    'messages.sms': 'SMS',
+    'messages.contacts': 'Contacts',
+
+    'voicemail.search': 'Search voicemails',
+    'voicemail.countLine': '{shown} of {total}',
+    'voicemail.elevenlabsGreeting': 'ElevenLabs greeting',
+    'voicemail.greetingPlaceholder': 'Type your voicemail greeting…',
+    'voicemail.saved': 'Greeting updated with ElevenLabs voice.',
+    'voicemail.noMatch': 'No matching voicemails',
+    'voicemail.noMatchHint': 'Try a different search term.',
+    'voicemail.empty': 'No voicemails',
+    'voicemail.emptyHint': 'When callers leave a message, AVA will transcribe and summarize it here.',
+    'voicemail.new': 'NEW',
+    'voicemail.high': 'HIGH',
+    'voicemail.audioUnavailable': 'Audio not available — recording may have been deleted from PBX.',
+
+    'queues.title': 'Call queues',
+    'queues.livePbx': 'Live PBX',
+    'queues.searchPlaceholder': 'Search queues…',
+    'queues.active': 'active',
+    'queues.joined': 'joined',
+    'queues.notSignedIn': 'Not signed in',
+    'queues.joinedToast': 'Joined {name}',
+    'queues.leftToast': 'Left {name}',
+    'queues.joinFailed': 'Join failed',
+    'queues.leaveFailed': 'Leave failed',
+    'queues.updateFailed': 'Update failed',
+    'queues.couldntLoad': "Couldn't load queues",
+    'queues.empty': 'No queues configured',
+    'queues.emptyHint': 'Queues synced from your SIP domain will appear here.',
+    'queues.waiting': '{n} waiting',
+    'queues.agentsOnline': '{n} agents online',
+    'queues.callsToday': '{n} calls today',
+    'queues.wait': 'Wait {n}s',
+    'queues.slaToday': 'SLA TODAY',
+    'queues.join': 'Join',
+    'queues.leave': 'Leave',
+    'queues.pause': 'Pause',
+    'queues.resume': 'Resume',
+    'queues.paused': 'PAUSED',
+    'queues.activeBadge': 'ACTIVE',
+
+    'auth.welcome': 'Welcome back',
+    'auth.signIn': 'Sign in',
+    'auth.signUp': 'Sign up',
+    'auth.email': 'Email',
+    'auth.password': 'Password',
+    'auth.forgot': 'Forgot password?',
+    'auth.continue': 'Continue',
+    'auth.or': 'or',
+    'auth.signInGoogle': 'Continue with Google',
+
+    'contacts.search': 'Search contacts',
+    'contacts.empty': 'No contacts yet',
+    'contacts.emptyHint': 'Contacts synced from your device or organization will appear here.',
+    'contacts.call': 'Call',
+    'contacts.message': 'Message',
+
+    'dialer.title': 'Dialer',
+
+    'profile.title': 'Profile',
+    'profile.editPhoto': 'Edit photo',
+    'profile.copyEmail': 'Copy email',
+    'profile.copyExt': 'Copy extension',
+
+    'permissions.mic': 'Microphone',
+    'permissions.notif': 'Notifications',
+    'permissions.contacts': 'Contacts',
+    'permissions.granted': 'Granted',
+    'permissions.denied': 'Denied',
+    'permissions.prompt': 'Not requested',
+
+    'data.error': 'Something went wrong',
+    'data.errorHint': 'Pull to refresh or try again.',
+    'data.empty': 'Nothing to show',
   },
   fr: {
     'common.signOut': 'Déconnexion',
@@ -126,6 +268,10 @@ const DICT = {
     'common.openSettings': "Ouvrir les paramètres de l'appareil",
     'common.cancel': 'Annuler',
     'common.save': 'Enregistrer',
+    'common.retry': 'Réessayer',
+    'common.refresh': 'Actualiser',
+    'common.search': 'Rechercher',
+    'common.loading': 'Chargement…',
     'common.today': "Aujourd'hui",
     'common.range7d': '7 jours',
     'common.range30d': '30 jours',
@@ -133,6 +279,12 @@ const DICT = {
     'header.callHistory': 'Historique des appels',
     'header.toggleTheme': 'Changer de thème',
     'header.toggleLang': 'Changer de langue',
+
+    'tabs.home': 'Accueil',
+    'tabs.calls': 'Appels',
+    'tabs.messages': 'Messages',
+    'tabs.settings': 'Réglages',
+    'tabs.ava': 'Assistant AVA',
 
     'dashboard.domain': 'Domaine',
     'dashboard.myActivity': 'Mon activité',
@@ -159,8 +311,8 @@ const DICT = {
     'm.totalTalk': 'Temps total',
     'm.peakHour': 'Heure de pointe',
     'm.outbound': 'Sortants',
-    'm.failedDials': 'Échecs d\'appel',
-    'm.dialSuccess': 'Succès d\'appel',
+    'm.failedDials': "Échecs d'appel",
+    'm.dialSuccess': "Succès d'appel",
     'm.activeExt': 'Ext. actives',
     'm.myCalls': 'Mes appels',
     'm.myAnswered': 'Mes répondus',
@@ -228,6 +380,138 @@ const DICT = {
     'settings.pushEnabled': 'Notifications activées',
     'settings.pushDisabled': 'Notifications désactivées',
     'settings.defaultGreeting': 'Par défaut · Lemtel AVA',
+
+    'more.eyebrowComms': 'Communications',
+    'more.moreFeatures': 'Plus de fonctionnalités',
+    'more.callingFeatures': "Fonctions d'appel",
+    'more.callingFeaturesHint': "Mise en attente, transfert, enregistrement, NPD…",
+    'more.voicemail': 'Messagerie vocale',
+    'more.voicemailHint': "Boîte de réception et messages d'accueil",
+    'more.messages': 'Messages',
+    'more.messagesHint': 'Conversations SMS',
+    'more.queues': "Files d'attente",
+    'more.queuesHint': "Files et agents en direct",
+    'more.contacts': 'Contacts',
+    'more.contactsHint': 'Répertoire',
+    'more.eyebrowAccount': 'Compte',
+    'more.settingsPrivacy': 'Réglages et confidentialité',
+    'more.settings': 'Réglages',
+    'more.permissions': 'Permissions',
+    'more.permissionsHint': 'Micro, notifications, contacts',
+    'more.privacy': 'Confidentialité',
+    'more.privacyHint': 'Utilisation de vos données',
+    'more.dataSafety': 'Sécurité des données',
+    'more.dataSafetyHint': 'Divulgations',
+    'more.aiAudit': 'Audit des requêtes IA',
+    'more.aiAuditHint': "Journal de transcription et d'analyse",
+    'more.terms': "Conditions d'utilisation",
+    'more.support': 'Support',
+    'more.eyebrowDanger': 'Zone sensible',
+    'more.accountControl': 'Contrôle du compte',
+    'more.signOut': 'Déconnexion',
+    'more.deleteAccount': 'Supprimer mon compte',
+    'more.back': 'Retour',
+
+    'calls.history': 'Historique',
+    'calls.recordings': 'Enregistrements',
+    'calls.voicemail': 'Messagerie',
+    'calls.keypad': 'Clavier',
+    'calls.all': 'Tous',
+    'calls.missed': 'Manqués',
+    'calls.extension': 'Extension',
+    'calls.allExtensions': 'Toutes les extensions (domaine)',
+    'calls.mine': 'La mienne ({ext})',
+    'calls.showingMine': 'Affichage uniquement de votre extension {ext}.',
+    'calls.searchPlaceholder': 'Rechercher nom, numéro, extension…',
+    'calls.enterNumber': 'Entrer un numéro',
+    'calls.dialing': 'Composition…',
+    'calls.call': 'Appeler',
+    'calls.live': 'SIP · En ligne',
+    'calls.offline': 'Hors ligne',
+    'calls.noCalls': 'Aucun appel',
+    'calls.noCallsHint': "Votre historique d'appels apparaîtra ici. Touchez le clavier pour commencer.",
+    'calls.openDialer': 'Ouvrir le clavier',
+    'calls.keypadError': 'Erreur du clavier',
+    'calls.sipNotReg': 'SIP non enregistré',
+    'calls.sipConnecting': 'Le client SIP se connecte encore. Touchez Réessayer pour vous reconnecter.',
+    'calls.retryConnect': 'Reconnecter',
+
+    'messages.team': "Chat d'équipe",
+    'messages.sms': 'SMS',
+    'messages.contacts': 'Contacts',
+
+    'voicemail.search': 'Rechercher dans la messagerie',
+    'voicemail.countLine': '{shown} sur {total}',
+    'voicemail.elevenlabsGreeting': 'Message ElevenLabs',
+    'voicemail.greetingPlaceholder': "Saisissez votre message d'accueil…",
+    'voicemail.saved': "Message mis à jour avec une voix ElevenLabs.",
+    'voicemail.noMatch': 'Aucun message correspondant',
+    'voicemail.noMatchHint': 'Essayez un autre terme.',
+    'voicemail.empty': 'Aucun message vocal',
+    'voicemail.emptyHint': 'Lorsque les appelants laissent un message, AVA le transcrit et le résume ici.',
+    'voicemail.new': 'NOUVEAU',
+    'voicemail.high': 'PRIORITAIRE',
+    'voicemail.audioUnavailable': "Audio indisponible — l'enregistrement a peut-être été supprimé du PBX.",
+
+    'queues.title': "Files d'attente",
+    'queues.livePbx': 'PBX en direct',
+    'queues.searchPlaceholder': 'Rechercher des files…',
+    'queues.active': 'actives',
+    'queues.joined': 'rejointes',
+    'queues.notSignedIn': 'Non connecté',
+    'queues.joinedToast': 'Rejoint {name}',
+    'queues.leftToast': 'Quitté {name}',
+    'queues.joinFailed': 'Échec de la jonction',
+    'queues.leaveFailed': 'Échec du départ',
+    'queues.updateFailed': 'Échec de la mise à jour',
+    'queues.couldntLoad': 'Impossible de charger les files',
+    'queues.empty': 'Aucune file configurée',
+    'queues.emptyHint': "Les files synchronisées depuis votre domaine SIP apparaîtront ici.",
+    'queues.waiting': '{n} en attente',
+    'queues.agentsOnline': '{n} agents en ligne',
+    'queues.callsToday': "{n} appels aujourd'hui",
+    'queues.wait': 'Attente {n}s',
+    'queues.slaToday': "SLA AUJOURD'HUI",
+    'queues.join': 'Rejoindre',
+    'queues.leave': 'Quitter',
+    'queues.pause': 'Pause',
+    'queues.resume': 'Reprendre',
+    'queues.paused': 'EN PAUSE',
+    'queues.activeBadge': 'ACTIF',
+
+    'auth.welcome': 'Bon retour',
+    'auth.signIn': 'Connexion',
+    'auth.signUp': "S'inscrire",
+    'auth.email': 'Courriel',
+    'auth.password': 'Mot de passe',
+    'auth.forgot': 'Mot de passe oublié ?',
+    'auth.continue': 'Continuer',
+    'auth.or': 'ou',
+    'auth.signInGoogle': 'Continuer avec Google',
+
+    'contacts.search': 'Rechercher des contacts',
+    'contacts.empty': 'Aucun contact',
+    'contacts.emptyHint': 'Les contacts synchronisés depuis votre appareil ou organisation apparaîtront ici.',
+    'contacts.call': 'Appeler',
+    'contacts.message': 'Message',
+
+    'dialer.title': 'Clavier',
+
+    'profile.title': 'Profil',
+    'profile.editPhoto': 'Modifier la photo',
+    'profile.copyEmail': 'Copier le courriel',
+    'profile.copyExt': "Copier l'extension",
+
+    'permissions.mic': 'Micro',
+    'permissions.notif': 'Notifications',
+    'permissions.contacts': 'Contacts',
+    'permissions.granted': 'Accordé',
+    'permissions.denied': 'Refusé',
+    'permissions.prompt': 'Non demandé',
+
+    'data.error': 'Une erreur est survenue',
+    'data.errorHint': 'Tirez pour actualiser ou réessayez.',
+    'data.empty': 'Rien à afficher',
   },
 } as const;
 
@@ -254,6 +538,7 @@ export function MobileI18nProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     try { localStorage.setItem(STORAGE, lang); } catch {}
+    try { document.documentElement.lang = lang; } catch {}
   }, [lang]);
 
   const t: Ctx['t'] = (key, vars) => {
@@ -272,8 +557,36 @@ export function MobileI18nProvider({ children }: { children: ReactNode }) {
 export function useT() {
   const c = useContext(I18nCtx);
   if (!c) {
-    // Fallback when used outside provider (e.g. in tests)
     return { lang: 'en' as Lang, setLang: () => {}, toggle: () => {}, t: ((k: Key) => (DICT.en as any)[k] ?? k) as Ctx['t'] };
   }
   return c;
 }
+
+/**
+ * Convenience hook that returns a deeply-typed translation tree
+ * so screens can do `tr.queues.joined` instead of stringly-typed keys.
+ * Falls back to the key itself when missing.
+ */
+export function useTr() {
+  const { t, lang, setLang, toggle } = useT();
+  const tr = useMemo(() => buildTree(t), [t, lang]);
+  return { tr, t, lang, setLang, toggle };
+}
+
+function buildTree(t: (k: Key, v?: any) => string) {
+  // Map dotted keys → nested object.
+  const root: any = {};
+  for (const k of Object.keys(DICT.en) as Key[]) {
+    const parts = (k as string).split('.');
+    let cur = root;
+    for (let i = 0; i < parts.length - 1; i++) {
+      cur[parts[i]] = cur[parts[i]] || {};
+      cur = cur[parts[i]];
+    }
+    const leaf = parts[parts.length - 1];
+    Object.defineProperty(cur, leaf, { enumerable: true, get: () => t(k) });
+  }
+  return root as TrTree;
+}
+
+type TrTree = any;

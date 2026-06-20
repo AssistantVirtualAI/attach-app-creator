@@ -317,21 +317,20 @@ function AuthenticatedShell({
     }}>
       <audio ref={audioRef} autoPlay playsInline />
 
-      {tab !== 'home' && <RealtimeHeader creds={creds} />}
-
       <div key={tab} className="lemtel-page-enter" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        {tab === 'home'       && <DashboardScreen onNavigate={setTab as any} haptic={haptic} onOpenProfile={() => setProfileOpen(true)} />}
-        {tab === 'calls'      && <CallsScreen sp={sp} haptic={haptic} creds={creds} />}
-        {tab === 'ava'        && <AVAChatScreen />}
-        {tab === 'messages'   && <MessagesHubScreen accessToken={creds.accessToken || null} userId={creds.userId} sp={sp} haptic={haptic} channelUnread={notif.channelUnread} />}
-        {tab === 'settings'   && <SettingsScreen creds={creds} sp={sp} onSignOut={onSignOut} onNavigate={setTab as any} />}
-        {/* legacy deep-link routes */}
-        {tab === 'more'       && <MoreScreen creds={creds} sp={sp} onSignOut={onSignOut} haptic={haptic} />}
-        {tab === 'voicemail'  && <VoicemailScreen haptic={haptic} />}
-        {tab === 'contacts'   && <ContactsScreen sp={sp} />}
-
-        {tab === 'sms'        && <MessagesScreen haptic={haptic} />}
-        {tab === 'queues'     && <QueuesScreen />}
+        <Suspense fallback={<div style={{ flex: 1 }} />}>
+          {tab === 'home'       && <DashboardScreen onNavigate={setTab as any} haptic={haptic} onOpenProfile={() => setProfileOpen(true)} />}
+          {tab === 'calls'      && <CallsScreen sp={sp} haptic={haptic} creds={creds} />}
+          {tab === 'ava'        && <AVAChatScreen />}
+          {tab === 'messages'   && <MessagesHubScreen accessToken={creds.accessToken || null} userId={creds.userId} sp={sp} haptic={haptic} channelUnread={notif.channelUnread} />}
+          {tab === 'settings'   && <SettingsScreen creds={creds} sp={sp} onSignOut={onSignOut} onNavigate={setTab as any} />}
+          {/* legacy deep-link routes */}
+          {tab === 'more'       && <MoreScreen creds={creds} sp={sp} onSignOut={onSignOut} haptic={haptic} />}
+          {tab === 'voicemail'  && <VoicemailScreen haptic={haptic} />}
+          {tab === 'contacts'   && <ContactsScreen sp={sp} />}
+          {tab === 'sms'        && <MessagesScreen haptic={haptic} />}
+          {tab === 'queues'     && <QueuesScreen />}
+        </Suspense>
       </div>
 
       <BottomTabs
@@ -364,21 +363,3 @@ function AuthenticatedShell({
   );
 }
 
-function RealtimeHeader({ creds }: { creds: Creds }) {
-  const { transport, warning, lastSyncAt, nextRetryAt, syncLog, retryNow } = useRealtimeCDR(creds);
-  return (
-    <div style={{
-      display: 'flex', justifyContent: 'flex-end', alignItems: 'center',
-      padding: '4px 12px 0',
-    }}>
-      <RealtimeStatusPill
-        transport={transport}
-        warning={warning}
-        lastSyncAt={lastSyncAt}
-        nextRetryAt={nextRetryAt}
-        syncLog={syncLog}
-        onRefresh={retryNow}
-      />
-    </div>
-  );
-}

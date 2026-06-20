@@ -11,10 +11,13 @@ import { useRealtimeCDR } from '../hooks/useRealtimeCDR';
 import type { Creds } from '../lib/creds';
 import { showMobileToast } from '../lib/mobileToast';
 import { restGet } from '../lib/mobileSupabase';
+import { useTr } from '../lib/i18n';
 
 type SubTab = 'recents' | 'recordings' | 'voicemail' | 'dial';
 
 export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s?: ImpactStyle) => Promise<void>; creds?: Creds | null }) {
+  const { tr } = useTr();
+
   const [sub, setSub] = useState<SubTab>('recents');
   const [selected, setSelected] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'missed'>('all');
@@ -132,27 +135,28 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
           <button onClick={dismissWarning} style={{ background: 'transparent', border: 'none', color: colors.warning, cursor: 'pointer', fontSize: 14 }}>×</button>
         </div>
       )}
-      <SegmentedControl value={sub} onChange={setSub} />
+      <SegmentedControl value={sub} onChange={setSub} tr={tr} />
       {transport === 'realtime' && false /* could surface a "live" pill here */}
 
       {sub === 'dial' && (
         <div style={{ marginTop: 6 }}>
-          <NumberDisplay value={number} onBackspace={() => { haptic(); setNumber((n) => n.slice(0, -1)); }} onClear={() => setNumber('')} />
+          <NumberDisplay value={number} placeholder={tr.calls.enterNumber} clearLabel={tr.common.clear} onBackspace={() => { haptic(); setNumber((n) => n.slice(0, -1)); }} onClear={() => setNumber('')} />
           <Dialpad
             onPress={(k) => { haptic(ImpactStyle.Light); setNumber((n) => n + k); }}
             onLongPressZero={() => { haptic(ImpactStyle.Medium); setNumber((n) => n + '+'); }}
           />
           <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
             <PrimaryButton onClick={() => startCall(number)} disabled={!number || dialing} style={{ flex: 1 }}>
-              {dialing ? '⏳ Dialing…' : '📞 Call'}
+              {dialing ? `⏳ ${tr.calls.dialing}` : `📞 ${tr.calls.call}`}
             </PrimaryButton>
             <GhostButton tone="cyan" onClick={() => sp?.snap?.status === 'connecting' ? null : haptic()}>
-              {sp?.snap?.status === 'registered' ? 'SIP · Live' : sp?.snap?.status || 'Offline'}
+              {sp?.snap?.status === 'registered' ? tr.calls.live : sp?.snap?.status || tr.calls.offline}
             </GhostButton>
           </div>
+
           {(dialError || dialDebug) && (
             <Card style={{ marginTop: 12 }} accent={dialError ? 'gold' : 'cyan'}>
-              {dialError && <div style={{ fontSize: font.sm, color: colors.danger, fontWeight: 800, marginBottom: 6 }}>Keypad error: {dialError}</div>}
+              {dialError && <div style={{ fontSize: font.sm, color: colors.danger, fontWeight: 800, marginBottom: 6 }}>{tr.calls.keypadError}: {dialError}</div>}
               <div style={{ fontSize: 11, color: colors.mutedSilver, lineHeight: 1.45, wordBreak: 'break-word', fontFamily: 'JetBrains Mono, monospace' }}>
                 {dialDebug || `SIP status: ${sp?.snap?.status || 'offline'}`}
               </div>
@@ -160,15 +164,16 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
           )}
           {sp?.snap?.status !== 'registered' && (
             <Card style={{ marginTop: 14 }} accent="gold">
-              <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 1.4, color: colors.signalGold, textTransform: 'uppercase' }}>SIP not registered</div>
+              <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 1.4, color: colors.signalGold, textTransform: 'uppercase' }}>{tr.calls.sipNotReg}</div>
               <p style={{ fontSize: font.sm, color: colors.mutedSilver, margin: '6px 0 10px', lineHeight: 1.5 }}>
-                {sp?.snap?.error || 'The SIP client is still connecting. Tap retry to reconnect now.'}
+                {sp?.snap?.error || tr.calls.sipConnecting}
               </p>
-              <PrimaryButton onClick={() => sp?.reconnect?.()}>Retry connection</PrimaryButton>
+              <PrimaryButton onClick={() => sp?.reconnect?.()}>{tr.calls.retryConnect}</PrimaryButton>
             </Card>
           )}
         </div>
       )}
+
 
       {sub === 'recordings' && (
         <div style={{ marginTop: 6 }}>
@@ -186,34 +191,35 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
                 border: `1px solid ${filter === f ? colors.borderGold : colors.border}`,
                 color: filter === f ? colors.signalGold : colors.mutedSilver,
                 fontSize: 10.5, fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer',
-              }}>{f}</button>
+              }}>{f === 'all' ? tr.calls.all : tr.calls.missed}</button>
             ))}
           </div>
 
           {isAdmin && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '0 2px 10px' }}>
-              <label style={{ fontSize: font.xs, color: colors.mutedSilver, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>Extension</label>
+              <label style={{ fontSize: font.xs, color: colors.mutedSilver, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>{tr.calls.extension}</label>
               <select value={extFilter} onChange={(e) => setExtFilter(e.target.value)} style={{ flex: 1, padding: '7px 10px', borderRadius: 10, border: `1px solid ${colors.border}`, background: 'rgba(255,255,255,0.06)', color: colors.textIce, fontSize: 12, fontWeight: 700 }}>
-                <option value="all">All extensions (domain)</option>
-                {myExt && <option value={myExt}>Mine ({myExt})</option>}
+                <option value="all">{tr.calls.allExtensions}</option>
+                {myExt && <option value={myExt}>{tr.calls.mine.replace('{ext}', myExt)}</option>}
                 {extensionOptions.filter((e) => e !== myExt).map((e) => <option key={e} value={e}>{e}</option>)}
               </select>
             </div>
           )}
           {isAdmin === false && myExt && (
-            <div style={{ fontSize: font.xs, color: colors.mutedSilver, margin: '0 2px 10px' }}>Showing your extension {myExt} only.</div>
+            <div style={{ fontSize: font.xs, color: colors.mutedSilver, margin: '0 2px 10px' }}>{tr.calls.showingMine.replace('{ext}', myExt)}</div>
           )}
 
           <div style={{ display: 'flex', gap: 6, alignItems: 'center', margin: '0 2px 10px' }}>
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name, number, extension…" style={{ flex: 1, minWidth: 0, padding: '8px 10px', borderRadius: 10, border: `1px solid ${colors.border}`, background: 'rgba(255,255,255,0.06)', color: colors.textIce, fontSize: 12, outline: 'none' }} />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={tr.calls.searchPlaceholder} style={{ flex: 1, minWidth: 0, padding: '8px 10px', borderRadius: 10, border: `1px solid ${colors.border}`, background: 'rgba(255,255,255,0.06)', color: colors.textIce, fontSize: 12, outline: 'none' }} />
             {([7, 30] as const).map((d) => <button key={d} onClick={() => setRangeDays(d)} style={{ padding: '7px 9px', borderRadius: 10, border: `1px solid ${rangeDays === d ? colors.borderGold : colors.border}`, background: rangeDays === d ? colors.signalGold + '1a' : 'rgba(255,255,255,0.04)', color: rangeDays === d ? colors.signalGold : colors.mutedSilver, fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>{d}d</button>)}
           </div>
 
 
           {!calls && <ListSkeleton rows={6} />}
           {calls && filtered.length === 0 && (
-            <EmptyState icon="📞" title="No calls yet" hint="Your call history will appear here. Tap the keypad to start one." cta={{ label: 'Open dialer', onPress: () => setSub('dial') }} />
+            <EmptyState icon="📞" title={tr.calls.noCalls} hint={tr.calls.noCallsHint} cta={{ label: tr.calls.openDialer, onPress: () => setSub('dial') }} />
           )}
+
           {calls && filtered.map((c) => <CallRow key={c.id} c={c} onPress={() => { haptic(); setSelected(c.id); }} />)}
         </>
       )}
@@ -225,12 +231,12 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
   );
 }
 
-function SegmentedControl({ value, onChange }: { value: SubTab; onChange: (v: SubTab) => void }) {
+function SegmentedControl({ value, onChange, tr }: { value: SubTab; onChange: (v: SubTab) => void; tr: any }) {
   const items: { id: SubTab; label: string }[] = [
-    { id: 'recents', label: 'History' },
-    { id: 'recordings', label: 'Recordings' },
-    { id: 'voicemail', label: 'Voicemail' },
-    { id: 'dial', label: 'Keypad' },
+    { id: 'recents', label: tr.calls.history },
+    { id: 'recordings', label: tr.calls.recordings },
+    { id: 'voicemail', label: tr.calls.voicemail },
+    { id: 'dial', label: tr.calls.keypad },
   ];
   return (
     <div style={{
@@ -255,7 +261,7 @@ function SegmentedControl({ value, onChange }: { value: SubTab; onChange: (v: Su
   );
 }
 
-function NumberDisplay({ value, onClear, onBackspace }: { value: string; onClear: () => void; onBackspace: () => void }) {
+function NumberDisplay({ value, placeholder, clearLabel, onClear, onBackspace }: { value: string; placeholder: string; clearLabel: string; onClear: () => void; onBackspace: () => void }) {
   return (
     <div style={{
       margin: '12px 0 16px', padding: '20px 16px',
@@ -266,17 +272,18 @@ function NumberDisplay({ value, onClear, onBackspace }: { value: string; onClear
       minHeight: 64,
     }}>
       <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: value.length > 10 ? 22 : 28, color: colors.textIce, fontWeight: 600, letterSpacing: 0.5, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        {value || <span style={{ color: colors.mutedSilver, fontWeight: 400 }}>Enter number</span>}
+        {value || <span style={{ color: colors.mutedSilver, fontWeight: 400 }}>{placeholder}</span>}
       </span>
       {value && (
         <>
           <button onClick={onBackspace} style={{ background: 'transparent', border: 'none', color: colors.mutedSilver, fontSize: 22, cursor: 'pointer', padding: 4 }}>⌫</button>
-          <button onClick={onClear} style={{ background: 'transparent', border: 'none', color: colors.mutedSilver, fontSize: 12, cursor: 'pointer' }}>Clear</button>
+          <button onClick={onClear} style={{ background: 'transparent', border: 'none', color: colors.mutedSilver, fontSize: 12, cursor: 'pointer' }}>{clearLabel}</button>
         </>
       )}
     </div>
   );
 }
+
 
 function CallRow({ c, onPress }: { c: CallRecord; onPress: () => void }) {
   const arrow = c.status === 'missed' ? '↙' : c.direction === 'in' ? '↘' : '↗';

@@ -4,6 +4,7 @@ import { colors, font, gradients, radius } from '../lib/theme';
 import TeamChatScreen from './TeamChatScreen';
 import MessagesScreen from './MessagesScreen';
 import ContactsScreen from './ContactsScreen';
+import { useTr } from '../lib/i18n';
 
 type Sub = 'team' | 'sms' | 'contacts';
 
@@ -17,11 +18,12 @@ export default function MessagesHubScreen({
   channelUnread?: Record<string, number>;
 }) {
   const [sub, setSub] = useState<Sub>('team');
+  const { tr } = useTr();
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div style={{ padding: '12px 14px 0' }}>
-        <Segmented value={sub} onChange={(v) => { haptic(); setSub(v); }} />
+        <Segmented value={sub} onChange={(v) => { haptic(); setSub(v); }} tr={tr} />
       </div>
       <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         {sub === 'team' && <TeamChatScreen accessToken={accessToken} userId={userId} channelUnread={channelUnread} />}
@@ -32,11 +34,11 @@ export default function MessagesHubScreen({
   );
 }
 
-function Segmented({ value, onChange }: { value: Sub; onChange: (v: Sub) => void }) {
+function Segmented({ value, onChange, tr }: { value: Sub; onChange: (v: Sub) => void; tr: any }) {
   const items: { id: Sub; label: string }[] = [
-    { id: 'team', label: 'Team Chat' },
-    { id: 'sms', label: 'SMS' },
-    { id: 'contacts', label: 'Contacts' },
+    { id: 'team', label: tr.messages.team },
+    { id: 'sms', label: tr.messages.sms },
+    { id: 'contacts', label: tr.messages.contacts },
   ];
   return (
     <div style={{

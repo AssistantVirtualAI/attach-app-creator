@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { ImpactStyle } from '@capacitor/haptics';
-import { colors, font, radius, gradients } from '../lib/theme';
+import { colors, font } from '../lib/theme';
 import type { Creds } from '../lib/creds';
 import { Card, SectionTitle, SettingsRow } from '../components/ui/Primitives';
 import { LemtelMark, AvaBadge } from '../components/Brand';
@@ -16,26 +16,28 @@ import SupportScreen from './SupportScreen';
 import AIAuditScreen from './AIAuditScreen';
 import QueuesScreen from './QueuesScreen';
 import FeaturesScreen from './FeaturesScreen';
+import { useTr } from '../lib/i18n';
 
 type Sub = null | 'voicemail' | 'messages' | 'contacts' | 'settings' | 'delete' | 'privacy' | 'datasafety' | 'permissions' | 'support' | 'aiaudit' | 'queues' | 'features';
 
 export default function MoreScreen({
   creds, sp, onSignOut, haptic,
 }: { creds: Creds; sp: any; onSignOut: () => void; haptic: (s?: ImpactStyle) => Promise<void> }) {
+  const { tr } = useTr();
   const [sub, setSub] = useState<Sub>(null);
 
-  if (sub === 'voicemail')   return <SubPage onBack={() => setSub(null)} title="Voicemail"><VoicemailScreen haptic={haptic} /></SubPage>;
-  if (sub === 'messages')    return <SubPage onBack={() => setSub(null)} title="Messages"><MessagesScreen haptic={haptic} /></SubPage>;
-  if (sub === 'contacts')    return <SubPage onBack={() => setSub(null)} title="Contacts"><ContactsScreen sp={sp} /></SubPage>;
-  if (sub === 'settings')    return <SubPage onBack={() => setSub(null)} title="Settings"><SettingsScreen creds={creds} sp={sp} onSignOut={onSignOut} /></SubPage>;
-  if (sub === 'delete')      return <SubPage onBack={() => setSub(null)} title="Delete account"><DeleteAccountScreen onDone={onSignOut} /></SubPage>;
-  if (sub === 'privacy')     return <SubPage onBack={() => setSub(null)} title="Privacy"><PrivacyScreen /></SubPage>;
-  if (sub === 'datasafety')  return <SubPage onBack={() => setSub(null)} title="Data safety"><DataSafetyScreen /></SubPage>;
-  if (sub === 'permissions') return <SubPage onBack={() => setSub(null)} title="Permissions"><PermissionsScreen /></SubPage>;
-  if (sub === 'support')     return <SubPage onBack={() => setSub(null)} title="Support"><SupportScreen /></SubPage>;
-  if (sub === 'aiaudit')     return <SubPage onBack={() => setSub(null)} title="AI requests"><AIAuditScreen /></SubPage>;
-  if (sub === 'queues')      return <SubPage onBack={() => setSub(null)} title="Queues"><QueuesScreen /></SubPage>;
-  if (sub === 'features')    return <SubPage onBack={() => setSub(null)} title="Calling features"><FeaturesScreen sp={sp} /></SubPage>;
+  if (sub === 'voicemail')   return <SubPage onBack={() => setSub(null)} title={tr.more.voicemail}><VoicemailScreen haptic={haptic} /></SubPage>;
+  if (sub === 'messages')    return <SubPage onBack={() => setSub(null)} title={tr.more.messages}><MessagesScreen haptic={haptic} /></SubPage>;
+  if (sub === 'contacts')    return <SubPage onBack={() => setSub(null)} title={tr.more.contacts}><ContactsScreen sp={sp} /></SubPage>;
+  if (sub === 'settings')    return <SubPage onBack={() => setSub(null)} title={tr.more.settings}><SettingsScreen creds={creds} sp={sp} onSignOut={onSignOut} /></SubPage>;
+  if (sub === 'delete')      return <SubPage onBack={() => setSub(null)} title={tr.more.deleteAccount}><DeleteAccountScreen onDone={onSignOut} /></SubPage>;
+  if (sub === 'privacy')     return <SubPage onBack={() => setSub(null)} title={tr.more.privacy}><PrivacyScreen /></SubPage>;
+  if (sub === 'datasafety')  return <SubPage onBack={() => setSub(null)} title={tr.more.dataSafety}><DataSafetyScreen /></SubPage>;
+  if (sub === 'permissions') return <SubPage onBack={() => setSub(null)} title={tr.more.permissions}><PermissionsScreen /></SubPage>;
+  if (sub === 'support')     return <SubPage onBack={() => setSub(null)} title={tr.more.support}><SupportScreen /></SubPage>;
+  if (sub === 'aiaudit')     return <SubPage onBack={() => setSub(null)} title={tr.more.aiAudit}><AIAuditScreen /></SubPage>;
+  if (sub === 'queues')      return <SubPage onBack={() => setSub(null)} title={tr.more.queues}><QueuesScreen /></SubPage>;
+  if (sub === 'features')    return <SubPage onBack={() => setSub(null)} title={tr.more.callingFeatures}><FeaturesScreen sp={sp} /></SubPage>;
 
   return (
     <div style={{ height: '100%', overflowY: 'auto', padding: '14px 14px 20px' }}>
@@ -54,30 +56,30 @@ export default function MoreScreen({
         </div>
       </Card>
 
-      <SectionTitle eyebrow="Communications" title="More features" />
+      <SectionTitle eyebrow={tr.more.eyebrowComms} title={tr.more.moreFeatures} />
       <Card padded={false}>
-        <SettingsRow label="Calling features" icon="☎" value="Hold, transfer, record, DND…" onPress={() => setSub('features')} />
-        <SettingsRow label="Voicemail" icon="✉" value="Inbox & greetings" onPress={() => setSub('voicemail')} />
-        <SettingsRow label="Messages" icon="💬" value="SMS conversations" onPress={() => setSub('messages')} />
-        <SettingsRow label="Queues" icon="⇉" value="Live queues & agents" onPress={() => setSub('queues')} />
-        <SettingsRow label="Contacts" icon="👥" value="Directory" onPress={() => setSub('contacts')} />
+        <SettingsRow label={tr.more.callingFeatures} icon="☎" value={tr.more.callingFeaturesHint} onPress={() => setSub('features')} />
+        <SettingsRow label={tr.more.voicemail} icon="✉" value={tr.more.voicemailHint} onPress={() => setSub('voicemail')} />
+        <SettingsRow label={tr.more.messages} icon="💬" value={tr.more.messagesHint} onPress={() => setSub('messages')} />
+        <SettingsRow label={tr.more.queues} icon="⇉" value={tr.more.queuesHint} onPress={() => setSub('queues')} />
+        <SettingsRow label={tr.more.contacts} icon="👥" value={tr.more.contactsHint} onPress={() => setSub('contacts')} />
       </Card>
 
-      <SectionTitle eyebrow="Account" title="Settings & privacy" />
+      <SectionTitle eyebrow={tr.more.eyebrowAccount} title={tr.more.settingsPrivacy} />
       <Card padded={false}>
-        <SettingsRow label="Settings" icon="⚙" onPress={() => setSub('settings')} />
-        <SettingsRow label="Permissions" icon="🔐" value="Mic, notifications, contacts" onPress={() => setSub('permissions')} />
-        <SettingsRow label="Privacy" icon="🛡" value="How we use your data" onPress={() => setSub('privacy')} />
-        <SettingsRow label="Data safety" icon="🗂" value="Store disclosures" onPress={() => setSub('datasafety')} />
-        <SettingsRow label="AI requests audit" icon="✨" value="Transcription & analysis log" onPress={() => setSub('aiaudit')} />
-        <SettingsRow label="Terms of service" icon="📄" onPress={() => openExternal('https://avastatistic.ca/terms')} />
-        <SettingsRow label="Support" icon="❔" value="support@avastatistic.ca" onPress={() => setSub('support')} />
+        <SettingsRow label={tr.more.settings} icon="⚙" onPress={() => setSub('settings')} />
+        <SettingsRow label={tr.more.permissions} icon="🔐" value={tr.more.permissionsHint} onPress={() => setSub('permissions')} />
+        <SettingsRow label={tr.more.privacy} icon="🛡" value={tr.more.privacyHint} onPress={() => setSub('privacy')} />
+        <SettingsRow label={tr.more.dataSafety} icon="🗂" value={tr.more.dataSafetyHint} onPress={() => setSub('datasafety')} />
+        <SettingsRow label={tr.more.aiAudit} icon="✨" value={tr.more.aiAuditHint} onPress={() => setSub('aiaudit')} />
+        <SettingsRow label={tr.more.terms} icon="📄" onPress={() => openExternal('https://avastatistic.ca/terms')} />
+        <SettingsRow label={tr.more.support} icon="❔" value="support@avastatistic.ca" onPress={() => setSub('support')} />
       </Card>
 
-      <SectionTitle eyebrow="Danger zone" title="Account control" />
+      <SectionTitle eyebrow={tr.more.eyebrowDanger} title={tr.more.accountControl} />
       <Card padded={false}>
-        <SettingsRow label="Sign out" icon="⎋" onPress={onSignOut} />
-        <SettingsRow label="Delete my account" icon="🗑" onPress={() => setSub('delete')} />
+        <SettingsRow label={tr.more.signOut} icon="⎋" onPress={onSignOut} />
+        <SettingsRow label={tr.more.deleteAccount} icon="🗑" onPress={() => setSub('delete')} />
       </Card>
 
       <div style={{ textAlign: 'center', marginTop: 18, fontSize: 10, color: colors.mutedSilver }}>
