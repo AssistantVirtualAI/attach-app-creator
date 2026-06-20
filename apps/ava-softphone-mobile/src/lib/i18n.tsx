@@ -257,7 +257,12 @@ const DICT = {
     'data.error': 'Something went wrong',
     'data.errorHint': 'Pull to refresh or try again.',
     'data.empty': 'Nothing to show',
+
+    'sync.loading': 'Syncing…',
+    'sync.success': 'Up to date',
+    'sync.error': 'Sync failed',
   },
+
   fr: {
     'common.signOut': 'Déconnexion',
     'common.on': 'Activé',
