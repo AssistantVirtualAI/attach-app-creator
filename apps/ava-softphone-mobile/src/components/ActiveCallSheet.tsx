@@ -2,6 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { ImpactStyle } from '@capacitor/haptics';
 import { colors, font, gradients, radius, shadow } from '../lib/theme';
 import { getCallStateVisual } from '../lib/callStateAccent';
+import CallQualityGauge from './CallQualityGauge';
+import type { AudioProfile } from '../lib/sip/audioProfile';
+import { EMPTY_QUALITY } from '../lib/sip/callQuality';
+
+const PROFILE_CYCLE: AudioProfile[] = ['auto', 'hd', 'low-bandwidth'];
 
 export default function ActiveCallSheet({
   sp,
@@ -71,7 +76,16 @@ export default function ActiveCallSheet({
         <span style={{ fontSize: 10, letterSpacing: 1.6, fontWeight: 800, color: stateAccent, textTransform: 'uppercase' }}>
           {stateLabel}
         </span>
-        <span style={{ fontSize: 10, fontWeight: 700, color: colors.avaCyan, letterSpacing: 1.2 }}>HD · Encrypted</span>
+        <CallQualityGauge
+          quality={sp.snap.quality || sp.quality || EMPTY_QUALITY}
+          profile={(sp.audioProfile as AudioProfile) || 'auto'}
+          onCycleProfile={() => {
+            const cur = (sp.audioProfile as AudioProfile) || 'auto';
+            const next = PROFILE_CYCLE[(PROFILE_CYCLE.indexOf(cur) + 1) % PROFILE_CYCLE.length];
+            haptic(ImpactStyle.Light);
+            sp.setAudioProfile?.(next);
+          }}
+        />
       </div>
 
       {/* Identity */}

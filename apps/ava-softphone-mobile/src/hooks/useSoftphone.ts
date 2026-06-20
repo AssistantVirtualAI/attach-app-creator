@@ -399,6 +399,8 @@ export function useSoftphone(
     return () => {
       cancelled = true;
       clearRetry();
+      if (reRegisterTimerRef.current) { clearTimeout(reRegisterTimerRef.current); reRegisterTimerRef.current = null; }
+      if (statsTimerRef.current) { clearInterval(statsTimerRef.current); statsTimerRef.current = null; }
       retryAttemptRef.current = 0;
       if (timerRef.current) clearInterval(timerRef.current);
       try { uaRef.current?.stop(); } catch {}
