@@ -65,14 +65,14 @@ export default function DialerScreen({
 
   const retryLimitReached: boolean = !!sp.retryLimitReached;
   const bannerTitle = isRegistered
-    ? `✅ Enregistré — Extension ${sp.sipConfig?.extension || ''}`.trim()
+    ? `✅ SIP enregistré — Extension ${sp.sipConfig?.extension || ''}`.trim()
     : isRetrying
       ? (countdown !== null && retryAttempt > 0
-          ? `🔄 Nouvelle tentative dans ${countdown}s (essai ${retryAttempt})…`
-          : '🔄 Connexion…')
+          ? `🟡 SIP en connexion — nouvelle tentative dans ${countdown}s (essai ${retryAttempt})…`
+          : '🟡 SIP en connexion…')
       : retryLimitReached
-        ? `⛔ Tentatives automatiques arrêtées après ${retryAttempt} essais${sipError ? ` — ${sipError}` : ''}. Touchez Réessayer.`
-        : `❌ Erreur SIP${sipError ? ` — ${sipError}` : ''}`;
+        ? `🔴 SIP indisponible — Click-to-Call actif${sipError ? ` (${sipError})` : ''}`
+        : `🔴 SIP indisponible — Click-to-Call actif${sipError ? ` (${sipError})` : ''}`;
 
   const preferClickToCall =
     (typeof localStorage !== 'undefined' && localStorage.getItem('prefer_click_to_call') !== 'off');
