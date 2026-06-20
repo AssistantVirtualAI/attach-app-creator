@@ -70,7 +70,7 @@ export default function DashboardScreen({
               <AvaBadge />
             </div>
             <div style={{ fontSize: 10.5, color: colors.signalGold, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', marginTop: 2 }}>
-              Call history · {RANGE_LABELS[range]}
+              {t('header.callHistory')} · {RANGE_LABELS[range]}
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
