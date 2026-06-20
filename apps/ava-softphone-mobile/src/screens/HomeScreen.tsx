@@ -40,7 +40,7 @@ export default function HomeScreen({ onNavigate, haptic }: Props) {
             {me ? `${me.dataScope === 'domain_admin' ? 'Admin domaine' : 'Extension'} ${me.extension.number} · ${me.domain.sipDomain || me.organization.name}` : <Skeleton w="60%" h={10} />}
           </div>
           <h1 style={{ fontSize: font.xxl, color: colors.textIce, margin: '6px 0 4px', fontWeight: 800, letterSpacing: -0.5 }}>
-            {data?.greeting || (me ? `Good morning, ${me.user.name.split(' ')[0]}` : <Skeleton w="70%" h={26} />)}
+            {data?.greeting || (me ? `Bonjour, ${me.user.name.split(' ')[0]}` : <Skeleton w="70%" h={26} />)}
           </h1>
           <p style={{ fontSize: font.base, color: colors.textSub, margin: 0, lineHeight: 1.5 }}>
             {data?.brief || <Skeleton w="100%" h={14} />}
@@ -49,56 +49,56 @@ export default function HomeScreen({ onNavigate, haptic }: Props) {
       </HeroGradient>
 
       {/* Quick actions */}
-      <SectionTitle eyebrow="Shortcuts" title="Quick actions" />
+      <SectionTitle eyebrow="Raccourcis" title="Actions rapides" />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-        <QuickAction label="Call" icon="☎" tone="gold" onPress={() => { haptic(ImpactStyle.Medium); onNavigate('calls'); }} />
+        <QuickAction label="Appeler" icon="☎" tone="gold" onPress={() => { haptic(ImpactStyle.Medium); onNavigate('calls'); }} />
         <QuickAction label="Message" icon="✉" tone="cyan" onPress={() => { haptic(); onNavigate('messages'); }} />
-        <QuickAction label="Ask AVA" icon="✦" tone="violet" onPress={() => { haptic(); onNavigate('ai'); }} />
-        <QuickAction label="Greeting" icon="◉" tone="violet" onPress={() => { haptic(); onNavigate('ai'); }} />
-        <QuickAction label="Forwarding" icon="↪" tone="gold" onPress={() => { haptic(); onNavigate('settings'); }} />
-        <QuickAction label="Voicemail" icon="✉" tone="cyan" onPress={() => { haptic(); onNavigate('calls'); }} />
+        <QuickAction label="Demander à AVA" icon="✦" tone="violet" onPress={() => { haptic(); onNavigate('ai'); }} />
+        <QuickAction label="Accueil" icon="◉" tone="violet" onPress={() => { haptic(); onNavigate('ai'); }} />
+        <QuickAction label="Transfert" icon="↪" tone="gold" onPress={() => { haptic(); onNavigate('settings'); }} />
+        <QuickAction label="Messagerie" icon="✉" tone="cyan" onPress={() => { haptic(); onNavigate('calls'); }} />
       </div>
 
       {/* Data scope */}
-      <SectionTitle eyebrow="Real PBX data" title="Access scope" />
+      <SectionTitle eyebrow="Données PBX réelles" title="Portée d'accès" />
       <Card padded={true} style={{ marginBottom: 10, background: 'linear-gradient(145deg, rgba(23,198,204,0.12), rgba(255,255,255,0.045))' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ width: 38, height: 38, borderRadius: 14, display: 'grid', placeItems: 'center', background: gradients.ai, fontSize: 18 }}>⌁</div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: font.base, fontWeight: 800, color: colors.textIce }}>{data?.scope.label || (me?.dataScope === 'domain_admin' ? 'Domain admin' : 'Extension user')}</div>
-            <div style={{ fontSize: font.sm, color: colors.mutedSilver, marginTop: 2 }}>{me ? `${me.client?.name ? `${me.client.name} · ` : ''}${me.organization.name} · ${me.domain.sipDomain || me.extension.sipDomain}` : 'Loading secure domain scope…'}</div>
+            <div style={{ fontSize: font.base, fontWeight: 800, color: colors.textIce }}>{data?.scope.label || (me?.dataScope === 'domain_admin' ? 'Admin du domaine' : 'Utilisateur extension')}</div>
+            <div style={{ fontSize: font.sm, color: colors.mutedSilver, marginTop: 2 }}>{me ? `${me.client?.name ? `${me.client.name} · ` : ''}${me.organization.name} · ${me.domain.sipDomain || me.extension.sipDomain}` : 'Chargement de la portée du domaine…'}</div>
           </div>
-          <Chip tone={me?.permissions.admin ? 'gold' : 'cyan'}>{me?.permissions.admin ? 'Admin' : 'User'}</Chip>
+          <Chip tone={me?.permissions.admin ? 'gold' : 'cyan'}>{me?.permissions.admin ? 'Admin' : 'Utilisateur'}</Chip>
         </div>
       </Card>
 
       {me?.status?.updatedAt && (
         <div style={{ margin: '8px 2px 0', fontSize: font.xs, color: colors.mutedSilver }}>
-          PBX status synced {new Date(me.status.updatedAt).toLocaleString()}
+          État PBX synchronisé {new Date(me.status.updatedAt).toLocaleString()}
         </div>
       )}
 
       {/* Communication health */}
-      <SectionTitle eyebrow="Today" title="Communication health" />
+      <SectionTitle eyebrow="Aujourd'hui" title="Santé des communications" />
       <AnswerRateHero
         answered={data?.metrics.answeredCalls}
         missed={data?.metrics.missedCalls}
       />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginTop: 10 }}>
-        <Metric label="Missed" value={data?.metrics.missedCalls} tone="danger" icon="↘" trend={-12} />
-        <Metric label="Answered" value={data?.metrics.answeredCalls} tone="success" icon="↗" trend={+18} />
-        <Metric label="Unread SMS" value={data?.metrics.unreadSms} tone="cyan" icon="✉" trend={+4} />
-        <Metric label="Voicemail" value={data?.metrics.voicemails} tone="gold" icon="◉" trend={-2} />
-        {me?.permissions.admin && <Metric label="Active users" value={data?.metrics.activeUsers} tone="success" icon="◆" trend={+6} />}
-        <Metric label="Action items" value={data?.metrics.actionItems} tone="violet" icon="✦" trend={+1} />
+        <Metric label="Manqués" value={data?.metrics.missedCalls} tone="danger" icon="↘" trend={-12} />
+        <Metric label="Répondus" value={data?.metrics.answeredCalls} tone="success" icon="↗" trend={+18} />
+        <Metric label="SMS non lus" value={data?.metrics.unreadSms} tone="cyan" icon="✉" trend={+4} />
+        <Metric label="Messagerie" value={data?.metrics.voicemails} tone="gold" icon="◉" trend={-2} />
+        {me?.permissions.admin && <Metric label="Utilisateurs actifs" value={data?.metrics.activeUsers} tone="success" icon="◆" trend={+6} />}
+        <Metric label="Tâches" value={data?.metrics.actionItems} tone="violet" icon="✦" trend={+1} />
       </div>
 
       {/* Activity sparkline */}
-      <SectionTitle eyebrow="Last 12 hours" title="Call activity" />
+      <SectionTitle eyebrow="12 dernières heures" title="Activité d'appels" />
       <ActivitySpark answered={data?.metrics.answeredCalls ?? 0} missed={data?.metrics.missedCalls ?? 0} />
 
       {/* Needs attention */}
-      <SectionTitle eyebrow="AVA prioritized" title="Needs attention" />
+      <SectionTitle eyebrow="Priorisé par AVA" title="À traiter" />
       {!data && <Card><Skeleton w="80%" h={12} /><div style={{ height: 8 }} /><Skeleton w="50%" h={10} /></Card>}
       {data?.needsAttention.map((n) => (
         <Card key={n.id} accent={n.accent === 'danger' ? 'gold' : (n.accent as any)} style={{ marginBottom: 10 }} onPress={() => haptic()}>
@@ -117,15 +117,15 @@ export default function HomeScreen({ onNavigate, haptic }: Props) {
       ))}
 
       {/* AI brief */}
-      <SectionTitle eyebrow="AVA Daily Brief" title="What changed since last login" />
-      <AIPanel title="AVA Daily Brief" right={<GhostButton tone="cyan" style={{ padding: '6px 10px' }} onClick={() => onNavigate('ai')}>Open AI</GhostButton>}>
+      <SectionTitle eyebrow="Résumé AVA" title="Ce qui a changé depuis votre dernière connexion" />
+      <AIPanel title="Résumé quotidien AVA" right={<GhostButton tone="cyan" style={{ padding: '6px 10px' }} onClick={() => onNavigate('ai')}>Ouvrir l'IA</GhostButton>}>
         <p style={{ fontSize: font.base, lineHeight: 1.55, color: colors.textIce, margin: 0 }}>
-          {data?.brief || 'Generating today\'s brief…'}
+          {data?.brief || "Génération du résumé du jour…"}
         </p>
         <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
-          <Chip tone="gold">{data?.metrics.actionItems ?? '·'} action items</Chip>
-          <Chip tone="cyan">{data?.metrics.unreadSms ?? '·'} unread</Chip>
-          <Chip tone="violet">AVA agents online</Chip>
+          <Chip tone="gold">{data?.metrics.actionItems ?? '·'} tâches</Chip>
+          <Chip tone="cyan">{data?.metrics.unreadSms ?? '·'} non lus</Chip>
+          <Chip tone="violet">Agents AVA en ligne</Chip>
         </div>
       </AIPanel>
 
