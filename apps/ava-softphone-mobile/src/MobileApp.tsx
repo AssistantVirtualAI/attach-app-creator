@@ -28,6 +28,7 @@ import { useNotificationCounts } from './hooks/useNotificationCounts';
 import { useStoredCreds, Creds, ensureStoredOrganizationId, hydrateSoftphoneCredentials } from './lib/creds';
 import { gradients, colors } from './lib/theme';
 import { ThemeProvider } from './lib/ThemeContext';
+import { MobileI18nProvider } from './lib/i18n';
 import { requestAllPermissions, checkAllPermissions } from './lib/permissions';
 import { registerPush, sendPushTokenToBackend } from './lib/pushNotifications';
 import { syncDeviceContacts } from './lib/contacts';
