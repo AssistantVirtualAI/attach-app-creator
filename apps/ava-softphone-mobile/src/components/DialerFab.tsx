@@ -10,9 +10,11 @@ import { colors, gradients, shadow } from '../lib/theme';
 export default function DialerFab({
   sp,
   haptic,
+  preferClickToCall,
 }: {
   sp: any;
   haptic: (s?: ImpactStyle) => Promise<void>;
+  preferClickToCall: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -98,7 +100,7 @@ export default function DialerFab({
             </button>
           </div>
           <div style={{ flex: 1, minHeight: 0 }}>
-            <DialerScreen sp={sp} haptic={haptic} />
+            <DialerScreen sp={sp} haptic={haptic} preferClickToCall={preferClickToCall} />
           </div>
         </div>
       )}
