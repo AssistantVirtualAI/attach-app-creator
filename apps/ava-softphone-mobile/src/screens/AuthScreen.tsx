@@ -554,7 +554,7 @@ function AccentSwitch({ accent, onChange, readOnly }: { accent: Accent; onChange
             disabled={readOnly}
             onClick={() => onChange?.(o.id)}
             aria-pressed={active}
-            title={`Theme: ${o.label}`}
+            title={`Thème : ${o.label}`}
             style={{
               border: 'none', cursor: readOnly ? 'default' : 'pointer',
               padding: '5px 10px', borderRadius: 999,
@@ -585,12 +585,12 @@ function ErrorBanner({ children, failure }: { children: React.ReactNode; failure
       <div>{children}</div>
       {failure && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-          <span style={chipStyle('step')}>step: {failure.step}</span>
-          <span style={chipStyle('code')}>code: {failure.code}</span>
+          <span style={chipStyle('step')}>étape : {failure.step}</span>
+          <span style={chipStyle('code')}>code : {failure.code}</span>
           {failure.detail && (
             <button type="button" onClick={() => setOpen((o) => !o)}
               style={{ ...chipStyle('toggle'), cursor: 'pointer' }}>
-              {open ? 'hide details' : 'details'}
+              {open ? 'masquer les détails' : 'détails'}
             </button>
           )}
         </div>
