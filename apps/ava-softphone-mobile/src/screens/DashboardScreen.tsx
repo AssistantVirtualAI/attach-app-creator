@@ -132,36 +132,68 @@ export default function DashboardScreen({
         ))}
       </div>
 
-      <AnswerRateHero
-        answered={s ? answered : undefined}
-        missed={s ? missed : undefined}
-        total={s ? total : undefined}
-        voicemails={s ? voicemails : undefined}
-        avgSec={s?.avgDurationSec}
-        rangeLabel={RANGE_LABELS[range]}
-      />
+      {(() => {
+        const isAdmin = !!m?.permissions?.admin || m?.dataScope === 'domain_admin';
+        const inbound = Math.max(0, total - (s?.outboundCalls ?? 0));
+        return (
+          <>
+            {isAdmin && (
+              <>
+                <SectionTitle eyebrow="Domain" title={`${m?.domain?.sipDomain || m?.organization?.name || 'Domain'} · ${RANGE_LABELS[range]}`} />
+                <AnswerRateHero
+                  answered={s ? answered : undefined}
+                  missed={s ? missed : undefined}
+                  total={s ? total : undefined}
+                  voicemails={s ? voicemails : undefined}
+                  avgSec={s?.avgDurationSec}
+                  rangeLabel={RANGE_LABELS[range]}
+                />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginTop: 10 }}>
-        <Metric label="Total calls" value={s ? total : undefined} tone="cyan" icon="☎" pct={100} />
-        <Metric label="Answered" value={s ? answered : undefined} tone="success" icon="↗" pct={total ? (answered / total) * 100 : 0} />
-        <Metric label="Missed" value={s ? missed : undefined} tone="danger" icon="↘" pct={total ? (missed / total) * 100 : 0} />
-        <Metric label="Voicemails" value={s ? voicemails : undefined} tone="gold" icon="✉" pct={total ? (voicemails / total) * 100 : 0} />
-        <Metric label="Answer rate" value={s?.answerRate != null ? `${s.answerRate}%` : undefined} tone="success" icon="◐" pct={s?.answerRate ?? 0} />
-        <Metric label="Avg duration" value={s?.avgDurationSec != null ? `${s.avgDurationSec}s` : undefined} tone="violet" icon="◷" pct={Math.min(100, ((s?.avgDurationSec ?? 0) / 300) * 100)} />
-        <Metric label="Total talk" value={s?.totalTalkSec != null ? fmtTalk(s.totalTalkSec) : undefined} tone="cyan" icon="∿" pct={75} />
-        <Metric label="Peak hour" value={s?.peakHour != null ? `${s.peakHour}:00` : undefined} tone="gold" icon="◉" pct={((s?.peakHour ?? 0) / 24) * 100} />
-        <Metric label="Outbound" value={s?.outboundCalls ?? undefined} tone="cyan" icon="↗" pct={total ? ((s?.outboundCalls ?? 0) / total) * 100 : 0} />
-        <Metric label="Failed dials" value={s?.dialFailedCount ?? undefined} tone="danger" icon="✕" pct={total ? ((s?.dialFailedCount ?? 0) / total) * 100 : 0} />
-        <Metric label="Dial success" value={s?.dialSuccessRate != null ? `${s.dialSuccessRate}%` : undefined} tone="success" icon="✓" pct={s?.dialSuccessRate ?? 0} />
-        <Metric label="Active ext." value={s?.activeExtensions ?? undefined} tone="violet" icon="◆" pct={Math.min(100, ((s?.activeExtensions ?? 0) / 20) * 100)} />
-      </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
+                  <DirectionDonut inbound={s ? inbound : undefined} outbound={s?.outboundCalls} />
+                  <TalkTimeGauge totalSec={s?.totalTalkSec} avgSec={s?.avgDurationSec} />
+                </div>
 
-      {m?.extension?.number && (
-        <>
-          <SectionTitle eyebrow="My extension" title={`Ext ${m.extension.number} · ${RANGE_LABELS[range]}`} />
-          <MyExtensionStats range={range} extension={m.extension.number} domainUuid={m.domain.fusionpbxDomainUuid} />
-        </>
-      )}
+                <SectionTitle eyebrow="Breakdown" title="Domain metrics" />
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+                  <Metric label="Total calls" value={s ? total : undefined} tone="cyan" icon="☎" pct={100} />
+                  <Metric label="Answered" value={s ? answered : undefined} tone="success" icon="↗" pct={total ? (answered / total) * 100 : 0} />
+                  <Metric label="Missed" value={s ? missed : undefined} tone="danger" icon="↘" pct={total ? (missed / total) * 100 : 0} />
+                  <Metric label="Voicemails" value={s ? voicemails : undefined} tone="gold" icon="✉" pct={total ? (voicemails / total) * 100 : 0} />
+                  <Metric label="Answer rate" value={s?.answerRate != null ? `${s.answerRate}%` : undefined} tone="success" icon="◐" pct={s?.answerRate ?? 0} />
+                  <Metric label="Avg duration" value={s?.avgDurationSec != null ? `${s.avgDurationSec}s` : undefined} tone="violet" icon="◷" pct={Math.min(100, ((s?.avgDurationSec ?? 0) / 300) * 100)} />
+                  <Metric label="Total talk" value={s?.totalTalkSec != null ? fmtTalk(s.totalTalkSec) : undefined} tone="cyan" icon="∿" pct={75} />
+                  <Metric label="Peak hour" value={s?.peakHour != null ? `${s.peakHour}:00` : undefined} tone="gold" icon="◉" pct={((s?.peakHour ?? 0) / 24) * 100} />
+                  <Metric label="Outbound" value={s?.outboundCalls ?? undefined} tone="cyan" icon="↗" pct={total ? ((s?.outboundCalls ?? 0) / total) * 100 : 0} />
+                  <Metric label="Failed dials" value={s?.dialFailedCount ?? undefined} tone="danger" icon="✕" pct={total ? ((s?.dialFailedCount ?? 0) / total) * 100 : 0} />
+                  <Metric label="Dial success" value={s?.dialSuccessRate != null ? `${s.dialSuccessRate}%` : undefined} tone="success" icon="✓" pct={s?.dialSuccessRate ?? 0} />
+                  <Metric label="Active ext." value={s?.activeExtensions ?? undefined} tone="violet" icon="◆" pct={Math.min(100, ((s?.activeExtensions ?? 0) / 20) * 100)} />
+                </div>
+              </>
+            )}
+
+            {m?.extension?.number && (
+              <>
+                <SectionTitle eyebrow={isAdmin ? 'My extension' : 'My activity'} title={`Ext ${m.extension.number} · ${RANGE_LABELS[range]}`} />
+                {!isAdmin && (
+                  <AnswerRateHero
+                    answered={s ? answered : undefined}
+                    missed={s ? missed : undefined}
+                    total={s ? total : undefined}
+                    voicemails={s ? voicemails : undefined}
+                    avgSec={s?.avgDurationSec}
+                    rangeLabel={RANGE_LABELS[range]}
+                  />
+                )}
+                <div style={{ marginTop: isAdmin ? 0 : 10 }}>
+                  <MyExtensionStats range={range} extension={m.extension.number} domainUuid={m.domain.fusionpbxDomainUuid} />
+                </div>
+              </>
+            )}
+          </>
+        );
+      })()}
+
 
       <SectionTitle eyebrow={RANGE_LABELS[range]} title="Calls per day" />
       <Card padded={true}>
