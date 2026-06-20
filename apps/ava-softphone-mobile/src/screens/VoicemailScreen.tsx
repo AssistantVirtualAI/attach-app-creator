@@ -7,8 +7,11 @@ import { Card, Chip, EmptyState, GhostButton, AIPanel, Skeleton } from '../compo
 import { audit } from '../lib/audit';
 import { useMobileCredentials } from '../hooks/useMobileCredentials';
 import { authedRealtime, edgeCall } from '../lib/mobileSupabase';
+import { useTr } from '../lib/i18n';
 
 export default function VoicemailScreen({ haptic }: { haptic?: (s?: ImpactStyle) => Promise<void> }) {
+  const { tr } = useTr();
+
   const mobile = useMobileCredentials();
   const [items, setItems] = useState<VoicemailEntry[] | null>(null);
   const [q, setQ] = useState('');
@@ -198,7 +201,7 @@ export default function VoicemailScreen({ haptic }: { haptic?: (s?: ImpactStyle)
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search voicemails"
+            placeholder={tr.voicemail.search}
             style={{
               width: '100%', height: 40, padding: '0 14px 0 34px', borderRadius: radius.lg,
               background: 'rgba(255,255,255,0.06)', border: `1px solid ${colors.border}`,
@@ -206,7 +209,7 @@ export default function VoicemailScreen({ haptic }: { haptic?: (s?: ImpactStyle)
             }}
           />
         </div>
-        <button onClick={reload} disabled={refreshing} aria-label="Refresh" style={{
+        <button onClick={reload} disabled={refreshing} aria-label={tr.common.refresh} style={{
           width: 40, height: 40, borderRadius: radius.lg, border: `1px solid ${colors.border}`,
           background: 'rgba(255,255,255,0.05)', color: colors.lemtelBlue, cursor: 'pointer',
           display: 'grid', placeItems: 'center', opacity: refreshing ? 0.6 : 1,
@@ -215,10 +218,11 @@ export default function VoicemailScreen({ haptic }: { haptic?: (s?: ImpactStyle)
         </button>
       </div>
       <div style={{ fontSize: 11, color: colors.mutedSilver, padding: '0 4px' }}>
-        {items ? `${filtered?.length ?? 0} of ${items.length} · live sync` : 'Loading…'}
+        {items ? tr.voicemail.countLine.replace('{shown}', String(filtered?.length ?? 0)).replace('{total}', String(items.length)) : tr.common.loading}
       </div>
     </div>
   );
+
 
   const GreetingEditor = (
     <div style={{ padding: '0 14px 12px' }}>
