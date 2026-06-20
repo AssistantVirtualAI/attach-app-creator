@@ -131,9 +131,9 @@ Deno.serve(async (req) => {
     sinceDate.setDate(sinceDate.getDate() - days);
     sinceDate.setHours(0, 0, 0, 0);
     const since = sinceDate.toISOString();
-    const limit = Math.min(Number(url.searchParams.get("limit")) || 50, 200);
+    const limit = Math.min(Number(url.searchParams.get("limit")) || 20, 200);
     let listQ = admin.from("pbx_call_records")
-      .select("id, pbx_uuid, organization_id, domain_uuid, domain_name, direction, call_status, caller_name, caller_number, source_number, destination, destination_number, extension, start_at, duration_seconds, missed_call, has_recording, recording_path, recording_name, recording_url, transcribed")
+      .select("id, pbx_uuid, organization_id, domain_uuid, direction, call_status, caller_name, caller_number, source_number, destination_number, extension, start_at, duration_seconds, missed_call, has_recording, transcribed")
       .eq("organization_id", sp.organization_id)
       .gte("start_at", since);
     if (!isDomainAdmin) listQ = listQ.or(extFilter);
