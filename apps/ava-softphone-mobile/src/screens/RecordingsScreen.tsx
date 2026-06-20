@@ -299,7 +299,7 @@ function RecordingAiPanel({ rec }: { rec: RecordingEntry }) {
           )}
 
           {data?.actionItems && data.actionItems.length > 0 && (
-            <AIPanel title="Action items" accent={colors.success}>
+            <AIPanel title={fr ? 'Actions à faire' : 'Action items'} accent={colors.success}>
               {data.actionItems.map((a, i) => (
                 <div key={i} style={{ display: 'flex', gap: 8, padding: '4px 0', fontSize: font.sm, color: colors.textIce }}>
                   <span style={{ color: colors.success }}>→</span><span>{a}</span>
