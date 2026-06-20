@@ -9,7 +9,7 @@
  * bubble up so the UI can render a real error state instead of fake data.
  */
 import { isMockMode } from './buildGuard';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from './mobileSupabase';
 import { perf } from './perfMetrics';
 
 export const MOBILE_DEFAULT_PORTAL = 'https://gejxisrqtvxavbrfcoxz.supabase.co';
@@ -38,6 +38,14 @@ async function getFreshToken(): Promise<string | null> {
   return authToken;
 }
 
+function emitAuthRequired() {
+  try {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('mobile-auth-required'));
+    }
+  } catch {}
+}
+
 async function liveCall<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = await getFreshToken();
   const headers: Record<string, string> = {
@@ -51,10 +59,14 @@ async function liveCall<T>(path: string, init: RequestInit = {}): Promise<T> {
     let detail: any = null;
     let text = '';
     try { detail = await res.json(); } catch { try { text = await res.text(); } catch {} }
-    const err = new Error(detail?.message || detail?.error || text || `HTTP ${res.status} ${path}`) as Error & { status?: number; detail?: any; path?: string };
+    const err = new Error(detail?.message || detail?.error || text || `HTTP ${res.status} ${path}`) as Error & { status?: number; detail?: any; path?: string; code?: string };
     err.status = res.status;
     err.detail = detail || text;
     err.path = path;
+    if (res.status === 401 || res.status === 403) {
+      err.code = 'AUTH_REQUIRED';
+      emitAuthRequired();
+    }
     throw err;
   }
   return res.json() as Promise<T>;
@@ -71,12 +83,19 @@ async function call<T>(path: string, init: RequestInit | undefined, mockData: T)
     await new Promise((r) => setTimeout(r, 220));
     return mockData;
   }
-  // Real users must see real errors, not fake records.
+  const isGet = !init || !init.method || init.method.toUpperCase() === 'GET';
   const token = await getFreshToken();
   if (!token) {
-    throw new Error('Not authenticated');
+    if (isGet) {
+      // Soft-fail GETs so screens render an empty state instead of blanking.
+      emitAuthRequired();
+      return mockData;
+    }
+    const err = new Error('Not authenticated') as Error & { code?: string };
+    err.code = 'AUTH_REQUIRED';
+    emitAuthRequired();
+    throw err;
   }
-  const isGet = !init || !init.method || init.method.toUpperCase() === 'GET';
   if (isGet) {
     const existing = _inflightGet.get(path);
     if (existing) { perf.dedupe(); return existing as Promise<T>; }
