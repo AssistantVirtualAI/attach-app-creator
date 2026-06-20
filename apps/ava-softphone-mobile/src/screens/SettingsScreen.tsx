@@ -45,7 +45,7 @@ export default function SettingsScreen({
   };
   const toggleHaptics = () => { const next = !haptics; setHaptics(next); localStorage.setItem('ava.haptics', next ? 'on' : 'off'); };
   const toggleAutoAnswer = () => { const next = !autoAnswer; setAutoAnswer(next); localStorage.setItem('ava.autoAnswer', next ? 'on' : 'off'); };
-  const togglePreferC2C = () => { const next = !preferC2C; setPreferC2C(next); localStorage.setItem('prefer_click_to_call', next ? 'on' : 'off'); };
+  const togglePreferC2C = () => onTogglePreferC2C();
   const pickRingtone = () => {
     const opts = ['AVA Default', 'Classic', 'Pulse', 'Marimba', 'Silent'];
     const choice = prompt((lang === 'fr' ? 'Sonnerie' : 'Ringtone') + ` (${opts.join(', ')}):`, ringtone);
