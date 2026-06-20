@@ -1,15 +1,14 @@
 /**
- * Lance un appel sur le bon canal :
- *  1. Essaie le softphone SIP si disponible (sp.call retourne true).
- *  2. Sinon, ouvre le composeur natif via `tel:` (Capacitor / navigateur).
- *
- * `sp.call` peut retourner `boolean | void`. On considère `false` ou une
- * exception comme un échec et on tombe alors sur `tel:`.
+ * Lance un appel UNIQUEMENT via le softphone SIP intégré.
+ * On n'utilise plus jamais le composeur natif (tel:) — toute la voix passe
+ * par le canal SIP/WebRTC de l'application pour garantir la qualité audio
+ * (noise cancellation, codec Opus FEC/DTX, etc.).
  */
 import { showMobileToast } from './mobileToast';
 
 export type SoftphoneLike = {
   call?: (n: string) => boolean | void;
+  reconnect?: () => void;
   snap?: { status?: string };
 };
 
@@ -21,21 +20,26 @@ export function dialNumber(sp: SoftphoneLike | null | undefined, rawNumber: stri
     showMobileToast('Numéro invalide', 'error');
     return false;
   }
-  // 1) SIP if registered.
-  const sipReady = sp?.snap?.status === 'registered' || sp?.snap?.status === 'active' || sp?.snap?.status === 'ringing';
-  if (sipReady && typeof sp?.call === 'function') {
-    try {
-      const r = sp.call(number);
-      if (r !== false) return true;
-    } catch { /* fallthrough to tel: */ }
+  if (!sp || typeof sp.call !== 'function') {
+    showMobileToast('Téléphone non initialisé', 'error');
+    return false;
   }
-  // 2) Fallback: system dialer.
+  const status = sp.snap?.status;
+  const sipReady = status === 'registered' || status === 'active' || status === 'ringing';
+  if (!sipReady) {
+    showMobileToast('Téléphone non connecté — reconnexion en cours…', 'error');
+    try { sp.reconnect?.(); } catch {}
+    return false;
+  }
   try {
-    // Capacitor WebView and mobile browsers handle `tel:` natively.
-    window.location.href = `tel:${number}`;
+    const r = sp.call(number);
+    if (r === false) {
+      showMobileToast("Impossible de lancer l'appel SIP", 'error');
+      return false;
+    }
     return true;
   } catch (e: any) {
-    showMobileToast(e?.message || 'Impossible de lancer l\'appel', 'error');
+    showMobileToast(e?.message || "Échec de l'appel SIP", 'error');
     return false;
   }
 }

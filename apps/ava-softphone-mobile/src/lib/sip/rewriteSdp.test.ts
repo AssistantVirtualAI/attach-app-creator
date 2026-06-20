@@ -1,8 +1,8 @@
 /**
  * Unit tests for the FusionPBX SDP rewriter.
- * Guarantees the workaround only ever ships PCMU(0) / PCMA(8) + telephone
- * event(101), strips DTLS/fingerprint/crypto, and removes every video
- * section — anything else triggers a 488 from FusionPBX.
+ * The rewriter now prefers Opus (with FEC/DTX) but keeps PCMU/PCMA as
+ * fallbacks so FusionPBX continues to negotiate successfully even when
+ * Opus is not enabled on the PBX side.
  */
 import { describe, it, expect } from 'vitest';
 import { rewriteSdpForFusionPBX } from './jssipProvider';
@@ -37,8 +37,8 @@ const RAW_SDP = [
 describe('rewriteSdpForFusionPBX', () => {
   const out = rewriteSdpForFusionPBX(RAW_SDP);
 
-  it('rewrites m=audio to plain RTP/AVP with only 0 8 101', () => {
-    expect(out).toMatch(/^m=audio \d+ RTP\/AVP 0 8 101$/m);
+  it('rewrites m=audio to plain RTP/AVP with Opus(111) preferred then PCMU/PCMA/telephone-event', () => {
+    expect(out).toMatch(/^m=audio \d+ RTP\/AVP 111 0 8 101$/m);
     expect(out).not.toMatch(/UDP\/TLS\/RTP\/SAVPF/);
   });
 
@@ -55,14 +55,16 @@ describe('rewriteSdpForFusionPBX', () => {
     expect(out).not.toMatch(/a=ice-options/);
   });
 
-  it('keeps only PCMU/PCMA/telephone-event rtpmap and fmtp entries', () => {
+  it('keeps only Opus/PCMU/PCMA/telephone-event rtpmap entries', () => {
     const rtpmaps = out.match(/^a=rtpmap:(\d+) /gm) || [];
     const pts = rtpmaps.map((l) => l.match(/^a=rtpmap:(\d+) /)![1]);
-    expect(new Set(pts)).toEqual(new Set(['0', '8', '101']));
+    expect(new Set(pts)).toEqual(new Set(['111', '0', '8', '101']));
+  });
 
-    const fmtps = out.match(/^a=fmtp:(\d+) /gm) || [];
-    const fpts = fmtps.map((l) => l.match(/^a=fmtp:(\d+) /)![1]);
-    for (const pt of fpts) expect(['0', '8', '101']).toContain(pt);
+  it('injects Opus FEC/DTX/maxaveragebitrate fmtp', () => {
+    expect(out).toMatch(/^a=fmtp:111 [^\r\n]*useinbandfec=1/m);
+    expect(out).toMatch(/^a=fmtp:111 [^\r\n]*usedtx=1/m);
+    expect(out).toMatch(/^a=fmtp:111 [^\r\n]*maxaveragebitrate=24000/m);
   });
 
   it('strips rtcp-fb and extmap lines', () => {

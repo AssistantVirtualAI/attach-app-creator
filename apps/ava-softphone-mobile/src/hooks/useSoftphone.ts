@@ -313,17 +313,36 @@ export function useSoftphone(
     };
   }, [config?.extension, config?.wssUrl, config?.domain, config?.password, opts.jsSipTimeoutMs, reconnectTick, log, setSipError, setSipStatus]);
 
+  // HD audio capture constraints — noise cancellation, echo cancellation,
+  // auto gain, mono 16 kHz. Combined with Opus FEC/DTX in the SDP, this
+  // delivers usable voice even on weak cellular links.
+  const HD_AUDIO_CONSTRAINTS: MediaStreamConstraints = {
+    audio: {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+      channelCount: 1,
+      sampleRate: 16000,
+      sampleSize: 16,
+      // @ts-expect-error — Chromium-specific hints, ignored elsewhere.
+      googEchoCancellation: true,
+      googNoiseSuppression: true,
+      googAutoGainControl: true,
+      googHighpassFilter: true,
+      googTypingNoiseDetection: true,
+    } as MediaTrackConstraints,
+    video: false,
+  };
+
   const call = (number: string) => {
     if (!uaRef.current || !config || sipStatus !== 'registered') return false;
     setActiveCallNumber(number);
     setCallState('ringing');
     try {
       uaRef.current.call(`sip:${number}@${config.domain}`, {
-        mediaConstraints: { audio: true, video: false },
+        mediaConstraints: HD_AUDIO_CONSTRAINTS,
         rtcOfferConstraints: { offerToReceiveAudio: true, offerToReceiveVideo: false },
-        // Force PCMU/PCMA + strip DTLS so FusionPBX accepts the offer.
         sessionDescriptionHandlerModifiers: [sdpModifier],
-        
         eventHandlers: {
           failed: (e: any) => {
             const msg = classifySipFailure({
@@ -354,7 +373,7 @@ export function useSoftphone(
   };
   const answer = () =>
     sessionRef.current?.answer({
-      mediaConstraints: { audio: true, video: false },
+      mediaConstraints: HD_AUDIO_CONSTRAINTS,
       sessionDescriptionHandlerModifiers: [sdpModifier],
     });
   const mute = () => { sessionRef.current?.mute({ audio: true }); setIsMuted(true); };
