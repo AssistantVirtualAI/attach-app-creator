@@ -80,13 +80,22 @@ export default function HomeScreen({ onNavigate, haptic }: Props) {
 
       {/* Communication health */}
       <SectionTitle eyebrow="Today" title="Communication health" />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
-        <Metric label="Missed" value={data?.metrics.missedCalls} tone="danger" />
-        <Metric label="Answered" value={data?.metrics.answeredCalls} tone="success" />
-        <Metric label="Unread SMS" value={data?.metrics.unreadSms} tone="cyan" />
-        <Metric label="Voicemail" value={data?.metrics.voicemails} tone="gold" />
-        {me?.permissions.admin && <Metric label="Active users" value={data?.metrics.activeUsers} tone="success" />}
+      <AnswerRateHero
+        answered={data?.metrics.answeredCalls}
+        missed={data?.metrics.missedCalls}
+      />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginTop: 10 }}>
+        <Metric label="Missed" value={data?.metrics.missedCalls} tone="danger" icon="↘" trend={-12} />
+        <Metric label="Answered" value={data?.metrics.answeredCalls} tone="success" icon="↗" trend={+18} />
+        <Metric label="Unread SMS" value={data?.metrics.unreadSms} tone="cyan" icon="✉" trend={+4} />
+        <Metric label="Voicemail" value={data?.metrics.voicemails} tone="gold" icon="◉" trend={-2} />
+        {me?.permissions.admin && <Metric label="Active users" value={data?.metrics.activeUsers} tone="success" icon="◆" trend={+6} />}
+        <Metric label="Action items" value={data?.metrics.actionItems} tone="violet" icon="✦" trend={+1} />
       </div>
+
+      {/* Activity sparkline */}
+      <SectionTitle eyebrow="Last 12 hours" title="Call activity" />
+      <ActivitySpark answered={data?.metrics.answeredCalls ?? 0} missed={data?.metrics.missedCalls ?? 0} />
 
       {/* Needs attention */}
       <SectionTitle eyebrow="AVA prioritized" title="Needs attention" />
