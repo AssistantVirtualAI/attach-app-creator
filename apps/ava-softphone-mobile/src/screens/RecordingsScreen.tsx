@@ -270,12 +270,12 @@ function RecordingAiPanel({ rec }: { rec: RecordingEntry }) {
 
           {error && (
             <div style={{ marginBottom: 8, padding: 10, borderRadius: radius.md, border: `1px solid ${colors.danger}55`, background: `${colors.danger}10` }}>
-              <div style={{ color: colors.danger, fontSize: 11, fontWeight: 800, marginBottom: 4 }}>⚠ Transcription failed</div>
+              <div style={{ color: colors.danger, fontSize: 11, fontWeight: 800, marginBottom: 4 }}>⚠ {fr ? 'Échec de la transcription' : 'Transcription failed'}</div>
               <div style={{ color: colors.mutedSilver, fontSize: 11, marginBottom: 8, wordBreak: 'break-word' }}>{error}</div>
               <button onClick={run} disabled={running} style={{
                 padding: '5px 10px', borderRadius: 8, border: `1px solid ${colors.danger}80`,
                 background: 'transparent', color: colors.danger, fontSize: 10.5, fontWeight: 800, cursor: 'pointer',
-              }}>↻ Retry AI run</button>
+              }}>↻ {fr ? 'Relancer l\'IA' : 'Retry AI run'}</button>
             </div>
           )}
 
