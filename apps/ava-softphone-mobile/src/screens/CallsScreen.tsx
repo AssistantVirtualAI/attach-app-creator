@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, Suspense, lazy } from 'react';
 import { ImpactStyle } from '@capacitor/haptics';
 import { colors, font, radius, gradients } from '../lib/theme';
 import { mobileApi, CallRecord } from '../lib/mobileApi';
@@ -6,13 +6,15 @@ import { Card, Chip, SectionTitle, Skeleton, EmptyState, PrimaryButton, GhostBut
 import CallDetailScreen from './CallDetailScreen';
 import Dialpad from '../components/Dialpad';
 import VoicemailScreen from './VoicemailScreen';
-import RecordingsScreen from './RecordingsScreen';
+// Lazy: recordings tab pulls a heavier audio/transcript bundle; load on demand.
+const RecordingsScreen = lazy(() => import('./RecordingsScreen'));
 import { useRealtimeCDR } from '../hooks/useRealtimeCDR';
 import type { Creds } from '../lib/creds';
 import { showMobileToast } from '../lib/mobileToast';
 import { restGet } from '../lib/mobileSupabase';
 import { useTr } from '../lib/i18n';
 import { dialNumber } from '../lib/dialNumber';
+
 
 type SubTab = 'recents' | 'recordings' | 'voicemail' | 'dial';
 
@@ -178,7 +180,9 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
 
       {sub === 'recordings' && (
         <div style={{ marginTop: 6 }}>
-          <RecordingsScreen creds={creds || null} isAdmin={!!isAdmin} myExtension={myExt} rangeDays={rangeDays} onRangeDaysChange={setRangeDays} />
+          <Suspense fallback={<ListSkeleton rows={4} />}>
+            <RecordingsScreen creds={creds || null} isAdmin={!!isAdmin} myExtension={myExt} rangeDays={rangeDays} onRangeDaysChange={setRangeDays} />
+          </Suspense>
         </div>
       )}
 

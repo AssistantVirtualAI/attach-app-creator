@@ -89,13 +89,13 @@ export function useAutoSync<T>(
   } = {},
 ) {
   const {
-    intervalMs = 60_000,
+    intervalMs = 120_000,
     deps = [],
     cacheKey,
     timeoutMs = 10_000,
     retries = 1,
     retryBaseMs = 600,
-    staleTimeMs = 30_000,
+    staleTimeMs = 60_000,
   } = opts;
 
   const initialEntry = getCache<T>(cacheKey);
