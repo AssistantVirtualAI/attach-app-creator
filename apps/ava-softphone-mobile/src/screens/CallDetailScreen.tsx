@@ -312,10 +312,10 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
 
           {/* AI Summary */}
           {data.summary && (
-            <AIPanel title="AVA Summary" accent={colors.avaViolet}>
+            <AIPanel title={fr ? 'Résumé AVA' : 'AVA Summary'} accent={colors.avaViolet}>
               <p style={{ fontSize: font.base, lineHeight: 1.55, color: colors.textIce, margin: 0 }}>{data.summary}</p>
               <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
-                {data.qualityScore > 0 && <Chip tone="gold">Quality {data.qualityScore}/100</Chip>}
+                {data.qualityScore > 0 && <Chip tone="gold">{fr ? 'Qualité' : 'Quality'} {data.qualityScore}/100</Chip>}
                 {data.coachingScore != null && <Chip tone="cyan">Coaching {data.coachingScore}/5</Chip>}
                 {data.sentiment && <Chip tone={data.sentiment === 'positive' ? 'success' : data.sentiment === 'negative' ? 'danger' : 'neutral'}>{data.sentiment}</Chip>}
                 {data.intent && <Chip tone="cyan">{data.intent}</Chip>}
