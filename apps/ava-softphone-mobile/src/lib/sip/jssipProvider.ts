@@ -87,18 +87,34 @@ export function getJsSIP() {
 
 /* ============================================================
    SDP rewriter — strip video, DTLS/SRTP (FusionPBX wants plain RTP),
-   then re-order audio codecs: Opus first (with FEC/DTX/HD bitrate
-   for resilience on weak networks), then PCMU/PCMA fallbacks, then
-   telephone-event for DTMF. This keeps backward compatibility with
-   FusionPBX (which still accepts PCMU) while letting the PBX pick
-   Opus when supported for much better quality + noise robustness.
+   then re-order audio codecs: Opus first (with FEC/DTX/adaptive
+   bitrate for resilience on weak networks), then PCMU/PCMA fallbacks,
+   then telephone-event for DTMF. Accepts profile-driven Opus
+   parameters (HD / auto / low-bandwidth).
    ============================================================ */
+export interface SdpRewriteOpts {
+  opusMaxAverageBitrate?: number;  // bps
+  opusMaxPlaybackRate?: number;    // Hz
+  opusUseInbandFec?: boolean;
+  opusUseDtx?: boolean;
+  opusPtime?: number;              // ms
+}
+
+const DEFAULT_OPTS: Required<SdpRewriteOpts> = {
+  opusMaxAverageBitrate: 24000,
+  opusMaxPlaybackRate: 16000,
+  opusUseInbandFec: true,
+  opusUseDtx: true,
+  opusPtime: 20,
+};
+
 function extractPt(sdp: string, codecRegex: RegExp): string | null {
   const m = sdp.match(new RegExp(`a=rtpmap:(\\d+)\\s+${codecRegex.source}`, 'i'));
   return m ? m[1] : null;
 }
 
-export function rewriteSdpForFusionPBX(sdp: string): string {
+export function rewriteSdpForFusionPBX(sdp: string, opts: SdpRewriteOpts = {}): string {
+  const o = { ...DEFAULT_OPTS, ...opts };
   let out = sdp;
   out = out.replace(/m=video[\s\S]*?(?=\r\nm=|$)/g, '');
   out = out.replace(/^a=fingerprint:.*$/gm, '');
@@ -126,7 +142,16 @@ export function rewriteSdpForFusionPBX(sdp: string): string {
   out = out.replace(/^a=fmtp:(\d+) [^\r\n]+$/gm, (line, pt) => (keep.has(pt) ? line : ''));
 
   if (opusPt) {
-    const opusFmtp = `a=fmtp:${opusPt} minptime=10;useinbandfec=1;usedtx=1;stereo=0;cbr=0;maxaveragebitrate=24000;maxplaybackrate=16000`;
+    const fmtpParts = [
+      `minptime=${Math.max(10, Math.min(o.opusPtime, 60))}`,
+      `useinbandfec=${o.opusUseInbandFec ? 1 : 0}`,
+      `usedtx=${o.opusUseDtx ? 1 : 0}`,
+      'stereo=0',
+      'cbr=0',
+      `maxaveragebitrate=${o.opusMaxAverageBitrate}`,
+      `maxplaybackrate=${o.opusMaxPlaybackRate}`,
+    ];
+    const opusFmtp = `a=fmtp:${opusPt} ${fmtpParts.join(';')}`;
     if (new RegExp(`^a=fmtp:${opusPt} `, 'm').test(out)) {
       out = out.replace(new RegExp(`^a=fmtp:${opusPt} [^\\r\\n]+$`, 'm'), opusFmtp);
     } else {
@@ -135,24 +160,35 @@ export function rewriteSdpForFusionPBX(sdp: string): string {
         `$1\r\n${opusFmtp}`,
       );
     }
+    // Add a=ptime hint so the PBX matches our packetization.
+    if (!/^a=ptime:/m.test(out)) {
+      out = out.replace(/(m=audio [^\r\n]+)/, `$1\r\na=ptime:${o.opusPtime}`);
+    }
   }
 
   out = out.replace(/\r?\n\r?\n+/g, '\r\n');
   return out;
 }
 
-/** Modifier passed to JsSIP outbound call + incoming answer. */
+/** Default modifier (auto profile) — kept for backward compatibility. */
 export const sdpModifier = (description: any) => {
   if (description?.sdp) {
-    try {
-      description.sdp = rewriteSdpForFusionPBX(description.sdp);
-    } catch (e) {
-      // eslint-disable-next-line no-console
-      console.error('[SIP][SDP] rewrite error', e);
-    }
+    try { description.sdp = rewriteSdpForFusionPBX(description.sdp); }
+    catch (e) { console.error('[SIP][SDP] rewrite error', e); }
   }
   return Promise.resolve(description);
 };
+
+/** Build a profile-driven modifier (used by useSoftphone per call). */
+export function buildSdpModifier(opts: SdpRewriteOpts) {
+  return (description: any) => {
+    if (description?.sdp) {
+      try { description.sdp = rewriteSdpForFusionPBX(description.sdp, opts); }
+      catch (e) { console.error('[SIP][SDP] rewrite error', e); }
+    }
+    return Promise.resolve(description);
+  };
+}
 
 /* ============================================================
    Failure classification — turns JsSIP error blobs into a
