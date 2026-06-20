@@ -238,11 +238,11 @@ function RecordingAiPanel({ rec }: { rec: RecordingEntry }) {
   }, [loading, running, hasTranscript, hasAi, error, run]);
 
   const statusText = running
-    ? stage === 'analyzing' ? 'Analyzing call · coaching & sentiment…' : 'Transcribing audio with AI…'
-    : error ? 'AI run failed'
-    : hasAi ? 'AI ready · cached'
-    : hasTranscript ? 'Transcript ready'
-    : 'Preparing AI…';
+    ? stage === 'analyzing' ? (fr ? 'Analyse · coaching et sentiment…' : 'Analyzing call · coaching & sentiment…') : (fr ? 'Transcription audio par IA…' : 'Transcribing audio with AI…')
+    : error ? (fr ? 'Échec de l\'IA' : 'AI run failed')
+    : hasAi ? (fr ? 'IA prête · en cache' : 'AI ready · cached')
+    : hasTranscript ? (fr ? 'Transcription prête' : 'Transcript ready')
+    : (fr ? 'Préparation de l\'IA…' : 'Preparing AI…');
 
   return (
     <div style={{ margin: '8px 0 0', padding: 12, borderRadius: radius.lg, border: `1px solid ${colors.borderAI}`, background: 'rgba(122,76,255,0.05)' }}>
