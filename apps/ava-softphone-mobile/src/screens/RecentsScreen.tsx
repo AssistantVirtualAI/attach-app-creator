@@ -1,12 +1,15 @@
 import React from 'react';
+import { useT } from '../lib/i18n';
 
 export default function RecentsScreen({ sp }: { sp: any }) {
   const recents: any[] = sp.snap.recents || [];
+  const { lang } = useT();
+  const fr = lang === 'fr';
   return (
     <div style={{ height: '100%', overflow: 'auto', padding: '20px 16px' }}>
-      <h2 style={titleStyle}>Recents</h2>
+      <h2 style={titleStyle}>{fr ? 'Récents' : 'Recents'}</h2>
       {recents.length === 0 ? (
-        <Empty label="No recent calls" />
+        <Empty label={fr ? 'Aucun appel récent' : 'No recent calls'} />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {recents.map((r, i) => (
@@ -16,7 +19,7 @@ export default function RecentsScreen({ sp }: { sp: any }) {
                   {r.name || r.number}
                 </span>
                 <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                  {r.direction === 'in' ? '↙' : r.direction === 'missed' ? '✕' : '↗'} {new Date(r.at).toLocaleString()}
+                  {r.direction === 'in' ? '↙' : r.direction === 'missed' ? '✕' : '↗'} {new Date(r.at).toLocaleString(fr ? 'fr-CA' : undefined)}
                 </span>
               </div>
               <span style={{ fontSize: 18, color: 'var(--brand-blue-2)' }}>☏</span>
