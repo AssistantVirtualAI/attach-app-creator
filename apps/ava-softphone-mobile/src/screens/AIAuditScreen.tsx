@@ -244,7 +244,7 @@ export default function AIAuditScreen() {
                   opacity: !r.call_record_id || !r.organization_id ? 0.4 : 1,
                   whiteSpace: 'nowrap',
                 }}
-              >{retrying === r.id ? '…' : '↻ Retry'}</button>
+              >{retrying === r.id ? '…' : (fr ? '↻ Réessayer' : '↻ Retry')}</button>
             </div>
           ))}
         </Card>
