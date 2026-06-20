@@ -178,10 +178,10 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
   const hasTranscript = (data?.transcript?.length || 0) > 0;
   const aiDone = hasTranscript && !!data?.summary;
   const statusText = transcribing
-    ? aiStage === 'analyzing' ? 'AI analysis: en cours — scoring/coaching' : 'AI analysis: en cours — transcription'
-    : aiDone || data?.aiCached ? 'AI analysis: déjà traité — cache réutilisé'
-    : transcribeError || data?.aiError ? 'AI analysis: échec'
-    : 'AI analysis: non traité';
+    ? aiStage === 'analyzing' ? (fr ? 'Analyse IA : en cours — scoring/coaching' : 'AI analysis: in progress — scoring/coaching') : (fr ? 'Analyse IA : transcription en cours' : 'AI analysis: transcribing')
+    : aiDone || data?.aiCached ? (fr ? 'Analyse IA : déjà traité — cache réutilisé' : 'AI analysis: cached')
+    : transcribeError || data?.aiError ? (fr ? 'Analyse IA : échec' : 'AI analysis: failed')
+    : (fr ? 'Analyse IA : non traité' : 'AI analysis: not processed');
 
   if (debugOpen) return <RecordingDebugScreen callId={id} onBack={() => setDebugOpen(false)} />;
 
