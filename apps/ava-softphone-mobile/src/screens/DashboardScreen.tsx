@@ -384,6 +384,7 @@ function AnswerRateHero({ answered, missed, total, voicemails, avgSec, rangeLabe
 }
 
 function MyExtensionStats({ range, extension, domainUuid }: { range: StatsRange; extension: string; domainUuid?: string | null }) {
+  const { t } = useT();
   const mobile = useMobileCredentials();
   const [s, setS] = React.useState<{ total: number; answered: number; missed: number; voicemails: number; recordings: number; avgSec: number } | null>(null);
   const [err, setErr] = React.useState<string | null>(null);
