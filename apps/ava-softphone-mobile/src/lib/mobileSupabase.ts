@@ -1,4 +1,6 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { Preferences } from '@capacitor/preferences';
+import { Capacitor } from '@capacitor/core';
 
 export const SUPABASE_URL =
   (import.meta as any).env?.VITE_SUPABASE_URL ||
@@ -9,16 +11,49 @@ export const SUPABASE_ANON =
   (import.meta as any).env?.VITE_SUPABASE_ANON_KEY ||
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdlanhpc3JxdHZ4YXZicmZjb3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1MDMxNzQsImV4cCI6MjA3NzA3OTE3NH0.kaO-GslE99OCNrZ4_AMnbzGqya2azqz_UMZR34zZvvo';
 
-let realtimeClient: ReturnType<typeof createClient> | null = null;
+// Capacitor Preferences-backed storage so the SDK can persist and refresh
+// sessions across native app restarts (where localStorage is unreliable).
+const nativeStorage = {
+  getItem: async (key: string) => {
+    try {
+      const { value } = await Preferences.get({ key });
+      return value ?? null;
+    } catch { return null; }
+  },
+  setItem: async (key: string, value: string) => {
+    try { await Preferences.set({ key, value }); } catch {}
+  },
+  removeItem: async (key: string) => {
+    try { await Preferences.remove({ key }); } catch {}
+  },
+};
+
+const webStorage = typeof window !== 'undefined' && window.localStorage
+  ? window.localStorage
+  : undefined;
+
+let _mobileClient: SupabaseClient | null = null;
+export function getMobileSupabaseClient(): SupabaseClient {
+  if (_mobileClient) return _mobileClient;
+  _mobileClient = createClient(SUPABASE_URL, SUPABASE_ANON, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: false,
+      storageKey: 'lemtel-mobile-auth',
+      storage: (Capacitor.isNativePlatform() ? nativeStorage : webStorage) as any,
+    },
+    realtime: { params: { eventsPerSecond: 2 } },
+  });
+  return _mobileClient;
+}
+
+export const supabase = getMobileSupabaseClient();
 
 export function authedRealtime(token?: string | null) {
-  if (!realtimeClient) {
-    realtimeClient = createClient(SUPABASE_URL, SUPABASE_ANON, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
-  }
-  if (token) realtimeClient.realtime.setAuth(token);
-  return realtimeClient;
+  const sb = getMobileSupabaseClient();
+  if (token) sb.realtime.setAuth(token);
+  return sb;
 }
 
 export async function restGet<T = any>(path: string, token?: string | null): Promise<T> {
