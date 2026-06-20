@@ -111,7 +111,7 @@ export default function FeaturesScreen({ sp }: { sp?: any }) {
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 20, color: enabled ? accent : colors.mutedSilver,
               }}>{f.icon}</span>
-              <span style={{ fontSize: 11, fontWeight: 700, textAlign: 'center', letterSpacing: 0.2 }}>{f.label}</span>
+              <span style={{ fontSize: 11, fontWeight: 700, textAlign: 'center', letterSpacing: 0.2 }}>{f.label[lang]}</span>
             </button>
           );
         })}
@@ -140,20 +140,20 @@ export default function FeaturesScreen({ sp }: { sp?: any }) {
                 fontSize: 24, color: toneAccent(open.tone),
               }}>{open.icon}</span>
               <div>
-                <div style={{ fontSize: font.md, fontWeight: 800 }}>{open.label}</div>
-                <div style={{ fontSize: 10.5, color: badgeFor(open.availability).color, fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase' }}>
-                  {badgeFor(open.availability).label}
+                <div style={{ fontSize: font.md, fontWeight: 800 }}>{open.label[lang]}</div>
+                <div style={{ fontSize: 10.5, color: badgeFor(open.availability, lang).color, fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase' }}>
+                  {badgeFor(open.availability, lang).label}
                 </div>
               </div>
             </div>
             <p style={{ fontSize: font.sm, color: colors.textSub, lineHeight: 1.55, margin: '8px 0 14px' }}>
-              {open.description}
+              {open.description[lang]}
             </p>
             <button onClick={() => setOpen(null)} style={{
               width: '100%', padding: '12px 14px', borderRadius: radius.md, border: 'none',
               background: gradients.shinyPrimary, color: '#fff', fontWeight: 800, letterSpacing: 0.4,
               cursor: 'pointer',
-            }}>Got it</button>
+            }}>{lang === 'fr' ? 'Compris' : 'Got it'}</button>
           </div>
         </div>
       )}
