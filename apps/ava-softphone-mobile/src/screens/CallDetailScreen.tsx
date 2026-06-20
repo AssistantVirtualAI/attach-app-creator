@@ -377,9 +377,9 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
           )}
 
           <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-            <GhostButton tone="gold" style={{ flex: 1 }}>Tag</GhostButton>
-            <GhostButton tone="cyan" style={{ flex: 1 }}>Share</GhostButton>
-            <GhostButton tone="violet" style={{ flex: 1 }} onClick={transcribe}>Re-analyze</GhostButton>
+            <GhostButton tone="gold" style={{ flex: 1 }}>{fr ? 'Étiqueter' : 'Tag'}</GhostButton>
+            <GhostButton tone="cyan" style={{ flex: 1 }}>{fr ? 'Partager' : 'Share'}</GhostButton>
+            <GhostButton tone="violet" style={{ flex: 1 }} onClick={transcribe}>{fr ? 'Ré-analyser' : 'Re-analyze'}</GhostButton>
           </div>
 
           <div style={{ height: 60 }} />
