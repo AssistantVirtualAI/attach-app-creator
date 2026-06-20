@@ -1,65 +1,47 @@
-## Objectif
-1. Finaliser la traduction française des écrans secondaires restants.
-2. Accélérer significativement le chargement des données sur toutes les pages.
+## Goal
+Eliminate "unauthorized" failures and blank screens in the mobile app by persisting the Supabase session natively, restoring it on launch, auto-refreshing tokens, and surfacing a clear error state instead of blanking out.
 
-## Partie 1 — Traduction française
+## Changes
 
-Écrans encore à traduire / vérifier :
-- `CallDetailScreen.tsx`
-- `CallsScreen.tsx`
-- `DashboardScreen.tsx`
-- `DataSafetyScreen.tsx`
-- `FeaturesScreen.tsx`
-- `MessagesHubScreen.tsx`
-- `MoreScreen.tsx`
-- `PrivacyScreen.tsx`
-- `QueuesScreen.tsx`
-- `RecordingsScreen.tsx`
-- `TeamChatScreen.tsx`
-- `VoicemailScreen.tsx`
+### 1. `apps/ava-softphone-mobile/src/lib/mobileSupabase.ts`
+Add a properly configured Supabase client (separate from the generated one in `@/integrations/supabase/client`) so the mobile app can persist its session via Capacitor `Preferences`:
+- New `getMobileSupabaseClient()` (and `export const supabase`) using `createClient` with:
+  - `auth.persistSession: true`, `auth.autoRefreshToken: true`
+  - `auth.storage` backed by `@capacitor/preferences` on native, `localStorage` fallback on web
+  - `auth.storageKey: 'lemtel-mobile-auth'` (so it does not collide with the desktop client)
+  - `realtime.params.eventsPerSecond: 2`
+- Keep `authedRealtime`, `restGet`, `restPost`, `edgeCall`, recordings helpers untouched (already token-aware).
 
-Approche : remplacer les libellés codés en dur, placeholders, aria-labels, états vides et messages d'erreur par `t(...)` ou des branches `lang === 'fr' ? ... : ...` cohérentes avec l'existant. Ajouter les clés manquantes dans `src/lib/i18n.tsx`.
+### 2. `apps/ava-softphone-mobile/src/lib/mobileApi.ts`
+- Switch the `supabase` import from `@/integrations/supabase/client` to the new `./mobileSupabase` client so `getFreshToken()` reads the persisted mobile session.
+- In `call()`, when `getFreshToken()` returns null, return the supplied `mockData` (treated as an empty placeholder) **only for GETs**, and throw an `AUTH_REQUIRED` error for mutations. This stops cascading blank screens during a brief token gap while still surfacing real auth failures on user actions.
+- Tag the thrown error with `code: 'AUTH_REQUIRED'` so the UI can detect it.
 
-## Partie 2 — Performance du chargement des données
+### 3. `apps/ava-softphone-mobile/src/MobileApp.tsx`
+- Import the new mobile `supabase` client.
+- New effect (after creds load) that calls `supabase.auth.setSession({ access_token, refresh_token })` whenever `creds.accessToken` / `creds.refreshToken` change, logging success/failure.
+- Subscribe to `supabase.auth.onAuthStateChange`:
+  - `TOKEN_REFRESHED` → `setCreds({ ...creds, accessToken, refreshToken })` so storage stays current.
+  - `SIGNED_OUT` → call existing `clearCreds()` so the app returns to `AuthScreen`.
+- Add a top-level `authError` state. When `mobileApi` throws `AUTH_REQUIRED` (caught via a new window-level event emitted from `mobileApi.ts`), render a `<SessionExpired />` banner with "Log out" button instead of a blank screen.
 
-Problèmes identifiés :
-- `useAutoSync` exécute un `refresh()` immédiat à chaque montage, même quand le cache est frais → re-fetch à chaque navigation.
-- `intervalMs = 60s` redéclenche un fetch même hors focus utilisateur.
-- Pas de déduplication entre composants utilisant le même `cacheKey`.
-- `visibilitychange` re-fetch à chaque retour d'onglet sans seuil de fraîcheur.
-- Skeletons non systématiques pendant la première charge depuis le cache.
+### 4. `apps/ava-softphone-mobile/src/hooks/useRealtimeCDR.ts`
+- Replace the locally-created `createClient(...)` with the shared `supabase` from `./lib/mobileSupabase` (still call `realtime.setAuth(token)` on token change so subscriptions are authenticated).
+- Drop the unused `ANON_KEY`/`SUPABASE_URL` constants where possible; keep them only for the `cron-pbx-sync` fetch.
 
-Changements :
+### 5. `apps/ava-softphone-mobile/src/lib/creds.ts` (small touch)
+- Ensure `Creds` already has `refreshToken`; if not, add it and persist via existing creds storage (read-only check — only edit if missing).
 
-1. **`useAutoSync.ts`**
-   - Ajouter `staleTimeMs` (par défaut 30 s). Si cache présent et `Date.now() - cachedAt < staleTimeMs`, ne pas refetch au mount — afficher direct le cache.
-   - Stocker `{value, at}` dans le cache au lieu de la valeur brute, exposer `lastSyncedAt` depuis le cache.
-   - **Déduplication globale** : map module-level `inflight: Map<cacheKey, Promise>` ; tous les hooks partageant la même clé attendent la même promesse.
-   - **Cache partagé en mémoire** : `Map<cacheKey, {value, at}>` consultée avant `localStorage` (évite JSON.parse répétés).
-   - **Broadcast** : quand un fetch réussit pour une clé, notifier tous les abonnés de cette clé via un EventTarget pour qu'ils mettent à jour leur state sans refetch.
-   - `visibilitychange` / `focus` → ne refresh que si `Date.now() - lastSyncedAt > staleTimeMs`.
-   - Réduire `timeoutMs` à 10 s, `retries` à 1 sur les pages secondaires, augmenter le backoff seulement sur erreurs réseau réelles.
+### 6. New component `apps/ava-softphone-mobile/src/components/SessionExpired.tsx`
+- Simple full-screen card: title "Session expirée", subtitle "Veuillez vous reconnecter pour continuer.", primary action button → `onSignOut()`.
 
-2. **`mobileApi.ts` / `mobileSupabase.ts`**
-   - Ajouter un cache mémoire court (5–10 s) sur les requêtes GET identiques pour absorber les doubles montages React 18 StrictMode.
-   - Limiter les colonnes sélectionnées (`select=...`) là où c'est encore `*`.
+## Non-goals
+- No changes to vite.config.ts, electron-builder.yml, `.github/workflows/`, or generated `src/integrations/supabase/*`.
+- No SIP / WebRTC / SDP changes.
+- No edge-function changes.
 
-3. **Écrans lourds** (`DashboardScreen`, `CallsScreen`, `VoicemailScreen`, `RecordingsScreen`, `QueuesScreen`, `CallDetailScreen`)
-   - Afficher immédiatement le cache si disponible (pas de spinner plein écran).
-   - Ajouter/uniformiser des skeletons légers pendant le premier fetch.
-   - Pagination/limit côté requête (ex: `limit(50)` au lieu de tout charger).
-
-4. **`MobileApp.tsx`**
-   - Précharger en parallèle au boot les caches des 3 écrans principaux (Home, Calls, Voicemail) via un seul `Promise.all`, pour que la navigation soit instantanée.
-
-## Détails techniques
-
-- Format cache : `{ v: T, at: number }` ; migration douce (si ancien format → ignorer et refetch).
-- Signature : `useAutoSync(loader, { cacheKey, staleTimeMs?, intervalMs?, timeoutMs?, retries?, deps? })`.
-- Aucun changement d'API publique pour les composants existants.
-- Pas de modification de la logique métier ni des Edge Functions.
-
-## Hors scope
-- Refactor des écrans qui n'utilisent pas `useAutoSync`.
-- Changements visuels au-delà des skeletons.
-- Logique d'authentification ou backend.
+## Validation
+- Boot app cold → splash → dashboard loads with stored session (no blank, no 401 spam in console).
+- Force expire token (set `accessToken=''` in storage) → see `SessionExpired` card with "Log out" instead of blank screen.
+- Idle 1h → `TOKEN_REFRESHED` event fires, `creds` updated, no re-auth required.
+- Realtime CDR keeps streaming after token refresh.
