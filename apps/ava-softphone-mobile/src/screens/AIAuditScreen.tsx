@@ -43,6 +43,11 @@ const STATUS_COLOR = (s: string) => {
 const isActive = (s: string) => s === 'pending' || s === 'queued' || s === 'running';
 
 const FILTERS = ['all', 'ok', 'no-audio', 'missing-key', 'ai-error', 'error'] as const;
+const FILTER_FR: Record<typeof FILTERS[number], string> = {
+  'all': 'tous', 'ok': 'ok', 'no-audio': 'sans audio',
+  'missing-key': 'clé manquante', 'ai-error': 'erreur ia', 'error': 'erreur',
+};
+
 
 function getToken(): string | null {
   try { return localStorage.getItem('ava.auth.token') || localStorage.getItem('sb-access-token'); } catch { return null; }
