@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { colors, font, radius } from '../lib/theme';
 import { Card, SectionTitle } from '../components/ui/Primitives';
+import { useT } from '../lib/i18n';
+
 
 /**
  * Mobile AI Requests audit view.
