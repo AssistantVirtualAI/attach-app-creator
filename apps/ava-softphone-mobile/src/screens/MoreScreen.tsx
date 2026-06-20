@@ -32,7 +32,7 @@ export default function MoreScreen({
   if (sub === 'voicemail')   return <SubPage onBack={() => setSub(null)} title={tr.more.voicemail}><VoicemailScreen haptic={haptic} /></SubPage>;
   if (sub === 'messages')    return <SubPage onBack={() => setSub(null)} title={tr.more.messages}><MessagesScreen haptic={haptic} /></SubPage>;
   if (sub === 'contacts')    return <SubPage onBack={() => setSub(null)} title={tr.more.contacts}><ContactsScreen sp={sp} /></SubPage>;
-  if (sub === 'settings')    return <SubPage onBack={() => setSub(null)} title={tr.more.settings}><SettingsScreen creds={creds} sp={sp} onSignOut={onSignOut} /></SubPage>;
+  if (sub === 'settings')    return <SubPage onBack={() => setSub(null)} title={tr.more.settings}><SettingsScreen creds={creds} sp={sp} onSignOut={onSignOut} preferClickToCall={preferClickToCall} onTogglePreferC2C={onTogglePreferC2C} /></SubPage>;
   if (sub === 'delete')      return <SubPage onBack={() => setSub(null)} title={tr.more.deleteAccount}><DeleteAccountScreen onDone={onSignOut} /></SubPage>;
   if (sub === 'privacy')     return <SubPage onBack={() => setSub(null)} title={tr.more.privacy}><PrivacyScreen /></SubPage>;
   if (sub === 'datasafety')  return <SubPage onBack={() => setSub(null)} title={tr.more.dataSafety}><DataSafetyScreen /></SubPage>;
