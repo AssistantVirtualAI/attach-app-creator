@@ -96,6 +96,7 @@ export default function MobileApp() {
   })();
   const [tab, setTab] = useState<Tab>(initialTab);
   const [booting, setBooting] = useState(!isPreviewMode);
+  const [preferC2C, setPreferC2C] = useState<boolean | null>(null);
 
   useEffect(() => {
     bootNative().finally(() => {
