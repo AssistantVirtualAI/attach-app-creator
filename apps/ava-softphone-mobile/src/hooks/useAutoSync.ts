@@ -18,15 +18,6 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { nextSyncId, syncBegin, syncSuccess, syncError, onSyncRefresh } from '../lib/syncStatus';
 import { perf } from '../lib/perfMetrics';
 
-/** Pré-remplit le cache partagé (utilisé par le prefetch au boot). */
-export function seedAutoSyncCache<T>(cacheKey: string, value: T) {
-  const entry: CacheEntry<T> = { v: value, at: Date.now() };
-  memCache.set(cacheKey, entry);
-  try { localStorage.setItem(CACHE_PREFIX + cacheKey, JSON.stringify(entry)); } catch {}
-  const subs = listeners.get(cacheKey);
-  if (subs) for (const fn of subs) { try { fn(entry); } catch {} }
-}
-
 const CACHE_PREFIX = 'ava.mobile.cache.';
 
 type CacheEntry<T> = { v: T; at: number };
