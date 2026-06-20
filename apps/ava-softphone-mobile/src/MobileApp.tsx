@@ -315,8 +315,11 @@ function AuthenticatedShell({
       paddingTop: 'var(--safe-top)',
       paddingBottom: 'var(--safe-bottom)',
       color: colors.textIce,
+      position: 'relative',
     }}>
       <audio ref={audioRef} autoPlay playsInline />
+      <SyncIndicator />
+
 
       <div key={tab} className="lemtel-page-enter" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <Suspense fallback={<div style={{ flex: 1 }} />}>
