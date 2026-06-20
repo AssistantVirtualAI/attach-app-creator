@@ -1,3 +1,4 @@
+import { supabase } from '@/integrations/supabase/client';
 /**
  * Real-time CDR subscription for the mobile softphone.
  * - Realtime postgres_changes on pbx_call_records (filtered to extension).
@@ -104,7 +105,9 @@ export function useRealtimeCDR(creds: Creds | null, rangeDays: 7 | 30 = 7, exten
       if (cancelled) return;
       const ext = creds?.extension;
       const orgId = creds?.organizationId;
-      const token = creds?.accessToken || null;
+      // Get fresh token from Supabase session first, fall back to stored creds
+      const { data: sessionData } = await supabase.auth.getSession().catch(() => ({ data: null }));
+      const token = sessionData?.session?.access_token || creds?.accessToken || null;
       if (!token || (!ext && !orgId)) { startPolling('Missing credentials for realtime — polling.'); return; }
 
       const sb = client(token);
