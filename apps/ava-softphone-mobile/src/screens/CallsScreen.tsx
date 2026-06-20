@@ -12,6 +12,7 @@ import type { Creds } from '../lib/creds';
 import { showMobileToast } from '../lib/mobileToast';
 import { restGet } from '../lib/mobileSupabase';
 import { useTr } from '../lib/i18n';
+import { dialNumber } from '../lib/dialNumber';
 
 type SubTab = 'recents' | 'recordings' | 'voicemail' | 'dial';
 
