@@ -347,6 +347,7 @@ function AuthenticatedShell({
           haptic(ImpactStyle.Light);
           if (t === 'calls') notif.markSeen('calls');
           if (t === 'voicemail') notif.markSeen('voicemail');
+          try { prefetchForTab(t); } catch {}
           setTab(t);
         }}
         badges={{
