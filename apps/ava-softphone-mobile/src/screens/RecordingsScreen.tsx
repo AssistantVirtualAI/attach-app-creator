@@ -198,7 +198,7 @@ export default function RecordingsScreen({
                   borderRadius: 8, padding: '2px 6px', fontSize: 10, fontWeight: 800, cursor: 'pointer',
                   display: 'inline-flex', alignItems: 'center', gap: 4,
                 }}>
-                  <Sparkles size={10} /> {expandedId === r.id ? 'Hide' : 'AI'}
+                  <Sparkles size={10} /> {expandedId === r.id ? (fr ? 'Masquer' : 'Hide') : 'AI'}
                 </button>
               </div>
             </div>
