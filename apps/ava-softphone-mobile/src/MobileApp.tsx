@@ -37,6 +37,8 @@ import { registerDeepLinkHandler } from './lib/deepLink';
 import { configureMobileApi } from './lib/mobileApi';
 import { configureAudit, audit } from './lib/audit';
 import { edgeCall } from './lib/mobileSupabase';
+import PerfOverlay from './components/PerfOverlay';
+import { startPrefetch } from './lib/prefetch';
 
 const isPreviewMode = (() => {
   try { return new URLSearchParams(window.location.search).get('preview') === '1'; }
@@ -61,6 +63,8 @@ export default function MobileApp() {
       setTimeout(() => setBooting(false), 700);
     });
     initBackgroundSync().catch(() => {});
+    // Préchargement opportuniste des écrans les plus consultés.
+    try { startPrefetch(); } catch {}
     let unsubDeepLink: (() => void) | undefined;
     registerDeepLinkHandler().then((u) => { unsubDeepLink = u; }).catch(() => {});
 
@@ -79,9 +83,9 @@ export default function MobileApp() {
 
 
   if (loading || booting) return <SplashAva />;
-  if (!creds) return <MobileI18nProvider><ThemeProvider><AuthScreen onAuthenticated={setCreds} /></ThemeProvider></MobileI18nProvider>;
+  if (!creds) return <MobileI18nProvider><ThemeProvider><AuthScreen onAuthenticated={setCreds} /><PerfOverlay /></ThemeProvider></MobileI18nProvider>;
 
-  return <MobileI18nProvider><ThemeProvider><AuthenticatedShell creds={creds} setCreds={setCreds} tab={tab} setTab={setTab} onSignOut={clearCreds} /></ThemeProvider></MobileI18nProvider>;
+  return <MobileI18nProvider><ThemeProvider><AuthenticatedShell creds={creds} setCreds={setCreds} tab={tab} setTab={setTab} onSignOut={clearCreds} /><PerfOverlay /></ThemeProvider></MobileI18nProvider>;
 }
 
 function AuthenticatedShell({
