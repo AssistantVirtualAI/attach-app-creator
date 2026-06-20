@@ -289,10 +289,16 @@ export function useSoftphone(
                 }, 2000);
               }
             });
+            const stopStats = () => {
+              if (statsTimerRef.current) { clearInterval(statsTimerRef.current); statsTimerRef.current = null; }
+              setQuality(EMPTY_QUALITY);
+              samplerStateRef.current = {};
+            };
             session.on('ended', () => {
               setCallState('ended');
               log('session.ended', remoteNumber);
               if (timerRef.current) clearInterval(timerRef.current);
+              stopStats();
               setTimeout(() => {
                 setCallState('idle');
                 setCallTimer(0);
@@ -311,6 +317,7 @@ export function useSoftphone(
               log('session.failed', `${remoteNumber} → ${msg}`, 'error');
               setCallState('idle');
               if (timerRef.current) clearInterval(timerRef.current);
+              stopStats();
               setActiveCallNumber('');
             });
           });
@@ -425,11 +432,12 @@ export function useSoftphone(
     if (!uaRef.current || !config || sipStatus !== 'registered') return false;
     setActiveCallNumber(number);
     setCallState('ringing');
+    const modifier = buildSdpModifier(PROFILE_OPUS[audioProfileRef.current]);
     try {
       uaRef.current.call(`sip:${number}@${config.domain}`, {
         mediaConstraints: HD_AUDIO_CONSTRAINTS,
         rtcOfferConstraints: { offerToReceiveAudio: true, offerToReceiveVideo: false },
-        sessionDescriptionHandlerModifiers: [sdpModifier],
+        sessionDescriptionHandlerModifiers: [modifier],
         eventHandlers: {
           failed: (e: any) => {
             const msg = classifySipFailure({
@@ -461,7 +469,7 @@ export function useSoftphone(
   const answer = () =>
     sessionRef.current?.answer({
       mediaConstraints: HD_AUDIO_CONSTRAINTS,
-      sessionDescriptionHandlerModifiers: [sdpModifier],
+      sessionDescriptionHandlerModifiers: [buildSdpModifier(PROFILE_OPUS[audioProfileRef.current])],
     });
   const mute = () => { sessionRef.current?.mute({ audio: true }); setIsMuted(true); };
   const unmute = () => { sessionRef.current?.unmute({ audio: true }); setIsMuted(false); };
