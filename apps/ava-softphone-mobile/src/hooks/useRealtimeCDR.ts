@@ -78,7 +78,9 @@ export function useRealtimeCDR(creds: Creds | null, rangeDays: 7 | 30 = 7, exten
 
   const load = useCallback(async () => {
     try {
-      const d = await mobileApi.calls({ rangeDays, extension: extensionFilter });
+      // Small page = fast paint on mobile. Realtime keeps the list fresh
+      // beyond this initial snapshot, so 20 rows is plenty.
+      const d = await mobileApi.calls({ rangeDays, extension: extensionFilter, limit: 20 });
       setCalls(d);
       setLastSyncAt(Date.now());
       pushLog({ status: 'success', source: 'snapshot', reason: `Snapshot loaded (${Array.isArray(d) ? d.length : 0} CDRs)` });
