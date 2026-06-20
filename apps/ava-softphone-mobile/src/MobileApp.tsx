@@ -36,6 +36,14 @@ import { syncDeviceContacts } from './lib/contacts';
 import { bootNative, onAppStateChange } from './lib/nativeBoot';
 import { registerDeepLinkHandler } from './lib/deepLink';
 import { configureMobileApi } from './lib/mobileApi';
+
+// Initialize immediately so API calls never go out without credentials
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdlanhpc3JxdHZ4YXZicmZjb3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1MDMxNzQsImV4cCI6MjA3NzA3OTE3NH0.kaO-GslE99OCNrZ4_AMnbzGqya2azqz_UMZR34zZvvo';
+configureMobileApi({
+  portalUrl: 'https://gejxisrqtvxavbrfcoxz.supabase.co',
+  anonKey: SUPABASE_ANON_KEY,
+  accessToken: null,
+});
 import { configureAudit, audit } from './lib/audit';
 import { edgeCall } from './lib/mobileSupabase';
 import PerfOverlay from './components/PerfOverlay';
@@ -122,8 +130,8 @@ function AuthenticatedShell({
   // but keep the mobile transport pinned to CA-signed WSS endpoints.
   const sipPassword = creds.sipPassword;
   const WORKING_WSS = [
-    'wss://node.lemtelcloud.net:7444',
-    'wss://pbxnode.lemtel.tel:7444',
+    'wss://node.lemtelcloud.net:7443',
+    'wss://pbxnode.lemtel.tel:7443',
   ];
   const sipDomain = creds.sipDomain || 'lemtel.lemtel.tel';
   // credentialsReady: true once we have extension + password, regardless of token freshness
