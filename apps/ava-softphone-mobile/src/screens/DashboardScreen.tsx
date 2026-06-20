@@ -415,12 +415,12 @@ function MyExtensionStats({ range, extension, domainUuid }: { range: StatsRange;
   if (err) return <Card accent="gold"><div style={{ fontSize: font.sm, color: colors.danger }}>{err}</div></Card>;
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
-      <Metric label="My calls" value={s?.total} tone="cyan" />
-      <Metric label="My answered" value={s?.answered} tone="success" />
-      <Metric label="My missed" value={s?.missed} tone="danger" />
-      <Metric label="My voicemails" value={s?.voicemails} tone="gold" />
-      <Metric label="My recordings" value={s?.recordings} tone="violet" />
-      <Metric label="My avg duration" value={s != null ? `${s.avgSec}s` : undefined} tone="cyan" />
+      <Metric label={t('m.myCalls')} value={s?.total} tone="cyan" />
+      <Metric label={t('m.myAnswered')} value={s?.answered} tone="success" />
+      <Metric label={t('m.myMissed')} value={s?.missed} tone="danger" />
+      <Metric label={t('m.myVoicemails')} value={s?.voicemails} tone="gold" />
+      <Metric label={t('m.myRecordings')} value={s?.recordings} tone="violet" />
+      <Metric label={t('m.myAvgDuration')} value={s != null ? `${s.avgSec}s` : undefined} tone="cyan" />
     </div>
   );
 }
