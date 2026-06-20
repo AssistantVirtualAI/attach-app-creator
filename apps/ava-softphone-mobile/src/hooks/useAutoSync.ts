@@ -70,6 +70,12 @@ function subscribe<T>(key: string, fn: Listener<T>) {
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
+/** Pré-remplit le cache partagé (utilisé par le prefetch au boot). */
+export function seedAutoSyncCache<T>(cacheKey: string, value: T) {
+  setCache(cacheKey, value);
+}
+
+
 export function useAutoSync<T>(
   loader: (signal?: AbortSignal) => Promise<T>,
   opts: {
