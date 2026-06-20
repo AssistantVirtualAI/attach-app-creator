@@ -482,7 +482,7 @@ export function useSoftphone(
   const answer = () =>
     sessionRef.current?.answer({
       mediaConstraints: HD_AUDIO_CONSTRAINTS,
-      sessionDescriptionHandlerModifiers: [buildSdpModifier(PROFILE_OPUS[audioProfileRef.current])],
+      sessionDescriptionHandlerModifiers: [buildSdpModifier(opusToSdpOpts(audioProfileRef.current))],
     });
   const mute = () => { sessionRef.current?.mute({ audio: true }); setIsMuted(true); };
   const unmute = () => { sessionRef.current?.unmute({ audio: true }); setIsMuted(false); };
