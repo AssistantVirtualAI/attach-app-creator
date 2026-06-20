@@ -5,15 +5,20 @@ import { EmptyState, SectionTitle, Skeleton } from '../components/ui/Primitives'
 import { useMobileCredentials } from '../hooks/useMobileCredentials';
 import { authedRealtime, restGet, restPost } from '../lib/mobileSupabase';
 import { loadCachedContacts, syncDeviceContacts } from '../lib/contacts';
+import NumberPickerSheet, { NumberOption } from '../components/NumberPickerSheet';
+import { dialNumber } from '../lib/dialNumber';
+import { useT } from '../lib/i18n';
 
 type Kind = 'domain' | 'manual' | 'mobile';
-type Contact = { id: string; kind: Kind; user_id: string | null; extension: string; phone?: string | null; email?: string | null; display_name: string | null; sip_domain: string | null; status: string | null; last_seen_at: string | null };
+type Contact = { id: string; kind: Kind; user_id: string | null; extension: string; phone?: string | null; email?: string | null; display_name: string | null; sip_domain: string | null; status: string | null; last_seen_at: string | null; numbers?: { label: string; number: string }[] };
 type Presence = { user_id: string; status: string; call_state?: string | null; last_seen_at: string | null };
 
 const safe = (v: string) => encodeURIComponent(v);
 
 export default function ContactsScreen({ sp }: { sp: any }) {
   const mobile = useMobileCredentials();
+  const { lang } = useT();
+  const fr = lang === 'fr';
   const [q, setQ] = useState('');
   const [contacts, setContacts] = useState<Contact[] | null>(null);
   const [selectedKind, setSelectedKind] = useState<'all' | Kind>('all');
@@ -21,6 +26,7 @@ export default function ContactsScreen({ sp }: { sp: any }) {
   const [newContact, setNewContact] = useState({ name: '', phone: '', email: '', company: '' });
   const [presence, setPresence] = useState<Record<string, Presence>>({});
   const [error, setError] = useState<string | null>(null);
+  const [picker, setPicker] = useState<{ title: string; options: NumberOption[] } | null>(null);
 
   const loadPresence = useCallback(async (rows: Contact[] | null) => {
     if (!mobile.accessToken || !rows?.length) { setPresence({}); return; }
@@ -58,7 +64,12 @@ export default function ContactsScreen({ sp }: { sp: any }) {
     }
     const domain = Array.from(byExt.values()).map((r) => ({ id: r.id, kind: 'domain' as const, user_id: r.portal_user_id, extension: r.extension, phone: r.extension, display_name: r.display_name, sip_domain: r.sip_domain, status: r.status, last_seen_at: r.last_seen_at }));
     const manual = (manualRows || []).map((r) => ({ id: r.id, kind: 'manual' as const, user_id: null, extension: r.phone || '', phone: r.phone, email: r.email, display_name: r.name, sip_domain: null, status: null, last_seen_at: null }));
-    const device = loadCachedContacts().map((c) => ({ id: `mobile-${c.id}`, kind: 'mobile' as const, user_id: null, extension: c.numbers[0] || '', phone: c.numbers[0], email: c.emails?.[0], display_name: c.name, sip_domain: null, status: null, last_seen_at: null }));
+    const device = loadCachedContacts().map((c) => ({
+      id: `mobile-${c.id}`, kind: 'mobile' as const, user_id: null,
+      extension: c.phones[0]?.number || '', phone: c.phones[0]?.number, email: c.emails?.[0],
+      display_name: c.name, sip_domain: null, status: null, last_seen_at: null,
+      numbers: c.phones.map((p) => ({ label: p.label || (fr ? 'Numéro' : 'Number'), number: p.number })),
+    }));
     const mapped = [...domain, ...manual, ...device];
     setContacts(mapped);
     await loadPresence(domain);
@@ -153,12 +164,26 @@ export default function ContactsScreen({ sp }: { sp: any }) {
                 <div style={{ fontSize: font.sm, fontWeight: 800, color: colors.textIce, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
                 <div style={{ fontSize: 11, color: colors.mutedSilver, marginTop: 2, fontFamily: 'JetBrains Mono, monospace' }}>{c.kind === 'domain' ? `Ext ${c.extension} · ${status.replace('_', ' ')}` : `${c.kind === 'manual' ? 'Contact ajouté' : 'Contact mobile'} · ${c.phone || c.email || ''}`}</div>
               </div>
-              <button onClick={() => sp?.call?.(c.phone || c.extension)} aria-label={`Appeler ${name}`} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', cursor: 'pointer', background: `linear-gradient(135deg, #22c55e, #16a34a)`, color: '#fff', display: 'grid', placeItems: 'center' }}><Phone size={18} /></button>
+              <button
+                onClick={() => {
+                  const opts: NumberOption[] = (c.numbers && c.numbers.length > 0)
+                    ? c.numbers.filter((n) => n.number)
+                    : [{ label: c.kind === 'domain' ? (fr ? 'Extension' : 'Extension') : (fr ? 'Numéro' : 'Number'), number: c.phone || c.extension || '' }].filter((n) => n.number);
+                  if (opts.length <= 1) {
+                    dialNumber(sp, opts[0]?.number || c.phone || c.extension);
+                  } else {
+                    setPicker({ title: name, options: opts });
+                  }
+                }}
+                aria-label={`Appeler ${name}`}
+                style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', cursor: 'pointer', background: `linear-gradient(135deg, #22c55e, #16a34a)`, color: '#fff', display: 'grid', placeItems: 'center' }}
+              ><Phone size={18} /></button>
             </div>
           );
         })}
       </div>
       {addOpen && <AddContactSheet value={newContact} setValue={setNewContact} onClose={() => setAddOpen(false)} onSave={addContact} />}
+      {picker && <NumberPickerSheet title={picker.title} options={picker.options} onPick={(n) => dialNumber(sp, n)} onClose={() => setPicker(null)} />}
       <div style={{ height: 80 }} />
     </div>
   );

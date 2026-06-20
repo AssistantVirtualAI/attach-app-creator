@@ -12,6 +12,7 @@ import type { Creds } from '../lib/creds';
 import { showMobileToast } from '../lib/mobileToast';
 import { restGet } from '../lib/mobileSupabase';
 import { useTr } from '../lib/i18n';
+import { dialNumber } from '../lib/dialNumber';
 
 type SubTab = 'recents' | 'recordings' | 'voicemail' | 'dial';
 
@@ -220,7 +221,7 @@ export default function CallsScreen({ sp, haptic, creds }: { sp: any; haptic: (s
             <EmptyState icon="📞" title={tr.calls.noCalls} hint={tr.calls.noCallsHint} cta={{ label: tr.calls.openDialer, onPress: () => setSub('dial') }} />
           )}
 
-          {calls && filtered.map((c) => <CallRow key={c.id} c={c} onPress={() => { haptic(); setSelected(c.id); }} onCall={(num) => { haptic(ImpactStyle.Medium); sp?.call?.(num); }} />)}
+          {calls && filtered.map((c) => <CallRow key={c.id} c={c} onPress={() => { haptic(); setSelected(c.id); }} onCall={(num) => { haptic(ImpactStyle.Medium); dialNumber(sp, num); }} />)}
         </>
       )}
 

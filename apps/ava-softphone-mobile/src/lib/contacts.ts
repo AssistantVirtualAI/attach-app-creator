@@ -5,9 +5,13 @@
  */
 import { Capacitor } from '@capacitor/core';
 
+export interface PhoneEntry { number: string; label?: string }
 export interface DeviceContact {
   id: string;
   name: string;
+  /** numéros (avec libellé : mobile, work, home…). */
+  phones: PhoneEntry[];
+  /** alias plat conservé pour compat ascendante. */
   numbers: string[];
   emails?: string[];
 }
@@ -27,13 +31,19 @@ export async function syncDeviceContacts(): Promise<DeviceContact[]> {
       projection: { name: true, phones: true, emails: true },
     });
     const contacts: DeviceContact[] = (result.contacts || [])
-      .map((c: any) => ({
-        id: c.contactId,
-        name: c.name?.display || [c.name?.given, c.name?.family].filter(Boolean).join(' ') || 'Unknown',
-        numbers: (c.phones || []).map((p: any) => p.number).filter(Boolean),
-        emails: (c.emails || []).map((e: any) => e.address).filter(Boolean),
-      }))
-      .filter((c) => c.numbers.length > 0);
+      .map((c: any) => {
+        const phones: PhoneEntry[] = (c.phones || [])
+          .map((p: any) => ({ number: String(p.number || '').trim(), label: p.type || p.label || undefined }))
+          .filter((p: PhoneEntry) => p.number);
+        return {
+          id: c.contactId,
+          name: c.name?.display || [c.name?.given, c.name?.family].filter(Boolean).join(' ') || 'Unknown',
+          phones,
+          numbers: phones.map((p) => p.number),
+          emails: (c.emails || []).map((e: any) => e.address).filter(Boolean),
+        } as DeviceContact;
+      })
+      .filter((c) => c.phones.length > 0);
 
     try { sessionStorage.setItem(CACHE_KEY, JSON.stringify(contacts)); } catch {}
     return contacts;
@@ -46,7 +56,14 @@ export async function syncDeviceContacts(): Promise<DeviceContact[]> {
 export function loadCachedContacts(): DeviceContact[] {
   try {
     const raw = sessionStorage.getItem(CACHE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    const list: any[] = raw ? JSON.parse(raw) : [];
+    // Migration : anciennes entrées sans `phones`.
+    return list.map((c) => ({
+      ...c,
+      phones: Array.isArray(c.phones) && c.phones.length
+        ? c.phones
+        : (Array.isArray(c.numbers) ? c.numbers.map((n: string) => ({ number: n })) : []),
+    })) as DeviceContact[];
   } catch { return []; }
 }
 
