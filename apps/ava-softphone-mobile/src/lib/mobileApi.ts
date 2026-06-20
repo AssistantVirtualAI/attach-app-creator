@@ -79,12 +79,16 @@ async function call<T>(path: string, init: RequestInit | undefined, mockData: T)
   const isGet = !init || !init.method || init.method.toUpperCase() === 'GET';
   if (isGet) {
     const existing = _inflightGet.get(path);
-    if (existing) return existing as Promise<T>;
-    const p = liveCall<T>(path, init).finally(() => { _inflightGet.delete(path); });
+    if (existing) { perf.dedupe(); return existing as Promise<T>; }
+    perf.request();
+    const p = liveCall<T>(path, init)
+      .catch((e) => { perf.error(); throw e; })
+      .finally(() => { _inflightGet.delete(path); });
     _inflightGet.set(path, p);
     return p;
   }
-  return liveCall<T>(path, init);
+  perf.request();
+  return liveCall<T>(path, init).catch((e) => { perf.error(); throw e; });
 }
 
 /* ─── Types ───────────────────────────────────────────────────── */
