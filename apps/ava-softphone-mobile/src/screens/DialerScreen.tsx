@@ -17,9 +17,11 @@ const CLICK_TO_CALL_FALLBACK_REASON =
 export default function DialerScreen({
   sp,
   haptic,
+  preferClickToCall,
 }: {
   sp: any;
   haptic: (s?: ImpactStyle) => Promise<void>;
+  preferClickToCall: boolean;
 }) {
   const [num, setNum] = useState('');
   const [dialing, setDialing] = useState(false);
@@ -73,9 +75,6 @@ export default function DialerScreen({
       : retryLimitReached
         ? `🔴 SIP indisponible — Click-to-Call actif${sipError ? ` (${sipError})` : ''}`
         : `🔴 SIP indisponible — Click-to-Call actif${sipError ? ` (${sipError})` : ''}`;
-
-  const preferClickToCall =
-    (typeof localStorage !== 'undefined' && localStorage.getItem('prefer_click_to_call') !== 'off');
 
   const startCall = async () => {
     if (!num || dialing) return;
