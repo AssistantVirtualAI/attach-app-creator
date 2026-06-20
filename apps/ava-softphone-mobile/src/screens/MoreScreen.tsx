@@ -24,8 +24,8 @@ import { useTr } from '../lib/i18n';
 type Sub = null | 'voicemail' | 'messages' | 'contacts' | 'settings' | 'delete' | 'privacy' | 'datasafety' | 'permissions' | 'support' | 'aiaudit' | 'queues' | 'features';
 
 export default function MoreScreen({
-  creds, sp, onSignOut, haptic,
-}: { creds: Creds; sp: any; onSignOut: () => void; haptic: (s?: ImpactStyle) => Promise<void> }) {
+  creds, sp, onSignOut, haptic, preferClickToCall, onTogglePreferC2C,
+}: { creds: Creds; sp: any; onSignOut: () => void; haptic: (s?: ImpactStyle) => Promise<void>; preferClickToCall?: boolean; onTogglePreferC2C?: () => void }) {
   const { tr } = useTr();
   const [sub, setSub] = useState<Sub>(null);
 
