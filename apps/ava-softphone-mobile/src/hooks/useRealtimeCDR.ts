@@ -6,23 +6,14 @@
  * - Exposes lastSyncAt + nextRetryAt for the UI sync pill and a manual retryNow().
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { mobileApi, CallRecord } from '../lib/mobileApi';
+import { supabase, SUPABASE_URL, SUPABASE_ANON as ANON_KEY } from '../lib/mobileSupabase';
 import type { Creds } from '../lib/creds';
 
-const SUPABASE_URL = 'https://gejxisrqtvxavbrfcoxz.supabase.co';
-const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdlanhpc3JxdHZ4YXZicmZjb3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1MDMxNzQsImV4cCI6MjA3NzA3OTE3NH0.kaO-GslE99OCNrZ4_AMnbzGqya2azqz_UMZR34zZvvo';
-
-let _client: SupabaseClient | null = null;
 function client(token?: string | null): SupabaseClient {
-  if (!_client) {
-    _client = createClient(SUPABASE_URL, ANON_KEY, {
-      auth: { persistSession: false, autoRefreshToken: false },
-      realtime: { params: { eventsPerSecond: 5 } },
-    });
-  }
-  if (token) _client.realtime.setAuth(token);
-  return _client;
+  if (token) supabase.realtime.setAuth(token);
+  return supabase;
 }
 
 function mapRow(r: any): CallRecord {
