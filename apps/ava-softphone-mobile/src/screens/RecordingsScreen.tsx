@@ -180,7 +180,7 @@ export default function RecordingsScreen({
               textAlign: 'left', cursor: 'pointer', padding: 0,
             }}>
               <div style={{ fontSize: font.base, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {r.customer || r.from || r.to || 'Unknown caller'}
+                {r.customer || r.from || r.to || (fr ? 'Appelant inconnu' : 'Unknown caller')}
               </div>
               <div style={{ fontSize: font.xs, color: colors.mutedSilver, fontFamily: 'JetBrains Mono, monospace', marginTop: 2 }}>
                 {r.from} → {r.to}{r.extension ? ` · ext ${r.extension}` : ''}
