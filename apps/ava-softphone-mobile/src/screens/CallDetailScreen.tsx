@@ -12,6 +12,8 @@ type AiStage = 'idle' | 'transcribing' | 'analyzing' | 'done' | 'error';
 
 export default function CallDetailScreen({ id, onBack }: { id: string; onBack: () => void }) {
   const mobile = useMobileCredentials();
+  const { lang } = useT();
+  const fr = lang === 'fr';
   const [debugOpen, setDebugOpen] = useState(false);
   const [data, setData] = useState<CallDetail | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
