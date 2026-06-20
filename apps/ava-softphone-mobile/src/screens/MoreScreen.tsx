@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, Suspense, lazy } from 'react';
 import type { ImpactStyle } from '@capacitor/haptics';
 import { colors, font } from '../lib/theme';
 import type { Creds } from '../lib/creds';
@@ -13,10 +13,13 @@ import PrivacyScreen from './PrivacyScreen';
 import DataSafetyScreen from './DataSafetyScreen';
 import PermissionsScreen from './PermissionsScreen';
 import SupportScreen from './SupportScreen';
-import AIAuditScreen from './AIAuditScreen';
-import QueuesScreen from './QueuesScreen';
-import FeaturesScreen from './FeaturesScreen';
+// Heavy/rare subpages — lazy-loaded so they don't bloat the main bundle.
+const AIAuditScreen = lazy(() => import('./AIAuditScreen'));
+const QueuesScreen  = lazy(() => import('./QueuesScreen'));
+const FeaturesScreen = lazy(() => import('./FeaturesScreen'));
+import ScreenSkeleton from '../components/ScreenSkeleton';
 import { useTr } from '../lib/i18n';
+
 
 type Sub = null | 'voicemail' | 'messages' | 'contacts' | 'settings' | 'delete' | 'privacy' | 'datasafety' | 'permissions' | 'support' | 'aiaudit' | 'queues' | 'features';
 
