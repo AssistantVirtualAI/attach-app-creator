@@ -50,14 +50,14 @@ class AuthError extends Error {
 
 const mapAuthError = (raw: string): string => {
   const m = (raw || '').toLowerCase();
-  if (m.includes('invalid_credentials') || m.includes('invalid login')) return 'Wrong email or password.';
-  if (m.includes('extension_not_found')) return 'Extension not found.';
-  if (m.includes('app_access_disabled') || m.includes('mobile_access_disabled')) return 'Mobile access has not been enabled for this extension. Contact your admin.';
-  if (m.includes('ambiguous_extension')) return 'Multiple extensions match — please enter the SIP domain.';
-  if (m.includes('rate') && m.includes('limit')) return 'Too many attempts. Please wait a moment and try again.';
-  if (m.includes('network') || m.includes('failed to fetch') || m.includes('load failed')) return 'Network error — check your connection.';
-  if (m.includes('session') || m.includes('jwt')) return 'Your session expired. Please sign in again.';
-  return raw || 'Something went wrong. Please try again.';
+  if (m.includes('invalid_credentials') || m.includes('invalid login')) return 'Adresse e-mail ou mot de passe incorrect.';
+  if (m.includes('extension_not_found')) return 'Extension introuvable.';
+  if (m.includes('app_access_disabled') || m.includes('mobile_access_disabled')) return "L'accès mobile n'a pas été activé pour cette extension. Contactez votre administrateur.";
+  if (m.includes('ambiguous_extension')) return 'Plusieurs extensions correspondent — veuillez saisir le domaine SIP.';
+  if (m.includes('rate') && m.includes('limit')) return 'Trop de tentatives. Veuillez patienter avant de réessayer.';
+  if (m.includes('network') || m.includes('failed to fetch') || m.includes('load failed')) return 'Erreur réseau — vérifiez votre connexion.';
+  if (m.includes('session') || m.includes('jwt')) return 'Votre session a expiré. Veuillez vous reconnecter.';
+  return raw || "Une erreur est survenue. Veuillez réessayer.";
 };
 
 export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: Creds) => void }) {
@@ -207,7 +207,7 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null); setFailure(null);
-    if (!validate()) { setFailure({ step: 'validation', code: 'invalid_input', message: 'Please fix the highlighted fields.' }); return; }
+    if (!validate()) { setFailure({ step: 'validation', code: 'invalid_input', message: 'Veuillez corriger les champs en évidence.' }); return; }
     setBusy(true);
     try {
       if (mode === 'email') await submitEmail();
@@ -217,7 +217,7 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
         setFailure({ step: e.step, code: e.code, message: e.message, detail: e.detail });
         setError(mapAuthError(e.code + ' ' + e.message));
       } else {
-        setFailure({ step: 'network', code: 'unknown', message: e?.message || 'Unknown error' });
+        setFailure({ step: 'network', code: 'unknown', message: e?.message || 'Erreur inconnue' });
         setError(mapAuthError(e?.message));
       }
       // eslint-disable-next-line no-console
@@ -242,17 +242,17 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
             <ModeToggle mode={mode} accent={accent} onChange={(m) => { setMode(m); setError(null); setFieldErrors({}); }} />
 
 
-            <Field label="Portal URL" value={portalUrl} onChange={setPortalUrl} type="url" />
+            <Field label="URL du portail" value={portalUrl} onChange={setPortalUrl} type="url" />
             {mode === 'email' ? (
               <>
-                <Field label="Email" value={email} onChange={(v) => { setEmail(v); setFieldErrors((f) => ({ ...f, email: '' })); }} type="email" placeholder="you@company.com" autoFocus error={fieldErrors.email} />
-                <Field label="Password" value={password} onChange={(v) => { setPassword(v); setFieldErrors((f) => ({ ...f, password: '' })); }} type="password" placeholder="••••••••" error={fieldErrors.password} />
+                <Field label="Adresse e-mail" value={email} onChange={(v) => { setEmail(v); setFieldErrors((f) => ({ ...f, email: '' })); }} type="email" placeholder="vous@entreprise.com" autoFocus error={fieldErrors.email} />
+                <Field label="Mot de passe" value={password} onChange={(v) => { setPassword(v); setFieldErrors((f) => ({ ...f, password: '' })); }} type="password" placeholder="••••••••" error={fieldErrors.password} />
               </>
             ) : (
               <>
-                <Field label="Extension" value={extension} onChange={(v) => { setExtension(v); setFieldErrors((f) => ({ ...f, extension: '' })); }} placeholder="e.g. 1001" autoFocus error={fieldErrors.extension} />
-                <Field label="SIP Domain" value={sipDomain} onChange={setSipDomain} placeholder="lemtel.lemtel.tel" />
-                <Field label="SIP Password" value={password} onChange={(v) => { setPassword(v); setFieldErrors((f) => ({ ...f, password: '' })); }} type="password" placeholder="••••••••" error={fieldErrors.password} />
+                <Field label="Extension" value={extension} onChange={(v) => { setExtension(v); setFieldErrors((f) => ({ ...f, extension: '' })); }} placeholder="ex. 1001" autoFocus error={fieldErrors.extension} />
+                <Field label="Domaine SIP" value={sipDomain} onChange={setSipDomain} placeholder="lemtel.lemtel.tel" />
+                <Field label="Mot de passe SIP" value={password} onChange={(v) => { setPassword(v); setFieldErrors((f) => ({ ...f, password: '' })); }} type="password" placeholder="••••••••" error={fieldErrors.password} />
               </>
             )}
 
@@ -265,7 +265,7 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
               style={{ marginTop: 6, height: 50, borderRadius: 14, fontSize: 14, cursor: busy ? 'wait' : 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
             >
               {busy && <Spinner />}
-              {busy ? 'Connecting…' : 'Sign in'}
+              {busy ? 'Connexion…' : 'Se connecter'}
             </button>
 
             {mode === 'email' && (
@@ -274,7 +274,7 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
                 onClick={() => setScreen('forgot')}
                 style={ghostLink}
               >
-                Forgot your password?
+                Mot de passe oublié ?
               </button>
             )}
 
@@ -283,13 +283,13 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
               onClick={() => setScreen('sip')}
               style={ghostBtn}
             >
-              Manual SIP setup
+              Configuration SIP manuelle
             </button>
 
             <div style={{ fontSize: 10.5, color: C.textDim, lineHeight: 1.5, textAlign: 'center', marginTop: 2 }}>
               {mode === 'extension'
-                ? 'Use the same SIP password defined on your extension in the portal (or in FusionPBX). If you don\u2019t have one, ask your administrator to set it on your extension.'
-                : 'Sign in with the email and password tied to your Lemtel portal account.'}
+                ? "Utilisez le même mot de passe SIP défini sur votre extension dans le portail (ou dans FusionPBX). Si vous n'en avez pas, demandez à votre administrateur de le configurer."
+                : "Connectez-vous avec l'adresse e-mail et le mot de passe associés à votre compte du portail Lemtel."}
             </div>
           </form>
         </div>
@@ -321,8 +321,8 @@ function ForgotPasswordScreen({ initialEmail, accent, onBack }: { initialEmail: 
 
   const goConfirm = () => {
     setError(null);
-    if (!email.trim()) { setFieldErr('Email is required.'); return; }
-    if (!isEmail(email)) { setFieldErr('Enter a valid email address.'); return; }
+    if (!email.trim()) { setFieldErr("L'adresse e-mail est requise."); return; }
+    if (!isEmail(email)) { setFieldErr('Saisissez une adresse e-mail valide.'); return; }
     setFieldErr('');
     setStep('confirm');
   };
@@ -346,7 +346,7 @@ function ForgotPasswordScreen({ initialEmail, accent, onBack }: { initialEmail: 
         throw new Error(detail?.msg || detail?.error || `HTTP ${res.status}`);
       }
       setCooldown(RESEND_COOLDOWN_SECONDS);
-      if (opts?.resend) setResentInfo('Reset email sent again.');
+      if (opts?.resend) setResentInfo('E-mail de réinitialisation renvoyé.');
       setStep('sent');
     } catch (e: any) {
       setError(mapAuthError(e?.message));
@@ -364,15 +364,15 @@ function ForgotPasswordScreen({ initialEmail, accent, onBack }: { initialEmail: 
           {step === 'form' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
-                <h2 style={headingStyle}>Reset password</h2>
-                <p style={subheadingStyle}>Enter your account email and we’ll send you a reset link.</p>
+                <h2 style={headingStyle}>Réinitialiser le mot de passe</h2>
+                <p style={subheadingStyle}>Saisissez l'adresse e-mail de votre compte et nous vous enverrons un lien de réinitialisation.</p>
               </div>
               <Field
-                label="Email"
+                label="Adresse e-mail"
                 value={email}
                 onChange={(v) => { setEmail(v); setFieldErr(''); }}
                 type="email"
-                placeholder="you@company.com"
+                placeholder="vous@entreprise.com"
                 autoFocus
                 error={fieldErr}
               />
@@ -384,17 +384,17 @@ function ForgotPasswordScreen({ initialEmail, accent, onBack }: { initialEmail: 
                 className="lemtel-btn-primary"
                 style={{ height: 50, borderRadius: 14, fontSize: 14, cursor: 'pointer' }}
               >
-                Continue
+                Continuer
               </button>
-              <button type="button" onClick={onBack} style={ghostBtn}>Back to sign in</button>
+              <button type="button" onClick={onBack} style={ghostBtn}>Retour à la connexion</button>
             </div>
           )}
 
           {step === 'confirm' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
-                <h2 style={headingStyle}>Send reset link?</h2>
-                <p style={subheadingStyle}>We’ll email a one-time password reset link to:</p>
+                <h2 style={headingStyle}>Envoyer le lien de réinitialisation ?</h2>
+                <p style={subheadingStyle}>Nous enverrons un lien unique de réinitialisation à :</p>
                 <div style={{ marginTop: 8, padding: '10px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`, color: C.textIce, fontWeight: 600, fontSize: 14, wordBreak: 'break-all' }}>{email}</div>
               </div>
               {error && <ErrorBanner>{error}</ErrorBanner>}
@@ -406,9 +406,9 @@ function ForgotPasswordScreen({ initialEmail, accent, onBack }: { initialEmail: 
                 style={{ height: 50, borderRadius: 14, fontSize: 14, cursor: busy ? 'wait' : 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
               >
                 {busy && <Spinner />}
-                {busy ? 'Sending…' : 'Send reset link'}
+                {busy ? 'Envoi…' : 'Envoyer le lien'}
               </button>
-              <button type="button" onClick={() => setStep('form')} style={ghostBtn} disabled={busy}>Cancel</button>
+              <button type="button" onClick={() => setStep('form')} style={ghostBtn} disabled={busy}>Annuler</button>
             </div>
           )}
 
@@ -420,9 +420,9 @@ function ForgotPasswordScreen({ initialEmail, accent, onBack }: { initialEmail: 
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 color: C.green, fontSize: 26, fontWeight: 800,
               }}>✓</div>
-              <h2 style={{ ...headingStyle, textAlign: 'center' }}>Check your inbox</h2>
+              <h2 style={{ ...headingStyle, textAlign: 'center' }}>Vérifiez votre boîte de réception</h2>
               <p style={{ ...subheadingStyle, textAlign: 'center' }}>
-                If an account exists for <strong style={{ color: C.textIce }}>{email}</strong>, you’ll receive a reset link shortly. Open it on this device or a desktop browser to set a new password.
+                Si un compte existe pour <strong style={{ color: C.textIce }}>{email}</strong>, vous recevrez un lien de réinitialisation sous peu. Ouvrez-le sur cet appareil ou sur un navigateur de bureau pour définir un nouveau mot de passe.
               </p>
               {resentInfo && (
                 <div style={{
@@ -451,13 +451,13 @@ function ForgotPasswordScreen({ initialEmail, accent, onBack }: { initialEmail: 
               >
                 {busy && <Spinner />}
                 {busy
-                  ? 'Sending…'
+                  ? 'Envoi…'
                   : cooldown > 0
-                    ? `Resend email in ${cooldown}s`
-                    : 'Resend email'}
+                    ? `Renvoyer dans ${cooldown}s`
+                    : "Renvoyer l'e-mail"}
               </button>
               <button type="button" onClick={onBack} className="lemtel-btn-primary" style={{ height: 50, borderRadius: 14, fontSize: 14, cursor: 'pointer' }}>
-                Back to sign in
+                Retour à la connexion
               </button>
             </div>
           )}
@@ -488,7 +488,7 @@ function Brand() {
         <img src="/ava-logo.png" alt="Lemtel" width={72} height={72} style={{ display: 'block', borderRadius: 16 }} />
       </div>
       <div style={{ marginTop: 14, fontSize: 22, fontWeight: 800, color: C.textIce, letterSpacing: 0.2 }}>Lemtel</div>
-      <div style={{ marginTop: 4, fontSize: 11, color: C.textSub, letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 600 }}>AI Business Phone System</div>
+      <div style={{ marginTop: 4, fontSize: 11, color: C.textSub, letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 600 }}>Téléphonie d'entreprise IA</div>
     </div>
   );
 }
@@ -500,7 +500,7 @@ function Footer() {
       fontSize: 11, color: C.textDim, letterSpacing: 0.4,
       position: 'relative', zIndex: 1,
     }}>
-      Built by <span style={{ color: C.gold, fontWeight: 600 }}>AVA Statistic · assistantvirtualai.com</span>
+      Conçu par <span style={{ color: C.gold, fontWeight: 600 }}>AVA Statistic · assistantvirtualai.com</span>
     </div>
   );
 }
@@ -554,7 +554,7 @@ function AccentSwitch({ accent, onChange, readOnly }: { accent: Accent; onChange
             disabled={readOnly}
             onClick={() => onChange?.(o.id)}
             aria-pressed={active}
-            title={`Theme: ${o.label}`}
+            title={`Thème : ${o.label}`}
             style={{
               border: 'none', cursor: readOnly ? 'default' : 'pointer',
               padding: '5px 10px', borderRadius: 999,
@@ -585,12 +585,12 @@ function ErrorBanner({ children, failure }: { children: React.ReactNode; failure
       <div>{children}</div>
       {failure && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-          <span style={chipStyle('step')}>step: {failure.step}</span>
-          <span style={chipStyle('code')}>code: {failure.code}</span>
+          <span style={chipStyle('step')}>étape : {failure.step}</span>
+          <span style={chipStyle('code')}>code : {failure.code}</span>
           {failure.detail && (
             <button type="button" onClick={() => setOpen((o) => !o)}
               style={{ ...chipStyle('toggle'), cursor: 'pointer' }}>
-              {open ? 'hide details' : 'details'}
+              {open ? 'masquer les détails' : 'détails'}
             </button>
           )}
         </div>

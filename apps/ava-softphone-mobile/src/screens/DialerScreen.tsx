@@ -65,14 +65,14 @@ export default function DialerScreen({
 
   const retryLimitReached: boolean = !!sp.retryLimitReached;
   const bannerTitle = isRegistered
-    ? `✅ Registered — Extension ${sp.sipConfig?.extension || ''}`.trim()
+    ? `✅ Enregistré — Extension ${sp.sipConfig?.extension || ''}`.trim()
     : isRetrying
       ? (countdown !== null && retryAttempt > 0
-          ? `🔄 Retrying in ${countdown}s (attempt ${retryAttempt})…`
-          : '🔄 Connecting...')
+          ? `🔄 Nouvelle tentative dans ${countdown}s (essai ${retryAttempt})…`
+          : '🔄 Connexion…')
       : retryLimitReached
-        ? `⛔ Auto-retry stopped after ${retryAttempt} attempts${sipError ? ` — ${sipError}` : ''}. Tap Retry to try again.`
-        : `❌ SIP error${sipError ? ` — ${sipError}` : ''}`;
+        ? `⛔ Tentatives automatiques arrêtées après ${retryAttempt} essais${sipError ? ` — ${sipError}` : ''}. Touchez Réessayer.`
+        : `❌ Erreur SIP${sipError ? ` — ${sipError}` : ''}`;
 
   const startCall = async () => {
     if (!num || dialing) return;
@@ -82,19 +82,19 @@ export default function DialerScreen({
     setError(null);
     try {
       if (!isRegistered) {
-        const msg = sipError || 'SIP not registered yet — wait for the green status or tap Retry.';
+        const msg = sipError || 'SIP non enregistré — attendez le statut vert ou touchez Réessayer.';
         setError(msg);
         showMobileToast(msg, 'error');
         return;
       }
       const ok = sp.call(num);
       if (ok === false) {
-        const msg = 'Unable to start call via SIP';
+        const msg = "Impossible de lancer l'appel via SIP";
         setError(msg);
         showMobileToast(msg, 'error');
       }
     } catch (e: any) {
-      const msg = e?.message || 'Unable to start call';
+      const msg = e?.message || "Impossible de lancer l'appel";
       setError(msg);
       showMobileToast(msg, 'error');
     } finally {
@@ -108,9 +108,9 @@ export default function DialerScreen({
     setError(null);
     try {
       await mobileApi.startCall(num, 'click_to_call' as any);
-      showMobileToast('Click-to-call requested — your phone will ring.', 'success');
+      showMobileToast('Click-to-call demandé — votre téléphone va sonner.', 'success');
     } catch (e: any) {
-      const msg = e?.message || 'Click-to-call failed';
+      const msg = e?.message || 'Échec du click-to-call';
       setError(msg);
       showMobileToast(msg, 'error');
     }
@@ -126,7 +126,7 @@ export default function DialerScreen({
             {status}
           </span>
         </div>
-        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Lemtel Telecom</div>
+        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Lemtel Télécom</div>
       </div>
 
       <div style={{ margin: '10px 16px 0', padding: '10px 12px', borderRadius: 12,
@@ -136,13 +136,13 @@ export default function DialerScreen({
         {sipError && !isFailed && <div style={{ fontWeight: 400, opacity: 0.9, lineHeight: 1.4 }}>{sipError}</div>}
         {sslLikely && (
           <div style={{ marginTop: 8, padding: 8, background: 'rgba(0,0,0,0.25)', borderRadius: 8, color: '#fde68a', fontSize: 11, lineHeight: 1.45 }}>
-            <div style={{ fontWeight: 700, marginBottom: 4 }}>⚠ SSL certificate problem detected</div>
-            Mobile browsers refuse self-signed certificates on WSS. Admin: install a
-            CA-signed cert on port 7443, e.g.:
+            <div style={{ fontWeight: 700, marginBottom: 4 }}>⚠ Problème de certificat SSL détecté</div>
+            Les navigateurs mobiles refusent les certificats auto-signés sur WSS. Admin : installer
+            un certificat signé par une CA sur le port 7443, ex. :
             <pre style={{ margin: '4px 0 0', fontSize: 10, whiteSpace: 'pre-wrap' }}>
 {`sudo certbot certonly --standalone -d node.lemtelcloud.net
-# point WSS (FreeSWITCH/Kamailio :7443) to fullchain.pem + privkey.pem
-# then restart the service`}
+# pointer WSS (FreeSWITCH/Kamailio :7443) vers fullchain.pem + privkey.pem
+# puis redémarrer le service`}
             </pre>
           </div>
         )}
@@ -152,13 +152,13 @@ export default function DialerScreen({
               onClick={() => { haptic(); sp.reconnect?.(); }}
               style={{ background: bannerColor, color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
             >
-              Retry connection
+              Reconnecter
             </button>
             <button
               onClick={() => { haptic(); setDiagOpen(true); }}
               style={{ background: 'rgba(255,255,255,0.12)', color: '#fff', border: '1px solid rgba(255,255,255,0.18)', padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
             >
-              Run WSS diagnostics
+              Diagnostics WSS
             </button>
           </div>
         )}
@@ -175,7 +175,7 @@ export default function DialerScreen({
             minHeight: 48,
             wordBreak: 'break-all',
           }}>
-            {num || <span style={{ color: 'rgba(255,255,255,0.2)' }}>Enter number</span>}
+            {num || <span style={{ color: 'rgba(255,255,255,0.2)' }}>Entrer un numéro</span>}
           </div>
         </div>
 
@@ -216,7 +216,7 @@ export default function DialerScreen({
             <button
               onClick={startClickToCall}
               disabled={!num || !c2c.enabled}
-              title={!c2c.enabled ? (c2c.reason || CLICK_TO_CALL_FALLBACK_REASON) : 'Ring your desk phone, then connect'}
+              title={!c2c.enabled ? (c2c.reason || CLICK_TO_CALL_FALLBACK_REASON) : 'Faire sonner votre téléphone de bureau, puis connecter'}
               style={{
                 width: '100%', padding: '12px 14px', borderRadius: 12,
                 border: '1px solid rgba(255,255,255,0.16)',
@@ -226,7 +226,7 @@ export default function DialerScreen({
                 cursor: c2c.enabled && num ? 'pointer' : 'not-allowed',
               }}
             >
-              {c2c.enabled ? 'Use click-to-call instead' : 'Click-to-call unavailable'}
+              {c2c.enabled ? 'Utiliser le click-to-call' : 'Click-to-call indisponible'}
             </button>
             {!c2c.enabled && (
               <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.4 }}>

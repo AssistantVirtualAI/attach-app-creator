@@ -5,10 +5,10 @@ import { mobileApi } from '../lib/mobileApi';
 type Msg = { id: string; role: 'user' | 'assistant'; text: string; pending?: boolean };
 
 const SUGGESTIONS = [
-  'How many calls did we receive today?',
-  'Who missed the most calls this week?',
-  'Summarize the last call from Quebec Auto',
-  'Which queue has the longest wait time?',
+  "Combien d'appels avons-nous reçus aujourd'hui ?",
+  'Qui a manqué le plus d\u2019appels cette semaine ?',
+  'Résume le dernier appel de Quebec Auto',
+  "Quelle file a le plus long temps d'attente ?",
 ];
 
 export default function AVAChatScreen() {
@@ -38,7 +38,7 @@ export default function AVAChatScreen() {
       const reply = await mobileApi.chat(text, msgs.map((m) => ({ role: m.role, content: m.text })));
       setMsgs((m) => m.map((x) => x.id === placeholder.id ? { ...x, text: reply.answer || '…', pending: false } : x));
     } catch (e: any) {
-      setMsgs((m) => m.map((x) => x.id === placeholder.id ? { ...x, text: `Sorry — ${e.message || 'AVA is unavailable.'}`, pending: false } : x));
+      setMsgs((m) => m.map((x) => x.id === placeholder.id ? { ...x, text: `Désolé — ${e.message || 'AVA est indisponible.'}`, pending: false } : x));
     } finally {
       setBusy(false);
       setTimeout(() => taRef.current?.focus(), 50);
@@ -55,7 +55,7 @@ export default function AVAChatScreen() {
         }}>✦</div>
         <div>
           <div style={{ fontSize: font.lg, fontWeight: 800, color: colors.textIce, letterSpacing: -0.3 }}>AVA</div>
-          <div style={{ fontSize: font.xs, color: colors.mutedSilver }}>Your AI phone assistant · live PBX data</div>
+          <div style={{ fontSize: font.xs, color: colors.mutedSilver }}>Votre assistant téléphonique IA · données PBX en direct</div>
         </div>
       </div>
 
@@ -64,7 +64,7 @@ export default function AVAChatScreen() {
         {msgs.length === 0 && (
           <div style={{ marginTop: 18 }}>
             <div style={{ fontSize: font.md, fontWeight: 700, color: colors.textIce, marginBottom: 8 }}>
-              Ask AVA anything about your phone system.
+              Posez n'importe quelle question à AVA sur votre système téléphonique.
             </div>
             <div style={{ display: 'grid', gap: 8 }}>
               {SUGGESTIONS.map((s) => (
@@ -134,7 +134,7 @@ export default function AVAChatScreen() {
           <button
             onClick={() => send()}
             disabled={!input.trim() || busy}
-            aria-label="Send"
+            aria-label="Envoyer"
             style={{
               width: 38, height: 38, borderRadius: '50%',
               border: 'none', cursor: input.trim() && !busy ? 'pointer' : 'not-allowed',
@@ -155,7 +155,7 @@ function Shimmer() {
       display: 'inline-block', color: colors.mutedSilver, fontStyle: 'italic',
       animation: 'avaPulse 1.4s ease-in-out infinite',
     }}>
-      Thinking…
+      Réflexion…
       <style>{`@keyframes avaPulse{0%,100%{opacity:.45}50%{opacity:1}}`}</style>
     </span>
   );

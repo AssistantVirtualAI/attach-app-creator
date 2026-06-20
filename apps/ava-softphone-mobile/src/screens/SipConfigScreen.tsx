@@ -36,11 +36,11 @@ export default function SipConfigScreen({
     e.preventDefault();
     setError(null);
     if (!extension || !sipDomain || !wssUrl || !password) {
-      setError('Extension, domain, password and WSS URL are required.');
+      setError("L'extension, le domaine, le mot de passe et l'URL WSS sont requis.");
       return;
     }
     if (!/^wss?:\/\//i.test(wssUrl)) {
-      setError('WSS URL must start with wss:// or ws://');
+      setError("L'URL WSS doit commencer par wss:// ou ws://");
       return;
     }
     setBusy(true);
@@ -57,7 +57,7 @@ export default function SipConfigScreen({
       await Store.set(creds);
       onSaved(creds);
     } catch (err: any) {
-      setError(err?.message || 'Failed to save configuration');
+      setError(err?.message || "Échec de l'enregistrement de la configuration");
     } finally {
       setBusy(false);
     }
@@ -66,27 +66,27 @@ export default function SipConfigScreen({
   return (
     <div style={wrap}>
       <div style={{ flex: 1, padding: '32px 24px', overflowY: 'auto' }}>
-        <h1 style={{ fontSize: 22, fontWeight: 600, margin: '0 0 6px' }}>Manual SIP Setup</h1>
+        <h1 style={{ fontSize: 22, fontWeight: 600, margin: '0 0 6px' }}>Configuration SIP manuelle</h1>
         <p style={{ fontSize: 13, color: 'var(--text-muted, #8a93a6)', margin: '0 0 24px' }}>
-          Enter your SIP credentials. They're saved on this device and reloaded on next launch.
+          Saisissez vos identifiants SIP. Ils sont enregistrés sur cet appareil et rechargés au prochain lancement.
         </p>
 
         <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <Field label="Extension" value={extension} onChange={setExtension} placeholder="300" autoFocus />
-          <Field label="Display name" value={displayName} onChange={setDisplayName} placeholder="John Smith" />
-          <Field label="SIP domain" value={sipDomain} onChange={setSipDomain} placeholder="lemtel.lemtel.tel" />
-          <Field label="Password" value={password} onChange={setPassword} placeholder="••••••••" type="password" />
-          <Field label="WSS URL" value={wssUrl} onChange={setWssUrl} placeholder="wss://sip.example.com:7443" />
+          <Field label="Nom affiché" value={displayName} onChange={setDisplayName} placeholder="Jean Tremblay" />
+          <Field label="Domaine SIP" value={sipDomain} onChange={setSipDomain} placeholder="lemtel.lemtel.tel" />
+          <Field label="Mot de passe" value={password} onChange={setPassword} placeholder="••••••••" type="password" />
+          <Field label="URL WSS" value={wssUrl} onChange={setWssUrl} placeholder="wss://sip.example.com:7443" />
 
           {error && (
             <div role="alert" style={errBox}>{error}</div>
           )}
 
           <button type="submit" disabled={busy} style={primaryBtn}>
-            {busy ? 'Saving…' : 'Save & Connect'}
+            {busy ? 'Enregistrement…' : 'Enregistrer et connecter'}
           </button>
           {onCancel && (
-            <button type="button" onClick={onCancel} style={ghostBtn}>Cancel</button>
+            <button type="button" onClick={onCancel} style={ghostBtn}>Annuler</button>
           )}
         </form>
       </div>
