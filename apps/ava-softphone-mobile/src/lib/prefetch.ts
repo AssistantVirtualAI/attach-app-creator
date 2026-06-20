@@ -42,3 +42,39 @@ export function startPrefetch() {
     })();
   });
 }
+
+/**
+ * Préchargement ciblé déclenché par la navigation entre onglets.
+ * On précharge la donnée probable de la page voisine pour rendre
+ * la transition instantanée (stale-while-revalidate).
+ */
+const NAV_TASKS: Record<string, Task[]> = {
+  home:     [{ key: 'mobile.dashboard',  run: () => mobileApi.dashboard() }],
+  calls:    [{ key: 'mobile.calls.7',    run: () => mobileApi.calls({ rangeDays: 7 }) }],
+  messages: [{ key: 'mobile.threads',    run: () => mobileApi.threads() }],
+  more:     [
+    { key: 'mobile.voicemails', run: () => mobileApi.voicemails() },
+    { key: 'mobile.threads',    run: () => mobileApi.threads() },
+  ],
+};
+
+const navDone = new Set<string>();
+export function prefetchForTab(tab: string) {
+  if (navDone.has(tab)) return;
+  const tasks = NAV_TASKS[tab];
+  if (!tasks) return;
+  navDone.add(tab);
+  const schedule = (cb: () => void) => {
+    const ric = (globalThis as any).requestIdleCallback as undefined | ((c: () => void, o?: { timeout: number }) => number);
+    if (ric) ric(cb, { timeout: 1_500 });
+    else setTimeout(cb, 0);
+  };
+  schedule(() => {
+    (async () => {
+      for (const t of tasks) {
+        try { seedAutoSyncCache(t.key, await t.run()); } catch {}
+      }
+    })();
+  });
+}
+
