@@ -6,11 +6,15 @@ import { Card, Chip, EmptyState, SectionTitle, Skeleton } from '../components/ui
 import { showMobileToast } from '../lib/mobileToast';
 import { useMobileCredentials } from '../hooks/useMobileCredentials';
 import { authedRealtime, edgeCall, restGet, SUPABASE_ANON, SUPABASE_URL } from '../lib/mobileSupabase';
+import { useTr } from '../lib/i18n';
+
 
 type AgentState = { id: string; queue_id: string; queue_name: string | null; paused: boolean; joined_at: string };
 
 export default function QueuesScreen() {
+  const { tr } = useTr();
   const mobile = useMobileCredentials();
+
   const [data, setData] = useState<QueueRow[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -101,23 +105,25 @@ export default function QueuesScreen() {
 
   return (
     <div style={{ height: '100%', overflowY: 'auto', padding: '14px 14px 20px' }}>
-      <SectionTitle eyebrow={mobile.sipDomain || 'Live PBX'} title="Call queues" />
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '0 2px 10px' }}><div data-search-bar="true" style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, padding: '8px 10px', borderRadius: 12, background: 'rgba(255,255,255,0.06)', border: `1px solid ${colors.border}` }}><Search size={14} color={colors.mutedSilver} /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search queues…" style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 13, color: colors.textIce }} /></div><button onClick={refresh} disabled={loading} style={{ padding: '8px 12px', borderRadius: 999, border: `1px solid ${colors.border}`, background: 'rgba(255,255,255,0.06)', color: colors.lemtelBlue, fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>{loading ? '…' : '↻'}</button></div>
+      <SectionTitle eyebrow={mobile.sipDomain || tr.queues.livePbx} title={tr.queues.title} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '0 2px 10px' }}><div data-search-bar="true" style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, padding: '8px 10px', borderRadius: 12, background: 'rgba(255,255,255,0.06)', border: `1px solid ${colors.border}` }}><Search size={14} color={colors.mutedSilver} /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder={tr.queues.searchPlaceholder} style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 13, color: colors.textIce }} /></div><button onClick={refresh} disabled={loading} style={{ padding: '8px 12px', borderRadius: 999, border: `1px solid ${colors.border}`, background: 'rgba(255,255,255,0.06)', color: colors.lemtelBlue, fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>{loading ? '…' : '↻'}</button></div>
       <div style={{ fontSize: font.xs, color: colors.mutedSilver, margin: '0 2px 10px' }}>{joinedCount} {tr.queues.active} · {Object.keys(states).length} {tr.queues.joined}</div>
-      {error && <Card accent="gold" style={{ marginBottom: 10 }}><div style={{ fontSize: font.sm, color: colors.danger, fontWeight: 700 }}>Couldn't load queues</div><div style={{ fontSize: font.xs, color: colors.mutedSilver, marginTop: 4 }}>{error.message}</div></Card>}
+      {error && <Card accent="gold" style={{ marginBottom: 10 }}><div style={{ fontSize: font.sm, color: colors.danger, fontWeight: 700 }}>{tr.queues.couldntLoad}</div><div style={{ fontSize: font.xs, color: colors.mutedSilver, marginTop: 4 }}>{error.message}</div></Card>}
       {!data && !error && [1, 2, 3].map((i) => <Card key={i} style={{ marginBottom: 8 }}><Skeleton w="60%" h={14} /><div style={{ height: 6 }} /><Skeleton w="40%" h={10} /></Card>)}
-      {data && data.length === 0 && <EmptyState icon="⇉" title="No queues configured" hint="Queues synced from your SIP domain will appear here." />}
-      {filtered && filtered.map((queue) => <QueueCard key={queue.id} q={queue} state={states[queue.id]} busy={busy === queue.id} onJoin={() => join(queue)} onLeave={() => leave(queue)} onTogglePause={() => togglePause(queue)} />)}
+      {data && data.length === 0 && <EmptyState icon="⇉" title={tr.queues.empty} hint={tr.queues.emptyHint} />}
+      {filtered && filtered.map((queue) => <QueueCard key={queue.id} q={queue} tr={tr} state={states[queue.id]} busy={busy === queue.id} onJoin={() => join(queue)} onLeave={() => leave(queue)} onTogglePause={() => togglePause(queue)} />)}
       <div style={{ height: 80 }} />
     </div>
   );
 }
 
-function QueueCard({ q, state, busy, onJoin, onLeave, onTogglePause }: { q: QueueRow; state?: AgentState; busy: boolean; onJoin: () => void; onLeave: () => void; onTogglePause: () => void }) {
+
+function QueueCard({ q, tr, state, busy, onJoin, onLeave, onTogglePause }: { q: QueueRow; tr: any; state?: AgentState; busy: boolean; onJoin: () => void; onLeave: () => void; onTogglePause: () => void }) {
   const slaTone = q.slaPct >= 85 ? colors.success : q.slaPct >= 70 ? colors.warning : colors.danger;
   const joined = !!state;
   const paused = !!state?.paused;
-  return <Card style={{ marginBottom: 8 }} padded={true}><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}><div style={{ flex: 1, minWidth: 0 }}><div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><div style={{ fontSize: font.md, fontWeight: 800, color: colors.textIce }}>{q.name}</div>{joined && <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: 0.8, padding: '2px 6px', borderRadius: 999, background: paused ? 'rgba(245,158,11,0.18)' : 'rgba(34,211,154,0.18)', color: paused ? colors.warning : colors.success }}>{paused ? 'PAUSED' : 'ACTIVE'}</span>}</div><div style={{ fontSize: font.xs, color: colors.mutedSilver, marginTop: 2, fontFamily: 'JetBrains Mono, monospace' }}>Ext {q.extension || '—'} · {q.strategy || 'default'}</div></div><div style={{ textAlign: 'right' }}><div style={{ fontSize: 22, fontWeight: 800, color: slaTone, fontFamily: 'JetBrains Mono, monospace' }}>{q.slaPct}%</div><div style={{ fontSize: 9.5, color: colors.mutedSilver, letterSpacing: 1 }}>SLA TODAY</div></div></div><div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}><Chip tone="cyan">{q.waiting} waiting</Chip><Chip tone="gold">{q.agentsOnline} agents online</Chip><Chip tone="violet">{q.callsToday} calls today</Chip>{q.avgWaitSec > 0 && <Chip>Wait {Math.round(q.avgWaitSec)}s</Chip>}</div><div style={{ display: 'flex', gap: 6, marginTop: 10 }}>{!joined ? <button onClick={onJoin} disabled={busy} style={pillBtn(colors.success, busy)}><LogIn size={12} /> {busy ? '…' : 'Join'}</button> : <><button onClick={onTogglePause} disabled={busy} style={pillBtn(paused ? colors.success : colors.warning, busy)}>{paused ? <Play size={12} /> : <Pause size={12} />} {paused ? 'Resume' : 'Pause'}</button><button onClick={onLeave} disabled={busy} style={pillBtn(colors.danger, busy)}><LogOut size={12} /> Leave</button></>}</div></Card>;
+  return <Card style={{ marginBottom: 8 }} padded={true}><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}><div style={{ flex: 1, minWidth: 0 }}><div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><div style={{ fontSize: font.md, fontWeight: 800, color: colors.textIce }}>{q.name}</div>{joined && <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: 0.8, padding: '2px 6px', borderRadius: 999, background: paused ? 'rgba(245,158,11,0.18)' : 'rgba(34,211,154,0.18)', color: paused ? colors.warning : colors.success }}>{paused ? tr.queues.paused : tr.queues.activeBadge}</span>}</div><div style={{ fontSize: font.xs, color: colors.mutedSilver, marginTop: 2, fontFamily: 'JetBrains Mono, monospace' }}>Ext {q.extension || '—'} · {q.strategy || 'default'}</div></div><div style={{ textAlign: 'right' }}><div style={{ fontSize: 22, fontWeight: 800, color: slaTone, fontFamily: 'JetBrains Mono, monospace' }}>{q.slaPct}%</div><div style={{ fontSize: 9.5, color: colors.mutedSilver, letterSpacing: 1 }}>{tr.queues.slaToday}</div></div></div><div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}><Chip tone="cyan">{q.waiting} {tr.queues.waiting.replace('{n} ', '')}</Chip><Chip tone="gold">{q.agentsOnline} {tr.queues.agentsOnline.replace('{n} ', '')}</Chip><Chip tone="violet">{q.callsToday} {tr.queues.callsToday.replace('{n} ', '')}</Chip>{q.avgWaitSec > 0 && <Chip>{tr.queues.wait.replace('{n}', String(Math.round(q.avgWaitSec)))}</Chip>}</div><div style={{ display: 'flex', gap: 6, marginTop: 10 }}>{!joined ? <button onClick={onJoin} disabled={busy} style={pillBtn(colors.success, busy)}><LogIn size={12} /> {busy ? '…' : tr.queues.join}</button> : <><button onClick={onTogglePause} disabled={busy} style={pillBtn(paused ? colors.success : colors.warning, busy)}>{paused ? <Play size={12} /> : <Pause size={12} />} {paused ? tr.queues.resume : tr.queues.pause}</button><button onClick={onLeave} disabled={busy} style={pillBtn(colors.danger, busy)}><LogOut size={12} /> {tr.queues.leave}</button></>}</div></Card>;
 }
+
 
 function pillBtn(color: string, busy: boolean): React.CSSProperties { return { display: 'inline-flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 999, border: 'none', background: color, color: '#fff', fontSize: 11, fontWeight: 800, letterSpacing: 0.6, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1 }; }
