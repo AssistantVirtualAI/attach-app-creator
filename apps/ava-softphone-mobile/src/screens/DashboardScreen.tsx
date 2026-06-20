@@ -11,14 +11,14 @@ import { useMobileCredentials } from '../hooks/useMobileCredentials';
 import { restGet } from '../lib/mobileSupabase';
 import type { Tab } from '../components/BottomTabs';
 import NotificationsSheet, { NotificationBell, useNotificationCounts } from '../components/NotificationsSheet';
-
-const RANGE_LABELS: Record<StatsRange, string> = { today: 'Today', '7d': '7 days', '30d': '30 days' };
-const AI_CACHE_KEY = (range: string) => `ava.aisummary.${range}`;
+import { useT } from '../lib/i18n';
 
 export default function DashboardScreen({
   onNavigate, haptic, onOpenProfile,
 }: { onNavigate: (t: Tab) => void; haptic: (s?: ImpactStyle) => Promise<void>; onOpenProfile?: () => void }) {
   const { mode, toggle } = useTheme();
+  const { t, lang, toggle: toggleLang } = useT();
+  const RANGE_LABELS: Record<StatsRange, string> = { today: t('common.today'), '7d': t('common.range7d'), '30d': t('common.range30d') };
   const [range, setRange] = useState<StatsRange>('today');
   const [notifOpen, setNotifOpen] = useState(false);
   const notifCounts = useNotificationCounts();
