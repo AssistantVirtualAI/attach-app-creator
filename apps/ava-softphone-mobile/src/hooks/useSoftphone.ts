@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { createSIPUA, JsSIPUnavailableError, SIPConfig, sdpModifier, classifySipFailure, hasWebRTC, WEBRTC_UNAVAILABLE_MESSAGE } from '../lib/sip/jssipProvider';
+import { createSIPUA, JsSIPUnavailableError, SIPConfig, buildSdpModifier, classifySipFailure, hasWebRTC, WEBRTC_UNAVAILABLE_MESSAGE } from '../lib/sip/jssipProvider';
 import {
   appendSipLog, clearSipLog as clearPersistedLog, clearPersistedStatus, loadPersistedError, loadPersistedStatus,
   loadSipLog, MAX_AUTO_RETRIES, PersistedSipError, probeWss, RETRY_BACKOFF_MS, savePersistedError, savePersistedStatus,
   SipLogEntry,
 } from '../lib/sip/sipPersistence';
+import { AudioProfile, loadAudioProfile, saveAudioProfile, PROFILE_OPUS } from '../lib/sip/audioProfile';
+import { CallQuality, EMPTY_QUALITY, SamplerState, sampleCallQuality, chooseAdaptiveBitrate } from '../lib/sip/callQuality';
 
 export type SIPStatus = 'idle' | 'connecting' | 'registered' | 'retrying' | 'error';
 export type CallState = 'idle' | 'ringing' | 'active' | 'ended';
@@ -40,6 +42,11 @@ export interface UseSoftphoneReturn {
   nextRetryAt: number | null;
   /** True once auto-retry budget is exhausted — requires manual reconnect. */
   retryLimitReached: boolean;
+  /** Live call quality (RTT / jitter / loss / level). */
+  quality: CallQuality;
+  /** Active audio profile (hd / auto / low-bandwidth). */
+  audioProfile: AudioProfile;
+  setAudioProfile: (p: AudioProfile) => void;
 }
 
 export function useSoftphone(
@@ -58,10 +65,35 @@ export function useSoftphone(
   const [retryAttempt, setRetryAttempt] = useState(0);
   const [nextRetryAt, setNextRetryAt] = useState<number | null>(null);
   const [retryLimitReached, setRetryLimitReached] = useState(false);
+  const [audioProfile, setAudioProfileState] = useState<AudioProfile>(() => loadAudioProfile());
+  const [quality, setQuality] = useState<CallQuality>(EMPTY_QUALITY);
 
   const uaRef = useRef<any>(null);
   const sessionRef = useRef<any>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const audioProfileRef = useRef<AudioProfile>(audioProfile);
+  const statsTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const samplerStateRef = useRef<SamplerState>({});
+  const currentBitrateRef = useRef<number>(PROFILE_OPUS.auto.hardCapBitrate);
+  const reRegisterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => { audioProfileRef.current = audioProfile; }, [audioProfile]);
+
+  const setAudioProfile = useCallback((p: AudioProfile) => {
+    setAudioProfileState(p);
+    saveAudioProfile(p);
+    try {
+      const pc: RTCPeerConnection | undefined = sessionRef.current?.connection;
+      const sender = pc?.getSenders().find((s) => s.track?.kind === 'audio');
+      if (sender) {
+        const params = sender.getParameters();
+        params.encodings = params.encodings?.length ? params.encodings : [{}];
+        params.encodings[0].maxBitrate = PROFILE_OPUS[p].hardCapBitrate;
+        currentBitrateRef.current = PROFILE_OPUS[p].hardCapBitrate;
+        sender.setParameters(params).catch(() => {});
+      }
+    } catch {}
+  }, []);
 
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const authBlockedRef = useRef(false);
@@ -161,8 +193,27 @@ export function useSoftphone(
             setSipErrorState('');
             log('register.ok', `ext=${config.extension}@${config.domain}`);
           });
+          // Silent re-register on expiry / soft unregister — keeps the
+          // active RTP session alive while we refresh the binding.
+          const scheduleSilentReRegister = (delayMs: number, reason: string) => {
+            if (reRegisterTimerRef.current) clearTimeout(reRegisterTimerRef.current);
+            const delay = Math.max(500, Math.min(delayMs, 30000));
+            log('register.silent-reattempt', `${reason} in ${delay}ms`, 'warn');
+            reRegisterTimerRef.current = setTimeout(() => {
+              try { uaRef.current?.register?.(); }
+              catch (e: any) { log('register.silent-reattempt.failed', e?.message || '', 'error'); }
+            }, delay);
+          };
           ua.on('unregistered', (e: any) => {
             log('register.unregistered', e?.cause || '', 'warn');
+            // Progressive backoff, scaled by retry attempt counter.
+            const a = retryAttemptRef.current;
+            const delay = [1000, 2000, 4000, 8000, 15000][Math.min(a, 4)];
+            scheduleSilentReRegister(delay, 'unregistered');
+          });
+          ua.on('registrationExpiring', () => {
+            log('register.expiring', 'refreshing binding');
+            scheduleSilentReRegister(500, 'expiring');
           });
           ua.on('registrationFailed', (e: any) => {
             const code = e?.response?.status_code;
@@ -201,11 +252,53 @@ export function useSoftphone(
               setCallState('active');
               log('session.confirmed', remoteNumber);
               timerRef.current = setInterval(() => setCallTimer((t) => t + 1), 1000);
+              // ---- Live quality sampler + adaptive bitrate loop ----
+              samplerStateRef.current = {};
+              const pc: RTCPeerConnection | undefined = session.connection;
+              const sender = pc?.getSenders().find((s) => s.track?.kind === 'audio');
+              const profile = audioProfileRef.current;
+              currentBitrateRef.current = PROFILE_OPUS[profile].hardCapBitrate;
+              if (sender) {
+                try {
+                  const params = sender.getParameters();
+                  params.encodings = params.encodings?.length ? params.encodings : [{}];
+                  params.encodings[0].maxBitrate = currentBitrateRef.current;
+                  sender.setParameters(params).catch(() => {});
+                } catch {}
+              }
+              if (pc) {
+                if (statsTimerRef.current) clearInterval(statsTimerRef.current);
+                statsTimerRef.current = setInterval(async () => {
+                  const q = await sampleCallQuality(pc, samplerStateRef.current);
+                  setQuality(q);
+                  // Only AUTO profile adapts. HD / low-bandwidth stay fixed.
+                  if (audioProfileRef.current === 'auto' && sender) {
+                    const cap = PROFILE_OPUS.auto.hardCapBitrate;
+                    const target = chooseAdaptiveBitrate(q, cap, currentBitrateRef.current);
+                    if (Math.abs(target - currentBitrateRef.current) > 1500) {
+                      currentBitrateRef.current = target;
+                      try {
+                        const params = sender.getParameters();
+                        params.encodings = params.encodings?.length ? params.encodings : [{}];
+                        params.encodings[0].maxBitrate = target;
+                        await sender.setParameters(params);
+                        log('adaptive.bitrate', `→ ${target} bps (loss=${q.lossPct}% rtt=${q.rtt}ms)`);
+                      } catch {}
+                    }
+                  }
+                }, 2000);
+              }
             });
+            const stopStats = () => {
+              if (statsTimerRef.current) { clearInterval(statsTimerRef.current); statsTimerRef.current = null; }
+              setQuality(EMPTY_QUALITY);
+              samplerStateRef.current = {};
+            };
             session.on('ended', () => {
               setCallState('ended');
               log('session.ended', remoteNumber);
               if (timerRef.current) clearInterval(timerRef.current);
+              stopStats();
               setTimeout(() => {
                 setCallState('idle');
                 setCallTimer(0);
@@ -224,6 +317,7 @@ export function useSoftphone(
               log('session.failed', `${remoteNumber} → ${msg}`, 'error');
               setCallState('idle');
               if (timerRef.current) clearInterval(timerRef.current);
+              stopStats();
               setActiveCallNumber('');
             });
           });
@@ -305,6 +399,8 @@ export function useSoftphone(
     return () => {
       cancelled = true;
       clearRetry();
+      if (reRegisterTimerRef.current) { clearTimeout(reRegisterTimerRef.current); reRegisterTimerRef.current = null; }
+      if (statsTimerRef.current) { clearInterval(statsTimerRef.current); statsTimerRef.current = null; }
       retryAttemptRef.current = 0;
       if (timerRef.current) clearInterval(timerRef.current);
       try { uaRef.current?.stop(); } catch {}
@@ -324,25 +420,37 @@ export function useSoftphone(
       channelCount: 1,
       sampleRate: 16000,
       sampleSize: 16,
-      // @ts-expect-error — Chromium-specific hints, ignored elsewhere.
+      // Chromium-specific hints, ignored elsewhere.
       googEchoCancellation: true,
       googNoiseSuppression: true,
       googAutoGainControl: true,
       googHighpassFilter: true,
       googTypingNoiseDetection: true,
-    } as MediaTrackConstraints,
+    } as any,
     video: false,
+  };
+
+  const opusToSdpOpts = (p: AudioProfile) => {
+    const o = PROFILE_OPUS[p];
+    return {
+      opusMaxAverageBitrate: o.maxAverageBitrate,
+      opusMaxPlaybackRate: o.maxPlaybackRate,
+      opusUseInbandFec: o.useInbandFec,
+      opusUseDtx: o.useDtx,
+      opusPtime: o.ptime,
+    };
   };
 
   const call = (number: string) => {
     if (!uaRef.current || !config || sipStatus !== 'registered') return false;
     setActiveCallNumber(number);
     setCallState('ringing');
+    const modifier = buildSdpModifier(opusToSdpOpts(audioProfileRef.current));
     try {
       uaRef.current.call(`sip:${number}@${config.domain}`, {
         mediaConstraints: HD_AUDIO_CONSTRAINTS,
         rtcOfferConstraints: { offerToReceiveAudio: true, offerToReceiveVideo: false },
-        sessionDescriptionHandlerModifiers: [sdpModifier],
+        sessionDescriptionHandlerModifiers: [modifier],
         eventHandlers: {
           failed: (e: any) => {
             const msg = classifySipFailure({
@@ -374,7 +482,7 @@ export function useSoftphone(
   const answer = () =>
     sessionRef.current?.answer({
       mediaConstraints: HD_AUDIO_CONSTRAINTS,
-      sessionDescriptionHandlerModifiers: [sdpModifier],
+      sessionDescriptionHandlerModifiers: [buildSdpModifier(opusToSdpOpts(audioProfileRef.current))],
     });
   const mute = () => { sessionRef.current?.mute({ audio: true }); setIsMuted(true); };
   const unmute = () => { sessionRef.current?.unmute({ audio: true }); setIsMuted(false); };
@@ -397,5 +505,6 @@ export function useSoftphone(
     sipStatus, sipError, callState, callTimer, isMuted, isOnHold, activeCallNumber,
     call, hangup, answer, mute, unmute, hold, unhold, sendDTMF, setStatus, reconnect,
     lastPersistedError, sipLog, clearSipLog, clearSipState, retryAttempt, nextRetryAt, retryLimitReached,
+    quality, audioProfile, setAudioProfile,
   };
 }
