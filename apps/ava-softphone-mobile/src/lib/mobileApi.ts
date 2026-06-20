@@ -59,6 +59,11 @@ async function liveCall<T>(path: string, init: RequestInit = {}): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+// In-flight GET dedup — multiple components requesting the same path in
+// quick succession share one network round-trip. Avoids the StrictMode /
+// multi-screen-mount thundering herd that made initial loads feel slow.
+const _inflightGet = new Map<string, Promise<any>>();
+
 async function call<T>(path: string, init: RequestInit | undefined, mockData: T): Promise<T> {
   // Mock data ONLY in dev builds explicitly opted into mock mode.
   if (isMockMode()) {
@@ -69,6 +74,14 @@ async function call<T>(path: string, init: RequestInit | undefined, mockData: T)
   const token = await getFreshToken();
   if (!token) {
     throw new Error('Not authenticated');
+  }
+  const isGet = !init || !init.method || init.method.toUpperCase() === 'GET';
+  if (isGet) {
+    const existing = _inflightGet.get(path);
+    if (existing) return existing as Promise<T>;
+    const p = liveCall<T>(path, init).finally(() => { _inflightGet.delete(path); });
+    _inflightGet.set(path, p);
+    return p;
   }
   return liveCall<T>(path, init);
 }
