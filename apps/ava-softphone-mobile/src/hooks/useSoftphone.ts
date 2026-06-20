@@ -193,8 +193,27 @@ export function useSoftphone(
             setSipErrorState('');
             log('register.ok', `ext=${config.extension}@${config.domain}`);
           });
+          // Silent re-register on expiry / soft unregister — keeps the
+          // active RTP session alive while we refresh the binding.
+          const scheduleSilentReRegister = (delayMs: number, reason: string) => {
+            if (reRegisterTimerRef.current) clearTimeout(reRegisterTimerRef.current);
+            const delay = Math.max(500, Math.min(delayMs, 30000));
+            log('register.silent-reattempt', `${reason} in ${delay}ms`, 'warn');
+            reRegisterTimerRef.current = setTimeout(() => {
+              try { uaRef.current?.register?.(); }
+              catch (e: any) { log('register.silent-reattempt.failed', e?.message || '', 'error'); }
+            }, delay);
+          };
           ua.on('unregistered', (e: any) => {
             log('register.unregistered', e?.cause || '', 'warn');
+            // Progressive backoff, scaled by retry attempt counter.
+            const a = retryAttemptRef.current;
+            const delay = [1000, 2000, 4000, 8000, 15000][Math.min(a, 4)];
+            scheduleSilentReRegister(delay, 'unregistered');
+          });
+          ua.on('registrationExpiring', () => {
+            log('register.expiring', 'refreshing binding');
+            scheduleSilentReRegister(500, 'expiring');
           });
           ua.on('registrationFailed', (e: any) => {
             const code = e?.response?.status_code;
@@ -233,6 +252,42 @@ export function useSoftphone(
               setCallState('active');
               log('session.confirmed', remoteNumber);
               timerRef.current = setInterval(() => setCallTimer((t) => t + 1), 1000);
+              // ---- Live quality sampler + adaptive bitrate loop ----
+              samplerStateRef.current = {};
+              const pc: RTCPeerConnection | undefined = session.connection;
+              const sender = pc?.getSenders().find((s) => s.track?.kind === 'audio');
+              const profile = audioProfileRef.current;
+              currentBitrateRef.current = PROFILE_OPUS[profile].hardCapBitrate;
+              if (sender) {
+                try {
+                  const params = sender.getParameters();
+                  params.encodings = params.encodings?.length ? params.encodings : [{}];
+                  params.encodings[0].maxBitrate = currentBitrateRef.current;
+                  sender.setParameters(params).catch(() => {});
+                } catch {}
+              }
+              if (pc) {
+                if (statsTimerRef.current) clearInterval(statsTimerRef.current);
+                statsTimerRef.current = setInterval(async () => {
+                  const q = await sampleCallQuality(pc, samplerStateRef.current);
+                  setQuality(q);
+                  // Only AUTO profile adapts. HD / low-bandwidth stay fixed.
+                  if (audioProfileRef.current === 'auto' && sender) {
+                    const cap = PROFILE_OPUS.auto.hardCapBitrate;
+                    const target = chooseAdaptiveBitrate(q, cap, currentBitrateRef.current);
+                    if (Math.abs(target - currentBitrateRef.current) > 1500) {
+                      currentBitrateRef.current = target;
+                      try {
+                        const params = sender.getParameters();
+                        params.encodings = params.encodings?.length ? params.encodings : [{}];
+                        params.encodings[0].maxBitrate = target;
+                        await sender.setParameters(params);
+                        log('adaptive.bitrate', `→ ${target} bps (loss=${q.lossPct}% rtt=${q.rtt}ms)`);
+                      } catch {}
+                    }
+                  }
+                }, 2000);
+              }
             });
             session.on('ended', () => {
               setCallState('ended');
