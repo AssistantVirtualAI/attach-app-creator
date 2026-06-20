@@ -88,12 +88,9 @@ export function useAutoSync<T>(
         attempt++;
         if (attempt > retries) break;
         await sleep(retryBaseMs * Math.pow(2, attempt - 1));
-        // re-arm abort controller for next attempt
-        if (ac.signal.aborted) {
-          const fresh = new AbortController();
-          abortRef.current = fresh;
-          (ac as any) = fresh; // not used further; we'll exit if aborted
-        }
+        // If aborted by a newer refresh, bail.
+        if (ac.signal.aborted && abortRef.current !== ac) { syncError(sid, 'aborted'); return; }
+
       }
     }
     if (!mounted.current) return;
