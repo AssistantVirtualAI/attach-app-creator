@@ -20,14 +20,17 @@ type Step = {
  */
 export default function RecordingDebugScreen({ callId, onBack }: { callId: string; onBack: () => void }) {
   const mobile = useMobileCredentials();
+  const { lang } = useT();
+  const fr = lang === 'fr';
   const [steps, setSteps] = useState<Step[]>([
-    { label: '1. Resolve organization context', status: 'pending' },
-    { label: '2. Request signed recording URL', status: 'pending' },
-    { label: '3. HEAD the signed URL (server reachable?)', status: 'pending' },
-    { label: '4. Inspect Content-Type / Content-Length', status: 'pending' },
-    { label: '5. Probe <audio> canplaythrough', status: 'pending' },
+    { label: fr ? '1. Résoudre le contexte organisation' : '1. Resolve organization context', status: 'pending' },
+    { label: fr ? '2. Demander une URL signée' : '2. Request signed recording URL', status: 'pending' },
+    { label: fr ? '3. Vérifier la signature (serveur joignable ?)' : '3. HEAD the signed URL (server reachable?)', status: 'pending' },
+    { label: fr ? '4. Inspecter Content-Type / Content-Length' : '4. Inspect Content-Type / Content-Length', status: 'pending' },
+    { label: fr ? '5. Tester la lecture <audio>' : '5. Probe <audio> canplaythrough', status: 'pending' },
   ]);
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
+
 
   const set = (i: number, patch: Partial<Step>) =>
     setSteps((cur) => cur.map((s, idx) => (idx === i ? { ...s, ...patch } : s)));
