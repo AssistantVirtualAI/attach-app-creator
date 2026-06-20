@@ -332,7 +332,7 @@ function AuthenticatedShell({
 
 
       <div key={tab} className="lemtel-page-enter" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        <Suspense fallback={<div style={{ flex: 1 }} />}>
+        <Suspense fallback={<ScreenSkeleton />}>
           {tab === 'home'       && <DashboardScreen onNavigate={setTab as any} haptic={haptic} onOpenProfile={() => setProfileOpen(true)} />}
           {tab === 'calls'      && <CallsScreen sp={sp} haptic={haptic} creds={creds} />}
           {tab === 'ava'        && <AVAChatScreen />}
