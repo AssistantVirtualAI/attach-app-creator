@@ -35,7 +35,8 @@ import { registerPush, sendPushTokenToBackend } from './lib/pushNotifications';
 import { syncDeviceContacts } from './lib/contacts';
 import { bootNative, onAppStateChange } from './lib/nativeBoot';
 import { registerDeepLinkHandler } from './lib/deepLink';
-import { configureMobileApi } from './lib/mobileApi';
+import { configureMobileApi, setAuthToken } from './lib/mobileApi';
+import { supabase } from '@/integrations/supabase/client';
 
 // Initialize immediately so API calls never go out without credentials
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdlanhpc3JxdHZ4YXZicmZjb3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1MDMxNzQsImV4cCI6MjA3NzA3OTE3NH0.kaO-GslE99OCNrZ4_AMnbzGqya2azqz_UMZR34zZvvo';
@@ -57,6 +58,31 @@ const isPreviewMode = (() => {
 
 export default function MobileApp() {
   const { creds, setCreds, clearCreds, loading } = useStoredCreds();
+
+  // Restore Supabase session on app launch so API calls are authenticated
+  useEffect(() => {
+    if (creds.accessToken && creds.refreshToken) {
+      supabase.auth.setSession({
+        access_token: creds.accessToken,
+        refresh_token: creds.refreshToken,
+      }).then(({ data, error }) => {
+        if (error) {
+          console.warn('[Auth] Session restore failed:', error.message);
+          supabase.auth.refreshSession().then(({ data: r }) => {
+            if (r?.session) {
+              setCreds((prev: any) => ({ ...prev, accessToken: r.session!.access_token, refreshToken: r.session!.refresh_token }));
+              setAuthToken(r.session!.access_token);
+              configureMobileApi({ accessToken: r.session!.access_token });
+            }
+          });
+        } else if (data.session) {
+          setAuthToken(data.session.access_token);
+          configureMobileApi({ accessToken: data.session.access_token });
+          console.log('[Auth] Session restored ✅');
+        }
+      });
+    }
+  }, [creds.accessToken, creds.refreshToken]);
   const ALL_TABS: Tab[] = ['home','calls','ava','messages','more','voicemail','contacts','sms','queues','settings'];
   const initialTab = (() => {
     try {
