@@ -51,6 +51,7 @@ import PerfOverlay from './components/PerfOverlay';
 import ScreenSkeleton from './components/ScreenSkeleton';
 import SessionExpired from './components/SessionExpired';
 import { startPrefetch, prefetchForTab } from './lib/prefetch';
+import { getPreferClickToCall, setPreferClickToCall } from './lib/prefs';
 
 const isPreviewMode = (() => {
   try { return new URLSearchParams(window.location.search).get('preview') === '1'; }
