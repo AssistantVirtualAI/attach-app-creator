@@ -43,7 +43,7 @@ export default function SetupWizard({ onComplete }: { onComplete: (creds: Creds)
       extension: String(softphone?.extension ?? extension ?? 'N/A'),
       displayName: softphone?.display_name || fallbackEmail.split('@')[0],
       sipDomain: softphone?.sip_domain || sipDomain || 'lemtel.lemtel.tel',
-      wssUrl: softphone?.wss_url || 'wss://lemtel.lemtel.tel:7443',
+      wssUrl: softphone?.wss_url || 'wss://node.lemtelcloud.net:7443',
       userId: authUserId,
       accessToken,
       refreshToken,

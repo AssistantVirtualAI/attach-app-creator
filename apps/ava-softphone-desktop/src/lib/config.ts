@@ -37,7 +37,7 @@ export const FN = {
 /* ---------- SIP / WebRTC (Lemtel) ---------- */
 export const SIP = {
   domain: 'lemtel.lemtel.tel',
-  wssUrl: 'wss://lemtel.lemtel.tel:7443',
+  wssUrl: 'wss://node.lemtelcloud.net:7443',
   userAgent: 'Lemtel AI Phone Desktop',
   // Auth: NEVER hardcode SIP passwords. Fetch from softphone-credentials
   // Edge Function which validates the Supabase JWT and returns short-lived

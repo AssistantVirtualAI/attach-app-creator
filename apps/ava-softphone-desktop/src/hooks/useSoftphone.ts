@@ -141,7 +141,7 @@ export function useSoftphone(args: UseSoftphoneArgs) {
           extension: fetched.extension || args.extension,
           displayName: fetched.display_name || args.displayName || args.extension,
           sipDomain: fetched.sip_domain || args.sipDomain || 'lemtel.lemtel.tel',
-          wssUrl: fetched.wss_url || args.wssUrl || 'wss://lemtel.lemtel.tel:7443',
+          wssUrl: fetched.wss_url || args.wssUrl || 'wss://node.lemtelcloud.net:7443',
           password: fetched.password,
           authUsername: fetched.auth_username || fetched.authUsername || fetched.extension || args.extension,
         };
