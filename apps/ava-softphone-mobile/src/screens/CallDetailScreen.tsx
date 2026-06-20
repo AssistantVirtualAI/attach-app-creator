@@ -345,7 +345,7 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
 
           {/* Topics */}
           {data.topics?.length > 0 && (
-            <AIPanel title="Topics" accent={colors.avaCyan}>
+            <AIPanel title={fr ? 'Sujets' : 'Topics'} accent={colors.avaCyan}>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {data.topics.map((t) => <Chip key={t} tone="cyan">{t}</Chip>)}
               </div>
