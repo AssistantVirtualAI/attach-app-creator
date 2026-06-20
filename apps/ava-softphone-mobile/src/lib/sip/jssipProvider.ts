@@ -113,60 +113,36 @@ function extractPt(sdp: string, codecRegex: RegExp): string | null {
   return m ? m[1] : null;
 }
 
-export function rewriteSdpForFusionPBX(sdp: string, opts: SdpRewriteOpts = {}): string {
-  const o = { ...DEFAULT_OPTS, ...opts };
+export function rewriteSdpForFusionPBX(sdp: string, _opts: SdpRewriteOpts = {}): string {
   let out = sdp;
+  // Drop the entire video m-section — we only do audio.
   out = out.replace(/m=video[\s\S]*?(?=\r\nm=|$)/g, '');
+  // Force PCMU-only audio (PT 0). FusionPBX/Keeny config rejects Opus.
+  out = out.replace(/m=audio (\d+) [A-Z\/]+ [^\r\n]+/g, 'm=audio $1 RTP/AVP 0');
+  // Remove DTLS / SRTP bits — FusionPBX expects plain RTP/AVP.
   out = out.replace(/^a=fingerprint:.*$/gm, '');
   out = out.replace(/^a=setup:.*$/gm, '');
   out = out.replace(/^a=dtls[-a-z]*:.*$/gm, '');
   out = out.replace(/^a=crypto:.*$/gm, '');
+  // Remove ICE — FusionPBX doesn't speak WebRTC ICE.
+  out = out.replace(/^a=ice-ufrag:.*$/gm, '');
+  out = out.replace(/^a=ice-pwd:.*$/gm, '');
   out = out.replace(/^a=ice-options:.*$/gm, '');
+  out = out.replace(/^a=candidate:.*$/gm, '');
+  out = out.replace(/^a=end-of-candidates.*$/gm, '');
+  // Keep only PCMU codec descriptors.
+  out = out.replace(/^a=rtpmap:(\d+) [^\r\n]+$/gm, (line, pt) => (pt === '0' ? line : ''));
+  out = out.replace(/^a=fmtp:(\d+) [^\r\n]+$/gm, (line, pt) => (pt === '0' ? line : ''));
+  // Remove WebRTC stream identifiers / feedback / extensions.
+  out = out.replace(/^a=msid:.*$/gm, '');
+  out = out.replace(/^a=ssrc:.*$/gm, '');
+  out = out.replace(/^a=ssrc-group:.*$/gm, '');
   out = out.replace(/^a=rtcp-fb:.*$/gm, '');
   out = out.replace(/^a=extmap:.*$/gm, '');
-
-  const opusPt = extractPt(out, /opus\/48000/);
-  const pcmuPt = extractPt(out, /PCMU\/8000/) || '0';
-  const pcmaPt = extractPt(out, /PCMA\/8000/) || '8';
-  const tePt   = extractPt(out, /telephone-event\/8000/) || '101';
-
-  const ordered: string[] = [];
-  if (opusPt) ordered.push(opusPt);
-  ordered.push(pcmuPt, pcmaPt, tePt);
-  const ptList = Array.from(new Set(ordered)).join(' ');
-
-  out = out.replace(/m=audio (\d+) [A-Z\/]+ [^\r\n]+/g, `m=audio $1 RTP/AVP ${ptList}`);
-
-  const keep = new Set(ordered);
-  out = out.replace(/^a=rtpmap:(\d+) [^\r\n]+$/gm, (line, pt) => (keep.has(pt) ? line : ''));
-  out = out.replace(/^a=fmtp:(\d+) [^\r\n]+$/gm, (line, pt) => (keep.has(pt) ? line : ''));
-
-  if (opusPt) {
-    const fmtpParts = [
-      `minptime=${Math.max(10, Math.min(o.opusPtime, 60))}`,
-      `useinbandfec=${o.opusUseInbandFec ? 1 : 0}`,
-      `usedtx=${o.opusUseDtx ? 1 : 0}`,
-      'stereo=0',
-      'cbr=0',
-      `maxaveragebitrate=${o.opusMaxAverageBitrate}`,
-      `maxplaybackrate=${o.opusMaxPlaybackRate}`,
-    ];
-    const opusFmtp = `a=fmtp:${opusPt} ${fmtpParts.join(';')}`;
-    if (new RegExp(`^a=fmtp:${opusPt} `, 'm').test(out)) {
-      out = out.replace(new RegExp(`^a=fmtp:${opusPt} [^\\r\\n]+$`, 'm'), opusFmtp);
-    } else {
-      out = out.replace(
-        new RegExp(`^(a=rtpmap:${opusPt} [^\\r\\n]+)$`, 'm'),
-        `$1\r\n${opusFmtp}`,
-      );
-    }
-    // Add a=ptime hint so the PBX matches our packetization.
-    if (!/^a=ptime:/m.test(out)) {
-      out = out.replace(/(m=audio [^\r\n]+)/, `$1\r\na=ptime:${o.opusPtime}`);
-    }
-  }
-
-  out = out.replace(/\r?\n\r?\n+/g, '\r\n');
+  out = out.replace(/^a=mid:.*$/gm, '');
+  out = out.replace(/^a=group:.*$/gm, '');
+  // Collapse blank lines created by the deletions.
+  out = out.replace(/(\r?\n){2,}/g, '\r\n');
   return out;
 }
 
