@@ -9,6 +9,7 @@
  * bubble up so the UI can render a real error state instead of fake data.
  */
 import { isMockMode } from './buildGuard';
+import { supabase } from '@/integrations/supabase/client';
 
 export const MOBILE_DEFAULT_PORTAL = 'https://gejxisrqtvxavbrfcoxz.supabase.co';
 
@@ -24,10 +25,23 @@ export function configureMobileApi(opts: { portalUrl?: string; accessToken?: str
 
 export function setAuthToken(t: string | null) { authToken = t; }
 
+async function getFreshToken(): Promise<string | null> {
+  try {
+    const { data } = await supabase.auth.getSession();
+    const t = data?.session?.access_token;
+    if (t) {
+      authToken = t;
+      return t;
+    }
+  } catch {}
+  return authToken;
+}
+
 async function liveCall<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const token = await getFreshToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(anonKey ? { apikey: anonKey } : {}),
     ...((init.headers as Record<string, string>) || {}),
   };
