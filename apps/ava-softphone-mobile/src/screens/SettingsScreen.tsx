@@ -129,7 +129,7 @@ export default function SettingsScreen({
         {me?.client && <SettingsRow label={t('settings.client')} icon="◈" value={me.client.name} />}
         <SettingsRow label={t('settings.dataScope')} icon="⌁" value={me?.dataScope === 'domain_admin' ? t('settings.scopeDomain') : t('settings.scopeOwn')} />
         <SettingsRow label={t('settings.role')} icon="◎" value={me?.role || creds.role || 'agent'} />
-        <SettingsRow label={t('settings.devices')} icon="📱" value="This device · WebRTC" onPress={() => onNavigate?.('permissions' as Tab)} />
+        <SettingsRow label={t('settings.devices')} icon="📱" value={lang === 'fr' ? 'Cet appareil · WebRTC' : 'This device · WebRTC'} onPress={() => onNavigate?.('permissions' as Tab)} />
         <SettingsRow label={t('settings.notifications')} icon="🔔" value={t('settings.pushEnabled')} onPress={() => openAppSettings()} />
       </Card>
 
@@ -142,24 +142,25 @@ export default function SettingsScreen({
             {me.permissions.canManageNumbers && <SettingsRow label={t('settings.phoneNumbers')} icon="#" value={t('settings.openPortal')} onPress={() => openPortal('/dashboard/phone-numbers')} />}
             {me.permissions.canManageRouting && <SettingsRow label={t('settings.ivrs')} icon="🎛" value={t('settings.openPortal')} onPress={() => openPortal('/dashboard/routing')} />}
             {me.permissions.canManageAgents && <SettingsRow label={t('settings.voiceAgents')} icon="🤖" value={t('settings.openPortal')} onPress={() => openPortal('/dashboard/agents')} />}
-            <SettingsRow label={t('settings.syncStatus')} icon="↻" value={s || 'idle'} onPress={() => sp?.reconnect?.()} />
+            <SettingsRow label={t('settings.syncStatus')} icon="↻" value={s || (lang === 'fr' ? 'inactif' : 'idle')} onPress={() => sp?.reconnect?.()} />
           </Card>
         </>
       )}
 
-      {/* SIP debug (collapsed, still useful) */}
+      {/* SIP debug — collapsible */}
       <SectionTitle eyebrow="SIP" title={t('settings.diagnostics')} />
       <Card padded={false}>
-        <SettingsRow label="Status" icon="●" value={sp?.snap?.status || 'idle'} />
-        <SettingsRow label="WSS URL" icon="↔" value={sp?.sipConfig?.wssUrl || '—'} />
-        <SettingsRow label="Last error" icon="!" value={sp?.snap?.error || t('common.none')} />
+        <SettingsRow label={lang === 'fr' ? 'Statut' : 'Status'} icon="●" value={sp?.snap?.status || (lang === 'fr' ? 'inactif' : 'idle')} />
+        <SettingsRow label="WSS" icon="↔" value={sp?.sipConfig?.wssUrl || '—'} />
+        <SettingsRow label={lang === 'fr' ? 'Dernière erreur' : 'Last error'} icon="!" value={sp?.snap?.error || t('common.none')} />
         <SettingsRow label={lang === 'fr' ? "Relancer l'enregistrement" : 'Retry Registration'} icon="↻" onPress={() => sp?.reconnect?.()} />
         <SettingsRow label={lang === 'fr' ? "Vider l'état SIP" : 'Clear SIP status'} icon="✕" onPress={() => sp?.clearSipState?.()} />
         <SettingsRow label={lang === 'fr' ? 'Copier le journal SIP' : 'Copy SIP log'} icon="⧉" onPress={async () => {
           const text = (sp?.sipLog || []).map((e: any) => `${new Date(e.time).toISOString()} [${e.level}] ${e.event}${e.detail ? ' — ' + e.detail : ''}`).join('\n');
-          try { await navigator.clipboard.writeText(text || ''); alert(lang === 'fr' ? 'Copié.' : 'Copied.'); } catch { alert('Copy failed'); }
+          try { await navigator.clipboard.writeText(text || ''); alert(lang === 'fr' ? 'Copié.' : 'Copied.'); } catch { alert(lang === 'fr' ? 'Échec de la copie' : 'Copy failed'); }
         }} />
       </Card>
+
 
       {/* Permissions */}
       <SectionTitle eyebrow={t('settings.privacy')} title={t('settings.permissions')} />
