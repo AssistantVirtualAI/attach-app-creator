@@ -333,7 +333,7 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
 
           {/* Action items */}
           {data.actionItems?.length > 0 && (
-            <AIPanel title="Action items" accent={colors.success}>
+            <AIPanel title={fr ? 'Actions à faire' : 'Action items'} accent={colors.success}>
               {data.actionItems.map((a, i) => (
                 <div key={i} style={{ display: 'flex', gap: 10, padding: '6px 0', borderBottom: i === data.actionItems.length - 1 ? 'none' : `1px solid ${colors.border}` }}>
                   <span style={{ color: colors.success }}>→</span>
