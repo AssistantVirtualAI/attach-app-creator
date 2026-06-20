@@ -354,7 +354,7 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
 
           {/* Transcript */}
           {hasTranscript && (
-            <AIPanel title="Transcript" accent={colors.signalGold}>
+            <AIPanel title={fr ? 'Transcription' : 'Transcript'} accent={colors.signalGold}>
               {data.transcript.map((line, i) => (
                 <div key={i} style={{
                   display: 'flex', flexDirection: 'column',
