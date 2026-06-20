@@ -132,8 +132,43 @@ function AuthenticatedShell({
   const [permsGateDone, setPermsGateDone] = useState<boolean | null>(isPreviewMode ? true : null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [freshCredentialToken, setFreshCredentialToken] = useState('');
+  const [authExpired, setAuthExpired] = useState(false);
   const passwordHealRef = useRef('');
   const hydratedTokenRef = useRef('');
+
+  // Restore Supabase session from stored creds so the mobile SDK can
+  // auto-refresh tokens (and so realtime/edge calls always have a fresh JWT).
+  useEffect(() => {
+    if (!creds.accessToken || !creds.refreshToken) return;
+    supabase.auth.setSession({
+      access_token: creds.accessToken,
+      refresh_token: creds.refreshToken,
+    }).then(({ error }) => {
+      if (error) console.warn('[Auth] Session restore failed:', error.message);
+      else console.log('[Auth] Session restored');
+    }).catch((e) => console.warn('[Auth] setSession threw', e?.message || e));
+  }, [creds.accessToken, creds.refreshToken]);
+
+  // Keep stored creds in sync with token refreshes; sign-out clears the app.
+  useEffect(() => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'TOKEN_REFRESHED' && session) {
+        setCreds({ ...creds, accessToken: session.access_token, refreshToken: session.refresh_token });
+        setAuthExpired(false);
+      } else if (event === 'SIGNED_OUT') {
+        onSignOut();
+      }
+    });
+    return () => { sub?.subscription?.unsubscribe?.(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Show a clear "Session expired" screen when API calls return 401/403.
+  useEffect(() => {
+    const onAuthReq = () => setAuthExpired(true);
+    window.addEventListener('mobile-auth-required', onAuthReq);
+    return () => window.removeEventListener('mobile-auth-required', onAuthReq);
+  }, []);
 
   // Decide whether to show the onboarding permission gate.
   useEffect(() => {
