@@ -6,15 +6,16 @@ import { useSoftphone } from './hooks/useSoftphone';
 import AuthScreen from './screens/AuthScreen';
 import DashboardScreen from './screens/DashboardScreen';
 import CallsScreen from './screens/CallsScreen';
-import AVAChatScreen from './screens/AVAChatScreen';
-import TeamChatScreen from './screens/TeamChatScreen';
-import MoreScreen from './screens/MoreScreen';
-import VoicemailScreen from './screens/VoicemailScreen';
-import ContactsScreen from './screens/ContactsScreen';
-import MessagesScreen from './screens/MessagesScreen';
-import MessagesHubScreen from './screens/MessagesHubScreen';
-import QueuesScreen from './screens/QueuesScreen';
-import SettingsScreen from './screens/SettingsScreen';
+// Lazy-loaded screens: only fetched when the user navigates to the tab.
+// Keeps the initial bundle small for fast mobile boot.
+const AVAChatScreen      = lazy(() => import('./screens/AVAChatScreen'));
+const MoreScreen         = lazy(() => import('./screens/MoreScreen'));
+const VoicemailScreen    = lazy(() => import('./screens/VoicemailScreen'));
+const ContactsScreen     = lazy(() => import('./screens/ContactsScreen'));
+const MessagesScreen     = lazy(() => import('./screens/MessagesScreen'));
+const MessagesHubScreen  = lazy(() => import('./screens/MessagesHubScreen'));
+const QueuesScreen       = lazy(() => import('./screens/QueuesScreen'));
+const SettingsScreen     = lazy(() => import('./screens/SettingsScreen'));
 import BottomTabs, { Tab } from './components/BottomTabs';
 import ActiveCallSheet from './components/ActiveCallSheet';
 import SplashAva from './components/SplashAva';
