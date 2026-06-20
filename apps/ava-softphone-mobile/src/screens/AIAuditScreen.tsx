@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { colors, font, radius } from '../lib/theme';
 import { Card, SectionTitle } from '../components/ui/Primitives';
+import { useT } from '../lib/i18n';
+
 
 /**
  * Mobile AI Requests audit view.
@@ -41,6 +43,11 @@ const STATUS_COLOR = (s: string) => {
 const isActive = (s: string) => s === 'pending' || s === 'queued' || s === 'running';
 
 const FILTERS = ['all', 'ok', 'no-audio', 'missing-key', 'ai-error', 'error'] as const;
+const FILTER_FR: Record<typeof FILTERS[number], string> = {
+  'all': 'tous', 'ok': 'ok', 'no-audio': 'sans audio',
+  'missing-key': 'clé manquante', 'ai-error': 'erreur ia', 'error': 'erreur',
+};
+
 
 function getToken(): string | null {
   try { return localStorage.getItem('ava.auth.token') || localStorage.getItem('sb-access-token'); } catch { return null; }
@@ -61,6 +68,8 @@ async function authFetch(path: string, init: RequestInit = {}) {
 }
 
 export default function AIAuditScreen() {
+  const { lang, t } = useT();
+  const fr = lang === 'fr';
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<typeof FILTERS[number]>('all');
@@ -69,6 +78,7 @@ export default function AIAuditScreen() {
   const [retrying, setRetrying] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const stopRef = useRef(false);
+
 
   const load = useCallback(async () => {
     try {
@@ -115,7 +125,7 @@ export default function AIAuditScreen() {
 
   const retry = async (row: Row) => {
     if (!row.call_record_id || !row.organization_id) {
-      setToast('Cannot retry — missing call id or workspace.');
+      setToast(fr ? 'Impossible de réessayer — identifiant ou organisation manquant.' : 'Cannot retry — missing call id or workspace.');
       return;
     }
     setRetrying(row.id); setToast(null);
@@ -131,12 +141,12 @@ export default function AIAuditScreen() {
       });
       const body = await res.json().catch(() => ({}));
       setToast(res.ok
-        ? `Retry queued for ${row.request_type} · #${row.call_record_id.slice(0, 8)}`
-        : `Retry failed (${res.status}) ${body?.error || ''}`);
+        ? (fr ? `Nouvelle tentative envoyée pour ${row.request_type} · #${row.call_record_id.slice(0, 8)}` : `Retry queued for ${row.request_type} · #${row.call_record_id.slice(0, 8)}`)
+        : (fr ? `Échec (${res.status}) ${body?.error || ''}` : `Retry failed (${res.status}) ${body?.error || ''}`));
       // The edge function inserts its own audit row — reload.
       setTimeout(load, 800);
     } catch (e: any) {
-      setToast(`Retry failed: ${e?.message || 'network error'}`);
+      setToast((fr ? 'Échec : ' : 'Retry failed: ') + (e?.message || (fr ? 'erreur réseau' : 'network error')));
     } finally {
       setRetrying(null);
     }
@@ -144,12 +154,12 @@ export default function AIAuditScreen() {
 
   return (
     <div style={{ padding: 14, overflowY: 'auto', paddingBottom: 120 }}>
-      <SectionTitle eyebrow="Diagnostics" title="AI requests" />
+      <SectionTitle eyebrow={fr ? 'Diagnostics' : 'Diagnostics'} title={fr ? 'Requêtes IA' : 'AI requests'} />
       <Card padded={true} style={{ marginBottom: 10 }}>
         <p style={{ margin: 0, fontSize: font.sm, color: colors.textSub, lineHeight: 1.5 }}>
-          Every transcription and analysis request is logged here with timestamp,
-          status and error code. Tap a row for full details, or use <strong>Retry</strong>
-          to re-queue the same call.
+          {fr
+            ? <>Chaque requête de transcription et d’analyse est enregistrée ici avec son horodatage, statut et code d’erreur. Touchez une ligne pour les détails, ou utilisez <strong>Réessayer</strong> pour relancer le même appel.</>
+            : <>Every transcription and analysis request is logged here with timestamp, status and error code. Tap a row for full details, or use <strong>Retry</strong> to re-queue the same call.</>}
         </p>
       </Card>
 
@@ -162,11 +172,11 @@ export default function AIAuditScreen() {
             background: filter === f ? 'rgba(0,35,230,0.12)' : 'transparent',
             color: filter === f ? colors.textIce : colors.textSub,
             fontSize: 10.5, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase',
-          }}>{f}</button>
+          }}>{fr ? FILTER_FR[f] : f}</button>
         ))}
       </div>
       <input value={search} onChange={e => setSearch(e.target.value)}
-        placeholder="Search call id, error code, message…"
+        placeholder={fr ? 'Rechercher identifiant, code d’erreur, message…' : 'Search call id, error code, message…'}
         style={{
           width: '100%', padding: '8px 10px', borderRadius: radius.sm,
           border: `1px solid ${colors.border}`, background: 'rgba(255,255,255,0.04)',
@@ -182,10 +192,11 @@ export default function AIAuditScreen() {
       )}
 
       {loading ? (
-        <Card padded={true}><div style={{ color: colors.mutedSilver, fontSize: font.sm }}>Loading…</div></Card>
+        <Card padded={true}><div style={{ color: colors.mutedSilver, fontSize: font.sm }}>{t('common.loading')}</div></Card>
       ) : filtered.length === 0 ? (
-        <Card padded={true}><div style={{ color: colors.mutedSilver, fontSize: font.sm }}>No AI requests yet.</div></Card>
+        <Card padded={true}><div style={{ color: colors.mutedSilver, fontSize: font.sm }}>{fr ? 'Aucune requête IA.' : 'No AI requests yet.'}</div></Card>
       ) : (
+
         <Card padded={false}>
           {filtered.map((r, i) => (
             <div key={r.id} style={{
@@ -233,7 +244,7 @@ export default function AIAuditScreen() {
                   opacity: !r.call_record_id || !r.organization_id ? 0.4 : 1,
                   whiteSpace: 'nowrap',
                 }}
-              >{retrying === r.id ? '…' : '↻ Retry'}</button>
+              >{retrying === r.id ? '…' : (fr ? '↻ Réessayer' : '↻ Retry')}</button>
             </div>
           ))}
         </Card>
@@ -252,21 +263,21 @@ export default function AIAuditScreen() {
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <h3 style={{ margin: 0, fontSize: font.md, color: colors.textIce }}>
-                AI {selected.request_type}
+                {fr ? `IA ${selected.request_type === 'analyze' ? 'analyse' : 'transcription'}` : `AI ${selected.request_type}`}
               </h3>
               <button onClick={() => setSelected(null)} style={{
                 background: 'transparent', border: 'none', color: colors.mutedSilver,
                 fontSize: 22, cursor: 'pointer',
               }}>✕</button>
             </div>
-            <KV k="Status" v={selected.status} accent={STATUS_COLOR(selected.status)} />
-            <KV k="Call id" v={selected.call_record_id || '—'} mono />
-            <KV k="Workspace" v={selected.organization_id || '—'} mono />
-            <KV k="Error code" v={selected.error_code || '—'} mono accent={selected.error_code ? colors.danger : undefined} />
+            <KV k={fr ? 'Statut' : 'Status'} v={selected.status} accent={STATUS_COLOR(selected.status)} />
+            <KV k={fr ? 'Identifiant appel' : 'Call id'} v={selected.call_record_id || '—'} mono />
+            <KV k={fr ? 'Organisation' : 'Workspace'} v={selected.organization_id || '—'} mono />
+            <KV k={fr ? 'Code d’erreur' : 'Error code'} v={selected.error_code || '—'} mono accent={selected.error_code ? colors.danger : undefined} />
             <KV k="HTTP" v={selected.http_status?.toString() || '—'} />
-            <KV k="Provider" v={`${selected.provider || '—'}${selected.model ? ' · ' + selected.model : ''}`} />
-            <KV k="Latency" v={selected.latency_ms ? `${selected.latency_ms}ms` : '—'} />
-            <KV k="When" v={new Date(selected.created_at).toLocaleString()} />
+            <KV k={fr ? 'Fournisseur' : 'Provider'} v={`${selected.provider || '—'}${selected.model ? ' · ' + selected.model : ''}`} />
+            <KV k={fr ? 'Latence' : 'Latency'} v={selected.latency_ms ? `${selected.latency_ms}ms` : '—'} />
+            <KV k={fr ? 'Date' : 'When'} v={new Date(selected.created_at).toLocaleString()} />
             {selected.message && (
               <div style={{ marginTop: 10 }}>
                 <div style={{ fontSize: 10, color: colors.mutedSilver, textTransform: 'uppercase', letterSpacing: 0.6 }}>Message</div>
@@ -275,7 +286,7 @@ export default function AIAuditScreen() {
             )}
             {selected.metadata && Object.keys(selected.metadata).length > 0 && (
               <div style={{ marginTop: 12 }}>
-                <div style={{ fontSize: 10, color: colors.mutedSilver, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>Raw payload</div>
+                <div style={{ fontSize: 10, color: colors.mutedSilver, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>{fr ? 'Charge utile' : 'Raw payload'}</div>
                 <pre style={{
                   background: 'rgba(0,0,0,0.35)', padding: 10, borderRadius: 8,
                   fontSize: 10.5, color: colors.textIce, overflow: 'auto', margin: 0,
@@ -292,7 +303,8 @@ export default function AIAuditScreen() {
                 fontSize: font.sm, fontWeight: 700, cursor: 'pointer',
                 opacity: retrying === selected.id ? 0.5 : 1,
               }}
-            >{retrying === selected.id ? 'Retrying…' : '↻ Retry this request'}</button>
+            >{retrying === selected.id ? (fr ? 'Nouvelle tentative…' : 'Retrying…') : (fr ? '↻ Relancer cette requête' : '↻ Retry this request')}</button>
+
           </div>
         </div>
       )}

@@ -9,7 +9,7 @@
  * - Aborts in-flight requests when deps change to avoid stale writes.
  */
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { nextSyncId, syncBegin, syncSuccess, syncError } from '../lib/syncStatus';
+import { nextSyncId, syncBegin, syncSuccess, syncError, onSyncRefresh } from '../lib/syncStatus';
 
 const CACHE_PREFIX = 'ava.mobile.cache.';
 
@@ -147,12 +147,16 @@ export function useAutoSync<T>(
       } catch { /* ignore */ }
     })();
 
+    const unsubManual = onSyncRefresh(() => { refresh(); });
+
     return () => {
       mounted.current = false;
       stop();
       unsubAppState();
+      unsubManual();
       abortRef.current?.abort();
     };
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 

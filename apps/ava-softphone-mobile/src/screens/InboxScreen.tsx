@@ -6,14 +6,9 @@ import VoicemailScreen from './VoicemailScreen';
 import MessagesScreen from './MessagesScreen';
 import TeamChatScreen from './TeamChatScreen';
 import { useStoredCreds } from '../lib/creds';
+import { useT } from '../lib/i18n';
 
 type SubTab = 'voicemail' | 'sms' | 'team';
-
-const TABS: { id: SubTab; label: string; Icon: typeof Voicemail; accent: string }[] = [
-  { id: 'team',       label: 'Team',       Icon: Users,             accent: '#21D4FD' },
-  { id: 'voicemail',  label: 'Voicemail',  Icon: Voicemail,         accent: '#FFD86B' },
-  { id: 'sms',        label: 'SMS',        Icon: MessageSquareText, accent: '#B79CFF' },
-];
 
 export default function InboxScreen({
   haptic,
@@ -24,17 +19,25 @@ export default function InboxScreen({
 }) {
   const [tab, setTab] = useState<SubTab>(initial);
   const { creds } = useStoredCreds();
+  const { t, lang } = useT();
+
+  const TABS: { id: SubTab; label: string; Icon: typeof Voicemail; accent: string }[] = [
+    { id: 'team',       label: t('messages.team'),     Icon: Users,             accent: '#21D4FD' },
+    { id: 'voicemail',  label: t('calls.voicemail'),   Icon: Voicemail,         accent: '#FFD86B' },
+    { id: 'sms',        label: t('messages.sms'),      Icon: MessageSquareText, accent: '#B79CFF' },
+  ];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <header style={{ padding: '16px 16px 12px' }}>
         <div style={{ fontSize: 11, color: colors.mutedSilver, textTransform: 'uppercase', letterSpacing: 1.6, fontWeight: 700 }}>
-          Inbox
+          {lang === 'fr' ? 'Boîte de réception' : 'Inbox'}
         </div>
         <div style={{ fontSize: 24, fontWeight: 800, color: colors.textIce, marginTop: 2, letterSpacing: -0.3 }}>
-          Messages
+          {t('tabs.messages')}
         </div>
       </header>
+
 
       <div style={{
         display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6,

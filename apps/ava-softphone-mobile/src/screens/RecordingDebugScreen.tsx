@@ -3,6 +3,8 @@ import { colors, font, radius } from '../lib/theme';
 import { mobileApi } from '../lib/mobileApi';
 import { Card } from '../components/ui/Primitives';
 import { useMobileCredentials } from '../hooks/useMobileCredentials';
+import { useT } from '../lib/i18n';
+
 
 
 type Step = {
@@ -18,14 +20,17 @@ type Step = {
  */
 export default function RecordingDebugScreen({ callId, onBack }: { callId: string; onBack: () => void }) {
   const mobile = useMobileCredentials();
+  const { lang } = useT();
+  const fr = lang === 'fr';
   const [steps, setSteps] = useState<Step[]>([
-    { label: '1. Resolve organization context', status: 'pending' },
-    { label: '2. Request signed recording URL', status: 'pending' },
-    { label: '3. HEAD the signed URL (server reachable?)', status: 'pending' },
-    { label: '4. Inspect Content-Type / Content-Length', status: 'pending' },
-    { label: '5. Probe <audio> canplaythrough', status: 'pending' },
+    { label: fr ? '1. Résoudre le contexte organisation' : '1. Resolve organization context', status: 'pending' },
+    { label: fr ? '2. Demander une URL signée' : '2. Request signed recording URL', status: 'pending' },
+    { label: fr ? '3. Vérifier la signature (serveur joignable ?)' : '3. HEAD the signed URL (server reachable?)', status: 'pending' },
+    { label: fr ? '4. Inspecter Content-Type / Content-Length' : '4. Inspect Content-Type / Content-Length', status: 'pending' },
+    { label: fr ? '5. Tester la lecture <audio>' : '5. Probe <audio> canplaythrough', status: 'pending' },
   ]);
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
+
 
   const set = (i: number, patch: Partial<Step>) =>
     setSteps((cur) => cur.map((s, idx) => (idx === i ? { ...s, ...patch } : s)));
@@ -120,12 +125,15 @@ export default function RecordingDebugScreen({ callId, onBack }: { callId: strin
         background: 'rgba(255,255,255,0.04)',
         border: `1px solid ${colors.border}`,
         borderRadius: 999, color: colors.textIce, fontSize: font.sm, cursor: 'pointer',
-      }}>← Back</button>
+      }}>← {fr ? 'Retour' : 'Back'}</button>
 
-      <h1 style={{ fontSize: font.xxl, color: colors.textIce, margin: '4px 0 4px', fontWeight: 800 }}>Playback debug</h1>
+      <h1 style={{ fontSize: font.xxl, color: colors.textIce, margin: '4px 0 4px', fontWeight: 800 }}>
+        {fr ? 'Diagnostic de lecture' : 'Playback debug'}
+      </h1>
       <div style={{ fontSize: font.sm, color: colors.mutedSilver, marginBottom: 14 }}>
-        Verifies the recording pipeline for <span style={{ fontFamily: 'JetBrains Mono, monospace' }}>{callId.slice(0, 12)}…</span>
+        {fr ? 'Vérifie le pipeline d’enregistrement pour' : 'Verifies the recording pipeline for'} <span style={{ fontFamily: 'JetBrains Mono, monospace' }}>{callId.slice(0, 12)}…</span>
       </div>
+
 
       <Card>
         {steps.map((s, i) => {
