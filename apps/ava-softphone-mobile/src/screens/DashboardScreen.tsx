@@ -268,11 +268,6 @@ export default function DashboardScreen({
         )}
       </AIPanel>
 
-      {stats.lastSyncedAt && (
-        <div style={{ textAlign: 'center', marginTop: 10, fontSize: font.xs, color: colors.mutedSilver }}>
-          Synced {new Date(stats.lastSyncedAt).toLocaleTimeString()} · auto-refresh every 60s
-        </div>
-      )}
       <div style={{ height: 80 }} />
       <NotificationsSheet open={notifOpen} onClose={() => setNotifOpen(false)} onNavigate={onNavigate} />
     </div>
