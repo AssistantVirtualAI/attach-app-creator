@@ -164,7 +164,20 @@ export default function ContactsScreen({ sp }: { sp: any }) {
                 <div style={{ fontSize: font.sm, fontWeight: 800, color: colors.textIce, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
                 <div style={{ fontSize: 11, color: colors.mutedSilver, marginTop: 2, fontFamily: 'JetBrains Mono, monospace' }}>{c.kind === 'domain' ? `Ext ${c.extension} · ${status.replace('_', ' ')}` : `${c.kind === 'manual' ? 'Contact ajouté' : 'Contact mobile'} · ${c.phone || c.email || ''}`}</div>
               </div>
-              <button onClick={() => sp?.call?.(c.phone || c.extension)} aria-label={`Appeler ${name}`} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', cursor: 'pointer', background: `linear-gradient(135deg, #22c55e, #16a34a)`, color: '#fff', display: 'grid', placeItems: 'center' }}><Phone size={18} /></button>
+              <button
+                onClick={() => {
+                  const opts: NumberOption[] = (c.numbers && c.numbers.length > 0)
+                    ? c.numbers.filter((n) => n.number)
+                    : [{ label: c.kind === 'domain' ? (fr ? 'Extension' : 'Extension') : (fr ? 'Numéro' : 'Number'), number: c.phone || c.extension || '' }].filter((n) => n.number);
+                  if (opts.length <= 1) {
+                    dialNumber(sp, opts[0]?.number || c.phone || c.extension);
+                  } else {
+                    setPicker({ title: name, options: opts });
+                  }
+                }}
+                aria-label={`Appeler ${name}`}
+                style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', cursor: 'pointer', background: `linear-gradient(135deg, #22c55e, #16a34a)`, color: '#fff', display: 'grid', placeItems: 'center' }}
+              ><Phone size={18} /></button>
             </div>
           );
         })}
