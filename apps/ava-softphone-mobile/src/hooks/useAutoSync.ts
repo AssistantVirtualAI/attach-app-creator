@@ -147,12 +147,16 @@ export function useAutoSync<T>(
       } catch { /* ignore */ }
     })();
 
+    const unsubManual = onSyncRefresh(() => { refresh(); });
+
     return () => {
       mounted.current = false;
       stop();
       unsubAppState();
+      unsubManual();
       abortRef.current?.abort();
     };
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 
