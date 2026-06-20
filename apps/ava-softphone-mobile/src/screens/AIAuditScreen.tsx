@@ -63,6 +63,8 @@ async function authFetch(path: string, init: RequestInit = {}) {
 }
 
 export default function AIAuditScreen() {
+  const { lang, t } = useT();
+  const fr = lang === 'fr';
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<typeof FILTERS[number]>('all');
@@ -71,6 +73,7 @@ export default function AIAuditScreen() {
   const [retrying, setRetrying] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const stopRef = useRef(false);
+
 
   const load = useCallback(async () => {
     try {
