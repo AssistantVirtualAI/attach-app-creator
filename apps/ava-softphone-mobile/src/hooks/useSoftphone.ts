@@ -492,5 +492,6 @@ export function useSoftphone(
     sipStatus, sipError, callState, callTimer, isMuted, isOnHold, activeCallNumber,
     call, hangup, answer, mute, unmute, hold, unhold, sendDTMF, setStatus, reconnect,
     lastPersistedError, sipLog, clearSipLog, clearSipState, retryAttempt, nextRetryAt, retryLimitReached,
+    quality, audioProfile, setAudioProfile,
   };
 }
