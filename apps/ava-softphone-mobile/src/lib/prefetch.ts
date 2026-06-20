@@ -17,9 +17,10 @@ type Task = { key: string; run: () => Promise<unknown> };
 // SIP credentials, dashboard stats, and a tiny page of recent calls — all in
 // parallel via Promise.all so the first paint has data ready.
 const STARTUP_TASKS: Task[] = [
-  { key: 'mobile.me',         run: () => mobileApi.me() },
-  { key: 'mobile.dashboard',  run: () => mobileApi.dashboard() },
-  { key: 'mobile.calls.7',    run: () => mobileApi.calls({ rangeDays: 7, limit: 10 }) },
+  { key: 'mobile.me',          run: () => mobileApi.me() },
+  { key: 'mobile.dashboard',   run: () => mobileApi.dashboard() },
+  { key: 'mobile.calls.7',     run: () => mobileApi.calls({ rangeDays: 7, limit: 10 }) },
+  { key: 'mobile.sipCreds',    run: () => mobileApi.webphoneToken() },
 ];
 
 let started = false;
