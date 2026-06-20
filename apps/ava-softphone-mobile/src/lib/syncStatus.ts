@@ -67,17 +67,17 @@ export function syncError(id: string, err: string) {
   emit();
 }
 export function getSyncSnapshot() { return snapshot(); }
-export function subscribeSync(l: Listener) { listeners.add(l); l(snapshot()); return () => listeners.delete(l); }
+export function subscribeSync(l: Listener) { listeners.add(l); l(snapshot()); return () => { listeners.delete(l); }; }
 
 // Manual refresh bus — useAutoSync hooks subscribe; SyncIndicator triggers.
 const refreshSubs = new Set<() => void>();
-export function onSyncRefresh(fn: () => void) { refreshSubs.add(fn); return () => refreshSubs.delete(fn); }
+export function onSyncRefresh(fn: () => void) { refreshSubs.add(fn); return () => { refreshSubs.delete(fn); }; }
 export function triggerSyncRefresh() { refreshSubs.forEach((fn) => { try { fn(); } catch {} }); }
 
 import { useEffect, useState } from 'react';
 export function useSyncStatus() {
   const [snap, setSnap] = useState<SyncSnapshot>(() => snapshot());
-  useEffect(() => subscribeSync(setSnap), []);
+  useEffect(() => { const off = subscribeSync(setSnap); return () => { off(); }; }, []);
   return snap;
 }
 
