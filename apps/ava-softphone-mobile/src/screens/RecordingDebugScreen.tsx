@@ -125,12 +125,15 @@ export default function RecordingDebugScreen({ callId, onBack }: { callId: strin
         background: 'rgba(255,255,255,0.04)',
         border: `1px solid ${colors.border}`,
         borderRadius: 999, color: colors.textIce, fontSize: font.sm, cursor: 'pointer',
-      }}>← Back</button>
+      }}>← {fr ? 'Retour' : 'Back'}</button>
 
-      <h1 style={{ fontSize: font.xxl, color: colors.textIce, margin: '4px 0 4px', fontWeight: 800 }}>Playback debug</h1>
+      <h1 style={{ fontSize: font.xxl, color: colors.textIce, margin: '4px 0 4px', fontWeight: 800 }}>
+        {fr ? 'Diagnostic de lecture' : 'Playback debug'}
+      </h1>
       <div style={{ fontSize: font.sm, color: colors.mutedSilver, marginBottom: 14 }}>
-        Verifies the recording pipeline for <span style={{ fontFamily: 'JetBrains Mono, monospace' }}>{callId.slice(0, 12)}…</span>
+        {fr ? 'Vérifie le pipeline d’enregistrement pour' : 'Verifies the recording pipeline for'} <span style={{ fontFamily: 'JetBrains Mono, monospace' }}>{callId.slice(0, 12)}…</span>
       </div>
+
 
       <Card>
         {steps.map((s, i) => {
