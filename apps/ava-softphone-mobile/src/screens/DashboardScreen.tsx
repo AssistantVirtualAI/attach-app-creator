@@ -324,8 +324,11 @@ function Metric({ label, value, tone, icon, pct }: { label: string; value?: numb
 function AnswerRateHero({ answered, missed, total, voicemails, avgSec, rangeLabel }: {
   answered?: number; missed?: number; total?: number; voicemails?: number; avgSec?: number; rangeLabel: string;
 }) {
-  const a = answered ?? 0; const m = missed ?? 0; const t = total ?? (a + m);
-  const rate = t > 0 ? Math.round((a / t) * 100) : 0;
+  const { t, lang } = useT();
+  const a = answered ?? 0; const m = missed ?? 0; const tot = total ?? (a + m);
+  const rate = tot > 0 ? Math.round((a / tot) * 100) : 0;
+  const ofLbl = lang === 'fr' ? 'sur' : 'of';
+  const handledLbl = lang === 'fr' ? 'traités' : 'handled';
   const size = 92; const stroke = 10; const r = (size - stroke) / 2;
   const circ = 2 * Math.PI * r;
   const offset = circ - (rate / 100) * circ;
@@ -355,12 +358,12 @@ function AnswerRateHero({ answered, missed, total, voicemails, avgSec, rangeLabe
           </div>
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 1.6, color: colors.avaCyan, textTransform: 'uppercase' }}>Answer rate · {rangeLabel}</div>
-          <div style={{ fontSize: font.lg, fontWeight: 800, color: colors.textIce, marginTop: 2, letterSpacing: -0.3 }}>{a} of {t} handled</div>
+          <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 1.6, color: colors.avaCyan, textTransform: 'uppercase' }}>{t('m.answerRateLabel')} · {rangeLabel}</div>
+          <div style={{ fontSize: font.lg, fontWeight: 800, color: colors.textIce, marginTop: 2, letterSpacing: -0.3 }}>{a} {ofLbl} {tot} {handledLbl}</div>
           <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
-            <Chip tone="cyan">{a} answered</Chip>
-            <Chip tone="gold">{m} missed</Chip>
-            {voicemails != null && <Chip tone="violet">{voicemails} vm</Chip>}
+            <Chip tone="cyan">{a} {t('m.answered').toLowerCase()}</Chip>
+            <Chip tone="gold">{m} {t('m.missed').toLowerCase()}</Chip>
+            {voicemails != null && <Chip tone="violet">{voicemails} {lang === 'fr' ? 'msg' : 'vm'}</Chip>}
           </div>
         </div>
       </div>
