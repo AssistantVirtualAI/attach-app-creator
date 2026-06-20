@@ -61,6 +61,7 @@ function toneAccent(t: Feature['tone']) {
 
 export default function FeaturesScreen({ sp }: { sp?: any }) {
   const [open, setOpen] = useState<Feature | null>(null);
+  const { lang } = useT();
   const inCall = sp?.snap?.callState === 'active' || sp?.snap?.callState === 'held';
   const onHold = sp?.snap?.callState === 'held';
 
@@ -73,9 +74,11 @@ export default function FeaturesScreen({ sp }: { sp?: any }) {
 
   return (
     <div style={{ height: '100%', overflowY: 'auto', padding: '14px 14px 32px' }}>
-      <SectionTitle eyebrow="Reference" title="Calling features" />
+      <SectionTitle eyebrow={lang === 'fr' ? 'Référence' : 'Reference'} title={lang === 'fr' ? "Fonctions d'appel" : 'Calling features'} />
       <p style={{ fontSize: font.sm, color: colors.mutedSilver, margin: '4px 0 14px', lineHeight: 1.55 }}>
-        Tap any tile to see how it works. Glowing tiles are available right now.
+        {lang === 'fr'
+          ? "Touchez une tuile pour voir son fonctionnement. Les tuiles lumineuses sont disponibles maintenant."
+          : 'Tap any tile to see how it works. Glowing tiles are available right now.'}
       </p>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
