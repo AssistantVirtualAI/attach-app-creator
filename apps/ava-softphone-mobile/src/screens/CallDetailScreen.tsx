@@ -237,7 +237,7 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
                   opacity: loadingAudio ? 0.6 : 1,
                 }}>
                   {loadingAudio ? <Loader2 size={14} className="spin" /> : playing ? <Pause size={14} /> : <Play size={14} />}
-                  {loadingAudio ? 'Loading' : playing ? 'Pause' : 'Play'}
+                  {loadingAudio ? (fr ? 'Chargement' : 'Loading') : playing ? (fr ? 'Pause' : 'Pause') : (fr ? 'Lire' : 'Play')}
                 </button>
                 <span style={{ fontSize: 11, color: colors.mutedSilver, fontFamily: 'JetBrains Mono, monospace' }}>{fmt(dur || data.durationSec)}</span>
               </div>
