@@ -64,7 +64,12 @@ export default function ContactsScreen({ sp }: { sp: any }) {
     }
     const domain = Array.from(byExt.values()).map((r) => ({ id: r.id, kind: 'domain' as const, user_id: r.portal_user_id, extension: r.extension, phone: r.extension, display_name: r.display_name, sip_domain: r.sip_domain, status: r.status, last_seen_at: r.last_seen_at }));
     const manual = (manualRows || []).map((r) => ({ id: r.id, kind: 'manual' as const, user_id: null, extension: r.phone || '', phone: r.phone, email: r.email, display_name: r.name, sip_domain: null, status: null, last_seen_at: null }));
-    const device = loadCachedContacts().map((c) => ({ id: `mobile-${c.id}`, kind: 'mobile' as const, user_id: null, extension: c.numbers[0] || '', phone: c.numbers[0], email: c.emails?.[0], display_name: c.name, sip_domain: null, status: null, last_seen_at: null }));
+    const device = loadCachedContacts().map((c) => ({
+      id: `mobile-${c.id}`, kind: 'mobile' as const, user_id: null,
+      extension: c.phones[0]?.number || '', phone: c.phones[0]?.number, email: c.emails?.[0],
+      display_name: c.name, sip_domain: null, status: null, last_seen_at: null,
+      numbers: c.phones.map((p) => ({ label: p.label || (fr ? 'Numéro' : 'Number'), number: p.number })),
+    }));
     const mapped = [...domain, ...manual, ...device];
     setContacts(mapped);
     await loadPresence(domain);
