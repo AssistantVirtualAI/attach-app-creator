@@ -81,7 +81,7 @@ export default function ContactsScreen({ sp }: { sp: any }) {
       setNewContact({ name: '', phone: '', email: '', company: '' });
       setAddOpen(false);
       await loadContacts();
-    } catch (e: any) { setError(e?.message || 'Contact add failed'); }
+    } catch (e: any) { setError(e?.message || "Échec de l'ajout du contact"); }
   }, [loadContacts, mobile.accessToken, mobile.organizationId, mobile.userId, newContact]);
 
   useEffect(() => {
@@ -90,7 +90,7 @@ export default function ContactsScreen({ sp }: { sp: any }) {
     let cancelled = false;
     syncDeviceContacts().then(() => loadContacts()).catch(() => {});
     loadContacts().then(() => !cancelled && setError(null)).catch((e) => {
-      if (!cancelled) { setContacts([]); setError(e?.message || 'Contacts failed'); }
+      if (!cancelled) { setContacts([]); setError(e?.message || 'Échec du chargement des contacts'); }
     });
     return () => { cancelled = true; };
   }, [loadContacts, mobile.loading, mobile.accessToken, mobile.domainUuid, mobile.organizationId]);
@@ -122,17 +122,20 @@ export default function ContactsScreen({ sp }: { sp: any }) {
 
   return (
     <div style={{ height: '100%', overflow: 'auto', padding: '14px 14px 24px' }}>
-      <SectionTitle eyebrow={mobile.sipDomain || 'Directory'} title="People" right={<button onClick={() => setAddOpen(true)} style={{ width: 34, height: 34, borderRadius: 17, border: `1px solid ${colors.border}`, background: 'rgba(255,255,255,0.06)', color: colors.textIce, display: 'grid', placeItems: 'center' }}><Plus size={16} /></button>} />
+      <SectionTitle eyebrow={mobile.sipDomain || 'Répertoire'} title="Personnes" right={<button onClick={() => setAddOpen(true)} style={{ width: 34, height: 34, borderRadius: 17, border: `1px solid ${colors.border}`, background: 'rgba(255,255,255,0.06)', color: colors.textIce, display: 'grid', placeItems: 'center' }}><Plus size={16} /></button>} />
       <div style={{ position: 'relative', marginBottom: 12 }}>
         <Search size={16} color={colors.mutedSilver} style={{ position: 'absolute', left: 12, top: 13 }} />
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or extension" style={{ width: '100%', height: 42, boxSizing: 'border-box', padding: '0 14px 0 36px', borderRadius: radius.lg, background: 'rgba(255,255,255,0.06)', border: `1px solid ${colors.border}`, color: colors.textIce, fontSize: 14, outline: 'none' }} />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher un nom ou une extension" style={{ width: '100%', height: 42, boxSizing: 'border-box', padding: '0 14px 0 36px', borderRadius: radius.lg, background: 'rgba(255,255,255,0.06)', border: `1px solid ${colors.border}`, color: colors.textIce, fontSize: 14, outline: 'none' }} />
       </div>
       <div style={{ display: 'flex', gap: 6, marginBottom: 12, overflowX: 'auto', paddingBottom: 2 }}>
-        {(['all', 'domain', 'mobile', 'manual'] as const).map((k) => <button key={k} onClick={() => setSelectedKind(k)} style={{ flexShrink: 0, padding: '7px 10px', borderRadius: 999, border: `1px solid ${selectedKind === k ? colors.lemtelBlue : colors.border}`, background: selectedKind === k ? 'rgba(0,35,230,0.22)' : 'rgba(255,255,255,0.04)', color: selectedKind === k ? colors.textIce : colors.mutedSilver, fontSize: 12, fontWeight: 800, textTransform: 'capitalize' }}>{k === 'domain' ? 'My domain' : k}</button>)}
+        {(['all', 'domain', 'mobile', 'manual'] as const).map((k) => {
+          const label = k === 'all' ? 'Tous' : k === 'domain' ? 'Mon domaine' : k === 'mobile' ? 'Mobile' : 'Manuel';
+          return <button key={k} onClick={() => setSelectedKind(k)} style={{ flexShrink: 0, padding: '7px 10px', borderRadius: 999, border: `1px solid ${selectedKind === k ? colors.lemtelBlue : colors.border}`, background: selectedKind === k ? 'rgba(0,35,230,0.22)' : 'rgba(255,255,255,0.04)', color: selectedKind === k ? colors.textIce : colors.mutedSilver, fontSize: 12, fontWeight: 800 }}>{label}</button>;
+        })}
       </div>
       {error && <div style={{ color: colors.danger, fontSize: font.xs, marginBottom: 10 }}>{error}</div>}
       {loading && <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} w="100%" h={56} />)}</div>}
-      {!loading && filtered.length === 0 && <EmptyState icon={<Users size={28} />} title="No contacts" hint="Team extensions from your SIP domain will appear here." />}
+      {!loading && filtered.length === 0 && <EmptyState icon={<Users size={28} />} title="Aucun contact" hint="Les extensions de votre domaine SIP apparaîtront ici." />}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {filtered.map((c) => {
           const pres = c.user_id ? presence[c.user_id] : null;
@@ -148,9 +151,9 @@ export default function ContactsScreen({ sp }: { sp: any }) {
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: font.sm, fontWeight: 800, color: colors.textIce, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
-                <div style={{ fontSize: 11, color: colors.mutedSilver, marginTop: 2, fontFamily: 'JetBrains Mono, monospace' }}>{c.kind === 'domain' ? `Ext ${c.extension} · ${status.replace('_', ' ')}` : `${c.kind === 'manual' ? 'New contact' : 'Mobile contact'} · ${c.phone || c.email || ''}`}</div>
+                <div style={{ fontSize: 11, color: colors.mutedSilver, marginTop: 2, fontFamily: 'JetBrains Mono, monospace' }}>{c.kind === 'domain' ? `Ext ${c.extension} · ${status.replace('_', ' ')}` : `${c.kind === 'manual' ? 'Contact ajouté' : 'Contact mobile'} · ${c.phone || c.email || ''}`}</div>
               </div>
-              <button onClick={() => sp?.call?.(c.phone || c.extension)} aria-label={`Call ${name}`} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', cursor: 'pointer', background: `linear-gradient(135deg, #22c55e, #16a34a)`, color: '#fff', display: 'grid', placeItems: 'center' }}><Phone size={18} /></button>
+              <button onClick={() => sp?.call?.(c.phone || c.extension)} aria-label={`Appeler ${name}`} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', cursor: 'pointer', background: `linear-gradient(135deg, #22c55e, #16a34a)`, color: '#fff', display: 'grid', placeItems: 'center' }}><Phone size={18} /></button>
             </div>
           );
         })}

@@ -121,10 +121,10 @@ export default function MessagesScreen({ haptic }: { haptic: (s?: ImpactStyle) =
 
         <div style={{ padding: '10px 12px 14px', borderTop: `1px solid ${colors.border}`, background: colors.midnight2 }}>
           <div style={{ display: 'flex', gap: 6, marginBottom: 8, overflowX: 'auto', paddingBottom: 4 }}>
-            <AIBtn label="✨ Rewrite" tone="violet" onClick={() => aiAction('rewrite')} disabled={aiBusy} />
-            <AIBtn label="Professional" tone="cyan" onClick={() => aiAction('professional')} disabled={aiBusy} />
-            <AIBtn label="Shorten" tone="gold" onClick={() => aiAction('shorten')} disabled={aiBusy} />
-            <AIBtn label="Translate FR" tone="neutral" onClick={() => aiAction('translate')} disabled={aiBusy} />
+            <AIBtn label="✨ Réécrire" tone="violet" onClick={() => aiAction('rewrite')} disabled={aiBusy} />
+            <AIBtn label="Professionnel" tone="cyan" onClick={() => aiAction('professional')} disabled={aiBusy} />
+            <AIBtn label="Raccourcir" tone="gold" onClick={() => aiAction('shorten')} disabled={aiBusy} />
+            <AIBtn label="Traduire EN" tone="neutral" onClick={() => aiAction('translate')} disabled={aiBusy} />
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
             <textarea
@@ -143,7 +143,7 @@ export default function MessagesScreen({ haptic }: { haptic: (s?: ImpactStyle) =
               padding: '0 18px', height: 44, borderRadius: radius.md, border: 'none',
               background: draft.trim() ? gradients.call : 'rgba(255,255,255,0.06)',
               color: '#fff', fontSize: font.base, fontWeight: 700, cursor: draft.trim() ? 'pointer' : 'not-allowed',
-            }}>Send</button>
+            }}>Envoyer</button>
           </div>
         </div>
       </div>
@@ -152,10 +152,10 @@ export default function MessagesScreen({ haptic }: { haptic: (s?: ImpactStyle) =
 
   return (
     <div style={{ height: '100%', overflowY: 'auto', padding: '14px 14px 20px' }}>
-      <SectionTitle eyebrow="Inbox" title="Messages" right={threads ? <Chip tone="gold">{threads.length}</Chip> : null} />
+      <SectionTitle eyebrow="Boîte de réception" title="Messages" right={threads ? <Chip tone="gold">{threads.length}</Chip> : null} />
       <div data-search-bar="true" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 10px', borderRadius: 12, background: 'rgba(255,255,255,0.06)', border: `1px solid ${colors.border}`, margin: '0 0 10px' }}>
         <Search size={14} color={colors.mutedSilver} />
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search threads…"
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher une conversation…"
           style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 13, color: colors.textIce }} />
       </div>
       {!threads && (
@@ -170,7 +170,7 @@ export default function MessagesScreen({ haptic }: { haptic: (s?: ImpactStyle) =
         </div>
       )}
       {threads && threads.length === 0 && (
-        <EmptyState icon="✉" title="Inbox is clear" hint="New SMS threads will appear here. Use AVA templates to start a conversation." />
+        <EmptyState icon="✉" title="Aucun message" hint="Les nouvelles conversations SMS apparaîtront ici. Utilisez les modèles AVA pour démarrer une discussion." />
       )}
       {filteredThreads?.map((t) => (
         <button key={t.id} onClick={() => { haptic(); setActive(t); }} style={{

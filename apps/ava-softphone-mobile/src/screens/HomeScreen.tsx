@@ -301,8 +301,8 @@ function ActivitySpark({ answered, missed }: { answered: number; missed: number 
         <span>8AM</span><span>12PM</span><span>4PM</span><span>8PM</span>
       </div>
       <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
-        <LegendDot color={colors.avaCyan} label="Answered" />
-        <LegendDot color={colors.signalGold} label="Missed" />
+        <LegendDot color={colors.avaCyan} label="Répondus" />
+        <LegendDot color={colors.signalGold} label="Manqués" />
       </div>
     </Card>
   );
