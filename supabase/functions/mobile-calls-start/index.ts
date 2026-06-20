@@ -59,12 +59,38 @@ Deno.serve(async (req) => {
       start_at: new Date().toISOString(),
     }).select("id").single();
 
-    // Outbound calls are always placed client-side via JsSIP/WebRTC.
-    // The previous FusionPBX "originate-click-to-call" path required
-    // command_add/command_edit on the PBX API user, which is not granted.
-    // We only log the attempt here; the client does the SIP INVITE.
-    const mode = "webrtc";
-    return json({ callId: rec?.id || `call-${Date.now()}`, mode, to: target, from: sp.extension });
+    // If client requested click-to-call (or it's the only available path),
+    // route through fusionpbx-proxy which handles the PBX originate command
+    // using the privileged service credentials.
+    if (requestedMode === "click_to_call") {
+      const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+      const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      const proxyRes = await fetch(`${SUPABASE_URL}/functions/v1/fusionpbx-proxy`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${SERVICE_KEY}`,
+          "apikey": SERVICE_KEY,
+        },
+        body: JSON.stringify({
+          action: "originate-click-to-call",
+          from_extension: sp.extension,
+          destination: target,
+          domain_name: sp.sip_domain,
+          domain_uuid: sp.domain_uuid,
+          organization_id: sp.organization_id,
+        }),
+      });
+      const proxyBody = await proxyRes.json().catch(() => ({}));
+      if (!proxyRes.ok || proxyBody?.ok === false || proxyBody?.error) {
+        const reason = proxyBody?.error || proxyBody?.message || `proxy_status_${proxyRes.status}`;
+        return json({ error: "CLICK_TO_CALL_FAILED", message: String(reason) }, 502);
+      }
+      return json({ callId: rec?.id || `call-${Date.now()}`, mode: "click_to_call", to: target, from: sp.extension });
+    }
+
+    // Default: client-side WebRTC INVITE via JsSIP.
+    return json({ callId: rec?.id || `call-${Date.now()}`, mode: "webrtc", to: target, from: sp.extension });
 
   } catch (e) {
     console.error("[mobile-calls-start]", e);
