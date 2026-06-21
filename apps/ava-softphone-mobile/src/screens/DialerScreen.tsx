@@ -58,6 +58,13 @@ export default function DialerScreen({ sp, haptic, preferClickToCall: _preferCli
       <div style={{ margin: '10px 16px 0', padding: '10px 12px', borderRadius: 12, background: bannerBg, border: `1px solid ${bannerColor}55`, color: bannerColor, fontSize: 12, flexShrink: 0 }}>
         <div style={{ fontWeight: 700 }}>{bannerTitle}</div>
         {sipError && !isFailed && <div style={{ fontWeight: 400, opacity: 0.9, lineHeight: 1.4 }}>{sipError}</div>}
+        {isRegistered && (sp.negotiatedCodec || (sp.offeredCodecs && sp.offeredCodecs.length > 0)) && (
+          <div style={{ fontWeight: 400, opacity: 0.85, marginTop: 4, fontSize: 11 }}>
+            {sp.negotiatedCodec
+              ? `🎙 Codec actif : ${sp.negotiatedCodec}`
+              : `🎙 Codecs offerts : ${(sp.offeredCodecs as string[]).join(', ')}`}
+          </div>
+        )}
         {(isFailed || sslLikely || isRetrying) && (
           <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
             <button onClick={() => { haptic(); sp.reconnect?.(); }} style={{ background: bannerColor, color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Reconnecter</button>

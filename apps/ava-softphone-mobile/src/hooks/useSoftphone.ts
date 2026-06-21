@@ -30,24 +30,20 @@ export interface UseSoftphoneReturn {
   sendDTMF: (key: string) => void;
   setStatus: (status: string) => void;
   reconnect: () => void;
-  /** Last persisted error (from prior session if app was restarted). */
   lastPersistedError: PersistedSipError | null;
-  /** Rolling buffer of SIP-related events (latest last). */
   sipLog: SipLogEntry[];
   clearSipLog: () => void;
-  /** Clear persisted sipStatus + last sipError (also resets retry cap). */
   clearSipState: () => void;
-  /** Current retry attempt counter (0 = none). */
   retryAttempt: number;
-  /** When the next auto-retry is scheduled (epoch ms) or null. */
   nextRetryAt: number | null;
-  /** True once auto-retry budget is exhausted — requires manual reconnect. */
   retryLimitReached: boolean;
-  /** Live call quality (RTT / jitter / loss / level). */
   quality: CallQuality;
-  /** Active audio profile (hd / auto / low-bandwidth). */
   audioProfile: AudioProfile;
   setAudioProfile: (p: AudioProfile) => void;
+  /** Codecs proposed in the outgoing INVITE SDP (audio m-line order). */
+  offeredCodecs: string[];
+  /** Codec actually negotiated for the current/last call. */
+  negotiatedCodec: string | null;
 }
 
 export function useSoftphone(
@@ -68,6 +64,10 @@ export function useSoftphone(
   const [retryLimitReached, setRetryLimitReached] = useState(false);
   const [audioProfile, setAudioProfileState] = useState<AudioProfile>(() => loadAudioProfile());
   const [quality, setQuality] = useState<CallQuality>(EMPTY_QUALITY);
+  const [offeredCodecs, setOfferedCodecs] = useState<string[]>([]);
+  const [negotiatedCodec, setNegotiatedCodec] = useState<string | null>(null);
+  const lastCallNumberRef = useRef<string>('');
+  const callAttemptRef = useRef<number>(0);
 
   const uaRef = useRef<any>(null);
   const sessionRef = useRef<any>(null);
@@ -277,10 +277,29 @@ export function useSoftphone(
             setActiveCallNumber(remoteNumber);
             log('session.new', `${session.direction} ${remoteNumber}`);
             if (session.direction === 'incoming') setCallState('ringing');
+            // ---- SDP introspection: log offer/answer codecs before INVITE is sent.
+            session.on('sdp', (data: any) => {
+              try {
+                const sdp = data?.sdp || '';
+                const codecs = extractAudioCodecs(sdp);
+                if (data?.originator === 'local') {
+                  setOfferedCodecs(codecs);
+                  log('sdp.offer', `codecs=[${codecs.join(', ')}] (${sdp.length}b)`);
+                  console.log('[SIP][SDP][local offer]\n' + sdp);
+                } else {
+                  log('sdp.remote', `codecs=[${codecs.join(', ')}]`);
+                  console.log('[SIP][SDP][remote ' + data?.type + ']\n' + sdp);
+                }
+              } catch (e: any) {
+                log('sdp.parse-failed', e?.message || '', 'warn');
+              }
+            });
             session.on('confirmed', () => {
               setCallState('active');
               log('session.confirmed', remoteNumber);
               timerRef.current = setInterval(() => setCallTimer((t) => t + 1), 1000);
+              // Read the codec actually negotiated by the PBX.
+              readNegotiatedCodec(session.connection);
               // ---- Live quality sampler + adaptive bitrate loop ----
               samplerStateRef.current = {};
               const pc: RTCPeerConnection | undefined = session.connection;
@@ -375,17 +394,28 @@ export function useSoftphone(
               }, 2000);
             });
             session.on('failed', (e: any) => {
+              const code = e?.message?.status_code;
               const msg = classifySipFailure({
                 cause: e?.cause,
-                status_code: e?.message?.status_code,
+                status_code: code,
                 reason_phrase: e?.message?.reason_phrase,
               });
-              setSipError(msg, ctx);
-              log('session.failed', `${remoteNumber} → ${msg}`, 'error');
+              log('session.failed', `${remoteNumber} code=${code ?? '?'} → ${msg}`, 'error');
               setCallState('idle');
               if (timerRef.current) clearInterval(timerRef.current);
               stopStats();
               setActiveCallNumber('');
+              // ---- 488 Not Acceptable Here: auto-retry once with the legacy
+              // PCMU-only SDP modifier (covers PBX profiles that refuse Opus).
+              if (code === 488 && callAttemptRef.current === 1 && lastCallNumberRef.current) {
+                callAttemptRef.current = 2;
+                const retryNumber = lastCallNumberRef.current;
+                log('call.retry-488', `→ ${retryNumber} with PCMU-only fallback`, 'warn');
+                setSipError('Codec refusé (488) — nouvelle tentative en PCMU…', ctx);
+                setTimeout(() => { try { placeCallInternal(retryNumber, true); } catch {} }, 250);
+              } else {
+                setSipError(msg, ctx);
+              }
             });
           });
           ua.start();
@@ -510,36 +540,71 @@ export function useSoftphone(
     };
   };
 
-  const call = (number: string) => {
-    if (!uaRef.current || !config || sipStatus !== 'registered') return false;
+  /** Parse SDP audio m-line + rtpmap lines into an ordered codec list. */
+  const extractAudioCodecs = (sdp: string): string[] => {
+    try {
+      const audio = sdp.split(/\r?\nm=/).find((s) => s.startsWith('audio'));
+      if (!audio) return [];
+      const firstLine = ('m=' + audio).split(/\r?\n/)[0];
+      const pts = firstLine.split(/\s+/).slice(3);
+      const map: Record<string, string> = {};
+      const rtpRe = /^a=rtpmap:(\d+)\s+([^\s/]+)/gm;
+      let m: RegExpExecArray | null;
+      while ((m = rtpRe.exec(sdp))) map[m[1]] = m[2].toUpperCase();
+      return pts.map((pt) => map[pt] || `pt${pt}`);
+    } catch { return []; }
+  };
+
+  /** Read the negotiated outbound audio codec from peerconnection stats. */
+  const readNegotiatedCodec = async (pc: RTCPeerConnection | undefined) => {
+    if (!pc) return;
+    try {
+      const stats = await pc.getStats();
+      let codecId: string | undefined;
+      stats.forEach((r: any) => {
+        if (r.type === 'outbound-rtp' && r.kind === 'audio' && r.codecId) codecId = r.codecId;
+      });
+      if (!codecId) return;
+      const codec: any = stats.get(codecId);
+      if (codec?.mimeType) {
+        const name = String(codec.mimeType).split('/').pop()?.toUpperCase() || null;
+        setNegotiatedCodec(name);
+        log('codec.negotiated', `${name} @ ${codec.clockRate || '?'}Hz`);
+      }
+    } catch (e: any) {
+      log('codec.stats-failed', e?.message || '', 'warn');
+    }
+  };
+
+  /** Place a call. `forcePcmu=true` uses the legacy SDP modifier (PCMU only) — used as a 488 fallback. */
+  const placeCallInternal = (number: string, forcePcmu = false): boolean => {
+    if (!uaRef.current || !config) return false;
     setActiveCallNumber(number);
     setCallState('ringing');
+    setOfferedCodecs([]);
+    setNegotiatedCodec(null);
+    lastCallNumberRef.current = number;
     try {
-      uaRef.current.call(`sip:${number}@${config.domain}`, {
+      const callOpts: any = {
         mediaConstraints: { audio: true, video: false },
         rtcOfferConstraints: {
           offerToReceiveAudio: true,
           offerToReceiveVideo: false,
           voiceActivityDetection: false,
         },
-        // No SDP modifier — let the browser negotiate codecs with the PBX.
         pcConfig: {
           iceServers: [],
           iceTransportPolicy: 'all',
           bundlePolicy: 'balanced',
         },
-        eventHandlers: {
-          failed: (e: any) => {
-            const msg = classifySipFailure({
-              cause: e?.cause,
-              status_code: e?.message?.status_code,
-              reason_phrase: e?.message?.reason_phrase,
-            });
-            console.error('[AVA keypad] SIP call failed', e);
-            setSipError(msg);
-          },
-        },
-      });
+      };
+      if (forcePcmu) {
+        callOpts.sessionDescriptionHandlerModifiers = [
+          buildSdpModifier(opusToSdpOpts(audioProfileRef.current)),
+        ];
+        log('call.fallback', 'PCMU-only SDP modifier active');
+      }
+      uaRef.current.call(`sip:${number}@${config.domain}`, callOpts);
       return true;
     } catch (err: any) {
       console.error('[AVA keypad] SIP call exception', err);
@@ -548,6 +613,12 @@ export function useSoftphone(
       setSipError(classifySipFailure({ cause: err?.message }));
       return false;
     }
+  };
+
+  const call = (number: string) => {
+    if (sipStatus !== 'registered') return false;
+    callAttemptRef.current = 1;
+    return placeCallInternal(number, false);
   };
   const hangup = () => {
     sessionRef.current?.terminate();
@@ -583,5 +654,6 @@ export function useSoftphone(
     call, hangup, answer, mute, unmute, hold, unhold, sendDTMF, setStatus, reconnect,
     lastPersistedError, sipLog, clearSipLog, clearSipState, retryAttempt, nextRetryAt, retryLimitReached,
     quality, audioProfile, setAudioProfile,
+    offeredCodecs, negotiatedCodec,
   };
 }
