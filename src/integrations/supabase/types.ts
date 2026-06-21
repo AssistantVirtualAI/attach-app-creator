@@ -7703,6 +7703,53 @@ export type Database = {
           },
         ]
       }
+      planipret_calendar_sync: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          id: string
+          last_sync_at: string
+          m365_event_id: string | null
+          maestro_event_id: string | null
+          status: string
+          sync_direction: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          last_sync_at?: string
+          m365_event_id?: string | null
+          maestro_event_id?: string | null
+          status?: string
+          sync_direction?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          last_sync_at?: string
+          m365_event_id?: string | null
+          maestro_event_id?: string | null
+          status?: string
+          sync_direction?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planipret_calendar_sync_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "planipret_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       planipret_call_consents: {
         Row: {
           call_id: string
@@ -8088,15 +8135,23 @@ export type Database = {
           elevenlabs_agent_id: string | null
           email: string | null
           extension: string | null
+          first_login_at: string | null
           full_name: string | null
           id: string
           language: string
+          last_eod_summary_at: string | null
+          last_morning_brief_at: string | null
           metadata: Json
           mobile_app_enabled: boolean
           ms365_access_token: string | null
           ms365_refresh_token: string | null
           notif_ai: boolean
+          notif_appointment_reminder: boolean
           notif_calls: boolean
+          notif_eod_summary: boolean
+          notif_hot_leads: boolean
+          notif_missed_call: boolean
+          notif_morning_brief: boolean
           notif_reminders: boolean
           notif_sms: boolean
           notif_voicemails: boolean
@@ -8105,6 +8160,8 @@ export type Database = {
           ns_jwt_expires_at: string | null
           ns_refresh_token: string | null
           ns_user_id: string | null
+          onboarding_completed: boolean
+          onboarding_step: number
           organization_id: string
           phone: string | null
           privacy_accepted_at: string | null
@@ -8126,15 +8183,23 @@ export type Database = {
           elevenlabs_agent_id?: string | null
           email?: string | null
           extension?: string | null
+          first_login_at?: string | null
           full_name?: string | null
           id?: string
           language?: string
+          last_eod_summary_at?: string | null
+          last_morning_brief_at?: string | null
           metadata?: Json
           mobile_app_enabled?: boolean
           ms365_access_token?: string | null
           ms365_refresh_token?: string | null
           notif_ai?: boolean
+          notif_appointment_reminder?: boolean
           notif_calls?: boolean
+          notif_eod_summary?: boolean
+          notif_hot_leads?: boolean
+          notif_missed_call?: boolean
+          notif_morning_brief?: boolean
           notif_reminders?: boolean
           notif_sms?: boolean
           notif_voicemails?: boolean
@@ -8143,6 +8208,8 @@ export type Database = {
           ns_jwt_expires_at?: string | null
           ns_refresh_token?: string | null
           ns_user_id?: string | null
+          onboarding_completed?: boolean
+          onboarding_step?: number
           organization_id?: string
           phone?: string | null
           privacy_accepted_at?: string | null
@@ -8164,15 +8231,23 @@ export type Database = {
           elevenlabs_agent_id?: string | null
           email?: string | null
           extension?: string | null
+          first_login_at?: string | null
           full_name?: string | null
           id?: string
           language?: string
+          last_eod_summary_at?: string | null
+          last_morning_brief_at?: string | null
           metadata?: Json
           mobile_app_enabled?: boolean
           ms365_access_token?: string | null
           ms365_refresh_token?: string | null
           notif_ai?: boolean
+          notif_appointment_reminder?: boolean
           notif_calls?: boolean
+          notif_eod_summary?: boolean
+          notif_hot_leads?: boolean
+          notif_missed_call?: boolean
+          notif_morning_brief?: boolean
           notif_reminders?: boolean
           notif_sms?: boolean
           notif_voicemails?: boolean
@@ -8181,6 +8256,8 @@ export type Database = {
           ns_jwt_expires_at?: string | null
           ns_refresh_token?: string | null
           ns_user_id?: string | null
+          onboarding_completed?: boolean
+          onboarding_step?: number
           organization_id?: string
           phone?: string | null
           privacy_accepted_at?: string | null
