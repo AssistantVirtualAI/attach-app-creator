@@ -11,7 +11,7 @@ const SUCCESS = "#27AE60";
 const DANGER = "#E74C3C";
 const BG = "#F8F9FA";
 
-export type PlanipretMobileContext = { profile: any; reloadProfile: () => Promise<void> };
+export type PlanipretMobileContext = { profile: any; reloadProfile: () => Promise<void>; openDialer: (number?: string) => void };
 
 const TABS = [
   { to: "/mplanipret/home", label: "Accueil", Icon: Home },
