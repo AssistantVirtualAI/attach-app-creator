@@ -356,6 +356,7 @@ const App = () => (
                   <Route path="messages" element={<MMessages />} />
                   <Route path="voicemail" element={<MVoicemail />} />
                   <Route path="more" element={<MMore />} />
+                  <Route path="pipeline" element={<MPipeline />} />
                 </Route>
                 <Route path="/planipret/dashboard" element={<Navigate to="/planipret/admin/overview" replace />} />
                 <Route path="/planipret/integrations" element={<Navigate to="/planipret/admin/integrations" replace />} />
