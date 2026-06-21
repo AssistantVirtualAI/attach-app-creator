@@ -354,7 +354,6 @@ const App = () => (
                 </Route>
                 <Route path="/planipret/dashboard" element={<PlanipretDashboard />} />
                 <Route path="/planipret/integrations" element={<PlanipretIntegrationSecrets />} />
-                <Route path="/dashboard/integrations" element={<PlanipretIntegrations />} />
                 <Route path="/auth/ms365/callback" element={<Ms365Callback />} />
                 <Route path="/dashboard/audit" element={<PlanipretAudit />} />
 
@@ -366,6 +365,7 @@ const App = () => (
                   <Route path="messages" element={<PAMessages />} />
                   <Route path="voicemails" element={<PAVoicemails />} />
                   <Route path="reports" element={<PAReports />} />
+                  <Route path="integrations" element={<PlanipretIntegrations />} />
                 </Route>
 
                 {/* Protected routes */}
