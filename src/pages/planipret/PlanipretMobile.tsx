@@ -173,7 +173,7 @@ export default function PlanipretMobile() {
           ))}
         </nav>
 
-        <Dialer open={dialerOpen} onClose={() => setDialerOpen(false)} />
+        <Dialer open={dialerOpen} onClose={() => setDialerOpen(false)} initial={dialerInit} />
       </div>
     </Frame>
   );
