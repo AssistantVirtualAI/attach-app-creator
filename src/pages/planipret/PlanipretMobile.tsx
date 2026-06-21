@@ -145,7 +145,7 @@ export default function PlanipretMobile() {
     <Frame>
       <div className="h-full flex flex-col relative overflow-hidden" style={{ background: BG }}>
         <div className="flex-1 overflow-y-auto pb-24">
-          <Outlet context={{ profile, reloadProfile: loadProfile } satisfies PlanipretMobileContext} />
+          <Outlet context={{ profile, reloadProfile: loadProfile, openDialer } satisfies PlanipretMobileContext} />
         </div>
 
         {/* FAB */}
