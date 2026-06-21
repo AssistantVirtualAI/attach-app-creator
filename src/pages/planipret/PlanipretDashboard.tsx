@@ -27,11 +27,21 @@ export default function PlanipretDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <header className="px-6 py-4 text-white" style={{ background: "#1F4E79" }}>
-        <div className="text-xs opacity-80">AVA · Planiprêt</div>
-        <h1 className="text-xl font-semibold">Tableau de bord Admin</h1>
+      <header className="px-6 py-4 text-white flex items-center justify-between" style={{ background: "#1F4E79" }}>
+        <div>
+          <div className="text-xs opacity-80">AVA · Planiprêt</div>
+          <h1 className="text-xl font-semibold">Tableau de bord Admin</h1>
+        </div>
+        <nav className="flex items-center gap-1 text-sm">
+          <Link to="/planipret/dashboard" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25"><Users className="w-4 h-4" />Utilisateurs</Link>
+          <Link to="/dashboard/integrations" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-white/15 relative">
+            <Plug className="w-4 h-4" />Intégrations
+          </Link>
+          <Link to="#" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-white/15 opacity-60"><BarChart3 className="w-4 h-4" />Rapports</Link>
+        </nav>
       </header>
       <main className="p-6">
+
         <div className="bg-white rounded-xl shadow p-4">
           <h2 className="font-semibold mb-3" style={{ color: "#1F4E79" }}>Courtiers ({brokers.length})</h2>
           <table className="w-full text-sm">
