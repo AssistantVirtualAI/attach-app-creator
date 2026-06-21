@@ -423,7 +423,7 @@ function AuthenticatedShell({
 
 
 
-      <div key={tab} className="lemtel-page-enter" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      <div key={tab} className="lemtel-page-enter" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', paddingBottom: 'calc(96px + env(safe-area-inset-bottom, 0px))' }}>
         <Suspense fallback={<ScreenSkeleton />}>
           {tab === 'contacts'   && <ContactsScreen sp={sp} />}
           {tab === 'chats'      && <MessagesHubScreen accessToken={creds.accessToken || null} userId={creds.userId} sp={sp} haptic={haptic} channelUnread={notif.channelUnread} />}
