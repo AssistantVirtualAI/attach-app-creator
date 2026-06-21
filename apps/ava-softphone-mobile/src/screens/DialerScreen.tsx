@@ -55,23 +55,15 @@ export default function DialerScreen({ sp, haptic, preferClickToCall: _preferCli
         </div>
         <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Lemtel Télécom</div>
       </div>
-      <div style={{ margin: '10px 16px 0', padding: '10px 12px', borderRadius: 12, background: bannerBg, border: `1px solid ${bannerColor}55`, color: bannerColor, fontSize: 12, flexShrink: 0 }}>
-        <div style={{ fontWeight: 700 }}>{bannerTitle}</div>
-        {sipError && !isFailed && <div style={{ fontWeight: 400, opacity: 0.9, lineHeight: 1.4 }}>{sipError}</div>}
-        {isRegistered && (sp.negotiatedCodec || (sp.offeredCodecs && sp.offeredCodecs.length > 0)) && (
-          <div style={{ fontWeight: 400, opacity: 0.85, marginTop: 4, fontSize: 11 }}>
-            {sp.negotiatedCodec
-              ? `🎙 Codec actif : ${sp.negotiatedCodec}`
-              : `🎙 Codecs offerts : ${(sp.offeredCodecs as string[]).join(', ')}`}
-          </div>
-        )}
-        {(isFailed || sslLikely || isRetrying) && (
+      {isFailed && (
+        <div style={{ margin: '10px 16px 0', padding: '10px 12px', borderRadius: 12, background: bannerBg, border: `1px solid ${bannerColor}55`, color: bannerColor, fontSize: 12, flexShrink: 0 }}>
+          <div style={{ fontWeight: 700 }}>{bannerTitle}</div>
           <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
             <button onClick={() => { haptic(); sp.reconnect?.(); }} style={{ background: bannerColor, color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Reconnecter</button>
             <button onClick={() => { haptic(); setDiagOpen(true); }} style={{ background: 'rgba(255,255,255,0.12)', color: '#fff', border: '1px solid rgba(255,255,255,0.18)', padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Diagnostics WSS</button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
       <div style={{ display: 'flex', flexDirection: 'column', paddingBottom: 24, flexShrink: 0 }}>
         <div style={{ textAlign: 'center', padding: '16px 24px 8px', minHeight: 64 }}>
           <div style={{ fontSize: num.length > 12 ? 28 : 38, fontWeight: 300, letterSpacing: 1, color: 'white', minHeight: 48, wordBreak: 'break-all' }}>
