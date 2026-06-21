@@ -14,8 +14,20 @@ Analyse cette transcription d'appel et retourne UNIQUEMENT un JSON valide, sans 
   "tasks": [{"title": string, "due_days_from_now": number}],
   "events": [{"title": string, "start_offset_hours": number, "duration_minutes": number}],
   "should_create_maestro_task": boolean,
-  "should_create_maestro_event": boolean
-}`;
+  "should_create_maestro_event": boolean,
+  "lead_score": number,
+  "lead_temperature": "hot"|"warm"|"cold",
+  "lead_score_reason": string,
+  "suggested_callback_delay": "now"|"2h"|"tomorrow_9am"|"monday_9am",
+  "callback_reason": string
+}
+
+CRITÈRES DE SCORING DU LEAD (lead_score 1-10) :
+- 9-10 (hot / 🔥 Chaud) : Client prêt à avancer, mentionne budget, urgence, accord verbal.
+- 6-8 (warm / 🌡️ Tiède) : Intéressé mais hésitant, questions sur les taux, demande de suivi.
+- 1-5 (cold / ❄️ Froid) : Pas de budget, juste info, long délai, refus implicite.
+lead_temperature DOIT correspondre au score. lead_score_reason : 1 phrase justifiant le score.
+suggested_callback_delay : choisir intelligemment selon l'urgence. callback_reason : 1 phrase.`;
 
 async function getSecret(admin: any, provider: string, key: string): Promise<string | null> {
   const { data } = await admin.from("planipret_integration_secrets").select("config").eq("provider", provider).maybeSingle();
