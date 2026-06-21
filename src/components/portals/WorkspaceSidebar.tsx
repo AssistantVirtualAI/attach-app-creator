@@ -7,6 +7,7 @@ import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar,
 } from "@/components/ui/sidebar";
+import { useOrganization } from "@/context/OrganizationContext";
 
 type Item = { label: string; to: string; icon: React.ComponentType<{ className?: string }> };
 
@@ -62,12 +63,18 @@ function NavGroup({ label, items }: { label: string; items: Item[] }) {
 }
 
 export function WorkspaceSidebar() {
+  const { selectedOrgId } = useOrganization();
+  const isLemtelOrgSelected = selectedOrgId === "71755d33-ed64-4ad5-a828-61c9d2029eb7";
+  const workspaceItems = isLemtelOrgSelected ? WORKSPACE : WORKSPACE.filter((item) => item.to === "/my");
+  const collabItems = isLemtelOrgSelected ? COLLAB : COLLAB.filter((item) => item.to !== "/my/telecom");
+  const toolItems = isLemtelOrgSelected ? TOOLS : TOOLS.filter((item) => item.to !== "/my/telecom");
+
   return (
     <Sidebar collapsible="icon">
       <SidebarContent>
-        <NavGroup label="Workspace" items={WORKSPACE} />
-        <NavGroup label="Collaboration" items={COLLAB} />
-        <NavGroup label="Tools" items={TOOLS} />
+        <NavGroup label="Workspace" items={workspaceItems} />
+        <NavGroup label="Collaboration" items={collabItems} />
+        <NavGroup label="Tools" items={toolItems} />
       </SidebarContent>
     </Sidebar>
   );

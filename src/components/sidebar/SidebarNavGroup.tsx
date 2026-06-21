@@ -30,9 +30,9 @@ const setCollapsedGroups = (groups: string[]) => {
 export const SidebarNavGroup = ({ group, onNavigate }: SidebarNavGroupProps) => {
   const location = useLocation();
   const { t } = useTranslation();
-  const { isSuperAdmin, organizationMemberships } = useOrganization();
-  const isLemtelMember = isSuperAdmin || organizationMemberships.some(m => m.organization.id === '71755d33-ed64-4ad5-a828-61c9d2029eb7');
-  const visibleItems = useMemo(() => group.items.filter(item => !(item.hideForLemtel && isLemtelMember)), [group.items, isLemtelMember]);
+  const { selectedOrgId } = useOrganization();
+  const isLemtelOrgSelected = selectedOrgId === '71755d33-ed64-4ad5-a828-61c9d2029eb7';
+  const visibleItems = useMemo(() => group.items.filter(item => !(item.hideForLemtel && isLemtelOrgSelected)), [group.items, isLemtelOrgSelected]);
   const isActiveGroup = visibleItems.some(item => location.pathname === item.href);
   
   const [isOpen, setIsOpen] = useState(() => {

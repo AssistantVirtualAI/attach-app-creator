@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { ReactNode, useMemo } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
   Shield, Building2, User, LayoutDashboard, Users, Phone, BarChart3, Settings,
@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import NotificationCenter from "@/components/notifications/NotificationCenter";
 import { WorkspaceHeaderExtras } from "@/components/portals/WorkspaceHeaderExtras";
+import { useOrganization } from "@/context/OrganizationContext";
 
 type NavItem = { label: string; to: string; icon: React.ComponentType<{ className?: string }> };
 
@@ -59,52 +60,64 @@ function Shell({ title, badge, accent, items }: {
 }
 
 export function PlatformAdminShell({ children }: { children?: ReactNode }) {
+  const { selectedOrgId } = useOrganization();
+  const isLemtelOrgSelected = selectedOrgId === "71755d33-ed64-4ad5-a828-61c9d2029eb7";
+  const items = useMemo(() => [
+    { label: "Overview", to: "/platform", icon: LayoutDashboard },
+    { label: "Organizations", to: "/platform/organizations", icon: Building2 },
+    { label: "All Users", to: "/platform/users", icon: Users },
+    ...(isLemtelOrgSelected ? [
+      { label: "All Calls", to: "/platform/calls", icon: Phone },
+      { label: "Telephony Core", to: "/platform/telephony", icon: Server },
+      { label: "Telephony QA", to: "/platform/qa", icon: Activity },
+    ] : []),
+    { label: "System Health", to: "/platform/health", icon: Activity },
+    { label: "Billing", to: "/platform/billing", icon: CreditCard },
+    { label: "Audit Logs", to: "/platform/audit", icon: FileText },
+    { label: "Settings", to: "/platform/settings", icon: Settings },
+  ], [isLemtelOrgSelected]);
+
   return (
     <Shell
       title="AVA · Lemtel"
       badge="Platform Admin"
       accent="bg-red-500"
-      items={[
-        { label: "Overview", to: "/platform", icon: LayoutDashboard },
-        { label: "Organizations", to: "/platform/organizations", icon: Building2 },
-        { label: "All Users", to: "/platform/users", icon: Users },
-        { label: "All Calls", to: "/platform/calls", icon: Phone },
-        { label: "Telephony Core", to: "/platform/telephony", icon: Server },
-        { label: "Telephony QA", to: "/platform/qa", icon: Activity },
-        { label: "System Health", to: "/platform/health", icon: Activity },
-        { label: "Billing", to: "/platform/billing", icon: CreditCard },
-        { label: "Audit Logs", to: "/platform/audit", icon: FileText },
-        { label: "Settings", to: "/platform/settings", icon: Settings },
-      ]}
+      items={items}
     />
   );
 }
 
 
 export function CustomerAdminShell({ children }: { children?: ReactNode }) {
+  const { selectedOrgId } = useOrganization();
+  const isLemtelOrgSelected = selectedOrgId === "71755d33-ed64-4ad5-a828-61c9d2029eb7";
+  const items = useMemo(() => [
+    { label: "Dashboard", to: "/customer", icon: LayoutDashboard },
+    { label: "Team", to: "/customer/team", icon: Users },
+    ...(isLemtelOrgSelected ? [
+      { label: "Extensions", to: "/customer/extensions", icon: Phone },
+      { label: "Queues", to: "/customer/queues", icon: Headphones },
+      { label: "IVR", to: "/customer/ivr", icon: Server },
+      { label: "Numbers", to: "/customer/numbers", icon: Phone },
+      { label: "CDR & Call History", to: "/customer/calls", icon: FileText },
+      { label: "Recordings", to: "/customer/recordings", icon: Headphones },
+      { label: "Sync Health", to: "/customer/sync-health", icon: Activity },
+      { label: "Reports", to: "/customer/reports", icon: BarChart3 },
+      { label: "Analytics", to: "/customer/analytics", icon: BarChart3 },
+    ] : []),
+    { label: "Org Chat", to: "/customer/chat", icon: MessageSquare },
+    { label: "AI Admin", to: "/customer/ai-admin", icon: Bot },
+    { label: "Knowledge Base", to: "/customer/knowledge", icon: Database },
+    { label: "Billing", to: "/customer/billing", icon: CreditCard },
+    { label: "Settings", to: "/customer/settings", icon: Settings },
+  ], [isLemtelOrgSelected]);
+
   return (
     <Shell
       title="Workspace Admin"
       badge="Customer Admin"
       accent="bg-blue-500"
-      items={[
-        { label: "Dashboard", to: "/customer", icon: LayoutDashboard },
-        { label: "Team", to: "/customer/team", icon: Users },
-        { label: "Extensions", to: "/customer/extensions", icon: Phone },
-        { label: "Queues", to: "/customer/queues", icon: Headphones },
-        { label: "IVR", to: "/customer/ivr", icon: Server },
-        { label: "Numbers", to: "/customer/numbers", icon: Phone },
-        { label: "CDR & Call History", to: "/customer/calls", icon: FileText },
-        { label: "Recordings", to: "/customer/recordings", icon: Headphones },
-        { label: "Org Chat", to: "/customer/chat", icon: MessageSquare },
-        { label: "AI Admin", to: "/customer/ai-admin", icon: Bot },
-        { label: "Sync Health", to: "/customer/sync-health", icon: Activity },
-        { label: "Reports", to: "/customer/reports", icon: BarChart3 },
-        { label: "Analytics", to: "/customer/analytics", icon: BarChart3 },
-        { label: "Knowledge Base", to: "/customer/knowledge", icon: Database },
-        { label: "Billing", to: "/customer/billing", icon: CreditCard },
-        { label: "Settings", to: "/customer/settings", icon: Settings },
-      ]}
+      items={items}
     />
   );
 }
