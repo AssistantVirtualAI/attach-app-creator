@@ -17,7 +17,7 @@ export interface TeamMember {
     avatar_url: string | null;
   } | null;
   role: {
-    role: 'super_admin' | 'org_admin' | 'manager' | 'agent' | 'viewer';
+    role: 'super_admin' | 'org_admin' | 'manager' | 'agent' | 'viewer' | 'planipret_admin' | 'planipret_broker';
   } | null;
 }
 
