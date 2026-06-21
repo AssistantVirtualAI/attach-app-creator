@@ -947,7 +947,7 @@ const App = () => (
 
                 {/* === Three-portal architecture === */}
                 {/* Platform Admin — AVA / Lemtel internal */}
-                <Route path="/platform" element={<ProtectedRoute><RolePortalGuard portal="platform"><LemtelGuard><PlatformAdminShell /></LemtelGuard></RolePortalGuard></ProtectedRoute>}>
+                <Route path="/platform" element={<ProtectedRoute><RolePortalGuard portal="platform"><PlatformAdminShell /></RolePortalGuard></ProtectedRoute>}>
                   <Route index element={<PlatformDashboard />} />
                   <Route path="organizations" element={<MasterOrganizations />} />
                   <Route path="users" element={<MasterAllUsers />} />
