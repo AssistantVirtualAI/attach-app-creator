@@ -246,7 +246,7 @@ class JsSipProvider {
       const fallbackUrls = Array.from(new Set([
         cfg.wssUrl,
         ...(cfg.wssUrls || []),
-        'wss://lemtel.lemtel.tel:7443',
+        'wss://node.lemtelcloud.net:7443',
         'wss://pbxnode.lemtel.tel:7443',
       ].filter(Boolean))) as string[];
 
