@@ -18,6 +18,11 @@ import AgencyHome from "./pages/AgencyHome";
 import PostLoginRedirect from "./pages/PostLoginRedirect";
 import PlanipretLogin from "./pages/planipret/PlanipretLogin";
 import PlanipretMobile from "./pages/planipret/PlanipretMobile";
+import MHome from "./pages/planipret/mobile/MHome";
+import MCalls from "./pages/planipret/mobile/MCalls";
+import MMessages from "./pages/planipret/mobile/MMessages";
+import MVoicemail from "./pages/planipret/mobile/MVoicemail";
+import MMore from "./pages/planipret/mobile/MMore";
 import PlanipretDashboard from "./pages/planipret/PlanipretDashboard";
 import PlanipretIntegrationSecrets from "./pages/planipret/PlanipretIntegrationSecrets";
 import PlanipretIntegrations from "./pages/planipret/PlanipretIntegrations";
@@ -328,7 +333,14 @@ const App = () => (
 
                 {/* Planiprêt (AVA-scoped) */}
                 <Route path="/planipret/login" element={<PlanipretLogin />} />
-                <Route path="/mplanipret" element={<PlanipretMobile />} />
+                <Route path="/mplanipret" element={<PlanipretMobile />}>
+                  <Route index element={<MHome />} />
+                  <Route path="home" element={<MHome />} />
+                  <Route path="calls" element={<MCalls />} />
+                  <Route path="messages" element={<MMessages />} />
+                  <Route path="voicemail" element={<MVoicemail />} />
+                  <Route path="more" element={<MMore />} />
+                </Route>
                 <Route path="/planipret/dashboard" element={<PlanipretDashboard />} />
                 <Route path="/planipret/integrations" element={<PlanipretIntegrationSecrets />} />
                 <Route path="/dashboard/integrations" element={<PlanipretIntegrations />} />
