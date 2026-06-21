@@ -576,36 +576,35 @@ export function useSoftphone(
     }
   };
 
-  const call = (number: string) => {
+  /** Place a call. `forcePcmu=true` uses the legacy SDP modifier (PCMU only) — used as a 488 fallback. */
+  const placeCallInternal = (number: string, forcePcmu = false): boolean => {
     if (!uaRef.current || !config || sipStatus !== 'registered') return false;
     setActiveCallNumber(number);
     setCallState('ringing');
+    setOfferedCodecs([]);
+    setNegotiatedCodec(null);
+    lastCallNumberRef.current = number;
     try {
-      uaRef.current.call(`sip:${number}@${config.domain}`, {
+      const callOpts: any = {
         mediaConstraints: { audio: true, video: false },
         rtcOfferConstraints: {
           offerToReceiveAudio: true,
           offerToReceiveVideo: false,
           voiceActivityDetection: false,
         },
-        // No SDP modifier — let the browser negotiate codecs with the PBX.
         pcConfig: {
           iceServers: [],
           iceTransportPolicy: 'all',
           bundlePolicy: 'balanced',
         },
-        eventHandlers: {
-          failed: (e: any) => {
-            const msg = classifySipFailure({
-              cause: e?.cause,
-              status_code: e?.message?.status_code,
-              reason_phrase: e?.message?.reason_phrase,
-            });
-            console.error('[AVA keypad] SIP call failed', e);
-            setSipError(msg);
-          },
-        },
-      });
+      };
+      if (forcePcmu) {
+        callOpts.sessionDescriptionHandlerModifiers = [
+          buildSdpModifier(opusToSdpOpts(audioProfileRef.current)),
+        ];
+        log('call.fallback', 'PCMU-only SDP modifier active');
+      }
+      uaRef.current.call(`sip:${number}@${config.domain}`, callOpts);
       return true;
     } catch (err: any) {
       console.error('[AVA keypad] SIP call exception', err);
@@ -614,6 +613,11 @@ export function useSoftphone(
       setSipError(classifySipFailure({ cause: err?.message }));
       return false;
     }
+  };
+
+  const call = (number: string) => {
+    callAttemptRef.current = 1;
+    return placeCallInternal(number, false);
   };
   const hangup = () => {
     sessionRef.current?.terminate();
