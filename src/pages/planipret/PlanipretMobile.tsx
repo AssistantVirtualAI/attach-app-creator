@@ -28,9 +28,10 @@ const KEYS: Array<{ d: string; l?: string }> = [
   { d: "*" }, { d: "0", l: "+" }, { d: "#" },
 ];
 
-function Dialer({ open, onClose }: { open: boolean; onClose: () => void }) {
+function Dialer({ open, onClose, initial }: { open: boolean; onClose: () => void; initial?: string }) {
   const [number, setNumber] = useState("");
   const [calling, setCalling] = useState(false);
+  useEffect(() => { if (open) setNumber(initial ?? ""); }, [open, initial]);
   const append = (c: string) => setNumber((n) => (n + c).slice(0, 20));
   const back = () => setNumber((n) => n.slice(0, -1));
   const startCall = async () => {
