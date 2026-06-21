@@ -24,7 +24,7 @@ export type Permission =
   | 'read:security_audit'
   | 'run:security_audit';
 
-export type Role = 'super_admin' | 'org_admin' | 'manager' | 'agent' | 'viewer';
+export type Role = 'super_admin' | 'org_admin' | 'manager' | 'agent' | 'viewer' | 'planipret_admin' | 'planipret_broker';
 
 export const DEFAULT_PERMISSIONS_MATRIX: Record<Role, Permission[]> = {
   super_admin: [
