@@ -32,7 +32,7 @@ export async function getPostLoginRoute(userId: string): Promise<string> {
     const orgRoles = (orgMemberRows || []).map((r: any) => r.role as string);
     const appRoles = (userRoles || []).map((r: any) => r.role as string);
 
-    // Highest priority: platform/admin roles. Use direct role rows as fallback if RPC is slow or blocked.
+    // Super admin / master admin / ava admin / lemtel admin → unified /dashboard (org switcher)
     if (
       isSuper ||
       isLemtelAdmin ||
@@ -40,14 +40,14 @@ export async function getPostLoginRoute(userId: string): Promise<string> {
       orgRoles.includes('ava_admin') ||
       orgRoles.includes('master_admin')
     ) {
-      return '/platform';
+      return '/dashboard';
     }
 
-    if (orgRoles.includes('ava_admin') || orgRoles.includes('master_admin')) return '/platform';
-    if (orgRoles.includes('reseller_admin') || orgRoles.includes('customer_admin')) return '/customer';
+    // Reseller / customer admins → also /dashboard (scoped to their org via the switcher)
+    if (orgRoles.includes('reseller_admin') || orgRoles.includes('customer_admin')) return '/dashboard';
 
     if (appRoles.includes('org_admin') || appRoles.includes('reseller_admin') || appRoles.includes('manager')) {
-      return '/customer';
+      return '/dashboard';
     }
 
     return '/dashboard';
