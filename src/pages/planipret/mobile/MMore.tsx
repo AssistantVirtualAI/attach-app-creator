@@ -125,6 +125,21 @@ export default function MMore() {
         <Row icon={<Info className="w-4 h-4" />} label="Mon extension" right={<span className="text-[12px] text-slate-500">{profile?.extension ?? "—"}</span>} />
       </Section>
 
+      <Section title="Disponibilité">
+        <Row
+          icon={<BellOff className="w-4 h-4" style={{ color: profile?.dnd_enabled ? "#E84C4C" : undefined }} />}
+          label="🔕 Mode Ne pas déranger"
+          sub={profile?.dnd_enabled ? "Actif — AVA répond pour vous" : "Inactif"}
+          right={<Toggle on={!!profile?.dnd_enabled} onChange={async (v) => {
+            await supabase.from("planipret_profiles").update({ dnd_enabled: v }).eq("user_id", profile.user_id);
+            await reloadProfile();
+            toast.success(v ? "DND activé" : "DND désactivé");
+          }} />}
+        />
+        <Row icon={<SettingsIcon className="w-4 h-4" />} label="⚙️ Configurer le mode DND" onClick={() => setDndOpen(true)} chevron />
+      </Section>
+
+
       <Section title="Intégrations">
         <Row icon={<Mail className="w-4 h-4" style={{ color: "#0078D4" }} />} label="Microsoft 365"
           onClick={ms365Connected ? disconnectMs365 : connectMs365}
