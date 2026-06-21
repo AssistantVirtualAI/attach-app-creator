@@ -355,10 +355,10 @@ const App = () => (
                 <Route path="/planipret/dashboard" element={<PlanipretDashboard />} />
                 <Route path="/planipret/integrations" element={<PlanipretIntegrationSecrets />} />
                 <Route path="/auth/ms365/callback" element={<Ms365Callback />} />
-                <Route path="/dashboard/audit" element={<PlanipretAudit />} />
+                <Route path="/planipret/audit" element={<PlanipretAudit />} />
 
                 {/* Planipret Admin sub-routes (layout with sidebar) */}
-                <Route path="/dashboard" element={<PlanipretAdminLayout />}>
+                <Route path="/planipret/admin" element={<PlanipretAdminLayout />}>
                   <Route index element={<PAOverview />} />
                   <Route path="overview" element={<PAOverview />} />
                   <Route path="users" element={<PAUsers />} />
