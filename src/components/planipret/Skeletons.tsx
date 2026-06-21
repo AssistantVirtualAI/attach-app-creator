@@ -2,7 +2,7 @@
 import type { CSSProperties } from "react";
 
 export function Shimmer({ className = "", style }: { className?: string; style?: CSSProperties }) {
-  return <div style={style} className={`animate-pulse bg-slate-200 dark:bg-gray-700 rounded ${className}`} />;
+  return <div style={style} className={`pp-skeleton ${className}`} />;
 }
 
 export function CallRowSkeleton() {

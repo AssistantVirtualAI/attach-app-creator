@@ -1,11 +1,7 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { LayoutDashboard, Users, Phone, MessageSquare, Voicemail, Plug, BarChart3, LogOut, Bell, Menu, X } from "lucide-react";
-
-const NAVY = "#0F1924";
-const ACCENT = "#2E86C1";
-const PRIMARY = "#1F4E79";
+import { LayoutDashboard, Users, Phone, MessageSquare, Voicemail, Plug, BarChart3, LogOut, Bell } from "lucide-react";
 
 const LINKS = [
   { to: "/planipret/admin/overview", label: "Vue d'ensemble", Icon: LayoutDashboard },
@@ -35,7 +31,6 @@ export default function PlanipretAdminLayout() {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [missingIntegrations, setMissingIntegrations] = useState(0);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [realtimeOk, setRealtimeOk] = useState(false);
 
   useEffect(() => {
@@ -62,54 +57,76 @@ export default function PlanipretAdminLayout() {
 
   const logout = async () => { await supabase.auth.signOut(); navigate("/login", { replace: true }); };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center text-slate-500">Chargement…</div>;
+  if (loading) return <div className="planipret-scope min-h-screen flex items-center justify-center" style={{ color: "var(--pp-text-muted)" }}>Chargement…</div>;
 
   const title = PAGE_TITLES[location.pathname] ?? "Tableau de bord";
   const dateLabel = new Date().toLocaleDateString("fr-CA", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
   return (
-    <div className="min-h-screen flex" style={{ background: "#F8F9FA" }}>
+    <div className="planipret-scope min-h-screen flex" style={{ background: "var(--pp-bg-base)" }}>
       {/* Mobile redirect notice */}
-      <div className="md:hidden fixed inset-0 z-50 flex items-center justify-center p-6 bg-white">
-        <div className="text-center max-w-xs">
-          <h2 className="font-semibold text-lg mb-2">Dashboard admin</h2>
-          <p className="text-sm text-slate-600 mb-4">Le dashboard admin est optimisé pour desktop. Sur mobile, utilisez l'application courtier.</p>
-          <button onClick={() => navigate("/mplanipret")} className="px-4 py-2 rounded-lg text-white text-sm font-medium" style={{ background: PRIMARY }}>
-            Ouvrir l'app mobile
-          </button>
+      <div className="md:hidden fixed inset-0 z-50 flex items-center justify-center p-6" style={{ background: "var(--pp-bg-base)" }}>
+        <div className="text-center max-w-xs pp-card" style={{ padding: 24 }}>
+          <h2 style={{ fontFamily: "Inter,sans-serif", fontWeight: 700, fontSize: 18, color: "var(--pp-text-primary)", marginBottom: 8 }}>Dashboard admin</h2>
+          <p style={{ fontSize: 13, color: "var(--pp-text-secondary)", marginBottom: 16 }}>Le dashboard admin est optimisé pour desktop. Sur mobile, utilisez l'application courtier.</p>
+          <button onClick={() => navigate("/mplanipret")} className="pp-btn-primary">Ouvrir l'app mobile</button>
         </div>
       </div>
 
       {/* Sidebar */}
-      <aside className={`hidden md:flex flex-col fixed left-0 top-0 h-screen w-[260px] text-white z-40`} style={{ background: NAVY }}>
-        <div className="px-5 pt-5 pb-4 border-b border-white/10">
-          <div className="font-bold text-[18px] tracking-tight">PLANIPRÊT</div>
-          <div className="text-[14px]" style={{ color: ACCENT }}>AI Portal</div>
+      <aside className="hidden md:flex flex-col fixed left-0 top-0 h-screen w-[260px] z-40"
+        style={{ background: "var(--pp-bg-deep)", borderRight: "1px solid var(--pp-bg-border)" }}>
+        <div className="px-5 pt-5 pb-4" style={{ borderBottom: "1px solid var(--pp-bg-border)" }}>
+          <div style={{ fontFamily: "Inter,sans-serif", fontWeight: 700, fontSize: 16, color: "var(--pp-text-primary)", letterSpacing: "0.04em" }}>
+            PLANIPRÊT
+          </div>
+          <div style={{ fontFamily: "DM Sans,sans-serif", fontWeight: 500, fontSize: 10, color: "var(--pp-brand-accent)", marginTop: 2 }}>
+            AI Portal · Admin
+          </div>
+          <div style={{ height: 1, marginTop: 12, background: "linear-gradient(90deg, var(--pp-brand-accent), transparent)", opacity: 0.4 }} />
         </div>
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
           {LINKS.map(({ to, label, Icon }) => (
             <NavLink key={to} to={to}
-              className={({ isActive }) => `flex items-center gap-3 px-3 h-11 rounded-lg text-sm transition ${isActive ? "text-white" : "text-slate-400 hover:bg-white/5"}`}
-              style={({ isActive }) => isActive ? { background: PRIMARY } : undefined}>
-              <Icon className="w-4 h-4" />
-              <span className="flex-1">{label}</span>
-              {to === "/planipret/admin/integrations" && missingIntegrations > 0 && (
-                <span className="text-[10px] font-bold bg-amber-500 text-white rounded-full px-1.5 py-0.5">{missingIntegrations}</span>
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition"
+              style={({ isActive }) => isActive
+                ? {
+                    background: "linear-gradient(135deg, #0D2A4A, #091E35)",
+                    border: "1px solid rgba(46,155,220,0.25)",
+                    color: "var(--pp-text-primary)",
+                  }
+                : { color: "var(--pp-text-muted)", border: "1px solid transparent" }
+              }>
+              {({ isActive }) => (
+                <>
+                  <Icon className="w-4 h-4" style={{ color: isActive ? "var(--pp-brand-accent)" : "currentColor" }} />
+                  <span className="flex-1">{label}</span>
+                  {to === "/planipret/admin/integrations" && missingIntegrations > 0 && (
+                    <span className="text-[9px] font-bold text-white rounded-full flex items-center justify-center"
+                      style={{ background: "var(--pp-danger)", width: 18, height: 18 }}>
+                      {missingIntegrations}
+                    </span>
+                  )}
+                </>
               )}
             </NavLink>
           ))}
         </nav>
-        <div className="px-3 py-4 border-t border-white/10">
+        <div className="px-3 py-4" style={{ borderTop: "1px solid var(--pp-bg-border)" }}>
           <div className="flex items-center gap-3 px-2 mb-3">
-            <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ background: PRIMARY }}>
+            <div className="rounded-full flex items-center justify-center text-white text-xs font-bold"
+              style={{ width: 36, height: 36, background: "linear-gradient(135deg, #1A4A8A, #2E9BDC)" }}>
               {initials(profile?.full_name)}
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-medium truncate">{profile?.full_name ?? "Admin"}</p>
-              <p className="text-[11px] text-slate-400">Super Admin</p>
+              <p style={{ fontSize: 12, fontWeight: 600, color: "var(--pp-text-primary)" }} className="truncate">{profile?.full_name ?? "Admin"}</p>
+              <p style={{ fontSize: 10, color: "var(--pp-text-faint)" }}>Super Admin</p>
             </div>
           </div>
-          <button onClick={logout} className="w-full flex items-center gap-2 px-3 h-9 rounded-lg text-sm text-slate-300 hover:bg-white/5">
+          <button onClick={logout} className="w-full flex items-center gap-2 px-3 h-9 rounded-lg text-sm transition"
+            style={{ color: "var(--pp-text-muted)" }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "var(--pp-bg-elevated)")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
             <LogOut className="w-4 h-4" /> Déconnexion
           </button>
         </div>
@@ -117,17 +134,28 @@ export default function PlanipretAdminLayout() {
 
       {/* Main */}
       <div className="hidden md:flex flex-1 flex-col ml-[260px]">
-        <header className="sticky top-0 h-14 bg-white border-b border-slate-100 flex items-center justify-between px-6 z-30">
-          <h1 className="font-bold text-[20px]" style={{ color: "#0F1924" }}>{title}</h1>
+        <header className="sticky top-0 h-14 flex items-center justify-between px-6 z-30"
+          style={{ background: "var(--pp-bg-base)", borderBottom: "1px solid var(--pp-bg-border)" }}>
+          <h1 style={{ fontFamily: "Inter,sans-serif", fontWeight: 700, fontSize: 18, color: "var(--pp-text-primary)" }}>{title}</h1>
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-1.5 text-xs">
-              <span className={`w-2 h-2 rounded-full ${realtimeOk ? "bg-green-500" : "bg-slate-300"}`} />
-              <span className="text-slate-500">{realtimeOk ? "En direct" : "Reconnexion..."}</span>
+            <div className="flex items-center gap-1.5"
+              style={{
+                background: realtimeOk ? "#0D3D2A" : "var(--pp-bg-elevated)",
+                border: `1px solid ${realtimeOk ? "#1A5A3F" : "var(--pp-bg-border-2)"}`,
+                borderRadius: 20, padding: "4px 12px",
+              }}>
+              <span className={realtimeOk ? "pp-live-dot" : ""} style={!realtimeOk ? { width: 6, height: 6, borderRadius: "50%", background: "var(--pp-text-faint)" } : undefined} />
+              <span style={{ fontSize: 10, fontWeight: 600, color: realtimeOk ? "var(--pp-success)" : "var(--pp-text-muted)" }}>
+                {realtimeOk ? "En direct" : "Reconnexion…"}
+              </span>
             </div>
-            <button className="relative w-9 h-9 rounded-full hover:bg-slate-100 flex items-center justify-center">
-              <Bell className="w-4 h-4 text-slate-600" />
+            <button className="relative w-9 h-9 rounded-full flex items-center justify-center transition"
+              style={{ color: "var(--pp-text-secondary)" }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = "var(--pp-bg-elevated)")}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+              <Bell className="w-4 h-4" />
             </button>
-            <span className="text-xs text-slate-500 capitalize">{dateLabel}</span>
+            <span className="capitalize" style={{ fontSize: 10, color: "var(--pp-text-muted)" }}>{dateLabel}</span>
           </div>
         </header>
         <main className="flex-1 p-6 overflow-y-auto">
