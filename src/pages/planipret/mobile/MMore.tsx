@@ -314,3 +314,56 @@ function CustomizeSheet({ profile, onClose, onSaved }: { profile: any; onClose: 
     </Sheet>
   );
 }
+
+function DndSheet({ profile, onClose, onSaved }: { profile: any; onClose: () => void; onSaved: () => Promise<void> }) {
+  const [enabled, setEnabled] = useState<boolean>(!!profile?.dnd_enabled);
+  const [auto, setAuto] = useState<boolean>(!!profile?.dnd_auto_schedule);
+  const [start, setStart] = useState<string>(profile?.dnd_start_time?.slice(0,5) ?? "18:00");
+  const [end, setEnd] = useState<string>(profile?.dnd_end_time?.slice(0,5) ?? "08:00");
+  const [msg, setMsg] = useState<string>(profile?.dnd_message_fr ?? "");
+  const [busy, setBusy] = useState(false);
+  const save = async () => {
+    setBusy(true);
+    const { error } = await supabase.from("planipret_profiles").update({
+      dnd_enabled: enabled,
+      dnd_auto_schedule: auto,
+      dnd_start_time: start,
+      dnd_end_time: end,
+      dnd_message_fr: msg,
+    }).eq("user_id", profile.user_id);
+    setBusy(false);
+    if (error) { toast.error("Erreur"); return; }
+    toast.success("Préférences DND enregistrées");
+    await onSaved();
+    onClose();
+  };
+  return (
+    <Sheet title="🔕 Mode Ne pas déranger" onClose={onClose}>
+      <div className="flex items-center justify-between py-2 border-b border-slate-100">
+        <span className="text-sm">Activer le mode DND</span>
+        <Toggle on={enabled} onChange={setEnabled} />
+      </div>
+      <div className="flex items-center justify-between py-2 border-b border-slate-100">
+        <span className="text-sm">Activer automatiquement selon horaire</span>
+        <Toggle on={auto} onChange={setAuto} />
+      </div>
+      {auto && (
+        <div className="grid grid-cols-2 gap-3 py-3">
+          <div>
+            <label className="block text-xs text-slate-500 mb-1">Début</label>
+            <input type="time" value={start} onChange={(e) => setStart(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm" />
+          </div>
+          <div>
+            <label className="block text-xs text-slate-500 mb-1">Fin</label>
+            <input type="time" value={end} onChange={(e) => setEnd(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm" />
+          </div>
+        </div>
+      )}
+      <label className="block text-xs text-slate-500 mb-1 mt-2">Message de réponse automatique</label>
+      <textarea value={msg} onChange={(e) => setMsg(e.target.value)} rows={4} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm mb-3" />
+      <button onClick={save} disabled={busy} className="w-full py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-50" style={{ background: PRIMARY }}>
+        {busy ? "…" : "Sauvegarder"}
+      </button>
+    </Sheet>
+  );
+}
