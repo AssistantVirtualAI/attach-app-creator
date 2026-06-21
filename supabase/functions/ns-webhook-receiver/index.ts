@@ -86,16 +86,24 @@ async function processEvent(event: any) {
     }
   } else if (type === "call.inbound") {
     const callId = data.call_id ?? data.id;
+    const dndActive = isDndActive(brokerProfile);
     await admin.from("planipret_phone_calls").insert({
       user_id: userId, call_id: callId, direction: "inbound",
       caller_number: data.from_number ?? data.from ?? null,
       callee_number: data.to_number ?? data.to ?? null,
-      status: "inbound_ringing",
+      status: dndActive ? "voicemail" : "inbound_ringing",
+      metadata: dndActive ? { dnd_auto_voicemail: true, dnd_message: brokerProfile?.dnd_message_fr } : null,
     });
-    if (userId) {
+    if (userId && !dndActive) {
       await admin.channel(`call-events:${userId}`).send({
         type: "broadcast", event: "inbound_call",
         payload: { type: "inbound_call", call_id: callId, from_number: data.from_number ?? data.from, to_number: data.to_number ?? data.to },
+      });
+    } else if (userId && dndActive) {
+      // Notify broker that AVA handled the call
+      await admin.channel(`call-events:${userId}`).send({
+        type: "broadcast", event: "dnd_auto_handled",
+        payload: { call_id: callId, from_number: data.from_number ?? data.from, message: brokerProfile?.dnd_message_fr },
       });
     }
   } else if (type === "message.inbound") {
