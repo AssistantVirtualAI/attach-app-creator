@@ -1,8 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import planipretLogo from "@/assets/planipret-logo.png.asset.json";
+import avaWordmark from "@/assets/ava-wordmark.svg";
 
 const BRAND = { primary: "#1F4E79", accent: "#2E86C1" };
+
 
 export default function PlanipretLogin() {
   const navigate = useNavigate();
@@ -39,12 +42,14 @@ export default function PlanipretLogin() {
         style={{ borderTopColor: BRAND.primary }}
       >
         <div className="text-center mb-6">
-          <div className="text-xs tracking-widest text-slate-500">AVA</div>
-          <h1 className="text-2xl font-bold mt-1" style={{ color: BRAND.primary }}>
-            Planiprêt
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">Portail courtiers hypothécaires</p>
+          <img
+            src={planipretLogo.url}
+            alt="Planiprêt"
+            className="mx-auto w-28 h-28 rounded-2xl shadow-md object-cover"
+          />
+          <p className="text-sm text-slate-500 mt-3">Portail courtiers hypothécaires</p>
         </div>
+
 
         <form onSubmit={onSubmit} className="space-y-4">
           <div>
@@ -82,7 +87,13 @@ export default function PlanipretLogin() {
             {loading ? "Connexion..." : "Se connecter"}
           </button>
         </form>
+
+        <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-center gap-2 text-[11px] text-slate-400">
+          <span>Powered by</span>
+          <img src={avaWordmark} alt="AVA" className="h-3 opacity-70" />
+        </div>
       </div>
     </div>
   );
 }
+

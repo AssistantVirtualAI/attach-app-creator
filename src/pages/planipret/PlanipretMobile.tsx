@@ -4,6 +4,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { Home, Phone, MessageSquare, Voicemail, MoreHorizontal, Phone as PhoneIcon, X, Delete, Plus, Lock } from "lucide-react";
 import { toast } from "sonner";
+import planipretLogo from "@/assets/planipret-logo.png.asset.json";
+import avaWordmark from "@/assets/ava-wordmark.svg";
+
 
 const PRIMARY = "#1F4E79";
 const ACCENT = "#2E86C1";
@@ -144,19 +147,25 @@ export default function PlanipretMobile() {
   return (
     <Frame>
       <div className="h-full flex flex-col relative overflow-hidden" style={{ background: BG }}>
-        <div className="flex-1 overflow-y-auto pb-24">
+        {/* Top brand header */}
+        <header className="flex items-center gap-2 px-4 pt-3 pb-2 bg-white border-b border-slate-100">
+          <img src={planipretLogo.url} alt="Planiprêt" className="w-8 h-8 rounded-lg object-cover" />
+          <span className="text-sm font-semibold tracking-tight" style={{ color: PRIMARY }}>Planiprêt</span>
+        </header>
+
+        <div className="flex-1 overflow-y-auto pb-[96px]">
           <Outlet context={{ profile, reloadProfile: loadProfile, openDialer } satisfies PlanipretMobileContext} />
         </div>
 
         {/* FAB */}
         <button onClick={() => setDialerOpen(true)}
           className="absolute left-1/2 -translate-x-1/2 z-20 rounded-full flex items-center justify-center text-white shadow-xl active:scale-95 transition"
-          style={{ background: PRIMARY, width: 60, height: 60, bottom: 50 }} aria-label="Composer un numéro">
+          style={{ background: PRIMARY, width: 60, height: 60, bottom: 72 }} aria-label="Composer un numéro">
           <PhoneIcon className="w-6 h-6" />
         </button>
 
         {/* Tab bar */}
-        <nav className="absolute bottom-0 inset-x-0 h-[72px] bg-white border-t border-slate-200 grid grid-cols-5 z-10">
+        <nav className="absolute bottom-[22px] inset-x-0 h-[72px] bg-white border-t border-slate-200 grid grid-cols-5 z-10">
           {TABS.map((t, i) => (
             <NavLink key={t.to} to={t.to}
               className={({ isActive }) =>
@@ -173,8 +182,15 @@ export default function PlanipretMobile() {
           ))}
         </nav>
 
+        {/* Powered by AVA footer */}
+        <div className="absolute bottom-0 inset-x-0 h-[22px] bg-white border-t border-slate-100 flex items-center justify-center gap-1.5 z-10">
+          <span className="text-[9px] tracking-wide text-slate-400">Powered by</span>
+          <img src={avaWordmark} alt="AVA" className="h-2.5 opacity-70" />
+        </div>
+
         <Dialer open={dialerOpen} onClose={() => setDialerOpen(false)} initial={dialerInit} />
       </div>
+
     </Frame>
   );
 }
