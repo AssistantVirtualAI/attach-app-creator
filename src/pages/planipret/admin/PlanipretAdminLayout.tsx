@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { LayoutDashboard, Users, Phone, MessageSquare, Voicemail, Plug, BarChart3, LogOut, Bell, ClipboardList, ShieldCheck } from "lucide-react";
+import { LayoutDashboard, Users, Phone, MessageSquare, Voicemail, Plug, BarChart3, LogOut, Bell, ClipboardList, ShieldCheck, Flame } from "lucide-react";
 import SessionTimeoutModal from "@/components/planipret/SessionTimeoutModal";
 
 const LINKS = [
   { to: "/planipret/admin/overview", label: "Vue d'ensemble", Icon: LayoutDashboard },
   { to: "/planipret/admin/users", label: "Utilisateurs", Icon: Users },
   { to: "/planipret/admin/calls", label: "Appels", Icon: Phone },
+  { to: "/planipret/admin/leads", label: "Leads & Pipeline", Icon: Flame },
   { to: "/planipret/admin/messages", label: "Messages", Icon: MessageSquare },
   { to: "/planipret/admin/voicemails", label: "Voicemails", Icon: Voicemail },
   { to: "/planipret/admin/reports", label: "Rapports", Icon: BarChart3 },
