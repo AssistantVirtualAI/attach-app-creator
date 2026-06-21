@@ -111,11 +111,24 @@ export default function PlanipretMobile() {
   const [dialerInit, setDialerInit] = useState<string | undefined>(undefined);
   const [unreadMsg, setUnreadMsg] = useState(0);
   const [unreadVm, setUnreadVm] = useState(0);
+  const [inbound, setInbound] = useState<InboundCall>(null);
   const openDialer = (n?: string) => { setDialerInit(n); setDialerOpen(true); };
   const refreshFn = useRef<(() => Promise<void> | void) | null>(null);
   const registerRefresh = (fn: (() => Promise<void> | void) | null) => { refreshFn.current = fn; };
   const handlePull = async () => { if (refreshFn.current) await refreshFn.current(); };
   const { ref: scrollRef, pullDist, refreshing, threshold } = usePullToRefresh(handlePull);
+
+  const onInboundRinging = useCallback((row: any) => {
+    setInbound({ call_id: row.id, from_number: row.from_number, caller_name: row.caller_name });
+  }, []);
+  const onAiInsight = useCallback((row: any) => {
+    toast(`🤖 Analyse IA disponible`, {
+      description: String(row.ai_summary ?? "").slice(0, 80),
+      duration: 8000,
+      action: { label: "Voir", onClick: () => navigate(`/mplanipret/calls?call=${row.id}`) },
+    });
+  }, [navigate]);
+  useRealtimeManager(profile?.user_id, { onInboundRinging, onAiInsight });
 
   useEffect(() => {
     if (!profile?.user_id) return;
