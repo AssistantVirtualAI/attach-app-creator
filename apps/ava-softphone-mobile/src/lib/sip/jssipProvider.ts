@@ -117,32 +117,30 @@ function extractPt(sdp: string, codecRegex: RegExp): string | null {
 
 export function rewriteSdpForFusionPBX(sdp: string, _opts: SdpRewriteOpts = {}): string {
   let out = sdp;
-  // Drop the entire video m-section — we only do audio.
-  out = out.replace(/m=video[\s\S]*?(?=\r\nm=|$)/g, '');
-  // Force PCMU-only audio (PT 0). FusionPBX/Keeny config rejects Opus.
-  out = out.replace(/m=audio (\d+) [A-Z\/]+ [^\r\n]+/g, 'm=audio $1 RTP/AVP 0 8 101');
-  // Remove DTLS / SRTP bits — FusionPBX expects plain RTP/AVP.
-  out = out.replace(/^a=fingerprint:.*$/gm, '');
-  out = out.replace(/^a=setup:.*$/gm, '');
-  out = out.replace(/^a=dtls[-a-z]*:.*$/gm, '');
-  out = out.replace(/^a=crypto:.*$/gm, '');
-  // Remove ICE — FusionPBX doesn't speak WebRTC ICE.
-  out = out.replace(/^a=ice-ufrag:.*$/gm, '');
-  out = out.replace(/^a=ice-pwd:.*$/gm, '');
-  out = out.replace(/^a=ice-options:.*$/gm, '');
-  out = out.replace(/^a=candidate:.*$/gm, '');
-  out = out.replace(/^a=end-of-candidates.*$/gm, '');
-  // Keep only PCMU codec descriptors.
-  out = out.replace(/^a=rtpmap:(\d+) [^\r\n]+$/gm, (line, pt) => ((pt === '0' || pt === '8' || pt === '101') ? line : ''));
-  out = out.replace(/^a=fmtp:(\d+) [^\r\n]+$/gm, (line, pt) => ((pt === '0' || pt === '8' || pt === '101') ? line : ''));
-  // Remove WebRTC stream identifiers / feedback / extensions.
-  out = out.replace(/^a=msid:.*$/gm, '');
-  out = out.replace(/^a=ssrc:.*$/gm, '');
-  out = out.replace(/^a=ssrc-group:.*$/gm, '');
-  out = out.replace(/^a=rtcp-fb:.*$/gm, '');
-  out = out.replace(/^a=extmap:.*$/gm, '');
-  out = out.replace(/^a=mid:.*$/gm, '');
-  out = out.replace(/^a=group:.*$/gm, '');
+  // Drop the entire video m-section — audio only.
+  out = out.replace(/m=video[\s\S]*?(?=\r\nm=|$)/gi, '');
+
+  // Restrict audio to PCMU(0) + PCMA(8) + telephone-event(101).
+  // CRITICAL: keep the original transport (UDP/TLS/RTP/SAVPF) — WebRTC requires
+  // DTLS-SRTP and FusionPBX with mod_verto/WSS expects it too. Stripping DTLS
+  // causes the PBX to answer 488 Not Acceptable Here.
+  out = out.replace(
+    /^m=audio\s+(\d+)\s+(\S+)\s+[^\r\n]+/gm,
+    (_m, port, proto) => `m=audio ${port} ${proto} 0 8 101`
+  );
+
+  // Keep only PCMU/PCMA/telephone-event rtpmap & fmtp lines.
+  out = out.replace(/^a=rtpmap:(\d+) [^\r\n]+$/gm, (line, pt) =>
+    pt === '0' || pt === '8' || pt === '101' ? line : ''
+  );
+  out = out.replace(/^a=fmtp:(\d+) [^\r\n]+$/gm, (line, pt) =>
+    pt === '0' || pt === '8' || pt === '101' ? line : ''
+  );
+  // Drop rtcp-fb for codecs we removed (Opus etc.).
+  out = out.replace(/^a=rtcp-fb:(\d+) [^\r\n]+$/gm, (line, pt) =>
+    pt === '*' || pt === '0' || pt === '8' || pt === '101' ? line : ''
+  );
+
   // Collapse blank lines created by the deletions.
   out = out.replace(/(\r?\n){2,}/g, '\r\n');
   return out;
