@@ -187,7 +187,7 @@ export function classifySipFailure(input: {
     return 'Extension not authorized';
   }
   if (code === 488 || /not acceptable/.test(reason)) {
-    return 'Codec rejected by PBX (488). Workaround active — contact your PBX admin.';
+    return 'PBX rejected WebRTC media (488) — use the WebRTC WSS profile/port with DTLS-SRTP enabled.';
   }
   if (code === 407 || /auth/.test(reason) || /unauthor/.test(cause)) {
     return 'Authentication failed — check the SIP extension and password.';
@@ -220,12 +220,14 @@ export function classifySipFailure(input: {
 export function buildWssFallbackList(config: SIPConfig): string[] {
   // pbxnode.lemtel.tel has the matching Let's Encrypt cert (CN=pbxnode.lemtel.tel)
   // node.lemtelcloud.net resolves to same server but cert CN mismatch may cause SIP 403
-  return [
-    'wss://pbxnode.lemtel.tel:7444',
-    'wss://node.lemtelcloud.net:7444',
+  return Array.from(new Set([
+    config.wssUrl,
+    ...(config.wssUrls || []),
     'wss://pbxnode.lemtel.tel:7443',
     'wss://node.lemtelcloud.net:7443',
-  ];
+    'wss://pbxnode.lemtel.tel:7444',
+    'wss://node.lemtelcloud.net:7444',
+  ].filter(Boolean)));
 }
 
 export async function createSIPUA(config: SIPConfig, timeoutMs = 8000) {
