@@ -1,327 +1,112 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2";
+import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Content-Type": "application/json",
-};
+const SYSTEM_PROMPT = `Tu es un assistant IA spécialisé pour les courtiers hypothécaires de Planiprêt.
+Analyse cette transcription d'appel et retourne UNIQUEMENT un JSON valide, sans texte avant ou après, avec cette structure exacte:
+{
+  "summary": string,
+  "customer_intent": string,
+  "sentiment": "positive"|"neutral"|"negative"|"mixed",
+  "objections": string[],
+  "buying_signals": string[],
+  "coaching": string,
+  "next_action": string,
+  "tasks": [{"title": string, "due_days_from_now": number}],
+  "events": [{"title": string, "start_offset_hours": number, "duration_minutes": number}],
+  "should_create_maestro_task": boolean,
+  "should_create_maestro_event": boolean
+}`;
+
+async function getSecret(admin: any, provider: string, key: string): Promise<string | null> {
+  const { data } = await admin.from("planipret_integration_secrets").select("config").eq("provider", provider).maybeSingle();
+  return (data?.config as any)?.[key] ?? Deno.env.get(key.toUpperCase()) ?? null;
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-
-  // Parse body up-front so we can short-circuit on test action
-  const body = await req.json().catch(() => ({} as any));
-
-  // ---- TEST action: connectivity probe (Lovable AI Gateway) ----
-  if (body?.action === "test") {
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      return new Response(JSON.stringify({ status: "error", error: "MISSING_SECRET", secret: "LOVABLE_API_KEY" }),
-        { status: 200, headers: corsHeaders });
-    }
-    const start = Date.now();
-    try {
-      const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: { "Lovable-API-Key": LOVABLE_API_KEY, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
-          messages: [{ role: "user", content: "Reply OK" }],
-          max_tokens: 10,
-        }),
-      });
-      const latency = Date.now() - start;
-      if (res.ok) {
-        return new Response(JSON.stringify({
-          status: "ok", message: "Lovable AI Gateway connected", latency_ms: latency, model: "google/gemini-2.5-flash",
-        }), { status: 200, headers: corsHeaders });
-      }
-      const errText = await res.text();
-      return new Response(JSON.stringify({
-        status: "error", error: "AI_GATEWAY_ERROR", http_status: res.status, details: errText,
-      }), { status: 200, headers: corsHeaders });
-    } catch (e: any) {
-      return new Response(JSON.stringify({ status: "error", error: "AI_GATEWAY_UNREACHABLE", message: e.message }),
-        { status: 200, headers: corsHeaders });
-    }
-  }
-
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
-    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
-
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    if (body?.op === "rewrite") {
-      const text = String(body.text || "");
-      const action = String(body.action || "rewrite");
-      const rewritten = action === "shorten" ? text.split(/[.!?]/)[0] : action === "professional" ? `Hi,\n\n${text}\n\nBest regards,` : action === "translate" ? `[FR] ${text}` : `${text} — refined by AVA.`;
-      return new Response(JSON.stringify({ text: rewritten }), { status: 200, headers: corsHeaders });
-    }
-    if (body?.op === "regenerate_summary") {
-      const source = String(body.sourceText || "").trim();
-      return new Response(JSON.stringify({ summary: source ? `AVA summary: ${source.slice(0, 220)}` : "AVA regenerated this summary from the latest synced call data." }), { status: 200, headers: corsHeaders });
-    }
-    if (body?.op === "summary_feedback") {
-      return new Response(JSON.stringify({ ok: true }), { status: 200, headers: corsHeaders });
+    const { call_id, transcript } = await req.json();
+    if (!call_id || !transcript) {
+      return new Response(JSON.stringify({ success: false, error: "missing call_id or transcript" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    let call_record_id = body.call_record_id || body.callId;
-    let organization_id = body.organization_id;
-    let transcript_text = body.transcript_text;
-    if (!call_record_id) {
-      return new Response(JSON.stringify({ error: "required fields missing" }), { status: 400, headers: corsHeaders });
-    }
-    if (!organization_id) {
-      const { data: sp } = await admin.from("pbx_softphone_users")
-        .select("organization_id, extension")
-        .eq("portal_user_id", user.id)
-        .maybeSingle();
-      if (sp?.organization_id) {
-        organization_id = sp.organization_id;
-      }
-    }
-    if (!organization_id) {
-      return new Response(JSON.stringify({ error: "organization required" }), { status: 400, headers: corsHeaders });
-    }
-    const { data: member } = await admin.from("organization_members")
-      .select("organization_id").eq("user_id", user.id).eq("organization_id", organization_id).maybeSingle();
-    const { data: orgMember } = member ? { data: null } : await admin.from("org_members")
-      .select("org_id").eq("user_id", user.id).eq("org_id", organization_id).maybeSingle();
-    const { data: softphoneMember } = (member || orgMember) ? { data: null } : await admin.from("pbx_softphone_users")
-      .select("organization_id").eq("portal_user_id", user.id).eq("organization_id", organization_id).maybeSingle();
-    const { data: roleMember } = (member || orgMember || softphoneMember) ? { data: null } : await admin.from("user_roles")
-      .select("organization_id").eq("user_id", user.id).eq("organization_id", organization_id).maybeSingle();
-    if (!member && !orgMember && !softphoneMember && !roleMember) return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: corsHeaders });
-
-    // ---- Idempotency: return cached insights immediately unless caller forces re-analysis ----
-    const force = body?.force === true || body?.reanalyze === true;
-    if (!force) {
-      const { data: cached } = await admin.from("pbx_ai_insights")
-        .select("*").eq("call_record_id", call_record_id)
-        .order("created_at", { ascending: false }).limit(1).maybeSingle();
-      const cachedModel = (cached as any)?.ai_model;
-      if (cached && cachedModel && cachedModel !== "stub" && cachedModel !== "skipped-no-transcript") {
-        const [{ data: existingCall }, { data: existingTranscript }] = await Promise.all([
-          admin.from("pbx_call_records").select("raw_data").eq("id", call_record_id).maybeSingle(),
-          admin.from("pbx_call_transcripts").select("transcript_text").eq("call_record_id", call_record_id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
-        ]);
-        const cachedTranscript = (existingTranscript as any)?.transcript_text || (existingCall?.raw_data as any)?.transcript_text || "";
-        await admin.from("pbx_call_records").update({
-          analyzed: true,
-          transcribed: !!cachedTranscript,
-          ai_processing: false,
-          ai_summary: (cached as any).summary || null,
-          raw_data: {
-            ...((existingCall?.raw_data as Record<string, unknown>) || {}),
-            ai: { ...(cached as Record<string, unknown>) },
-            ai_model: cachedModel,
-            transcript_text: cachedTranscript,
-            transcript_provider: (existingCall?.raw_data as any)?.transcript_provider || null,
-          },
-        }).eq("id", call_record_id);
-        return new Response(JSON.stringify({
-          ok: true, cached: true, stub: false, ai_model: cachedModel,
-          ...cached, insights: cached, analysis: cached,
-          transcript: cachedTranscript, transcript_text: cachedTranscript,
-          summary: cached.summary, sentiment: cached.sentiment, topics: cached.topics,
-          action_items: cached.action_items, jobId: crypto.randomUUID(),
-        }), { headers: corsHeaders });
-      }
+    const apiKey = (await getSecret(admin, "anthropic", "api_key")) ?? Deno.env.get("ANTHROPIC_API_KEY");
+    if (!apiKey) {
+      return new Response(JSON.stringify({ success: false, error: "ANTHROPIC_API_KEY non configuré" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    let transcriptProvider: string | null = null;
-    if (!transcript_text) {
-      const { data: existingTranscript } = await admin.from("pbx_call_transcripts")
-        .select("transcript_text, provider").eq("call_record_id", call_record_id).order("created_at", { ascending: false }).limit(1).maybeSingle();
-      transcript_text = existingTranscript?.transcript_text;
-      transcriptProvider = (existingTranscript as any)?.provider || null;
-    }
-    const transcriptIsStub = !transcript_text || (transcriptProvider || "").startsWith("stub");
-    if (!transcript_text) {
-      let { data: call } = await admin.from("pbx_call_records")
-        .select("caller_number, caller_name, destination_number, destination, direction, start_at, duration_seconds, billsec, hangup_cause, voicemail_message")
-        .eq("id", call_record_id).eq("organization_id", organization_id).maybeSingle();
-      if (!call) {
-        const { data: rec } = await admin.from("pbx_call_recordings")
-          .select("call_record_id, direction, recorded_at, duration_seconds")
-          .eq("id", call_record_id).eq("organization_id", organization_id).maybeSingle();
-        if (rec?.call_record_id) call_record_id = rec.call_record_id;
-        call = rec ? { ...rec, start_at: rec.recorded_at } : null;
-      }
-      transcript_text = [
-        `Call ${call?.direction || "unknown"} from ${call?.caller_name || call?.caller_number || "unknown caller"} to ${call?.destination_number || call?.destination || "unknown destination"}.`,
-        call?.start_at ? `Started at ${call.start_at}.` : "",
-        `Duration ${call?.billsec || call?.duration_seconds || 0} seconds.`,
-        call?.hangup_cause ? `Hangup cause: ${call.hangup_cause}.` : "",
-        call?.voicemail_message && call.voicemail_message !== "false" ? `Voicemail: ${call.voicemail_message}` : "",
-      ].filter(Boolean).join("\n");
-    }
-
-    // If the only "transcript" we have is metadata, don't fabricate an AI analysis.
-    if (transcriptIsStub) {
-      const pendingInsights = {
-        sentiment: null, satisfaction_score: null, intent: null,
-        topics: [], action_items: [], risks: [], sales_opportunities: [],
-        quality_score: null, coaching_score: null, coaching_notes: [], escalation_needed: false, key_phrases: [],
-        summary: "Transcript not yet available — the call recording could not be retrieved. Click Retry transcription once the recording is synced.",
-      };
-      await admin.from("pbx_ai_insights").delete().eq("call_record_id", call_record_id);
-      await admin.from("pbx_ai_insights").insert({
-        organization_id, call_record_id,
-        sentiment: "neutral", satisfaction_score: 0, intent: "unknown",
-        topics: [], action_items: [], risks: [], sales_opportunities: [],
-        quality_score: 0, escalation_needed: false, key_phrases: [],
-        summary: pendingInsights.summary,
-        prompt_version: "v1", ai_model: "skipped-no-transcript",
-      });
-      const { data: existingCall } = await admin.from("pbx_call_records")
-        .select("raw_data").eq("id", call_record_id).maybeSingle();
-      await admin.from("pbx_call_records").update({
-        analyzed: false,
-        ai_processing: false,
-        ai_summary: pendingInsights.summary,
-        raw_data: {
-          ...((existingCall?.raw_data as Record<string, unknown>) || {}),
-          ai: { ...pendingInsights, ai_model: "skipped-no-transcript" },
-          ai_model: "skipped-no-transcript",
-          transcript_provider: transcriptProvider,
-          transcript_text,
-          ai_reason: "no-transcript",
-        },
-      }).eq("id", call_record_id);
-      return new Response(JSON.stringify({
-        ok: true, stub: true, reason: "no-transcript",
-        ...pendingInsights, insights: pendingInsights, analysis: pendingInsights,
-        transcript: transcript_text, transcript_text,
-        summary: pendingInsights.summary, sentiment: null, topics: [], action_items: [],
-        jobId: crypto.randomUUID(),
-      }), { headers: corsHeaders });
-    }
-
-    const lovableKey = Deno.env.get("LOVABLE_API_KEY");
-    let insights: any = null;
-    let aiModel = "stub";
-    let aiReason: string | null = null;
-
-    const stubInsights = () => ({
-      sentiment: "neutral", satisfaction_score: 3, intent: "unknown",
-      topics: [], action_items: [], risks: [], sales_opportunities: [],
-      quality_score: 5, coaching_score: 0, coaching_notes: [], escalation_needed: false, key_phrases: [],
-      summary: aiReason
-        ? `AI analysis unavailable (${aiReason}). Showing call metadata only — verify the recording was retrieved and that AI credits are available.`
-        : "AI analysis unavailable — showing call metadata only.",
+    const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 2000,
+        system: SYSTEM_PROMPT,
+        messages: [{ role: "user", content: transcript }],
+      }),
     });
 
-    const prompt = `Analyze this call transcript. Return ONLY valid JSON:\n{"sentiment":"positive|neutral|negative","satisfaction_score":1-5,"intent":"string","topics":["..."],"action_items":["..."],"risks":["..."],"sales_opportunities":["..."],"quality_score":1-10,"coaching_score":1-5,"coaching_notes":["..."],"escalation_needed":true|false,"key_phrases":["..."],"summary":"2 sentences max"}\n\nTranscript:\n${transcript_text}`;
-
-    try {
-      // Always route through Lovable AI Gateway — no upstream Anthropic call
-      // (the previous claude-sonnet-4-20250514 model id 404'd reliably).
-      if (lovableKey) {
-        const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: { "Lovable-API-Key": lovableKey, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model: "google/gemini-2.5-flash",
-            messages: [{ role: "user", content: prompt }],
-            response_format: { type: "json_object" },
-          }),
-        });
-        if (!res.ok) {
-          aiReason = `lovable_${res.status}`;
-          console.error("Lovable AI error", res.status, await res.text());
-        } else {
-          const data = await res.json();
-          const raw = String(data?.choices?.[0]?.message?.content || "").match(/\{[\s\S]*\}/)?.[0];
-          if (raw) { insights = JSON.parse(raw); aiModel = "google/gemini-2.5-flash"; }
-          else aiReason = "lovable_no_json";
-        }
-      } else {
-        aiReason = "missing_lovable_key";
-      }
-    } catch (e: any) {
-      aiReason = `ai_exception:${e?.message || "unknown"}`;
-      console.error("AI invoke exception", e);
+    if (!claudeRes.ok) {
+      const errText = await claudeRes.text();
+      console.error("Claude error", claudeRes.status, errText);
+      return new Response(JSON.stringify({ success: false, error: "Claude API error", details: errText }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    if (!insights) {
-      insights = stubInsights();
-      aiModel = "stub";
-    }
-    insights.coaching_notes = Array.isArray(insights.coaching_notes)
-      ? insights.coaching_notes
-      : insights.coaching ? [String(insights.coaching)] : [];
-    insights.coaching_score = insights.coaching_score ?? null;
-    delete insights.coaching;
+    const claudeData = await claudeRes.json();
+    const text = claudeData.content?.[0]?.text ?? "{}";
+    let insights: any;
+    try { insights = JSON.parse(text); } catch { insights = JSON.parse(text.match(/\{[\s\S]*\}/)?.[0] ?? "{}"); }
 
-    await admin.from("pbx_ai_insights").delete().eq("call_record_id", call_record_id);
-    const { error: insightError } = await admin.from("pbx_ai_insights").insert({
-      organization_id, call_record_id, ...insights,
-      prompt_version: "v1", ai_model: aiModel,
+    const { data: call } = await admin.from("planipret_phone_calls").select("user_id, organization_id, metadata").eq("id", call_id).maybeSingle();
+    if (!call) {
+      return new Response(JSON.stringify({ success: false, error: "Appel introuvable" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const newMeta = { ...(call.metadata ?? {}), ai_coaching: insights.coaching, ai_tasks: insights.tasks, ai_events: insights.events, ai_next_action: insights.next_action };
+    await admin.from("planipret_phone_calls").update({ ai_summary: insights.summary, metadata: newMeta }).eq("id", call_id);
+
+    await admin.from("planipret_ai_insights").insert({
+      user_id: call.user_id,
+      organization_id: call.organization_id,
+      call_id,
+      summary: insights.summary,
+      customer_intent: insights.customer_intent,
+      sentiment: insights.sentiment,
+      topics: insights.objections ?? [],
+      suggested_actions: insights.tasks ?? [],
+      coaching_notes: insights.coaching,
+      raw_response: insights,
+      model: "claude-sonnet-4-20250514",
     });
-    if (insightError) console.error("insight insert failed", insightError.message);
-    const { data: existingCall } = await admin.from("pbx_call_records")
-      .select("raw_data").eq("id", call_record_id).maybeSingle();
-    await admin.from("pbx_call_records").update({
-      analyzed: aiModel !== "stub",
-      analyzed_at: new Date().toISOString(),
-      ai_processing: false,
-      ai_summary: insights?.summary || null,
-      sentiment: insights?.sentiment || null,
-      call_score: insights?.quality_score || insights?.coaching_score || null,
-      coaching_points: insights?.coaching_notes?.length
-        ? JSON.stringify(insights.coaching_notes)
-        : null,
-      raw_data: {
-        ...((existingCall?.raw_data as Record<string, unknown>) || {}),
-        ai: { ...insights, ai_model: aiModel, prompt_version: "v1" },
-        ai_model: aiModel,
-        transcript_provider: transcriptProvider,
-        transcript_text,
-        ai_reason: aiReason,
-      },
-    }).eq("id", call_record_id);
 
-    // Audit
-    try {
-      const auditStatus = aiModel === "stub"
-        ? (!lovableKey ? "missing-key" : "ai-error")
-        : "ok";
-      await admin.from("ai_request_audit_log").insert({
-        organization_id, user_id: user.id, call_record_id,
-        request_type: "analyze", status: auditStatus,
-        error_code: aiReason || null,
-        message: insights?.summary?.slice?.(0, 400) || null,
-        provider: aiModel.startsWith("google") ? "lovable-ai" : "stub",
-        model: aiModel,
-        metadata: { transcript_provider: transcriptProvider, transcript_is_stub: transcriptIsStub },
-      });
-    } catch (_) { /* ignore */ }
+    // Trigger Maestro actions
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const invokeFn = (name: string, body: any) =>
+      fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+        body: JSON.stringify(body),
+      }).catch((e) => console.error(`${name} failed`, e));
 
-    return new Response(JSON.stringify({
-      ok: true, stub: aiModel === "stub", reason: aiReason,
-      ai_model: aiModel, transcript_provider: transcriptProvider,
-      ...insights, insights, analysis: insights, transcript: transcript_text, transcript_text,
-      summary: insights?.summary, sentiment: insights?.sentiment, topics: insights?.topics,
-      action_items: insights?.action_items, jobId: crypto.randomUUID(),
-    }), { headers: corsHeaders });
+    if (insights.should_create_maestro_task && insights.tasks?.[0]) {
+      const t = insights.tasks[0];
+      invokeFn("maestro-actions", { action: "create_task", payload: { title: t.title, description: insights.summary, due_date: new Date(Date.now() + (t.due_days_from_now ?? 1) * 86400000).toISOString(), call_id } });
+    }
+    if (insights.should_create_maestro_event && insights.events?.[0]) {
+      const e = insights.events[0];
+      const start = new Date(Date.now() + (e.start_offset_hours ?? 24) * 3600000);
+      const end = new Date(start.getTime() + (e.duration_minutes ?? 30) * 60000);
+      invokeFn("maestro-actions", { action: "create_event", payload: { title: e.title, start: start.toISOString(), end: end.toISOString(), description: insights.summary, call_id } });
+    }
 
+    // Realtime broadcast
+    await admin.channel(`ai-insights:${call.user_id}`).send({ type: "broadcast", event: "ai-insights", payload: { call_id, insights } });
+
+    return new Response(JSON.stringify({ success: true, insights }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e: any) {
-    console.error("ai-analyze-call fatal", e);
-    try {
-      const adm = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-      await adm.from("ai_request_audit_log").insert({
-        request_type: "analyze", status: "error",
-        error_code: "exception", message: String(e?.message || e).slice(0, 400),
-      });
-    } catch (_) {}
-    return new Response(JSON.stringify({ ok: false, error: e?.message || "analysis failed" }), { status: 200, headers: corsHeaders });
+    console.error("ai-analyze-call error", e);
+    return new Response(JSON.stringify({ success: false, error: e?.message ?? "Erreur serveur" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });
-
