@@ -87,7 +87,13 @@ export default function PlanipretLogin() {
             {loading ? "Connexion..." : "Se connecter"}
           </button>
         </form>
+
+        <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-center gap-2 text-[11px] text-slate-400">
+          <span>Powered by</span>
+          <img src={avaWordmark} alt="AVA" className="h-3 opacity-70" />
+        </div>
       </div>
     </div>
   );
 }
+
