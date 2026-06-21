@@ -510,6 +510,42 @@ export function useSoftphone(
     };
   };
 
+  /** Parse SDP audio m-line + rtpmap lines into an ordered codec list. */
+  const extractAudioCodecs = (sdp: string): string[] => {
+    try {
+      const audio = sdp.split(/\r?\nm=/).find((s) => s.startsWith('audio'));
+      if (!audio) return [];
+      const firstLine = ('m=' + audio).split(/\r?\n/)[0];
+      const pts = firstLine.split(/\s+/).slice(3);
+      const map: Record<string, string> = {};
+      const rtpRe = /^a=rtpmap:(\d+)\s+([^\s/]+)/gm;
+      let m: RegExpExecArray | null;
+      while ((m = rtpRe.exec(sdp))) map[m[1]] = m[2].toUpperCase();
+      return pts.map((pt) => map[pt] || `pt${pt}`);
+    } catch { return []; }
+  };
+
+  /** Read the negotiated outbound audio codec from peerconnection stats. */
+  const readNegotiatedCodec = async (pc: RTCPeerConnection | undefined) => {
+    if (!pc) return;
+    try {
+      const stats = await pc.getStats();
+      let codecId: string | undefined;
+      stats.forEach((r: any) => {
+        if (r.type === 'outbound-rtp' && r.kind === 'audio' && r.codecId) codecId = r.codecId;
+      });
+      if (!codecId) return;
+      const codec: any = stats.get(codecId);
+      if (codec?.mimeType) {
+        const name = String(codec.mimeType).split('/').pop()?.toUpperCase() || null;
+        setNegotiatedCodec(name);
+        log('codec.negotiated', `${name} @ ${codec.clockRate || '?'}Hz`);
+      }
+    } catch (e: any) {
+      log('codec.stats-failed', e?.message || '', 'warn');
+    }
+  };
+
   const call = (number: string) => {
     if (!uaRef.current || !config || sipStatus !== 'registered') return false;
     setActiveCallNumber(number);
