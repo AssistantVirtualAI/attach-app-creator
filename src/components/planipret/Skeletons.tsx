@@ -1,6 +1,8 @@
 // Reusable shimmer skeletons for Planipret UI
-export function Shimmer({ className = "" }: { className?: string }) {
-  return <div className={`animate-pulse bg-slate-200 dark:bg-gray-700 rounded ${className}`} />;
+import type { CSSProperties } from "react";
+
+export function Shimmer({ className = "", style }: { className?: string; style?: CSSProperties }) {
+  return <div style={style} className={`animate-pulse bg-slate-200 dark:bg-gray-700 rounded ${className}`} />;
 }
 
 export function CallRowSkeleton() {
@@ -62,7 +64,7 @@ export function BarChartSkeleton() {
   return (
     <div className="flex items-end gap-2 h-40 p-4">
       {heights.map((h, i) => (
-        <Shimmer key={i} className="flex-1 rounded-t" style={{ height: `${h}px` } as any} />
+        <Shimmer key={i} className="flex-1 rounded-t" style={{ height: `${h}px` }} />
       ))}
     </div>
   );
