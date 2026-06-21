@@ -21,6 +21,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/planipret/admin/overview": "Vue d'ensemble",
   "/planipret/admin/users": "Gestion des utilisateurs",
   "/planipret/admin/calls": "Appels",
+  "/planipret/admin/leads": "Leads & Pipeline",
   "/planipret/admin/messages": "Messages",
   "/planipret/admin/voicemails": "Voicemails",
   "/planipret/admin/integrations": "Intégrations",
