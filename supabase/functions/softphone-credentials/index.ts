@@ -165,12 +165,16 @@ Deno.serve(async (req) => {
     // and wss://170.39.199.132:7443 currently use a self-signed cert that mobile
     // WebSocket clients refuse. Desktop/Electron is more permissive, but mobile
     // browsers MUST use a CA-signed host. Always include the working fallbacks.
-    const WORKING_PRIMARY = "wss://node.lemtelcloud.net:7443";
-    const WORKING_FALLBACK = "wss://pbxnode.lemtel.tel:7443";
+    const WORKING_PRIMARY = "wss://pbxnode.lemtel.tel:7444";
+    const WORKING_FALLBACK = "wss://node.lemtelcloud.net:7444";
+    const WORKING_FALLBACK_2 = "wss://pbxnode.lemtel.tel:7443";
+    const WORKING_FALLBACK_3 = "wss://node.lemtelcloud.net:7443";
     const wssUrl = sp.wss_url || Deno.env.get("FUSIONPBX_WSS_URL") || WORKING_PRIMARY;
     const wssUrls = Array.from(new Set([
       WORKING_PRIMARY,
       WORKING_FALLBACK,
+      WORKING_FALLBACK_2,
+      WORKING_FALLBACK_3,
       wssUrl,
     ].filter(Boolean)));
 
