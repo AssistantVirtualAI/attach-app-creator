@@ -1,8 +1,767 @@
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useOutletContext } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import {
+  Search, X, Phone, PhoneIncoming, PhoneOutgoing, PhoneMissed, PhoneOff, Copy,
+  Bot, ChevronDown, ChevronUp, Pause, Play, Mic, MicOff, ArrowRightLeft, Loader2,
+  Check, Sparkles, RefreshCw,
+} from "lucide-react";
+import type { PlanipretMobileContext } from "../PlanipretMobile";
+
+const PRIMARY = "#1F4E79";
+const ACCENT = "#2E86C1";
+const SUCCESS = "#27AE60";
+const DANGER = "#E74C3C";
+const PURPLE = "#7C3AED";
+
+type Call = {
+  id: string;
+  user_id: string;
+  ns_call_id: string | null;
+  direction: string;
+  status: string | null;
+  from_number: string | null;
+  from_name: string | null;
+  to_number: string | null;
+  to_name: string | null;
+  started_at: string;
+  duration_seconds: number | null;
+  recording_url: string | null;
+  transcript: string | null;
+  ai_summary: string | null;
+  metadata: any;
+};
+
+type Insight = {
+  call_id: string;
+  summary: string | null;
+  coaching_notes: string | null;
+  customer_intent: string | null;
+  sentiment: string | null;
+  topics: any;
+  suggested_actions: any;
+};
+
+// ---------- helpers ----------
+const isOutbound = (c: Call) => c.direction === "outbound";
+const isMissed = (c: Call) => c.direction === "missed" || c.status === "missed";
+
+const otherNumber = (c: Call) => (isOutbound(c) ? c.to_number : c.from_number) || "";
+const otherName = (c: Call) => (isOutbound(c) ? c.to_name : c.from_name) || "";
+const displayLabel = (c: Call) => otherName(c) || otherNumber(c) || "Inconnu";
+
+const frenchDateTime = (iso: string) => {
+  const d = new Date(iso);
+  const today = new Date();
+  const yest = new Date(); yest.setDate(today.getDate() - 1);
+  const sameDay = d.toDateString() === today.toDateString();
+  const isYest = d.toDateString() === yest.toDateString();
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  if (sameDay) return `Aujourd'hui, ${hh}h${mm}`;
+  if (isYest) return `Hier, ${hh}h${mm}`;
+  return `${d.toLocaleDateString("fr-CA", { day: "2-digit", month: "short" })}, ${hh}h${mm}`;
+};
+const frenchDuration = (s: number | null) => {
+  if (!s) return "—";
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  if (m === 0) return `${sec} sec`;
+  return `${m} min ${sec} sec`;
+};
+
+// ---------- main ----------
 export default function MCalls() {
+  const { profile, openDialer } = useOutletContext<PlanipretMobileContext>();
+  const [tab, setTab] = useState<"recents" | "active" | "missed">("recents");
+  const [calls, setCalls] = useState<Call[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [selected, setSelected] = useState<Call | null>(null);
+
+  const userId = profile?.user_id;
+
+  const load = useCallback(async () => {
+    if (!userId) return;
+    const { data } = await supabase
+      .from("planipret_phone_calls")
+      .select("*")
+      .eq("user_id", userId)
+      .order("started_at", { ascending: false })
+      .limit(100);
+    setCalls((data ?? []) as Call[]);
+    setLoading(false);
+  }, [userId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  // Realtime updates on phone_calls (for new entries)
+  useEffect(() => {
+    if (!userId) return;
+    const ch = supabase
+      .channel(`planipret-calls:${userId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "planipret_phone_calls", filter: `user_id=eq.${userId}` }, () => load())
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [userId, load]);
+
+  const missedCount = useMemo(() => calls.filter(isMissed).length, [calls]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const base = tab === "missed" ? calls.filter(isMissed) : calls;
+    if (!q) return base;
+    return base.filter((c) =>
+      [c.from_number, c.to_number, c.from_name, c.to_name]
+        .filter(Boolean).some((v) => String(v).toLowerCase().includes(q))
+    );
+  }, [calls, tab, search]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await load();
+    setTimeout(() => setRefreshing(false), 300);
+  };
+
   return (
-    <div className="p-4">
-      <h1 className="text-xl font-bold mb-3" style={{ color: "#1A1A2E" }}>Appels</h1>
-      <div className="bg-white rounded-2xl p-6 text-center text-slate-400 text-sm shadow-sm">Historique d'appels à venir</div>
+    <div className="h-full flex flex-col">
+      {/* Header */}
+      <div className="px-4 pt-5 pb-3 bg-white border-b border-slate-100">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold" style={{ color: "#1A1A2E" }}>Appels</h1>
+          <button
+            onClick={() => { setSearchOpen((v) => !v); if (searchOpen) setSearch(""); }}
+            className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-slate-100"
+            aria-label="Rechercher"
+          >
+            {searchOpen ? <X className="w-5 h-5 text-slate-600" /> : <Search className="w-5 h-5 text-slate-600" />}
+          </button>
+        </div>
+        {searchOpen && (
+          <div className="mt-3">
+            <input
+              autoFocus
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Rechercher un numéro..."
+              className="w-full px-3 py-2 rounded-lg bg-slate-100 text-sm outline-none focus:ring-2"
+              style={{ boxShadow: `0 0 0 0 ${PRIMARY}` }}
+            />
+          </div>
+        )}
+        {/* Tabs */}
+        <div className="mt-3 flex bg-slate-100 rounded-lg p-1">
+          {[
+            { k: "recents", label: "Récents" },
+            { k: "active", label: "Actifs" },
+            { k: "missed", label: "Manqués" },
+          ].map((t) => {
+            const active = tab === (t.k as any);
+            const isMissedTab = t.k === "missed";
+            return (
+              <button
+                key={t.k}
+                onClick={() => setTab(t.k as any)}
+                className={`flex-1 py-2 text-xs font-semibold rounded-md transition flex items-center justify-center gap-1.5 ${active ? "bg-white shadow-sm" : "text-slate-500"}`}
+                style={active ? { color: PRIMARY } : undefined}
+              >
+                {t.label}
+                {isMissedTab && missedCount > 0 && (
+                  <span className="text-[10px] text-white px-1.5 rounded-full" style={{ background: DANGER }}>{missedCount}</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Body */}
+      <div className="flex-1 overflow-y-auto">
+        {tab === "active" ? (
+          <ActiveCallsTab userId={userId} openDialer={openDialer} />
+        ) : (
+          <>
+            {/* Pull-to-refresh proxy */}
+            <div className="px-4 pt-2 flex items-center justify-end">
+              <button onClick={onRefresh} className="text-xs text-slate-500 flex items-center gap-1 px-2 py-1">
+                <RefreshCw className={`w-3 h-3 ${refreshing ? "animate-spin" : ""}`} /> Actualiser
+              </button>
+            </div>
+            {loading ? (
+              <div className="p-8 text-center text-slate-400 text-sm">Chargement…</div>
+            ) : filtered.length === 0 ? (
+              <EmptyState tab={tab} />
+            ) : (
+              <ul className="px-3 pb-4 space-y-1.5">
+                {filtered.map((c) => (
+                  <CallRow key={c.id} call={c} onTap={() => setSelected(c)} onCall={() => openDialer(otherNumber(c))} showCallBtn={tab === "missed"} />
+                ))}
+              </ul>
+            )}
+          </>
+        )}
+      </div>
+
+      {selected && (
+        <CallDetailSheet
+          call={selected}
+          userId={userId}
+          onClose={() => setSelected(null)}
+          openDialer={openDialer}
+          onUpdated={(updated) => {
+            setSelected(updated);
+            setCalls((cs) => cs.map((x) => (x.id === updated.id ? updated : x)));
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+// ---------- row ----------
+function CallRow({ call, onTap, onCall, showCallBtn }: { call: Call; onTap: () => void; onCall: () => void; showCallBtn?: boolean }) {
+  const missed = isMissed(call);
+  const out = isOutbound(call);
+  const color = missed ? DANGER : out ? SUCCESS : ACCENT;
+  const Icon = missed ? PhoneMissed : out ? PhoneOutgoing : PhoneIncoming;
+  const hasAi = !!call.ai_summary;
+
+  return (
+    <li>
+      <div className="bg-white rounded-xl px-3 py-3 flex items-center gap-3 shadow-sm active:bg-slate-50">
+        <button onClick={onTap} className="flex items-center gap-3 flex-1 min-w-0 text-left">
+          <div className="rounded-full flex items-center justify-center shrink-0" style={{ width: 44, height: 44, background: `${color}15`, color }}>
+            <Icon className="w-5 h-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="font-semibold text-[15px] truncate" style={{ color: missed ? DANGER : "#1A1A2E" }}>
+              {displayLabel(call)}
+            </div>
+            <div className="text-xs text-slate-500 truncate">
+              {frenchDateTime(call.started_at)} · {frenchDuration(call.duration_seconds)}
+            </div>
+          </div>
+        </button>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {hasAi && (
+            <span className="rounded-full p-1.5 flex items-center justify-center" style={{ background: `${PURPLE}15`, color: PURPLE }} title="Analyse IA">
+              <Bot className="w-3.5 h-3.5" />
+            </span>
+          )}
+          {(showCallBtn || true) && (
+            <button onClick={onCall} className="rounded-full flex items-center justify-center" style={{ width: 36, height: 36, background: `${PRIMARY}15`, color: PRIMARY }} aria-label="Rappeler">
+              <Phone className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      </div>
+    </li>
+  );
+}
+
+// ---------- empty ----------
+function EmptyState({ tab }: { tab: "recents" | "active" | "missed" }) {
+  const cfg = {
+    recents: { Icon: Phone, title: "Aucun appel dans l'historique", sub: "Vos appels apparaîtront ici." },
+    active: { Icon: Phone, title: "Aucun appel actif en ce moment", sub: "Utilisez le bouton 📞 pour passer un appel." },
+    missed: { Icon: PhoneMissed, title: "Aucun appel manqué 🎉", sub: "Tout est sous contrôle." },
+  }[tab];
+  return (
+    <div className="p-10 text-center">
+      <div className="w-14 h-14 mx-auto rounded-full flex items-center justify-center mb-3" style={{ background: `${PRIMARY}10`, color: PRIMARY }}>
+        <cfg.Icon className="w-6 h-6" />
+      </div>
+      <div className="font-semibold text-slate-700">{cfg.title}</div>
+      <div className="text-xs text-slate-400 mt-1">{cfg.sub}</div>
+    </div>
+  );
+}
+
+// ============================================================
+// CALL DETAIL SHEET
+// ============================================================
+function CallDetailSheet({
+  call, userId, onClose, openDialer, onUpdated,
+}: {
+  call: Call; userId: string; onClose: () => void; openDialer: (n?: string) => void; onUpdated: (c: Call) => void;
+}) {
+  const [insight, setInsight] = useState<Insight | null>(null);
+  const [recLoading, setRecLoading] = useState(false);
+  const [txLoading, setTxLoading] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [taskState, setTaskState] = useState<Record<string, { creating?: boolean; createdId?: string }>>({});
+  const [eventState, setEventState] = useState<Record<string, { creating?: boolean; createdId?: string }>>({});
+
+  // Load insight
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from("planipret_ai_insights")
+        .select("*")
+        .eq("call_id", call.id)
+        .maybeSingle();
+      setInsight((data as any) ?? null);
+    })();
+  }, [call.id]);
+
+  // Realtime refresh on ai-insights channel
+  useEffect(() => {
+    if (!userId) return;
+    const ch = supabase
+      .channel(`ai-insights:${userId}`)
+      .on("broadcast", { event: "updated" }, async (msg: any) => {
+        if (msg?.payload?.call_id === call.id) {
+          const { data: ins } = await supabase.from("planipret_ai_insights").select("*").eq("call_id", call.id).maybeSingle();
+          setInsight((ins as any) ?? null);
+          const { data: c2 } = await supabase.from("planipret_phone_calls").select("*").eq("id", call.id).maybeSingle();
+          if (c2) onUpdated(c2 as Call);
+        }
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [userId, call.id, onUpdated]);
+
+  const refreshCall = async () => {
+    const { data } = await supabase.from("planipret_phone_calls").select("*").eq("id", call.id).maybeSingle();
+    if (data) onUpdated(data as Call);
+  };
+
+  const fetchRecording = async () => {
+    setRecLoading(true);
+    const { data, error } = await supabase.functions.invoke("ns-recordings", { body: { call_id: call.ns_call_id ?? call.id } });
+    setRecLoading(false);
+    if (error || !(data as any)?.recording_url) { toast.error("Enregistrement non disponible"); return; }
+    await supabase.from("planipret_phone_calls").update({ recording_url: (data as any).recording_url }).eq("id", call.id);
+    await refreshCall();
+    toast.success("Enregistrement récupéré");
+  };
+
+  const fetchTranscript = async () => {
+    setTxLoading(true);
+    const { data, error } = await supabase.functions.invoke("ns-transcription", { body: { call_id: call.ns_call_id ?? call.id } });
+    setTxLoading(false);
+    if (error || !(data as any)?.transcript) { toast.error("Transcription non disponible"); return; }
+    await supabase.from("planipret_phone_calls").update({ transcript: (data as any).transcript }).eq("id", call.id);
+    await refreshCall();
+    toast.success("Transcription récupérée");
+  };
+
+  const analyzeAI = async () => {
+    if (!call.transcript) return;
+    setAiLoading(true);
+    const { data, error } = await supabase.functions.invoke("ai-analyze-call", { body: { call_id: call.id, transcript: call.transcript } });
+    setAiLoading(false);
+    if (error) { toast.error(error.message ?? "Échec de l'analyse"); return; }
+    toast.success("Analyse IA terminée ✅");
+    await refreshCall();
+    const { data: ins } = await supabase.from("planipret_ai_insights").select("*").eq("call_id", call.id).maybeSingle();
+    setInsight((ins as any) ?? null);
+  };
+
+  const meta = (call.metadata ?? {}) as any;
+  const aiTasks: Array<any> = Array.isArray(meta.ai_tasks) ? meta.ai_tasks
+    : Array.isArray(insight?.suggested_actions?.tasks) ? insight!.suggested_actions.tasks
+    : [];
+  const aiEvents: Array<any> = Array.isArray(meta.ai_events) ? meta.ai_events
+    : Array.isArray(insight?.suggested_actions?.events) ? insight!.suggested_actions.events
+    : [];
+
+  const createOne = async (type: "task" | "event", item: any, idx: number) => {
+    const key = String(idx);
+    if (type === "task") setTaskState((s) => ({ ...s, [key]: { creating: true } }));
+    else setEventState((s) => ({ ...s, [key]: { creating: true } }));
+    const { data, error } = await supabase.functions.invoke("maestro-actions", {
+      body: { action: type === "task" ? "create_task" : "create_event", call_id: call.id, payload: item },
+    });
+    const createdId = (data as any)?.id ?? (data as any)?.maestro_task_id ?? (data as any)?.maestro_event_id ?? "ok";
+    if (error || (data as any)?.success === false) {
+      toast.error(`Échec création ${type === "task" ? "tâche" : "événement"}`);
+      if (type === "task") setTaskState((s) => ({ ...s, [key]: {} }));
+      else setEventState((s) => ({ ...s, [key]: {} }));
+      return;
+    }
+    toast.success(type === "task" ? "Tâche créée ✅" : "Événement créé ✅");
+    if (type === "task") setTaskState((s) => ({ ...s, [key]: { createdId } }));
+    else setEventState((s) => ({ ...s, [key]: { createdId } }));
+  };
+
+  const createAll = async () => {
+    for (let i = 0; i < aiTasks.length; i++) if (!taskState[String(i)]?.createdId) await createOne("task", aiTasks[i], i);
+    for (let i = 0; i < aiEvents.length; i++) if (!eventState[String(i)]?.createdId) await createOne("event", aiEvents[i], i);
+  };
+
+  const copyTranscript = async () => {
+    if (!call.transcript) return;
+    await navigator.clipboard.writeText(call.transcript);
+    toast.success("Transcription copiée");
+  };
+
+  const direction = isOutbound(call) ? "Sortant" : isMissed(call) ? "Manqué" : "Entrant";
+  const dirColor = isMissed(call) ? DANGER : isOutbound(call) ? SUCCESS : ACCENT;
+
+  const objections: string[] = (insight?.suggested_actions?.objections as string[]) || (meta.objections as string[]) || [];
+  const buyingSignals: string[] = (insight?.suggested_actions?.buying_signals as string[]) || (meta.buying_signals as string[]) || [];
+  const nextAction: string = (insight?.suggested_actions?.next_action as string) || (meta.next_action as string) || "";
+  const coaching = insight?.coaching_notes || meta.ai_coaching || "";
+  const summary = insight?.summary || call.ai_summary || "";
+
+  return (
+    <div className="absolute inset-0 z-40 flex items-end" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/40" />
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="relative w-full bg-white rounded-t-3xl shadow-2xl flex flex-col"
+        style={{ height: "90%" }}
+      >
+        <div className="pt-2 pb-1 flex flex-col items-center relative shrink-0">
+          <div className="w-10 h-1.5 rounded-full bg-slate-300" />
+          <button onClick={onClose} className="absolute right-3 top-2 p-1.5 rounded-full hover:bg-slate-100">
+            <X className="w-5 h-5 text-slate-600" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 pb-8">
+          {/* SECTION 1 */}
+          <div className="text-center pt-4 pb-5 border-b border-slate-100">
+            <div className="text-xl font-bold" style={{ color: "#1A1A2E" }}>{displayLabel(call)}</div>
+            {otherName(call) && <div className="text-xs text-slate-400 mt-0.5">{otherNumber(call)}</div>}
+            <div className="mt-2 flex items-center justify-center gap-2 text-xs">
+              <span className="px-2 py-0.5 rounded-full font-medium" style={{ background: `${dirColor}15`, color: dirColor }}>{direction}</span>
+              <span className="text-slate-500">{frenchDateTime(call.started_at)}</span>
+              <span className="text-slate-300">·</span>
+              <span className="text-slate-500">{frenchDuration(call.duration_seconds)}</span>
+            </div>
+            <button
+              onClick={() => { openDialer(otherNumber(call)); onClose(); }}
+              className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-white text-sm font-semibold shadow"
+              style={{ background: PRIMARY }}
+            >
+              <Phone className="w-4 h-4" /> Rappeler
+            </button>
+          </div>
+
+          {/* SECTION 2 - Recording */}
+          <Section title="🎙️ Enregistrement">
+            {call.recording_url ? (
+              <audio controls className="w-full mt-1" style={{ accentColor: PRIMARY }} src={call.recording_url} />
+            ) : (
+              <button onClick={fetchRecording} disabled={recLoading} className="w-full py-2.5 rounded-lg text-sm font-medium border border-slate-200 text-slate-700 active:bg-slate-50 disabled:opacity-50 flex items-center justify-center gap-2">
+                {recLoading && <Loader2 className="w-4 h-4 animate-spin" />} Obtenir l'enregistrement
+              </button>
+            )}
+          </Section>
+
+          {/* SECTION 3 - Transcript */}
+          <Section title="📝 Transcription">
+            {call.transcript ? (
+              <div className="relative">
+                <button onClick={copyTranscript} className="absolute right-1 top-1 text-[11px] px-2 py-1 rounded-md bg-white/90 border border-slate-200 hover:bg-slate-50 flex items-center gap-1">
+                  <Copy className="w-3 h-3" /> Copier
+                </button>
+                <div className="bg-slate-50 rounded-lg p-3 pt-7 text-xs text-slate-700 whitespace-pre-wrap overflow-y-auto" style={{ maxHeight: 200 }}>
+                  {call.transcript}
+                </div>
+              </div>
+            ) : (
+              <button onClick={fetchTranscript} disabled={txLoading} className="w-full py-2.5 rounded-lg text-sm font-medium border border-slate-200 text-slate-700 active:bg-slate-50 disabled:opacity-50 flex items-center justify-center gap-2">
+                {txLoading && <Loader2 className="w-4 h-4 animate-spin" />} Obtenir la transcription
+              </button>
+            )}
+          </Section>
+
+          {/* SECTION 4 - AI Analysis */}
+          <Section title="🤖 Analyse IA">
+            {summary ? (
+              <div className="space-y-2">
+                <Accordion title="📋 Résumé" defaultOpen>
+                  <p className="text-xs text-slate-700 whitespace-pre-wrap">{summary}</p>
+                </Accordion>
+                {coaching && (
+                  <Accordion title="🎯 Coaching">
+                    <p className="text-xs text-slate-700 whitespace-pre-wrap">{coaching}</p>
+                  </Accordion>
+                )}
+                {objections.length > 0 && (
+                  <Accordion title="⚠️ Objections">
+                    <div className="flex flex-wrap gap-1.5">
+                      {objections.map((o, i) => (
+                        <span key={i} className="text-[11px] px-2 py-1 rounded-full border" style={{ borderColor: DANGER, color: DANGER }}>{o}</span>
+                      ))}
+                    </div>
+                  </Accordion>
+                )}
+                {buyingSignals.length > 0 && (
+                  <Accordion title="✅ Signaux d'achat">
+                    <div className="flex flex-wrap gap-1.5">
+                      {buyingSignals.map((o, i) => (
+                        <span key={i} className="text-[11px] px-2 py-1 rounded-full border" style={{ borderColor: SUCCESS, color: SUCCESS }}>{o}</span>
+                      ))}
+                    </div>
+                  </Accordion>
+                )}
+                {nextAction && (
+                  <Accordion title="➡️ Prochaine étape">
+                    <div className="text-xs p-2.5 rounded-lg" style={{ background: `${PRIMARY}10`, color: PRIMARY }}>{nextAction}</div>
+                  </Accordion>
+                )}
+              </div>
+            ) : call.transcript ? (
+              <button onClick={analyzeAI} disabled={aiLoading} className="w-full py-2.5 rounded-lg text-sm font-semibold text-white disabled:opacity-50 flex items-center justify-center gap-2" style={{ background: PURPLE }}>
+                {aiLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Analyse en cours…</> : <><Sparkles className="w-4 h-4" /> Analyser avec l'IA</>}
+              </button>
+            ) : (
+              <p className="text-xs text-slate-400 italic">Obtenez d'abord la transcription pour analyser l'appel.</p>
+            )}
+          </Section>
+
+          {/* SECTION 5 - AI Actions */}
+          {(aiTasks.length > 0 || aiEvents.length > 0) && (
+            <Section title="⚡ Actions suggérées">
+              <div className="space-y-2">
+                {aiTasks.map((t: any, i: number) => {
+                  const st = taskState[String(i)] ?? {};
+                  return (
+                    <ActionRow
+                      key={`t-${i}`}
+                      icon="📌"
+                      title={t.title ?? t.name ?? "Tâche"}
+                      sub={t.due_date ?? t.due ?? ""}
+                      done={!!st.createdId}
+                      loading={!!st.creating}
+                      doneLabel={st.createdId ? `Créé · ${String(st.createdId).slice(0, 8)}` : undefined}
+                      onCreate={() => createOne("task", t, i)}
+                    />
+                  );
+                })}
+                {aiEvents.map((e: any, i: number) => {
+                  const st = eventState[String(i)] ?? {};
+                  return (
+                    <ActionRow
+                      key={`e-${i}`}
+                      icon="📅"
+                      title={e.title ?? e.subject ?? "Événement"}
+                      sub={e.start ?? e.suggested_time ?? ""}
+                      done={!!st.createdId}
+                      loading={!!st.creating}
+                      onCreate={() => createOne("event", e, i)}
+                    />
+                  );
+                })}
+                {aiTasks.length + aiEvents.length > 1 && (
+                  <button onClick={createAll} className="w-full mt-2 py-2.5 rounded-lg text-sm font-semibold text-white flex items-center justify-center gap-2" style={{ background: PRIMARY }}>
+                    <Sparkles className="w-4 h-4" /> Tout créer dans Maestro
+                  </button>
+                )}
+              </div>
+            </Section>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="mt-5">
+      <div className="text-[13px] font-semibold mb-2" style={{ color: "#1A1A2E" }}>{title}</div>
+      {children}
+    </div>
+  );
+}
+
+function Accordion({ title, children, defaultOpen }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(!!defaultOpen);
+  return (
+    <div className="border border-slate-100 rounded-lg overflow-hidden">
+      <button onClick={() => setOpen((v) => !v)} className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-slate-700 bg-slate-50">
+        <span>{title}</span>
+        {open ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+      </button>
+      {open && <div className="p-3">{children}</div>}
+    </div>
+  );
+}
+
+function ActionRow({ icon, title, sub, onCreate, loading, done, doneLabel }: {
+  icon: string; title: string; sub?: string; onCreate: () => void; loading?: boolean; done?: boolean; doneLabel?: string;
+}) {
+  return (
+    <div className="flex items-center gap-2 p-2.5 rounded-lg border border-slate-100">
+      <div className="text-lg">{icon}</div>
+      <div className="flex-1 min-w-0">
+        <div className="text-xs font-semibold text-slate-800 truncate">{title}</div>
+        {sub && <div className="text-[11px] text-slate-500 truncate">{sub}</div>}
+      </div>
+      {done ? (
+        <span className="text-[11px] font-semibold px-2.5 py-1.5 rounded-md flex items-center gap-1" style={{ background: `${SUCCESS}15`, color: SUCCESS }}>
+          <Check className="w-3 h-3" /> {doneLabel ?? "Créé"}
+        </span>
+      ) : (
+        <button onClick={onCreate} disabled={loading} className="text-[11px] font-semibold px-2.5 py-1.5 rounded-md text-white flex items-center gap-1 disabled:opacity-50" style={{ background: PRIMARY }}>
+          {loading && <Loader2 className="w-3 h-3 animate-spin" />} Créer dans Maestro
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// ACTIVE CALLS TAB
+// ============================================================
+type ActiveCall = {
+  id: string;
+  number: string;
+  name?: string;
+  status: "ringing" | "active" | "hold" | "inbound";
+  startedAt: number;
+};
+
+function ActiveCallsTab({ userId, openDialer }: { userId: string; openDialer: (n?: string) => void }) {
+  const [active, setActive] = useState<ActiveCall[]>([]);
+  const [muted, setMuted] = useState<Record<string, boolean>>({});
+  const [transferOpen, setTransferOpen] = useState<string | null>(null);
+  const [transferTo, setTransferTo] = useState("");
+  const [incoming, setIncoming] = useState<ActiveCall | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const fetchActive = async () => {
+    const { data, error } = await supabase.functions.invoke("ns-calls", { body: { action: "list" } });
+    if (error) return;
+    const list = ((data as any)?.calls ?? []) as any[];
+    setActive(list.map((c: any) => ({
+      id: c.id ?? c.call_id,
+      number: c.remote_number ?? c.number ?? "",
+      name: c.remote_name ?? c.name,
+      status: (c.state ?? c.status ?? "active") as any,
+      startedAt: c.started_at ? new Date(c.started_at).getTime() : Date.now(),
+    })));
+  };
+
+  useEffect(() => {
+    fetchActive();
+    pollRef.current = setInterval(fetchActive, 5000);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, []);
+
+  useEffect(() => {
+    if (!userId) return;
+    const ch = supabase
+      .channel(`call-events:${userId}`)
+      .on("broadcast", { event: "*" }, (msg: any) => {
+        const p = msg?.payload;
+        if (!p) return;
+        if (p.event === "ringing" || p.state === "ringing") {
+          setIncoming({ id: p.id ?? p.call_id, number: p.from_number ?? p.number, status: "inbound", startedAt: Date.now() });
+        } else if (p.event === "ended" || p.state === "ended" || p.state === "disconnected") {
+          setIncoming(null);
+          fetchActive();
+        } else {
+          fetchActive();
+        }
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [userId]);
+
+  const action = async (act: string, callId: string, extra: any = {}) => {
+    const { error } = await supabase.functions.invoke("ns-calls", { body: { action: act, call_id: callId, ...extra } });
+    if (error) toast.error(error.message);
+    else fetchActive();
+  };
+
+  if (!active.length && !incoming) return <EmptyState tab="active" />;
+
+  return (
+    <div className="p-4 space-y-3">
+      {active.map((c) => (
+        <ActiveCallCard
+          key={c.id}
+          call={c}
+          muted={!!muted[c.id]}
+          onMute={() => setMuted((m) => ({ ...m, [c.id]: !m[c.id] }))}
+          onHold={() => action(c.status === "hold" ? "unhold" : "hold", c.id)}
+          onTransfer={() => setTransferOpen(c.id)}
+          onHangup={() => action("disconnect", c.id)}
+        />
+      ))}
+
+      {transferOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-6" onClick={() => setTransferOpen(null)}>
+          <div className="bg-white rounded-2xl p-4 w-full max-w-xs" onClick={(e) => e.stopPropagation()}>
+            <div className="font-semibold text-sm mb-2">Transférer l'appel</div>
+            <input value={transferTo} onChange={(e) => setTransferTo(e.target.value)} placeholder="Transférer vers..." className="w-full px-3 py-2 rounded-lg bg-slate-100 text-sm outline-none mb-3" />
+            <div className="flex gap-2">
+              <button onClick={() => setTransferOpen(null)} className="flex-1 py-2 rounded-lg text-sm text-slate-600 bg-slate-100">Annuler</button>
+              <button onClick={() => { if (transferOpen && transferTo) { action("transfer", transferOpen, { destination: transferTo }); setTransferOpen(null); setTransferTo(""); } }} className="flex-1 py-2 rounded-lg text-sm text-white" style={{ background: PRIMARY }}>Transférer</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {incoming && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center text-white p-6" style={{ background: PRIMARY }}>
+          <div className="absolute inset-0 opacity-30 animate-pulse" style={{ background: PRIMARY }} />
+          <div className="relative text-center mb-10">
+            <div className="text-sm opacity-80 mb-2">Appel entrant…</div>
+            <div className="text-3xl font-bold">{incoming.name ?? incoming.number}</div>
+            {incoming.name && <div className="text-sm opacity-80 mt-1">{incoming.number}</div>}
+          </div>
+          <div className="relative flex gap-6">
+            <button onClick={() => { action("reject", incoming.id); setIncoming(null); }} className="w-16 h-16 rounded-full flex items-center justify-center shadow-lg" style={{ background: DANGER }}>
+              <PhoneOff className="w-7 h-7" />
+            </button>
+            <button onClick={() => { action("answer", incoming.id); setIncoming(null); fetchActive(); }} className="w-16 h-16 rounded-full flex items-center justify-center shadow-lg" style={{ background: SUCCESS }}>
+              <Phone className="w-7 h-7" />
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ActiveCallCard({ call, muted, onMute, onHold, onTransfer, onHangup }: {
+  call: ActiveCall; muted: boolean; onMute: () => void; onHold: () => void; onTransfer: () => void; onHangup: () => void;
+}) {
+  const [tick, setTick] = useState(0);
+  useEffect(() => { const t = setInterval(() => setTick((x) => x + 1), 1000); return () => clearInterval(t); }, []);
+  const sec = Math.max(0, Math.floor((Date.now() - call.startedAt) / 1000));
+  const mm = String(Math.floor(sec / 60)).padStart(2, "0");
+  const ss = String(sec % 60).padStart(2, "0");
+  const statusLabel = call.status === "ringing" ? "Sonnerie..." : call.status === "hold" ? "En attente" : "En communication";
+
+  return (
+    <div className="rounded-2xl p-5 text-white shadow-lg" style={{ background: PRIMARY }}>
+      <div className="text-center">
+        <div className="text-2xl font-bold">{call.name ?? call.number}</div>
+        {call.name && <div className="text-sm opacity-80 mt-0.5">{call.number}</div>}
+        <div className="text-3xl font-mono mt-3">{mm}:{ss}</div>
+        <div className="text-xs opacity-80 mt-1">{statusLabel}</div>
+      </div>
+      <div className="grid grid-cols-4 gap-2 mt-5">
+        <ActionBtn label="Muet" active={muted} Icon={muted ? MicOff : Mic} onClick={onMute} />
+        <ActionBtn label={call.status === "hold" ? "Reprendre" : "Attente"} Icon={call.status === "hold" ? Play : Pause} onClick={onHold} />
+        <ActionBtn label="Transférer" Icon={ArrowRightLeft} onClick={onTransfer} />
+        <ActionBtn label="Raccrocher" Icon={PhoneOff} onClick={onHangup} big danger />
+      </div>
+    </div>
+  );
+}
+
+function ActionBtn({ label, Icon, onClick, active, big, danger }: { label: string; Icon: any; onClick: () => void; active?: boolean; big?: boolean; danger?: boolean }) {
+  return (
+    <button onClick={onClick} className="flex flex-col items-center gap-1.5">
+      <div
+        className={`rounded-full flex items-center justify-center ${big ? "w-14 h-14" : "w-12 h-12"} ${active ? "bg-white/40" : "bg-white/15"}`}
+        style={danger ? { background: DANGER } : undefined}
+      >
+        <Icon className={`${big ? "w-6 h-6" : "w-5 h-5"} text-white`} />
+      </div>
+      <span className="text-[10px] text-white/90">{label}</span>
+    </button>
   );
 }

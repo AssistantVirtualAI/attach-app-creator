@@ -11,7 +11,7 @@ const SUCCESS = "#27AE60";
 const DANGER = "#E74C3C";
 const BG = "#F8F9FA";
 
-export type PlanipretMobileContext = { profile: any; reloadProfile: () => Promise<void> };
+export type PlanipretMobileContext = { profile: any; reloadProfile: () => Promise<void>; openDialer: (number?: string) => void };
 
 const TABS = [
   { to: "/mplanipret/home", label: "Accueil", Icon: Home },
@@ -28,9 +28,10 @@ const KEYS: Array<{ d: string; l?: string }> = [
   { d: "*" }, { d: "0", l: "+" }, { d: "#" },
 ];
 
-function Dialer({ open, onClose }: { open: boolean; onClose: () => void }) {
+function Dialer({ open, onClose, initial }: { open: boolean; onClose: () => void; initial?: string }) {
   const [number, setNumber] = useState("");
   const [calling, setCalling] = useState(false);
+  useEffect(() => { if (open) setNumber(initial ?? ""); }, [open, initial]);
   const append = (c: string) => setNumber((n) => (n + c).slice(0, 20));
   const back = () => setNumber((n) => n.slice(0, -1));
   const startCall = async () => {
@@ -99,6 +100,8 @@ export default function PlanipretMobile() {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [dialerOpen, setDialerOpen] = useState(false);
+  const [dialerInit, setDialerInit] = useState<string | undefined>(undefined);
+  const openDialer = (n?: string) => { setDialerInit(n); setDialerOpen(true); };
 
   const loadProfile = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -142,7 +145,7 @@ export default function PlanipretMobile() {
     <Frame>
       <div className="h-full flex flex-col relative overflow-hidden" style={{ background: BG }}>
         <div className="flex-1 overflow-y-auto pb-24">
-          <Outlet context={{ profile, reloadProfile: loadProfile } satisfies PlanipretMobileContext} />
+          <Outlet context={{ profile, reloadProfile: loadProfile, openDialer } satisfies PlanipretMobileContext} />
         </div>
 
         {/* FAB */}
@@ -170,7 +173,7 @@ export default function PlanipretMobile() {
           ))}
         </nav>
 
-        <Dialer open={dialerOpen} onClose={() => setDialerOpen(false)} />
+        <Dialer open={dialerOpen} onClose={() => setDialerOpen(false)} initial={dialerInit} />
       </div>
     </Frame>
   );
