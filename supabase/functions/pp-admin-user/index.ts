@@ -47,6 +47,42 @@ Deno.serve(async (req) => {
         resource_type: "user", resource_id: created.user.id,
         metadata: { email, extension: ns_extension },
       });
+
+      // Welcome sequence (best-effort, non-blocking)
+      try {
+        const appUrl = "https://avastatistic.ca/mplanipret";
+        const html = `
+          <div style="font-family:Inter,Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#1A1A2E">
+            <h1 style="color:#1F4E79;margin:0 0 12px">Bienvenue sur Planiprêt AI Portal 🎉</h1>
+            <p>Bonjour <strong>${full_name}</strong>,</p>
+            <p>Votre accès est prêt. Voici vos informations :</p>
+            <ul style="background:#F4F8FC;padding:16px 24px;border-radius:8px">
+              <li><strong>Extension :</strong> ${ns_extension}</li>
+              <li><strong>Domaine :</strong> planipret.ca</li>
+              <li><strong>Email :</strong> ${email}</li>
+            </ul>
+            <p style="text-align:center;margin:24px 0">
+              <a href="${appUrl}" style="background:#1F4E79;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600">Ouvrir Planiprêt AI</a>
+            </p>
+            <p><img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(appUrl)}" alt="QR code" /></p>
+            <h3>Démarrage en 3 étapes</h3>
+            <ol>
+              <li>Connectez-vous à l'app et acceptez la politique de confidentialité</li>
+              <li>Ajoutez l'app à votre écran d'accueil (PWA)</li>
+              <li>Connectez Microsoft 365 dans Plus → Intégrations</li>
+            </ol>
+            <p style="font-size:12px;color:#94A3B8;margin-top:32px">Support : support@avastatistic.ca</p>
+          </div>`;
+        await admin.functions.invoke("send-transactional-email", {
+          body: { to: email, subject: "Bienvenue sur Planiprêt AI Portal 🎉", html, from: "support@avastatistic.ca" },
+        }).catch(() => null);
+
+        // Welcome SMS via NS-API
+        await admin.functions.invoke("ns-sms", {
+          body: { action: "send", to: payload.phone_number, body: `Bonjour ${full_name}! Votre accès Planiprêt AI est prêt. Connectez-vous: ${appUrl} Extension: ${ns_extension} - Support: support@avastatistic.ca` },
+        }).catch(() => null);
+      } catch (e) { console.error("welcome sequence", e); }
+
       return jsonResponse({ success: true, user_id: created.user.id });
     }
 
