@@ -24,7 +24,7 @@ export type Permission =
   | 'read:security_audit'
   | 'run:security_audit';
 
-export type Role = 'super_admin' | 'org_admin' | 'manager' | 'agent' | 'viewer';
+export type Role = 'super_admin' | 'org_admin' | 'manager' | 'agent' | 'viewer' | 'planipret_admin' | 'planipret_broker';
 
 export const DEFAULT_PERMISSIONS_MATRIX: Record<Role, Permission[]> = {
   super_admin: [
@@ -107,6 +107,17 @@ export const DEFAULT_PERMISSIONS_MATRIX: Record<Role, Permission[]> = {
     'read:agent_config',
   ],
   viewer: ['read:conversations', 'read:analytics', 'read:knowledge_base', 'read:agent_config'],
+  planipret_admin: [
+    'read:conversations',
+    'read:analytics',
+    'manage:members',
+    'manage:organization',
+    'read:notifications',
+  ],
+  planipret_broker: [
+    'read:conversations',
+    'read:notifications',
+  ],
 };
 
 export const ALL_PERMISSIONS = Array.from(

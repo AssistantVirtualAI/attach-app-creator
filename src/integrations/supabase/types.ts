@@ -7590,6 +7590,419 @@ export type Database = {
           },
         ]
       }
+      planipret_ai_insights: {
+        Row: {
+          call_id: string | null
+          coaching_notes: string | null
+          created_at: string
+          customer_intent: string | null
+          id: string
+          model: string | null
+          organization_id: string
+          raw_response: Json | null
+          sentiment: string | null
+          suggested_actions: Json
+          summary: string | null
+          topics: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          call_id?: string | null
+          coaching_notes?: string | null
+          created_at?: string
+          customer_intent?: string | null
+          id?: string
+          model?: string | null
+          organization_id?: string
+          raw_response?: Json | null
+          sentiment?: string | null
+          suggested_actions?: Json
+          summary?: string | null
+          topics?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          call_id?: string | null
+          coaching_notes?: string | null
+          created_at?: string
+          customer_intent?: string | null
+          id?: string
+          model?: string | null
+          organization_id?: string
+          raw_response?: Json | null
+          sentiment?: string | null
+          suggested_actions?: Json
+          summary?: string | null
+          topics?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planipret_ai_insights_call_id_fkey"
+            columns: ["call_id"]
+            isOneToOne: false
+            referencedRelation: "planipret_phone_calls"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      planipret_contacts: {
+        Row: {
+          company: string | null
+          created_at: string
+          email: string | null
+          external_id: string | null
+          first_name: string | null
+          full_name: string | null
+          id: string
+          last_name: string | null
+          metadata: Json
+          mobile: string | null
+          notes: string | null
+          organization_id: string
+          phone: string | null
+          source: string | null
+          tags: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          company?: string | null
+          created_at?: string
+          email?: string | null
+          external_id?: string | null
+          first_name?: string | null
+          full_name?: string | null
+          id?: string
+          last_name?: string | null
+          metadata?: Json
+          mobile?: string | null
+          notes?: string | null
+          organization_id?: string
+          phone?: string | null
+          source?: string | null
+          tags?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          company?: string | null
+          created_at?: string
+          email?: string | null
+          external_id?: string | null
+          first_name?: string | null
+          full_name?: string | null
+          id?: string
+          last_name?: string | null
+          metadata?: Json
+          mobile?: string | null
+          notes?: string | null
+          organization_id?: string
+          phone?: string | null
+          source?: string | null
+          tags?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      planipret_phone_calls: {
+        Row: {
+          ai_summary: string | null
+          answered_at: string | null
+          created_at: string
+          direction: string
+          duration_seconds: number | null
+          ended_at: string | null
+          extension: string | null
+          from_name: string | null
+          from_number: string | null
+          id: string
+          metadata: Json
+          ns_call_id: string | null
+          ns_domain: string | null
+          organization_id: string
+          recording_url: string | null
+          started_at: string | null
+          status: string | null
+          to_name: string | null
+          to_number: string | null
+          transcript: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ai_summary?: string | null
+          answered_at?: string | null
+          created_at?: string
+          direction: string
+          duration_seconds?: number | null
+          ended_at?: string | null
+          extension?: string | null
+          from_name?: string | null
+          from_number?: string | null
+          id?: string
+          metadata?: Json
+          ns_call_id?: string | null
+          ns_domain?: string | null
+          organization_id?: string
+          recording_url?: string | null
+          started_at?: string | null
+          status?: string | null
+          to_name?: string | null
+          to_number?: string | null
+          transcript?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ai_summary?: string | null
+          answered_at?: string | null
+          created_at?: string
+          direction?: string
+          duration_seconds?: number | null
+          ended_at?: string | null
+          extension?: string | null
+          from_name?: string | null
+          from_number?: string | null
+          id?: string
+          metadata?: Json
+          ns_call_id?: string | null
+          ns_domain?: string | null
+          organization_id?: string
+          recording_url?: string | null
+          started_at?: string | null
+          status?: string | null
+          to_name?: string | null
+          to_number?: string | null
+          transcript?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      planipret_phone_messages: {
+        Row: {
+          body: string | null
+          created_at: string
+          direction: string
+          from_number: string | null
+          id: string
+          media_urls: Json
+          metadata: Json
+          ns_message_id: string | null
+          organization_id: string
+          read_at: string | null
+          sent_at: string | null
+          status: string | null
+          thread_id: string | null
+          to_number: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          direction: string
+          from_number?: string | null
+          id?: string
+          media_urls?: Json
+          metadata?: Json
+          ns_message_id?: string | null
+          organization_id?: string
+          read_at?: string | null
+          sent_at?: string | null
+          status?: string | null
+          thread_id?: string | null
+          to_number?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          direction?: string
+          from_number?: string | null
+          id?: string
+          media_urls?: Json
+          metadata?: Json
+          ns_message_id?: string | null
+          organization_id?: string
+          read_at?: string | null
+          sent_at?: string | null
+          status?: string | null
+          thread_id?: string | null
+          to_number?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      planipret_profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string | null
+          extension: string | null
+          full_name: string | null
+          id: string
+          language: string
+          metadata: Json
+          mobile_app_enabled: boolean
+          ns_domain: string | null
+          ns_user_id: string | null
+          organization_id: string
+          phone: string | null
+          role: string
+          updated_at: string
+          user_id: string
+          voice_agent_enabled: boolean
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          extension?: string | null
+          full_name?: string | null
+          id?: string
+          language?: string
+          metadata?: Json
+          mobile_app_enabled?: boolean
+          ns_domain?: string | null
+          ns_user_id?: string | null
+          organization_id?: string
+          phone?: string | null
+          role?: string
+          updated_at?: string
+          user_id: string
+          voice_agent_enabled?: boolean
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          extension?: string | null
+          full_name?: string | null
+          id?: string
+          language?: string
+          metadata?: Json
+          mobile_app_enabled?: boolean
+          ns_domain?: string | null
+          ns_user_id?: string | null
+          organization_id?: string
+          phone?: string | null
+          role?: string
+          updated_at?: string
+          user_id?: string
+          voice_agent_enabled?: boolean
+        }
+        Relationships: []
+      }
+      planipret_settings: {
+        Row: {
+          created_at: string
+          id: string
+          language: string | null
+          m365_connected: boolean
+          maestro_connected: boolean
+          notifications_enabled: boolean
+          organization_id: string
+          preferences: Json
+          ringtone: string | null
+          theme: string | null
+          updated_at: string
+          user_id: string
+          voice_agent_lang: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          language?: string | null
+          m365_connected?: boolean
+          maestro_connected?: boolean
+          notifications_enabled?: boolean
+          organization_id?: string
+          preferences?: Json
+          ringtone?: string | null
+          theme?: string | null
+          updated_at?: string
+          user_id: string
+          voice_agent_lang?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          language?: string | null
+          m365_connected?: boolean
+          maestro_connected?: boolean
+          notifications_enabled?: boolean
+          organization_id?: string
+          preferences?: Json
+          ringtone?: string | null
+          theme?: string | null
+          updated_at?: string
+          user_id?: string
+          voice_agent_lang?: string | null
+        }
+        Relationships: []
+      }
+      planipret_voicemails: {
+        Row: {
+          audio_url: string | null
+          created_at: string
+          duration_seconds: number | null
+          folder: string
+          from_name: string | null
+          from_number: string | null
+          id: string
+          is_read: boolean
+          metadata: Json
+          ns_vm_id: string | null
+          organization_id: string
+          received_at: string | null
+          transcript: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          audio_url?: string | null
+          created_at?: string
+          duration_seconds?: number | null
+          folder?: string
+          from_name?: string | null
+          from_number?: string | null
+          id?: string
+          is_read?: boolean
+          metadata?: Json
+          ns_vm_id?: string | null
+          organization_id?: string
+          received_at?: string | null
+          transcript?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          audio_url?: string | null
+          created_at?: string
+          duration_seconds?: number | null
+          folder?: string
+          from_name?: string | null
+          from_number?: string | null
+          id?: string
+          is_read?: boolean
+          metadata?: Json
+          ns_vm_id?: string | null
+          organization_id?: string
+          received_at?: string | null
+          transcript?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       platform_branding: {
         Row: {
           client_portal_favicon_url: string | null
@@ -11176,6 +11589,8 @@ export type Database = {
             }
             Returns: boolean
           }
+      is_planipret_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_planipret_member: { Args: { _user_id: string }; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       lemtel_can_grant_app_access: { Args: { _uid: string }; Returns: boolean }
       log_access_violation: {
@@ -11215,6 +11630,7 @@ export type Database = {
         Returns: boolean
       }
       pin_chat_message: { Args: { _message_id: string }; Returns: undefined }
+      planipret_ava_org_id: { Args: never; Returns: string }
       reconcile_pbx_call_records: { Args: { _org_id: string }; Returns: Json }
       relink_my_softphone_user: { Args: never; Returns: Json }
       resolve_org_by_domain_name: {
@@ -11306,7 +11722,14 @@ export type Database = {
         | "forward_extension"
         | "forward_external"
         | "follow_org_default"
-      app_role: "super_admin" | "org_admin" | "manager" | "agent" | "viewer"
+      app_role:
+        | "super_admin"
+        | "org_admin"
+        | "manager"
+        | "agent"
+        | "viewer"
+        | "planipret_admin"
+        | "planipret_broker"
       porting_status:
         | "submitted"
         | "in_review"
@@ -11453,7 +11876,15 @@ export const Constants = {
         "forward_external",
         "follow_org_default",
       ],
-      app_role: ["super_admin", "org_admin", "manager", "agent", "viewer"],
+      app_role: [
+        "super_admin",
+        "org_admin",
+        "manager",
+        "agent",
+        "viewer",
+        "planipret_admin",
+        "planipret_broker",
+      ],
       porting_status: [
         "submitted",
         "in_review",

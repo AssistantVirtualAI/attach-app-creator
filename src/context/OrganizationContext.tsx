@@ -22,7 +22,7 @@ interface UserRole {
   id: string;
   user_id: string;
   organization_id: string;
-  role: 'super_admin' | 'org_admin' | 'manager' | 'agent' | 'viewer';
+  role: 'super_admin' | 'org_admin' | 'manager' | 'agent' | 'viewer' | 'planipret_admin' | 'planipret_broker';
   created_at: string;
 }
 
