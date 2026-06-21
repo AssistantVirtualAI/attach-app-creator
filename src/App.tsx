@@ -359,6 +359,7 @@ const App = () => (
 
                 {/* Planipret Admin sub-routes (layout with sidebar) */}
                 <Route path="/dashboard" element={<PlanipretAdminLayout />}>
+                  <Route index element={<PAOverview />} />
                   <Route path="overview" element={<PAOverview />} />
                   <Route path="users" element={<PAUsers />} />
                   <Route path="calls" element={<PACalls />} />
