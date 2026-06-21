@@ -50,8 +50,9 @@ export async function getPostLoginRoute(userId: string): Promise<string> {
       return '/customer';
     }
 
-    return '/my';
+    return '/dashboard';
   } catch {
-    return '/my';
+    return '/dashboard';
+
   }
 }
