@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
-import { useOutletContext } from "react-router-dom";
+import { useOutletContext, useNavigate } from "react-router-dom";
 
 import { supabase } from "@/integrations/supabase/client";
-import { Phone, PhoneMissed, MessageSquare, Voicemail, ArrowDownLeft, ArrowUpRight, X, Calendar, Headphones, Bot } from "lucide-react";
+import { Phone, PhoneMissed, MessageSquare, Voicemail, ArrowDownLeft, ArrowUpRight, X, Calendar, Headphones, Bot, BellOff, Flame } from "lucide-react";
 import type { PlanipretMobileContext } from "../PlanipretMobile";
 import { toast } from "sonner";
 import VoiceAgent from "@/components/VoiceAgent";
 import PWAInstallBanner from "@/components/planipret/PWAInstallBanner";
+import { TEMP_COLORS, TEMP_EMOJI } from "@/components/planipret/leadHelpers";
 
 const PRIMARY = "#1F4E79";
 const SUCCESS = "#27AE60";
