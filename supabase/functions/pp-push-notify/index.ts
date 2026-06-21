@@ -5,9 +5,12 @@ import webpush from "npm:web-push@3.6.7";
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
-    const VAPID_PUBLIC = Deno.env.get("VAPID_PUBLIC_KEY");
-    const VAPID_PRIVATE = Deno.env.get("VAPID_PRIVATE_KEY");
-    const SUBJECT = Deno.env.get("VAPID_SUBJECT") ?? "mailto:noreply@avastatistic.ca";
+    const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const { data: cfg } = await admin.from("planipret_integration_secrets").select("config").eq("provider", "webpush").maybeSingle();
+    const c = (cfg?.config ?? {}) as any;
+    const VAPID_PUBLIC = c.public_key ?? Deno.env.get("VAPID_PUBLIC_KEY");
+    const VAPID_PRIVATE = c.private_key ?? Deno.env.get("VAPID_PRIVATE_KEY");
+    const SUBJECT = c.subject ?? Deno.env.get("VAPID_SUBJECT") ?? "mailto:noreply@avastatistic.ca";
     if (!VAPID_PUBLIC || !VAPID_PRIVATE) return json({ error: "vapid_not_configured" }, 503);
     webpush.setVapidDetails(SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);
 
