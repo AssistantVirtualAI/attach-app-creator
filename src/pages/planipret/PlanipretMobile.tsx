@@ -195,20 +195,30 @@ export default function PlanipretMobile() {
 
         {/* Tab bar */}
         <nav className="absolute bottom-[22px] inset-x-0 h-[72px] bg-white border-t border-slate-200 grid grid-cols-5 z-10">
-          {TABS.map((t, i) => (
-            <NavLink key={t.to} to={t.to}
-              className={({ isActive }) =>
-                `flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium ${i === 2 ? "invisible" : ""} ${isActive ? "" : "text-slate-400"}`
-              }
-              style={({ isActive }) => isActive ? { color: PRIMARY } : undefined}>
-              {({ isActive }) => (
-                <>
-                  <t.Icon className="w-5 h-5" strokeWidth={isActive ? 2.5 : 1.8} fill={isActive ? "currentColor" : "none"} fillOpacity={isActive ? 0.15 : 0} />
-                  <span>{t.label}</span>
-                </>
-              )}
-            </NavLink>
-          ))}
+          {TABS.map((t, i) => {
+            const badge = t.to.endsWith("/messages") ? unreadMsg : t.to.endsWith("/voicemail") ? unreadVm : 0;
+            return (
+              <NavLink key={t.to} to={t.to}
+                className={({ isActive }) =>
+                  `relative flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium ${i === 2 ? "invisible" : ""} ${isActive ? "" : "text-slate-400"}`
+                }
+                style={({ isActive }) => isActive ? { color: PRIMARY } : undefined}>
+                {({ isActive }) => (
+                  <>
+                    <div className="relative">
+                      <t.Icon className="w-5 h-5" strokeWidth={isActive ? 2.5 : 1.8} fill={isActive ? "currentColor" : "none"} fillOpacity={isActive ? 0.15 : 0} />
+                      {badge > 0 && (
+                        <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">
+                          {badge > 9 ? "9+" : badge}
+                        </span>
+                      )}
+                    </div>
+                    <span>{t.label}</span>
+                  </>
+                )}
+              </NavLink>
+            );
+          })}
         </nav>
 
         {/* Powered by AVA footer */}
