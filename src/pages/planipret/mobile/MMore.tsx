@@ -229,6 +229,29 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
   );
 }
 
+function NotificationsSection({ profile, reloadProfile }: { profile: any; reloadProfile: () => Promise<void> }) {
+  const { subscribe, sendTest, busy } = require("@/hooks/usePlanipretPush").usePlanipretPush();
+  const setPref = async (field: string, val: boolean) => {
+    await supabase.from("planipret_profiles").update({ [field]: val }).eq("user_id", profile.user_id);
+    await reloadProfile();
+  };
+  const enablePush = async () => {
+    const ok = await subscribe(profile.user_id);
+    if (ok) await reloadProfile();
+  };
+  return (
+    <Section title="Notifications push">
+      <Row icon={<Bell className="w-4 h-4" />} label="Activer notifications push" onClick={enablePush} sub="Recevoir des alertes même app fermée" chevron />
+      <Row icon={<Phone className="w-4 h-4" />} label="Appels entrants" right={<Toggle on={!!profile?.notif_calls} onChange={(v) => setPref("notif_calls", v)} />} />
+      <Row icon={<Bell className="w-4 h-4" />} label="Nouveaux SMS" right={<Toggle on={!!profile?.notif_sms} onChange={(v) => setPref("notif_sms", v)} />} />
+      <Row icon={<Bell className="w-4 h-4" />} label="Nouveaux voicemails" right={<Toggle on={!!profile?.notif_voicemails} onChange={(v) => setPref("notif_voicemails", v)} />} />
+      <Row icon={<Sparkles className="w-4 h-4" />} label="Analyses IA prêtes" right={<Toggle on={!!profile?.notif_ai} onChange={(v) => setPref("notif_ai", v)} />} />
+      <Row icon={<Bell className="w-4 h-4" />} label="Rappels" right={<Toggle on={!!profile?.notif_reminders} onChange={(v) => setPref("notif_reminders", v)} />} />
+      <Row icon={<Sparkles className="w-4 h-4" />} label={busy ? "Envoi…" : "Tester une notification"} onClick={() => sendTest(profile.user_id)} chevron />
+    </Section>
+  );
+}
+
 function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-40 flex items-end md:items-center md:justify-center bg-black/40" onClick={onClose}>
