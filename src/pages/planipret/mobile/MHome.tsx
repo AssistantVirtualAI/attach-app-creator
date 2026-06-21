@@ -26,6 +26,15 @@ export default function MHome() {
   const [briefLoading, setBriefLoading] = useState(false);
   const [statsLoading, setStatsLoading] = useState(true);
   const [sipOnline, setSipOnline] = useState(false);
+  const [agentOpen, setAgentOpen] = useState(false);
+
+  const openAgent = async () => {
+    try {
+      const p = await navigator.permissions.query({ name: "microphone" as PermissionName });
+      if (p.state === "denied") { toast.error("🎙️ Accès au microphone refusé. Autorisez-le dans votre navigateur."); return; }
+    } catch { /* ignore */ }
+    setAgentOpen(true);
+  };
 
   const dateLabel = new Date().toLocaleDateString("fr-CA", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
