@@ -100,7 +100,7 @@ export default function DialerFab({
             </button>
           </div>
           <div style={{ flex: 1, minHeight: 0 }}>
-            <DialerScreen sp={sp} haptic={haptic} preferClickToCall={preferClickToCall} />
+            <DialerScreen sp={sp} haptic={haptic} />
           </div>
         </div>
       )}

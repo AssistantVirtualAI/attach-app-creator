@@ -429,7 +429,7 @@ function AuthenticatedShell({
           {tab === 'contacts'   && <ContactsScreen sp={sp} />}
           {tab === 'chats'      && <MessagesHubScreen accessToken={creds.accessToken || null} userId={creds.userId} sp={sp} haptic={haptic} channelUnread={notif.channelUnread} />}
           {tab === 'calls'      && <CallsScreen sp={sp} haptic={haptic} creds={creds} />}
-          {tab === 'keypad'     && <DialerScreen sp={sp} haptic={haptic} preferClickToCall={preferClickToCall} />}
+          {tab === 'keypad'     && <DialerScreen sp={sp} haptic={haptic} />}
           {tab === 'speeddial'  && <SpeedDialScreen sp={sp} preferClickToCall={preferClickToCall} />}
           {/* legacy deep-link routes */}
           {tab === 'home'       && <DashboardScreen onNavigate={setTab as any} haptic={haptic} onOpenProfile={() => setProfileOpen(true)} />}
