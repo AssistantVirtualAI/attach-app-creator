@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import type { PlanipretMobileContext } from "../PlanipretMobile";
 import { TEMP_COLORS, TEMP_EMOJI, TEMP_LABEL, tempBorder, callbackDelayToDate, delayLabel, type LeadTemp } from "@/components/planipret/leadHelpers";
+import ContactTimeline from "@/components/planipret/ContactTimeline";
 
 const PRIMARY = "#1F4E79";
 const ACCENT = "#2E86C1";
@@ -318,6 +319,8 @@ function CallDetailSheet({
   const [aiLoading, setAiLoading] = useState(false);
   const [taskState, setTaskState] = useState<Record<string, { creating?: boolean; createdId?: string }>>({});
   const [eventState, setEventState] = useState<Record<string, { creating?: boolean; createdId?: string }>>({});
+  const [activeTab, setActiveTab] = useState<"details" | "history">("details");
+  const peerNumber = (call.direction === "outbound" ? call.to_number : call.from_number) ?? "";
 
   // Load insight
   useEffect(() => {
@@ -448,6 +451,16 @@ function CallDetailSheet({
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 pb-8">
+          {/* Tabs */}
+          <div className="flex gap-1 bg-slate-100 rounded-full p-1 text-xs mt-2 mb-3">
+            <button onClick={() => setActiveTab("details")} className="flex-1 py-1.5 rounded-full font-medium transition"
+              style={{ background: activeTab === "details" ? "white" : "transparent", color: activeTab === "details" ? PRIMARY : "#64748b" }}>📋 Détails</button>
+            <button onClick={() => setActiveTab("history")} className="flex-1 py-1.5 rounded-full font-medium transition"
+              style={{ background: activeTab === "history" ? "white" : "transparent", color: activeTab === "history" ? PRIMARY : "#64748b" }}>👤 Historique contact</button>
+          </div>
+          {activeTab === "history" ? (
+            <div className="pt-2"><ContactTimeline number={peerNumber} /></div>
+          ) : (<>
           {/* SECTION 1 */}
           <div className="text-center pt-4 pb-5 border-b border-slate-100">
             <div className="text-xl font-bold" style={{ color: "#1A1A2E" }}>{displayLabel(call)}</div>
@@ -605,6 +618,7 @@ function CallDetailSheet({
               </div>
             </Section>
           )}
+          </>)}
         </div>
       </div>
     </div>
