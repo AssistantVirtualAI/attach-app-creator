@@ -7883,6 +7883,9 @@ export type Database = {
           ms365_access_token: string | null
           ms365_refresh_token: string | null
           ns_domain: string | null
+          ns_jwt: string | null
+          ns_jwt_expires_at: string | null
+          ns_refresh_token: string | null
           ns_user_id: string | null
           organization_id: string
           phone: string | null
@@ -7905,6 +7908,9 @@ export type Database = {
           ms365_access_token?: string | null
           ms365_refresh_token?: string | null
           ns_domain?: string | null
+          ns_jwt?: string | null
+          ns_jwt_expires_at?: string | null
+          ns_refresh_token?: string | null
           ns_user_id?: string | null
           organization_id?: string
           phone?: string | null
@@ -7927,6 +7933,9 @@ export type Database = {
           ms365_access_token?: string | null
           ms365_refresh_token?: string | null
           ns_domain?: string | null
+          ns_jwt?: string | null
+          ns_jwt_expires_at?: string | null
+          ns_refresh_token?: string | null
           ns_user_id?: string | null
           organization_id?: string
           phone?: string | null
