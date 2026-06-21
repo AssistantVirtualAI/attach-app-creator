@@ -26,6 +26,7 @@ import MMore from "./pages/planipret/mobile/MMore";
 import PlanipretDashboard from "./pages/planipret/PlanipretDashboard";
 import PlanipretIntegrationSecrets from "./pages/planipret/PlanipretIntegrationSecrets";
 import PlanipretIntegrations from "./pages/planipret/PlanipretIntegrations";
+import PlanipretAudit from "./pages/planipret/PlanipretAudit";
 import Ms365Callback from "./pages/planipret/Ms365Callback";
 
 import Dashboard from "./pages/Dashboard";
@@ -345,6 +346,7 @@ const App = () => (
                 <Route path="/planipret/integrations" element={<PlanipretIntegrationSecrets />} />
                 <Route path="/dashboard/integrations" element={<PlanipretIntegrations />} />
                 <Route path="/auth/ms365/callback" element={<Ms365Callback />} />
+                <Route path="/dashboard/audit" element={<PlanipretAudit />} />
 
                 
                 {/* Protected routes */}
