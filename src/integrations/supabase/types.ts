@@ -11306,7 +11306,14 @@ export type Database = {
         | "forward_extension"
         | "forward_external"
         | "follow_org_default"
-      app_role: "super_admin" | "org_admin" | "manager" | "agent" | "viewer"
+      app_role:
+        | "super_admin"
+        | "org_admin"
+        | "manager"
+        | "agent"
+        | "viewer"
+        | "planipret_admin"
+        | "planipret_broker"
       porting_status:
         | "submitted"
         | "in_review"
@@ -11453,7 +11460,15 @@ export const Constants = {
         "forward_external",
         "follow_org_default",
       ],
-      app_role: ["super_admin", "org_admin", "manager", "agent", "viewer"],
+      app_role: [
+        "super_admin",
+        "org_admin",
+        "manager",
+        "agent",
+        "viewer",
+        "planipret_admin",
+        "planipret_broker",
+      ],
       porting_status: [
         "submitted",
         "in_review",
