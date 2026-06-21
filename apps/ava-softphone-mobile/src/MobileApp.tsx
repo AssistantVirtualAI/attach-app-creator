@@ -460,7 +460,7 @@ function AuthenticatedShell({
         }}
       />
 
-      {!inCall && <DialerFab sp={sp} haptic={haptic}  />}
+      {/* Floating keypad FAB removed — keypad is reachable via the bottom tab bar. */}
       {inCall && <ActiveCallSheet sp={sp} haptic={haptic} />}
 
       {profileOpen && (
