@@ -331,6 +331,8 @@ const App = () => (
                 <Route path="/mplanipret" element={<PlanipretMobile />} />
                 <Route path="/planipret/dashboard" element={<PlanipretDashboard />} />
                 <Route path="/planipret/integrations" element={<PlanipretIntegrationSecrets />} />
+                <Route path="/dashboard/integrations" element={<PlanipretIntegrations />} />
+                <Route path="/auth/ms365/callback" element={<Ms365Callback />} />
 
                 
                 {/* Protected routes */}
