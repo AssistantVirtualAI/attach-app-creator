@@ -106,11 +106,31 @@ export default function PlanipretMobile() {
   const [loading, setLoading] = useState(true);
   const [dialerOpen, setDialerOpen] = useState(false);
   const [dialerInit, setDialerInit] = useState<string | undefined>(undefined);
+  const [unreadMsg, setUnreadMsg] = useState(0);
+  const [unreadVm, setUnreadVm] = useState(0);
   const openDialer = (n?: string) => { setDialerInit(n); setDialerOpen(true); };
   const refreshFn = useRef<(() => Promise<void> | void) | null>(null);
   const registerRefresh = (fn: (() => Promise<void> | void) | null) => { refreshFn.current = fn; };
   const handlePull = async () => { if (refreshFn.current) await refreshFn.current(); };
   const { ref: scrollRef, pullDist, refreshing, threshold } = usePullToRefresh(handlePull);
+
+  useEffect(() => {
+    if (!profile?.user_id) return;
+    const refreshCounts = async () => {
+      const [{ count: mc }, { count: vc }] = await Promise.all([
+        supabase.from("planipret_phone_messages").select("id", { count: "exact", head: true }).eq("user_id", profile.user_id).eq("direction", "inbound").is("read_at", null),
+        supabase.from("planipret_voicemails").select("id", { count: "exact", head: true }).eq("user_id", profile.user_id).eq("folder", "inbox").eq("is_read", false),
+      ]);
+      setUnreadMsg(mc ?? 0); setUnreadVm(vc ?? 0);
+    };
+    refreshCounts();
+    const ch = supabase
+      .channel("mplanipret-badges")
+      .on("postgres_changes", { event: "*", schema: "public", table: "planipret_phone_messages", filter: `user_id=eq.${profile.user_id}` }, refreshCounts)
+      .on("postgres_changes", { event: "*", schema: "public", table: "planipret_voicemails", filter: `user_id=eq.${profile.user_id}` }, refreshCounts)
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [profile?.user_id, location.pathname]);
 
 
   const loadProfile = async () => {
@@ -175,20 +195,30 @@ export default function PlanipretMobile() {
 
         {/* Tab bar */}
         <nav className="absolute bottom-[22px] inset-x-0 h-[72px] bg-white border-t border-slate-200 grid grid-cols-5 z-10">
-          {TABS.map((t, i) => (
-            <NavLink key={t.to} to={t.to}
-              className={({ isActive }) =>
-                `flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium ${i === 2 ? "invisible" : ""} ${isActive ? "" : "text-slate-400"}`
-              }
-              style={({ isActive }) => isActive ? { color: PRIMARY } : undefined}>
-              {({ isActive }) => (
-                <>
-                  <t.Icon className="w-5 h-5" strokeWidth={isActive ? 2.5 : 1.8} fill={isActive ? "currentColor" : "none"} fillOpacity={isActive ? 0.15 : 0} />
-                  <span>{t.label}</span>
-                </>
-              )}
-            </NavLink>
-          ))}
+          {TABS.map((t, i) => {
+            const badge = t.to.endsWith("/messages") ? unreadMsg : t.to.endsWith("/voicemail") ? unreadVm : 0;
+            return (
+              <NavLink key={t.to} to={t.to}
+                className={({ isActive }) =>
+                  `relative flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium ${i === 2 ? "invisible" : ""} ${isActive ? "" : "text-slate-400"}`
+                }
+                style={({ isActive }) => isActive ? { color: PRIMARY } : undefined}>
+                {({ isActive }) => (
+                  <>
+                    <div className="relative">
+                      <t.Icon className="w-5 h-5" strokeWidth={isActive ? 2.5 : 1.8} fill={isActive ? "currentColor" : "none"} fillOpacity={isActive ? 0.15 : 0} />
+                      {badge > 0 && (
+                        <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">
+                          {badge > 9 ? "9+" : badge}
+                        </span>
+                      )}
+                    </div>
+                    <span>{t.label}</span>
+                  </>
+                )}
+              </NavLink>
+            );
+          })}
         </nav>
 
         {/* Powered by AVA footer */}
