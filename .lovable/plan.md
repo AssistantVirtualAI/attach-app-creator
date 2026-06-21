@@ -1,47 +1,53 @@
-## Goal
-Eliminate "unauthorized" failures and blank screens in the mobile app by persisting the Supabase session natively, restoring it on launch, auto-refreshing tokens, and surfacing a clear error state instead of blanking out.
+# Réorganisation de la barre de navigation mobile
 
-## Changes
+## Objectif
+Faire correspondre la barre du bas à la capture d'écran fournie :
+**Contacts · Chats · Calls · Keypad · Speed dial** — supprimer Home, supprimer complètement le bouton AVA (chatbot) flottant au centre.
 
-### 1. `apps/ava-softphone-mobile/src/lib/mobileSupabase.ts`
-Add a properly configured Supabase client (separate from the generated one in `@/integrations/supabase/client`) so the mobile app can persist its session via Capacitor `Preferences`:
-- New `getMobileSupabaseClient()` (and `export const supabase`) using `createClient` with:
-  - `auth.persistSession: true`, `auth.autoRefreshToken: true`
-  - `auth.storage` backed by `@capacitor/preferences` on native, `localStorage` fallback on web
-  - `auth.storageKey: 'lemtel-mobile-auth'` (so it does not collide with the desktop client)
-  - `realtime.params.eventsPerSecond: 2`
-- Keep `authedRealtime`, `restGet`, `restPost`, `edgeCall`, recordings helpers untouched (already token-aware).
+## 1. `components/BottomTabs.tsx` — refonte
+- Supprimer le bouton circulaire AVA flottant au centre et toute la logique associée (gradient, label "AVA").
+- Remplacer le type `Tab` actif par les 5 onglets visibles : `contacts | chats | calls | keypad | speeddial` (les anciens identifiants `home`, `ava`, `more`, `voicemail`, `sms`, `queues`, `messages`, `settings` restent dans le type pour les deep-links mais ne sont plus rendus dans la barre).
+- Grille `gridTemplateColumns: 'repeat(5, 1fr)'`.
+- Icônes (lucide) :
+  - Contacts → `User`
+  - Chats → `MessageCircle` (ou icône bulle de discussion)
+  - Calls → `Phone`
+  - Keypad → `Grid3x3` (style pavé numérique)
+  - Speed dial → `LayoutGrid` (4 points / grille)
+- L'onglet actif garde le style bleu surligné comme dans la photo (texte bleu, icône bleue).
 
-### 2. `apps/ava-softphone-mobile/src/lib/mobileApi.ts`
-- Switch the `supabase` import from `@/integrations/supabase/client` to the new `./mobileSupabase` client so `getFreshToken()` reads the persisted mobile session.
-- In `call()`, when `getFreshToken()` returns null, return the supplied `mockData` (treated as an empty placeholder) **only for GETs**, and throw an `AUTH_REQUIRED` error for mutations. This stops cascading blank screens during a brief token gap while still surfacing real auth failures on user actions.
-- Tag the thrown error with `code: 'AUTH_REQUIRED'` so the UI can detect it.
+## 2. `MobileApp.tsx` — routage
+- Onglet par défaut : `keypad` (au lieu de `home`).
+- Mapping des routes rendues :
+  - `contacts` → `ContactsScreen`
+  - `chats` → `MessagesHubScreen` (réutilise l'écran de messagerie existant)
+  - `calls` → `CallsScreen`
+  - `keypad` → `DialerScreen`
+  - `speeddial` → nouvel écran (voir §4)
+- Conserver les routes existantes pour deep-links (`home`, `ava`, `more`, etc.) mais ne plus les afficher dans la barre.
+- Supprimer le redirect automatique vers `ava` dans le gestionnaire de notifications (ou le laisser ouvrir `chats`).
+- Remplacer `setTab('home')` initial par `setTab('keypad')`.
 
-### 3. `apps/ava-softphone-mobile/src/MobileApp.tsx`
-- Import the new mobile `supabase` client.
-- New effect (after creds load) that calls `supabase.auth.setSession({ access_token, refresh_token })` whenever `creds.accessToken` / `creds.refreshToken` change, logging success/failure.
-- Subscribe to `supabase.auth.onAuthStateChange`:
-  - `TOKEN_REFRESHED` → `setCreds({ ...creds, accessToken, refreshToken })` so storage stays current.
-  - `SIGNED_OUT` → call existing `clearCreds()` so the app returns to `AuthScreen`.
-- Add a top-level `authError` state. When `mobileApi` throws `AUTH_REQUIRED` (caught via a new window-level event emitted from `mobileApi.ts`), render a `<SessionExpired />` banner with "Log out" button instead of a blank screen.
+## 3. `SettingsScreen.tsx` — masquer AVA chatbot
+- Supprimer toute entrée/lien menant à `AVAChatScreen` ou au "AVA Assistant / Chatbot" dans la page Réglages.
+- Retirer également le `DialerFab` "AVA" s'il apparaît dans d'autres écrans liés aux réglages.
 
-### 4. `apps/ava-softphone-mobile/src/hooks/useRealtimeCDR.ts`
-- Replace the locally-created `createClient(...)` with the shared `supabase` from `./lib/mobileSupabase` (still call `realtime.setAuth(token)` on token change so subscriptions are authenticated).
-- Drop the unused `ANON_KEY`/`SUPABASE_URL` constants where possible; keep them only for the `cron-pbx-sync` fetch.
+## 4. Nouvel écran `screens/SpeedDialScreen.tsx`
+- Grille de favoris (contacts épinglés) avec appel rapide via `sp.call(number)` ou Click-to-Call.
+- Données depuis `mobileApi.getContacts({ favorite: true })` (fallback : liste vide avec état "Ajoutez des favoris").
+- Skeletons pendant le chargement (cohérent avec les autres écrans).
 
-### 5. `apps/ava-softphone-mobile/src/lib/creds.ts` (small touch)
-- Ensure `Creds` already has `refreshToken`; if not, add it and persist via existing creds storage (read-only check — only edit if missing).
+## 5. i18n
+- Ajouter clés `tabs.contacts`, `tabs.chats`, `tabs.keypad`, `tabs.speeddial` (fr + en).
+- Supprimer `tabs.home` et `tabs.ava` de la barre (clés peuvent rester pour compat).
 
-### 6. New component `apps/ava-softphone-mobile/src/components/SessionExpired.tsx`
-- Simple full-screen card: title "Session expirée", subtitle "Veuillez vous reconnecter pour continuer.", primary action button → `onSignOut()`.
+## Fichiers touchés
+- `apps/ava-softphone-mobile/src/components/BottomTabs.tsx` (refonte)
+- `apps/ava-softphone-mobile/src/MobileApp.tsx` (routage + tab initial)
+- `apps/ava-softphone-mobile/src/screens/SettingsScreen.tsx` (suppression entrées AVA)
+- `apps/ava-softphone-mobile/src/screens/SpeedDialScreen.tsx` (nouveau)
+- `apps/ava-softphone-mobile/src/lib/i18n.ts` (nouvelles clés)
 
-## Non-goals
-- No changes to vite.config.ts, electron-builder.yml, `.github/workflows/`, or generated `src/integrations/supabase/*`.
-- No SIP / WebRTC / SDP changes.
-- No edge-function changes.
-
-## Validation
-- Boot app cold → splash → dashboard loads with stored session (no blank, no 401 spam in console).
-- Force expire token (set `accessToken=''` in storage) → see `SessionExpired` card with "Log out" instead of blank screen.
-- Idle 1h → `TOKEN_REFRESHED` event fires, `creds` updated, no re-auth required.
-- Realtime CDR keeps streaming after token refresh.
+## Hors scope
+- Pas de modification du backend / edge functions.
+- `AVAChatScreen` reste accessible via deep-link (`?tab=ava`) mais n'est plus exposé dans l'UI.

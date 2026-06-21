@@ -12,8 +12,8 @@ import type { Tab } from '../components/BottomTabs';
 const PORTAL_URL = 'https://avastatistic.ca';
 
 export default function SettingsScreen({
-  creds, sp, onSignOut, onNavigate, 
-}: { creds: Creds; sp: any; onSignOut: () => void; onNavigate?: (t: Tab) => void;  }) {
+  creds, sp, onSignOut, onNavigate, preferClickToCall = false, togglePreferC2C = () => {},
+}: { creds: Creds; sp: any; onSignOut: () => void; onNavigate?: (t: Tab) => void; preferClickToCall?: boolean; togglePreferC2C?: () => void }) {
   const { t, lang, setLang } = useT();
   const { mode, toggle: toggleTheme } = useTheme();
   const [me, setMe] = useState<MeResponse | null>(null);

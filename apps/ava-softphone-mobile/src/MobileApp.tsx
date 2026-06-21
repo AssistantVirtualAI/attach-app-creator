@@ -16,6 +16,8 @@ const MessagesScreen     = lazy(() => import('./screens/MessagesScreen'));
 const MessagesHubScreen  = lazy(() => import('./screens/MessagesHubScreen'));
 const QueuesScreen       = lazy(() => import('./screens/QueuesScreen'));
 const SettingsScreen     = lazy(() => import('./screens/SettingsScreen'));
+const DialerScreen       = lazy(() => import('./screens/DialerScreen'));
+const SpeedDialScreen    = lazy(() => import('./screens/SpeedDialScreen'));
 import BottomTabs, { Tab } from './components/BottomTabs';
 import ActiveCallSheet from './components/ActiveCallSheet';
 import SplashAva from './components/SplashAva';
@@ -85,13 +87,13 @@ export default function MobileApp() {
       }
     });
   }, [creds?.accessToken, creds?.refreshToken]);
-  const ALL_TABS: Tab[] = ['home','calls','ava','messages','more','voicemail','contacts','sms','queues','settings'];
+  const ALL_TABS: Tab[] = ['home','calls','ava','messages','more','voicemail','contacts','sms','queues','settings','chats','keypad','speeddial'];
   const initialTab = (() => {
     try {
       const t = new URLSearchParams(window.location.search).get('tab') as Tab | null;
       if (t && ALL_TABS.includes(t)) return t;
     } catch {}
-    return 'home' as Tab;
+    return 'keypad' as Tab;
   })();
   const [tab, setTab] = useState<Tab>(initialTab);
   const [booting, setBooting] = useState(!isPreviewMode);
@@ -99,7 +101,6 @@ export default function MobileApp() {
 
   useEffect(() => {
     let cancelled = false;
-    });
     bootNative().finally(() => {
       setTimeout(() => setBooting(false), 700);
     });
@@ -127,7 +128,7 @@ export default function MobileApp() {
   if (loading || booting) return <SplashAva />;
   if (!creds) return <MobileI18nProvider><ThemeProvider><AuthScreen onAuthenticated={setCreds} /><PerfOverlay /></ThemeProvider></MobileI18nProvider>;
 
-  return <MobileI18nProvider><ThemeProvider><AuthenticatedShell creds={creds} setCreds={setCreds} tab={tab} setTab={setTab} onSignOut={clearCreds}} /><PerfOverlay /></ThemeProvider></MobileI18nProvider>;
+  return <MobileI18nProvider><ThemeProvider><AuthenticatedShell creds={creds} setCreds={setCreds} tab={tab} setTab={setTab} onSignOut={clearCreds} preferClickToCall={preferC2C} onTogglePreferC2C={() => {}} /><PerfOverlay /></ThemeProvider></MobileI18nProvider>;
 }
 
 function AuthenticatedShell({
@@ -409,19 +410,23 @@ function AuthenticatedShell({
 
       <div key={tab} className="lemtel-page-enter" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <Suspense fallback={<ScreenSkeleton />}>
-          {tab === 'home'       && <DashboardScreen onNavigate={setTab as any} haptic={haptic} onOpenProfile={() => setProfileOpen(true)} />}
+          {tab === 'contacts'   && <ContactsScreen sp={sp} />}
+          {tab === 'chats'      && <MessagesHubScreen accessToken={creds.accessToken || null} userId={creds.userId} sp={sp} haptic={haptic} channelUnread={notif.channelUnread} />}
           {tab === 'calls'      && <CallsScreen sp={sp} haptic={haptic} creds={creds} />}
+          {tab === 'keypad'     && <DialerScreen sp={sp} haptic={haptic} preferClickToCall={preferClickToCall} />}
+          {tab === 'speeddial'  && <SpeedDialScreen sp={sp} preferClickToCall={preferClickToCall} />}
+          {/* legacy deep-link routes */}
+          {tab === 'home'       && <DashboardScreen onNavigate={setTab as any} haptic={haptic} onOpenProfile={() => setProfileOpen(true)} />}
           {tab === 'ava'        && <AVAChatScreen />}
           {tab === 'messages'   && <MessagesHubScreen accessToken={creds.accessToken || null} userId={creds.userId} sp={sp} haptic={haptic} channelUnread={notif.channelUnread} />}
-          {tab === 'settings'   && <SettingsScreen creds={creds} sp={sp} onSignOut={onSignOut} onNavigate={setTab as any} />}
-          {/* legacy deep-link routes */}
+          {tab === 'settings'   && <SettingsScreen creds={creds} sp={sp} onSignOut={onSignOut} onNavigate={setTab as any} preferClickToCall={preferClickToCall} togglePreferC2C={onTogglePreferC2C} />}
           {tab === 'more'       && <MoreScreen creds={creds} sp={sp} onSignOut={onSignOut} haptic={haptic} />}
           {tab === 'voicemail'  && <VoicemailScreen haptic={haptic} />}
-          {tab === 'contacts'   && <ContactsScreen sp={sp} />}
           {tab === 'sms'        && <MessagesScreen haptic={haptic} />}
           {tab === 'queues'     && <QueuesScreen />}
         </Suspense>
       </div>
+
 
       <BottomTabs
         active={tab}

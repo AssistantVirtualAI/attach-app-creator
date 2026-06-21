@@ -1,26 +1,27 @@
 import React from 'react';
 import {
-  Home, Phone, MessageCircle, Sparkles, Settings as SettingsIcon,
+  User, MessageCircle, Phone, Grid3x3, LayoutGrid,
   type LucideIcon,
 } from 'lucide-react';
-import { colors, gradients, radius } from '../lib/theme';
+import { colors, radius } from '../lib/theme';
 import { useT } from '../lib/i18n';
 
 export type Tab =
-  | 'home' | 'calls' | 'ava' | 'messages' | 'settings'
+  | 'contacts' | 'chats' | 'calls' | 'keypad' | 'speeddial'
   // legacy routes still reachable via deep-link / query param:
-  | 'more' | 'voicemail' | 'contacts' | 'sms' | 'queues';
+  | 'home' | 'ava' | 'messages' | 'settings' | 'more' | 'voicemail' | 'sms' | 'queues';
 
+type LabelKey =
+  | 'tabs.contacts' | 'tabs.chats' | 'tabs.calls' | 'tabs.keypad' | 'tabs.speeddial';
 
-type Item = { id: Tab; labelKey: 'tabs.home' | 'tabs.calls' | 'tabs.messages' | 'tabs.settings'; Icon: LucideIcon };
+type Item = { id: Tab; labelKey: LabelKey; Icon: LucideIcon };
 
-const LEFT: Item[] = [
-  { id: 'home',  labelKey: 'tabs.home',  Icon: Home },
-  { id: 'calls', labelKey: 'tabs.calls', Icon: Phone },
-];
-const RIGHT: Item[] = [
-  { id: 'messages', labelKey: 'tabs.messages', Icon: MessageCircle },
-  { id: 'settings', labelKey: 'tabs.settings', Icon: SettingsIcon },
+const TABS: Item[] = [
+  { id: 'contacts',  labelKey: 'tabs.contacts',  Icon: User },
+  { id: 'chats',     labelKey: 'tabs.chats',     Icon: MessageCircle },
+  { id: 'calls',     labelKey: 'tabs.calls',     Icon: Phone },
+  { id: 'keypad',    labelKey: 'tabs.keypad',    Icon: Grid3x3 },
+  { id: 'speeddial', labelKey: 'tabs.speeddial', Icon: LayoutGrid },
 ];
 
 export default function BottomTabs({
@@ -47,43 +48,19 @@ export default function BottomTabs({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: '1fr 1fr 78px 1fr 1fr',
+          gridTemplateColumns: 'repeat(5, 1fr)',
           alignItems: 'center',
         }}
       >
-        {LEFT.map((it) => (
-          <TabBtn key={it.id} label={t(it.labelKey)} Icon={it.Icon} active={active === it.id} onPress={() => onChange(it.id)} badge={badges?.[it.id]} />
-        ))}
-
-        <div style={{ position: 'relative', display: 'flex', justifyContent: 'center' }}>
-          <button
-            onClick={() => onChange('ava')}
-            aria-label={t('tabs.ava')}
-            style={{
-              position: 'absolute', top: -34, width: 62, height: 62,
-              borderRadius: '50%', background: gradients.ai,
-              border: '3px solid rgba(255,255,255,0.96)',
-              boxShadow:
-                '0 18px 38px -12px rgba(122,76,255,0.6), 0 0 0 6px rgba(122,76,255,0.08), 0 0 24px rgba(106,225,255,0.35) inset',
-              color: '#fff', cursor: 'pointer', display: 'grid', placeItems: 'center',
-              transform: active === 'ava' ? 'scale(1.08) translateY(-2px)' : 'scale(1)',
-              transition: 'transform .25s cubic-bezier(.34,1.56,.64,1)',
-            }}
-          >
-            <Sparkles size={26} strokeWidth={2.4} />
-          </button>
-          <span
-            style={{
-              position: 'absolute', top: 36, fontSize: 9.5, fontWeight: 800, letterSpacing: 1.4,
-              color: active === 'ava' ? colors.avaViolet : colors.mutedSilver,
-            }}
-          >
-            AVA
-          </span>
-        </div>
-
-        {RIGHT.map((it) => (
-          <TabBtn key={it.id} label={t(it.labelKey)} Icon={it.Icon} active={active === it.id} onPress={() => onChange(it.id)} badge={badges?.[it.id]} />
+        {TABS.map((it) => (
+          <TabBtn
+            key={it.id}
+            label={t(it.labelKey as any)}
+            Icon={it.Icon}
+            active={active === it.id}
+            onPress={() => onChange(it.id)}
+            badge={badges?.[it.id]}
+          />
         ))}
       </div>
     </nav>
@@ -121,7 +98,7 @@ function TabBtn({ label, Icon, active, onPress, badge }: { label: string; Icon: 
             : 'transparent',
         }}
       >
-        <Icon size={18} strokeWidth={active ? 2.6 : 2} />
+        <Icon size={20} strokeWidth={active ? 2.6 : 2} />
         {badge && badge > 0 ? (
           <span
             aria-label={`${badge} new`}
@@ -139,7 +116,7 @@ function TabBtn({ label, Icon, active, onPress, badge }: { label: string; Icon: 
           </span>
         ) : null}
       </span>
-      <span style={{ fontSize: 9.5, fontWeight: active ? 800 : 600, letterSpacing: 0.3 }}>
+      <span style={{ fontSize: 10, fontWeight: active ? 800 : 600, letterSpacing: 0.3 }}>
         {label}
       </span>
     </button>

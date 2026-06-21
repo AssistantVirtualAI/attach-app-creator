@@ -5,7 +5,7 @@ import WssDiagnostics from '../components/WssDiagnostics';
 import { audit } from '../lib/audit';
 import { showMobileToast } from '../lib/mobileToast';
 
-export default function DialerScreen({ sp, haptic }: { sp: any; haptic: (s?: ImpactStyle) => Promise<void> }) {
+export default function DialerScreen({ sp, haptic, preferClickToCall: _preferClickToCall = false }: { sp: any; haptic: (s?: ImpactStyle) => Promise<void>; preferClickToCall?: boolean }) {
   const [num, setNum] = useState('');
   const [dialing, setDialing] = useState(false);
   const [error, setError] = useState<string | null>(null);
