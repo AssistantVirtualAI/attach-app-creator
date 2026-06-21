@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, NavLink, Outlet, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
@@ -6,6 +6,8 @@ import { Home, Phone, MessageSquare, Voicemail, MoreHorizontal, Phone as PhoneIc
 import { toast } from "sonner";
 import planipretLogo from "@/assets/planipret-logo.png.asset.json";
 import avaWordmark from "@/assets/ava-wordmark.svg";
+import { usePullToRefresh, PullIndicator } from "@/hooks/usePullToRefresh";
+
 
 
 const PRIMARY = "#1F4E79";
@@ -14,7 +16,7 @@ const SUCCESS = "#27AE60";
 const DANGER = "#E74C3C";
 const BG = "#F8F9FA";
 
-export type PlanipretMobileContext = { profile: any; reloadProfile: () => Promise<void>; openDialer: (number?: string) => void };
+export type PlanipretMobileContext = { profile: any; reloadProfile: () => Promise<void>; openDialer: (number?: string) => void; registerRefresh: (fn: (() => Promise<void> | void) | null) => void };
 
 const TABS = [
   { to: "/mplanipret/home", label: "Accueil", Icon: Home },
@@ -105,6 +107,11 @@ export default function PlanipretMobile() {
   const [dialerOpen, setDialerOpen] = useState(false);
   const [dialerInit, setDialerInit] = useState<string | undefined>(undefined);
   const openDialer = (n?: string) => { setDialerInit(n); setDialerOpen(true); };
+  const refreshFn = useRef<(() => Promise<void> | void) | null>(null);
+  const registerRefresh = (fn: (() => Promise<void> | void) | null) => { refreshFn.current = fn; };
+  const handlePull = async () => { if (refreshFn.current) await refreshFn.current(); };
+  const { ref: scrollRef, pullDist, refreshing, threshold } = usePullToRefresh(handlePull);
+
 
   const loadProfile = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -153,9 +160,11 @@ export default function PlanipretMobile() {
           <span className="text-sm font-semibold tracking-tight" style={{ color: PRIMARY }}>Planiprêt</span>
         </header>
 
-        <div className="flex-1 overflow-y-auto pb-[96px]">
-          <Outlet context={{ profile, reloadProfile: loadProfile, openDialer } satisfies PlanipretMobileContext} />
+        <div ref={scrollRef} className="flex-1 overflow-y-auto pb-[96px]">
+          <PullIndicator pullDist={pullDist} refreshing={refreshing} threshold={threshold} color={PRIMARY} />
+          <Outlet context={{ profile, reloadProfile: loadProfile, openDialer, registerRefresh } satisfies PlanipretMobileContext} />
         </div>
+
 
         {/* FAB */}
         <button onClick={() => setDialerOpen(true)}

@@ -73,7 +73,7 @@ const frenchDuration = (s: number | null) => {
 
 // ---------- main ----------
 export default function MCalls() {
-  const { profile, openDialer } = useOutletContext<PlanipretMobileContext>();
+  const { profile, openDialer, registerRefresh } = useOutletContext<PlanipretMobileContext>();
   const [tab, setTab] = useState<"recents" | "active" | "missed">("recents");
   const [calls, setCalls] = useState<Call[]>([]);
   const [loading, setLoading] = useState(true);
@@ -97,6 +97,11 @@ export default function MCalls() {
   }, [userId]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    registerRefresh(() => load());
+    return () => registerRefresh(null);
+  }, [load, registerRefresh]);
+
 
   // Realtime updates on phone_calls (for new entries)
   useEffect(() => {

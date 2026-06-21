@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
+
 import { supabase } from "@/integrations/supabase/client";
 import { Phone, PhoneMissed, MessageSquare, Voicemail, ArrowDownLeft, ArrowUpRight, X, Calendar, Headphones } from "lucide-react";
 import type { PlanipretMobileContext } from "../PlanipretMobile";
@@ -15,7 +16,7 @@ function Shimmer({ className = "" }: { className?: string }) {
 }
 
 export default function MHome() {
-  const { profile } = useOutletContext<PlanipretMobileContext>();
+  const { profile, registerRefresh } = useOutletContext<PlanipretMobileContext>();
   const [stats, setStats] = useState({ calls: 0, missed: 0, sms: 0, voicemails: 0 });
   const [recent, setRecent] = useState<any[]>([]);
   const [events, setEvents] = useState<any[] | null>(null);
@@ -67,6 +68,12 @@ export default function MHome() {
   };
 
   useEffect(() => { loadStats(); loadEvents(); /* eslint-disable-next-line */ }, [profile?.user_id]);
+  useEffect(() => {
+    registerRefresh(async () => { await Promise.all([loadStats(), loadEvents()]); });
+    return () => registerRefresh(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.user_id]);
+
 
   const playBrief = async () => {
     setBriefLoading(true);
