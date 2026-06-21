@@ -92,8 +92,9 @@ export default function MMore() {
         <p className="text-[14px] text-slate-500">{profile?.extension ? `${profile.extension}@planipret.ca` : profile?.email}</p>
       </header>
 
-      <Section title="Pipeline">
+      <Section title="Pipeline & Performance">
         <Row icon={<BarChart3 className="w-4 h-4" />} label="📊 Pipeline des dossiers" onClick={() => navigate("/mplanipret/pipeline")} chevron />
+        <Row icon={<BarChart3 className="w-4 h-4" />} label="📈 Mes performances" onClick={() => navigate("/mplanipret/stats")} chevron />
       </Section>
 
       <Section title="Mon compte">
@@ -168,6 +169,8 @@ export default function MMore() {
         <Row icon={<Bell className="w-4 h-4" />} label="Notifications" right={<Toggle on={notifEnabled} onChange={toggleNotif} />} />
         <Row icon={<Moon className="w-4 h-4" />} label="Mode sombre" right={<Toggle on={darkMode} onChange={setDarkMode} />} />
       </Section>
+
+      <NotificationsSection profile={profile} reloadProfile={reloadProfile} />
 
       <Section title="Aide & support">
         <Row icon={<HelpCircle className="w-4 h-4" />} label="Centre d'aide" onClick={() => setHelpOpen(true)} chevron />
