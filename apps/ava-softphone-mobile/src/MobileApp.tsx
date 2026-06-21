@@ -19,6 +19,10 @@ const SettingsScreen     = lazy(() => import('./screens/SettingsScreen'));
 const DialerScreen       = lazy(() => import('./screens/DialerScreen'));
 const SpeedDialScreen    = lazy(() => import('./screens/SpeedDialScreen'));
 import BottomTabs, { Tab } from './components/BottomTabs';
+import NotificationsSheet from './components/NotificationsSheet';
+import { useTheme } from './lib/ThemeContext';
+import { useT } from './lib/i18n';
+import { Bell, Sun, Moon, Globe } from 'lucide-react';
 import ActiveCallSheet from './components/ActiveCallSheet';
 import SplashAva from './components/SplashAva';
 import PermissionGate from './components/PermissionGate';
@@ -405,7 +409,7 @@ function AuthenticatedShell({
     }}>
       <audio ref={audioRef} autoPlay playsInline />
 
-      {/* Top header — hamburger menu + title (Google-Voice style) */}
+      {/* Top header — centered logo + hamburger + title + actions */}
       <TopHeader
         tab={tab}
         onNavigate={(t) => { haptic(ImpactStyle.Light); setTab(t); }}
@@ -469,66 +473,116 @@ function AuthenticatedShell({
   );
 }
 
-/* ─── Top header with hamburger dropdown ─────────────────────── */
+/* ─── Top header with hamburger dropdown + actions ─────────────────────── */
 function TopHeader({
   tab, onNavigate, haptic,
 }: { tab: Tab; onNavigate: (t: Tab) => void; haptic: (s?: ImpactStyle) => Promise<void> }) {
   const [open, setOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const { mode, toggle: toggleTheme } = useTheme();
+  const { lang, toggle: toggleLang, t: tr } = useT();
   const titles: Partial<Record<Tab, string>> = {
-    contacts: 'Contacts',
-    chats: 'Chats',
-    calls: 'Calls',
-    keypad: 'Keypad',
-    speeddial: 'Speed dial',
-    settings: 'Settings',
-    home: 'Home',
+    contacts: tr('tabs.contacts' as any),
+    chats: tr('tabs.chats' as any),
+    calls: tr('tabs.calls' as any),
+    keypad: tr('tabs.keypad' as any),
+    speeddial: tr('tabs.speeddial' as any),
+    settings: tr('tabs.settings' as any),
+    home: tr('tabs.home' as any),
   };
   const items: { id: Tab; label: string; icon: string }[] = [
-    { id: 'home',     label: 'Accueil',  icon: '🏠' },
-    { id: 'contacts', label: 'Contacts', icon: '👤' },
-    { id: 'calls',    label: 'Calls',    icon: '📞' },
-    { id: 'keypad',   label: 'Keypad',   icon: '⌨️' },
-    { id: 'settings', label: 'Settings', icon: '⚙️' },
+    { id: 'home',     label: tr('tabs.home' as any),     icon: '🏠' },
+    { id: 'contacts', label: tr('tabs.contacts' as any), icon: '👤' },
+    { id: 'chats',    label: tr('tabs.chats' as any),    icon: '💬' },
+    { id: 'calls',    label: tr('tabs.calls' as any),    icon: '📞' },
+    { id: 'keypad',   label: tr('tabs.keypad' as any),   icon: '⌨️' },
+    { id: 'settings', label: tr('tabs.settings' as any), icon: '⚙️' },
   ];
+
+  const iconBtn: React.CSSProperties = {
+    width: 36, height: 36, borderRadius: 10,
+    background: 'rgba(255,255,255,0.06)',
+    border: '1px solid rgba(255,255,255,0.10)',
+    display: 'grid', placeItems: 'center', cursor: 'pointer',
+    color: colors.textIce, WebkitTapHighlightColor: 'transparent',
+    padding: 0,
+  };
+
   return (
-    <header style={{
-      position: 'relative',
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: '14px 16px 10px',
-      minHeight: 56,
-    }}>
-      <button
-        onClick={() => { haptic(ImpactStyle.Light); setOpen((v) => !v); }}
-        aria-label="Open menu"
-        style={{
-          position: 'relative',
-          width: 44, height: 44, borderRadius: 12,
-          background: open ? 'rgba(255,255,255,0.10)' : 'transparent',
-          border: 'none', display: 'grid', placeItems: 'center',
-          cursor: 'pointer', color: colors.textIce,
-          WebkitTapHighlightColor: 'transparent',
-        }}
-      >
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
-          <line x1="4" y1="7"  x2="20" y2="7" />
-          <line x1="4" y1="12" x2="20" y2="12" />
-          <line x1="4" y1="17" x2="14" y2="17" />
-        </svg>
-        <span style={{
-          position: 'absolute', right: 6, top: 6, width: 8, height: 8,
-          borderRadius: '50%', background: colors.lemtelBlue,
-        }} />
-      </button>
+    <header style={{ position: 'relative', padding: '8px 12px 6px' }}>
+      {/* Centered logo at the very top of every page */}
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 36 }}>
+        <img
+          src="/ava-logo.png"
+          alt="AVA"
+          width={32}
+          height={32}
+          style={{ width: 32, height: 32, borderRadius: 8, boxShadow: `0 6px 18px -8px ${colors.lemtelBlue}` }}
+        />
+      </div>
 
-      <span style={{
-        flex: 1, marginLeft: 8,
-        fontSize: 22, fontWeight: 500, color: 'rgba(255,255,255,0.85)',
-        letterSpacing: 0.2,
+      {/* Title row: hamburger | title | (lang, theme, bell) */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        marginTop: 4, minHeight: 48,
       }}>
-        {titles[tab] || ''}
-      </span>
+        <button
+          onClick={() => { haptic(ImpactStyle.Light); setOpen((v) => !v); }}
+          aria-label="Open menu"
+          style={{
+            position: 'relative',
+            width: 44, height: 44, borderRadius: 12,
+            background: open ? 'rgba(255,255,255,0.10)' : 'transparent',
+            border: 'none', display: 'grid', placeItems: 'center',
+            cursor: 'pointer', color: colors.textIce,
+            WebkitTapHighlightColor: 'transparent', padding: 0,
+          }}
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+            <line x1="4" y1="7"  x2="20" y2="7" />
+            <line x1="4" y1="12" x2="20" y2="12" />
+            <line x1="4" y1="17" x2="14" y2="17" />
+          </svg>
+          <span style={{
+            position: 'absolute', right: 6, top: 6, width: 8, height: 8,
+            borderRadius: '50%', background: colors.lemtelBlue,
+          }} />
+        </button>
 
-      <div style={{ width: 44 }} />
+        <span style={{
+          flex: 1, marginLeft: 4,
+          fontSize: 22, fontWeight: 600, color: 'rgba(255,255,255,0.92)',
+          letterSpacing: 0.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+        }}>
+          {titles[tab] || ''}
+        </span>
+
+        <button
+          onClick={() => { haptic(ImpactStyle.Light); toggleLang(); }}
+          aria-label="Switch language"
+          title="Switch language"
+          style={{ ...iconBtn, gap: 4, width: 'auto', padding: '0 10px', fontSize: 12, fontWeight: 700, display: 'inline-flex', alignItems: 'center' }}
+        >
+          <Globe size={14} />
+          <span style={{ textTransform: 'uppercase' }}>{lang}</span>
+        </button>
+        <button
+          onClick={() => { haptic(ImpactStyle.Light); toggleTheme(); }}
+          aria-label="Toggle theme"
+          title="Toggle theme"
+          style={iconBtn}
+        >
+          {mode === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+        </button>
+        <button
+          onClick={() => { haptic(ImpactStyle.Light); setNotifOpen(true); }}
+          aria-label="Notifications"
+          title="Notifications"
+          style={iconBtn}
+        >
+          <Bell size={16} />
+        </button>
+      </div>
 
       {open && (
         <>
@@ -539,7 +593,7 @@ function TopHeader({
           <div
             role="menu"
             style={{
-              position: 'absolute', top: 58, left: 12, zIndex: 71,
+              position: 'absolute', top: 92, left: 12, zIndex: 71,
               minWidth: 220, padding: 6,
               borderRadius: 14,
               background: 'rgba(20,28,52,0.96)',
@@ -572,8 +626,15 @@ function TopHeader({
           </div>
         </>
       )}
+
+      <NotificationsSheet
+        open={notifOpen}
+        onClose={() => setNotifOpen(false)}
+        onNavigate={(t) => { setNotifOpen(false); onNavigate(t); }}
+      />
     </header>
   );
 }
+
 
 
