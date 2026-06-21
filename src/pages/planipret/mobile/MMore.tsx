@@ -19,6 +19,7 @@ export default function MMore() {
   const [editOpen, setEditOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [customizeOpen, setCustomizeOpen] = useState(false);
+  const [dndOpen, setDndOpen] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
   const [notifEnabled, setNotifEnabled] = useState<boolean>(() => localStorage.getItem("planipret_notif") === "1");
   const [darkMode, setDarkMode] = useState<boolean>(() => localStorage.getItem("planipret_dark") === "1");
