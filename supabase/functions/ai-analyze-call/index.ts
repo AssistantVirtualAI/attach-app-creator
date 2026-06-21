@@ -76,7 +76,17 @@ Deno.serve(async (req) => {
     }
 
     const newMeta = { ...(call.metadata ?? {}), ai_coaching: insights.coaching, ai_tasks: insights.tasks, ai_events: insights.events, ai_next_action: insights.next_action };
-    await admin.from("planipret_phone_calls").update({ ai_summary: insights.summary, metadata: newMeta }).eq("id", call_id);
+    const validTemp = ["hot","warm","cold"].includes(insights.lead_temperature) ? insights.lead_temperature : null;
+    const leadScore = typeof insights.lead_score === "number" ? Math.min(10, Math.max(1, Math.round(insights.lead_score))) : null;
+    await admin.from("planipret_phone_calls").update({
+      ai_summary: insights.summary,
+      metadata: newMeta,
+      lead_score: leadScore,
+      lead_temperature: validTemp,
+      lead_score_reason: insights.lead_score_reason ?? null,
+      suggested_callback_delay: insights.suggested_callback_delay ?? null,
+      callback_reason: insights.callback_reason ?? null,
+    }).eq("id", call_id);
 
     await admin.from("planipret_ai_insights").insert({
       user_id: call.user_id,
