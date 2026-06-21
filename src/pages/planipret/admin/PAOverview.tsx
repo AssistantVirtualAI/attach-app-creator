@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Phone, Users, MessageSquare, Bot, ArrowUpRight, ArrowDownLeft, X, Sparkles } from "lucide-react";
+import { Phone, Users, MessageSquare, Bot, ArrowUpRight, ArrowDownLeft, X, Sparkles, Flame, Clock } from "lucide-react";
+import { TEMP_COLORS, TEMP_EMOJI } from "@/components/planipret/leadHelpers";
 
 const COLORS = { calls: "#2E86C1", users: "#27AE60", sms: "#F39C12", agent: "#8B5CF6" };
 
