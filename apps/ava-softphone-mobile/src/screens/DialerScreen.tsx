@@ -10,8 +10,8 @@ export default function DialerScreen({ sp, haptic, preferClickToCall: _preferCli
   const [dialing, setDialing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [diagOpen, setDiagOpen] = useState(false);
-  const status: string = sp.snap.status || 'connecting';
-  const sipError: string = sp.snap.error || '';
+  const status: string = sp.sipStatus || 'connecting';
+  const sipError: string = sp.sipError || '';
   const isRegistered = status === 'registered';
   const isRetrying = status === 'connecting' || status === 'retrying';
   const isFailed = status === 'error';
