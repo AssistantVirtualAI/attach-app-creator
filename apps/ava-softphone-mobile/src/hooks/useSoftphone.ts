@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { createSIPUA, JsSIPUnavailableError, SIPConfig, buildSdpModifier, classifySipFailure, hasWebRTC, WEBRTC_UNAVAILABLE_MESSAGE } from '../lib/sip/jssipProvider';
+import { createSIPUA, JsSIPUnavailableError, SIPConfig, classifySipFailure, hasWebRTC, rewriteSdpForFusionPBX, WEBRTC_UNAVAILABLE_MESSAGE } from '../lib/sip/jssipProvider';
 import {
   appendSipLog, clearSipLog as clearPersistedLog, clearPersistedStatus, loadPersistedError, loadPersistedStatus,
   loadSipLog, MAX_AUTO_RETRIES, PersistedSipError, probeWss, RETRY_BACKOFF_MS, savePersistedError, savePersistedStatus,
@@ -280,7 +280,15 @@ export function useSoftphone(
             // ---- SDP introspection: log offer/answer codecs before INVITE is sent.
             session.on('sdp', (data: any) => {
               try {
-                const sdp = data?.sdp || '';
+                let sdp = data?.sdp || '';
+                if (data?.originator === 'local' && data?.type === 'offer' && callAttemptRef.current === 2) {
+                  const rewritten = rewriteSdpForFusionPBX(sdp);
+                  if (rewritten && rewritten !== sdp) {
+                    data.sdp = rewritten;
+                    sdp = rewritten;
+                    log('sdp.fallback-rewritten', 'local offer reduced to secure PCMU-only before INVITE');
+                  }
+                }
                 const codecs = extractAudioCodecs(sdp);
                 if (data?.originator === 'local') {
                   setOfferedCodecs(codecs);
@@ -529,17 +537,6 @@ export function useSoftphone(
     video: false,
   };
 
-  const opusToSdpOpts = (p: AudioProfile) => {
-    const o = PROFILE_OPUS[p];
-    return {
-      opusMaxAverageBitrate: o.maxAverageBitrate,
-      opusMaxPlaybackRate: o.maxPlaybackRate,
-      opusUseInbandFec: o.useInbandFec,
-      opusUseDtx: o.useDtx,
-      opusPtime: o.ptime,
-    };
-  };
-
   /** Parse SDP audio m-line + rtpmap lines into an ordered codec list. */
   const extractAudioCodecs = (sdp: string): string[] => {
     try {
@@ -598,12 +595,7 @@ export function useSoftphone(
           bundlePolicy: 'balanced',
         },
       };
-      if (forcePcmu) {
-        callOpts.sessionDescriptionHandlerModifiers = [
-          buildSdpModifier(opusToSdpOpts(audioProfileRef.current)),
-        ];
-        log('call.fallback', 'secure PCMU-only SDP modifier active');
-      }
+      if (forcePcmu) log('call.fallback', 'secure PCMU-only SDP rewrite armed');
       uaRef.current.call(`sip:${number}@${config.domain}`, callOpts);
       return true;
     } catch (err: any) {
