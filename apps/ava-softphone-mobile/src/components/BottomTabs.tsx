@@ -36,8 +36,11 @@ export default function BottomTabs({
         left: 0,
         right: 0,
         zIndex: 50,
+        width: 'min(100% - 16px, 480px)',
+        marginLeft: 'auto',
+        marginRight: 'auto',
+        marginBottom: 'calc(env(safe-area-inset-bottom, 0px) + 2px)',
         display: 'flex', flexDirection: 'column',
-        margin: '0 8px calc(2px + var(--safe-bottom))',
         padding: '10px 8px 8px',
         background:
           'linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(244,247,255,0.86) 100%)',
