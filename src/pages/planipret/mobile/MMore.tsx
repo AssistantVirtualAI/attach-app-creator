@@ -8,6 +8,8 @@ import {
 } from "lucide-react";
 import type { PlanipretMobileContext } from "../PlanipretMobile";
 import { usePlanipretPush } from "@/hooks/usePlanipretPush";
+import { CalendarSyncCard } from "@/components/planipret/CalendarSyncCard";
+import { SiriShortcutsCard } from "@/components/planipret/SiriShortcutsCard";
 
 const PRIMARY = "#1F4E79";
 
@@ -155,7 +157,10 @@ export default function MMore() {
               <span className="text-slate-500">{ms365Connected ? "Connecté" : "Non connecté"}</span>
             </span>
           } chevron />
+        {ms365Connected && <CalendarSyncCard profile={profile} />}
       </Section>
+
+      <SiriShortcutsCard />
 
       {profile?.voice_agent_enabled && (
         <Section title="Assistant IA">
@@ -248,6 +253,11 @@ function NotificationsSection({ profile, reloadProfile }: { profile: any; reload
       <Row icon={<Bell className="w-4 h-4" />} label="Nouveaux voicemails" right={<Toggle on={!!profile?.notif_voicemails} onChange={(v) => setPref("notif_voicemails", v)} />} />
       <Row icon={<Sparkles className="w-4 h-4" />} label="Analyses IA prêtes" right={<Toggle on={!!profile?.notif_ai} onChange={(v) => setPref("notif_ai", v)} />} />
       <Row icon={<Bell className="w-4 h-4" />} label="Rappels" right={<Toggle on={!!profile?.notif_reminders} onChange={(v) => setPref("notif_reminders", v)} />} />
+      <Row icon={<Sparkles className="w-4 h-4" />} label="🔥 Leads chauds sans suivi" right={<Toggle on={profile?.notif_hot_leads !== false} onChange={(v) => setPref("notif_hot_leads", v)} />} />
+      <Row icon={<Bell className="w-4 h-4" />} label="📅 Rappel RDV imminents" right={<Toggle on={profile?.notif_appointment_reminder !== false} onChange={(v) => setPref("notif_appointment_reminder", v)} />} />
+      <Row icon={<Phone className="w-4 h-4" />} label="📞 Appels manqués non traités" right={<Toggle on={profile?.notif_missed_call !== false} onChange={(v) => setPref("notif_missed_call", v)} />} />
+      <Row icon={<Sparkles className="w-4 h-4" />} label="☀️ Briefing matinal (08:30)" right={<Toggle on={profile?.notif_morning_brief !== false} onChange={(v) => setPref("notif_morning_brief", v)} />} />
+      <Row icon={<Sparkles className="w-4 h-4" />} label="📊 Résumé fin de journée (17:30)" right={<Toggle on={profile?.notif_eod_summary !== false} onChange={(v) => setPref("notif_eod_summary", v)} />} />
       <Row icon={<Sparkles className="w-4 h-4" />} label={busy ? "Envoi…" : "Tester une notification"} onClick={() => sendTest(profile.user_id)} chevron />
     </Section>
   );
