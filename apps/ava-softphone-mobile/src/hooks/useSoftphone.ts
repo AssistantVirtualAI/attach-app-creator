@@ -514,19 +514,18 @@ export function useSoftphone(
     if (!uaRef.current || !config || sipStatus !== 'registered') return false;
     setActiveCallNumber(number);
     setCallState('ringing');
-    const modifier = buildSdpModifier(opusToSdpOpts(audioProfileRef.current));
     try {
       uaRef.current.call(`sip:${number}@${config.domain}`, {
-        mediaConstraints: HD_AUDIO_CONSTRAINTS,
+        mediaConstraints: { audio: true, video: false },
         rtcOfferConstraints: {
           offerToReceiveAudio: true,
           offerToReceiveVideo: false,
           voiceActivityDetection: false,
         },
-        sessionDescriptionHandlerModifiers: [modifier],
-        // Empty iceServers avoids external STUN while keeping a valid WebRTC config.
+        // No SDP modifier — let the browser negotiate codecs with the PBX.
         pcConfig: {
           iceServers: [],
+          iceTransportPolicy: 'all',
           bundlePolicy: 'balanced',
         },
         eventHandlers: {
@@ -559,9 +558,8 @@ export function useSoftphone(
   };
   const answer = () =>
     sessionRef.current?.answer({
-      mediaConstraints: HD_AUDIO_CONSTRAINTS,
-      sessionDescriptionHandlerModifiers: [buildSdpModifier(opusToSdpOpts(audioProfileRef.current))],
-      pcConfig: { iceServers: [], bundlePolicy: 'balanced' },
+      mediaConstraints: { audio: true, video: false },
+      pcConfig: { iceServers: [], iceTransportPolicy: 'all', bundlePolicy: 'balanced' },
     });
   const mute = () => { sessionRef.current?.mute({ audio: true }); setIsMuted(true); };
   const unmute = () => { sessionRef.current?.unmute({ audio: true }); setIsMuted(false); };
