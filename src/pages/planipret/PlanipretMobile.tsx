@@ -106,11 +106,31 @@ export default function PlanipretMobile() {
   const [loading, setLoading] = useState(true);
   const [dialerOpen, setDialerOpen] = useState(false);
   const [dialerInit, setDialerInit] = useState<string | undefined>(undefined);
+  const [unreadMsg, setUnreadMsg] = useState(0);
+  const [unreadVm, setUnreadVm] = useState(0);
   const openDialer = (n?: string) => { setDialerInit(n); setDialerOpen(true); };
   const refreshFn = useRef<(() => Promise<void> | void) | null>(null);
   const registerRefresh = (fn: (() => Promise<void> | void) | null) => { refreshFn.current = fn; };
   const handlePull = async () => { if (refreshFn.current) await refreshFn.current(); };
   const { ref: scrollRef, pullDist, refreshing, threshold } = usePullToRefresh(handlePull);
+
+  useEffect(() => {
+    if (!profile?.user_id) return;
+    const refreshCounts = async () => {
+      const [{ count: mc }, { count: vc }] = await Promise.all([
+        supabase.from("planipret_phone_messages").select("id", { count: "exact", head: true }).eq("user_id", profile.user_id).eq("direction", "inbound").is("read_at", null),
+        supabase.from("planipret_voicemails").select("id", { count: "exact", head: true }).eq("user_id", profile.user_id).eq("folder", "inbox").eq("is_read", false),
+      ]);
+      setUnreadMsg(mc ?? 0); setUnreadVm(vc ?? 0);
+    };
+    refreshCounts();
+    const ch = supabase
+      .channel("mplanipret-badges")
+      .on("postgres_changes", { event: "*", schema: "public", table: "planipret_phone_messages", filter: `user_id=eq.${profile.user_id}` }, refreshCounts)
+      .on("postgres_changes", { event: "*", schema: "public", table: "planipret_voicemails", filter: `user_id=eq.${profile.user_id}` }, refreshCounts)
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [profile?.user_id, location.pathname]);
 
 
   const loadProfile = async () => {
