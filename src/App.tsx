@@ -28,6 +28,13 @@ import PlanipretIntegrationSecrets from "./pages/planipret/PlanipretIntegrationS
 import PlanipretIntegrations from "./pages/planipret/PlanipretIntegrations";
 import PlanipretAudit from "./pages/planipret/PlanipretAudit";
 import Ms365Callback from "./pages/planipret/Ms365Callback";
+import PlanipretAdminLayout from "./pages/planipret/admin/PlanipretAdminLayout";
+import PAOverview from "./pages/planipret/admin/PAOverview";
+import PAUsers from "./pages/planipret/admin/PAUsers";
+import PACalls from "./pages/planipret/admin/PACalls";
+import PAMessages from "./pages/planipret/admin/PAMessages";
+import PAVoicemails from "./pages/planipret/admin/PAVoicemails";
+import PAReports from "./pages/planipret/admin/PAReports";
 
 import Dashboard from "./pages/Dashboard";
 import VoiceAnalytics from "./pages/VoiceAnalytics";
@@ -347,11 +354,20 @@ const App = () => (
                 </Route>
                 <Route path="/planipret/dashboard" element={<PlanipretDashboard />} />
                 <Route path="/planipret/integrations" element={<PlanipretIntegrationSecrets />} />
-                <Route path="/dashboard/integrations" element={<PlanipretIntegrations />} />
                 <Route path="/auth/ms365/callback" element={<Ms365Callback />} />
                 <Route path="/dashboard/audit" element={<PlanipretAudit />} />
 
-                
+                {/* Planipret Admin sub-routes (layout with sidebar) */}
+                <Route path="/dashboard" element={<PlanipretAdminLayout />}>
+                  <Route path="overview" element={<PAOverview />} />
+                  <Route path="users" element={<PAUsers />} />
+                  <Route path="calls" element={<PACalls />} />
+                  <Route path="messages" element={<PAMessages />} />
+                  <Route path="voicemails" element={<PAVoicemails />} />
+                  <Route path="reports" element={<PAReports />} />
+                  <Route path="integrations" element={<PlanipretIntegrations />} />
+                </Route>
+
                 {/* Protected routes */}
                 <Route
                   path="/home"
