@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate, NavLink, Outlet, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,6 +7,9 @@ import { toast } from "sonner";
 import planipretLogo from "@/assets/planipret-logo.png.asset.json";
 import avaWordmark from "@/assets/ava-wordmark.svg";
 import { usePullToRefresh, PullIndicator } from "@/hooks/usePullToRefresh";
+import { useRealtimeManager } from "@/hooks/useRealtimeManager";
+import InboundCallOverlay, { type InboundCall } from "@/components/InboundCallOverlay";
+import { OfflineBanner } from "@/components/PlanipretErrorBoundary";
 
 
 
