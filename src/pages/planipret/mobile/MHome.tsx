@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 
 import { supabase } from "@/integrations/supabase/client";
-import { Phone, PhoneMissed, MessageSquare, Voicemail, ArrowDownLeft, ArrowUpRight, X, Calendar, Headphones } from "lucide-react";
+import { Phone, PhoneMissed, MessageSquare, Voicemail, ArrowDownLeft, ArrowUpRight, X, Calendar, Headphones, Bot } from "lucide-react";
 import type { PlanipretMobileContext } from "../PlanipretMobile";
 import { toast } from "sonner";
+import VoiceAgent from "@/components/VoiceAgent";
 
 const PRIMARY = "#1F4E79";
 const SUCCESS = "#27AE60";
