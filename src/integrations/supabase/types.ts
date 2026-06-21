@@ -7873,6 +7873,7 @@ export type Database = {
         Row: {
           ai_summary: string | null
           answered_at: string | null
+          callback_reason: string | null
           created_at: string
           direction: string
           duration_seconds: number | null
@@ -7881,6 +7882,9 @@ export type Database = {
           from_name: string | null
           from_number: string | null
           id: string
+          lead_score: number | null
+          lead_score_reason: string | null
+          lead_temperature: string | null
           metadata: Json
           ns_call_id: string | null
           ns_domain: string | null
@@ -7888,6 +7892,7 @@ export type Database = {
           recording_url: string | null
           started_at: string | null
           status: string | null
+          suggested_callback_delay: string | null
           to_name: string | null
           to_number: string | null
           transcript: string | null
@@ -7897,6 +7902,7 @@ export type Database = {
         Insert: {
           ai_summary?: string | null
           answered_at?: string | null
+          callback_reason?: string | null
           created_at?: string
           direction: string
           duration_seconds?: number | null
@@ -7905,6 +7911,9 @@ export type Database = {
           from_name?: string | null
           from_number?: string | null
           id?: string
+          lead_score?: number | null
+          lead_score_reason?: string | null
+          lead_temperature?: string | null
           metadata?: Json
           ns_call_id?: string | null
           ns_domain?: string | null
@@ -7912,6 +7921,7 @@ export type Database = {
           recording_url?: string | null
           started_at?: string | null
           status?: string | null
+          suggested_callback_delay?: string | null
           to_name?: string | null
           to_number?: string | null
           transcript?: string | null
@@ -7921,6 +7931,7 @@ export type Database = {
         Update: {
           ai_summary?: string | null
           answered_at?: string | null
+          callback_reason?: string | null
           created_at?: string
           direction?: string
           duration_seconds?: number | null
@@ -7929,6 +7940,9 @@ export type Database = {
           from_name?: string | null
           from_number?: string | null
           id?: string
+          lead_score?: number | null
+          lead_score_reason?: string | null
+          lead_temperature?: string | null
           metadata?: Json
           ns_call_id?: string | null
           ns_domain?: string | null
@@ -7936,6 +7950,7 @@ export type Database = {
           recording_url?: string | null
           started_at?: string | null
           status?: string | null
+          suggested_callback_delay?: string | null
           to_name?: string | null
           to_number?: string | null
           transcript?: string | null
@@ -8001,10 +8016,75 @@ export type Database = {
         }
         Relationships: []
       }
+      planipret_pipeline: {
+        Row: {
+          contact_name: string
+          contact_number: string | null
+          created_at: string
+          id: string
+          last_call_id: string | null
+          maestro_contact_id: string | null
+          next_reminder_at: string | null
+          notes: string | null
+          stage: string
+          updated_at: string
+          user_id: string
+          value_estimate: number | null
+        }
+        Insert: {
+          contact_name: string
+          contact_number?: string | null
+          created_at?: string
+          id?: string
+          last_call_id?: string | null
+          maestro_contact_id?: string | null
+          next_reminder_at?: string | null
+          notes?: string | null
+          stage?: string
+          updated_at?: string
+          user_id: string
+          value_estimate?: number | null
+        }
+        Update: {
+          contact_name?: string
+          contact_number?: string | null
+          created_at?: string
+          id?: string
+          last_call_id?: string | null
+          maestro_contact_id?: string | null
+          next_reminder_at?: string | null
+          notes?: string | null
+          stage?: string
+          updated_at?: string
+          user_id?: string
+          value_estimate?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planipret_pipeline_last_call_id_fkey"
+            columns: ["last_call_id"]
+            isOneToOne: false
+            referencedRelation: "planipret_phone_calls"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "planipret_pipeline_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "planipret_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       planipret_profiles: {
         Row: {
           avatar_url: string | null
           created_at: string
+          dnd_auto_schedule: boolean
+          dnd_enabled: boolean
+          dnd_end_time: string
+          dnd_message_fr: string
+          dnd_start_time: string
           elevenlabs_agent_id: string | null
           email: string | null
           extension: string | null
@@ -8033,6 +8113,11 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           created_at?: string
+          dnd_auto_schedule?: boolean
+          dnd_enabled?: boolean
+          dnd_end_time?: string
+          dnd_message_fr?: string
+          dnd_start_time?: string
           elevenlabs_agent_id?: string | null
           email?: string | null
           extension?: string | null
@@ -8061,6 +8146,11 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           created_at?: string
+          dnd_auto_schedule?: boolean
+          dnd_enabled?: boolean
+          dnd_end_time?: string
+          dnd_message_fr?: string
+          dnd_start_time?: string
           elevenlabs_agent_id?: string | null
           email?: string | null
           extension?: string | null
@@ -8087,6 +8177,69 @@ export type Database = {
           voice_agent_enabled?: boolean
         }
         Relationships: []
+      }
+      planipret_reminders: {
+        Row: {
+          ai_suggested: boolean
+          call_id: string | null
+          contact_name: string | null
+          contact_number: string | null
+          created_at: string
+          id: string
+          note: string | null
+          reminder_type: string
+          scheduled_at: string
+          sent_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ai_suggested?: boolean
+          call_id?: string | null
+          contact_name?: string | null
+          contact_number?: string | null
+          created_at?: string
+          id?: string
+          note?: string | null
+          reminder_type?: string
+          scheduled_at: string
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ai_suggested?: boolean
+          call_id?: string | null
+          contact_name?: string | null
+          contact_number?: string | null
+          created_at?: string
+          id?: string
+          note?: string | null
+          reminder_type?: string
+          scheduled_at?: string
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planipret_reminders_call_id_fkey"
+            columns: ["call_id"]
+            isOneToOne: false
+            referencedRelation: "planipret_phone_calls"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "planipret_reminders_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "planipret_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       planipret_retention_policy: {
         Row: {
