@@ -24,15 +24,15 @@ import { useTr } from '../lib/i18n';
 type Sub = null | 'voicemail' | 'messages' | 'contacts' | 'settings' | 'delete' | 'privacy' | 'datasafety' | 'permissions' | 'support' | 'aiaudit' | 'queues' | 'features';
 
 export default function MoreScreen({
-  creds, sp, onSignOut, haptic, preferClickToCall, onTogglePreferC2C,
-}: { creds: Creds; sp: any; onSignOut: () => void; haptic: (s?: ImpactStyle) => Promise<void>; preferClickToCall?: boolean; onTogglePreferC2C?: () => void }) {
+  creds, sp, onSignOut, haptic, 
+}: { creds: Creds; sp: any; onSignOut: () => void; haptic: (s?: ImpactStyle) => Promise<void>;  }) {
   const { tr } = useTr();
   const [sub, setSub] = useState<Sub>(null);
 
   if (sub === 'voicemail')   return <SubPage onBack={() => setSub(null)} title={tr.more.voicemail}><VoicemailScreen haptic={haptic} /></SubPage>;
   if (sub === 'messages')    return <SubPage onBack={() => setSub(null)} title={tr.more.messages}><MessagesScreen haptic={haptic} /></SubPage>;
   if (sub === 'contacts')    return <SubPage onBack={() => setSub(null)} title={tr.more.contacts}><ContactsScreen sp={sp} /></SubPage>;
-  if (sub === 'settings')    return <SubPage onBack={() => setSub(null)} title={tr.more.settings}><SettingsScreen creds={creds} sp={sp} onSignOut={onSignOut} preferClickToCall={preferClickToCall} onTogglePreferC2C={onTogglePreferC2C} /></SubPage>;
+  if (sub === 'settings')    return <SubPage onBack={() => setSub(null)} title={tr.more.settings}><SettingsScreen creds={creds} sp={sp} onSignOut={onSignOut}  /></SubPage>;
   if (sub === 'delete')      return <SubPage onBack={() => setSub(null)} title={tr.more.deleteAccount}><DeleteAccountScreen onDone={onSignOut} /></SubPage>;
   if (sub === 'privacy')     return <SubPage onBack={() => setSub(null)} title={tr.more.privacy}><PrivacyScreen /></SubPage>;
   if (sub === 'datasafety')  return <SubPage onBack={() => setSub(null)} title={tr.more.dataSafety}><DataSafetyScreen /></SubPage>;

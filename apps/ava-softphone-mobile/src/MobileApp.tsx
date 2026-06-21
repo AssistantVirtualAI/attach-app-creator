@@ -51,7 +51,6 @@ import PerfOverlay from './components/PerfOverlay';
 import ScreenSkeleton from './components/ScreenSkeleton';
 import SessionExpired from './components/SessionExpired';
 import { startPrefetch, prefetchForTab } from './lib/prefetch';
-import { getPreferClickToCall, setPreferClickToCall } from './lib/prefs';
 
 const isPreviewMode = (() => {
   try { return new URLSearchParams(window.location.search).get('preview') === '1'; }
@@ -96,12 +95,10 @@ export default function MobileApp() {
   })();
   const [tab, setTab] = useState<Tab>(initialTab);
   const [booting, setBooting] = useState(!isPreviewMode);
-  const [preferC2C, setPreferC2C] = useState<boolean | null>(null);
+  const preferC2C = false;
 
   useEffect(() => {
     let cancelled = false;
-    getPreferClickToCall().then((val) => {
-      if (!cancelled) setPreferC2C(val);
     });
     bootNative().finally(() => {
       setTimeout(() => setBooting(false), 700);
@@ -127,10 +124,10 @@ export default function MobileApp() {
   }, []);
 
 
-  if (loading || booting || preferC2C === null) return <SplashAva />;
+  if (loading || booting) return <SplashAva />;
   if (!creds) return <MobileI18nProvider><ThemeProvider><AuthScreen onAuthenticated={setCreds} /><PerfOverlay /></ThemeProvider></MobileI18nProvider>;
 
-  return <MobileI18nProvider><ThemeProvider><AuthenticatedShell creds={creds} setCreds={setCreds} tab={tab} setTab={setTab} onSignOut={clearCreds} preferClickToCall={preferC2C} onTogglePreferC2C={() => { const next = !preferC2C; setPreferC2C(next); setPreferClickToCall(next); }} /><PerfOverlay /></ThemeProvider></MobileI18nProvider>;
+  return <MobileI18nProvider><ThemeProvider><AuthenticatedShell creds={creds} setCreds={setCreds} tab={tab} setTab={setTab} onSignOut={clearCreds}} /><PerfOverlay /></ThemeProvider></MobileI18nProvider>;
 }
 
 function AuthenticatedShell({
@@ -416,9 +413,9 @@ function AuthenticatedShell({
           {tab === 'calls'      && <CallsScreen sp={sp} haptic={haptic} creds={creds} />}
           {tab === 'ava'        && <AVAChatScreen />}
           {tab === 'messages'   && <MessagesHubScreen accessToken={creds.accessToken || null} userId={creds.userId} sp={sp} haptic={haptic} channelUnread={notif.channelUnread} />}
-          {tab === 'settings'   && <SettingsScreen creds={creds} sp={sp} onSignOut={onSignOut} onNavigate={setTab as any} preferClickToCall={preferClickToCall} onTogglePreferC2C={onTogglePreferC2C} />}
+          {tab === 'settings'   && <SettingsScreen creds={creds} sp={sp} onSignOut={onSignOut} onNavigate={setTab as any} />}
           {/* legacy deep-link routes */}
-          {tab === 'more'       && <MoreScreen creds={creds} sp={sp} onSignOut={onSignOut} haptic={haptic} preferClickToCall={preferClickToCall} onTogglePreferC2C={onTogglePreferC2C} />}
+          {tab === 'more'       && <MoreScreen creds={creds} sp={sp} onSignOut={onSignOut} haptic={haptic} />}
           {tab === 'voicemail'  && <VoicemailScreen haptic={haptic} />}
           {tab === 'contacts'   && <ContactsScreen sp={sp} />}
           {tab === 'sms'        && <MessagesScreen haptic={haptic} />}
@@ -442,7 +439,7 @@ function AuthenticatedShell({
         }}
       />
 
-      {!inCall && <DialerFab sp={sp} haptic={haptic} preferClickToCall={preferClickToCall} />}
+      {!inCall && <DialerFab sp={sp} haptic={haptic}  />}
       {inCall && <ActiveCallSheet sp={sp} haptic={haptic} />}
 
       {profileOpen && (

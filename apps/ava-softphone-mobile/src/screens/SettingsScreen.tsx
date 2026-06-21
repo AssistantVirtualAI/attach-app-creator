@@ -12,8 +12,8 @@ import type { Tab } from '../components/BottomTabs';
 const PORTAL_URL = 'https://avastatistic.ca';
 
 export default function SettingsScreen({
-  creds, sp, onSignOut, onNavigate, preferClickToCall, onTogglePreferC2C,
-}: { creds: Creds; sp: any; onSignOut: () => void; onNavigate?: (t: Tab) => void; preferClickToCall?: boolean; onTogglePreferC2C?: () => void }) {
+  creds, sp, onSignOut, onNavigate, 
+}: { creds: Creds; sp: any; onSignOut: () => void; onNavigate?: (t: Tab) => void;  }) {
   const { t, lang, setLang } = useT();
   const { mode, toggle: toggleTheme } = useTheme();
   const [me, setMe] = useState<MeResponse | null>(null);
@@ -45,7 +45,7 @@ export default function SettingsScreen({
   };
   const toggleHaptics = () => { const next = !haptics; setHaptics(next); localStorage.setItem('ava.haptics', next ? 'on' : 'off'); };
   const toggleAutoAnswer = () => { const next = !autoAnswer; setAutoAnswer(next); localStorage.setItem('ava.autoAnswer', next ? 'on' : 'off'); };
-  const togglePreferC2C = () => onTogglePreferC2C();
+  
   const pickRingtone = () => {
     const opts = ['AVA Default', 'Classic', 'Pulse', 'Marimba', 'Silent'];
     const choice = prompt((lang === 'fr' ? 'Sonnerie' : 'Ringtone') + ` (${opts.join(', ')}):`, ringtone);
