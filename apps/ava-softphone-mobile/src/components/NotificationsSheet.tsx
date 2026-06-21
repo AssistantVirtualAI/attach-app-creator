@@ -4,14 +4,13 @@ import { colors, font, radius } from '../lib/theme';
 import { mobileApi, CallRecord, VoicemailEntry, SmsThread, RecordingEntry } from '../lib/mobileApi';
 import type { Tab } from './BottomTabs';
 
-type Counts = { missed: number; voicemails: number; recordings: number; sms: number; total: number; loading: boolean };
+type Counts = { missed: number; voicemails: number; recordings: number; sms: number; total: number };
 
 export function useNotificationCounts(): Counts {
-  const [c, setC] = useState<Counts>({ missed: 0, voicemails: 0, recordings: 0, sms: 0, total: 0, loading: true });
+  const [c, setC] = useState<Counts>({ missed: 0, voicemails: 0, recordings: 0, sms: 0, total: 0 });
   useEffect(() => {
     let alive = true;
-    const load = async (initial: boolean) => {
-      if (initial && alive) setC((p) => ({ ...p, loading: true }));
+    const load = async () => {
       try {
         const [calls, vms, threads, recs] = await Promise.all([
           mobileApi.calls({ rangeDays: 7 }).catch(() => [] as CallRecord[]),
@@ -26,13 +25,11 @@ export function useNotificationCounts(): Counts {
         const recordings = (recs as RecordingEntry[]).length;
         if (!alive) return;
         const total = missed + voicemails + sms + recordings;
-        setC({ missed, voicemails, recordings, sms, total, loading: false });
-      } catch {
-        if (alive) setC((p) => ({ ...p, loading: false }));
-      }
+        setC({ missed, voicemails, recordings, sms, total });
+      } catch {}
     };
-    load(true);
-    const id = window.setInterval(() => load(false), 60_000);
+    load();
+    const id = window.setInterval(load, 60_000);
     return () => { alive = false; window.clearInterval(id); };
   }, []);
   return c;
@@ -74,17 +71,12 @@ export default function NotificationsSheet({
             <X size={20} />
           </button>
         </div>
-        {c.loading && (
-          <div style={{ padding: 24, textAlign: 'center', color: colors.textSub, fontSize: font.sm }}>
-            Loading notifications…
-          </div>
-        )}
-        {!c.loading && c.total === 0 && (
+        {c.total === 0 && (
           <div style={{ padding: 24, textAlign: 'center', color: colors.textSub, fontSize: font.sm }}>
             You're all caught up.
           </div>
         )}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, opacity: c.loading ? 0.5 : 1 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {items.map(({ tab, icon: Icon, label, count, tone }) => (
             <button
               key={label}

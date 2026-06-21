@@ -31,11 +31,13 @@ export default function BottomTabs({
   return (
     <nav
       style={{
-        position: 'sticky',
+        position: 'fixed',
         bottom: 0,
+        left: 0,
+        right: 0,
         zIndex: 50,
         display: 'flex', flexDirection: 'column',
-        margin: '0 10px calc(8px + var(--safe-bottom))',
+        margin: '0 8px calc(2px + var(--safe-bottom))',
         padding: '10px 8px 8px',
         background:
           'linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(244,247,255,0.86) 100%)',
