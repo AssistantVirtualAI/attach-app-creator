@@ -30,7 +30,8 @@ export function usePlanipretPush() {
 
   const subscribe = useCallback(async (userId: string) => {
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) { toast.error("Notifications non supportées par ce navigateur"); return false; }
-    if (!VAPID_PUBLIC_KEY) { toast.error("Clé VAPID non configurée"); return false; }
+    const publicKey = await fetchVapidPublicKey();
+    if (!publicKey) { toast.error("Clé VAPID non configurée (Intégrations → Web Push)"); return false; }
     setBusy(true);
     try {
       const perm = await Notification.requestPermission();
@@ -39,7 +40,7 @@ export function usePlanipretPush() {
       await navigator.serviceWorker.ready;
       const existing = await reg.pushManager.getSubscription();
       const sub = existing ?? await reg.pushManager.subscribe({
-        userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+        userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(publicKey),
       });
       const json = sub.toJSON() as any;
       const p256dh = json.keys?.p256dh ?? arrayBufferToBase64(sub.getKey("p256dh"));
