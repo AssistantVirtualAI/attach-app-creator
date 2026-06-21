@@ -18,7 +18,7 @@ Deno.serve(async (req) => {
     const { user_id, title, body: text, data, icon } = body ?? {};
     if (!user_id || !title) return json({ error: "missing_fields" }, 400);
 
-    const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    // admin already created above for VAPID lookup
     const { data: subs } = await admin.from("planipret_push_subscriptions").select("id,endpoint,p256dh,auth").eq("user_id", user_id);
     if (!subs?.length) return json({ delivered: 0 });
 
