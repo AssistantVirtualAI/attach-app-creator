@@ -19,6 +19,7 @@ import PostLoginRedirect from "./pages/PostLoginRedirect";
 import PlanipretLogin from "./pages/planipret/PlanipretLogin";
 import PlanipretMobile from "./pages/planipret/PlanipretMobile";
 import PlanipretDashboard from "./pages/planipret/PlanipretDashboard";
+import PlanipretIntegrationSecrets from "./pages/planipret/PlanipretIntegrationSecrets";
 
 import Dashboard from "./pages/Dashboard";
 import VoiceAnalytics from "./pages/VoiceAnalytics";
@@ -327,6 +328,7 @@ const App = () => (
                 <Route path="/planipret/login" element={<PlanipretLogin />} />
                 <Route path="/mplanipret" element={<PlanipretMobile />} />
                 <Route path="/planipret/dashboard" element={<PlanipretDashboard />} />
+                <Route path="/planipret/integrations" element={<PlanipretIntegrationSecrets />} />
 
                 
                 {/* Protected routes */}
