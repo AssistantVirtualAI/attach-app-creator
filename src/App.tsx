@@ -20,6 +20,8 @@ import PlanipretLogin from "./pages/planipret/PlanipretLogin";
 import PlanipretMobile from "./pages/planipret/PlanipretMobile";
 import PlanipretDashboard from "./pages/planipret/PlanipretDashboard";
 import PlanipretIntegrationSecrets from "./pages/planipret/PlanipretIntegrationSecrets";
+import PlanipretIntegrations from "./pages/planipret/PlanipretIntegrations";
+import Ms365Callback from "./pages/planipret/Ms365Callback";
 
 import Dashboard from "./pages/Dashboard";
 import VoiceAnalytics from "./pages/VoiceAnalytics";
