@@ -16,6 +16,8 @@ const MessagesScreen     = lazy(() => import('./screens/MessagesScreen'));
 const MessagesHubScreen  = lazy(() => import('./screens/MessagesHubScreen'));
 const QueuesScreen       = lazy(() => import('./screens/QueuesScreen'));
 const SettingsScreen     = lazy(() => import('./screens/SettingsScreen'));
+const DialerScreen       = lazy(() => import('./screens/DialerScreen'));
+const SpeedDialScreen    = lazy(() => import('./screens/SpeedDialScreen'));
 import BottomTabs, { Tab } from './components/BottomTabs';
 import ActiveCallSheet from './components/ActiveCallSheet';
 import SplashAva from './components/SplashAva';
@@ -408,19 +410,23 @@ function AuthenticatedShell({
 
       <div key={tab} className="lemtel-page-enter" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <Suspense fallback={<ScreenSkeleton />}>
-          {tab === 'home'       && <DashboardScreen onNavigate={setTab as any} haptic={haptic} onOpenProfile={() => setProfileOpen(true)} />}
+          {tab === 'contacts'   && <ContactsScreen sp={sp} />}
+          {tab === 'chats'      && <MessagesHubScreen accessToken={creds.accessToken || null} userId={creds.userId} sp={sp} haptic={haptic} channelUnread={notif.channelUnread} />}
           {tab === 'calls'      && <CallsScreen sp={sp} haptic={haptic} creds={creds} />}
+          {tab === 'keypad'     && <DialerScreen sp={sp} haptic={haptic} preferClickToCall={preferClickToCall} />}
+          {tab === 'speeddial'  && <SpeedDialScreen sp={sp} preferClickToCall={preferClickToCall} />}
+          {/* legacy deep-link routes */}
+          {tab === 'home'       && <DashboardScreen onNavigate={setTab as any} haptic={haptic} onOpenProfile={() => setProfileOpen(true)} />}
           {tab === 'ava'        && <AVAChatScreen />}
           {tab === 'messages'   && <MessagesHubScreen accessToken={creds.accessToken || null} userId={creds.userId} sp={sp} haptic={haptic} channelUnread={notif.channelUnread} />}
-          {tab === 'settings'   && <SettingsScreen creds={creds} sp={sp} onSignOut={onSignOut} onNavigate={setTab as any} />}
-          {/* legacy deep-link routes */}
+          {tab === 'settings'   && <SettingsScreen creds={creds} sp={sp} onSignOut={onSignOut} onNavigate={setTab as any} preferClickToCall={preferClickToCall} togglePreferC2C={onTogglePreferC2C} />}
           {tab === 'more'       && <MoreScreen creds={creds} sp={sp} onSignOut={onSignOut} haptic={haptic} />}
           {tab === 'voicemail'  && <VoicemailScreen haptic={haptic} />}
-          {tab === 'contacts'   && <ContactsScreen sp={sp} />}
           {tab === 'sms'        && <MessagesScreen haptic={haptic} />}
           {tab === 'queues'     && <QueuesScreen />}
         </Suspense>
       </div>
+
 
       <BottomTabs
         active={tab}
