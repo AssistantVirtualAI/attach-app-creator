@@ -51,9 +51,9 @@ export default function SpeedDialScreen({ sp, preferClickToCall }: { sp: any; pr
   if (favs === null) {
     return (
       <div style={{ padding: 14 }}>
-        <Skeleton style={{ height: 100, marginBottom: 10 }} />
-        <Skeleton style={{ height: 100, marginBottom: 10 }} />
-        <Skeleton style={{ height: 100 }} />
+        <Skeleton h={100} style={{ marginBottom: 10 }} />
+        <Skeleton h={100} style={{ marginBottom: 10 }} />
+        <Skeleton h={100} />
       </div>
     );
   }
