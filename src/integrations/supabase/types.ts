@@ -7709,6 +7709,33 @@ export type Database = {
         }
         Relationships: []
       }
+      planipret_integration_secrets: {
+        Row: {
+          config: Json
+          created_at: string
+          id: string
+          provider: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          id?: string
+          provider: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          id?: string
+          provider?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       planipret_phone_calls: {
         Row: {
           ai_summary: string | null
