@@ -44,7 +44,7 @@ export default function SpeedDialScreen({ sp, preferClickToCall }: { sp: any; pr
     setFavs(next); saveFavorites(next);
   };
   const call = (number: string) => {
-    try { dialNumber({ sp, number, preferClickToCall: !!preferClickToCall }); }
+    try { dialNumber(sp, number); }
     catch { sp?.call?.(number); }
   };
 
