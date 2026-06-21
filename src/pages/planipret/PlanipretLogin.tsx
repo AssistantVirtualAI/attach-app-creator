@@ -1,8 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import planipretLogo from "@/assets/planipret-logo.png.asset.json";
+import avaWordmark from "@/assets/ava-wordmark.svg";
 
 const BRAND = { primary: "#1F4E79", accent: "#2E86C1" };
+
 
 export default function PlanipretLogin() {
   const navigate = useNavigate();
