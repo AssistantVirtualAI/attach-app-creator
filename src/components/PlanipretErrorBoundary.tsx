@@ -33,7 +33,18 @@ export function OfflineBanner() {
   }, []);
   if (!offline) return null;
   return (
-    <div className="fixed top-0 inset-x-0 z-[200] bg-amber-500 text-white text-center text-sm py-2 shadow">
+    <div
+      className="fixed top-0 inset-x-0 z-[200] text-center py-2"
+      style={{
+        background: "rgba(245,166,35,0.12)",
+        borderBottom: "1px solid rgba(245,166,35,0.3)",
+        color: "#F5A623",
+        fontFamily: "'DM Sans', sans-serif",
+        fontWeight: 600,
+        fontSize: 12,
+        backdropFilter: "blur(8px)",
+      }}
+    >
       📡 Connexion perdue — tentative de reconnexion…
     </div>
   );

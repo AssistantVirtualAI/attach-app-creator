@@ -785,3 +785,146 @@ All colors MUST be HSL.
   50%      { transform: translateX(-50%) scaleY(1.4); }
 }
 .animate-mascot-mouth { animation: mascot-mouth 280ms ease-in-out infinite; transform-origin: center; }
+
+/* ===== PLANIPRÊT — Step 11-15 extensions ===== */
+
+/* Keyframes */
+@keyframes pp-pulse-red {
+  0%   { box-shadow: 0 0 0 0 rgba(232,76,76,0.7); }
+  70%  { box-shadow: 0 0 0 12px rgba(232,76,76,0); }
+  100% { box-shadow: 0 0 0 0 rgba(232,76,76,0); }
+}
+@keyframes pp-blink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.3; }
+}
+@keyframes pp-glow-purple {
+  0%, 100% { box-shadow: 0 4px 16px rgba(155,127,232,0.4); }
+  50%      { box-shadow: 0 4px 28px rgba(155,127,232,0.7); }
+}
+
+.planipret-scope .pp-pulse-red    { animation: pp-pulse-red 1.5s infinite; }
+.planipret-scope .pp-blink-dot    { animation: pp-blink 2s infinite; }
+.planipret-scope .pp-glow-purple  { animation: pp-glow-purple 2s infinite; }
+
+/* Sonner — typed borders (global; Sonner mounts outside scope) */
+[data-sonner-toast] {
+  background: #0A1628 !important;
+  border: 1px solid #0E2A45 !important;
+  color: #E8EDF5 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4) !important;
+  font-family: 'DM Sans', sans-serif !important;
+}
+[data-sonner-toast][data-type="success"] { border-left: 3px solid #00D4AA !important; }
+[data-sonner-toast][data-type="error"]   { border-left: 3px solid #E84C4C !important; }
+[data-sonner-toast][data-type="info"]    { border-left: 3px solid #2E9BDC !important; }
+[data-sonner-toast][data-type="warning"] { border-left: 3px solid #F5A623 !important; }
+
+/* SMS bubbles */
+.planipret-scope .pp-bubble-out {
+  background: linear-gradient(135deg, #1A4A8A, #2E9BDC);
+  color: #fff;
+  border-radius: 18px 18px 4px 18px;
+  padding: 10px 14px;
+  max-width: 75%;
+  margin-left: auto;
+}
+.planipret-scope .pp-bubble-in {
+  background: var(--pp-bg-elevated);
+  border: 1px solid var(--pp-bg-border-2);
+  color: var(--pp-text-primary);
+  border-radius: 18px 18px 18px 4px;
+  padding: 10px 14px;
+  max-width: 75%;
+}
+.planipret-scope .pp-bubble-time { font-size: 9px; color: var(--pp-text-faint); margin-top: 4px; }
+
+/* Voicemail player */
+.planipret-scope .pp-vm-player {
+  background: var(--pp-bg-elevated);
+  border: 1px solid var(--pp-bg-border-2);
+  border-radius: 12px;
+  padding: 12px;
+}
+.planipret-scope .pp-vm-track { background: var(--pp-bg-border-2); height: 4px; border-radius: 2px; overflow: hidden; }
+.planipret-scope .pp-vm-fill  { background: var(--pp-brand-accent); height: 100%; }
+
+/* Modal */
+.planipret-scope .pp-modal-overlay {
+  background: rgba(4,11,22,0.9);
+  backdrop-filter: blur(8px);
+}
+.planipret-scope .pp-modal {
+  background: var(--pp-bg-surface);
+  border: 1px solid var(--pp-bg-border-2);
+  border-radius: 18px;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+  overflow: hidden;
+}
+.planipret-scope .pp-modal-header {
+  padding: 20px 24px;
+  background: var(--pp-bg-deep);
+  border-bottom: 1px solid var(--pp-bg-border);
+  font: 700 18px 'Inter', sans-serif;
+  color: var(--pp-text-primary);
+}
+.planipret-scope .pp-modal-body { padding: 24px; }
+.planipret-scope .pp-modal-footer {
+  padding: 16px 24px;
+  background: var(--pp-bg-deep);
+  border-top: 1px solid var(--pp-bg-border);
+}
+
+/* Integration status badges */
+.planipret-scope .pp-status-ok {
+  background: #0D3D2A;
+  border: 1px solid #1A5A3F;
+  color: var(--pp-success);
+  border-radius: 20px;
+  padding: 3px 10px;
+  font: 600 10px 'DM Sans', sans-serif;
+}
+.planipret-scope .pp-status-off {
+  background: var(--pp-bg-elevated);
+  border: 1px solid var(--pp-bg-border-2);
+  color: var(--pp-text-faint);
+  border-radius: 20px;
+  padding: 3px 10px;
+  font: 600 10px 'DM Sans', sans-serif;
+}
+.planipret-scope .pp-warning-banner {
+  background: rgba(245,166,35,0.08);
+  border: 1px solid rgba(245,166,35,0.25);
+  color: var(--pp-warning);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font: 500 12px 'DM Sans', sans-serif;
+}
+
+/* Empty state */
+.planipret-scope .pp-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; padding: 40px 20px; gap: 8px;
+}
+.planipret-scope .pp-empty-icon { color: var(--pp-text-faint); width: 48px; height: 48px; }
+.planipret-scope .pp-empty-title { font: 600 16px 'Inter', sans-serif; color: var(--pp-text-secondary); }
+.planipret-scope .pp-empty-sub   { font: 400 13px 'DM Sans', sans-serif; color: var(--pp-text-muted); }
+
+/* Toggle switch */
+.planipret-scope .pp-toggle {
+  width: 30px; height: 16px; border-radius: 8px;
+  background: var(--pp-bg-elevated);
+  border: 1px solid var(--pp-bg-border-2);
+  position: relative; cursor: pointer; transition: all 0.2s;
+}
+.planipret-scope .pp-toggle.on {
+  background: linear-gradient(90deg, #1A5A8A, #2E9BDC);
+  border-color: transparent;
+}
+.planipret-scope .pp-toggle::after {
+  content: ''; position: absolute; top: 1px; left: 1px;
+  width: 12px; height: 12px; border-radius: 50%; background: #fff;
+  transition: left 0.2s;
+}
+.planipret-scope .pp-toggle.on::after { left: 16px; }
