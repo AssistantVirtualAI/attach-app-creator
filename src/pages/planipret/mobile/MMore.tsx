@@ -92,6 +92,10 @@ export default function MMore() {
         <p className="text-[14px] text-slate-500">{profile?.extension ? `${profile.extension}@planipret.ca` : profile?.email}</p>
       </header>
 
+      <Section title="Pipeline">
+        <Row icon={<BarChart3 className="w-4 h-4" />} label="📊 Pipeline des dossiers" onClick={() => navigate("/mplanipret/pipeline")} chevron />
+      </Section>
+
       <Section title="Mon compte">
         <Row icon={<User className="w-4 h-4" />} label="Mon profil" onClick={() => setEditOpen(true)} chevron />
         <Row icon={<Lock className="w-4 h-4" />} label="Changer le mot de passe" onClick={() => navigate("/reset-password")} chevron />
