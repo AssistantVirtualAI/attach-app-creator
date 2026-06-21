@@ -25,13 +25,14 @@ export default function SpeedDialScreen({ sp, preferClickToCall }: { sp: any; pr
 
   useEffect(() => {
     setFavs(loadFavorites());
-    loadCachedContacts().then((rows: any[]) => {
-      const list = (rows || []).slice(0, 12).map((c: any) => ({
+    try {
+      const rows: any[] = loadCachedContacts() || [];
+      const list = rows.slice(0, 12).map((c: any) => ({
         name: c.display_name || c.name || c.phone || c.extension || '',
         number: c.phone || c.extension || '',
       })).filter((c) => c.number);
       setSuggestions(list);
-    }).catch(() => setSuggestions([]));
+    } catch { setSuggestions([]); }
   }, []);
 
   const addFav = (name: string, number: string) => {
