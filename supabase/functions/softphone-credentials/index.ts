@@ -172,7 +172,6 @@ Deno.serve(async (req) => {
       WORKING_PRIMARY,
       WORKING_FALLBACK,
       wssUrl,
-      `wss://${sipDomain}:7443`,
     ].filter(Boolean)));
 
     let password = "";
