@@ -616,6 +616,7 @@ export function useSoftphone(
   };
 
   const call = (number: string) => {
+    if (sipStatus !== 'registered') return false;
     callAttemptRef.current = 1;
     return placeCallInternal(number, false);
   };
