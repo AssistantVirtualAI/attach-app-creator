@@ -460,7 +460,6 @@ function AuthenticatedShell({
         }}
       />
 
-      {!inCall && <DialerFab sp={sp} haptic={haptic}  />}
       {inCall && <ActiveCallSheet sp={sp} haptic={haptic} />}
 
       {profileOpen && (
