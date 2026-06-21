@@ -524,12 +524,9 @@ export function useSoftphone(
           voiceActivityDetection: false,
         },
         sessionDescriptionHandlerModifiers: [modifier],
-        // Empty iceServers + iceTransportPolicy:'none' makes WebRTC skip ICE
-        // gathering so the resulting SDP looks like classic RTP/AVP — exactly
-        // what FusionPBX expects (otherwise it answers 488 Not Acceptable).
+        // Empty iceServers avoids external STUN while keeping a valid WebRTC config.
         pcConfig: {
           iceServers: [],
-          iceTransportPolicy: 'none',
           bundlePolicy: 'balanced',
         },
         eventHandlers: {
@@ -564,7 +561,7 @@ export function useSoftphone(
     sessionRef.current?.answer({
       mediaConstraints: HD_AUDIO_CONSTRAINTS,
       sessionDescriptionHandlerModifiers: [buildSdpModifier(opusToSdpOpts(audioProfileRef.current))],
-      pcConfig: { iceServers: [], iceTransportPolicy: 'none', bundlePolicy: 'balanced' },
+      pcConfig: { iceServers: [], bundlePolicy: 'balanced' },
     });
   const mute = () => { sessionRef.current?.mute({ audio: true }); setIsMuted(true); };
   const unmute = () => { sessionRef.current?.unmute({ audio: true }); setIsMuted(false); };
