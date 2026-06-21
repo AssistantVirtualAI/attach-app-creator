@@ -220,6 +220,7 @@ import PortalPrompt from "./pages/PortalPrompt";
 import PortalSettings from "./pages/PortalSettings";
 import PortalProfile from "./pages/PortalProfile";
 import UniversalLogin from "./pages/UniversalLogin";
+
 import EndUserLogin from "./pages/EndUserLogin";
 import PortalChooser from "./pages/PortalChooser";
 
@@ -324,6 +325,8 @@ const App = () => (
                 
                 {/* Universal login - redirects based on user type */}
                 <Route path="/login" element={<UniversalLogin />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
+
                 <Route path="/portals" element={<PortalChooser />} />
                 <Route path="/c/:domain" element={<CustomerPortalGate />} />
                 <Route path="/end-user/login" element={<EndUserLogin />} />

@@ -86,7 +86,13 @@ export default function PlanipretLogin() {
           >
             {loading ? "Connexion..." : "Se connecter"}
           </button>
+          <div className="text-center">
+            <a href="/reset-password" className="text-xs text-slate-500 hover:text-slate-700 underline">
+              Mot de passe oublié?
+            </a>
+          </div>
         </form>
+
 
         <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-center gap-2 text-[11px] text-slate-400">
           <span>Powered by</span>
