@@ -2,9 +2,9 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { AVA_OWNER_USER_ID } from "@/lib/avaOwner";
-import { Phone, Mic, Sparkles, Database, Cloud, ArrowLeft, CheckCircle2, AlertCircle, Loader2, ExternalLink, X } from "lucide-react";
+import { Phone, Mic, Sparkles, Database, Cloud, ArrowLeft, CheckCircle2, AlertCircle, Loader2, ExternalLink, X, Bell } from "lucide-react";
 
-type Provider = "nsapi" | "elevenlabs" | "anthropic" | "maestro" | "microsoft";
+type Provider = "nsapi" | "elevenlabs" | "anthropic" | "maestro" | "microsoft" | "webpush";
 
 type StoredItem = { provider: Provider; updated_at: string | null; config_masked: Record<string, string>; has_keys: string[] };
 
@@ -62,6 +62,17 @@ const CARDS: Array<{
       { key: "tenant_id", label: "Tenant ID", defaultValue: "common" },
     ],
     note: "Chaque courtier connecte son compte M365 individuellement depuis l'app mobile (More → Microsoft 365)",
+  },
+  {
+    id: "webpush", name: "Web Push (VAPID)", description: "Notifications push navigateur & PWA",
+    color: "#2E9BDC", Icon: Bell,
+    fields: [
+      { key: "public_key", label: "VAPID Public Key" },
+      { key: "private_key", label: "VAPID Private Key", secret: true },
+      { key: "subject", label: "Subject (mailto:...)", defaultValue: "mailto:noreply@avastatistic.ca" },
+    ],
+    note: "Générer les clés avec: npx web-push generate-vapid-keys",
+    features: ["Notifications appels entrants", "Nouveaux SMS", "Nouveaux voicemails", "Analyses IA prêtes"],
   },
 ];
 
