@@ -64,7 +64,9 @@ function Shell({ title, badge, accent, items }: {
 
 export function PlatformAdminShell({ children }: { children?: ReactNode }) {
   const { selectedOrgId } = useOrganization();
+  const { user } = useAuth();
   const isLemtelOrgSelected = selectedOrgId === "71755d33-ed64-4ad5-a828-61c9d2029eb7";
+  const isAvaOwner = user?.id === AVA_OWNER_USER_ID;
   const items = useMemo(() => [
     { label: "Overview", to: "/platform", icon: LayoutDashboard },
     { label: "Organizations", to: "/platform/organizations", icon: Building2 },
@@ -76,9 +78,11 @@ export function PlatformAdminShell({ children }: { children?: ReactNode }) {
     ] : []),
     { label: "System Health", to: "/platform/health", icon: Activity },
     { label: "Billing", to: "/platform/billing", icon: CreditCard },
+    ...(isAvaOwner ? [{ label: "AI Usage", to: "/platform/ai-usage", icon: DollarSign }] : []),
     { label: "Audit Logs", to: "/platform/audit", icon: FileText },
     { label: "Settings", to: "/platform/settings", icon: Settings },
-  ], [isLemtelOrgSelected]);
+  ], [isLemtelOrgSelected, isAvaOwner]);
+
 
   return (
     <Shell
