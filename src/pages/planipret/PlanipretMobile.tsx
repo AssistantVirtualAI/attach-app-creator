@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, NavLink, Outlet, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
@@ -6,6 +6,8 @@ import { Home, Phone, MessageSquare, Voicemail, MoreHorizontal, Phone as PhoneIc
 import { toast } from "sonner";
 import planipretLogo from "@/assets/planipret-logo.png.asset.json";
 import avaWordmark from "@/assets/ava-wordmark.svg";
+import { usePullToRefresh, PullIndicator } from "@/hooks/usePullToRefresh";
+
 
 
 const PRIMARY = "#1F4E79";
@@ -14,7 +16,7 @@ const SUCCESS = "#27AE60";
 const DANGER = "#E74C3C";
 const BG = "#F8F9FA";
 
-export type PlanipretMobileContext = { profile: any; reloadProfile: () => Promise<void>; openDialer: (number?: string) => void };
+export type PlanipretMobileContext = { profile: any; reloadProfile: () => Promise<void>; openDialer: (number?: string) => void; registerRefresh: (fn: (() => Promise<void> | void) | null) => void };
 
 const TABS = [
   { to: "/mplanipret/home", label: "Accueil", Icon: Home },
