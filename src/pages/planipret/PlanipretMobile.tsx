@@ -13,6 +13,7 @@ import { OfflineBanner } from "@/components/PlanipretErrorBoundary";
 import SessionTimeoutModal from "@/components/planipret/SessionTimeoutModal";
 import PrivacyConsentGate from "@/components/planipret/PrivacyConsentGate";
 import UniversalSearchBar from "@/components/planipret/UniversalSearchBar";
+import { OnboardingTutorial } from "@/components/planipret/OnboardingTutorial";
 
 const ACCENT = "#2E9BDC";
 
@@ -214,6 +215,9 @@ export default function PlanipretMobile() {
         </div>
         <SessionTimeoutModal />
         {profile && <PrivacyConsentGate profile={profile} onAccepted={loadProfile} />}
+        {profile && profile.consent_accepted_at && !profile.onboarding_completed && (
+          <OnboardingTutorial profile={profile} onDone={loadProfile} />
+        )}
 
         {/* FAB */}
         <button onClick={() => setDialerOpen(true)}
