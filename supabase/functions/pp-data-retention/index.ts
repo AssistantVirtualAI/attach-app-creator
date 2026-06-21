@@ -25,7 +25,6 @@ Deno.serve(async (req) => {
   const { data: policyRow } = await admin
     .from("planipret_retention_policy")
     .select("*")
-    .order("created_at", { ascending: true })
     .limit(1)
     .maybeSingle();
   const policy = policyRow ?? {
