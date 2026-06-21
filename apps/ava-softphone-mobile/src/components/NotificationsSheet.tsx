@@ -4,13 +4,14 @@ import { colors, font, radius } from '../lib/theme';
 import { mobileApi, CallRecord, VoicemailEntry, SmsThread, RecordingEntry } from '../lib/mobileApi';
 import type { Tab } from './BottomTabs';
 
-type Counts = { missed: number; voicemails: number; recordings: number; sms: number; total: number };
+type Counts = { missed: number; voicemails: number; recordings: number; sms: number; total: number; loading: boolean };
 
 export function useNotificationCounts(): Counts {
-  const [c, setC] = useState<Counts>({ missed: 0, voicemails: 0, recordings: 0, sms: 0, total: 0 });
+  const [c, setC] = useState<Counts>({ missed: 0, voicemails: 0, recordings: 0, sms: 0, total: 0, loading: true });
   useEffect(() => {
     let alive = true;
-    const load = async () => {
+    const load = async (initial: boolean) => {
+      if (initial && alive) setC((p) => ({ ...p, loading: true }));
       try {
         const [calls, vms, threads, recs] = await Promise.all([
           mobileApi.calls({ rangeDays: 7 }).catch(() => [] as CallRecord[]),
@@ -25,11 +26,13 @@ export function useNotificationCounts(): Counts {
         const recordings = (recs as RecordingEntry[]).length;
         if (!alive) return;
         const total = missed + voicemails + sms + recordings;
-        setC({ missed, voicemails, recordings, sms, total });
-      } catch {}
+        setC({ missed, voicemails, recordings, sms, total, loading: false });
+      } catch {
+        if (alive) setC((p) => ({ ...p, loading: false }));
+      }
     };
-    load();
-    const id = window.setInterval(load, 60_000);
+    load(true);
+    const id = window.setInterval(() => load(false), 60_000);
     return () => { alive = false; window.clearInterval(id); };
   }, []);
   return c;
