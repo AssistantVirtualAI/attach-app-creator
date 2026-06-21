@@ -7,6 +7,7 @@ import {
   LogOut, ChevronRight, Bot, Sparkles, X, Download, Shield, BellOff, Settings as SettingsIcon, BarChart3,
 } from "lucide-react";
 import type { PlanipretMobileContext } from "../PlanipretMobile";
+import { usePlanipretPush } from "@/hooks/usePlanipretPush";
 
 const PRIMARY = "#1F4E79";
 
@@ -230,7 +231,7 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
 }
 
 function NotificationsSection({ profile, reloadProfile }: { profile: any; reloadProfile: () => Promise<void> }) {
-  const { subscribe, sendTest, busy } = require("@/hooks/usePlanipretPush").usePlanipretPush();
+  const { subscribe, sendTest, busy } = usePlanipretPush();
   const setPref = async (field: string, val: boolean) => {
     await supabase.from("planipret_profiles").update({ [field]: val }).eq("user_id", profile.user_id);
     await reloadProfile();
