@@ -1001,7 +1001,7 @@ const App = () => (
                 </Route>
 
                 {/* PBX Command Center (desktop admin shell) */}
-                <Route path="/console" element={<ProtectedRoute><ConsoleShell /></ProtectedRoute>}>
+                <Route path="/console" element={<ProtectedRoute><LemtelOrgOnly><ConsoleShell /></LemtelOrgOnly></ProtectedRoute>}>
                   <Route index element={<ConsoleDashboard />} />
                   <Route path="extensions" element={<ConsoleExtensions />} />
                   <Route path="devices" element={<ConsoleDevices />} />
