@@ -1,0 +1,124 @@
+import { createClient } from "npm:@supabase/supabase-js@2";
+import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+
+const GRAPH = "https://graph.microsoft.com/v1.0";
+
+async function getMsConfig(admin: any) {
+  const { data } = await admin.from("planipret_integration_secrets").select("config").eq("provider", "microsoft").maybeSingle();
+  const c = (data?.config ?? {}) as Record<string, string>;
+  return {
+    clientId: c.client_id ?? Deno.env.get("MICROSOFT_CLIENT_ID") ?? "",
+    clientSecret: c.client_secret ?? Deno.env.get("MICROSOFT_CLIENT_SECRET") ?? "",
+    tenant: c.tenant_id ?? Deno.env.get("MICROSOFT_TENANT_ID") ?? "common",
+  };
+}
+
+async function refreshToken(admin: any, profile: any) {
+  const cfg = await getMsConfig(admin);
+  if (!profile.ms365_refresh_token) return null;
+  const body = new URLSearchParams({
+    client_id: cfg.clientId,
+    client_secret: cfg.clientSecret,
+    grant_type: "refresh_token",
+    refresh_token: profile.ms365_refresh_token,
+    scope: "openid offline_access Mail.ReadWrite Calendars.ReadWrite User.Read",
+  });
+  const r = await fetch(`https://login.microsoftonline.com/${cfg.tenant}/oauth2/v2.0/token`, {
+    method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body,
+  });
+  if (!r.ok) { console.error("MS refresh failed", await r.text()); return null; }
+  const d = await r.json();
+  await admin.from("planipret_profiles").update({
+    ms365_access_token: d.access_token,
+    ms365_refresh_token: d.refresh_token ?? profile.ms365_refresh_token,
+  }).eq("id", profile.id);
+  return d.access_token as string;
+}
+
+async function graph(admin: any, profile: any, path: string, init: RequestInit = {}, retry = true): Promise<Response> {
+  const token = profile.ms365_access_token;
+  const r = await fetch(`${GRAPH}${path}`, {
+    ...init,
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(init.headers ?? {}) },
+  });
+  if (r.status === 401 && retry) {
+    const newToken = await refreshToken(admin, profile);
+    if (newToken) { profile.ms365_access_token = newToken; return graph(admin, profile, path, init, false); }
+  }
+  return r;
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  try {
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const userClient = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: authHeader } } });
+    const { data: claims } = await userClient.auth.getClaims(authHeader.replace("Bearer ", ""));
+    const userId = claims?.claims?.sub;
+    if (!userId) return new Response(JSON.stringify({ success: false, error: "Unauthorized", code: 401 }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+    const { data: profile } = await admin.from("planipret_profiles").select("id, user_id, full_name, ms365_access_token, ms365_refresh_token").eq("user_id", userId).maybeSingle();
+    if (!profile?.ms365_access_token) {
+      return new Response(JSON.stringify({ success: false, error: "Microsoft 365 non connecté pour ce courtier" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const { action, payload = {} } = await req.json();
+    const j = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+    switch (action) {
+      case "read_emails": {
+        const r = await graph(admin, profile, `/me/messages?$top=20&$orderby=receivedDateTime%20desc&$select=subject,from,receivedDateTime,bodyPreview,isRead`);
+        const d = await r.json();
+        return j({ success: r.ok, emails: d.value ?? [] }, r.ok ? 200 : 500);
+      }
+      case "send_email": {
+        const r = await graph(admin, profile, `/me/sendMail`, { method: "POST", body: JSON.stringify({ message: { subject: payload.subject, body: { contentType: "HTML", content: payload.body }, toRecipients: (payload.to ?? []).map((e: string) => ({ emailAddress: { address: e } })) } }) });
+        return j({ success: r.ok }, r.ok ? 200 : 500);
+      }
+      case "create_calendar_event": {
+        const r = await graph(admin, profile, `/me/events`, { method: "POST", body: JSON.stringify({ subject: payload.subject, start: payload.start, end: payload.end, body: { contentType: "HTML", content: payload.body ?? "" }, attendees: (payload.attendees ?? []).map((e: string) => ({ emailAddress: { address: e }, type: "required" })) }) });
+        const d = await r.json();
+        return j({ success: r.ok, event_id: d.id }, r.ok ? 200 : 500);
+      }
+      case "list_calendar_events": {
+        const start = payload.start ?? new Date().toISOString();
+        const end = payload.end ?? new Date(Date.now() + 7 * 86400000).toISOString();
+        const r = await graph(admin, profile, `/me/calendarView?startDateTime=${start}&endDateTime=${end}`);
+        const d = await r.json();
+        return j({ success: r.ok, events: d.value ?? [] }, r.ok ? 200 : 500);
+      }
+      case "daily_briefing": {
+        const emailsR = await graph(admin, profile, `/me/messages?$top=5&$filter=isRead%20eq%20false&$select=subject,from,bodyPreview`);
+        const emails = (await emailsR.json()).value ?? [];
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today.getTime() + 86400000);
+        const eventsR = await graph(admin, profile, `/me/calendarView?startDateTime=${today.toISOString()}&endDateTime=${tomorrow.toISOString()}`);
+        const events = (await eventsR.json()).value ?? [];
+
+        const { data: ant } = await admin.from("planipret_integration_secrets").select("config").eq("provider", "anthropic").maybeSingle();
+        const apiKey = (ant?.config as any)?.api_key ?? Deno.env.get("ANTHROPIC_API_KEY");
+        let briefing = `Bonjour ${profile.full_name ?? ""}, voici votre résumé du ${today.toLocaleDateString("fr-CA")}. Vous avez ${emails.length} courriels non lus et ${events.length} rendez-vous aujourd'hui.`;
+        if (apiKey) {
+          const cr = await fetch("https://api.anthropic.com/v1/messages", {
+            method: "POST",
+            headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+            body: JSON.stringify({
+              model: "claude-sonnet-4-20250514",
+              max_tokens: 600,
+              system: "Tu es un assistant pour courtier hypothécaire. Génère un briefing matinal court et professionnel en français.",
+              messages: [{ role: "user", content: `Courtier: ${profile.full_name}\nDate: ${today.toLocaleDateString("fr-CA")}\nCourriels non lus: ${JSON.stringify(emails)}\nRendez-vous: ${JSON.stringify(events)}\n\nGénère un briefing oral de 3-4 phrases.` }],
+            }),
+          });
+          if (cr.ok) { const cd = await cr.json(); briefing = cd.content?.[0]?.text ?? briefing; }
+        }
+        return j({ success: true, briefing_text: briefing, emails_count: emails.length, events_count: events.length });
+      }
+      default:
+        return j({ success: false, error: "Action inconnue" }, 400);
+    }
+  } catch (e: any) {
+    console.error("ms365-actions error", e);
+    return new Response(JSON.stringify({ success: false, error: e?.message ?? "Erreur serveur", code: 0 }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
+});
