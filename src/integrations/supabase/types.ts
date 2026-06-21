@@ -7845,6 +7845,7 @@ export type Database = {
         Row: {
           avatar_url: string | null
           created_at: string
+          elevenlabs_agent_id: string | null
           email: string | null
           extension: string | null
           full_name: string | null
@@ -7852,6 +7853,8 @@ export type Database = {
           language: string
           metadata: Json
           mobile_app_enabled: boolean
+          ms365_access_token: string | null
+          ms365_refresh_token: string | null
           ns_domain: string | null
           ns_user_id: string | null
           organization_id: string
@@ -7864,6 +7867,7 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           created_at?: string
+          elevenlabs_agent_id?: string | null
           email?: string | null
           extension?: string | null
           full_name?: string | null
@@ -7871,6 +7875,8 @@ export type Database = {
           language?: string
           metadata?: Json
           mobile_app_enabled?: boolean
+          ms365_access_token?: string | null
+          ms365_refresh_token?: string | null
           ns_domain?: string | null
           ns_user_id?: string | null
           organization_id?: string
@@ -7883,6 +7889,7 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           created_at?: string
+          elevenlabs_agent_id?: string | null
           email?: string | null
           extension?: string | null
           full_name?: string | null
@@ -7890,6 +7897,8 @@ export type Database = {
           language?: string
           metadata?: Json
           mobile_app_enabled?: boolean
+          ms365_access_token?: string | null
+          ms365_refresh_token?: string | null
           ns_domain?: string | null
           ns_user_id?: string | null
           organization_id?: string
