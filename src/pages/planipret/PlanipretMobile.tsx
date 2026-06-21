@@ -244,6 +244,8 @@ export default function PlanipretMobile() {
         </div>
 
         <Dialer open={dialerOpen} onClose={() => setDialerOpen(false)} initial={dialerInit} />
+        <InboundCallOverlay call={inbound} onClose={() => setInbound(null)} />
+        <OfflineBanner />
       </div>
 
     </Frame>
