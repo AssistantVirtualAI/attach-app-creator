@@ -8,6 +8,7 @@ import {
   Check, Sparkles, RefreshCw,
 } from "lucide-react";
 import type { PlanipretMobileContext } from "../PlanipretMobile";
+import { TEMP_COLORS, TEMP_EMOJI, TEMP_LABEL, tempBorder, callbackDelayToDate, delayLabel, type LeadTemp } from "@/components/planipret/leadHelpers";
 
 const PRIMARY = "#1F4E79";
 const ACCENT = "#2E86C1";
