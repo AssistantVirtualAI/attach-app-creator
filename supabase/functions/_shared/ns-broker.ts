@@ -68,7 +68,7 @@ export async function authBroker(req: Request) {
 
 export async function obtainBrokerJwt(extension: string) {
   const env = nsEnv();
-  const res = await fetch(`${env.base}/ns-api/v2/jwt`, {
+  const res = await fetch(`${env.base}/jwt`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -87,7 +87,7 @@ export async function obtainBrokerJwt(extension: string) {
 
 export async function refreshBrokerJwt(refreshToken: string) {
   const env = nsEnv();
-  const res = await fetch(`${env.base}/ns-api/v2/jwt`, {
+  const res = await fetch(`${env.base}/jwt`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ refresh_token: refreshToken }),
@@ -132,7 +132,7 @@ export async function nsBrokerFetch(
   init: RequestInit = {},
 ): Promise<Response> {
   const env = nsEnv();
-  const url = `${env.base}/ns-api/v2${path}`;
+  const url = `${env.base}${path}`;
   let token = await ensureBrokerJwt(admin, profile);
   const doFetch = (t: string) =>
     fetch(url, {
