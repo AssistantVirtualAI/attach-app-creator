@@ -611,6 +611,47 @@ function CallDetailSheet({
   );
 }
 
+function CallbackSuggestion({ call, onScheduled }: { call: Call; onScheduled: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const schedule = async (delay: string) => {
+    setBusy(true);
+    const at = callbackDelayToDate(delay);
+    if (!at) { setBusy(false); return; }
+    const { error } = await supabase.from("planipret_reminders").insert({
+      user_id: call.user_id,
+      call_id: call.id,
+      contact_number: call.direction === "outbound" ? call.to_number : call.from_number,
+      contact_name: call.direction === "outbound" ? call.to_name : call.from_name,
+      reminder_type: "callback",
+      scheduled_at: at.toISOString(),
+      ai_suggested: true,
+      note: call.callback_reason ?? null,
+    });
+    setBusy(false);
+    if (error) { toast.error("Erreur création rappel"); return; }
+    // Best-effort Maestro event
+    supabase.functions.invoke("maestro-actions", {
+      body: { action: "create_event", call_id: call.id, payload: { title: `Rappel: ${call.from_name ?? call.from_number ?? ""}`, start: at.toISOString(), end: new Date(at.getTime() + 30*60000).toISOString(), description: call.callback_reason ?? "" } },
+    }).catch(() => {});
+    onScheduled();
+  };
+  return (
+    <div className="mt-3 rounded-xl p-3" style={{ background: "rgba(124,58,237,0.08)", border: "1px solid rgba(124,58,237,0.25)" }}>
+      <div className="text-xs font-semibold mb-1" style={{ color: "#7C3AED" }}>⏰ Rappel suggéré par AVA</div>
+      {call.callback_reason && <p className="text-xs text-slate-600 mb-2">{call.callback_reason}</p>}
+      <div className="flex flex-wrap gap-1.5">
+        {(["2h","tomorrow_9am","monday_9am"] as const).map((d) => (
+          <button key={d} disabled={busy} onClick={() => schedule(d)}
+            className="text-[11px] font-semibold px-2.5 py-1.5 rounded-md text-white disabled:opacity-50"
+            style={{ background: "#7C3AED" }}>
+            {delayLabel(d)}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="mt-5">
