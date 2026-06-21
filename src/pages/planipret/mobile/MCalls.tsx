@@ -252,7 +252,10 @@ function CallRow({ call, onTap, onCall, showCallBtn }: { call: Call; onTap: () =
 
   return (
     <li>
-      <div className="bg-white rounded-xl px-3 py-3 flex items-center gap-3 shadow-sm active:bg-slate-50">
+      <div
+        className="bg-white rounded-xl px-3 py-3 flex items-center gap-3 shadow-sm active:bg-slate-50"
+        style={{ borderLeft: tempBorder(call.lead_temperature as LeadTemp) }}
+      >
         <button onClick={onTap} className="flex items-center gap-3 flex-1 min-w-0 text-left">
           <div className="rounded-full flex items-center justify-center shrink-0" style={{ width: 44, height: 44, background: `${color}15`, color }}>
             <Icon className="w-5 h-5" />
