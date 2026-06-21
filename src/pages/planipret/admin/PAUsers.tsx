@@ -97,8 +97,25 @@ export default function PAUsers() {
     toast.success("Suppression terminée");
   };
 
+  const adminCount = rows.length; // proxy — extend later with role filter
   return (
     <div className="space-y-4">
+      {/* Onboard first Planipret admin */}
+      {!loading && adminCount <= 1 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
+          <div className="text-blue-600 text-xl leading-none">ℹ️</div>
+          <div className="flex-1">
+            <p className="font-semibold text-sm text-blue-900">Créez un compte admin Planiprêt</p>
+            <p className="text-xs text-blue-800 mt-1">
+              Ajoutez un administrateur Planiprêt pour qu'il puisse gérer ses courtiers de façon autonome.
+            </p>
+          </div>
+          <button onClick={() => setAddOpen(true)} className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white" style={{ background: PRIMARY }}>
+            + Ajouter un admin
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
