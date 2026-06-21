@@ -227,6 +227,7 @@ import { RolePortalGuard } from "./components/portals/RolePortalGuard";
 import PlatformDashboard from "./pages/portals/PlatformDashboard";
 import PlatformSystemHealth from "./pages/platform/SystemHealth";
 import PlatformTelephonyQA from "./pages/platform/TelephonyQA";
+import PlatformAIUsage from "./pages/platform/AIUsage";
 import CustomerDashboard from "./pages/portals/CustomerDashboard";
 import MyDashboardLanding from "./pages/portals/MyDashboardLanding";
 const DesignPreview = lazy(() => import("./pages/DesignPreview"));
@@ -959,6 +960,7 @@ const App = () => (
                   <Route path="qa" element={<LemtelOrgOnly fallback="/platform"><PlatformTelephonyQA /></LemtelOrgOnly>} />
                   <Route path="audit" element={<MasterAuditLogs />} />
                   <Route path="settings" element={<LemtelSettings />} />
+                  <Route path="ai-usage" element={<PlatformAIUsage />} />
                 </Route>
 
                 {/* Customer Admin — workspace owners / resellers */}
