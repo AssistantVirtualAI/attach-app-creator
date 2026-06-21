@@ -23,6 +23,8 @@ export default function PAOverview() {
   const [stats, setStats] = useState({ calls: 0, callsYest: 0, brokers: 0, brokersTotal: 0, sms: 0, ava: 0 });
   const [recent, setRecent] = useState<any[]>([]);
   const [brokers, setBrokers] = useState<any[]>([]);
+  const [hotLeads, setHotLeads] = useState<any[]>([]);
+  const [pendingByBroker, setPendingByBroker] = useState<Array<{ name: string; total: number; overdue: number }>>([]);
 
   const load = async () => {
     const today = new Date(); today.setHours(0, 0, 0, 0);
