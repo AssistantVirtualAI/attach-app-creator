@@ -50,6 +50,32 @@ export default function PAOverview() {
     });
     setRecent(rec.data ?? []);
     setBrokers((bList.data ?? []).slice(0, 12));
+
+    // Top hot leads today
+    const { data: hot } = await supabase
+      .from("planipret_phone_calls")
+      .select("id, user_id, from_number, from_name, to_number, to_name, lead_score, started_at, planipret_profiles!inner(full_name)")
+      .gte("started_at", todayIso)
+      .gte("lead_score", 8)
+      .order("lead_score", { ascending: false })
+      .limit(10);
+    setHotLeads((hot ?? []) as any);
+
+    // Pending reminders aggregated per broker
+    const nowIso2 = new Date().toISOString();
+    const { data: rems } = await supabase
+      .from("planipret_reminders")
+      .select("user_id, scheduled_at, status, planipret_profiles!inner(full_name)")
+      .eq("status", "pending");
+    const agg: Record<string, { name: string; total: number; overdue: number }> = {};
+    (rems ?? []).forEach((r: any) => {
+      const name = r.planipret_profiles?.full_name ?? "—";
+      const key = r.user_id;
+      if (!agg[key]) agg[key] = { name, total: 0, overdue: 0 };
+      agg[key].total += 1;
+      if (r.scheduled_at < nowIso2) agg[key].overdue += 1;
+    });
+    setPendingByBroker(Object.values(agg).sort((a, b) => b.overdue - a.overdue || b.total - a.total).slice(0, 8));
   };
 
   useEffect(() => {
