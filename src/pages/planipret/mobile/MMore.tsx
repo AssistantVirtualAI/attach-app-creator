@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
   User, Lock, Phone, Info, Mail, Bell, Moon, HelpCircle, MessageCircle,
-  LogOut, ChevronRight, Bot, Sparkles, X, Download, Shield,
+  LogOut, ChevronRight, Bot, Sparkles, X, Download, Shield, BellOff, Settings as SettingsIcon, BarChart3,
 } from "lucide-react";
 import type { PlanipretMobileContext } from "../PlanipretMobile";
 
@@ -19,6 +19,7 @@ export default function MMore() {
   const [editOpen, setEditOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [customizeOpen, setCustomizeOpen] = useState(false);
+  const [dndOpen, setDndOpen] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
   const [notifEnabled, setNotifEnabled] = useState<boolean>(() => localStorage.getItem("planipret_notif") === "1");
   const [darkMode, setDarkMode] = useState<boolean>(() => localStorage.getItem("planipret_dark") === "1");
@@ -91,6 +92,10 @@ export default function MMore() {
         <p className="text-[14px] text-slate-500">{profile?.extension ? `${profile.extension}@planipret.ca` : profile?.email}</p>
       </header>
 
+      <Section title="Pipeline">
+        <Row icon={<BarChart3 className="w-4 h-4" />} label="📊 Pipeline des dossiers" onClick={() => navigate("/mplanipret/pipeline")} chevron />
+      </Section>
+
       <Section title="Mon compte">
         <Row icon={<User className="w-4 h-4" />} label="Mon profil" onClick={() => setEditOpen(true)} chevron />
         <Row icon={<Lock className="w-4 h-4" />} label="Changer le mot de passe" onClick={() => navigate("/reset-password")} chevron />
@@ -123,6 +128,21 @@ export default function MMore() {
           } />
         <Row icon={<Info className="w-4 h-4" />} label="Mon extension" right={<span className="text-[12px] text-slate-500">{profile?.extension ?? "—"}</span>} />
       </Section>
+
+      <Section title="Disponibilité">
+        <Row
+          icon={<BellOff className="w-4 h-4" style={{ color: profile?.dnd_enabled ? "#E84C4C" : undefined }} />}
+          label="🔕 Mode Ne pas déranger"
+          sub={profile?.dnd_enabled ? "Actif — AVA répond pour vous" : "Inactif"}
+          right={<Toggle on={!!profile?.dnd_enabled} onChange={async (v) => {
+            await supabase.from("planipret_profiles").update({ dnd_enabled: v }).eq("user_id", profile.user_id);
+            await reloadProfile();
+            toast.success(v ? "DND activé" : "DND désactivé");
+          }} />}
+        />
+        <Row icon={<SettingsIcon className="w-4 h-4" />} label="⚙️ Configurer le mode DND" onClick={() => setDndOpen(true)} chevron />
+      </Section>
+
 
       <Section title="Intégrations">
         <Row icon={<Mail className="w-4 h-4" style={{ color: "#0078D4" }} />} label="Microsoft 365"
@@ -167,6 +187,7 @@ export default function MMore() {
       {editOpen && <EditProfileSheet profile={profile} onClose={() => setEditOpen(false)} onSaved={reloadProfile} />}
       {helpOpen && <HelpSheet onClose={() => setHelpOpen(false)} />}
       {customizeOpen && <CustomizeSheet profile={profile} onClose={() => setCustomizeOpen(false)} onSaved={reloadProfile} />}
+      {dndOpen && <DndSheet profile={profile} onClose={() => setDndOpen(false)} onSaved={reloadProfile} />}
     </div>
   );
 }
@@ -291,6 +312,59 @@ function CustomizeSheet({ profile, onClose, onSaved }: { profile: any; onClose: 
           </button>
         ))}
       </div>
+      <button onClick={save} disabled={busy} className="w-full py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-50" style={{ background: PRIMARY }}>
+        {busy ? "…" : "Sauvegarder"}
+      </button>
+    </Sheet>
+  );
+}
+
+function DndSheet({ profile, onClose, onSaved }: { profile: any; onClose: () => void; onSaved: () => Promise<void> }) {
+  const [enabled, setEnabled] = useState<boolean>(!!profile?.dnd_enabled);
+  const [auto, setAuto] = useState<boolean>(!!profile?.dnd_auto_schedule);
+  const [start, setStart] = useState<string>(profile?.dnd_start_time?.slice(0,5) ?? "18:00");
+  const [end, setEnd] = useState<string>(profile?.dnd_end_time?.slice(0,5) ?? "08:00");
+  const [msg, setMsg] = useState<string>(profile?.dnd_message_fr ?? "");
+  const [busy, setBusy] = useState(false);
+  const save = async () => {
+    setBusy(true);
+    const { error } = await supabase.from("planipret_profiles").update({
+      dnd_enabled: enabled,
+      dnd_auto_schedule: auto,
+      dnd_start_time: start,
+      dnd_end_time: end,
+      dnd_message_fr: msg,
+    }).eq("user_id", profile.user_id);
+    setBusy(false);
+    if (error) { toast.error("Erreur"); return; }
+    toast.success("Préférences DND enregistrées");
+    await onSaved();
+    onClose();
+  };
+  return (
+    <Sheet title="🔕 Mode Ne pas déranger" onClose={onClose}>
+      <div className="flex items-center justify-between py-2 border-b border-slate-100">
+        <span className="text-sm">Activer le mode DND</span>
+        <Toggle on={enabled} onChange={setEnabled} />
+      </div>
+      <div className="flex items-center justify-between py-2 border-b border-slate-100">
+        <span className="text-sm">Activer automatiquement selon horaire</span>
+        <Toggle on={auto} onChange={setAuto} />
+      </div>
+      {auto && (
+        <div className="grid grid-cols-2 gap-3 py-3">
+          <div>
+            <label className="block text-xs text-slate-500 mb-1">Début</label>
+            <input type="time" value={start} onChange={(e) => setStart(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm" />
+          </div>
+          <div>
+            <label className="block text-xs text-slate-500 mb-1">Fin</label>
+            <input type="time" value={end} onChange={(e) => setEnd(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm" />
+          </div>
+        </div>
+      )}
+      <label className="block text-xs text-slate-500 mb-1 mt-2">Message de réponse automatique</label>
+      <textarea value={msg} onChange={(e) => setMsg(e.target.value)} rows={4} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm mb-3" />
       <button onClick={save} disabled={busy} className="w-full py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-50" style={{ background: PRIMARY }}>
         {busy ? "…" : "Sauvegarder"}
       </button>

@@ -14,8 +14,20 @@ Analyse cette transcription d'appel et retourne UNIQUEMENT un JSON valide, sans 
   "tasks": [{"title": string, "due_days_from_now": number}],
   "events": [{"title": string, "start_offset_hours": number, "duration_minutes": number}],
   "should_create_maestro_task": boolean,
-  "should_create_maestro_event": boolean
-}`;
+  "should_create_maestro_event": boolean,
+  "lead_score": number,
+  "lead_temperature": "hot"|"warm"|"cold",
+  "lead_score_reason": string,
+  "suggested_callback_delay": "now"|"2h"|"tomorrow_9am"|"monday_9am",
+  "callback_reason": string
+}
+
+CRITÈRES DE SCORING DU LEAD (lead_score 1-10) :
+- 9-10 (hot / 🔥 Chaud) : Client prêt à avancer, mentionne budget, urgence, accord verbal.
+- 6-8 (warm / 🌡️ Tiède) : Intéressé mais hésitant, questions sur les taux, demande de suivi.
+- 1-5 (cold / ❄️ Froid) : Pas de budget, juste info, long délai, refus implicite.
+lead_temperature DOIT correspondre au score. lead_score_reason : 1 phrase justifiant le score.
+suggested_callback_delay : choisir intelligemment selon l'urgence. callback_reason : 1 phrase.`;
 
 async function getSecret(admin: any, provider: string, key: string): Promise<string | null> {
   const { data } = await admin.from("planipret_integration_secrets").select("config").eq("provider", provider).maybeSingle();
@@ -64,7 +76,17 @@ Deno.serve(async (req) => {
     }
 
     const newMeta = { ...(call.metadata ?? {}), ai_coaching: insights.coaching, ai_tasks: insights.tasks, ai_events: insights.events, ai_next_action: insights.next_action };
-    await admin.from("planipret_phone_calls").update({ ai_summary: insights.summary, metadata: newMeta }).eq("id", call_id);
+    const validTemp = ["hot","warm","cold"].includes(insights.lead_temperature) ? insights.lead_temperature : null;
+    const leadScore = typeof insights.lead_score === "number" ? Math.min(10, Math.max(1, Math.round(insights.lead_score))) : null;
+    await admin.from("planipret_phone_calls").update({
+      ai_summary: insights.summary,
+      metadata: newMeta,
+      lead_score: leadScore,
+      lead_temperature: validTemp,
+      lead_score_reason: insights.lead_score_reason ?? null,
+      suggested_callback_delay: insights.suggested_callback_delay ?? null,
+      callback_reason: insights.callback_reason ?? null,
+    }).eq("id", call_id);
 
     await admin.from("planipret_ai_insights").insert({
       user_id: call.user_id,

@@ -23,6 +23,7 @@ import MCalls from "./pages/planipret/mobile/MCalls";
 import MMessages from "./pages/planipret/mobile/MMessages";
 import MVoicemail from "./pages/planipret/mobile/MVoicemail";
 import MMore from "./pages/planipret/mobile/MMore";
+import MPipeline from "./pages/planipret/mobile/MPipeline";
 import PlanipretAudit from "./pages/planipret/PlanipretAudit";
 import Ms365Callback from "./pages/planipret/Ms365Callback";
 // Lazy-load admin pages (each is its own chunk)
@@ -35,6 +36,7 @@ const PAVoicemails = lazy(() => import("./pages/planipret/admin/PAVoicemails"));
 const PAReports = lazy(() => import("./pages/planipret/admin/PAReports"));
 const PAAuditLog = lazy(() => import("./pages/planipret/admin/PAAuditLog"));
 const PACompliance = lazy(() => import("./pages/planipret/admin/PACompliance"));
+const PALeads = lazy(() => import("./pages/planipret/admin/PALeads"));
 const PlanipretPrivacy = lazy(() => import("./pages/planipret/PlanipretPrivacy"));
 const PlanipretIntegrationsLazy = lazy(() => import("./pages/planipret/PlanipretIntegrations"));
 import { AdminPageSkeleton } from "./components/planipret/Skeletons";
@@ -354,6 +356,7 @@ const App = () => (
                   <Route path="messages" element={<MMessages />} />
                   <Route path="voicemail" element={<MVoicemail />} />
                   <Route path="more" element={<MMore />} />
+                  <Route path="pipeline" element={<MPipeline />} />
                 </Route>
                 <Route path="/planipret/dashboard" element={<Navigate to="/planipret/admin/overview" replace />} />
                 <Route path="/planipret/integrations" element={<Navigate to="/planipret/admin/integrations" replace />} />
@@ -378,6 +381,7 @@ const App = () => (
                   <Route path="reports" element={<Suspense fallback={<AdminPageSkeleton />}><PAReports /></Suspense>} />
                   <Route path="audit" element={<Suspense fallback={<AdminPageSkeleton />}><PAAuditLog /></Suspense>} />
                   <Route path="compliance" element={<Suspense fallback={<AdminPageSkeleton />}><PACompliance /></Suspense>} />
+                  <Route path="leads" element={<Suspense fallback={<AdminPageSkeleton />}><PALeads /></Suspense>} />
                   <Route path="integrations" element={<Suspense fallback={<AdminPageSkeleton />}><PlanipretIntegrationsLazy /></Suspense>} />
                 </Route>
                 <Route path="/planipret/privacy" element={<Suspense fallback={<AdminPageSkeleton />}><PlanipretPrivacy /></Suspense>} />

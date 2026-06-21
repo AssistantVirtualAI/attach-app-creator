@@ -8,6 +8,7 @@ import {
   Check, Sparkles, RefreshCw,
 } from "lucide-react";
 import type { PlanipretMobileContext } from "../PlanipretMobile";
+import { TEMP_COLORS, TEMP_EMOJI, TEMP_LABEL, tempBorder, callbackDelayToDate, delayLabel, type LeadTemp } from "@/components/planipret/leadHelpers";
 
 const PRIMARY = "#1F4E79";
 const ACCENT = "#2E86C1";
@@ -31,6 +32,11 @@ type Call = {
   transcript: string | null;
   ai_summary: string | null;
   metadata: any;
+  lead_score?: number | null;
+  lead_temperature?: LeadTemp;
+  lead_score_reason?: string | null;
+  suggested_callback_delay?: string | null;
+  callback_reason?: string | null;
 };
 
 type Insight = {
@@ -246,7 +252,10 @@ function CallRow({ call, onTap, onCall, showCallBtn }: { call: Call; onTap: () =
 
   return (
     <li>
-      <div className="bg-white rounded-xl px-3 py-3 flex items-center gap-3 shadow-sm active:bg-slate-50">
+      <div
+        className="bg-white rounded-xl px-3 py-3 flex items-center gap-3 shadow-sm active:bg-slate-50"
+        style={{ borderLeft: tempBorder(call.lead_temperature as LeadTemp) }}
+      >
         <button onClick={onTap} className="flex items-center gap-3 flex-1 min-w-0 text-left">
           <div className="rounded-full flex items-center justify-center shrink-0" style={{ width: 44, height: 44, background: `${color}15`, color }}>
             <Icon className="w-5 h-5" />
@@ -458,6 +467,29 @@ function CallDetailSheet({
             </button>
           </div>
 
+          {/* LEAD SCORE */}
+          {call.lead_temperature && call.lead_score != null && (
+            <div className="mt-4 rounded-xl p-3 flex items-center gap-3"
+              style={{ background: `${TEMP_COLORS[call.lead_temperature]}12`, border: `1px solid ${TEMP_COLORS[call.lead_temperature]}40` }}>
+              <div className="text-3xl">{TEMP_EMOJI[call.lead_temperature]}</div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-bold" style={{ color: TEMP_COLORS[call.lead_temperature] }}>
+                  Lead {TEMP_LABEL[call.lead_temperature].toLowerCase()} — Score {call.lead_score}/10
+                </div>
+                {call.lead_score_reason && (
+                  <div className="text-xs text-slate-500 mt-0.5">{call.lead_score_reason}</div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* CALLBACK SUGGESTION */}
+          {call.suggested_callback_delay && (
+            <CallbackSuggestion call={call} onScheduled={() => toast.success("Rappel programmé ✅")} />
+          )}
+
+
+
           {/* SECTION 2 - Recording */}
           <Section title="🎙️ Enregistrement">
             {call.recording_url ? (
@@ -574,6 +606,47 @@ function CallDetailSheet({
             </Section>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function CallbackSuggestion({ call, onScheduled }: { call: Call; onScheduled: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const schedule = async (delay: string) => {
+    setBusy(true);
+    const at = callbackDelayToDate(delay);
+    if (!at) { setBusy(false); return; }
+    const { error } = await supabase.from("planipret_reminders").insert({
+      user_id: call.user_id,
+      call_id: call.id,
+      contact_number: call.direction === "outbound" ? call.to_number : call.from_number,
+      contact_name: call.direction === "outbound" ? call.to_name : call.from_name,
+      reminder_type: "callback",
+      scheduled_at: at.toISOString(),
+      ai_suggested: true,
+      note: call.callback_reason ?? null,
+    });
+    setBusy(false);
+    if (error) { toast.error("Erreur création rappel"); return; }
+    // Best-effort Maestro event
+    supabase.functions.invoke("maestro-actions", {
+      body: { action: "create_event", call_id: call.id, payload: { title: `Rappel: ${call.from_name ?? call.from_number ?? ""}`, start: at.toISOString(), end: new Date(at.getTime() + 30*60000).toISOString(), description: call.callback_reason ?? "" } },
+    }).catch(() => {});
+    onScheduled();
+  };
+  return (
+    <div className="mt-3 rounded-xl p-3" style={{ background: "rgba(124,58,237,0.08)", border: "1px solid rgba(124,58,237,0.25)" }}>
+      <div className="text-xs font-semibold mb-1" style={{ color: "#7C3AED" }}>⏰ Rappel suggéré par AVA</div>
+      {call.callback_reason && <p className="text-xs text-slate-600 mb-2">{call.callback_reason}</p>}
+      <div className="flex flex-wrap gap-1.5">
+        {(["2h","tomorrow_9am","monday_9am"] as const).map((d) => (
+          <button key={d} disabled={busy} onClick={() => schedule(d)}
+            className="text-[11px] font-semibold px-2.5 py-1.5 rounded-md text-white disabled:opacity-50"
+            style={{ background: "#7C3AED" }}>
+            {delayLabel(d)}
+          </button>
+        ))}
       </div>
     </div>
   );

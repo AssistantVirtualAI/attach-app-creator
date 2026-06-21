@@ -37,10 +37,29 @@ async function processEvent(event: any) {
 
   const ext = data?.extension ?? data?.user ?? data?.to ?? data?.callee ?? null;
   let userId: string | null = null;
+  let brokerProfile: any = null;
   if (ext) {
     const { data: p } = await admin
-      .from("planipret_profiles").select("user_id").eq("extension", String(ext)).maybeSingle();
+      .from("planipret_profiles").select("user_id, dnd_enabled, dnd_auto_schedule, dnd_start_time, dnd_end_time, dnd_message_fr")
+      .eq("extension", String(ext)).maybeSingle();
     userId = p?.user_id ?? null;
+    brokerProfile = p;
+  }
+
+  function isDndActive(p: any): boolean {
+    if (!p) return false;
+    if (p.dnd_enabled) return true;
+    if (p.dnd_auto_schedule && p.dnd_start_time && p.dnd_end_time) {
+      const now = new Date();
+      const hh = now.getHours(), mm = now.getMinutes();
+      const cur = hh * 60 + mm;
+      const [sh, sm] = String(p.dnd_start_time).split(":").map(Number);
+      const [eh, em] = String(p.dnd_end_time).split(":").map(Number);
+      const s = sh * 60 + sm, e = eh * 60 + em;
+      if (s < e) return cur >= s && cur < e;
+      return cur >= s || cur < e; // overnight window
+    }
+    return false;
   }
 
   if (type === "cdr") {
@@ -67,16 +86,24 @@ async function processEvent(event: any) {
     }
   } else if (type === "call.inbound") {
     const callId = data.call_id ?? data.id;
+    const dndActive = isDndActive(brokerProfile);
     await admin.from("planipret_phone_calls").insert({
       user_id: userId, call_id: callId, direction: "inbound",
       caller_number: data.from_number ?? data.from ?? null,
       callee_number: data.to_number ?? data.to ?? null,
-      status: "inbound_ringing",
+      status: dndActive ? "voicemail" : "inbound_ringing",
+      metadata: dndActive ? { dnd_auto_voicemail: true, dnd_message: brokerProfile?.dnd_message_fr } : null,
     });
-    if (userId) {
+    if (userId && !dndActive) {
       await admin.channel(`call-events:${userId}`).send({
         type: "broadcast", event: "inbound_call",
         payload: { type: "inbound_call", call_id: callId, from_number: data.from_number ?? data.from, to_number: data.to_number ?? data.to },
+      });
+    } else if (userId && dndActive) {
+      // Notify broker that AVA handled the call
+      await admin.channel(`call-events:${userId}`).send({
+        type: "broadcast", event: "dnd_auto_handled",
+        payload: { call_id: callId, from_number: data.from_number ?? data.from, message: brokerProfile?.dnd_message_fr },
       });
     }
   } else if (type === "message.inbound") {

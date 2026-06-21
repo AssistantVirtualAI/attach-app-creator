@@ -10,6 +10,7 @@ type Profile = {
   mobile_app_enabled: boolean; voice_agent_enabled: boolean;
   ns_domain: string; elevenlabs_agent_id: string | null;
   updated_at: string; created_at: string;
+  dnd_enabled?: boolean;
 };
 
 const PAGE = 25;
@@ -176,6 +177,7 @@ export default function PAUsers() {
                 <th className="p-3">Ext.</th>
                 <th className="p-3">App</th>
                 <th className="p-3">Agent IA</th>
+                <th className="p-3">DND</th>
                 <th className="p-3">Appels mois</th>
                 <th className="p-3">Dernière activité</th>
                 <th className="p-3">Actions</th>
@@ -195,7 +197,7 @@ export default function PAUsers() {
                   </tr>
                 ))
               ) : paged.length === 0 ? (
-                <tr><td colSpan={9} className="p-8 text-center text-slate-400">Aucun courtier</td></tr>
+                <tr><td colSpan={10} className="p-8 text-center text-slate-400">Aucun courtier</td></tr>
               ) : paged.map((u) => (
                 <tr key={u.user_id} className={`border-t border-slate-100 hover:bg-slate-50 transition ${highlightId === u.user_id ? "bg-yellow-50" : ""}`}>
                   <td className="p-3"><input type="checkbox" checked={selected.has(u.user_id)} onChange={(e) => {
@@ -208,6 +210,24 @@ export default function PAUsers() {
                   <td className="p-3 text-slate-600 tabular-nums">{u.extension}</td>
                   <td className="p-3"><Toggle on={u.mobile_app_enabled} loading={savingId === u.user_id} onChange={() => toggleField(u, "mobile_app_enabled")} /></td>
                   <td className="p-3"><Toggle on={u.voice_agent_enabled} loading={savingId === u.user_id} onChange={() => toggleField(u, "voice_agent_enabled")} /></td>
+                  <td className="p-3">
+                    {u.dnd_enabled ? (
+                      <button
+                        onClick={async () => {
+                          if (!confirm(`Désactiver le mode DND pour ${u.full_name} (urgence) ?`)) return;
+                          await supabase.from("planipret_profiles").update({ dnd_enabled: false }).eq("user_id", u.user_id);
+                          await load();
+                          toast.success("DND désactivé");
+                        }}
+                        className="text-[11px] font-semibold px-2 py-1 rounded-full text-white"
+                        style={{ background: "#E84C4C" }}
+                        title="Cliquez pour désactiver (override admin)">
+                        🔕 Actif
+                      </button>
+                    ) : (
+                      <span className="text-[11px] text-slate-400">—</span>
+                    )}
+                  </td>
                   <td className="p-3 text-slate-700 tabular-nums">{callsByUser[u.user_id] ?? 0}</td>
                   <td className="p-3 text-slate-400 text-xs">{u.updated_at ? new Date(u.updated_at).toLocaleString("fr-CA", { dateStyle: "short", timeStyle: "short" }) : "—"}</td>
                   <td className="p-3 flex items-center gap-1">
