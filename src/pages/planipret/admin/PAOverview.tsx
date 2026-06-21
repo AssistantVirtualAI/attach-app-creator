@@ -127,6 +127,21 @@ export default function PAOverview() {
           </ul>
         </div>
       </div>
+
+      {/* RGPD / retention notice */}
+      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3">
+        <div className="text-amber-600 text-xl leading-none">⚠️</div>
+        <div className="flex-1">
+          <p className="font-semibold text-sm text-amber-900">Rétention des données</p>
+          <p className="text-xs text-amber-800 mt-1">
+            Les enregistrements d'appels sont supprimés par NetSapiens après 90 jours.
+            Aucune purge automatique n'est configurée pour les transcriptions et analyses IA.
+          </p>
+          <p className="text-[11px] text-amber-700 mt-2">
+            Pour configurer la rétention : <code className="bg-amber-100 px-1 rounded">planipret_settings.retention_days</code>
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

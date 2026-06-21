@@ -204,6 +204,27 @@ export default function PlanipretIntegrations() {
                     </div>
                   </div>
 
+                  {/* ElevenLabs Agent ID warning */}
+                  {card.id === "elevenlabs" && !stored?.has_keys?.includes("default_agent_id") && !forms.elevenlabs?.default_agent_id && (
+                    <div className="mb-3 p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs">
+                      <div className="flex items-start gap-2">
+                        <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                          <p className="font-semibold text-amber-900">Agent ElevenLabs non configuré</p>
+                          <p className="text-amber-800 mt-1">Sans Agent ID, le bouton 🤖 ne fonctionnera pas pour les courtiers.</p>
+                          <a href="https://elevenlabs.io/app/conversational-ai" target="_blank" rel="noopener" className="inline-flex items-center gap-1 text-amber-900 underline mt-2">
+                            <ExternalLink className="w-3 h-3" /> Comment obtenir un Agent ID ?
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* NetSapiens webhook helper */}
+                  {card.id === "nsapi" && <NSWebhookHelper />}
+
+
+
                   <div className="space-y-2.5 mb-3">
                     {card.fields.map((f) => (
                       <div key={f.key}>
@@ -287,3 +308,68 @@ export default function PlanipretIntegrations() {
     </div>
   );
 }
+
+function NSWebhookHelper() {
+  const [status, setStatus] = useState<Record<string, boolean> | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const baseUrl = (import.meta.env.VITE_SUPABASE_URL || "").replace(/\/$/, "");
+  const receiverUrl = `${baseUrl}/functions/v1/ns-webhook-receiver`;
+
+  const check = async () => {
+    setBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("ns-webhook-setup", { body: { action: "list" } });
+      if (error) throw error;
+      const types = ["CDR", "SMS", "Voicemail"];
+      const present: Record<string, boolean> = {};
+      const list: any[] = (data as any)?.subscriptions ?? [];
+      types.forEach((t) => { present[t] = list.some((s) => String(s.event_type || s.type || "").toLowerCase().includes(t.toLowerCase())); });
+      setStatus(present);
+    } catch (e: any) {
+      setMsg(e.message || "Erreur de vérification");
+    } finally { setBusy(false); }
+  };
+
+  const register = async () => {
+    setBusy(true); setMsg(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("ns-webhook-setup", { body: { action: "register" } });
+      if (error) throw error;
+      setMsg(`✅ ${((data as any)?.registered ?? 3)} webhooks enregistrés`);
+      await check();
+    } catch (e: any) {
+      setMsg(`❌ ${e.message || "Échec d'enregistrement"}`);
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <div className="mb-3 p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs space-y-2">
+      <div className="flex items-center justify-between">
+        <p className="font-semibold text-slate-700">Webhooks NS-API</p>
+        <button onClick={check} disabled={busy} className="text-[11px] underline text-slate-600 disabled:opacity-50">Vérifier</button>
+      </div>
+      <div className="flex flex-col gap-1">
+        {["CDR", "SMS", "Voicemail"].map((t) => (
+          <div key={t} className="flex items-center justify-between">
+            <span className="text-slate-600">{t}</span>
+            <span>{status === null ? "—" : status[t] ? "✅" : "❌"}</span>
+          </div>
+        ))}
+      </div>
+      <div className="flex items-center gap-2 text-[10px] text-slate-500">
+        <span className="truncate font-mono">{receiverUrl}</span>
+        <button
+          onClick={() => { navigator.clipboard.writeText(receiverUrl); setMsg("URL copiée"); }}
+          className="px-2 py-0.5 border rounded text-slate-600"
+        >📋</button>
+      </div>
+      <button onClick={register} disabled={busy} className="w-full px-3 py-1.5 rounded-lg text-white text-xs font-medium disabled:opacity-60" style={{ background: "#1F4E79" }}>
+        {busy ? "…" : "Enregistrer les webhooks"}
+      </button>
+      {msg && <p className="text-[11px] text-slate-700">{msg}</p>}
+    </div>
+  );
+}
+

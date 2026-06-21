@@ -196,7 +196,17 @@ export default function MCalls() {
               </button>
             </div>
             {loading ? (
-              <div className="p-8 text-center text-slate-400 text-sm">Chargement…</div>
+              <ul className="px-3 pt-3 pb-4 space-y-1.5">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <li key={i} className="bg-white rounded-xl px-3 py-3 flex items-center gap-3 shadow-sm">
+                    <div className="w-12 h-12 rounded-full animate-pulse bg-slate-200" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-3 w-[70%] animate-pulse bg-slate-200 rounded" />
+                      <div className="h-3 w-[40%] animate-pulse bg-slate-200 rounded" />
+                    </div>
+                  </li>
+                ))}
+              </ul>
             ) : filtered.length === 0 ? (
               <EmptyState tab={tab} />
             ) : (

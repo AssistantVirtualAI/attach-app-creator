@@ -97,8 +97,25 @@ export default function PAUsers() {
     toast.success("Suppression terminée");
   };
 
+  const adminCount = rows.length; // proxy — extend later with role filter
   return (
     <div className="space-y-4">
+      {/* Onboard first Planipret admin */}
+      {!loading && adminCount <= 1 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
+          <div className="text-blue-600 text-xl leading-none">ℹ️</div>
+          <div className="flex-1">
+            <p className="font-semibold text-sm text-blue-900">Créez un compte admin Planiprêt</p>
+            <p className="text-xs text-blue-800 mt-1">
+              Ajoutez un administrateur Planiprêt pour qu'il puisse gérer ses courtiers de façon autonome.
+            </p>
+          </div>
+          <button onClick={() => setAddOpen(true)} className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white" style={{ background: PRIMARY }}>
+            + Ajouter un admin
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -166,7 +183,17 @@ export default function PAUsers() {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={9} className="p-8 text-center text-slate-400">Chargement…</td></tr>
+                Array.from({ length: 10 }).map((_, i) => (
+                  <tr key={i} className="border-t border-slate-100">
+                    <td className="p-3"><div className="w-4 h-4 animate-pulse bg-slate-200 rounded" /></td>
+                    <td className="p-3"><div className="flex items-center gap-2"><div className="w-8 h-8 rounded-full animate-pulse bg-slate-200" /><div className="h-3 w-24 animate-pulse bg-slate-200 rounded" /></div></td>
+                    {Array.from({ length: 5 }).map((_, j) => (
+                      <td key={j} className="p-3"><div className="h-3 w-3/4 animate-pulse bg-slate-200 rounded" /></td>
+                    ))}
+                    <td className="p-3"><div className="h-6 w-10 rounded-full animate-pulse bg-slate-200" /></td>
+                    <td className="p-3"><div className="h-6 w-10 rounded-full animate-pulse bg-slate-200" /></td>
+                  </tr>
+                ))
               ) : paged.length === 0 ? (
                 <tr><td colSpan={9} className="p-8 text-center text-slate-400">Aucun courtier</td></tr>
               ) : paged.map((u) => (

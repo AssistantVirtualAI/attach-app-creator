@@ -6,6 +6,7 @@ import { Phone, PhoneMissed, MessageSquare, Voicemail, ArrowDownLeft, ArrowUpRig
 import type { PlanipretMobileContext } from "../PlanipretMobile";
 import { toast } from "sonner";
 import VoiceAgent from "@/components/VoiceAgent";
+import PWAInstallBanner from "@/components/planipret/PWAInstallBanner";
 
 const PRIMARY = "#1F4E79";
 const SUCCESS = "#27AE60";
@@ -97,6 +98,7 @@ export default function MHome() {
 
   return (
     <div className="p-4 space-y-4">
+      <PWAInstallBanner />
       <header className="flex items-start justify-between pt-2">
         <div>
           <h1 className="text-xl font-bold" style={{ color: "#1A1A2E" }}>Bonjour, {profile?.full_name ?? "Courtier"}</h1>
