@@ -277,10 +277,29 @@ export function useSoftphone(
             setActiveCallNumber(remoteNumber);
             log('session.new', `${session.direction} ${remoteNumber}`);
             if (session.direction === 'incoming') setCallState('ringing');
+            // ---- SDP introspection: log offer/answer codecs before INVITE is sent.
+            session.on('sdp', (data: any) => {
+              try {
+                const sdp = data?.sdp || '';
+                const codecs = extractAudioCodecs(sdp);
+                if (data?.originator === 'local') {
+                  setOfferedCodecs(codecs);
+                  log('sdp.offer', `codecs=[${codecs.join(', ')}] (${sdp.length}b)`);
+                  console.log('[SIP][SDP][local offer]\n' + sdp);
+                } else {
+                  log('sdp.remote', `codecs=[${codecs.join(', ')}]`);
+                  console.log('[SIP][SDP][remote ' + data?.type + ']\n' + sdp);
+                }
+              } catch (e: any) {
+                log('sdp.parse-failed', e?.message || '', 'warn');
+              }
+            });
             session.on('confirmed', () => {
               setCallState('active');
               log('session.confirmed', remoteNumber);
               timerRef.current = setInterval(() => setCallTimer((t) => t + 1), 1000);
+              // Read the codec actually negotiated by the PBX.
+              readNegotiatedCodec(session.connection);
               // ---- Live quality sampler + adaptive bitrate loop ----
               samplerStateRef.current = {};
               const pc: RTCPeerConnection | undefined = session.connection;
