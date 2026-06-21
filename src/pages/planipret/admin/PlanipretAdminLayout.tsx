@@ -8,23 +8,23 @@ const ACCENT = "#2E86C1";
 const PRIMARY = "#1F4E79";
 
 const LINKS = [
-  { to: "/dashboard/overview", label: "Vue d'ensemble", Icon: LayoutDashboard },
-  { to: "/dashboard/users", label: "Utilisateurs", Icon: Users },
-  { to: "/dashboard/calls", label: "Appels", Icon: Phone },
-  { to: "/dashboard/messages", label: "Messages", Icon: MessageSquare },
-  { to: "/dashboard/voicemails", label: "Voicemails", Icon: Voicemail },
-  { to: "/dashboard/integrations", label: "Intégrations", Icon: Plug },
-  { to: "/dashboard/reports", label: "Rapports", Icon: BarChart3 },
+  { to: "/planipret/admin/overview", label: "Vue d'ensemble", Icon: LayoutDashboard },
+  { to: "/planipret/admin/users", label: "Utilisateurs", Icon: Users },
+  { to: "/planipret/admin/calls", label: "Appels", Icon: Phone },
+  { to: "/planipret/admin/messages", label: "Messages", Icon: MessageSquare },
+  { to: "/planipret/admin/voicemails", label: "Voicemails", Icon: Voicemail },
+  { to: "/planipret/admin/integrations", label: "Intégrations", Icon: Plug },
+  { to: "/planipret/admin/reports", label: "Rapports", Icon: BarChart3 },
 ];
 
 const PAGE_TITLES: Record<string, string> = {
-  "/dashboard/overview": "Vue d'ensemble",
-  "/dashboard/users": "Gestion des utilisateurs",
-  "/dashboard/calls": "Appels",
-  "/dashboard/messages": "Messages",
-  "/dashboard/voicemails": "Voicemails",
-  "/dashboard/integrations": "Intégrations",
-  "/dashboard/reports": "Rapports",
+  "/planipret/admin/overview": "Vue d'ensemble",
+  "/planipret/admin/users": "Gestion des utilisateurs",
+  "/planipret/admin/calls": "Appels",
+  "/planipret/admin/messages": "Messages",
+  "/planipret/admin/voicemails": "Voicemails",
+  "/planipret/admin/integrations": "Intégrations",
+  "/planipret/admin/reports": "Rapports",
 };
 
 const initials = (n?: string) => (n ?? "A").split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase()).join("") || "A";
@@ -93,7 +93,7 @@ export default function PlanipretAdminLayout() {
               style={({ isActive }) => isActive ? { background: PRIMARY } : undefined}>
               <Icon className="w-4 h-4" />
               <span className="flex-1">{label}</span>
-              {to === "/dashboard/integrations" && missingIntegrations > 0 && (
+              {to === "/planipret/admin/integrations" && missingIntegrations > 0 && (
                 <span className="text-[10px] font-bold bg-amber-500 text-white rounded-full px-1.5 py-0.5">{missingIntegrations}</span>
               )}
             </NavLink>
