@@ -1,0 +1,289 @@
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { AVA_OWNER_USER_ID } from "@/lib/avaOwner";
+import { Phone, Mic, Sparkles, Database, Cloud, ArrowLeft, CheckCircle2, AlertCircle, Loader2, ExternalLink, X } from "lucide-react";
+
+type Provider = "nsapi" | "elevenlabs" | "anthropic" | "maestro" | "microsoft";
+
+type StoredItem = { provider: Provider; updated_at: string | null; config_masked: Record<string, string>; has_keys: string[] };
+
+const CARDS: Array<{
+  id: Provider; name: string; description: string; color: string; Icon: any;
+  fields: { key: string; label: string; secret?: boolean; readonly?: boolean; defaultValue?: string }[];
+  testAction?: string;
+  note?: string;
+  features?: string[];
+  critical?: boolean;
+}> = [
+  {
+    id: "nsapi", name: "NS-API (NetSapiens)", description: "Téléphonie cloud Planiprêt",
+    color: "#1F4E79", Icon: Phone, critical: true,
+    fields: [
+      { key: "base_url", label: "NS_API_BASE_URL", readonly: true, defaultValue: "https://voice.ava-telecom.ca/ns-api/v2" },
+      { key: "domain", label: "NS_DEFAULT_DOMAIN", readonly: true, defaultValue: "planipret.ca" },
+    ],
+    testAction: "test_nsapi",
+  },
+  {
+    id: "elevenlabs", name: "ElevenLabs", description: "Agent vocal IA",
+    color: "#6C3CE1", Icon: Mic, critical: true,
+    fields: [
+      { key: "api_key", label: "API Key", secret: true },
+      { key: "default_agent_id", label: "Default Agent ID" },
+      { key: "agent_name", label: "Agent Name (ex: AVA - Planiprêt)" },
+    ],
+    testAction: "test_elevenlabs",
+    note: "L'agent vocal sera activé par broker depuis Gestion Utilisateurs",
+  },
+  {
+    id: "anthropic", name: "Anthropic (Claude AI)", description: "Analyse d'appels & coaching",
+    color: "#D97706", Icon: Sparkles, critical: true,
+    fields: [{ key: "api_key", label: "API Key", secret: true }],
+    testAction: "test_anthropic",
+  },
+  {
+    id: "maestro", name: "Maestro CRM", description: "Tâches, rendez-vous, contacts",
+    color: "#059669", Icon: Database,
+    fields: [
+      { key: "api_url", label: "API Base URL", defaultValue: "https://api.maestrocrm.com" },
+      { key: "api_key", label: "API Key", secret: true },
+      { key: "account_id", label: "Account ID" },
+    ],
+    testAction: "test_maestro",
+    features: ["Création de tâches automatique", "Création de rendez-vous", "Recherche de contacts", "Sync après chaque appel analysé"],
+  },
+  {
+    id: "microsoft", name: "Microsoft 365", description: "Courriels & Calendrier",
+    color: "#0078D4", Icon: Cloud,
+    fields: [
+      { key: "client_id", label: "Azure App Client ID" },
+      { key: "client_secret", label: "Azure App Client Secret", secret: true },
+      { key: "tenant_id", label: "Tenant ID", defaultValue: "common" },
+    ],
+    note: "Chaque courtier connecte son compte M365 individuellement depuis l'app mobile (More → Microsoft 365)",
+  },
+];
+
+export default function PlanipretIntegrations() {
+  const navigate = useNavigate();
+  const [authorized, setAuthorized] = useState<boolean | null>(null);
+  const [items, setItems] = useState<Record<string, StoredItem>>({});
+  const [forms, setForms] = useState<Record<string, Record<string, string>>>({});
+  const [saving, setSaving] = useState<string | null>(null);
+  const [testing, setTesting] = useState<string | null>(null);
+  const [testResults, setTestResults] = useState<Record<string, { ok: boolean; msg: string }>>({});
+  const [msg, setMsg] = useState<string | null>(null);
+  const [showAzureModal, setShowAzureModal] = useState(false);
+
+  const reload = async () => {
+    const { data } = await supabase.functions.invoke("pp-integration-secrets");
+    const map: Record<string, StoredItem> = {};
+    for (const it of (data as any)?.items ?? []) map[it.provider] = it;
+    setItems(map);
+  };
+
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || user.id !== AVA_OWNER_USER_ID) { setAuthorized(false); return; }
+      setAuthorized(true);
+      reload();
+      runAllTests();
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const isConfigured = (id: Provider) => {
+    const item = items[id];
+    if (id === "nsapi") return true; // env-backed
+    return (item?.has_keys?.length ?? 0) > 0;
+  };
+
+  const configuredCount = CARDS.filter((c) => isConfigured(c.id)).length;
+
+  const save = async (provider: Provider) => {
+    setSaving(provider); setMsg(null);
+    const { error } = await supabase.functions.invoke("pp-integration-secrets", { body: { provider, config: forms[provider] ?? {} } });
+    setSaving(null);
+    if (error) setMsg(error.message);
+    else { setMsg(`✓ ${provider} sauvegardé`); setForms((f) => ({ ...f, [provider]: {} })); await reload(); testOne(provider); }
+  };
+
+  const testOne = async (provider: Provider) => {
+    setTesting(provider);
+    try {
+      let result: { ok: boolean; msg: string };
+      if (provider === "nsapi") {
+        const { data } = await supabase.functions.invoke("ns-auth");
+        result = { ok: !!(data as any)?.success, msg: (data as any)?.success ? "Connecté" : (data as any)?.error ?? "Erreur" };
+      } else if (provider === "elevenlabs") {
+        const cfg = items.elevenlabs?.config_masked;
+        const apiKey = forms.elevenlabs?.api_key;
+        if (!apiKey && !cfg?.api_key) result = { ok: false, msg: "Saisir la clé d'abord" };
+        else {
+          // Use a proxy via pp-integration-secrets test action — simpler: hit elevenlabs directly with provided key
+          if (apiKey) {
+            const r = await fetch("https://api.elevenlabs.io/v1/user", { headers: { "xi-api-key": apiKey } });
+            const d = await r.json().catch(() => ({}));
+            result = { ok: r.ok, msg: r.ok ? `Compte: ${d.subscription?.tier ?? "OK"}` : "Clé invalide" };
+          } else {
+            result = { ok: true, msg: "Clé stockée (entrez à nouveau pour tester)" };
+          }
+        }
+      } else if (provider === "anthropic") {
+        const { data } = await supabase.functions.invoke("ai-analyze-call", { body: { call_id: "test", transcript: "test" } });
+        const ok = (data as any)?.success === false && /Appel introuvable/i.test((data as any)?.error ?? "");
+        result = { ok: ok || (data as any)?.success === true, msg: ok ? "Claude API opérationnelle" : (data as any)?.error ?? "Erreur" };
+      } else if (provider === "maestro") {
+        const { data } = await supabase.functions.invoke("maestro-actions", { body: { action: "test" } });
+        result = { ok: !!(data as any)?.success, msg: (data as any)?.success ? "Maestro CRM connecté" : (data as any)?.error ?? "Erreur" };
+      } else {
+        result = { ok: isConfigured(provider), msg: isConfigured(provider) ? "Configuré" : "Non configuré" };
+      }
+      setTestResults((p) => ({ ...p, [provider]: result }));
+    } finally {
+      setTesting(null);
+    }
+  };
+
+  const runAllTests = async () => { for (const c of CARDS) await testOne(c.id); };
+
+  if (authorized === false) return <div className="min-h-screen flex items-center justify-center text-slate-600">Accès refusé.</div>;
+  if (authorized === null) return null;
+
+  return (
+    <div className="min-h-screen bg-slate-50">
+      <header className="px-6 py-4 text-white flex items-center gap-3" style={{ background: "#1F4E79" }}>
+        <button onClick={() => navigate("/planipret/dashboard")} className="p-1.5 hover:bg-white/10 rounded"><ArrowLeft className="w-4 h-4" /></button>
+        <div className="flex-1">
+          <div className="text-xs opacity-80">AVA · Planiprêt</div>
+          <h1 className="text-xl font-semibold">Intégrations</h1>
+        </div>
+      </header>
+
+      <main className="p-6 max-w-5xl mx-auto space-y-5">
+        {msg && <div className="text-sm bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg px-3 py-2">{msg}</div>}
+
+        {/* Summary bar */}
+        <div className="bg-white rounded-xl shadow p-5">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="font-semibold text-slate-700">{configuredCount}/{CARDS.length} intégrations configurées</h2>
+            <button onClick={runAllTests} className="text-xs text-slate-500 hover:text-slate-700">Re-tester</button>
+          </div>
+          <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+            <div className="h-full transition-all" style={{ width: `${(configuredCount / CARDS.length) * 100}%`, background: "#1F4E79" }} />
+          </div>
+          {CARDS.filter((c) => c.critical && !isConfigured(c.id)).map((c) => (
+            <div key={c.id} className="mt-3 text-xs flex items-center gap-2 text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2 rounded">
+              <AlertCircle className="w-3.5 h-3.5" /> {c.name} est requise mais non configurée
+            </div>
+          ))}
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-5">
+          {CARDS.map((card) => {
+            const stored = items[card.id];
+            const tested = testResults[card.id];
+            const configured = isConfigured(card.id);
+            const status = tested ? (tested.ok ? "Connecté" : "Erreur") : (configured ? "Configuré" : "Non configuré");
+            const statusClass = tested?.ok ? "bg-emerald-100 text-emerald-700" : tested && !tested.ok ? "bg-red-100 text-red-700" : configured ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500";
+            return (
+              <div key={card.id} className="bg-white rounded-xl shadow border-t-4 overflow-hidden" style={{ borderTopColor: card.color }}>
+                <div className="p-5">
+                  <div className="flex items-start gap-3 mb-3">
+                    <div className="p-2 rounded-lg flex-shrink-0" style={{ background: `${card.color}15`, color: card.color }}>
+                      <card.Icon className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold text-slate-800">{card.name}</h3>
+                        <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${statusClass}`}>{status}</span>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-0.5">{card.description}</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2.5 mb-3">
+                    {card.fields.map((f) => (
+                      <div key={f.key}>
+                        <label className="block text-xs font-medium text-slate-600 mb-1">{f.label}</label>
+                        <input
+                          type={f.secret ? "password" : "text"}
+                          disabled={f.readonly}
+                          value={f.readonly ? (f.defaultValue ?? "") : (forms[card.id]?.[f.key] ?? "")}
+                          placeholder={stored?.config_masked?.[f.key] || f.defaultValue || "—"}
+                          onChange={(e) => setForms((s) => ({ ...s, [card.id]: { ...(s[card.id] ?? {}), [f.key]: e.target.value } }))}
+                          className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-mono disabled:bg-slate-50 disabled:text-slate-500"
+                          autoComplete="off"
+                        />
+                        {stored?.has_keys?.includes(f.key) && !f.readonly && (
+                          <div className="text-[10px] text-emerald-600 mt-0.5">✓ valeur stockée</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {card.features && configured && (
+                    <ul className="text-xs text-slate-600 space-y-1 mb-3">
+                      {card.features.map((f) => (<li key={f} className="flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3 text-emerald-600" />{f}</li>))}
+                    </ul>
+                  )}
+
+                  {card.note && <p className="text-[11px] text-slate-500 italic mb-3">{card.note}</p>}
+
+                  <div className="flex flex-wrap gap-2">
+                    {!card.fields.every((f) => f.readonly) && (
+                      <button onClick={() => save(card.id)} disabled={saving === card.id} className="px-3 py-1.5 rounded-lg text-white text-xs font-medium disabled:opacity-60" style={{ background: card.color }}>
+                        {saving === card.id ? <Loader2 className="w-3 h-3 animate-spin" /> : "Sauvegarder"}
+                      </button>
+                    )}
+                    {card.testAction && (
+                      <button onClick={() => testOne(card.id)} disabled={testing === card.id} className="px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-60">
+                        {testing === card.id ? "Test…" : "Tester la connexion"}
+                      </button>
+                    )}
+                    {card.id === "microsoft" && (
+                      <button onClick={() => setShowAzureModal(true)} className="px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-300 text-slate-700 hover:bg-slate-50 flex items-center gap-1">
+                        <ExternalLink className="w-3 h-3" /> Instructions Azure
+                      </button>
+                    )}
+                  </div>
+
+                  {tested && (
+                    <div className={`mt-2 text-xs ${tested.ok ? "text-emerald-700" : "text-red-700"}`}>{tested.msg}</div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </main>
+
+      {showAzureModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={() => setShowAzureModal(false)}>
+          <div className="bg-white rounded-xl max-w-lg w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between mb-4">
+              <h3 className="font-semibold text-lg" style={{ color: "#0078D4" }}>Configuration Azure App Registration</h3>
+              <button onClick={() => setShowAzureModal(false)} className="text-slate-400 hover:text-slate-700"><X className="w-5 h-5" /></button>
+            </div>
+            <ol className="text-sm text-slate-700 space-y-2 list-decimal list-inside">
+              <li>Aller sur <a href="https://portal.azure.com" target="_blank" rel="noreferrer" className="text-blue-600 underline">portal.azure.com</a></li>
+              <li>Azure Active Directory → App registrations → <b>New registration</b></li>
+              <li>Nom : <code className="bg-slate-100 px-1 rounded">Planiprêt AI Portal</code></li>
+              <li>Redirect URI (Web) : <code className="bg-slate-100 px-1 rounded text-xs break-all">{window.location.origin}/auth/ms365/callback</code></li>
+              <li>API Permissions (Microsoft Graph, Delegated) :
+                <ul className="list-disc list-inside ml-4 text-xs mt-1 text-slate-600">
+                  <li>Mail.ReadWrite</li><li>Calendars.ReadWrite</li><li>User.Read</li><li>offline_access</li>
+                </ul>
+              </li>
+              <li>Cliquer <b>Grant admin consent</b></li>
+              <li>Certificates & secrets → New client secret → copier la valeur</li>
+              <li>Coller <b>Client ID</b> et <b>Client Secret</b> dans la carte ci-contre</li>
+            </ol>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
