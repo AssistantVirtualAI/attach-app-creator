@@ -42,7 +42,6 @@ import {
 import { NotificationsBell } from '@/components/notifications/NotificationsBell';
 import { OrgSwitcher } from '@/components/layout/OrgSwitcher';
 import { useApplyBranding } from '@/hooks/useApplyBranding';
-import { SoftphoneWidget } from '@/components/softphone/SoftphoneWidget';
 import { AppAccessGate } from '@/components/auth/AppAccessGate';
 import { VersionBadge } from '@/components/shared/VersionBadge';
 
@@ -98,20 +97,17 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
   // (debug logging removed)
 
   // Filter groups based on route scope, role and Lemtel org membership
-  const isLemtelMember = isSuperAdmin || organizationMemberships.some(m => m.organization.id === '71755d33-ed64-4ad5-a828-61c9d2029eb7');
+  const isLemtelOrgSelected = selectedOrgId === '71755d33-ed64-4ad5-a828-61c9d2029eb7';
   const currentScope = getSidebarScope(location.pathname);
   const visibleGroups = useMemo(() => sidebarGroups.filter(g => {
     const groupScope = g.scope ?? 'legacy';
     if (currentScope === 'admin') return false; // admin portal uses its own layout
-    if (g.lemtelOnly && !isLemtelMember) return false;
-    if (g.hideForLemtel && isLemtelMember) return false;
-    // Lemtel members (incl. super admins) always see telephony org + my groups,
-    // regardless of the current route scope, so the full phone system stays
-    // accessible from a single unified sidebar.
-    if (isLemtelMember && (groupScope === 'org' || groupScope === 'my')) return true;
+    if (g.lemtelOnly && !isLemtelOrgSelected) return false;
+    if (g.hideForLemtel && isLemtelOrgSelected) return false;
+    if (isLemtelOrgSelected && (groupScope === 'org' || groupScope === 'my')) return true;
     if (groupScope !== currentScope) return false;
     return true;
-  }), [isLemtelMember, currentScope]);
+  }), [isLemtelOrgSelected, currentScope]);
 
 
   // Sidebar group ordering with drag & drop
@@ -278,7 +274,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
             </DndContext>
 
             {/* Portal switcher (Lemtel only) */}
-            {isLemtelMember && currentScope === 'org' && (
+            {isLemtelOrgSelected && currentScope === 'org' && (
               <Link
                 to="/org/lemtel/my/dashboard"
                 onClick={() => setIsSidebarOpen(false)}
@@ -288,7 +284,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
                 <span className="font-medium text-sm">👤 My Workspace →</span>
               </Link>
             )}
-            {isLemtelMember && currentScope === 'my' && (
+            {isLemtelOrgSelected && currentScope === 'my' && (
               <Link
                 to="/org/lemtel/admin/dashboard"
                 onClick={() => setIsSidebarOpen(false)}
@@ -348,8 +344,8 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
         />
       )}
 
-      {/* Lemtel Softphone (only visible to Lemtel members) */}
-      <AppAccessGate><SoftphoneWidget /></AppAccessGate>
+      {/* Softphone stays hidden outside the Lemtel organization. */}
+      {isLemtelOrgSelected && <AppAccessGate />}
     </div>
   );
 };
