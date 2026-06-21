@@ -42,6 +42,7 @@ import {
 import { NotificationsBell } from '@/components/notifications/NotificationsBell';
 import { OrgSwitcher } from '@/components/layout/OrgSwitcher';
 import { useApplyBranding } from '@/hooks/useApplyBranding';
+import { SoftphoneWidget } from '@/components/softphone/SoftphoneWidget';
 import { AppAccessGate } from '@/components/auth/AppAccessGate';
 import { VersionBadge } from '@/components/shared/VersionBadge';
 
@@ -345,7 +346,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
       )}
 
       {/* Softphone stays hidden outside the Lemtel organization. */}
-      {isLemtelOrgSelected && <AppAccessGate />}
+      {isLemtelOrgSelected && <AppAccessGate><SoftphoneWidget /></AppAccessGate>}
     </div>
   );
 };
