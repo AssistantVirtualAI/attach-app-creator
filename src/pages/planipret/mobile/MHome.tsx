@@ -217,6 +217,16 @@ export default function MHome() {
           </ul>
         )}
       </section>
+
+      {profile?.voice_agent_enabled && (
+        <button onClick={openAgent} aria-label="Parler à AVA"
+          className={`fixed right-4 z-30 w-[52px] h-[52px] rounded-full flex items-center justify-center text-white shadow-xl active:scale-95 transition ${agentOpen ? "ring-4 ring-emerald-400/60 animate-pulse" : ""}`}
+          style={{ background: "linear-gradient(135deg, #6C3CE1, #8B5CF6)", bottom: "calc(94px + 60px + 24px)" }}>
+          <Bot className="w-6 h-6" />
+        </button>
+      )}
+
+      {agentOpen && <VoiceAgent onClose={() => setAgentOpen(false)} />}
     </div>
   );
 }
