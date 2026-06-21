@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { AVA_ORG_ID, AVA_OWNER_USER_ID } from '@/lib/avaOwner';
 
 interface Organization {
   id: string;
@@ -132,7 +133,11 @@ export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
       if (oErr) throw oErr;
       if (rErr) throw rErr;
-      const list = (orgs || []) as Organization[];
+      let list = (orgs || []) as Organization[];
+      // Hard scope: only the AVA owner may see the AVA Main Dashboard org.
+      if (user.id !== AVA_OWNER_USER_ID) {
+        list = list.filter((o) => o.id !== AVA_ORG_ID);
+      }
       const rolesList = (roles || []) as UserRole[];
       setOrganizations(list);
       setOrganizationMemberships(

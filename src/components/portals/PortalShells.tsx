@@ -5,9 +5,12 @@ import {
   CreditCard, FileText, Headphones, Voicemail, Download, MessageSquare, Database,
   Server, Activity, Sliders, Sparkles, Bot,
 } from "lucide-react";
+import { DollarSign } from "lucide-react";
 import NotificationCenter from "@/components/notifications/NotificationCenter";
 import { WorkspaceHeaderExtras } from "@/components/portals/WorkspaceHeaderExtras";
 import { useOrganization } from "@/context/OrganizationContext";
+import { useAuth } from "@/hooks/useAuth";
+import { AVA_OWNER_USER_ID } from "@/lib/avaOwner";
 
 type NavItem = { label: string; to: string; icon: React.ComponentType<{ className?: string }> };
 
