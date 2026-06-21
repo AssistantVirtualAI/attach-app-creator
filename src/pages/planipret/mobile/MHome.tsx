@@ -19,7 +19,8 @@ function Shimmer({ className = "" }: { className?: string }) {
 }
 
 export default function MHome() {
-  const { profile, registerRefresh } = useOutletContext<PlanipretMobileContext>();
+  const { profile, registerRefresh, openDialer, reloadProfile } = useOutletContext<PlanipretMobileContext>();
+  const navigate = useNavigate();
   const [stats, setStats] = useState({ calls: 0, missed: 0, sms: 0, voicemails: 0 });
   const [recent, setRecent] = useState<any[]>([]);
   const [events, setEvents] = useState<any[] | null>(null);
@@ -29,6 +30,8 @@ export default function MHome() {
   const [statsLoading, setStatsLoading] = useState(true);
   const [sipOnline, setSipOnline] = useState(false);
   const [agentOpen, setAgentOpen] = useState(false);
+  const [hotLeads, setHotLeads] = useState<any[]>([]);
+  const [dueReminders, setDueReminders] = useState<any[]>([]);
 
   const openAgent = async () => {
     try {
