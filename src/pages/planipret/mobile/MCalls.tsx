@@ -467,6 +467,29 @@ function CallDetailSheet({
             </button>
           </div>
 
+          {/* LEAD SCORE */}
+          {call.lead_temperature && call.lead_score != null && (
+            <div className="mt-4 rounded-xl p-3 flex items-center gap-3"
+              style={{ background: `${TEMP_COLORS[call.lead_temperature]}12`, border: `1px solid ${TEMP_COLORS[call.lead_temperature]}40` }}>
+              <div className="text-3xl">{TEMP_EMOJI[call.lead_temperature]}</div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-bold" style={{ color: TEMP_COLORS[call.lead_temperature] }}>
+                  Lead {TEMP_LABEL[call.lead_temperature].toLowerCase()} — Score {call.lead_score}/10
+                </div>
+                {call.lead_score_reason && (
+                  <div className="text-xs text-slate-500 mt-0.5">{call.lead_score_reason}</div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* CALLBACK SUGGESTION */}
+          {call.suggested_callback_delay && (
+            <CallbackSuggestion call={call} onScheduled={() => toast.success("Rappel programmé ✅")} />
+          )}
+
+
+
           {/* SECTION 2 - Recording */}
           <Section title="🎙️ Enregistrement">
             {call.recording_url ? (
