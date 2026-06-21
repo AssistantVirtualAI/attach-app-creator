@@ -558,9 +558,8 @@ export function useSoftphone(
   };
   const answer = () =>
     sessionRef.current?.answer({
-      mediaConstraints: HD_AUDIO_CONSTRAINTS,
-      sessionDescriptionHandlerModifiers: [buildSdpModifier(opusToSdpOpts(audioProfileRef.current))],
-      pcConfig: { iceServers: [], bundlePolicy: 'balanced' },
+      mediaConstraints: { audio: true, video: false },
+      pcConfig: { iceServers: [], iceTransportPolicy: 'all', bundlePolicy: 'balanced' },
     });
   const mute = () => { sessionRef.current?.mute({ audio: true }); setIsMuted(true); };
   const unmute = () => { sessionRef.current?.unmute({ audio: true }); setIsMuted(false); };
