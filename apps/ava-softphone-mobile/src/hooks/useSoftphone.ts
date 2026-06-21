@@ -64,6 +64,10 @@ export function useSoftphone(
   const [retryLimitReached, setRetryLimitReached] = useState(false);
   const [audioProfile, setAudioProfileState] = useState<AudioProfile>(() => loadAudioProfile());
   const [quality, setQuality] = useState<CallQuality>(EMPTY_QUALITY);
+  const [offeredCodecs, setOfferedCodecs] = useState<string[]>([]);
+  const [negotiatedCodec, setNegotiatedCodec] = useState<string | null>(null);
+  const lastCallNumberRef = useRef<string>('');
+  const callAttemptRef = useRef<number>(0);
 
   const uaRef = useRef<any>(null);
   const sessionRef = useRef<any>(null);
