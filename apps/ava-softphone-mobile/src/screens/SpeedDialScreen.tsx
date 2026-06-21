@@ -66,7 +66,7 @@ export default function SpeedDialScreen({ sp, preferClickToCall }: { sp: any; pr
         <EmptyState
           icon={<Star size={28} />}
           title={fr ? 'Aucun favori' : 'No favorites yet'}
-          description={fr ? 'Épinglez vos contacts les plus appelés pour les composer en un toucher.' : 'Pin your most-called contacts to dial them in one tap.'}
+          hint={fr ? 'Épinglez vos contacts les plus appelés pour les composer en un toucher.' : 'Pin your most-called contacts to dial them in one tap.'}
         />
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
