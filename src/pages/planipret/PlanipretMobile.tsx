@@ -4,6 +4,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { Home, Phone, MessageSquare, Voicemail, MoreHorizontal, Phone as PhoneIcon, X, Delete, Plus, Lock } from "lucide-react";
 import { toast } from "sonner";
+import planipretLogo from "@/assets/planipret-logo.png.asset.json";
+import avaWordmark from "@/assets/ava-wordmark.svg";
+
 
 const PRIMARY = "#1F4E79";
 const ACCENT = "#2E86C1";
