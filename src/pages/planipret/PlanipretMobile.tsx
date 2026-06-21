@@ -100,6 +100,8 @@ export default function PlanipretMobile() {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [dialerOpen, setDialerOpen] = useState(false);
+  const [dialerInit, setDialerInit] = useState<string | undefined>(undefined);
+  const openDialer = (n?: string) => { setDialerInit(n); setDialerOpen(true); };
 
   const loadProfile = async () => {
     const { data: { user } } = await supabase.auth.getUser();
