@@ -254,6 +254,15 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <TrialExpiredGate>{children}</TrialExpiredGate>;
 };
 
+const LEMTEL_ORG_ID = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
+
+const LemtelOrgOnly = ({ children, fallback = "/dashboard" }: { children: React.ReactNode; fallback?: string }) => {
+  const { selectedOrgId, isLoading } = useOrganization();
+  if (isLoading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading…</div>;
+  if (selectedOrgId !== LEMTEL_ORG_ID) return <Navigate to={fallback} replace />;
+  return <>{children}</>;
+};
+
 const LemtelAdminPage = ({ children }: { children: React.ReactNode }) => (
   <ProtectedRoute><LemtelGuard><ImpersonationProvider><AdminPortalLayout>{children}</AdminPortalLayout></ImpersonationProvider></LemtelGuard></ProtectedRoute>
 );
