@@ -201,10 +201,10 @@ function AuthenticatedShell({
   // but keep the mobile transport pinned to CA-signed WSS endpoints.
   const sipPassword = creds.sipPassword;
   const WORKING_WSS = [
-    'wss://pbxnode.lemtel.tel:7444',
-    'wss://node.lemtelcloud.net:7444',
     'wss://pbxnode.lemtel.tel:7443',
     'wss://node.lemtelcloud.net:7443',
+    'wss://pbxnode.lemtel.tel:7444',
+    'wss://node.lemtelcloud.net:7444',
   ];
   const sipDomain = creds.sipDomain || 'lemtel.lemtel.tel';
   // credentialsReady: true once we have extension + password, regardless of token freshness
