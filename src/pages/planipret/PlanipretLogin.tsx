@@ -42,12 +42,14 @@ export default function PlanipretLogin() {
         style={{ borderTopColor: BRAND.primary }}
       >
         <div className="text-center mb-6">
-          <div className="text-xs tracking-widest text-slate-500">AVA</div>
-          <h1 className="text-2xl font-bold mt-1" style={{ color: BRAND.primary }}>
-            Planiprêt
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">Portail courtiers hypothécaires</p>
+          <img
+            src={planipretLogo.url}
+            alt="Planiprêt"
+            className="mx-auto w-28 h-28 rounded-2xl shadow-md object-cover"
+          />
+          <p className="text-sm text-slate-500 mt-3">Portail courtiers hypothécaires</p>
         </div>
+
 
         <form onSubmit={onSubmit} className="space-y-4">
           <div>
