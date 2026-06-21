@@ -100,6 +100,64 @@ export default function PAOverview() {
         <KpiCard icon={<Bot className="w-5 h-5" />} title="Sessions AVA aujourd'hui" value={stats.ava} subtitle="agent vocal actif" color={COLORS.agent} />
       </div>
 
+      {/* Top hot leads + pending reminders */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="bg-white rounded-xl shadow-sm p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-semibold flex items-center gap-2" style={{ color: "#0F1924" }}>
+              <Flame className="w-4 h-4" style={{ color: TEMP_COLORS.hot }} /> Top leads chauds
+            </h2>
+            <Link to="/planipret/admin/leads" className="text-xs text-blue-600 hover:underline">Voir tous →</Link>
+          </div>
+          {hotLeads.length === 0 ? (
+            <p className="text-xs text-slate-400 py-4 text-center">Aucun lead chaud aujourd'hui</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead><tr className="text-[11px] uppercase tracking-wider text-slate-400 text-left border-b">
+                <th className="py-2">Courtier</th><th>Contact</th><th>Score</th><th>Heure</th>
+              </tr></thead>
+              <tbody>
+                {hotLeads.map((l) => {
+                  const contact = l.from_name ?? l.from_number ?? l.to_name ?? l.to_number ?? "—";
+                  return (
+                    <tr key={l.id} className="border-b border-slate-50" style={{ borderLeft: `3px solid ${TEMP_COLORS.hot}` }}>
+                      <td className="py-2 pl-2 text-slate-700 truncate max-w-[140px]">{l.planipret_profiles?.full_name ?? "—"}</td>
+                      <td className="text-slate-600">{contact}</td>
+                      <td className="font-bold" style={{ color: TEMP_COLORS.hot }}>{TEMP_EMOJI.hot} {l.lead_score}/10</td>
+                      <td className="text-slate-400 text-xs">{new Date(l.started_at).toLocaleTimeString("fr-CA", { hour: "2-digit", minute: "2-digit" })}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm p-5">
+          <h2 className="font-semibold flex items-center gap-2 mb-3" style={{ color: "#0F1924" }}>
+            <Clock className="w-4 h-4 text-amber-500" /> Rappels en attente
+          </h2>
+          {pendingByBroker.length === 0 ? (
+            <p className="text-xs text-slate-400 py-4 text-center">Aucun rappel en attente</p>
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {pendingByBroker.map((p, i) => (
+                <li key={i} className="py-2 flex items-center gap-2">
+                  <span className="flex-1 text-sm text-slate-700 truncate">{p.name}</span>
+                  <span className="text-xs text-slate-500 tabular-nums">{p.total} en attente</span>
+                  {p.overdue > 0 && (
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full text-white" style={{ background: "#E84C4C" }}>
+                      {p.overdue} en retard
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+
+
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
         <div className="lg:col-span-3 bg-white rounded-xl shadow-sm p-5">
           <h2 className="font-semibold mb-3" style={{ color: "#0F1924" }}>Activité récente</h2>
