@@ -16,6 +16,9 @@ import Landing from "./pages/Landing";
 import AuthPage from "./pages/Auth";
 import AgencyHome from "./pages/AgencyHome";
 import PostLoginRedirect from "./pages/PostLoginRedirect";
+import PlanipretLogin from "./pages/planipret/PlanipretLogin";
+import PlanipretMobile from "./pages/planipret/PlanipretMobile";
+import PlanipretDashboard from "./pages/planipret/PlanipretDashboard";
 
 import Dashboard from "./pages/Dashboard";
 import VoiceAnalytics from "./pages/VoiceAnalytics";
@@ -319,6 +322,11 @@ const App = () => (
                 
                 {/* Admin auth (legacy, redirects to /login) */}
                 <Route path="/auth" element={<Navigate to="/login" replace />} />
+
+                {/* Planiprêt (AVA-scoped) */}
+                <Route path="/planipret/login" element={<PlanipretLogin />} />
+                <Route path="/mplanipret" element={<PlanipretMobile />} />
+                <Route path="/planipret/dashboard" element={<PlanipretDashboard />} />
 
                 
                 {/* Protected routes */}
