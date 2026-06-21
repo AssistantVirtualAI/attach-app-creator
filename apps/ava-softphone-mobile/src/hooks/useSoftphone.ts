@@ -578,7 +578,7 @@ export function useSoftphone(
 
   /** Place a call. `forcePcmu=true` uses the legacy SDP modifier (PCMU only) — used as a 488 fallback. */
   const placeCallInternal = (number: string, forcePcmu = false): boolean => {
-    if (!uaRef.current || !config || sipStatus !== 'registered') return false;
+    if (!uaRef.current || !config) return false;
     setActiveCallNumber(number);
     setCallState('ringing');
     setOfferedCodecs([]);
