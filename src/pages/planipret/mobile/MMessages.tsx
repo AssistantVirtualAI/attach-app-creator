@@ -2,8 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Plus, X, ArrowLeft, Phone, Send, Paperclip, MessageSquare } from "lucide-react";
+import { Plus, X, ArrowLeft, Phone, Send, Paperclip, MessageSquare, Zap } from "lucide-react";
 import type { PlanipretMobileContext } from "../PlanipretMobile";
+import SmsTemplatesSheet from "@/components/planipret/SmsTemplatesSheet";
 
 const PRIMARY = "#1F4E79";
 
@@ -163,6 +164,7 @@ function ThreadView({ number, myExt, userId, messages, onBack, onCall, onSent }:
 }) {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+  const [tplOpen, setTplOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const ordered = useMemo(() => [...messages].sort((a, b) => +new Date(a.created_at) - +new Date(b.created_at)), [messages]);
 
@@ -238,6 +240,9 @@ function ThreadView({ number, myExt, userId, messages, onBack, onCall, onSent }:
         <button onClick={() => toast("Pièce jointe : bientôt disponible")} className="p-2 rounded-full hover:bg-slate-100 text-slate-500">
           <Paperclip className="w-5 h-5" />
         </button>
+        <button onClick={() => setTplOpen(true)} className="p-2 rounded-full hover:bg-slate-100" title="Templates" style={{ color: PRIMARY }}>
+          <Zap className="w-5 h-5" />
+        </button>
         <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") send(); }}
           placeholder="Écrire un message..."
           className="flex-1 px-3 py-2 rounded-full bg-slate-100 text-sm focus:outline-none" />
@@ -246,6 +251,7 @@ function ThreadView({ number, myExt, userId, messages, onBack, onCall, onSent }:
           <Send className="w-4 h-4" />
         </button>
       </div>
+      <SmsTemplatesSheet open={tplOpen} onClose={() => setTplOpen(false)} userId={userId} onPick={(body) => setText((t) => t ? `${t} ${body}` : body)} />
     </div>
   );
 }
