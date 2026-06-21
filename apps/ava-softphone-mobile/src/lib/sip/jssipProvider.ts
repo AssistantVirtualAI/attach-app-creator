@@ -88,11 +88,9 @@ export function getJsSIP() {
 
 
 /* ============================================================
-   SDP rewriter — strip video, DTLS/SRTP (FusionPBX wants plain RTP),
-   then re-order audio codecs: Opus first (with FEC/DTX/adaptive
-   bitrate for resilience on weak networks), then PCMU/PCMA fallbacks,
-   then telephone-event for DTMF. Accepts profile-driven Opus
-   parameters (HD / auto / low-bandwidth).
+   SDP rewriter — used only for the 488 fallback. Keep WebRTC security
+   lines intact, but reduce the audio m-line to PCMU + telephone-event/8000.
+   FusionPBX over WSS still requires DTLS-SRTP/ICE; removing those causes 488.
    ============================================================ */
 export interface SdpRewriteOpts {
   opusMaxAverageBitrate?: number;  // bps
@@ -120,25 +118,27 @@ export function rewriteSdpForFusionPBX(sdp: string, _opts: SdpRewriteOpts = {}):
   // Drop the entire video m-section — audio only.
   out = out.replace(/m=video[\s\S]*?(?=\r\nm=|$)/gi, '');
 
-  // Restrict audio to PCMU(0) + PCMA(8) + telephone-event(101).
-  // CRITICAL: keep the original transport (UDP/TLS/RTP/SAVPF) — WebRTC requires
-  // DTLS-SRTP and FusionPBX with mod_verto/WSS expects it too. Stripping DTLS
-  // causes the PBX to answer 488 Not Acceptable Here.
+  const pcmuPt = extractPt(out, /PCMU\/8000/);
+  const dtmfPt = out.match(/^a=rtpmap:(\d+)\s+telephone-event\/8000(?:\s|$)/im)?.[1] || null;
+  if (!pcmuPt) return out;
+  const keepPts = new Set([pcmuPt, dtmfPt].filter(Boolean) as string[]);
+
+  // Restrict audio to PCMU + the browser's actual telephone-event/8000 PT.
+  // CRITICAL: keep the original transport (UDP/TLS/RTP/SAVPF).
   out = out.replace(
     /^m=audio\s+(\d+)\s+(\S+)\s+[^\r\n]+/gm,
-    (_m, port, proto) => `m=audio ${port} ${proto} 0 8 101`
+    (_m, port, proto) => `m=audio ${port} ${proto} ${Array.from(keepPts).join(' ')}`
   );
 
-  // Keep only PCMU/PCMA/telephone-event rtpmap & fmtp lines.
+  // Keep only the rtpmap/fmtp/rtcp-fb lines for the surviving payload types.
   out = out.replace(/^a=rtpmap:(\d+) [^\r\n]+$/gm, (line, pt) =>
-    pt === '0' || pt === '8' || pt === '101' ? line : ''
+    keepPts.has(pt) ? line : ''
   );
   out = out.replace(/^a=fmtp:(\d+) [^\r\n]+$/gm, (line, pt) =>
-    pt === '0' || pt === '8' || pt === '101' ? line : ''
+    keepPts.has(pt) ? line : ''
   );
-  // Drop rtcp-fb for codecs we removed (Opus etc.).
   out = out.replace(/^a=rtcp-fb:(\d+) [^\r\n]+$/gm, (line, pt) =>
-    pt === '*' || pt === '0' || pt === '8' || pt === '101' ? line : ''
+    keepPts.has(pt) ? line : ''
   );
 
   // Collapse blank lines created by the deletions.
