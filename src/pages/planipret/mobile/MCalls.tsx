@@ -32,6 +32,11 @@ type Call = {
   transcript: string | null;
   ai_summary: string | null;
   metadata: any;
+  lead_score?: number | null;
+  lead_temperature?: LeadTemp;
+  lead_score_reason?: string | null;
+  suggested_callback_delay?: string | null;
+  callback_reason?: string | null;
 };
 
 type Insight = {
