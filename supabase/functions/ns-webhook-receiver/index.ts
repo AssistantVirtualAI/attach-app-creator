@@ -40,11 +40,19 @@ async function processEvent(event: any) {
   let brokerProfile: any = null;
   if (ext) {
     const { data: p } = await admin
-      .from("planipret_profiles").select("user_id, dnd_enabled, dnd_auto_schedule, dnd_start_time, dnd_end_time, dnd_message_fr")
+      .from("planipret_profiles").select("user_id, dnd_enabled, dnd_auto_schedule, dnd_start_time, dnd_end_time, dnd_message_fr, notif_calls, notif_sms, notif_voicemails")
       .eq("extension", String(ext)).maybeSingle();
     userId = p?.user_id ?? null;
     brokerProfile = p;
   }
+
+  const sendPush = (uid: string, payload: any) => {
+    fetch(`${SUPABASE_URL}/functions/v1/pp-push-notify`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: uid, ...payload }),
+    }).catch(() => {});
+  };
 
   function isDndActive(p: any): boolean {
     if (!p) return false;
@@ -99,12 +107,40 @@ async function processEvent(event: any) {
         type: "broadcast", event: "inbound_call",
         payload: { type: "inbound_call", call_id: callId, from_number: data.from_number ?? data.from, to_number: data.to_number ?? data.to },
       });
+      if (brokerProfile?.notif_calls !== false) {
+        sendPush(userId, {
+          title: "📞 Appel entrant",
+          body: data.from_number ?? data.from ?? "Inconnu",
+          data: { url: "/mplanipret/calls", call_id: callId },
+          actions: [{ action: "answer", title: "Répondre" }],
+        });
+      }
     } else if (userId && dndActive) {
-      // Notify broker that AVA handled the call
       await admin.channel(`call-events:${userId}`).send({
         type: "broadcast", event: "dnd_auto_handled",
         payload: { call_id: callId, from_number: data.from_number ?? data.from, message: brokerProfile?.dnd_message_fr },
       });
+    }
+  } else if (type === "message.inbound") {
+    await admin.from("planipret_phone_messages").insert({
+      user_id: userId, direction: "inbound",
+      from_number: data.from_number ?? data.from ?? null,
+      to_number: data.to_number ?? data.to ?? null,
+      body: data.body ?? data.message ?? "",
+      type: "sms",
+    });
+    if (userId) {
+      await admin.channel(`messages:${userId}`).send({
+        type: "broadcast", event: "inbound_message",
+        payload: { from_number: data.from_number ?? data.from, body: data.body ?? data.message },
+      });
+      if (brokerProfile?.notif_sms !== false) {
+        sendPush(userId, {
+          title: `💬 ${data.from_number ?? data.from ?? "SMS"}`,
+          body: String(data.body ?? data.message ?? "").slice(0, 140),
+          data: { url: "/mplanipret/messages" },
+        });
+      }
     }
   } else if (type === "message.inbound") {
     await admin.from("planipret_phone_messages").insert({
