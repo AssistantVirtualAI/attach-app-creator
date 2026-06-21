@@ -23,6 +23,7 @@ import MCalls from "./pages/planipret/mobile/MCalls";
 import MMessages from "./pages/planipret/mobile/MMessages";
 import MVoicemail from "./pages/planipret/mobile/MVoicemail";
 import MMore from "./pages/planipret/mobile/MMore";
+import MPipeline from "./pages/planipret/mobile/MPipeline";
 import PlanipretAudit from "./pages/planipret/PlanipretAudit";
 import Ms365Callback from "./pages/planipret/Ms365Callback";
 // Lazy-load admin pages (each is its own chunk)
