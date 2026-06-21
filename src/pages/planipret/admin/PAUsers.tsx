@@ -166,6 +166,29 @@ export default function PAUsers() {
             </thead>
             <tbody>
               {loading ? (
+                <>
+                  {Array.from({ length: 10 }).map((_, i) => (
+                    <tr key={i} className="border-t border-slate-100">
+                      <td className="p-3"><div className="w-4 h-4 animate-pulse bg-slate-200 rounded" /></td>
+                      <td className="p-3 flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full animate-pulse bg-slate-200" />
+                        <div className="h-3 w-24 animate-pulse bg-slate-200 rounded" />
+                      </td>
+                      {Array.from({ length: 5 }).map((_, j) => (
+                        <td key={j} className="p-3"><div className="h-3 w-3/4 animate-pulse bg-slate-200 rounded" /></td>
+                      ))}
+                      <td className="p-3"><div className="h-6 w-10 rounded-full animate-pulse bg-slate-200" /></td>
+                      <td className="p-3"><div className="h-6 w-10 rounded-full animate-pulse bg-slate-200" /></td>
+                    </tr>
+                  ))}
+                </>
+              ) : null}
+              {!loading && (
+                <>
+                {/* placeholder so structure parses */}
+                </>
+              )}
+              {!loading && false && (
                 <tr><td colSpan={9} className="p-8 text-center text-slate-400">Chargement…</td></tr>
               ) : paged.length === 0 ? (
                 <tr><td colSpan={9} className="p-8 text-center text-slate-400">Aucun courtier</td></tr>
