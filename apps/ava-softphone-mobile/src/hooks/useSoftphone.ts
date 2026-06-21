@@ -30,24 +30,20 @@ export interface UseSoftphoneReturn {
   sendDTMF: (key: string) => void;
   setStatus: (status: string) => void;
   reconnect: () => void;
-  /** Last persisted error (from prior session if app was restarted). */
   lastPersistedError: PersistedSipError | null;
-  /** Rolling buffer of SIP-related events (latest last). */
   sipLog: SipLogEntry[];
   clearSipLog: () => void;
-  /** Clear persisted sipStatus + last sipError (also resets retry cap). */
   clearSipState: () => void;
-  /** Current retry attempt counter (0 = none). */
   retryAttempt: number;
-  /** When the next auto-retry is scheduled (epoch ms) or null. */
   nextRetryAt: number | null;
-  /** True once auto-retry budget is exhausted — requires manual reconnect. */
   retryLimitReached: boolean;
-  /** Live call quality (RTT / jitter / loss / level). */
   quality: CallQuality;
-  /** Active audio profile (hd / auto / low-bandwidth). */
   audioProfile: AudioProfile;
   setAudioProfile: (p: AudioProfile) => void;
+  /** Codecs proposed in the outgoing INVITE SDP (audio m-line order). */
+  offeredCodecs: string[];
+  /** Codec actually negotiated for the current/last call. */
+  negotiatedCodec: string | null;
 }
 
 export function useSoftphone(
