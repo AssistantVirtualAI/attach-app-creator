@@ -405,38 +405,13 @@ function AuthenticatedShell({
     }}>
       <audio ref={audioRef} autoPlay playsInline />
 
-      {/* Top header with hamburger → Settings */}
-      <header style={{
-        display: 'flex', alignItems: 'center', gap: 12,
-        padding: '10px 14px 8px',
-      }}>
-        <button
-          onClick={() => { haptic(ImpactStyle.Light); setTab('settings'); }}
-          aria-label="Open settings"
-          style={{
-            position: 'relative',
-            width: 40, height: 40, borderRadius: 12,
-            background: 'rgba(255,255,255,0.06)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            display: 'grid', placeItems: 'center',
-            cursor: 'pointer', color: colors.textIce,
-          }}
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
-            <line x1="4" y1="7"  x2="20" y2="7" />
-            <line x1="4" y1="12" x2="20" y2="12" />
-            <line x1="4" y1="17" x2="14" y2="17" />
-          </svg>
-          <span style={{
-            position: 'absolute', right: -2, top: -2, width: 8, height: 8,
-            borderRadius: '50%', background: colors.lemtelBlue,
-            boxShadow: '0 0 0 2px rgba(10,18,40,0.9)',
-          }} />
-        </button>
-        <span style={{ fontSize: 18, fontWeight: 700, color: colors.textIce, textTransform: 'capitalize' }}>
-          {tab === 'speeddial' ? 'Speed dial' : tab}
-        </span>
-      </header>
+      {/* Top header — hamburger menu + title (Google-Voice style) */}
+      <TopHeader
+        tab={tab}
+        onNavigate={(t) => { haptic(ImpactStyle.Light); setTab(t); }}
+        haptic={haptic}
+      />
+
 
 
 
@@ -493,4 +468,112 @@ function AuthenticatedShell({
     </div>
   );
 }
+
+/* ─── Top header with hamburger dropdown ─────────────────────── */
+function TopHeader({
+  tab, onNavigate, haptic,
+}: { tab: Tab; onNavigate: (t: Tab) => void; haptic: (s?: ImpactStyle) => Promise<void> }) {
+  const [open, setOpen] = useState(false);
+  const titles: Partial<Record<Tab, string>> = {
+    contacts: 'Contacts',
+    chats: 'Chats',
+    calls: 'Calls',
+    keypad: 'Keypad',
+    speeddial: 'Speed dial',
+    settings: 'Settings',
+    home: 'Home',
+  };
+  const items: { id: Tab; label: string; icon: string }[] = [
+    { id: 'home',     label: 'Accueil',  icon: '🏠' },
+    { id: 'contacts', label: 'Contacts', icon: '👤' },
+    { id: 'calls',    label: 'Calls',    icon: '📞' },
+    { id: 'keypad',   label: 'Keypad',   icon: '⌨️' },
+    { id: 'settings', label: 'Settings', icon: '⚙️' },
+  ];
+  return (
+    <header style={{
+      position: 'relative',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '14px 16px 10px',
+      minHeight: 56,
+    }}>
+      <button
+        onClick={() => { haptic(ImpactStyle.Light); setOpen((v) => !v); }}
+        aria-label="Open menu"
+        style={{
+          position: 'relative',
+          width: 44, height: 44, borderRadius: 12,
+          background: open ? 'rgba(255,255,255,0.10)' : 'transparent',
+          border: 'none', display: 'grid', placeItems: 'center',
+          cursor: 'pointer', color: colors.textIce,
+          WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+          <line x1="4" y1="7"  x2="20" y2="7" />
+          <line x1="4" y1="12" x2="20" y2="12" />
+          <line x1="4" y1="17" x2="14" y2="17" />
+        </svg>
+        <span style={{
+          position: 'absolute', right: 6, top: 6, width: 8, height: 8,
+          borderRadius: '50%', background: colors.lemtelBlue,
+        }} />
+      </button>
+
+      <span style={{
+        flex: 1, marginLeft: 8,
+        fontSize: 22, fontWeight: 500, color: 'rgba(255,255,255,0.85)',
+        letterSpacing: 0.2,
+      }}>
+        {titles[tab] || ''}
+      </span>
+
+      <div style={{ width: 44 }} />
+
+      {open && (
+        <>
+          <div
+            onClick={() => setOpen(false)}
+            style={{ position: 'fixed', inset: 0, zIndex: 70, background: 'transparent' }}
+          />
+          <div
+            role="menu"
+            style={{
+              position: 'absolute', top: 58, left: 12, zIndex: 71,
+              minWidth: 220, padding: 6,
+              borderRadius: 14,
+              background: 'rgba(20,28,52,0.96)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              boxShadow: '0 24px 60px -20px rgba(0,0,0,0.6)',
+              backdropFilter: 'blur(20px)',
+            }}
+          >
+            {items.map((it) => {
+              const active = tab === it.id;
+              return (
+                <button
+                  key={it.id}
+                  onClick={() => { setOpen(false); onNavigate(it.id); }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    width: '100%', padding: '10px 12px',
+                    borderRadius: 10, border: 'none', cursor: 'pointer',
+                    background: active ? 'rgba(0,120,255,0.18)' : 'transparent',
+                    color: active ? '#7ab8ff' : colors.textIce,
+                    fontSize: 15, fontWeight: active ? 700 : 500,
+                    textAlign: 'left',
+                  }}
+                >
+                  <span style={{ fontSize: 18, width: 22, textAlign: 'center' }}>{it.icon}</span>
+                  <span>{it.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </header>
+  );
+}
+
 
