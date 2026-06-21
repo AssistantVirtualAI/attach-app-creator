@@ -183,6 +183,7 @@ export default function MMore() {
       {editOpen && <EditProfileSheet profile={profile} onClose={() => setEditOpen(false)} onSaved={reloadProfile} />}
       {helpOpen && <HelpSheet onClose={() => setHelpOpen(false)} />}
       {customizeOpen && <CustomizeSheet profile={profile} onClose={() => setCustomizeOpen(false)} onSaved={reloadProfile} />}
+      {dndOpen && <DndSheet profile={profile} onClose={() => setDndOpen(false)} onSaved={reloadProfile} />}
     </div>
   );
 }
