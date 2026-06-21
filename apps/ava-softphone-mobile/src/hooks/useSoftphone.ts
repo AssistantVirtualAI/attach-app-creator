@@ -77,6 +77,7 @@ export function useSoftphone(
   const samplerStateRef = useRef<SamplerState>({});
   const currentBitrateRef = useRef<number>(PROFILE_OPUS.auto.hardCapBitrate);
   const reRegisterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const registrationWatchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Last quality alert level shown, and when — used to throttle toasts. */
   const lastAlertRef = useRef<{ level: number; at: number }>({ level: 4, at: 0 });
 
@@ -175,10 +176,32 @@ export function useSoftphone(
       if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null; }
       setNextRetryAt(null);
     };
+    const clearRegistrationWatchdog = () => {
+      if (registrationWatchdogRef.current) {
+        clearTimeout(registrationWatchdogRef.current);
+        registrationWatchdogRef.current = null;
+      }
+    };
     authBlockedRef.current = false;
+    let scheduleRetry: () => Promise<void> = async () => {};
+
+    const armRegistrationWatchdog = () => {
+      clearRegistrationWatchdog();
+      registrationWatchdogRef.current = setTimeout(() => {
+        if (cancelled) return;
+        const msg = 'SIP registration timed out — retrying connection.';
+        setSipStatus('error');
+        setSipError(msg, ctx);
+        log('register.timeout', `no registered/failed event after UA start (${config.wssUrl})`, 'error');
+        try { uaRef.current?.stop(); } catch {}
+        uaRef.current = null;
+        scheduleRetry();
+      }, Math.max(10000, (opts.jsSipTimeoutMs ?? 8000) + 4000));
+    };
 
     const start = () => {
       if (cancelled) return;
+      clearRegistrationWatchdog();
       setSipStatus('connecting');
       setSipErrorState('');
       log('register.start', `ext=${config.extension}@${config.domain} wss=${config.wssUrl}`);
@@ -189,6 +212,7 @@ export function useSoftphone(
           ua.on('connecting', () => log('ws.connecting', config.wssUrl));
           ua.on('connected', () => log('ws.connected', config.wssUrl));
           ua.on('registered', () => {
+            clearRegistrationWatchdog();
             retryAttemptRef.current = 0;
             setRetryAttempt(0);
             clearRetry();
@@ -219,6 +243,7 @@ export function useSoftphone(
             scheduleSilentReRegister(500, 'expiring');
           });
           ua.on('registrationFailed', (e: any) => {
+            clearRegistrationWatchdog();
             const code = e?.response?.status_code;
             const msg = classifySipFailure({
               cause: e?.cause,
@@ -236,6 +261,7 @@ export function useSoftphone(
             scheduleRetry();
           });
           ua.on('disconnected', (e: any) => {
+            clearRegistrationWatchdog();
             setSipStatus('connecting');
             log('ws.disconnected', `code=${e?.code || ''} reason=${e?.reason || ''}`, 'warn');
             if (e?.error) {
@@ -364,6 +390,7 @@ export function useSoftphone(
           });
           ua.start();
           uaRef.current = ua;
+          armRegistrationWatchdog();
         })
         .catch((err) => {
           if (cancelled) return;
@@ -377,7 +404,7 @@ export function useSoftphone(
         });
     };
 
-    const scheduleRetry = async () => {
+    scheduleRetry = async () => {
       if (cancelled) return;
       if (authBlockedRef.current) return;
 
@@ -440,6 +467,7 @@ export function useSoftphone(
     return () => {
       cancelled = true;
       clearRetry();
+      clearRegistrationWatchdog();
       if (reRegisterTimerRef.current) { clearTimeout(reRegisterTimerRef.current); reRegisterTimerRef.current = null; }
       if (statsTimerRef.current) { clearInterval(statsTimerRef.current); statsTimerRef.current = null; }
       retryAttemptRef.current = 0;
