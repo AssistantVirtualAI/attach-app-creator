@@ -76,11 +76,11 @@ describe('rewriteSdpForFusionPBX', () => {
     expect(out).not.toMatch(/a=fmtp:111/);
   });
 
-  it('strips rtcp-fb, extmap, msid, ssrc and mid lines', () => {
+  it('keeps WebRTC media metadata but drops rtcp-fb for removed codecs', () => {
     expect(out).not.toMatch(/a=rtcp-fb/);
-    expect(out).not.toMatch(/a=extmap/);
-    expect(out).not.toMatch(/a=msid/);
-    expect(out).not.toMatch(/a=ssrc/);
-    expect(out).not.toMatch(/a=mid:/);
+    expect(out).toMatch(/a=extmap/);
+    expect(out).toMatch(/a=msid/);
+    expect(out).toMatch(/a=ssrc/);
+    expect(out).toMatch(/a=mid:/);
   });
 });
