@@ -177,6 +177,7 @@ export default function PAUsers() {
                 <th className="p-3">Ext.</th>
                 <th className="p-3">App</th>
                 <th className="p-3">Agent IA</th>
+                <th className="p-3">DND</th>
                 <th className="p-3">Appels mois</th>
                 <th className="p-3">Dernière activité</th>
                 <th className="p-3">Actions</th>
