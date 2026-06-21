@@ -12,6 +12,7 @@ import InboundCallOverlay, { type InboundCall } from "@/components/InboundCallOv
 import { OfflineBanner } from "@/components/PlanipretErrorBoundary";
 import SessionTimeoutModal from "@/components/planipret/SessionTimeoutModal";
 import PrivacyConsentGate from "@/components/planipret/PrivacyConsentGate";
+import UniversalSearchBar from "@/components/planipret/UniversalSearchBar";
 
 const ACCENT = "#2E9BDC";
 
@@ -206,6 +207,7 @@ export default function PlanipretMobile() {
           </span>
         </header>
 
+        <UniversalSearchBar />
         <div ref={scrollRef} className="flex-1 overflow-y-auto pb-[96px]">
           <PullIndicator pullDist={pullDist} refreshing={refreshing} threshold={threshold} color={ACCENT} />
           <Outlet context={{ profile, reloadProfile: loadProfile, openDialer, registerRefresh } satisfies PlanipretMobileContext} />

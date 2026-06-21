@@ -7,6 +7,7 @@ import {
   LogOut, ChevronRight, Bot, Sparkles, X, Download, Shield, BellOff, Settings as SettingsIcon, BarChart3,
 } from "lucide-react";
 import type { PlanipretMobileContext } from "../PlanipretMobile";
+import { usePlanipretPush } from "@/hooks/usePlanipretPush";
 
 const PRIMARY = "#1F4E79";
 
@@ -92,8 +93,9 @@ export default function MMore() {
         <p className="text-[14px] text-slate-500">{profile?.extension ? `${profile.extension}@planipret.ca` : profile?.email}</p>
       </header>
 
-      <Section title="Pipeline">
+      <Section title="Pipeline & Performance">
         <Row icon={<BarChart3 className="w-4 h-4" />} label="📊 Pipeline des dossiers" onClick={() => navigate("/mplanipret/pipeline")} chevron />
+        <Row icon={<BarChart3 className="w-4 h-4" />} label="📈 Mes performances" onClick={() => navigate("/mplanipret/stats")} chevron />
       </Section>
 
       <Section title="Mon compte">
@@ -169,6 +171,8 @@ export default function MMore() {
         <Row icon={<Moon className="w-4 h-4" />} label="Mode sombre" right={<Toggle on={darkMode} onChange={setDarkMode} />} />
       </Section>
 
+      <NotificationsSection profile={profile} reloadProfile={reloadProfile} />
+
       <Section title="Aide & support">
         <Row icon={<HelpCircle className="w-4 h-4" />} label="Centre d'aide" onClick={() => setHelpOpen(true)} chevron />
         <Row icon={<MessageCircle className="w-4 h-4" />} label="Contacter le support"
@@ -223,6 +227,29 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
     <button onClick={(e) => { e.stopPropagation(); onChange(!on); }} className={`w-10 h-6 rounded-full p-0.5 transition ${on ? "" : "bg-slate-300"}`} style={on ? { background: PRIMARY } : undefined}>
       <span className={`block w-5 h-5 rounded-full bg-white shadow transition-transform ${on ? "translate-x-4" : ""}`} />
     </button>
+  );
+}
+
+function NotificationsSection({ profile, reloadProfile }: { profile: any; reloadProfile: () => Promise<void> }) {
+  const { subscribe, sendTest, busy } = usePlanipretPush();
+  const setPref = async (field: string, val: boolean) => {
+    await supabase.from("planipret_profiles").update({ [field]: val }).eq("user_id", profile.user_id);
+    await reloadProfile();
+  };
+  const enablePush = async () => {
+    const ok = await subscribe(profile.user_id);
+    if (ok) await reloadProfile();
+  };
+  return (
+    <Section title="Notifications push">
+      <Row icon={<Bell className="w-4 h-4" />} label="Activer notifications push" onClick={enablePush} sub="Recevoir des alertes même app fermée" chevron />
+      <Row icon={<Phone className="w-4 h-4" />} label="Appels entrants" right={<Toggle on={!!profile?.notif_calls} onChange={(v) => setPref("notif_calls", v)} />} />
+      <Row icon={<Bell className="w-4 h-4" />} label="Nouveaux SMS" right={<Toggle on={!!profile?.notif_sms} onChange={(v) => setPref("notif_sms", v)} />} />
+      <Row icon={<Bell className="w-4 h-4" />} label="Nouveaux voicemails" right={<Toggle on={!!profile?.notif_voicemails} onChange={(v) => setPref("notif_voicemails", v)} />} />
+      <Row icon={<Sparkles className="w-4 h-4" />} label="Analyses IA prêtes" right={<Toggle on={!!profile?.notif_ai} onChange={(v) => setPref("notif_ai", v)} />} />
+      <Row icon={<Bell className="w-4 h-4" />} label="Rappels" right={<Toggle on={!!profile?.notif_reminders} onChange={(v) => setPref("notif_reminders", v)} />} />
+      <Row icon={<Sparkles className="w-4 h-4" />} label={busy ? "Envoi…" : "Tester une notification"} onClick={() => sendTest(profile.user_id)} chevron />
+    </Section>
   );
 }
 

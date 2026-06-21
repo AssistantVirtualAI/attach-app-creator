@@ -8095,6 +8095,11 @@ export type Database = {
           mobile_app_enabled: boolean
           ms365_access_token: string | null
           ms365_refresh_token: string | null
+          notif_ai: boolean
+          notif_calls: boolean
+          notif_reminders: boolean
+          notif_sms: boolean
+          notif_voicemails: boolean
           ns_domain: string | null
           ns_jwt: string | null
           ns_jwt_expires_at: string | null
@@ -8128,6 +8133,11 @@ export type Database = {
           mobile_app_enabled?: boolean
           ms365_access_token?: string | null
           ms365_refresh_token?: string | null
+          notif_ai?: boolean
+          notif_calls?: boolean
+          notif_reminders?: boolean
+          notif_sms?: boolean
+          notif_voicemails?: boolean
           ns_domain?: string | null
           ns_jwt?: string | null
           ns_jwt_expires_at?: string | null
@@ -8161,6 +8171,11 @@ export type Database = {
           mobile_app_enabled?: boolean
           ms365_access_token?: string | null
           ms365_refresh_token?: string | null
+          notif_ai?: boolean
+          notif_calls?: boolean
+          notif_reminders?: boolean
+          notif_sms?: boolean
+          notif_voicemails?: boolean
           ns_domain?: string | null
           ns_jwt?: string | null
           ns_jwt_expires_at?: string | null
@@ -8177,6 +8192,44 @@ export type Database = {
           voice_agent_enabled?: boolean
         }
         Relationships: []
+      }
+      planipret_push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          endpoint: string
+          id: string
+          p256dh: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          endpoint: string
+          id?: string
+          p256dh: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          endpoint?: string
+          id?: string
+          p256dh?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planipret_push_subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "planipret_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       planipret_reminders: {
         Row: {
@@ -8347,6 +8400,50 @@ export type Database = {
           voice_agent_lang?: string | null
         }
         Relationships: []
+      }
+      planipret_sms_templates: {
+        Row: {
+          body: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_shared: boolean
+          title: string
+          updated_at: string
+          use_count: number
+          user_id: string | null
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_shared?: boolean
+          title: string
+          updated_at?: string
+          use_count?: number
+          user_id?: string | null
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_shared?: boolean
+          title?: string
+          updated_at?: string
+          use_count?: number
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planipret_sms_templates_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "planipret_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       planipret_voicemails: {
         Row: {
