@@ -142,20 +142,6 @@ async function processEvent(event: any) {
         });
       }
     }
-  } else if (type === "message.inbound") {
-    await admin.from("planipret_phone_messages").insert({
-      user_id: userId, direction: "inbound",
-      from_number: data.from_number ?? data.from ?? null,
-      to_number: data.to_number ?? data.to ?? null,
-      body: data.body ?? data.message ?? "",
-      type: "sms",
-    });
-    if (userId) {
-      await admin.channel(`messages:${userId}`).send({
-        type: "broadcast", event: "inbound_message",
-        payload: { from_number: data.from_number ?? data.from, body: data.body ?? data.message },
-      });
-    }
   } else if (type === "voicemail.new") {
     const vmId = data.vm_id ?? data.id;
     await admin.from("planipret_voicemails").insert({
@@ -169,6 +155,14 @@ async function processEvent(event: any) {
         type: "broadcast", event: "new_voicemail",
         payload: { vm_id: vmId, from_number: data.from_number ?? data.from },
       });
+      if (brokerProfile?.notif_voicemails !== false) {
+        sendPush(userId, {
+          title: "📬 Nouveau voicemail",
+          body: `De ${data.from_number ?? data.from ?? "inconnu"}`,
+          data: { url: "/mplanipret/voicemail" },
+          actions: [{ action: "listen", title: "Écouter" }],
+        });
+      }
     }
   }
 }
