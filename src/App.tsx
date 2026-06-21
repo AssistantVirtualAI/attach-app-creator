@@ -965,35 +965,35 @@ const App = () => (
                 <Route path="/customer" element={<ProtectedRoute><RolePortalGuard portal="customer"><CustomerAdminShell /></RolePortalGuard></ProtectedRoute>}>
                   <Route index element={<CustomerDashboard />} />
                   <Route path="team" element={<Team />} />
-                  <Route path="extensions" element={<LemtelExtensions />} />
-                  <Route path="queues" element={<LemtelQueues />} />
-                  <Route path="ivr" element={<LemtelIVR />} />
+                  <Route path="extensions" element={<LemtelOrgOnly fallback="/customer"><LemtelExtensions /></LemtelOrgOnly>} />
+                  <Route path="queues" element={<LemtelOrgOnly fallback="/customer"><LemtelQueues /></LemtelOrgOnly>} />
+                  <Route path="ivr" element={<LemtelOrgOnly fallback="/customer"><LemtelIVR /></LemtelOrgOnly>} />
                   <Route path="numbers" element={<PhoneNumbers />} />
-                  <Route path="calls" element={<TelephonyMediaCenter scope="org" />} />
-                  <Route path="cdrs" element={<LemtelPortalCalls />} />
-                  <Route path="recordings" element={<AdminRecordings />} />
-                  <Route path="analytics" element={<LemtelAnalytics />} />
+                  <Route path="calls" element={<LemtelOrgOnly fallback="/customer"><TelephonyMediaCenter scope="org" /></LemtelOrgOnly>} />
+                  <Route path="cdrs" element={<LemtelOrgOnly fallback="/customer"><LemtelPortalCalls /></LemtelOrgOnly>} />
+                  <Route path="recordings" element={<LemtelOrgOnly fallback="/customer"><AdminRecordings /></LemtelOrgOnly>} />
+                  <Route path="analytics" element={<LemtelOrgOnly fallback="/customer"><LemtelAnalytics /></LemtelOrgOnly>} />
                   <Route path="knowledge" element={<KnowledgeBase />} />
                   <Route path="billing" element={<StripeBilling />} />
                   <Route path="settings" element={<Settings />} />
                   <Route path="chat" element={<MyOrgChat />} />
                   <Route path="ai-admin" element={<CustomerAdminAIChat />} />
-                  <Route path="sync-health" element={<CustomerSyncHealth />} />
-                  <Route path="reports" element={<LemtelAnalytics />} />
+                  <Route path="sync-health" element={<LemtelOrgOnly fallback="/customer"><CustomerSyncHealth /></LemtelOrgOnly>} />
+                  <Route path="reports" element={<LemtelOrgOnly fallback="/customer"><LemtelAnalytics /></LemtelOrgOnly>} />
                 </Route>
 
                 {/* My Workspace — end users */}
                 <Route path="/my" element={<ProtectedRoute><RolePortalGuard portal="my"><MyWorkspaceShellSidebar /></RolePortalGuard></ProtectedRoute>}>
                   <Route index element={<MyDashboardLanding />} />
                   <Route path="dashboard" element={<MyDashboardLanding />} />
-                  <Route path="softphone" element={<TelephonyWebphone />} />
-                  <Route path="calls" element={<TelephonyMediaCenter scope="mine" />} />
-                  <Route path="voicemail" element={<MyVoicemail />} />
-                  <Route path="greetings" element={<MyGreetingsLibrary />} />
-                  <Route path="messages" element={<LemtelMessages />} />
-                  <Route path="recordings" element={<MyRecordings />} />
+                  <Route path="softphone" element={<LemtelOrgOnly fallback="/my"><TelephonyWebphone /></LemtelOrgOnly>} />
+                  <Route path="calls" element={<LemtelOrgOnly fallback="/my"><TelephonyMediaCenter scope="mine" /></LemtelOrgOnly>} />
+                  <Route path="voicemail" element={<LemtelOrgOnly fallback="/my"><MyVoicemail /></LemtelOrgOnly>} />
+                  <Route path="greetings" element={<LemtelOrgOnly fallback="/my"><MyGreetingsLibrary /></LemtelOrgOnly>} />
+                  <Route path="messages" element={<LemtelOrgOnly fallback="/my"><LemtelMessages /></LemtelOrgOnly>} />
+                  <Route path="recordings" element={<LemtelOrgOnly fallback="/my"><MyRecordings /></LemtelOrgOnly>} />
                   <Route path="chat" element={<MyOrgChat />} />
-                  <Route path="telecom" element={<MyTelecomSettings />} />
+                  <Route path="telecom" element={<LemtelOrgOnly fallback="/my"><MyTelecomSettings /></LemtelOrgOnly>} />
                   <Route path="ai" element={<MyAIAssistant />} />
                   <Route path="downloads" element={<DownloadCenter personalize />} />
                   <Route path="profile" element={<Profile />} />
