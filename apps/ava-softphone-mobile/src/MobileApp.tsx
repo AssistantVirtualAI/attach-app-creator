@@ -26,7 +26,6 @@ import { Bell, Sun, Moon, Globe } from 'lucide-react';
 import ActiveCallSheet from './components/ActiveCallSheet';
 import SplashAva from './components/SplashAva';
 import PermissionGate from './components/PermissionGate';
-import DialerFab from './components/DialerFab';
 import SyncIndicator from './components/SyncIndicator';
 import ProfileSheet from './components/ProfileSheet';
 import { useRealtimeCDR } from './hooks/useRealtimeCDR';
