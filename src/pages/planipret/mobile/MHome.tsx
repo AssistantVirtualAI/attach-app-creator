@@ -119,6 +119,124 @@ export default function MHome() {
         </button>
       </header>
 
+      {/* DND BANNER */}
+      {profile?.dnd_enabled && (
+        <div className="rounded-xl p-3 flex items-center gap-3"
+          style={{ background: "rgba(232,76,76,0.12)", border: "1px solid rgba(232,76,76,0.35)" }}>
+          <BellOff className="w-5 h-5" style={{ color: "#E84C4C" }} />
+          <div className="flex-1 min-w-0">
+            <div className="text-xs font-bold" style={{ color: "#E84C4C" }}>🔕 Mode Ne pas déranger actif</div>
+            <div className="text-[11px] text-slate-500">AVA répond à vos appels automatiquement</div>
+          </div>
+          <button
+            onClick={async () => {
+              await supabase.from("planipret_profiles").update({ dnd_enabled: false }).eq("user_id", profile.user_id);
+              await reloadProfile();
+              toast.success("Mode DND désactivé");
+            }}
+            className="text-[11px] font-semibold px-2.5 py-1 rounded-md text-white" style={{ background: "#E84C4C" }}>
+            Désactiver
+          </button>
+        </div>
+      )}
+
+      {/* PRIORITY WIDGET */}
+      {(dueReminders.length > 0 || hotLeads.length > 0) && (() => {
+        const overdue = dueReminders[0];
+        const hot = !overdue ? hotLeads[0] : null;
+        const target = overdue ?? hot;
+        if (!target) return null;
+        const name = overdue ? (overdue.contact_name ?? overdue.contact_number) : (hot.from_name ?? hot.from_number ?? hot.to_number);
+        const phone = overdue ? overdue.contact_number : (hot.from_number ?? hot.to_number);
+        const reason = overdue
+          ? `Rappel en retard${overdue.note ? ` • ${overdue.note}` : ""}`
+          : `Lead chaud • Score ${hot.lead_score}/10`;
+        return (
+          <section className="rounded-2xl p-4"
+            style={{ background: "linear-gradient(135deg,#1A0D0D,#3D1010)", border: "1px solid rgba(232,76,76,0.3)" }}>
+            <div className="flex items-center gap-2 mb-1">
+              <Flame className="w-4 h-4 text-red-400" />
+              <span className="text-[11px] font-bold uppercase tracking-wider text-red-300">Priorité maintenant</span>
+            </div>
+            <div className="text-lg font-bold text-white truncate">{name ?? "—"}</div>
+            <div className="text-xs text-red-200/80 mb-3">{reason}</div>
+            <div className="flex gap-2">
+              <button onClick={() => openDialer(phone ?? undefined)}
+                className="flex-1 py-2.5 rounded-lg text-white text-sm font-semibold flex items-center justify-center gap-2"
+                style={{ background: "#27AE60" }}>
+                <Phone className="w-4 h-4" /> Appeler maintenant
+              </button>
+              {overdue && (
+                <button
+                  onClick={async () => {
+                    const next = new Date(Date.now() + 3600 * 1000).toISOString();
+                    await supabase.from("planipret_reminders").update({ scheduled_at: next }).eq("id", overdue.id);
+                    loadStats();
+                  }}
+                  className="px-3 py-2.5 rounded-lg text-xs text-white/80" style={{ background: "rgba(255,255,255,0.08)" }}>
+                  ⏩ 1h
+                </button>
+              )}
+            </div>
+          </section>
+        );
+      })()}
+
+      {/* Hot leads today */}
+      {hotLeads.length > 0 && (
+        <section className="bg-white rounded-2xl shadow-sm p-4">
+          <h2 className="text-sm font-semibold mb-3 flex items-center gap-1.5" style={{ color: PRIMARY }}>
+            🔥 Leads chauds aujourd'hui
+          </h2>
+          <ul className="divide-y divide-slate-100">
+            {hotLeads.map((l) => {
+              const name = l.from_name || l.from_number || l.to_name || l.to_number;
+              const phone = l.from_number || l.to_number;
+              return (
+                <li key={l.id} className="py-2 flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate" style={{ color: "#1A1A2E" }}>{name ?? "—"}</p>
+                    <p className="text-[11px] text-slate-400">{TEMP_EMOJI.hot} Score {l.lead_score}/10</p>
+                  </div>
+                  <button onClick={() => openDialer(phone ?? undefined)}
+                    className="text-[11px] font-semibold px-2.5 py-1.5 rounded-md text-white"
+                    style={{ background: TEMP_COLORS.hot }}>
+                    Rappeler
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
+      {/* Due reminders */}
+      {dueReminders.length > 0 && (
+        <section className="bg-white rounded-2xl shadow-sm p-4">
+          <h2 className="text-sm font-semibold mb-3" style={{ color: PRIMARY }}>⏰ À rappeler aujourd'hui</h2>
+          <ul className="divide-y divide-slate-100">
+            {dueReminders.map((r) => (
+              <li key={r.id} className="py-2 flex items-center gap-2">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate" style={{ color: "#1A1A2E" }}>{r.contact_name ?? r.contact_number ?? "—"}</p>
+                  {r.note && <p className="text-[11px] text-slate-400 truncate">{r.note}</p>}
+                </div>
+                <button onClick={() => openDialer(r.contact_number ?? undefined)}
+                  className="text-[11px] font-semibold px-2 py-1 rounded-md text-white" style={{ background: PRIMARY }}>📞</button>
+                <button
+                  onClick={async () => {
+                    await supabase.from("planipret_reminders").update({ status: "done" }).eq("id", r.id);
+                    loadStats();
+                  }}
+                  className="text-[11px] font-semibold px-2 py-1 rounded-md bg-slate-100 text-slate-600">✅</button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+
+
       {/* Card 1: stats */}
       <section className="bg-white rounded-2xl shadow-sm p-4">
         <h2 className="text-sm font-semibold mb-3" style={{ color: PRIMARY }}>Résumé du jour</h2>
