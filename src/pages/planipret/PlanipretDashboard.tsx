@@ -8,6 +8,7 @@ export default function PlanipretDashboard() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [brokers, setBrokers] = useState<any[]>([]);
+  const [integrationsMissing, setIntegrationsMissing] = useState(0);
 
   useEffect(() => {
     (async () => {
@@ -20,6 +21,11 @@ export default function PlanipretDashboard() {
         .from("planipret_profiles").select("*").order("created_at", { ascending: false });
       setBrokers(data ?? []);
       setLoading(false);
+      // Check missing integrations (nsapi is env-backed = always OK)
+      const { data: secrets } = await supabase.functions.invoke("pp-integration-secrets");
+      const present = new Set(((secrets as any)?.items ?? []).filter((i: any) => i.has_keys?.length).map((i: any) => i.provider));
+      const required = ["elevenlabs", "anthropic", "maestro", "microsoft"];
+      setIntegrationsMissing(required.filter((p) => !present.has(p)).length);
     })();
   }, [navigate]);
 
@@ -36,10 +42,14 @@ export default function PlanipretDashboard() {
           <Link to="/planipret/dashboard" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25"><Users className="w-4 h-4" />Utilisateurs</Link>
           <Link to="/dashboard/integrations" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-white/15 relative">
             <Plug className="w-4 h-4" />Intégrations
+            {integrationsMissing > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-amber-500 text-[10px] font-bold text-white flex items-center justify-center">{integrationsMissing}</span>
+            )}
           </Link>
           <Link to="#" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-white/15 opacity-60"><BarChart3 className="w-4 h-4" />Rapports</Link>
         </nav>
       </header>
+
       <main className="p-6">
 
         <div className="bg-white rounded-xl shadow p-4">
