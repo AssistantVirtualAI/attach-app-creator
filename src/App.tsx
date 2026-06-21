@@ -33,6 +33,9 @@ const PACalls = lazy(() => import("./pages/planipret/admin/PACalls"));
 const PAMessages = lazy(() => import("./pages/planipret/admin/PAMessages"));
 const PAVoicemails = lazy(() => import("./pages/planipret/admin/PAVoicemails"));
 const PAReports = lazy(() => import("./pages/planipret/admin/PAReports"));
+const PAAuditLog = lazy(() => import("./pages/planipret/admin/PAAuditLog"));
+const PACompliance = lazy(() => import("./pages/planipret/admin/PACompliance"));
+const PlanipretPrivacy = lazy(() => import("./pages/planipret/PlanipretPrivacy"));
 const PlanipretIntegrationsLazy = lazy(() => import("./pages/planipret/PlanipretIntegrations"));
 import { AdminPageSkeleton } from "./components/planipret/Skeletons";
 
@@ -373,8 +376,11 @@ const App = () => (
                   <Route path="messages" element={<Suspense fallback={<AdminPageSkeleton />}><PAMessages /></Suspense>} />
                   <Route path="voicemails" element={<Suspense fallback={<AdminPageSkeleton />}><PAVoicemails /></Suspense>} />
                   <Route path="reports" element={<Suspense fallback={<AdminPageSkeleton />}><PAReports /></Suspense>} />
+                  <Route path="audit" element={<Suspense fallback={<AdminPageSkeleton />}><PAAuditLog /></Suspense>} />
+                  <Route path="compliance" element={<Suspense fallback={<AdminPageSkeleton />}><PACompliance /></Suspense>} />
                   <Route path="integrations" element={<Suspense fallback={<AdminPageSkeleton />}><PlanipretIntegrationsLazy /></Suspense>} />
                 </Route>
+                <Route path="/planipret/privacy" element={<Suspense fallback={<AdminPageSkeleton />}><PlanipretPrivacy /></Suspense>} />
 
                 {/* Protected routes */}
                 <Route

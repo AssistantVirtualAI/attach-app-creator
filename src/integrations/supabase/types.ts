@@ -7649,6 +7649,139 @@ export type Database = {
           },
         ]
       }
+      planipret_audit_log: {
+        Row: {
+          action: string
+          admin_id: string | null
+          created_at: string
+          id: string
+          ip_address: string | null
+          metadata: Json
+          resource_id: string | null
+          resource_type: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          admin_id?: string | null
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          metadata?: Json
+          resource_id?: string | null
+          resource_type?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          admin_id?: string | null
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          metadata?: Json
+          resource_id?: string | null
+          resource_type?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planipret_audit_log_admin_id_fkey"
+            columns: ["admin_id"]
+            isOneToOne: false
+            referencedRelation: "planipret_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "planipret_audit_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "planipret_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      planipret_call_consents: {
+        Row: {
+          call_id: string
+          consent_given: boolean
+          consent_timestamp: string
+          created_at: string
+          id: string
+          ip_address: string | null
+          user_id: string | null
+        }
+        Insert: {
+          call_id: string
+          consent_given?: boolean
+          consent_timestamp?: string
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          call_id?: string
+          consent_given?: boolean
+          consent_timestamp?: string
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planipret_call_consents_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "planipret_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      planipret_consent_settings: {
+        Row: {
+          consent_delay_seconds: number
+          consent_message_en: string
+          consent_message_fr: string
+          domain: string
+          id: string
+          recording_consent_enabled: boolean
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          consent_delay_seconds?: number
+          consent_message_en?: string
+          consent_message_fr?: string
+          domain?: string
+          id?: string
+          recording_consent_enabled?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          consent_delay_seconds?: number
+          consent_message_en?: string
+          consent_message_fr?: string
+          domain?: string
+          id?: string
+          recording_consent_enabled?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planipret_consent_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "planipret_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       planipret_contacts: {
         Row: {
           company: string | null
@@ -7889,6 +8022,9 @@ export type Database = {
           ns_user_id: string | null
           organization_id: string
           phone: string | null
+          privacy_accepted_at: string | null
+          privacy_version: string | null
+          recording_consent: boolean
           role: string
           updated_at: string
           user_id: string
@@ -7914,6 +8050,9 @@ export type Database = {
           ns_user_id?: string | null
           organization_id?: string
           phone?: string | null
+          privacy_accepted_at?: string | null
+          privacy_version?: string | null
+          recording_consent?: boolean
           role?: string
           updated_at?: string
           user_id: string
@@ -7939,12 +8078,65 @@ export type Database = {
           ns_user_id?: string | null
           organization_id?: string
           phone?: string | null
+          privacy_accepted_at?: string | null
+          privacy_version?: string | null
+          recording_consent?: boolean
           role?: string
           updated_at?: string
           user_id?: string
           voice_agent_enabled?: boolean
         }
         Relationships: []
+      }
+      planipret_retention_policy: {
+        Row: {
+          ai_insights_retention_days: number
+          audit_logs_retention_days: number
+          calls_retention_days: number
+          id: string
+          last_run_at: string | null
+          messages_retention_days: number
+          recordings_retention_days: number
+          transcripts_retention_days: number
+          updated_at: string
+          updated_by: string | null
+          voicemails_retention_days: number
+        }
+        Insert: {
+          ai_insights_retention_days?: number
+          audit_logs_retention_days?: number
+          calls_retention_days?: number
+          id?: string
+          last_run_at?: string | null
+          messages_retention_days?: number
+          recordings_retention_days?: number
+          transcripts_retention_days?: number
+          updated_at?: string
+          updated_by?: string | null
+          voicemails_retention_days?: number
+        }
+        Update: {
+          ai_insights_retention_days?: number
+          audit_logs_retention_days?: number
+          calls_retention_days?: number
+          id?: string
+          last_run_at?: string | null
+          messages_retention_days?: number
+          recordings_retention_days?: number
+          transcripts_retention_days?: number
+          updated_at?: string
+          updated_by?: string | null
+          voicemails_retention_days?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planipret_retention_policy_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "planipret_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       planipret_settings: {
         Row: {
@@ -7953,10 +8145,13 @@ export type Database = {
           language: string | null
           m365_connected: boolean
           maestro_connected: boolean
+          max_concurrent_sessions: number
           notifications_enabled: boolean
           organization_id: string
           preferences: Json
           ringtone: string | null
+          session_timeout_enabled: boolean
+          session_timeout_minutes: number
           theme: string | null
           updated_at: string
           user_id: string
@@ -7968,10 +8163,13 @@ export type Database = {
           language?: string | null
           m365_connected?: boolean
           maestro_connected?: boolean
+          max_concurrent_sessions?: number
           notifications_enabled?: boolean
           organization_id?: string
           preferences?: Json
           ringtone?: string | null
+          session_timeout_enabled?: boolean
+          session_timeout_minutes?: number
           theme?: string | null
           updated_at?: string
           user_id: string
@@ -7983,10 +8181,13 @@ export type Database = {
           language?: string | null
           m365_connected?: boolean
           maestro_connected?: boolean
+          max_concurrent_sessions?: number
           notifications_enabled?: boolean
           organization_id?: string
           preferences?: Json
           ringtone?: string | null
+          session_timeout_enabled?: boolean
+          session_timeout_minutes?: number
           theme?: string | null
           updated_at?: string
           user_id?: string

@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
   User, Lock, Phone, Info, Mail, Bell, Moon, HelpCircle, MessageCircle,
-  LogOut, ChevronRight, Bot, Sparkles, X,
+  LogOut, ChevronRight, Bot, Sparkles, X, Download, Shield,
 } from "lucide-react";
 import type { PlanipretMobileContext } from "../PlanipretMobile";
 
@@ -94,6 +94,23 @@ export default function MMore() {
       <Section title="Mon compte">
         <Row icon={<User className="w-4 h-4" />} label="Mon profil" onClick={() => setEditOpen(true)} chevron />
         <Row icon={<Lock className="w-4 h-4" />} label="Changer le mot de passe" onClick={() => navigate("/reset-password")} chevron />
+        <Row icon={<Download className="w-4 h-4" />} label="📦 Mes données" sub="Téléchargez toutes vos données (Loi 25 / PIPEDA)"
+          onClick={async () => {
+            toast.info("Préparation de votre export…");
+            const { data: { session } } = await supabase.auth.getSession();
+            const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/pp-gdpr-export`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
+              body: JSON.stringify({ broker_id: profile.id }),
+            });
+            if (!res.ok) { toast.error("Échec de l'export"); return; }
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url; a.download = `mes-donnees-planipret.json`; a.click();
+            URL.revokeObjectURL(url);
+            toast.success("Export téléchargé ✅");
+          }} chevron />
       </Section>
 
       <Section title="Téléphonie">
@@ -136,6 +153,7 @@ export default function MMore() {
         <Row icon={<HelpCircle className="w-4 h-4" />} label="Centre d'aide" onClick={() => setHelpOpen(true)} chevron />
         <Row icon={<MessageCircle className="w-4 h-4" />} label="Contacter le support"
           onClick={() => { window.location.href = "mailto:support@avastatistic.ca?subject=Support%20Planipr%C3%AAt%20AI%20Portal"; }} chevron />
+        <Row icon={<Shield className="w-4 h-4" />} label="🔏 Politique de confidentialité" onClick={() => navigate("/planipret/privacy")} chevron />
         <Row icon={<Info className="w-4 h-4" />} label="Version de l'app" right={<span className="text-[12px] text-slate-400">v1.0.0 (build 1)</span>} />
       </Section>
 
