@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Phone, PhoneMissed, MessageSquare, Voicemail, ArrowDownLeft, ArrowUpRight, X } from "lucide-react";
-import type { PlanipretMobileContext } from "./PlanipretMobile";
+import type { PlanipretMobileContext } from "../PlanipretMobile";
 
 const PRIMARY = "#1F4E79";
 const SUCCESS = "#27AE60";
