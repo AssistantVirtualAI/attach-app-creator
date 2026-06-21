@@ -7769,6 +7769,48 @@ export type Database = {
         }
         Relationships: []
       }
+      security_access_violations: {
+        Row: {
+          action: string
+          attempted_org_id: string | null
+          id: string
+          ip_address: string | null
+          metadata: Json | null
+          occurred_at: string
+          resource: string | null
+          user_agent: string | null
+          user_email: string | null
+          user_id: string | null
+          user_org_ids: string[] | null
+        }
+        Insert: {
+          action: string
+          attempted_org_id?: string | null
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          occurred_at?: string
+          resource?: string | null
+          user_agent?: string | null
+          user_email?: string | null
+          user_id?: string | null
+          user_org_ids?: string[] | null
+        }
+        Update: {
+          action?: string
+          attempted_org_id?: string | null
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          occurred_at?: string
+          resource?: string | null
+          user_agent?: string | null
+          user_email?: string | null
+          user_id?: string | null
+          user_org_ids?: string[] | null
+        }
+        Relationships: []
+      }
       security_audit_runs: {
         Row: {
           created_at: string
@@ -10953,6 +10995,10 @@ export type Database = {
         Args: { _email: string; _extension: string; _org_id: string }
         Returns: Json
       }
+      assert_org_access: {
+        Args: { _action?: string; _resource?: string; _target_org: string }
+        Returns: undefined
+      }
       audit_my_extension_isolation: { Args: never; Returns: Json }
       audit_my_pbx_extensions_access: {
         Args: { _org_id?: string }
@@ -11132,6 +11178,15 @@ export type Database = {
           }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       lemtel_can_grant_app_access: { Args: { _uid: string }; Returns: boolean }
+      log_access_violation: {
+        Args: {
+          _action: string
+          _metadata?: Json
+          _resource?: string
+          _target_org: string
+        }
+        Returns: string
+      }
       log_agent_access: {
         Args: { _action: string; _metadata?: Json; _org_id: string }
         Returns: undefined
@@ -11242,6 +11297,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      verify_org_isolation: { Args: never; Returns: Json }
       verify_tenant_isolation: { Args: { _org_id: string }; Returns: Json }
     }
     Enums: {
