@@ -1,4 +1,4 @@
-import { authBroker, corsHeaders, jsonResponse, nsBrokerFetch, nsEnv, nsPath } from "../_shared/ns-broker.ts";
+import { authBroker, corsHeaders, jsonResponse, logAudit, nsBrokerFetch, nsEnv, nsPath } from "../_shared/ns-broker.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -22,6 +22,10 @@ Deno.serve(async (req) => {
       return jsonResponse({ success: false, error: txt || "Enregistrement introuvable", code: res.status }, 200);
     }
     const blob = await res.arrayBuffer();
+    await logAudit(admin, req, {
+      user_id: profile.id, action: "RECORDING_ACCESS",
+      resource_type: "recording", resource_id: callId,
+    });
     return new Response(blob, {
       status: 200,
       headers: {
