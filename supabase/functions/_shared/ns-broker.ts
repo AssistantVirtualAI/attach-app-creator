@@ -57,13 +57,22 @@ export async function authBroker(req: Request) {
   }
   const { data: profile } = await admin
     .from("planipret_profiles")
-    .select("id, extension, ns_jwt, ns_refresh_token, ns_jwt_expires_at, organization_id")
+    .select("id, extension, role, ns_jwt, ns_refresh_token, ns_jwt_expires_at, organization_id")
     .eq("user_id", userId)
     .maybeSingle();
   if (!profile || profile.organization_id !== AVA_ORG_ID) {
     return { error: jsonResponse({ success: false, error: "Profil introuvable", code: 404 }, 404) };
   }
   return { admin, userId, profile };
+}
+
+export async function requirePlanipretAdmin(req: Request) {
+  const res = await authBroker(req);
+  if ("error" in res) return res;
+  if ((res as any).profile.role !== "admin") {
+    return { error: jsonResponse({ success: false, error: "Accès refusé", code: 403 }, 403) };
+  }
+  return res;
 }
 
 export async function obtainBrokerJwt(extension: string) {
