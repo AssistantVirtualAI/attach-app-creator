@@ -2,7 +2,12 @@ import { useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-const VAPID_PUBLIC_KEY = (import.meta.env.VITE_VAPID_PUBLIC_KEY as string) || "";
+async function fetchVapidPublicKey(): Promise<string> {
+  try {
+    const { data } = await supabase.functions.invoke("pp-vapid-public");
+    return (data as any)?.public_key ?? "";
+  } catch { return ""; }
+}
 
 function urlBase64ToUint8Array(base64: string) {
   const padding = "=".repeat((4 - (base64.length % 4)) % 4);
