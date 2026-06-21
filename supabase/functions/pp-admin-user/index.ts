@@ -1,4 +1,4 @@
-import { authBroker, corsHeaders, jsonResponse, supaAdmin } from "../_shared/ns-broker.ts";
+import { authBroker, corsHeaders, jsonResponse, logAudit, supaAdmin } from "../_shared/ns-broker.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -42,6 +42,11 @@ Deno.serve(async (req) => {
         await admin.auth.admin.deleteUser(created.user.id);
         return jsonResponse({ success: false, error: pErr.message }, 200);
       }
+      await logAudit(admin, req, {
+        admin_id: profile.id, action: "USER_CREATE",
+        resource_type: "user", resource_id: created.user.id,
+        metadata: { email, extension: ns_extension },
+      });
       return jsonResponse({ success: true, user_id: created.user.id });
     }
 
@@ -62,6 +67,10 @@ Deno.serve(async (req) => {
       if (!user_id) return jsonResponse({ success: false, error: "user_id requis" }, 400);
       await admin.from("planipret_profiles").delete().eq("user_id", user_id);
       await admin.auth.admin.deleteUser(user_id).catch(() => null);
+      await logAudit(admin, req, {
+        admin_id: profile.id, action: "USER_DELETE",
+        resource_type: "user", resource_id: user_id,
+      });
       return jsonResponse({ success: true });
     }
 
@@ -70,6 +79,7 @@ Deno.serve(async (req) => {
       const redirectTo = `${Deno.env.get("SUPABASE_URL")?.replace(".supabase.co", ".lovable.app") ?? ""}/reset-password`;
       const { error } = await admin.auth.resetPasswordForEmail(email, { redirectTo });
       if (error) return jsonResponse({ success: false, error: error.message }, 200);
+      await logAudit(admin, req, { admin_id: profile.id, action: "PASSWORD_RESET", metadata: { email } });
       return jsonResponse({ success: true });
     }
 

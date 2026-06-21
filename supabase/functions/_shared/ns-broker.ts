@@ -166,3 +166,33 @@ export async function nsBrokerFetch(
 export function nsPath(domain: string, extension: string, sub = "") {
   return `/domains/${encodeURIComponent(domain)}/users/${encodeURIComponent(extension)}${sub}`;
 }
+
+/** Insert one row in planipret_audit_log. Never throws. */
+export async function logAudit(
+  admin: ReturnType<typeof supaAdmin>,
+  req: Request,
+  entry: {
+    user_id?: string | null;
+    admin_id?: string | null;
+    action: string;
+    resource_type?: string | null;
+    resource_id?: string | null;
+    metadata?: Record<string, unknown>;
+  },
+): Promise<void> {
+  try {
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+      ?? req.headers.get("cf-connecting-ip") ?? null;
+    const ua = req.headers.get("user-agent") ?? null;
+    await admin.from("planipret_audit_log").insert({
+      user_id: entry.user_id ?? null,
+      admin_id: entry.admin_id ?? null,
+      action: entry.action,
+      resource_type: entry.resource_type ?? null,
+      resource_id: entry.resource_id ?? null,
+      ip_address: ip,
+      user_agent: ua,
+      metadata: entry.metadata ?? {},
+    });
+  } catch (_e) { /* swallow */ }
+}

@@ -10,6 +10,8 @@ import { usePullToRefresh, PullIndicator } from "@/hooks/usePullToRefresh";
 import { useRealtimeManager } from "@/hooks/useRealtimeManager";
 import InboundCallOverlay, { type InboundCall } from "@/components/InboundCallOverlay";
 import { OfflineBanner } from "@/components/PlanipretErrorBoundary";
+import SessionTimeoutModal from "@/components/planipret/SessionTimeoutModal";
+import PrivacyConsentGate from "@/components/planipret/PrivacyConsentGate";
 
 const ACCENT = "#2E9BDC";
 
@@ -208,6 +210,8 @@ export default function PlanipretMobile() {
           <PullIndicator pullDist={pullDist} refreshing={refreshing} threshold={threshold} color={ACCENT} />
           <Outlet context={{ profile, reloadProfile: loadProfile, openDialer, registerRefresh } satisfies PlanipretMobileContext} />
         </div>
+        <SessionTimeoutModal />
+        {profile && <PrivacyConsentGate profile={profile} onAccepted={loadProfile} />}
 
         {/* FAB */}
         <button onClick={() => setDialerOpen(true)}

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { LayoutDashboard, Users, Phone, MessageSquare, Voicemail, Plug, BarChart3, LogOut, Bell } from "lucide-react";
+import { LayoutDashboard, Users, Phone, MessageSquare, Voicemail, Plug, BarChart3, LogOut, Bell, ClipboardList, ShieldCheck } from "lucide-react";
+import SessionTimeoutModal from "@/components/planipret/SessionTimeoutModal";
 
 const LINKS = [
   { to: "/planipret/admin/overview", label: "Vue d'ensemble", Icon: LayoutDashboard },
@@ -9,8 +10,10 @@ const LINKS = [
   { to: "/planipret/admin/calls", label: "Appels", Icon: Phone },
   { to: "/planipret/admin/messages", label: "Messages", Icon: MessageSquare },
   { to: "/planipret/admin/voicemails", label: "Voicemails", Icon: Voicemail },
-  { to: "/planipret/admin/integrations", label: "Intégrations", Icon: Plug },
   { to: "/planipret/admin/reports", label: "Rapports", Icon: BarChart3 },
+  { to: "/planipret/admin/audit", label: "Journal d'audit", Icon: ClipboardList },
+  { to: "/planipret/admin/compliance", label: "Conformité", Icon: ShieldCheck },
+  { to: "/planipret/admin/integrations", label: "Intégrations", Icon: Plug },
 ];
 
 const PAGE_TITLES: Record<string, string> = {
@@ -21,6 +24,8 @@ const PAGE_TITLES: Record<string, string> = {
   "/planipret/admin/voicemails": "Voicemails",
   "/planipret/admin/integrations": "Intégrations",
   "/planipret/admin/reports": "Rapports",
+  "/planipret/admin/audit": "Journal d'audit",
+  "/planipret/admin/compliance": "Conformité",
 };
 
 const initials = (n?: string) => (n ?? "A").split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase()).join("") || "A";
@@ -162,6 +167,7 @@ export default function PlanipretAdminLayout() {
           <Outlet context={{ profile }} />
         </main>
       </div>
+      <SessionTimeoutModal />
     </div>
   );
 }

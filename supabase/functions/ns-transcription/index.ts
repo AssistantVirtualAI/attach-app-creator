@@ -1,4 +1,4 @@
-import { authBroker, corsHeaders, jsonResponse, nsBrokerFetch, nsEnv } from "../_shared/ns-broker.ts";
+import { authBroker, corsHeaders, jsonResponse, logAudit, nsBrokerFetch, nsEnv } from "../_shared/ns-broker.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -27,6 +27,10 @@ Deno.serve(async (req) => {
     if (transcript) {
       await admin.from("planipret_phone_calls").update({ transcript }).eq("call_id", callId);
     }
+    await logAudit(admin, req, {
+      user_id: profile.id, action: "TRANSCRIPT_ACCESS",
+      resource_type: "transcript", resource_id: callId,
+    });
     return jsonResponse({ success: true, transcript });
   } catch (e) {
     console.error("ns-transcription error", e);

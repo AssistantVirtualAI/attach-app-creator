@@ -1,4 +1,4 @@
-import { authBroker, corsHeaders, jsonResponse, nsBrokerFetch } from "../_shared/ns-broker.ts";
+import { authBroker, corsHeaders, jsonResponse, logAudit, nsBrokerFetch } from "../_shared/ns-broker.ts";
 
 const DOMAIN = "planipret.ca";
 
@@ -32,6 +32,11 @@ Deno.serve(async (req) => {
       from_number: profile.extension,
       body: message,
       type,
+    });
+    await logAudit(admin, req, {
+      user_id: profile.id, action: "SMS_SEND",
+      resource_type: "message",
+      metadata: { to, length: message.length, type },
     });
     return jsonResponse({ success: true });
   } catch (e) {
