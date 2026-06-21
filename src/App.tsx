@@ -745,6 +745,8 @@ const App = () => (
                 <Route path="/org/lemtel/admin/time-conditions" element={<LemtelAdminPage><AdminTimeConditions /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/settings" element={<LemtelAdminPage><TelephonySettings /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/hours" element={<LemtelAdminPage><BusinessHours /></LemtelAdminPage>} />
+                <Route path="/org/:slug/admin" element={<Navigate to="dashboard" replace />} />
+                <Route path="/org/:slug/admin/dashboard" element={<ProtectedRoute><AdminPortalLayout><CustomerDashboard /></AdminPortalLayout></ProtectedRoute>} />
                 <Route path="/org/:slug/admin/hours" element={<ProtectedRoute><AdminPortalLayout><BusinessHours /></AdminPortalLayout></ProtectedRoute>} />
                 <Route path="/org/:slug/admin/settings" element={<ProtectedRoute><AdminPortalLayout><CustomerSettings /></AdminPortalLayout></ProtectedRoute>} />
                 <Route path="/org/lemtel/admin/downloads" element={<LemtelAdminPage><DownloadCenter /></LemtelAdminPage>} />
