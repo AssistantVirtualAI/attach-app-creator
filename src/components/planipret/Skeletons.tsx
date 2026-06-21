@@ -2,7 +2,7 @@
 import type { CSSProperties } from "react";
 
 export function Shimmer({ className = "", style }: { className?: string; style?: CSSProperties }) {
-  return <div style={style} className={`animate-pulse bg-slate-200 dark:bg-gray-700 rounded ${className}`} />;
+  return <div style={style} className={`pp-skeleton ${className}`} />;
 }
 
 export function CallRowSkeleton() {
@@ -75,7 +75,7 @@ export function DonutSkeleton() {
     <div className="flex items-center justify-center h-40">
       <div className="relative w-32 h-32">
         <Shimmer className="absolute inset-0 rounded-full" />
-        <div className="absolute inset-6 rounded-full bg-white dark:bg-gray-900" />
+        <div className="absolute inset-6 rounded-full" style={{ background: "var(--pp-bg-base, #060D1A)" }} />
       </div>
     </div>
   );
