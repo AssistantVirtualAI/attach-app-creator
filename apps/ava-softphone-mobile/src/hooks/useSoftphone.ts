@@ -394,17 +394,28 @@ export function useSoftphone(
               }, 2000);
             });
             session.on('failed', (e: any) => {
+              const code = e?.message?.status_code;
               const msg = classifySipFailure({
                 cause: e?.cause,
-                status_code: e?.message?.status_code,
+                status_code: code,
                 reason_phrase: e?.message?.reason_phrase,
               });
-              setSipError(msg, ctx);
-              log('session.failed', `${remoteNumber} → ${msg}`, 'error');
+              log('session.failed', `${remoteNumber} code=${code ?? '?'} → ${msg}`, 'error');
               setCallState('idle');
               if (timerRef.current) clearInterval(timerRef.current);
               stopStats();
               setActiveCallNumber('');
+              // ---- 488 Not Acceptable Here: auto-retry once with the legacy
+              // PCMU-only SDP modifier (covers PBX profiles that refuse Opus).
+              if (code === 488 && callAttemptRef.current === 1 && lastCallNumberRef.current) {
+                callAttemptRef.current = 2;
+                const retryNumber = lastCallNumberRef.current;
+                log('call.retry-488', `→ ${retryNumber} with PCMU-only fallback`, 'warn');
+                setSipError('Codec refusé (488) — nouvelle tentative en PCMU…', ctx);
+                setTimeout(() => { try { placeCallInternal(retryNumber, true); } catch {} }, 250);
+              } else {
+                setSipError(msg, ctx);
+              }
             });
           });
           ua.start();
