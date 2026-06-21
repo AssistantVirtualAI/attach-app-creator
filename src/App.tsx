@@ -220,7 +220,6 @@ import PortalPrompt from "./pages/PortalPrompt";
 import PortalSettings from "./pages/PortalSettings";
 import PortalProfile from "./pages/PortalProfile";
 import UniversalLogin from "./pages/UniversalLogin";
-import ResetPassword from "./pages/ResetPassword";
 
 import EndUserLogin from "./pages/EndUserLogin";
 import PortalChooser from "./pages/PortalChooser";
