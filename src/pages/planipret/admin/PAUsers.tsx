@@ -10,6 +10,7 @@ type Profile = {
   mobile_app_enabled: boolean; voice_agent_enabled: boolean;
   ns_domain: string; elevenlabs_agent_id: string | null;
   updated_at: string; created_at: string;
+  dnd_enabled?: boolean;
 };
 
 const PAGE = 25;
