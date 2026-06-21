@@ -107,6 +107,17 @@ export const DEFAULT_PERMISSIONS_MATRIX: Record<Role, Permission[]> = {
     'read:agent_config',
   ],
   viewer: ['read:conversations', 'read:analytics', 'read:knowledge_base', 'read:agent_config'],
+  planipret_admin: [
+    'read:conversations',
+    'read:analytics',
+    'manage:members',
+    'manage:organization',
+    'read:notifications',
+  ],
+  planipret_broker: [
+    'read:conversations',
+    'read:notifications',
+  ],
 };
 
 export const ALL_PERMISSIONS = Array.from(
