@@ -60,23 +60,29 @@ function Shell({ title, badge, accent, items }: {
 }
 
 export function PlatformAdminShell({ children }: { children?: ReactNode }) {
+  const { selectedOrgId } = useOrganization();
+  const isLemtelOrgSelected = selectedOrgId === "71755d33-ed64-4ad5-a828-61c9d2029eb7";
+  const items = useMemo(() => [
+    { label: "Overview", to: "/platform", icon: LayoutDashboard },
+    { label: "Organizations", to: "/platform/organizations", icon: Building2 },
+    { label: "All Users", to: "/platform/users", icon: Users },
+    ...(isLemtelOrgSelected ? [
+      { label: "All Calls", to: "/platform/calls", icon: Phone },
+      { label: "Telephony Core", to: "/platform/telephony", icon: Server },
+      { label: "Telephony QA", to: "/platform/qa", icon: Activity },
+    ] : []),
+    { label: "System Health", to: "/platform/health", icon: Activity },
+    { label: "Billing", to: "/platform/billing", icon: CreditCard },
+    { label: "Audit Logs", to: "/platform/audit", icon: FileText },
+    { label: "Settings", to: "/platform/settings", icon: Settings },
+  ], [isLemtelOrgSelected]);
+
   return (
     <Shell
       title="AVA · Lemtel"
       badge="Platform Admin"
       accent="bg-red-500"
-      items={[
-        { label: "Overview", to: "/platform", icon: LayoutDashboard },
-        { label: "Organizations", to: "/platform/organizations", icon: Building2 },
-        { label: "All Users", to: "/platform/users", icon: Users },
-        { label: "All Calls", to: "/platform/calls", icon: Phone },
-        { label: "Telephony Core", to: "/platform/telephony", icon: Server },
-        { label: "Telephony QA", to: "/platform/qa", icon: Activity },
-        { label: "System Health", to: "/platform/health", icon: Activity },
-        { label: "Billing", to: "/platform/billing", icon: CreditCard },
-        { label: "Audit Logs", to: "/platform/audit", icon: FileText },
-        { label: "Settings", to: "/platform/settings", icon: Settings },
-      ]}
+      items={items}
     />
   );
 }
