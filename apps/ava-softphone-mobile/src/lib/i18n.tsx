@@ -30,6 +30,10 @@ const DICT = {
     'tabs.messages': 'Messages',
     'tabs.settings': 'Settings',
     'tabs.ava': 'AVA assistant',
+    'tabs.contacts': 'Contacts',
+    'tabs.chats': 'Chats',
+    'tabs.keypad': 'Keypad',
+    'tabs.speeddial': 'Speed dial',
 
     'dashboard.domain': 'Domain',
     'dashboard.myActivity': 'My activity',
@@ -290,6 +294,10 @@ const DICT = {
     'tabs.messages': 'Messages',
     'tabs.settings': 'Réglages',
     'tabs.ava': 'Assistant AVA',
+    'tabs.contacts': 'Contacts',
+    'tabs.chats': 'Discussions',
+    'tabs.keypad': 'Clavier',
+    'tabs.speeddial': 'Appel rapide',
 
     'dashboard.domain': 'Domaine',
     'dashboard.myActivity': 'Mon activité',
