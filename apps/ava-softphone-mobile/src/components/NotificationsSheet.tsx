@@ -74,12 +74,17 @@ export default function NotificationsSheet({
             <X size={20} />
           </button>
         </div>
-        {c.total === 0 && (
+        {c.loading && (
+          <div style={{ padding: 24, textAlign: 'center', color: colors.textSub, fontSize: font.sm }}>
+            Loading notifications…
+          </div>
+        )}
+        {!c.loading && c.total === 0 && (
           <div style={{ padding: 24, textAlign: 'center', color: colors.textSub, fontSize: font.sm }}>
             You're all caught up.
           </div>
         )}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, opacity: c.loading ? 0.5 : 1 }}>
           {items.map(({ tab, icon: Icon, label, count, tone }) => (
             <button
               key={label}
