@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 
 import { supabase } from "@/integrations/supabase/client";
-import { Phone, PhoneMissed, MessageSquare, Voicemail, ArrowDownLeft, ArrowUpRight, X, Calendar, Headphones } from "lucide-react";
+import { Phone, PhoneMissed, MessageSquare, Voicemail, ArrowDownLeft, ArrowUpRight, X, Calendar, Headphones, Bot } from "lucide-react";
 import type { PlanipretMobileContext } from "../PlanipretMobile";
 import { toast } from "sonner";
+import VoiceAgent from "@/components/VoiceAgent";
 
 const PRIMARY = "#1F4E79";
 const SUCCESS = "#27AE60";
@@ -25,6 +26,15 @@ export default function MHome() {
   const [briefLoading, setBriefLoading] = useState(false);
   const [statsLoading, setStatsLoading] = useState(true);
   const [sipOnline, setSipOnline] = useState(false);
+  const [agentOpen, setAgentOpen] = useState(false);
+
+  const openAgent = async () => {
+    try {
+      const p = await navigator.permissions.query({ name: "microphone" as PermissionName });
+      if (p.state === "denied") { toast.error("🎙️ Accès au microphone refusé. Autorisez-le dans votre navigateur."); return; }
+    } catch { /* ignore */ }
+    setAgentOpen(true);
+  };
 
   const dateLabel = new Date().toLocaleDateString("fr-CA", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
@@ -207,6 +217,16 @@ export default function MHome() {
           </ul>
         )}
       </section>
+
+      {profile?.voice_agent_enabled && (
+        <button onClick={openAgent} aria-label="Parler à AVA"
+          className={`fixed right-4 z-30 w-[52px] h-[52px] rounded-full flex items-center justify-center text-white shadow-xl active:scale-95 transition ${agentOpen ? "ring-4 ring-emerald-400/60 animate-pulse" : ""}`}
+          style={{ background: "linear-gradient(135deg, #6C3CE1, #8B5CF6)", bottom: "calc(94px + 60px + 24px)" }}>
+          <Bot className="w-6 h-6" />
+        </button>
+      )}
+
+      {agentOpen && <VoiceAgent onClose={() => setAgentOpen(false)} />}
     </div>
   );
 }
