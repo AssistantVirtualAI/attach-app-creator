@@ -576,7 +576,7 @@ export function useSoftphone(
     }
   };
 
-  /** Place a call. `forcePcmu=true` uses the legacy SDP modifier (PCMU only) — used as a 488 fallback. */
+  /** Place a call. `forcePcmu=true` uses a secure WebRTC PCMU-only SDP modifier — used as a 488 fallback. */
   const placeCallInternal = (number: string, forcePcmu = false): boolean => {
     if (!uaRef.current || !config) return false;
     setActiveCallNumber(number);
@@ -602,7 +602,7 @@ export function useSoftphone(
         callOpts.sessionDescriptionHandlerModifiers = [
           buildSdpModifier(opusToSdpOpts(audioProfileRef.current)),
         ];
-        log('call.fallback', 'PCMU-only SDP modifier active');
+        log('call.fallback', 'secure PCMU-only SDP modifier active');
       }
       uaRef.current.call(`sip:${number}@${config.domain}`, callOpts);
       return true;
