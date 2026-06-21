@@ -85,13 +85,13 @@ export default function MobileApp() {
       }
     });
   }, [creds?.accessToken, creds?.refreshToken]);
-  const ALL_TABS: Tab[] = ['home','calls','ava','messages','more','voicemail','contacts','sms','queues','settings'];
+  const ALL_TABS: Tab[] = ['home','calls','ava','messages','more','voicemail','contacts','sms','queues','settings','chats','keypad','speeddial'];
   const initialTab = (() => {
     try {
       const t = new URLSearchParams(window.location.search).get('tab') as Tab | null;
       if (t && ALL_TABS.includes(t)) return t;
     } catch {}
-    return 'home' as Tab;
+    return 'keypad' as Tab;
   })();
   const [tab, setTab] = useState<Tab>(initialTab);
   const [booting, setBooting] = useState(!isPreviewMode);
@@ -99,7 +99,6 @@ export default function MobileApp() {
 
   useEffect(() => {
     let cancelled = false;
-    });
     bootNative().finally(() => {
       setTimeout(() => setBooting(false), 700);
     });
@@ -127,7 +126,7 @@ export default function MobileApp() {
   if (loading || booting) return <SplashAva />;
   if (!creds) return <MobileI18nProvider><ThemeProvider><AuthScreen onAuthenticated={setCreds} /><PerfOverlay /></ThemeProvider></MobileI18nProvider>;
 
-  return <MobileI18nProvider><ThemeProvider><AuthenticatedShell creds={creds} setCreds={setCreds} tab={tab} setTab={setTab} onSignOut={clearCreds}} /><PerfOverlay /></ThemeProvider></MobileI18nProvider>;
+  return <MobileI18nProvider><ThemeProvider><AuthenticatedShell creds={creds} setCreds={setCreds} tab={tab} setTab={setTab} onSignOut={clearCreds} preferClickToCall={preferC2C} onTogglePreferC2C={() => {}} /><PerfOverlay /></ThemeProvider></MobileI18nProvider>;
 }
 
 function AuthenticatedShell({
