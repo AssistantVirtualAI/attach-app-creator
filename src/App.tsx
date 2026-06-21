@@ -951,12 +951,12 @@ const App = () => (
                   <Route index element={<PlatformDashboard />} />
                   <Route path="organizations" element={<MasterOrganizations />} />
                   <Route path="users" element={<MasterAllUsers />} />
-                  <Route path="calls" element={<MasterAllCalls />} />
-                  <Route path="telephony" element={<TelephonyDashboard />} />
+                  <Route path="calls" element={<LemtelOrgOnly fallback="/platform"><MasterAllCalls /></LemtelOrgOnly>} />
+                  <Route path="telephony" element={<LemtelOrgOnly fallback="/platform"><TelephonyDashboard /></LemtelOrgOnly>} />
                   <Route path="billing" element={<MasterBilling />} />
                   <Route path="system" element={<MasterSystem />} />
                   <Route path="health" element={<PlatformSystemHealth />} />
-                  <Route path="qa" element={<PlatformTelephonyQA />} />
+                  <Route path="qa" element={<LemtelOrgOnly fallback="/platform"><PlatformTelephonyQA /></LemtelOrgOnly>} />
                   <Route path="audit" element={<MasterAuditLogs />} />
                   <Route path="settings" element={<LemtelSettings />} />
                 </Route>
