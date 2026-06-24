@@ -37,6 +37,7 @@ export default function MHome() {
   const [agentOpen, setAgentOpen] = useState(false);
   const [hotLeads, setHotLeads] = useState<any[]>([]);
   const [dueReminders, setDueReminders] = useState<any[]>([]);
+  const [maestroCounts, setMaestroCounts] = useState<any | null>(null);
 
   const openAgent = async () => {
     try {
@@ -97,7 +98,15 @@ export default function MHome() {
     setEventsState("ready");
   };
 
-  useEffect(() => { loadStats(); loadEvents(); /* eslint-disable-next-line */ }, [profile?.user_id]);
+  const loadMaestroCounts = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke("maestro-counts", { body: {} });
+      if (error) return;
+      setMaestroCounts((data as any)?.counts ?? data ?? null);
+    } catch { /* silent */ }
+  };
+
+  useEffect(() => { loadStats(); loadEvents(); loadMaestroCounts(); /* eslint-disable-next-line */ }, [profile?.user_id]);
   useEffect(() => {
     registerRefresh(async () => { await Promise.all([loadStats(), loadEvents()]); });
     return () => registerRefresh(null);
