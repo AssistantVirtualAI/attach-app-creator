@@ -223,10 +223,10 @@ export function buildWssFallbackList(config: SIPConfig): string[] {
   return Array.from(new Set([
     config.wssUrl,
     ...(config.wssUrls || []),
-    'wss://pbxnode.lemtel.tel:7443',
-    'wss://node.lemtelcloud.net:7443',
     'wss://pbxnode.lemtel.tel:7444',
     'wss://node.lemtelcloud.net:7444',
+    'wss://pbxnode.lemtel.tel:7443',
+    'wss://node.lemtelcloud.net:7443',
   ].filter(Boolean)));
 }
 
