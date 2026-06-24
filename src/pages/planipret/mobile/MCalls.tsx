@@ -12,11 +12,11 @@ import { TEMP_COLORS, TEMP_EMOJI, TEMP_LABEL, tempBorder, callbackDelayToDate, d
 import ContactTimeline from "@/components/planipret/ContactTimeline";
 
 
-const PRIMARY = "#1F4E79";
-const ACCENT = "#2E86C1";
-const SUCCESS = "#27AE60";
-const DANGER = "#E74C3C";
-const PURPLE = "#7C3AED";
+const PRIMARY = "var(--pp-brand-accent-2)";
+const ACCENT = "var(--pp-brand-accent)";
+const SUCCESS = "var(--pp-success)";
+const DANGER = "var(--pp-danger)";
+const PURPLE = "var(--pp-agent)";
 
 type Call = {
   id: string;
@@ -619,7 +619,7 @@ function CallDetailSheet({
           ) : (<>
           {/* SECTION 1 */}
           <div className="text-center pt-4 pb-5 border-b border-slate-100">
-            <div className="text-xl font-bold" style={{ color: "#1A1A2E" }}>{displayLabel(call)}</div>
+            <div className="text-xl font-bold" style={{ color: "var(--pp-text-primary)" }}>{displayLabel(call)}</div>
             {otherName(call) && <div className="text-xs text-slate-400 mt-0.5">{otherNumber(call)}</div>}
             <div className="mt-2 flex items-center justify-center gap-2 text-xs">
               <span className="px-2 py-0.5 rounded-full font-medium" style={{ background: `${dirColor}15`, color: dirColor }}>{direction}</span>
@@ -807,13 +807,13 @@ function CallbackSuggestion({ call, onScheduled }: { call: Call; onScheduled: ()
   };
   return (
     <div className="mt-3 rounded-xl p-3" style={{ background: "rgba(124,58,237,0.08)", border: "1px solid rgba(124,58,237,0.25)" }}>
-      <div className="text-xs font-semibold mb-1" style={{ color: "#7C3AED" }}>⏰ Rappel suggéré par AVA</div>
+      <div className="text-xs font-semibold mb-1" style={{ color: "var(--pp-agent)" }}>⏰ Rappel suggéré par AVA</div>
       {call.callback_reason && <p className="text-xs text-slate-600 mb-2">{call.callback_reason}</p>}
       <div className="flex flex-wrap gap-1.5">
         {(["2h","tomorrow_9am","monday_9am"] as const).map((d) => (
           <button key={d} disabled={busy} onClick={() => schedule(d)}
             className="text-[11px] font-semibold px-2.5 py-1.5 rounded-md text-white disabled:opacity-50"
-            style={{ background: "#7C3AED" }}>
+            style={{ background: "var(--pp-agent)" }}>
             {delayLabel(d)}
           </button>
         ))}
@@ -825,7 +825,7 @@ function CallbackSuggestion({ call, onScheduled }: { call: Call; onScheduled: ()
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="mt-5">
-      <div className="text-[13px] font-semibold mb-2" style={{ color: "#1A1A2E" }}>{title}</div>
+      <div className="text-[13px] font-semibold mb-2" style={{ color: "var(--pp-text-primary)" }}>{title}</div>
       {children}
     </div>
   );
