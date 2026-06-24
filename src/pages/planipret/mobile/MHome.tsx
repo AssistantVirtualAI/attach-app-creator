@@ -344,6 +344,24 @@ export default function MHome() {
         )}
       </section>
 
+      {/* ===== MAESTRO SNAPSHOT ===== */}
+      {maestroCounts && (() => {
+        const tasks = maestroCounts.tasks_due_today ?? maestroCounts.tasks_today ?? maestroCounts.open_tasks ?? 0;
+        const appts = maestroCounts.appointments_today ?? maestroCounts.todays_appointments ?? 0;
+        const leadsToCall = maestroCounts.leads_to_call ?? maestroCounts.followups_due ?? 0;
+        if (tasks + appts + leadsToCall === 0) return null;
+        return (
+          <section
+            className="rounded-2xl p-3 grid grid-cols-3 gap-2"
+            style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)" }}
+          >
+            <MaestroBadge label="Tâches" value={tasks} accent="var(--pp-brand-accent)" onClick={() => navigate("/mplanipret/contacts")} />
+            <MaestroBadge label="RDV jour" value={appts} accent="var(--pp-agent)" onClick={() => navigate("/mplanipret/home")} />
+            <MaestroBadge label="À rappeler" value={leadsToCall} accent="var(--pp-danger)" onClick={() => navigate("/mplanipret/calls?tab=missed")} />
+          </section>
+        );
+      })()}
+
       {/* ===== HOT LEADS ===== */}
       {hotLeads.length > 0 && (
         <section className="pp-card rounded-2xl p-4">
