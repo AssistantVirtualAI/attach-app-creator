@@ -25,7 +25,7 @@ const STAGES: Array<{ key: string; label: string; emoji: string }> = [
   { key: "closed", label: "Fermé", emoji: "🔒" },
 ];
 
-const PRIMARY = "#1F4E79";
+const PRIMARY = "var(--pp-brand-accent-2)";
 
 export default function MPipeline() {
   const { profile, openDialer } = useOutletContext<PlanipretMobileContext>();
@@ -61,7 +61,7 @@ export default function MPipeline() {
     <div className="h-full flex flex-col" style={{ background: "#F4F6F9" }}>
       <div className="px-4 pt-5 pb-3 bg-white border-b border-slate-100 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: "#1A1A2E" }}>📊 Pipeline</h1>
+          <h1 className="text-2xl font-bold" style={{ color: "var(--pp-text-primary)" }}>📊 Pipeline</h1>
           <p className="text-xs text-slate-500">{cards.length} dossier{cards.length > 1 ? "s" : ""}</p>
         </div>
         <button onClick={() => setAddOpen(true)} className="w-9 h-9 rounded-full text-white flex items-center justify-center" style={{ background: PRIMARY }}>
@@ -79,7 +79,7 @@ export default function MPipeline() {
               return (
                 <div key={s.key} className="w-[260px] flex flex-col bg-white rounded-2xl shadow-sm">
                   <div className="px-3 py-2 border-b border-slate-100 flex items-center justify-between">
-                    <span className="text-xs font-semibold" style={{ color: "#1A1A2E" }}>{s.emoji} {s.label}</span>
+                    <span className="text-xs font-semibold" style={{ color: "var(--pp-text-primary)" }}>{s.emoji} {s.label}</span>
                     <span className="text-[11px] text-slate-400 tabular-nums">{items.length}</span>
                   </div>
                   <div className="flex-1 p-2 space-y-2 overflow-y-auto">
@@ -88,7 +88,7 @@ export default function MPipeline() {
                     ) : items.map((c) => (
                       <button key={c.id} onClick={() => setSelected(c)}
                         className="w-full text-left bg-slate-50 hover:bg-slate-100 rounded-lg p-2.5">
-                        <div className="text-sm font-semibold truncate" style={{ color: "#1A1A2E" }}>{c.contact_name}</div>
+                        <div className="text-sm font-semibold truncate" style={{ color: "var(--pp-text-primary)" }}>{c.contact_name}</div>
                         {c.contact_number && <div className="text-[11px] text-slate-500 truncate">{c.contact_number}</div>}
                         <div className="flex items-center justify-end mt-1">
                           <span onClick={(e) => { e.stopPropagation(); openDialer(c.contact_number ?? undefined); }}
@@ -130,7 +130,7 @@ function DetailSheet({ card, onClose, onMove, onChanged }: { card: Card; onClose
     <div className="fixed inset-0 z-50 flex items-end bg-black/40" onClick={onClose}>
       <div className="w-full bg-white rounded-t-3xl p-5 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-bold" style={{ color: "#1A1A2E" }}>{card.contact_name}</h2>
+          <h2 className="text-lg font-bold" style={{ color: "var(--pp-text-primary)" }}>{card.contact_name}</h2>
           <button onClick={onClose}><X className="w-5 h-5 text-slate-500" /></button>
         </div>
         {card.contact_number && (
@@ -187,7 +187,7 @@ function AddSheet({ userId, onClose, onAdded }: { userId: string; onClose: () =>
     <div className="fixed inset-0 z-50 flex items-end bg-black/40" onClick={onClose}>
       <div className="w-full bg-white rounded-t-3xl p-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-bold" style={{ color: "#1A1A2E" }}>Nouveau dossier</h2>
+          <h2 className="text-lg font-bold" style={{ color: "var(--pp-text-primary)" }}>Nouveau dossier</h2>
           <button onClick={onClose}><X className="w-5 h-5 text-slate-500" /></button>
         </div>
         <label className="block text-xs text-slate-500 mb-1">Nom du contact</label>

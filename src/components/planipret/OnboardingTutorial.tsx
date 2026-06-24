@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-const PRIMARY = "#1F4E79";
+const PRIMARY = "var(--pp-brand-accent-2)";
 
 const STEPS = [
   { emoji: "📊", title: "Tableau de bord", desc: "Voici votre tableau de bord avec tous vos KPI en un coup d'œil." },
@@ -64,7 +64,7 @@ export function OnboardingTutorial({ profile, onDone }: { profile: any; onDone: 
         </div>
         <div className="text-center">
           <div className="text-5xl mb-3">{s.emoji}</div>
-          <h2 className="text-lg font-bold mb-2" style={{ color: "#1A1A2E" }}>{s.title}</h2>
+          <h2 className="text-lg font-bold mb-2" style={{ color: "var(--pp-text-primary)" }}>{s.title}</h2>
           <p className="text-sm text-slate-600 mb-6">{s.desc}</p>
         </div>
         <div className="flex gap-2">

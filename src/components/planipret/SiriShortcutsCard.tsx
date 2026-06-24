@@ -19,7 +19,7 @@ export function SiriShortcutsCard() {
         <div className="px-4 py-3 border-b border-slate-100">
           <div className="flex items-center gap-2 mb-2">
             <Mic className="w-4 h-4 text-purple-600" />
-            <span className="text-sm font-medium" style={{ color: "#1A1A2E" }}>
+            <span className="text-sm font-medium" style={{ color: "var(--pp-text-primary)" }}>
               {isIOS ? "Raccourcis Siri" : "Google Assistant"}
             </span>
           </div>
@@ -38,7 +38,7 @@ export function SiriShortcutsCard() {
           className="w-full px-4 h-12 flex items-center gap-2 text-left active:bg-slate-50 transition"
         >
           <Smartphone className="w-4 h-4 text-slate-600" />
-          <span className="flex-1 text-sm font-medium" style={{ color: "#1A1A2E" }}>
+          <span className="flex-1 text-sm font-medium" style={{ color: "var(--pp-text-primary)" }}>
             {isIOS ? "Ajouter à Siri" : "Configurer Google Assistant"}
           </span>
         </button>

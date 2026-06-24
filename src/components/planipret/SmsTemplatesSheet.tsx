@@ -5,7 +5,7 @@ import { toast } from "sonner";
 
 type Tpl = { id: string; user_id: string | null; title: string; body: string; is_shared: boolean; use_count: number };
 
-const PRIMARY = "#1F4E79";
+const PRIMARY = "var(--pp-brand-accent-2)";
 
 export default function SmsTemplatesSheet({ open, onClose, onPick, userId, isAdmin }: {
   open: boolean; onClose: () => void; onPick: (body: string, id: string) => void; userId: string; isAdmin?: boolean;

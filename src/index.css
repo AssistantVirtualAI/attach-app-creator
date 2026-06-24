@@ -1081,4 +1081,32 @@ All colors MUST be HSL.
   background-color: var(--pp-bg-surface) !important;
   border: 1px solid var(--pp-bg-border-2) !important;
 }
+/* Brand accent dots / pills leftover from legacy components */
+.planipret-scope .bg-blue-500,
+.planipret-scope .bg-blue-600,
+.planipret-scope .bg-indigo-500 {
+  background-color: var(--pp-brand-accent) !important;
+}
+.planipret-scope .bg-red-500,
+.planipret-scope .bg-red-600 {
+  background-color: var(--pp-danger) !important;
+}
+.planipret-scope .bg-green-500,
+.planipret-scope .bg-green-600,
+.planipret-scope .bg-emerald-500 {
+  background-color: var(--pp-success) !important;
+}
+.planipret-scope .text-red-500,
+.planipret-scope .text-red-600 {
+  color: var(--pp-danger) !important;
+}
+.planipret-scope .text-blue-500,
+.planipret-scope .text-blue-600 {
+  color: var(--pp-brand-accent) !important;
+}
+.planipret-scope .border-white,
+.planipret-scope .border-white\/40 {
+  border-color: var(--pp-bg-border-2) !important;
+}
+
 

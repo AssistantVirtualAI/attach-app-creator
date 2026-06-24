@@ -42,7 +42,7 @@ export function CalendarSyncCard({ profile }: { profile: any }) {
     <div className="px-4 py-3 border-t border-slate-100">
       <div className="flex items-center gap-2 mb-2">
         <Calendar className="w-4 h-4 text-blue-600" />
-        <span className="text-sm font-medium" style={{ color: "#1A1A2E" }}>Synchronisation calendrier</span>
+        <span className="text-sm font-medium" style={{ color: "var(--pp-text-primary)" }}>Synchronisation calendrier</span>
       </div>
       <div className="text-[11px] text-slate-500 mb-2">
         <div>Dernière sync: <span className="font-medium text-slate-700">{ago(lastSync)}</span></div>

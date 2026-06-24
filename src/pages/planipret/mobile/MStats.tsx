@@ -7,7 +7,7 @@ import type { PlanipretMobileContext } from "../PlanipretMobile";
 
 type Period = "week" | "month" | "quarter";
 
-const PRIMARY = "#1F4E79";
+const PRIMARY = "var(--pp-brand-accent-2)";
 const ACCENT = "#2E9BDC";
 const SUCCESS = "#10B981";
 const DANGER = "#E84C4C";
@@ -84,7 +84,7 @@ export default function MStats() {
       <header className="flex items-center gap-2 mb-4">
         <button onClick={() => navigate(-1)} className="p-1.5 rounded-full hover:bg-slate-100"><ArrowLeft className="w-5 h-5" /></button>
         <div>
-          <h1 className="text-xl font-bold" style={{ color: "#1A1A2E" }}>Mes performances</h1>
+          <h1 className="text-xl font-bold" style={{ color: "var(--pp-text-primary)" }}>Mes performances</h1>
           <p className="text-xs text-slate-400">{profile?.full_name ?? ""} · {new Date().toLocaleDateString("fr-CA", { month: "long", year: "numeric" })}</p>
         </div>
       </header>

@@ -5,7 +5,7 @@ import { Loader2, Phone, MessageSquare, Voicemail, Mail, User } from "lucide-rea
 type Item = { type: "call" | "sms" | "voicemail" | "email" | "contact"; at: string; data: any };
 
 const ICONS: Record<string, any> = { call: Phone, sms: MessageSquare, voicemail: Voicemail, email: Mail, contact: User };
-const COLORS: Record<string, string> = { call: "#1F4E79", sms: "#2E9BDC", voicemail: "#7C3AED", email: "#0EA5E9", contact: "#10B981" };
+const COLORS: Record<string, string> = { call: "var(--pp-brand-accent-2)", sms: "#2E9BDC", voicemail: "var(--pp-agent)", email: "#0EA5E9", contact: "#10B981" };
 
 function groupLabel(d: Date) {
   const now = new Date();

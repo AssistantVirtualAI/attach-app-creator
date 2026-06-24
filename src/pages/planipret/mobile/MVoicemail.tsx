@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Mic, Play, Pause, Phone, Save, Forward, Trash2, FileText, X } from "lucide-react";
 import type { PlanipretMobileContext } from "../PlanipretMobile";
 
-const PRIMARY = "#1F4E79";
+const PRIMARY = "var(--pp-brand-accent-2)";
 
 type VM = {
   id: string;
@@ -117,7 +117,7 @@ export default function MVoicemail() {
     <div className="p-4">
       <header className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <h1 className="text-xl font-bold" style={{ color: "#1A1A2E" }}>Boîte vocale</h1>
+          <h1 className="text-xl font-bold" style={{ color: "var(--pp-text-primary)" }}>Boîte vocale</h1>
           {unreadInbox > 0 && <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-red-500 text-white text-[10px] font-semibold flex items-center justify-center">{unreadInbox}</span>}
         </div>
       </header>
@@ -151,7 +151,7 @@ export default function MVoicemail() {
                   {!vm.is_read && <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-blue-500 border-2 border-white" />}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className={`text-sm truncate ${vm.is_read ? "" : "font-semibold"}`} style={{ color: "#1A1A2E" }}>{vm.from_name || vm.from_number || "Inconnu"}</p>
+                  <p className={`text-sm truncate ${vm.is_read ? "" : "font-semibold"}`} style={{ color: "var(--pp-text-primary)" }}>{vm.from_name || vm.from_number || "Inconnu"}</p>
                   <p className="text-[11px] text-slate-500">{fmtDate(vm.received_at ?? vm.created_at)} · {fmtDur(vm.duration_seconds)}</p>
                 </div>
                 <div className="w-8 h-8 rounded-full flex items-center justify-center text-white" style={{ background: PRIMARY }}>
@@ -262,7 +262,7 @@ function ForwardModal({ vm, onClose }: { vm: VM; onClose: () => void }) {
     <div className="fixed inset-0 z-40 flex items-end md:items-center md:justify-center bg-black/40" onClick={onClose}>
       <div className="bg-white w-full md:w-[360px] rounded-t-2xl md:rounded-2xl p-4" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="font-semibold" style={{ color: "#1A1A2E" }}>Transférer le voicemail</h2>
+          <h2 className="font-semibold" style={{ color: "var(--pp-text-primary)" }}>Transférer le voicemail</h2>
           <button onClick={onClose} className="p-1 rounded-full hover:bg-slate-100"><X className="w-4 h-4" /></button>
         </div>
         <input value={ext} onChange={(e) => setExt(e.target.value)} placeholder="Extension ou utilisateur" className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm" />
