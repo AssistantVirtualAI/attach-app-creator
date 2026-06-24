@@ -194,13 +194,15 @@ export default function MCalls() {
             { k: "active", label: "Actifs" },
             { k: "missed", label: "Manqués" },
             { k: "recordings", label: "Enreg." },
+            { k: "voicemails", label: "Vocaux" },
           ].map((t) => {
             const active = tab === (t.k as any);
             const isMissedTab = t.k === "missed";
             return (
               <button
                 key={t.k}
-                onClick={() => setTab(t.k as any)}
+                onClick={() => { setTab(t.k as any); const np = new URLSearchParams(params); np.set("tab", t.k); setParams(np, { replace: true }); }}
+
                 className="flex-1 py-2 text-xs font-semibold rounded-full transition flex items-center justify-center gap-1.5"
                 style={
                   active
