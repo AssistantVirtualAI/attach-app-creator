@@ -1,4 +1,4 @@
-// Logs WSS fallback events (e.g. 7444 -> 7443) into planipret_audit_log.
+// Logs WSS fallback events between SIP endpoints into planipret_audit_log.
 // Authenticates the caller via their JWT and writes with service-role.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
