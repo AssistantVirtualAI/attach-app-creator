@@ -1,168 +1,151 @@
-# Refonte mobile Planiprêt — Plan en 10 phases
+# Intégration Maestro/Kanguru — Plan multiphases
 
-**Portée :** Organisation AVA Main Dashboard uniquement. Aucune modification backend (Edge Functions, schémas `planipret_*`, auth, NS-API, ElevenLabs, Maestro/M365). Refonte UI/UX mobile uniquement, avec ajout de 2 tables (`planipret_team_messages`, `planipret_ava_conversations`) pour les nouvelles surfaces Chat Équipe et AVA Chat.
+**Portée :** Organisation AVA Main Dashboard uniquement. Aucune modification de Lemtel Communications, des tables `planipret_*` existantes (uniquement ajouts de colonnes), des Edge Functions NS-API, ElevenLabs, M365, auth/routing ou du dark mode actuel.
 
-**Cible :** `src/pages/planipret/PlanipretMobile.tsx` + `src/pages/planipret/mobile/**` + `src/components/planipret/**`.
+**Livraison :** 8 phases autonomes, chacune testable en preview avant la suivante. Backend d'abord (P1-P3), puis surface UI (P4-P7), puis admin/QA (P8).
 
 ---
 
-## Phase 1 — Fondations visuelles (design system)
+## Phase 1 — Fondations DB & secrets
 
-Mettre en place le système de tokens dark navy partagé par tous les écrans avant de toucher les pages.
+Préparer le terrain avant toute Edge Function.
 
-- Ajouter variables CSS dans `src/index.css` (scope `.planipret-mobile`) :
-  `--bg-base #060D1A`, `--bg-surface #0A1628`, `--bg-elevated #0D1F35`, `--bg-deep #040B16`, `--bg-border #0A1E35`, `--bg-border-2 #0E2A45`, `--brand-accent #2E9BDC`, `--color-success #00D4AA`, `--color-agent #9B7FE8`, `--color-warning #F5A623`, `--color-danger #E84C4C`, `--text-primary #E8EDF5`, `--text-secondary #8FA8C0`, `--text-muted #4A7FA5`, `--text-faint #2A4A6A`.
-- Importer Inter + DM Sans (Google Fonts) dans `index.html`.
-- Créer primitives partagées sous `src/components/planipret/mobile/ui/` :
-  `GlassCard`, `StatCard`, `PillTabs`, `PrimaryButton`, `SecondaryButton`, `DangerButton`, `StatusPill`, `Avatar`, `BottomSheet`, `Waveform`.
-- Animations standard : transition 200ms ease-out, tap scale(0.98), tab fade 150ms, bottom-sheet spring translateY.
+**Migration SQL** (un seul lot) :
 
-## Phase 2 — Conteneur téléphone + navigation 5 onglets
+- Colonnes ajoutées à `planipret_phone_calls` :
+  `maestro_synced bool default false`, `maestro_call_id text`, `maestro_client_id text`, `transcript_segments jsonb`, `transcript_language text default 'fr-CA'`, `ai_coaching jsonb`, `ai_key_points jsonb`, `ai_client_insights jsonb`, `lead_score int`, `lead_temperature text`, `lead_score_reason text`, `pipeline_state jsonb default '{}'` (suit CDR/Transcript/IA/Maestro).
+- Colonnes ajoutées à `planipret_profiles` :
+  `maestro_broker_token text`, `maestro_broker_id text`, `maestro_token_expires_at timestamptz`.
+- Index : `idx_pp_calls_maestro_client (maestro_client_id)`, `idx_pp_calls_pipeline (user_id, created_at desc) where recording_url is not null or transcript is not null or ai_summary is not null`.
 
-Restructurer `PlanipretMobile.tsx` comme shell unique qui contient TOUT (overlays, modals, chatbot inclus).
+**Secrets requis** (via `add_secret`) :
+`MAESTRO_API_URL`, `MAESTRO_API_KEY` (clé service), `MAESTRO_WEBHOOK_SECRET`, `OPENAI_API_KEY` (fallback Whisper). `LOVABLE_API_KEY` déjà présent pour Claude via Gateway.
 
-- Wrapper desktop : 390×844, `border-radius:44px`, `border:2px solid #1A3A5A`, `background:#060D1A`, double box-shadow + inset highlight, `overflow:hidden`.
-- Wrapper mobile (`<768px`) : 100vw/100vh, pas de border-radius.
-- Tous les `position:fixed` deviennent `position:absolute` relatifs au conteneur.
-- Nouvelle nav 5 onglets : Accueil / Appels / Messages / Contacts / Plus (Voicemail retiré de la nav).
-- Routes : `/mplanipret/home|calls|messages|contacts|more` (+ redirection legacy `/mplanipret/voicemail` → `/mplanipret/calls?tab=voicemails`).
-- Tab bar 72px, `rgba(4,11,22,0.98)` + blur(20px), icône 22px + label 9px, dot bleu actif, couleurs inactif `#2A4A6A` / actif `#2E9BDC`.
-- FAB central 56px gradient `#1A4A8A→#2E9BDC`, flotte 16px au-dessus, ouvre `DialerSheet` (existant).
+**Helpers partagés** : `supabase/functions/_shared/maestro.ts` (fetch wrapper avec retry, refresh token broker, Idempotency-Key, error mapping). `supabase/functions/_shared/cors.ts` réutilisé.
 
-## Phase 3 — Écran Accueil (`/mplanipret/home`)
+## Phase 2 — Edge Functions cœur (CDR + lookup + recording)
 
-Refonte complète avec cartes glass-morphism dark, suppression de tout fond clair.
+Les 4 fonctions appelées en temps réel pendant/après l'appel. Aucune dépendance IA.
 
-- Header : logo + "Planiprêt", pill statut SIP tappable (vert/rouge) qui déclenche reconnexion `ns-auth`.
-- Greeting : éyebrow date majuscule `#2A4A6A`, "Bonjour, {prenom} 👋" Inter 26/700.
-- SearchBar 48px qui ouvre un overlay plein conteneur appelant `pp-search`.
-- StatsCards horizontales (4 × 140×100) alimentées par `planipret_phone_calls` (jour courant) : Appels, Manqués, SMS non lus, Voicemails. Bordure-top couleur par métrique.
-- AI Recommendations card : gradient violet/bleu, 3 bullets depuis dernier `ai_analyze-call` / `pp-ava-proactive`, liens "Voir mes stats" + "Parler à AVA" (ouvre l'onglet AVA Chat).
-- Brief IA card avec bouton [Écouter] gradient.
-- Prochains RDV (M365) : 2 events ou CTA compact "Connectez M365 →".
-- Appels récents : 3 derniers, avatar directionnel + score IA.
-- Bouton AVA flottant 48px gradient violet (absolute, dans le conteneur), ouvre bottom-sheet 70% avec chat (réutilise UI Phase 5 sub-tab AVA).
+1. **`maestro-client-lookup`** (GET, < 2s p95) — recherche par `phone` E.164, met à jour `planipret_phone_calls.maestro_client_id` si match.
+2. **`maestro-client-create`** (POST) — création prospect minimal.
+3. **`maestro-cdr`** (POST) — appelé par `ns-webhook-receiver` à la fin de l'appel : lookup → POST `/api/v1/calls/cdr` avec `Idempotency-Key: {call_id}` → marque `maestro_synced=true`, gère 409.
+4. **`maestro-recording`** (GET) — récupère URL signée, met en cache, refresh si `expires_at` dépassé.
 
-## Phase 4 — Écran Appels (`/mplanipret/calls`)
+**Hook NS-webhook :** modifier `ns-webhook-receiver` pour invoquer `maestro-cdr` en fire-and-forget après insertion CDR (pas de blocage du webhook NetSapiens).
 
-Pill tabs `[Récents] [Actifs] [Manqués] [Enregistrements]`. Aucune route ni hook modifiés, juste présentation.
+## Phase 3 — Pipeline IA (transcript + analyse + tasks)
 
-- **Récents** : cartes (pas de rows), avatar directionnel 40px, score IA, ligne d'actions expand-on-tap [🎙️][📝][🤖][📞], badge "🤖 Analysé" si `ai_summary`.
-- **Actifs** : empty-state dark si aucun ; sinon carte large gradient, timer 40px, waveform animée, grille 2×2 d'actions (Muet/Attente/Transfert/Raccrocher). Overlay inbound plein conteneur avec 3 pulses + Répondre/Rejeter.
-- **Manqués** : mêmes cartes, bordure gauche rouge, [📞 Rappeler] proéminent.
-- **Enregistrements** (NOUVEAU) : cartes avec waveform statique, player audio inline (progress, ⏮▶⏭, vitesse 1×/1.5×/2×), transcript scrollable avec labels Broker/Client, [⬇️ Télécharger].
+Le pipeline async qui transforme un CDR en coaching exploitable.
 
-## Phase 5 — Écran Messages (`/mplanipret/messages`) + 2 tables backend
+5. **`maestro-transcript`** (POST) — pipeline :
+   - Vérifie `transcript` existant → skip.
+   - Essaie NS-API `/domains/planipret.ca/transcriptions?callId=` en premier.
+   - Fallback OpenAI Whisper (`fr-CA`, fallback `en-CA`) en envoyant l'URL signée Maestro.
+   - Stocke `transcript`, `transcript_segments`, `transcript_language`.
+   - Push `POST /api/v1/calls/{id}/transcript` à Maestro.
+   - Fire-and-forget `maestro-ai-analysis`.
+6. **`maestro-ai-analysis`** (POST) — appel Claude Sonnet 4.6 via Lovable AI Gateway (model `anthropic/claude-sonnet-4-5` ou équivalent dispo) avec le prompt système courtier hypothécaire et schema JSON strict (tool calling pour garantir parsing). Stocke `ai_summary`, `ai_coaching`, `ai_tasks`, `ai_key_points`, `ai_sentiment`, `ai_client_insights`, `lead_score`, `lead_temperature`. Push `/ai_summary` à Maestro. Auto-crée les tasks `priority='high'` via `maestro-task`. Broadcast Realtime `ai-insights:{user_id}` `{type:'analysis_ready', call_id, lead_score, lead_temperature, coaching_score}`.
+7. **`maestro-task`** (POST) — création tâche Maestro liée à un client + call.
+8. **`maestro-appointment`** (POST) — création RDV Maestro.
 
-Sub-tabs pills horizontales : `[SMS] [Chat Équipe] [AVA Chat] [Emails]`.
+**Chaînage auto déclenché par `ns-webhook-receiver`** :
+CDR → `maestro-cdr` → `maestro-client-lookup` (déjà fait inline) → `maestro-transcript` (différé 10s pour laisser NS-API publier le recording) → `maestro-ai-analysis` → tasks high-prio. `pipeline_state` mis à jour à chaque étape.
 
-**Migration SQL** (créée dans `supabase/migrations/`) :
+## Phase 4 — Edge Functions complémentaires (history + counts + webhooks entrants)
 
-```sql
--- planipret_team_messages
-CREATE TABLE public.planipret_team_messages (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  sender_id uuid NOT NULL REFERENCES public.planipret_profiles(id) ON DELETE CASCADE,
-  channel text NOT NULL DEFAULT 'general',
-  message text NOT NULL,
-  attachments jsonb DEFAULT '[]'::jsonb,
-  reply_to uuid REFERENCES public.planipret_team_messages(id),
-  reactions jsonb DEFAULT '{}'::jsonb,
-  is_pinned boolean DEFAULT false,
-  created_at timestamptz DEFAULT now()
-);
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.planipret_team_messages TO authenticated;
-GRANT ALL ON public.planipret_team_messages TO service_role;
-ALTER TABLE public.planipret_team_messages ENABLE ROW LEVEL SECURITY;
--- policies: brokers du même domaine lisent/écrivent ; canal 'admin' restreint via has_role
+9. **`maestro-client-history`** (GET) — merge `/communications` + `/ai_history`, trié DESC.
+10. **`maestro-counts`** (GET) — `/brokers/{id}/counts` pour badges Home.
+11. **`maestro-webhook-receiver`** (POST, `verify_jwt=false`) — vérif HMAC `X-Maestro-Signature` avec `MAESTRO_WEBHOOK_SECRET`, route par `event` :
+   - `client.created` / `appointment.updated|cancelled|reminder` / `task.assigned|completed`.
+   - Insère dans `planipret_audit_log`, broadcast Realtime `maestro-events:{broker_id}`, optionnel push web via `usePlanipretPush`.
+   - Toujours `return 200` immédiatement, traitement en `EdgeRuntime.waitUntil`.
 
--- planipret_ava_conversations
-CREATE TABLE public.planipret_ava_conversations (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL,
-  role text NOT NULL CHECK (role IN ('user','assistant')),
-  message text NOT NULL,
-  tool_calls jsonb,
-  created_at timestamptz DEFAULT now()
-);
-GRANT SELECT, INSERT, DELETE ON public.planipret_ava_conversations TO authenticated;
-GRANT ALL ON public.planipret_ava_conversations TO service_role;
-ALTER TABLE public.planipret_ava_conversations ENABLE ROW LEVEL SECURITY;
--- policy: user_id = auth.uid()
-```
+## Phase 5 — Onglet Enregistrements (refonte complète)
 
-- **SMS** : threads card style dark, vue thread avec bulles, picker pièces jointes [📷][📄][🎙️], templates [⚡].
-- **Chat Équipe** : sidebar canaux (général / transactions / leads-chauds / admin), zone messages avec avatar 32px, réactions 👍❤️🔥✅, threads reply, upload Storage (`organization-assets` ou nouveau bucket `planipret-team-files`), Realtime channel `team-chat:{domain}`, badge mentions `@name`.
-- **AVA Chat** : interface principale d'AVA (le bouton flottant Home y redirige). Affiche tool executions, chips d'actions rapides [📞][📅][📊][📧][🔥], mic → VoiceAgent dans le conteneur. Persistance dans `planipret_ava_conversations`.
-- **Emails M365** : CTA connect si absent ; sinon liste 20 derniers, détail avec [↩️][↪️][🗑️][🤖 Résumer], compose overlay avec autocomplete contacts.
+Le hub Recording → Transcript → IA → Coaching dans `MCalls.tsx` (4ᵉ tab existant).
 
-Badge unread sur l'onglet Messages = SMS non lus + team mentions.
+**Architecture** : extraire `RecordingsTab` en composant dédié `src/components/planipret/mobile/recordings/`.
 
-## Phase 6 — Écran Contacts (`/mplanipret/contacts`) — NOUVEAU
+- **Carte enrichie** :
+  - Pipeline progress bar haut de carte : `[CDR][Transcript][IA][Maestro]`, pilote depuis `pipeline_state`.
+  - Status pills tappables `[🎙️][📝][🤖]` qui scrollent vers la section.
+  - Badge lead score (🔥/🌡️/❄️) selon `lead_temperature`.
+- **Accordion 4 sections** (composants séparés) :
+  - `RecordingSection` — player custom (waveform CSS animé, ±15s, vitesse 0.75/1/1.5/2×, download). Bouton "Charger" → `maestro-recording`.
+  - `TranscriptSection` — segments par speaker (bulles courtier bleu gauche / client gris droite), toggle FR/EN, copier, rechercher (highlight regex). Bouton "Obtenir" → `maestro-transcript` avec progress steps.
+  - `AISection` — 4 sous-blocs (Résumé, Coaching avec score circle gradient, Insights client avec chips objections/buying signals + barre lead, Actions suggérées avec boutons "Créer dans Maestro" / "Tout créer"). Bouton "Analyser avec l'IA" si transcript présent, sinon "Transcription + IA" combo.
+  - `MaestroSyncSection` — état sync, lien client, modal lookup/create.
+- **Subscription Realtime** : `ai-insights:{user_id}` met à jour la carte en place + toast `🤖 Analyse prête — {score}/10`, `🔥 Lead chaud!` si ≥8.
+- Tokens `--pp-*` uniquement, animations 200ms.
 
-Remplace Voicemail dans la nav.
+## Phase 6 — Inbound overlay + Contacts Maestro + Home recos
 
-- SearchBar permanente.
-- Pills `[Maestro CRM] [Téléphone] [Récents]`.
-- **Maestro** : `maestro-actions` recherche, cartes avec score lead + quick actions [📞][💬][📧], détail = profil complet + historiques.
-- **Téléphone** : permission contacts device (Capacitor `@capacitor/contacts` si dispo, sinon entrée manuelle), index alpha à droite.
-- **Récents** : agrégation calls + SMS + emails dédupliquée.
+Intégrer la donnée Maestro dans les surfaces existantes (zéro nouvelle page).
 
-## Phase 7 — Écran Plus (`/mplanipret/more`)
+- **`InboundCallOverlay`** (déjà géré par `MCalls` ActiveTab) :
+  - Au INSERT `planipret_phone_calls` inbound → `maestro-client-lookup(from_number)` en parallèle avec l'animation ring.
+  - Si trouvé : nom large, company, mortgage_stage badge, "📋 {X} appels précédents", température.
+  - Sinon : "👤 Nouveau contact" + bouton `+ Créer dans Maestro` → `maestro-client-create`.
+- **`MContacts` — onglet Maestro CRM** : remplace la query locale `planipret_contacts` par `maestro-client-history` à l'ouverture du détail. Carte détail enrichie : timeline (📞💬📧📋), dernière analyse IA, quick actions (Appeler/SMS/Email/Tâche/RDV/Voir Maestro).
+- **`MHome` — AI Recommendations** : remplace mock par `maestro-counts` (badges) + `pp-ava-proactive` enrichi avec lead scores récents, tâches en retard, RDV du jour. 3 recos dynamiques au format spec.
 
-Refonte uniquement présentation, conserve toutes les actions existantes.
+## Phase 7 — Admin Integrations (page web `/planipret/admin/integrations`)
 
-- Header avatar 72px gradient + nom + extension + [✏️ Modifier].
-- Mini stats card "Ce mois: X appels · Y leads · Z%".
-- Sections groupées : Mon compte / Téléphonie / Intégrations / Assistant AVA / Préférences / Aide / Déconnexion (rouge).
-- Voicemail accessible ici en plus de l'onglet Appels.
+Étendre la section Maestro existante.
 
-## Phase 8 — Voicemail (déplacé)
+- **Section "Configuration OAuth courtiers"** : liste des `planipret_profiles` (extension + nom), statut token (`maestro_broker_token` non null + non expiré), bouton `🔗 Connecter Maestro` par broker → modal :
+  - Onglet "Clé API directe" : input + validation via call test `GET /api/v1/brokers/me`.
+  - Onglet "OAuth" (si MAESTRO supporte) : redirect `/auth/maestro/callback` Edge Function.
+- **Bouton "Test pipeline complet"** : sélectionne un call récent du broker → enchaîne CDR → transcript → IA → task de test, affiche timeline succès/échec étape par étape (modal avec spinners).
+- **Section "Webhooks entrants"** :
+  - Liste des events attendus avec ✅/❌ basé sur `planipret_audit_log` (présence d'au moins 1 event reçu dans les 30j).
+  - URL receiver `{SUPABASE_URL}/functions/v1/maestro-webhook-receiver` avec bouton copier.
+  - Affichage du `MAESTRO_WEBHOOK_SECRET` masqué + bouton régénérer.
+- **Logs récents Maestro** : table dernières 50 lignes `planipret_audit_log WHERE action LIKE 'maestro_%'`.
 
-- Surface principale = 4e sub-tab "Voicemails" dans `/mplanipret/calls`.
-- Cartes dark, bordure gauche bleue si non lu, player inline + transcript, actions [📞 Rappeler][💾 Garder][🗑️ Supprimer].
-- Lien depuis Plus → réutilise le même composant.
+## Phase 8 — QA, observabilité, sécurité
 
-## Phase 9 — Système visuel global
+Verrouiller avant production.
 
-Appliquer les tokens Phase 1 partout, supprimer tout fond clair restant, harmoniser :
-
-- Cards : `var(--bg-surface)` + border `var(--bg-border-2)` + radius 16px.
-- Boutons Primary / Secondary / Danger normalisés.
-- Vérifier que chaque écran refondu n'utilise plus de `bg-white`, `text-black`, ni couleurs hardcodées.
-
-## Phase 10 — Fixes critiques & QA
-
-1. Bouton AVA = `position:absolute` dans le conteneur (jamais `fixed` page).
-2. Audit tailwind grep `bg-white|text-black|bg-gray-[1-3]` sous `src/pages/planipret/mobile/` et `src/components/planipret/` → remplacer.
-3. `overflow:hidden` sur frame desktop confirmé visuellement.
-4. Badge Messages branché sur SMS + team mentions.
-5. Stats Home : requête réelle `planipret_phone_calls` (today range).
-6. Pill SIP "Hors ligne" → handler reconnexion `ns-auth`.
-7. SearchBar → appel `pp-search` avec debounce 250ms.
-8. Pull-to-refresh sur Appels / Messages / Contacts / Voicemails (composant partagé).
+1. **RLS** : aucune nouvelle table → uniquement vérifier que les nouvelles colonnes ne fuitent pas via les policies existantes (`SELECT` user-scoped sur `planipret_phone_calls`).
+2. **Rate limiting** : `maestro-ai-analysis` protégé par un advisory lock (`pg_advisory_lock(hashtextextended('maestro-ai:'||call_id))`) — éviter double analyse concurrente.
+3. **Idempotence** : `maestro-cdr` honore `Idempotency-Key: {call_id}`, `maestro-transcript` skip si déjà présent, `maestro-ai-analysis` skip si `ai_summary` présent (option `force=true`).
+4. **Coût IA** : log `tokens_in/out` par appel dans `planipret_audit_log`. Cap quotidien par broker (config `planipret_settings`).
+5. **Realtime** : ajouter `planipret_phone_calls` à `supabase_realtime` si pas déjà fait (pour update UI).
+6. **Tests E2E** :
+   - Pipeline complet (call mock → CDR → transcript → IA → task) via `supabase--curl_edge_functions`.
+   - Webhook receiver avec signature valide/invalide.
+   - Rejet sans token broker.
+7. **Doc opérateur** : `docs/maestro-integration.md` (variables, retry, troubleshooting).
 
 ---
 
 ## Détails techniques
 
-**Fichiers créés (estim.) :**
-- `src/components/planipret/mobile/ui/*.tsx` (~10 primitives)
-- `src/components/planipret/mobile/home/*.tsx` (StatsRow, AIRecsCard, BriefCard, UpcomingCard, RecentCallsCard, AvaFab)
-- `src/components/planipret/mobile/calls/*.tsx` (CallCard, ActiveCallView, RecordingCard, AudioPlayer)
-- `src/components/planipret/mobile/messages/*.tsx` (SmsList, TeamChat, AvaChat, EmailsList)
-- `src/components/planipret/mobile/contacts/*.tsx`
-- `src/pages/planipret/mobile/MContacts.tsx`
-- `supabase/migrations/<timestamp>_planipret_team_and_ava_tables.sql`
+**Structure fichiers** :
+- `supabase/functions/_shared/maestro.ts` (client HTTP, refresh, signature HMAC)
+- `supabase/functions/_shared/ai-analysis.ts` (prompt + schema Claude)
+- `supabase/functions/maestro-{cdr,recording,transcript,ai-analysis,task,appointment,client-lookup,client-create,client-history,counts,webhook-receiver}/index.ts`
+- `src/components/planipret/mobile/recordings/{RecordingsList,RecordingCard,PipelineProgress,RecordingSection,TranscriptSection,AISection,MaestroSyncSection,LinkClientModal}.tsx`
+- `src/components/planipret/admin/maestro/{BrokerTokensTable,PipelineTestModal,WebhookStatusPanel,MaestroLogsTable}.tsx`
+- Migration unique Phase 1.
 
-**Fichiers édités :**
-- `src/pages/planipret/PlanipretMobile.tsx` (shell + nav 5 onglets + FAB + frame)
-- `src/pages/planipret/mobile/MHome.tsx`, `MCalls.tsx`, `MMessages.tsx`, `MMore.tsx`
-- `src/index.css` (tokens scope `.planipret-mobile`)
-- `index.html` (fonts)
-- Router app (route `contacts`, redirect voicemail)
-- `src/integrations/supabase/types.ts` (régénération auto après migration)
+**Modèles IA** :
+- Transcription : NS-API d'abord → OpenAI Whisper `whisper-1` fallback.
+- Analyse : Lovable AI Gateway `google/gemini-2.5-pro` ou `anthropic/claude-sonnet-4-5` (à confirmer dispo), tool calling JSON Schema strict pour garantir parsing.
 
-**Non touché (garanti) :** toutes Edge Functions, schémas `planipret_*` existants, auth/routing global, NS-API, ElevenLabs, Maestro/M365, dark mode prefs, PWA manifest, audit logging, Lemtel Communications.
+**Stratégie de déploiement** :
+- P1 (migration) doit être validée avant tout.
+- P2 + P3 + P4 livrables séparément, déployables sans casser l'UI (les nouvelles colonnes restent nulles).
+- P5 utilisable dès que P2-P3 actifs, dégrade gracieusement si fonctions absentes.
+- P6 + P7 surface uniquement, aucun risque de régression backend.
+- P8 obligatoire avant annonce go-live aux courtiers.
 
-**Stratégie de livraison :** chaque phase = un lot d'edits autonome, testable en preview avant de passer à la suivante. Phases 1-2 d'abord (sans elles, le reste casse visuellement). Phase 5 inclut la migration SQL — à appliquer avant d'écrire les composants Chat Équipe / AVA Chat.
+**Garanties "DO NOT CHANGE" respectées** :
+✅ Aucune table existante modifiée (ALTER ADD COLUMN seulement)
+✅ NS-API / ns-webhook-receiver : hook fire-and-forget non bloquant
+✅ Auth/routing intacts
+✅ ElevenLabs / M365 / Lemtel : zéro modification
+✅ Dark mode + tokens `--pp-*` Phase 7 du refonte mobile préservés
+✅ Audit logging étendu, jamais remplacé
