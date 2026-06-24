@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { useOutletContext } from "react-router-dom";
+import { useOutletContext, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
   Search, X, Phone, PhoneIncoming, PhoneOutgoing, PhoneMissed, PhoneOff, Copy,
   Bot, ChevronDown, ChevronUp, Pause, Play, Mic, MicOff, ArrowRightLeft, Loader2,
-  Check, Sparkles, RefreshCw,
+  Check, Sparkles, RefreshCw, Voicemail as VmIcon, Save, Trash2, FileText,
 } from "lucide-react";
 import type { PlanipretMobileContext } from "../PlanipretMobile";
 import { TEMP_COLORS, TEMP_EMOJI, TEMP_LABEL, tempBorder, callbackDelayToDate, delayLabel, type LeadTemp } from "@/components/planipret/leadHelpers";
 import ContactTimeline from "@/components/planipret/ContactTimeline";
+
 
 const PRIMARY = "#1F4E79";
 const ACCENT = "#2E86C1";
