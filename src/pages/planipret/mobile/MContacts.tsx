@@ -151,7 +151,12 @@ export default function MContacts() {
             const sub = tab === "maestro" ? (c.phone ?? c.email ?? "") : c.number;
             const phone = tab === "maestro" ? c.phone : c.number;
             return (
-              <div key={c.id} className="pp-card flex items-center gap-3" style={{ padding: 12 }}>
+              <div
+                key={c.id}
+                onClick={() => tab === "maestro" && setSelected(c)}
+                className="pp-card flex items-center gap-3 cursor-pointer"
+                style={{ padding: 12 }}
+              >
                 <Avatar name={name || "?"} />
                 <div className="flex-1 min-w-0">
                   <div style={{ fontFamily: "Inter,sans-serif", fontWeight: 600, fontSize: 14, color: "var(--pp-text-primary)" }}
@@ -159,7 +164,7 @@ export default function MContacts() {
                   <div style={{ fontFamily: "DM Sans,sans-serif", fontSize: 11, color: "var(--pp-text-muted)" }}
                     className="truncate">{sub}</div>
                 </div>
-                <button onClick={() => phone && openDialer(phone)}
+                <button onClick={(e) => { e.stopPropagation(); phone && openDialer(phone); }}
                   className="flex items-center justify-center active:scale-95 transition"
                   style={{ width: 32, height: 32, borderRadius: "50%", background: "rgba(46,155,220,0.12)", border: "1px solid rgba(46,155,220,0.3)", color: "var(--pp-brand-accent)" }}
                   aria-label="Appeler">
@@ -167,10 +172,10 @@ export default function MContacts() {
                 </button>
                 {tab === "maestro" && (
                   <>
-                    <button className="flex items-center justify-center" style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>
+                    <button onClick={(e) => e.stopPropagation()} className="flex items-center justify-center" style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>
                       <MessageSquare className="w-3.5 h-3.5" />
                     </button>
-                    <button className="flex items-center justify-center" style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>
+                    <button onClick={(e) => e.stopPropagation()} className="flex items-center justify-center" style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>
                       <Mail className="w-3.5 h-3.5" />
                     </button>
                   </>
@@ -180,6 +185,157 @@ export default function MContacts() {
           })}
         </div>
       )}
+
+      {selected && (
+        <ContactDetailSheet
+          contact={selected}
+          onClose={() => setSelected(null)}
+          onCall={(p) => { setSelected(null); openDialer(p); }}
+        />
+      )}
     </div>
+  );
+}
+
+function ContactDetailSheet({
+  contact, onClose, onCall,
+}: { contact: any; onClose: () => void; onCall: (phone: string) => void }) {
+  const [history, setHistory] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [creatingTask, setCreatingTask] = useState(false);
+
+  const name = `${contact.first_name ?? ""} ${contact.last_name ?? ""}`.trim() || contact.phone || "Contact";
+  const phone: string | undefined = contact.phone;
+  const maestroId: string | undefined = contact.maestro_client_id || contact.external_id || contact.id;
+
+  useEffect(() => {
+    let cancel = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const { data } = await supabase.functions.invoke("maestro-client-history", {
+          body: { client_id: maestroId, phone },
+        });
+        if (!cancel) setHistory(((data as any)?.history ?? (data as any)?.items ?? []).slice(0, 30));
+      } catch {
+        if (!cancel) setHistory([]);
+      } finally {
+        if (!cancel) setLoading(false);
+      }
+    })();
+    return () => { cancel = true; };
+  }, [maestroId, phone]);
+
+  const createTask = async () => {
+    setCreatingTask(true);
+    try {
+      const { error } = await supabase.functions.invoke("maestro-task", {
+        body: { client_id: maestroId, title: `Suivi ${name}`, priority: "medium" },
+      });
+      if (error) throw error;
+      toast.success("Tâche créée dans Maestro");
+    } catch (e: any) {
+      toast.error("Échec création tâche", { description: e?.message });
+    } finally {
+      setCreatingTask(false);
+    }
+  };
+
+  const iconFor = (kind: string) => {
+    const k = (kind || "").toLowerCase();
+    if (k.includes("call") || k.includes("appel")) return "📞";
+    if (k.includes("sms") || k.includes("message")) return "💬";
+    if (k.includes("email") || k.includes("mail")) return "📧";
+    if (k.includes("appoint") || k.includes("rdv")) return "📅";
+    if (k.includes("task") || k.includes("tâche")) return "📋";
+    return "•";
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div
+        className="w-full sm:max-w-md max-h-[88vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl p-4"
+        style={{ background: "var(--pp-bg-base)", border: "1px solid var(--pp-bg-border-2)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between mb-3">
+          <div className="min-w-0">
+            <div className="text-lg font-bold truncate" style={{ color: "var(--pp-text-primary)" }}>{name}</div>
+            {phone && <div className="text-xs" style={{ color: "var(--pp-text-muted)" }}>{phone}</div>}
+            {contact.email && <div className="text-xs" style={{ color: "var(--pp-text-muted)" }}>{contact.email}</div>}
+          </div>
+          <button onClick={onClose} className="p-1" style={{ color: "var(--pp-text-muted)" }}><X className="w-5 h-5" /></button>
+        </div>
+
+        {/* Quick actions */}
+        <div className="grid grid-cols-5 gap-2 mb-4">
+          <QuickAction icon={<Phone className="w-4 h-4" />} label="Appeler" onClick={() => phone && onCall(phone)} disabled={!phone} />
+          <QuickAction icon={<MessageSquare className="w-4 h-4" />} label="SMS" onClick={() => phone && onCall(phone)} disabled={!phone} />
+          <QuickAction icon={<Mail className="w-4 h-4" />} label="Email" onClick={() => contact.email && window.open(`mailto:${contact.email}`)} disabled={!contact.email} />
+          <QuickAction icon={creatingTask ? <Loader2 className="w-4 h-4 animate-spin" /> : <ListChecks className="w-4 h-4" />} label="Tâche" onClick={createTask} disabled={creatingTask} />
+          <QuickAction icon={<Calendar className="w-4 h-4" />} label="RDV" onClick={() => toast.info("Bientôt disponible")} />
+        </div>
+
+        {/* Timeline */}
+        <div className="text-[10px] font-semibold uppercase tracking-wide mb-2" style={{ color: "var(--pp-text-muted)" }}>
+          Historique Maestro
+        </div>
+        {loading ? (
+          <div className="py-8 text-center text-xs" style={{ color: "var(--pp-text-muted)" }}>
+            <Loader2 className="w-4 h-4 animate-spin mx-auto mb-2" /> Chargement…
+          </div>
+        ) : history.length === 0 ? (
+          <div className="py-6 text-center text-xs" style={{ color: "var(--pp-text-muted)" }}>
+            Aucune interaction enregistrée.
+          </div>
+        ) : (
+          <ul className="space-y-1.5">
+            {history.map((h: any, i: number) => (
+              <li key={i} className="flex gap-2 p-2 rounded-lg"
+                  style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)" }}>
+                <span className="text-base shrink-0">{iconFor(h.type || h.kind || h.event)}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-medium truncate" style={{ color: "var(--pp-text-primary)" }}>
+                    {h.title || h.summary || h.subject || h.type || "Interaction"}
+                  </div>
+                  {h.description && (
+                    <div className="text-[11px] line-clamp-2" style={{ color: "var(--pp-text-secondary)" }}>
+                      {h.description}
+                    </div>
+                  )}
+                  <div className="text-[10px] mt-0.5" style={{ color: "var(--pp-text-muted)" }}>
+                    {h.created_at || h.date ? new Date(h.created_at || h.date).toLocaleString("fr-CA") : ""}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {maestroId && (
+          <button
+            onClick={() => toast.info("Lien Maestro à configurer")}
+            className="w-full mt-3 py-2 rounded-lg text-[11px] font-medium flex items-center justify-center gap-1.5"
+            style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}
+          >
+            <ExternalLink className="w-3 h-3" /> Voir dans Maestro
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function QuickAction({ icon, label, onClick, disabled }: { icon: React.ReactNode; label: string; onClick: () => void; disabled?: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="flex flex-col items-center gap-1 py-2 rounded-xl transition disabled:opacity-40"
+      style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }}
+    >
+      {icon}
+      <span className="text-[10px]" style={{ color: "var(--pp-text-secondary)" }}>{label}</span>
+    </button>
   );
 }
