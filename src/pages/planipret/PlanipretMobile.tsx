@@ -233,26 +233,28 @@ export default function PlanipretMobile() {
           <PhoneIcon className="w-6 h-6" />
         </button>
 
-        {/* Tab bar */}
-        <nav className="absolute bottom-[22px] inset-x-0 grid grid-cols-5 z-10"
+        {/* Tab bar (6 slots: 5 tabs + center FAB placeholder) */}
+        <nav className="absolute bottom-[22px] inset-x-0 grid grid-cols-6 z-10"
           style={{
-            height: 64,
-            background: "rgba(6,13,26,0.97)",
+            height: 72,
+            background: "rgba(4,11,22,0.98)",
             backdropFilter: "blur(20px)",
             borderTop: "1px solid var(--pp-bg-border)",
           }}>
           {TABS.map((t, i) => {
-            const badge = t.to.endsWith("/messages") ? unreadMsg : t.to.endsWith("/voicemail") ? unreadVm : 0;
+            if (t.to === "_fab") return <div key="fab-slot" />;
+            const badge = t.to.endsWith("/messages") ? unreadMsg : 0;
             return (
               <NavLink key={t.to} to={t.to}
-                className={({ isActive }) =>
-                  `relative flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium ${i === 2 ? "invisible" : ""}`
-                }
+                className="relative flex flex-col items-center justify-center gap-1 text-[9px] font-semibold pt-1.5"
                 style={({ isActive }) => ({ color: isActive ? "var(--pp-brand-accent)" : "var(--pp-text-faint)" })}>
                 {({ isActive }) => (
                   <>
+                    {isActive && (
+                      <span className="absolute top-1 w-1 h-1 rounded-full" style={{ background: "var(--pp-brand-accent)" }} />
+                    )}
                     <div className="relative">
-                      <t.Icon className="w-5 h-5" strokeWidth={isActive ? 2.5 : 1.8} />
+                      <t.Icon className="w-[22px] h-[22px]" strokeWidth={isActive ? 2.4 : 1.8} />
                       {badge > 0 && (
                         <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 px-1 rounded-full text-white text-[9px] font-bold flex items-center justify-center"
                           style={{ background: "var(--pp-danger)" }}>
@@ -260,13 +262,14 @@ export default function PlanipretMobile() {
                         </span>
                       )}
                     </div>
-                    <span>{t.label}</span>
+                    <span style={{ letterSpacing: "0.02em" }}>{t.label}</span>
                   </>
                 )}
               </NavLink>
             );
           })}
         </nav>
+
 
         {/* Powered by AVA footer */}
         <div className="absolute bottom-0 inset-x-0 h-[22px] flex items-center justify-center gap-1.5 z-10"
