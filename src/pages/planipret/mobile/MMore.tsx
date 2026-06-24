@@ -40,20 +40,22 @@ export default function MMore() {
     (async () => {
       if (!profile?.id) return;
       const start = new Date(); start.setDate(1); start.setHours(0, 0, 0, 0);
-      const { data: calls } = await supabase
+      const callsRes: any = await supabase
         .from("planipret_phone_calls")
-        .select("id, direction, duration_seconds", { count: "exact" })
+        .select("id, duration_seconds")
         .eq("broker_id", profile.id)
         .gte("started_at", start.toISOString());
-      const total = calls?.length ?? 0;
-      const connected = calls?.filter((c: any) => (c.duration_seconds ?? 0) > 10).length ?? 0;
+      const callsArr: any[] = callsRes?.data ?? [];
+      const total = callsArr.length;
+      const connected = callsArr.filter((c) => (c.duration_seconds ?? 0) > 10).length;
       const rate = total ? Math.round((connected / total) * 100) : 0;
-      const { count: leadsCount } = await supabase
+      const leadsRes: any = await supabase
         .from("planipret_contacts")
-        .select("id", { count: "exact", head: true })
+        .select("id")
         .eq("broker_id", profile.id)
         .gte("created_at", start.toISOString());
-      setMonthStats({ calls: total, leads: leadsCount ?? 0, rate });
+      const leadsCount: number = (leadsRes?.data ?? []).length;
+      setMonthStats({ calls: total, leads: leadsCount, rate });
     })();
   }, [profile?.id]);
 
