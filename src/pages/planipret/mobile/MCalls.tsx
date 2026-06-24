@@ -289,43 +289,143 @@ export default function MCalls() {
 function CallRow({ call, onTap, onCall, showCallBtn }: { call: Call; onTap: () => void; onCall: () => void; showCallBtn?: boolean }) {
   const missed = isMissed(call);
   const out = isOutbound(call);
-  const color = missed ? DANGER : out ? SUCCESS : ACCENT;
+  const color = missed ? "var(--pp-danger)" : out ? "var(--pp-success)" : "var(--pp-brand-accent)";
   const Icon = missed ? PhoneMissed : out ? PhoneOutgoing : PhoneIncoming;
   const hasAi = !!call.ai_summary;
 
   return (
     <li>
       <div
-        className="bg-white rounded-xl px-3 py-3 flex items-center gap-3 shadow-sm active:bg-slate-50"
-        style={{ borderLeft: tempBorder(call.lead_temperature as LeadTemp) }}
+        className="rounded-2xl px-3 py-3 flex items-center gap-3 active:opacity-80"
+        style={{
+          background: "var(--pp-bg-surface)",
+          border: "1px solid var(--pp-bg-border-2)",
+          borderLeft: tempBorder(call.lead_temperature as LeadTemp) || "1px solid var(--pp-bg-border-2)",
+        }}
       >
         <button onClick={onTap} className="flex items-center gap-3 flex-1 min-w-0 text-left">
-          <div className="rounded-full flex items-center justify-center shrink-0" style={{ width: 44, height: 44, background: `${color}15`, color }}>
+          <div
+            className="rounded-full flex items-center justify-center shrink-0"
+            style={{ width: 44, height: 44, background: "var(--pp-bg-elevated)", color }}
+          >
             <Icon className="w-5 h-5" />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="font-semibold text-[15px] truncate" style={{ color: missed ? DANGER : "#1A1A2E" }}>
+            <div
+              className="font-semibold text-[15px] truncate"
+              style={{ color: missed ? "var(--pp-danger)" : "var(--pp-text-primary)" }}
+            >
               {displayLabel(call)}
             </div>
-            <div className="text-xs text-slate-500 truncate">
+            <div className="text-xs truncate" style={{ color: "var(--pp-text-muted)" }}>
               {frenchDateTime(call.started_at)} · {frenchDuration(call.duration_seconds)}
             </div>
           </div>
         </button>
         <div className="flex items-center gap-1.5 shrink-0">
           {hasAi && (
-            <span className="rounded-full p-1.5 flex items-center justify-center" style={{ background: `${PURPLE}15`, color: PURPLE }} title="Analyse IA">
+            <span
+              className="rounded-full p-1.5 flex items-center justify-center"
+              style={{ background: "rgba(155,127,232,0.15)", color: "var(--pp-agent)" }}
+              title="Analyse IA"
+            >
               <Bot className="w-3.5 h-3.5" />
             </span>
           )}
-          {(showCallBtn || true) && (
-            <button onClick={onCall} className="rounded-full flex items-center justify-center" style={{ width: 36, height: 36, background: `${PRIMARY}15`, color: PRIMARY }} aria-label="Rappeler">
-              <Phone className="w-4 h-4" />
-            </button>
-          )}
+          <button
+            onClick={onCall}
+            className="rounded-full flex items-center justify-center"
+            style={{
+              width: 36,
+              height: 36,
+              background: "rgba(46,155,220,0.15)",
+              color: "var(--pp-brand-accent)",
+            }}
+            aria-label="Rappeler"
+          >
+            <Phone className="w-4 h-4" />
+          </button>
         </div>
       </div>
     </li>
+  );
+}
+
+// ---------- recordings tab ----------
+function RecordingsTab({ calls, loading, onTap }: { calls: Call[]; loading: boolean; onTap: (c: Call) => void }) {
+  const withRec = useMemo(() => calls.filter((c) => !!c.recording_url), [calls]);
+  if (loading) {
+    return (
+      <ul className="px-3 pt-3 pb-4 space-y-1.5">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <li key={i} className="rounded-xl p-3" style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)" }}>
+            <div className="h-3 w-1/2 rounded animate-pulse mb-2" style={{ background: "var(--pp-bg-elevated)" }} />
+            <div className="h-10 w-full rounded animate-pulse" style={{ background: "var(--pp-bg-elevated)" }} />
+          </li>
+        ))}
+      </ul>
+    );
+  }
+  if (withRec.length === 0) {
+    return (
+      <div className="p-10 text-center">
+        <div
+          className="w-14 h-14 mx-auto rounded-full flex items-center justify-center mb-3"
+          style={{ background: "rgba(46,155,220,0.12)", color: "var(--pp-brand-accent)" }}
+        >
+          <Play className="w-6 h-6" />
+        </div>
+        <div className="font-semibold" style={{ color: "var(--pp-text-secondary)" }}>Aucun enregistrement</div>
+        <div className="text-xs mt-1" style={{ color: "var(--pp-text-muted)" }}>
+          Les appels enregistrés apparaîtront ici.
+        </div>
+      </div>
+    );
+  }
+  return (
+    <ul className="px-3 pt-3 pb-4 space-y-2">
+      {withRec.map((c) => (
+        <li
+          key={c.id}
+          className="rounded-2xl p-3"
+          style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)" }}
+        >
+          <button onClick={() => onTap(c)} className="w-full flex items-center justify-between mb-2 text-left">
+            <div className="min-w-0">
+              <div className="font-semibold text-sm truncate" style={{ color: "var(--pp-text-primary)" }}>
+                {displayLabel(c)}
+              </div>
+              <div className="text-[11px] truncate" style={{ color: "var(--pp-text-muted)" }}>
+                {frenchDateTime(c.started_at)} · {frenchDuration(c.duration_seconds)}
+              </div>
+            </div>
+            {c.ai_summary && (
+              <span
+                className="rounded-full p-1.5 flex items-center justify-center shrink-0"
+                style={{ background: "rgba(155,127,232,0.15)", color: "var(--pp-agent)" }}
+              >
+                <Bot className="w-3.5 h-3.5" />
+              </span>
+            )}
+          </button>
+          <audio
+            controls
+            preload="none"
+            src={c.recording_url!}
+            className="w-full"
+            style={{ accentColor: "var(--pp-brand-accent)", filter: "invert(0.85) hue-rotate(180deg)" }}
+          />
+          {c.transcript && (
+            <p
+              className="mt-2 text-[11px] line-clamp-2"
+              style={{ color: "var(--pp-text-secondary)" }}
+            >
+              {c.transcript}
+            </p>
+          )}
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -338,14 +438,18 @@ function EmptyState({ tab }: { tab: "recents" | "active" | "missed" }) {
   }[tab];
   return (
     <div className="p-10 text-center">
-      <div className="w-14 h-14 mx-auto rounded-full flex items-center justify-center mb-3" style={{ background: `${PRIMARY}10`, color: PRIMARY }}>
+      <div
+        className="w-14 h-14 mx-auto rounded-full flex items-center justify-center mb-3"
+        style={{ background: "rgba(46,155,220,0.12)", color: "var(--pp-brand-accent)" }}
+      >
         <cfg.Icon className="w-6 h-6" />
       </div>
-      <div className="font-semibold text-slate-700">{cfg.title}</div>
-      <div className="text-xs text-slate-400 mt-1">{cfg.sub}</div>
+      <div className="font-semibold" style={{ color: "var(--pp-text-secondary)" }}>{cfg.title}</div>
+      <div className="text-xs mt-1" style={{ color: "var(--pp-text-muted)" }}>{cfg.sub}</div>
     </div>
   );
 }
+
 
 // ============================================================
 // CALL DETAIL SHEET
