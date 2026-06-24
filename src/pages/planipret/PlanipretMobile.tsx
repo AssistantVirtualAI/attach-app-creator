@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate, NavLink, Outlet, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
-import { Home, Phone, MessageSquare, Voicemail, MoreHorizontal, Phone as PhoneIcon, X, Delete, Plus, Lock } from "lucide-react";
+import { Home, Phone, MessageSquare, Users, MoreHorizontal, Phone as PhoneIcon, X, Delete, Plus, Lock } from "lucide-react";
 import { toast } from "sonner";
 import planipretLogo from "@/assets/planipret-logo.png.asset.json";
 import avaWordmark from "@/assets/ava-wordmark.svg";
@@ -22,10 +22,12 @@ export type PlanipretMobileContext = { profile: any; reloadProfile: () => Promis
 const TABS = [
   { to: "/mplanipret/home", label: "Accueil", Icon: Home },
   { to: "/mplanipret/calls", label: "Appels", Icon: Phone },
+  { to: "_fab", label: "", Icon: PhoneIcon },
   { to: "/mplanipret/messages", label: "Messages", Icon: MessageSquare },
-  { to: "/mplanipret/voicemail", label: "Boîte voc.", Icon: Voicemail },
+  { to: "/mplanipret/contacts", label: "Contacts", Icon: Users },
   { to: "/mplanipret/more", label: "Plus", Icon: MoreHorizontal },
 ];
+
 
 const KEYS: Array<{ d: string; l?: string }> = [
   { d: "1", l: "" }, { d: "2", l: "ABC" }, { d: "3", l: "DEF" },
@@ -209,7 +211,7 @@ export default function PlanipretMobile() {
         </header>
 
         <UniversalSearchBar />
-        <div ref={scrollRef} className="flex-1 overflow-y-auto pb-[96px]">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto pb-[110px]">
           <PullIndicator pullDist={pullDist} refreshing={refreshing} threshold={threshold} color={ACCENT} />
           <Outlet context={{ profile, reloadProfile: loadProfile, openDialer, registerRefresh } satisfies PlanipretMobileContext} />
         </div>
@@ -219,38 +221,41 @@ export default function PlanipretMobile() {
           <OnboardingTutorial profile={profile} onDone={loadProfile} />
         )}
 
-        {/* FAB */}
+        {/* Center FAB (between Appels and Messages) */}
         <button onClick={() => setDialerOpen(true)}
           className="absolute left-1/2 -translate-x-1/2 z-20 rounded-full flex items-center justify-center text-white active:scale-95 transition"
           style={{
             background: "linear-gradient(135deg, #1A4A8A, #2E9BDC)",
-            boxShadow: "0 4px 24px rgba(46,155,220,0.5)",
-            width: 52, height: 52, bottom: 78,
+            boxShadow: "0 4px 24px rgba(46,155,220,0.6)",
+            width: 56, height: 56, bottom: 78,
           }}
           aria-label="Composer un numéro">
           <PhoneIcon className="w-6 h-6" />
         </button>
 
-        {/* Tab bar */}
-        <nav className="absolute bottom-[22px] inset-x-0 grid grid-cols-5 z-10"
+
+        {/* Tab bar (6 slots: 5 tabs + center FAB placeholder) */}
+        <nav className="absolute bottom-[22px] inset-x-0 grid grid-cols-6 z-10"
           style={{
-            height: 64,
-            background: "rgba(6,13,26,0.97)",
+            height: 72,
+            background: "rgba(4,11,22,0.98)",
             backdropFilter: "blur(20px)",
             borderTop: "1px solid var(--pp-bg-border)",
           }}>
           {TABS.map((t, i) => {
-            const badge = t.to.endsWith("/messages") ? unreadMsg : t.to.endsWith("/voicemail") ? unreadVm : 0;
+            if (t.to === "_fab") return <div key="fab-slot" />;
+            const badge = t.to.endsWith("/messages") ? unreadMsg : 0;
             return (
               <NavLink key={t.to} to={t.to}
-                className={({ isActive }) =>
-                  `relative flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium ${i === 2 ? "invisible" : ""}`
-                }
+                className="relative flex flex-col items-center justify-center gap-1 text-[9px] font-semibold pt-1.5"
                 style={({ isActive }) => ({ color: isActive ? "var(--pp-brand-accent)" : "var(--pp-text-faint)" })}>
                 {({ isActive }) => (
                   <>
+                    {isActive && (
+                      <span className="absolute top-1 w-1 h-1 rounded-full" style={{ background: "var(--pp-brand-accent)" }} />
+                    )}
                     <div className="relative">
-                      <t.Icon className="w-5 h-5" strokeWidth={isActive ? 2.5 : 1.8} />
+                      <t.Icon className="w-[22px] h-[22px]" strokeWidth={isActive ? 2.4 : 1.8} />
                       {badge > 0 && (
                         <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 px-1 rounded-full text-white text-[9px] font-bold flex items-center justify-center"
                           style={{ background: "var(--pp-danger)" }}>
@@ -258,13 +263,14 @@ export default function PlanipretMobile() {
                         </span>
                       )}
                     </div>
-                    <span>{t.label}</span>
+                    <span style={{ letterSpacing: "0.02em" }}>{t.label}</span>
                   </>
                 )}
               </NavLink>
             );
           })}
         </nav>
+
 
         {/* Powered by AVA footer */}
         <div className="absolute bottom-0 inset-x-0 h-[22px] flex items-center justify-center gap-1.5 z-10"
@@ -283,15 +289,16 @@ export default function PlanipretMobile() {
 
 function Frame({ children }: { children: React.ReactNode }) {
   return (
-    <div className="planipret-scope min-h-screen w-full flex items-center justify-center md:p-6" style={{ background: "#030810" }}>
-      <div className="overflow-hidden w-full md:w-[390px] md:h-[844px] h-screen md:rounded-[40px]"
+    <div className="planipret-scope min-h-screen w-full flex items-center justify-center md:p-6" style={{ background: "#020610" }}>
+      <div className="overflow-hidden w-full md:w-[390px] md:h-[844px] h-screen md:rounded-[44px] relative"
         style={{
-          background: "var(--pp-bg-base)",
-          border: "2px solid var(--pp-bg-border-2)",
-          boxShadow: "0 0 0 1px #040B16, 0 40px 100px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.04)",
+          background: "#060D1A",
+          border: "2px solid #1A3A5A",
+          boxShadow: "0 0 0 8px #040B16, 0 40px 120px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.05)",
         }}>
         {children}
       </div>
     </div>
   );
 }
+

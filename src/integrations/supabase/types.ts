@@ -7703,6 +7703,33 @@ export type Database = {
           },
         ]
       }
+      planipret_ava_conversations: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          role: string
+          tool_calls: Json | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          role: string
+          tool_calls?: Json | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          role?: string
+          tool_calls?: Json | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       planipret_calendar_sync: {
         Row: {
           created_at: string
@@ -8516,6 +8543,60 @@ export type Database = {
           {
             foreignKeyName: "planipret_sms_templates_user_id_fkey"
             columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "planipret_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      planipret_team_messages: {
+        Row: {
+          attachments: Json
+          channel: string
+          created_at: string
+          id: string
+          is_pinned: boolean
+          message: string
+          reactions: Json
+          reply_to: string | null
+          sender_id: string
+          updated_at: string
+        }
+        Insert: {
+          attachments?: Json
+          channel?: string
+          created_at?: string
+          id?: string
+          is_pinned?: boolean
+          message: string
+          reactions?: Json
+          reply_to?: string | null
+          sender_id: string
+          updated_at?: string
+        }
+        Update: {
+          attachments?: Json
+          channel?: string
+          created_at?: string
+          id?: string
+          is_pinned?: boolean
+          message?: string
+          reactions?: Json
+          reply_to?: string | null
+          sender_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planipret_team_messages_reply_to_fkey"
+            columns: ["reply_to"]
+            isOneToOne: false
+            referencedRelation: "planipret_team_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "planipret_team_messages_sender_id_fkey"
+            columns: ["sender_id"]
             isOneToOne: false
             referencedRelation: "planipret_profiles"
             referencedColumns: ["id"]

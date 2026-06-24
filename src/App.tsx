@@ -23,6 +23,7 @@ import MCalls from "./pages/planipret/mobile/MCalls";
 import MMessages from "./pages/planipret/mobile/MMessages";
 import MVoicemail from "./pages/planipret/mobile/MVoicemail";
 import MMore from "./pages/planipret/mobile/MMore";
+import MContacts from "./pages/planipret/mobile/MContacts";
 import MPipeline from "./pages/planipret/mobile/MPipeline";
 import MSearch from "./pages/planipret/mobile/MSearch";
 import MStats from "./pages/planipret/mobile/MStats";
@@ -358,6 +359,7 @@ const App = () => (
                   <Route path="calls" element={<MCalls />} />
                   <Route path="messages" element={<MMessages />} />
                   <Route path="voicemail" element={<MVoicemail />} />
+                  <Route path="contacts" element={<MContacts />} />
                   <Route path="more" element={<MMore />} />
                   <Route path="pipeline" element={<MPipeline />} />
                   <Route path="search" element={<MSearch />} />
