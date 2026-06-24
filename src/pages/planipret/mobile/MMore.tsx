@@ -4,16 +4,15 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
   User, Lock, Phone, Info, Mail, Bell, Moon, HelpCircle, MessageCircle,
-  LogOut, ChevronRight, Bot, Sparkles, X, Download, Shield, BellOff, Settings as SettingsIcon, BarChart3,
+  LogOut, ChevronRight, Bot, Sparkles, X, Download, Shield, BellOff, Settings as SettingsIcon, BarChart3, Voicemail, Edit3,
 } from "lucide-react";
 import type { PlanipretMobileContext } from "../PlanipretMobile";
 import { usePlanipretPush } from "@/hooks/usePlanipretPush";
 import { CalendarSyncCard } from "@/components/planipret/CalendarSyncCard";
 import { SiriShortcutsCard } from "@/components/planipret/SiriShortcutsCard";
 
-const PRIMARY = "#1F4E79";
-
-const initials = (name?: string) => (name ?? "").split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase()).join("") || "?";
+const initials = (name?: string) =>
+  (name ?? "").split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase()).join("") || "?";
 
 export default function MMore() {
   const { profile, reloadProfile } = useOutletContext<PlanipretMobileContext>();
@@ -27,6 +26,7 @@ export default function MMore() {
   const [notifEnabled, setNotifEnabled] = useState<boolean>(() => localStorage.getItem("planipret_notif") === "1");
   const [darkMode, setDarkMode] = useState<boolean>(() => localStorage.getItem("planipret_dark") === "1");
   const [agentOn, setAgentOn] = useState<boolean>(() => localStorage.getItem("planipret_agent_on") !== "0");
+  const [monthStats, setMonthStats] = useState<{ calls: number; leads: number; rate: number }>({ calls: 0, leads: 0, rate: 0 });
 
   useEffect(() => { if (params.get("ms365") === "ok") toast.success("Microsoft 365 connecté ✅"); }, [params]);
 
@@ -36,6 +36,27 @@ export default function MMore() {
     localStorage.setItem("planipret_dark", darkMode ? "1" : "0");
   }, [darkMode]);
 
+  useEffect(() => {
+    (async () => {
+      if (!profile?.id) return;
+      const start = new Date(); start.setDate(1); start.setHours(0, 0, 0, 0);
+      const { data: calls } = await supabase
+        .from("planipret_phone_calls")
+        .select("id, direction, duration_seconds", { count: "exact" })
+        .eq("broker_id", profile.id)
+        .gte("started_at", start.toISOString());
+      const total = calls?.length ?? 0;
+      const connected = calls?.filter((c: any) => (c.duration_seconds ?? 0) > 10).length ?? 0;
+      const rate = total ? Math.round((connected / total) * 100) : 0;
+      const { count: leadsCount } = await supabase
+        .from("planipret_contacts")
+        .select("id", { count: "exact", head: true })
+        .eq("broker_id", profile.id)
+        .gte("created_at", start.toISOString());
+      setMonthStats({ calls: total, leads: leadsCount ?? 0, rate });
+    })();
+  }, [profile?.id]);
+
   const nsConnected = !!profile?.ns_jwt && (!profile?.ns_jwt_expires_at || new Date(profile.ns_jwt_expires_at) > new Date());
   const ms365Connected = !!profile?.ms365_access_token;
 
@@ -43,7 +64,7 @@ export default function MMore() {
     setReconnecting(true);
     const { data, error } = await supabase.functions.invoke("ns-auth", { body: { action: "refresh" } });
     setReconnecting(false);
-    if (error || (data as any)?.success === false) { toast.error("Échec de connexion. Vérifiez vos identifiants."); return; }
+    if (error || (data as any)?.success === false) { toast.error("Échec de connexion."); return; }
     toast.success("Connexion téléphonique établie ✅");
     await reloadProfile();
   };
@@ -85,25 +106,62 @@ export default function MMore() {
   };
 
   return (
-    <div className="p-4 space-y-4">
-      {/* Profile header */}
-      <header className="flex flex-col items-center pt-3 pb-2">
-        <div className="w-16 h-16 rounded-full flex items-center justify-center text-white text-xl font-bold" style={{ background: PRIMARY }}>
+    <div className="p-4 pb-2 space-y-4" style={{ background: "var(--pp-bg-deep)", minHeight: "100%" }}>
+      {/* Profile hero */}
+      <header
+        className="pp-card flex items-center gap-3"
+        style={{ padding: 14, background: "linear-gradient(135deg, rgba(46,155,220,0.10), rgba(155,127,232,0.06))" }}
+      >
+        <div
+          className="flex items-center justify-center font-bold text-white relative"
+          style={{
+            width: 64, height: 64, borderRadius: "50%",
+            background: "linear-gradient(135deg, #1A4A8A, #2E9BDC)",
+            fontSize: 22, fontFamily: "Inter, sans-serif",
+            boxShadow: "0 8px 24px -8px rgba(46,155,220,0.55)",
+          }}
+        >
           {initials(profile?.full_name)}
         </div>
-        <p className="mt-2 font-semibold text-[18px]" style={{ color: "#1A1A2E" }}>{profile?.full_name ?? "Courtier"}</p>
-        <p className="text-[14px] text-slate-500">{profile?.extension ? `${profile.extension}@planipret.ca` : profile?.email}</p>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <p className="truncate" style={{ fontFamily: "Inter,sans-serif", fontWeight: 700, fontSize: 17, color: "var(--pp-text-primary)" }}>
+              {profile?.full_name ?? "Courtier"}
+            </p>
+          </div>
+          <p className="truncate" style={{ fontFamily: "DM Sans,sans-serif", fontSize: 12, color: "var(--pp-text-muted)" }}>
+            {profile?.extension ? `Ext ${profile.extension} · ${profile?.ns_domain ?? "planipret"}` : profile?.email}
+          </p>
+        </div>
+        <button
+          onClick={() => setEditOpen(true)}
+          className="flex items-center gap-1.5 active:scale-95 transition"
+          style={{
+            padding: "6px 10px", borderRadius: 10,
+            background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)",
+            color: "var(--pp-text-secondary)", fontSize: 11, fontFamily: "DM Sans,sans-serif", fontWeight: 600,
+          }}
+        >
+          <Edit3 className="w-3 h-3" /> Modifier
+        </button>
       </header>
 
+      {/* Month stats */}
+      <div className="grid grid-cols-3 gap-2">
+        <MiniStat label="Appels" value={monthStats.calls} accent="var(--pp-brand-accent)" />
+        <MiniStat label="Leads" value={monthStats.leads} accent="var(--pp-color-success)" />
+        <MiniStat label="Taux" value={`${monthStats.rate}%`} accent="var(--pp-color-agent)" />
+      </div>
+
       <Section title="Pipeline & Performance">
-        <Row icon={<BarChart3 className="w-4 h-4" />} label="📊 Pipeline des dossiers" onClick={() => navigate("/mplanipret/pipeline")} chevron />
-        <Row icon={<BarChart3 className="w-4 h-4" />} label="📈 Mes performances" onClick={() => navigate("/mplanipret/stats")} chevron />
+        <Row icon={<BarChart3 className="w-4 h-4" />} label="Pipeline des dossiers" onClick={() => navigate("/mplanipret/pipeline")} chevron />
+        <Row icon={<BarChart3 className="w-4 h-4" />} label="Mes performances" onClick={() => navigate("/mplanipret/stats")} chevron />
       </Section>
 
       <Section title="Mon compte">
         <Row icon={<User className="w-4 h-4" />} label="Mon profil" onClick={() => setEditOpen(true)} chevron />
         <Row icon={<Lock className="w-4 h-4" />} label="Changer le mot de passe" onClick={() => navigate("/reset-password")} chevron />
-        <Row icon={<Download className="w-4 h-4" />} label="📦 Mes données" sub="Téléchargez toutes vos données (Loi 25 / PIPEDA)"
+        <Row icon={<Download className="w-4 h-4" />} label="Mes données" sub="Téléchargez toutes vos données (Loi 25 / PIPEDA)"
           onClick={async () => {
             toast.info("Préparation de votre export…");
             const { data: { session } } = await supabase.auth.getSession();
@@ -123,20 +181,22 @@ export default function MMore() {
       </Section>
 
       <Section title="Téléphonie">
-        <Row icon={<Phone className="w-4 h-4" />} label="Connexion téléphonique" onClick={reconnectNs}
-          right={
-            <span className="flex items-center gap-1.5 text-[11px]">
-              <span className={`w-2 h-2 rounded-full ${nsConnected ? "bg-green-500" : "bg-red-500"}`} />
-              <span className="text-slate-500">{reconnecting ? "…" : nsConnected ? "Connecté" : "Déconnecté"}</span>
-            </span>
-          } />
-        <Row icon={<Info className="w-4 h-4" />} label="Mon extension" right={<span className="text-[12px] text-slate-500">{profile?.extension ?? "—"}</span>} />
+        <Row
+          icon={<Phone className="w-4 h-4" />}
+          label="Connexion téléphonique"
+          onClick={reconnectNs}
+          right={<StatusPill ok={nsConnected} label={reconnecting ? "…" : nsConnected ? "Connecté" : "Hors ligne"} />}
+        />
+        <Row icon={<Info className="w-4 h-4" />} label="Mon extension"
+          right={<span style={{ fontSize: 12, color: "var(--pp-text-muted)" }}>{profile?.extension ?? "—"}</span>} />
+        <Row icon={<Voicemail className="w-4 h-4" />} label="Messagerie vocale"
+          onClick={() => navigate("/mplanipret/calls?tab=voicemails")} chevron />
       </Section>
 
       <Section title="Disponibilité">
         <Row
-          icon={<BellOff className="w-4 h-4" style={{ color: profile?.dnd_enabled ? "#E84C4C" : undefined }} />}
-          label="🔕 Mode Ne pas déranger"
+          icon={<BellOff className="w-4 h-4" style={profile?.dnd_enabled ? { color: "var(--pp-color-danger)" } : undefined} />}
+          label="Mode Ne pas déranger"
           sub={profile?.dnd_enabled ? "Actif — AVA répond pour vous" : "Inactif"}
           right={<Toggle on={!!profile?.dnd_enabled} onChange={async (v) => {
             await supabase.from("planipret_profiles").update({ dnd_enabled: v }).eq("user_id", profile.user_id);
@@ -144,27 +204,27 @@ export default function MMore() {
             toast.success(v ? "DND activé" : "DND désactivé");
           }} />}
         />
-        <Row icon={<SettingsIcon className="w-4 h-4" />} label="⚙️ Configurer le mode DND" onClick={() => setDndOpen(true)} chevron />
+        <Row icon={<SettingsIcon className="w-4 h-4" />} label="Configurer le mode DND" onClick={() => setDndOpen(true)} chevron />
       </Section>
-
 
       <Section title="Intégrations">
-        <Row icon={<Mail className="w-4 h-4" style={{ color: "#0078D4" }} />} label="Microsoft 365"
+        <Row icon={<Mail className="w-4 h-4" style={{ color: "#3FA3F0" }} />} label="Microsoft 365"
           onClick={ms365Connected ? disconnectMs365 : connectMs365}
-          right={
-            <span className="flex items-center gap-1.5 text-[11px]">
-              <span className={`w-2 h-2 rounded-full ${ms365Connected ? "bg-green-500" : "bg-slate-300"}`} />
-              <span className="text-slate-500">{ms365Connected ? "Connecté" : "Non connecté"}</span>
-            </span>
-          } chevron />
-        {ms365Connected && <CalendarSyncCard profile={profile} />}
+          right={<StatusPill ok={ms365Connected} label={ms365Connected ? "Connecté" : "—"} />} chevron />
+        {ms365Connected && (
+          <div style={{ padding: 8 }}>
+            <CalendarSyncCard profile={profile} />
+          </div>
+        )}
       </Section>
 
-      <SiriShortcutsCard />
+      <div className="pp-card" style={{ padding: 4 }}>
+        <SiriShortcutsCard />
+      </div>
 
       {profile?.voice_agent_enabled && (
         <Section title="Assistant IA">
-          <Row icon={<Bot className="w-4 h-4" style={{ color: PRIMARY }} />} label="Assistant vocal AVA"
+          <Row icon={<Bot className="w-4 h-4" style={{ color: "var(--pp-color-agent)" }} />} label="Assistant vocal AVA"
             sub="AVA peut répondre à vos appels et gérer vos tâches"
             right={<Toggle on={agentOn} onChange={(v) => { setAgentOn(v); localStorage.setItem("planipret_agent_on", v ? "1" : "0"); }} />} />
           <Row icon={<Sparkles className="w-4 h-4" />} label="Personnaliser AVA" onClick={() => setCustomizeOpen(true)} chevron />
@@ -182,16 +242,23 @@ export default function MMore() {
         <Row icon={<HelpCircle className="w-4 h-4" />} label="Centre d'aide" onClick={() => setHelpOpen(true)} chevron />
         <Row icon={<MessageCircle className="w-4 h-4" />} label="Contacter le support"
           onClick={() => { window.location.href = "mailto:support@avastatistic.ca?subject=Support%20Planipr%C3%AAt%20AI%20Portal"; }} chevron />
-        <Row icon={<Shield className="w-4 h-4" />} label="🔏 Politique de confidentialité" onClick={() => navigate("/planipret/privacy")} chevron />
-        <Row icon={<Info className="w-4 h-4" />} label="Version de l'app" right={<span className="text-[12px] text-slate-400">v1.0.0 (build 1)</span>} />
+        <Row icon={<Shield className="w-4 h-4" />} label="Politique de confidentialité" onClick={() => navigate("/planipret/privacy")} chevron />
+        <Row icon={<Info className="w-4 h-4" />} label="Version de l'app" right={<span style={{ fontSize: 12, color: "var(--pp-text-faint)" }}>v1.0.0 (build 1)</span>} />
       </Section>
 
-      <Section title="Compte">
-        <button onClick={logout} className="w-full px-4 h-14 flex items-center gap-3 text-left active:bg-red-50 transition">
-          <LogOut className="w-4 h-4 text-red-500" />
-          <span className="flex-1 text-sm font-medium text-red-600">Se déconnecter</span>
-        </button>
-      </Section>
+      <button
+        onClick={logout}
+        className="w-full flex items-center justify-center gap-2 active:scale-[0.99] transition"
+        style={{
+          padding: "14px 16px", borderRadius: 14,
+          background: "rgba(232,76,76,0.08)", border: "1px solid rgba(232,76,76,0.25)",
+          color: "var(--pp-color-danger)", fontFamily: "Inter,sans-serif", fontWeight: 600, fontSize: 14,
+        }}
+      >
+        <LogOut className="w-4 h-4" /> Se déconnecter
+      </button>
+
+      <div style={{ height: 16 }} />
 
       {editOpen && <EditProfileSheet profile={profile} onClose={() => setEditOpen(false)} onSaved={reloadProfile} />}
       {helpOpen && <HelpSheet onClose={() => setHelpOpen(false)} />}
@@ -201,36 +268,118 @@ export default function MMore() {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+/* =================== Primitives =================== */
+
+function MiniStat({ label, value, accent }: { label: string; value: number | string; accent: string }) {
   return (
-    <div>
-      <p className="px-2 mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">{title}</p>
-      <div className="bg-white rounded-2xl shadow-sm overflow-hidden divide-y" style={{ borderColor: "#F0F0F0" }}>
-        {children}
+    <div
+      className="pp-card"
+      style={{ padding: 10, borderTop: `2px solid ${accent}` }}
+    >
+      <div style={{ fontFamily: "Inter,sans-serif", fontWeight: 700, fontSize: 18, color: "var(--pp-text-primary)" }}>
+        {value}
+      </div>
+      <div style={{ fontFamily: "DM Sans,sans-serif", fontSize: 10, color: "var(--pp-text-muted)", textTransform: "uppercase", letterSpacing: 0.5 }}>
+        {label}
       </div>
     </div>
   );
 }
 
-function Row({ icon, label, sub, onClick, right, chevron }: { icon: React.ReactNode; label: string; sub?: string; onClick?: () => void; right?: React.ReactNode; chevron?: boolean }) {
+function StatusPill({ ok, label }: { ok: boolean; label: string }) {
+  return (
+    <span
+      className="flex items-center gap-1.5"
+      style={{
+        padding: "3px 8px", borderRadius: 999, fontSize: 10, fontFamily: "DM Sans,sans-serif", fontWeight: 600,
+        background: ok ? "rgba(0,212,170,0.10)" : "rgba(232,76,76,0.10)",
+        border: `1px solid ${ok ? "rgba(0,212,170,0.30)" : "rgba(232,76,76,0.25)"}`,
+        color: ok ? "var(--pp-color-success)" : "var(--pp-color-danger)",
+      }}
+    >
+      <span className="w-1.5 h-1.5 rounded-full" style={{ background: ok ? "var(--pp-color-success)" : "var(--pp-color-danger)" }} />
+      {label}
+    </span>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <p
+        className="px-2 mb-1.5"
+        style={{ fontFamily: "DM Sans,sans-serif", fontSize: 10, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", color: "var(--pp-text-faint)" }}
+      >
+        {title}
+      </p>
+      <div
+        className="pp-card overflow-hidden"
+        style={{ padding: 0 }}
+      >
+        <div className="divide-y" style={{ borderColor: "var(--pp-bg-border)" }}>
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Row({
+  icon, label, sub, onClick, right, chevron,
+}: { icon: React.ReactNode; label: string; sub?: string; onClick?: () => void; right?: React.ReactNode; chevron?: boolean }) {
   const Comp: any = onClick ? "button" : "div";
   return (
-    <Comp onClick={onClick} className={`w-full px-4 ${sub ? "py-3" : "h-14"} flex items-center gap-3 text-left ${onClick ? "active:bg-slate-50 transition" : ""}`}>
-      <span className="text-slate-600">{icon}</span>
+    <Comp
+      onClick={onClick}
+      className={`w-full px-4 ${sub ? "py-3" : "h-14"} flex items-center gap-3 text-left ${onClick ? "active:bg-[rgba(46,155,220,0.05)] transition" : ""}`}
+      style={{ background: "transparent" }}
+    >
+      <span
+        className="flex items-center justify-center"
+        style={{
+          width: 32, height: 32, borderRadius: 10,
+          background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)",
+          color: "var(--pp-text-secondary)",
+        }}
+      >
+        {icon}
+      </span>
       <span className="flex-1 min-w-0">
-        <span className="block text-sm font-medium" style={{ color: "#1A1A2E" }}>{label}</span>
-        {sub && <span className="block text-[11px] text-slate-400 mt-0.5">{sub}</span>}
+        <span className="block truncate" style={{ fontFamily: "Inter,sans-serif", fontWeight: 500, fontSize: 13.5, color: "var(--pp-text-primary)" }}>
+          {label}
+        </span>
+        {sub && (
+          <span className="block truncate" style={{ fontFamily: "DM Sans,sans-serif", fontSize: 11, color: "var(--pp-text-muted)", marginTop: 2 }}>
+            {sub}
+          </span>
+        )}
       </span>
       {right}
-      {chevron && <ChevronRight className="w-4 h-4 text-slate-300" />}
+      {chevron && <ChevronRight className="w-4 h-4" style={{ color: "var(--pp-text-faint)" }} />}
     </Comp>
   );
 }
 
 function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
   return (
-    <button onClick={(e) => { e.stopPropagation(); onChange(!on); }} className={`w-10 h-6 rounded-full p-0.5 transition ${on ? "" : "bg-slate-300"}`} style={on ? { background: PRIMARY } : undefined}>
-      <span className={`block w-5 h-5 rounded-full bg-white shadow transition-transform ${on ? "translate-x-4" : ""}`} />
+    <button
+      onClick={(e) => { e.stopPropagation(); onChange(!on); }}
+      className="rounded-full p-0.5 transition"
+      style={{
+        width: 40, height: 24,
+        background: on ? "linear-gradient(135deg, #1A4A8A, #2E9BDC)" : "var(--pp-bg-elevated)",
+        border: `1px solid ${on ? "rgba(46,155,220,0.5)" : "var(--pp-bg-border-2)"}`,
+      }}
+    >
+      <span
+        className="block rounded-full transition-transform"
+        style={{
+          width: 18, height: 18,
+          background: on ? "#fff" : "var(--pp-text-muted)",
+          transform: on ? "translateX(16px)" : "translateX(0)",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.4)",
+        }}
+      />
     </button>
   );
 }
@@ -250,32 +399,76 @@ function NotificationsSection({ profile, reloadProfile }: { profile: any; reload
       <Row icon={<Bell className="w-4 h-4" />} label="Activer notifications push" onClick={enablePush} sub="Recevoir des alertes même app fermée" chevron />
       <Row icon={<Phone className="w-4 h-4" />} label="Appels entrants" right={<Toggle on={!!profile?.notif_calls} onChange={(v) => setPref("notif_calls", v)} />} />
       <Row icon={<Bell className="w-4 h-4" />} label="Nouveaux SMS" right={<Toggle on={!!profile?.notif_sms} onChange={(v) => setPref("notif_sms", v)} />} />
-      <Row icon={<Bell className="w-4 h-4" />} label="Nouveaux voicemails" right={<Toggle on={!!profile?.notif_voicemails} onChange={(v) => setPref("notif_voicemails", v)} />} />
+      <Row icon={<Voicemail className="w-4 h-4" />} label="Nouveaux voicemails" right={<Toggle on={!!profile?.notif_voicemails} onChange={(v) => setPref("notif_voicemails", v)} />} />
       <Row icon={<Sparkles className="w-4 h-4" />} label="Analyses IA prêtes" right={<Toggle on={!!profile?.notif_ai} onChange={(v) => setPref("notif_ai", v)} />} />
       <Row icon={<Bell className="w-4 h-4" />} label="Rappels" right={<Toggle on={!!profile?.notif_reminders} onChange={(v) => setPref("notif_reminders", v)} />} />
-      <Row icon={<Sparkles className="w-4 h-4" />} label="🔥 Leads chauds sans suivi" right={<Toggle on={profile?.notif_hot_leads !== false} onChange={(v) => setPref("notif_hot_leads", v)} />} />
-      <Row icon={<Bell className="w-4 h-4" />} label="📅 Rappel RDV imminents" right={<Toggle on={profile?.notif_appointment_reminder !== false} onChange={(v) => setPref("notif_appointment_reminder", v)} />} />
-      <Row icon={<Phone className="w-4 h-4" />} label="📞 Appels manqués non traités" right={<Toggle on={profile?.notif_missed_call !== false} onChange={(v) => setPref("notif_missed_call", v)} />} />
-      <Row icon={<Sparkles className="w-4 h-4" />} label="☀️ Briefing matinal (08:30)" right={<Toggle on={profile?.notif_morning_brief !== false} onChange={(v) => setPref("notif_morning_brief", v)} />} />
-      <Row icon={<Sparkles className="w-4 h-4" />} label="📊 Résumé fin de journée (17:30)" right={<Toggle on={profile?.notif_eod_summary !== false} onChange={(v) => setPref("notif_eod_summary", v)} />} />
+      <Row icon={<Sparkles className="w-4 h-4" />} label="Leads chauds sans suivi" right={<Toggle on={profile?.notif_hot_leads !== false} onChange={(v) => setPref("notif_hot_leads", v)} />} />
+      <Row icon={<Bell className="w-4 h-4" />} label="Rappel RDV imminents" right={<Toggle on={profile?.notif_appointment_reminder !== false} onChange={(v) => setPref("notif_appointment_reminder", v)} />} />
+      <Row icon={<Phone className="w-4 h-4" />} label="Appels manqués non traités" right={<Toggle on={profile?.notif_missed_call !== false} onChange={(v) => setPref("notif_missed_call", v)} />} />
+      <Row icon={<Sparkles className="w-4 h-4" />} label="Briefing matinal (08:30)" right={<Toggle on={profile?.notif_morning_brief !== false} onChange={(v) => setPref("notif_morning_brief", v)} />} />
+      <Row icon={<Sparkles className="w-4 h-4" />} label="Résumé fin de journée (17:30)" right={<Toggle on={profile?.notif_eod_summary !== false} onChange={(v) => setPref("notif_eod_summary", v)} />} />
       <Row icon={<Sparkles className="w-4 h-4" />} label={busy ? "Envoi…" : "Tester une notification"} onClick={() => sendTest(profile.user_id)} chevron />
     </Section>
   );
 }
 
+/* =================== Sheets (dark) =================== */
+
 function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
-    <div className="fixed inset-0 z-40 flex items-end md:items-center md:justify-center bg-black/40" onClick={onClose}>
-      <div className="bg-white w-full md:w-[360px] rounded-t-2xl md:rounded-2xl p-4 max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="absolute inset-0 z-40 flex items-end"
+      style={{ background: "rgba(4,11,22,0.7)", backdropFilter: "blur(6px)" }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full p-4 max-h-[80%] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "var(--pp-bg-surface)",
+          borderTop: "1px solid var(--pp-bg-border-2)",
+          borderTopLeftRadius: 20, borderTopRightRadius: 20,
+          boxShadow: "0 -20px 40px -10px rgba(0,0,0,0.5)",
+        }}
+      >
         <div className="flex items-center justify-between mb-3">
-          <h2 className="font-semibold" style={{ color: "#1A1A2E" }}>{title}</h2>
-          <button onClick={onClose} className="p-1 rounded-full hover:bg-slate-100"><X className="w-4 h-4" /></button>
+          <h2 style={{ fontFamily: "Inter,sans-serif", fontWeight: 700, fontSize: 16, color: "var(--pp-text-primary)" }}>{title}</h2>
+          <button
+            onClick={onClose}
+            className="flex items-center justify-center active:scale-95"
+            style={{ width: 28, height: 28, borderRadius: "50%", background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
         {children}
       </div>
     </div>
   );
 }
+
+const fieldStyle: React.CSSProperties = {
+  background: "var(--pp-bg-deep)",
+  border: "1px solid var(--pp-bg-border-2)",
+  color: "var(--pp-text-primary)",
+  borderRadius: 10,
+  padding: "10px 12px",
+  fontSize: 13,
+  fontFamily: "DM Sans,sans-serif",
+  width: "100%",
+};
+
+const labelStyle: React.CSSProperties = {
+  fontSize: 11, color: "var(--pp-text-muted)", fontFamily: "DM Sans,sans-serif",
+  display: "block", marginBottom: 4, marginTop: 8,
+};
+
+const primaryBtn: React.CSSProperties = {
+  width: "100%", padding: "12px 14px", borderRadius: 12,
+  background: "linear-gradient(135deg, #1A4A8A, #2E9BDC)",
+  color: "#fff", fontFamily: "Inter,sans-serif", fontWeight: 600, fontSize: 13,
+  marginTop: 12,
+};
 
 function EditProfileSheet({ profile, onClose, onSaved }: { profile: any; onClose: () => void; onSaved: () => Promise<void> }) {
   const [name, setName] = useState(profile?.full_name ?? "");
@@ -291,15 +484,15 @@ function EditProfileSheet({ profile, onClose, onSaved }: { profile: any; onClose
   };
   return (
     <Sheet title="Mon profil" onClose={onClose}>
-      <label className="block text-xs text-slate-500 mb-1">Nom complet</label>
-      <input value={name} onChange={(e) => setName(e.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm mb-3" />
-      <label className="block text-xs text-slate-500 mb-1">Email</label>
-      <input value={profile?.email ?? ""} readOnly className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm bg-slate-50 mb-3" />
-      <label className="block text-xs text-slate-500 mb-1">Extension</label>
-      <input value={profile?.extension ?? ""} readOnly className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm bg-slate-50 mb-3" />
-      <label className="block text-xs text-slate-500 mb-1">Domaine</label>
-      <input value={profile?.ns_domain ?? ""} readOnly className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm bg-slate-50 mb-3" />
-      <button onClick={save} disabled={busy} className="w-full py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-50" style={{ background: PRIMARY }}>
+      <label style={labelStyle}>Nom complet</label>
+      <input value={name} onChange={(e) => setName(e.target.value)} style={fieldStyle} />
+      <label style={labelStyle}>Email</label>
+      <input value={profile?.email ?? ""} readOnly style={{ ...fieldStyle, opacity: 0.6 }} />
+      <label style={labelStyle}>Extension</label>
+      <input value={profile?.extension ?? ""} readOnly style={{ ...fieldStyle, opacity: 0.6 }} />
+      <label style={labelStyle}>Domaine</label>
+      <input value={profile?.ns_domain ?? ""} readOnly style={{ ...fieldStyle, opacity: 0.6 }} />
+      <button onClick={save} disabled={busy} style={{ ...primaryBtn, opacity: busy ? 0.5 : 1 }}>
         {busy ? "Enregistrement…" : "Sauvegarder"}
       </button>
     </Sheet>
@@ -316,9 +509,9 @@ function HelpSheet({ onClose }: { onClose: () => void }) {
     <Sheet title="Centre d'aide" onClose={onClose}>
       <div className="space-y-3">
         {faq.map((f, i) => (
-          <div key={i} className="border-b border-slate-100 pb-3 last:border-0">
-            <p className="font-medium text-sm" style={{ color: "#1A1A2E" }}>{f.q}</p>
-            <p className="text-xs text-slate-600 mt-1">{f.a}</p>
+          <div key={i} className="pb-3" style={{ borderBottom: "1px solid var(--pp-bg-border)" }}>
+            <p style={{ fontFamily: "Inter,sans-serif", fontWeight: 600, fontSize: 13, color: "var(--pp-text-primary)" }}>{f.q}</p>
+            <p style={{ fontFamily: "DM Sans,sans-serif", fontSize: 12, color: "var(--pp-text-secondary)", marginTop: 4 }}>{f.a}</p>
           </div>
         ))}
       </div>
@@ -339,17 +532,28 @@ function CustomizeSheet({ profile, onClose, onSaved }: { profile: any; onClose: 
   };
   return (
     <Sheet title="Personnaliser AVA" onClose={onClose}>
-      <p className="text-xs text-slate-500 mb-2">AVA répond en :</p>
-      <div className="flex gap-2 mb-3">
-        {(["fr", "en"] as const).map((l) => (
-          <button key={l} onClick={() => setLang(l)}
-            className={`flex-1 py-2 rounded-lg text-sm font-medium ${lang === l ? "text-white" : "bg-slate-100 text-slate-600"}`}
-            style={lang === l ? { background: PRIMARY } : undefined}>
-            {l === "fr" ? "🇫🇷 Français" : "🇬🇧 English"}
-          </button>
-        ))}
+      <p style={{ ...labelStyle, marginTop: 0 }}>AVA répond en :</p>
+      <div className="flex gap-2">
+        {(["fr", "en"] as const).map((l) => {
+          const active = lang === l;
+          return (
+            <button
+              key={l}
+              onClick={() => setLang(l)}
+              className="flex-1"
+              style={{
+                padding: "10px 12px", borderRadius: 12, fontSize: 13, fontWeight: 600, fontFamily: "Inter,sans-serif",
+                background: active ? "linear-gradient(135deg, #1A4A8A, #2E9BDC)" : "var(--pp-bg-elevated)",
+                border: `1px solid ${active ? "rgba(46,155,220,0.5)" : "var(--pp-bg-border-2)"}`,
+                color: active ? "#fff" : "var(--pp-text-secondary)",
+              }}
+            >
+              {l === "fr" ? "🇫🇷 Français" : "🇬🇧 English"}
+            </button>
+          );
+        })}
       </div>
-      <button onClick={save} disabled={busy} className="w-full py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-50" style={{ background: PRIMARY }}>
+      <button onClick={save} disabled={busy} style={{ ...primaryBtn, opacity: busy ? 0.5 : 1 }}>
         {busy ? "…" : "Sauvegarder"}
       </button>
     </Sheet>
@@ -359,8 +563,8 @@ function CustomizeSheet({ profile, onClose, onSaved }: { profile: any; onClose: 
 function DndSheet({ profile, onClose, onSaved }: { profile: any; onClose: () => void; onSaved: () => Promise<void> }) {
   const [enabled, setEnabled] = useState<boolean>(!!profile?.dnd_enabled);
   const [auto, setAuto] = useState<boolean>(!!profile?.dnd_auto_schedule);
-  const [start, setStart] = useState<string>(profile?.dnd_start_time?.slice(0,5) ?? "18:00");
-  const [end, setEnd] = useState<string>(profile?.dnd_end_time?.slice(0,5) ?? "08:00");
+  const [start, setStart] = useState<string>(profile?.dnd_start_time?.slice(0, 5) ?? "18:00");
+  const [end, setEnd] = useState<string>(profile?.dnd_end_time?.slice(0, 5) ?? "08:00");
   const [msg, setMsg] = useState<string>(profile?.dnd_message_fr ?? "");
   const [busy, setBusy] = useState(false);
   const save = async () => {
@@ -379,30 +583,30 @@ function DndSheet({ profile, onClose, onSaved }: { profile: any; onClose: () => 
     onClose();
   };
   return (
-    <Sheet title="🔕 Mode Ne pas déranger" onClose={onClose}>
-      <div className="flex items-center justify-between py-2 border-b border-slate-100">
-        <span className="text-sm">Activer le mode DND</span>
+    <Sheet title="Mode Ne pas déranger" onClose={onClose}>
+      <div className="flex items-center justify-between py-2" style={{ borderBottom: "1px solid var(--pp-bg-border)" }}>
+        <span style={{ fontSize: 13, color: "var(--pp-text-primary)" }}>Activer le mode DND</span>
         <Toggle on={enabled} onChange={setEnabled} />
       </div>
-      <div className="flex items-center justify-between py-2 border-b border-slate-100">
-        <span className="text-sm">Activer automatiquement selon horaire</span>
+      <div className="flex items-center justify-between py-2" style={{ borderBottom: "1px solid var(--pp-bg-border)" }}>
+        <span style={{ fontSize: 13, color: "var(--pp-text-primary)" }}>Activation auto selon horaire</span>
         <Toggle on={auto} onChange={setAuto} />
       </div>
       {auto && (
         <div className="grid grid-cols-2 gap-3 py-3">
           <div>
-            <label className="block text-xs text-slate-500 mb-1">Début</label>
-            <input type="time" value={start} onChange={(e) => setStart(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm" />
+            <label style={labelStyle}>Début</label>
+            <input type="time" value={start} onChange={(e) => setStart(e.target.value)} style={fieldStyle} />
           </div>
           <div>
-            <label className="block text-xs text-slate-500 mb-1">Fin</label>
-            <input type="time" value={end} onChange={(e) => setEnd(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm" />
+            <label style={labelStyle}>Fin</label>
+            <input type="time" value={end} onChange={(e) => setEnd(e.target.value)} style={fieldStyle} />
           </div>
         </div>
       )}
-      <label className="block text-xs text-slate-500 mb-1 mt-2">Message de réponse automatique</label>
-      <textarea value={msg} onChange={(e) => setMsg(e.target.value)} rows={4} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm mb-3" />
-      <button onClick={save} disabled={busy} className="w-full py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-50" style={{ background: PRIMARY }}>
+      <label style={labelStyle}>Message de réponse automatique</label>
+      <textarea value={msg} onChange={(e) => setMsg(e.target.value)} rows={4} style={{ ...fieldStyle, resize: "none" }} />
+      <button onClick={save} disabled={busy} style={{ ...primaryBtn, opacity: busy ? 0.5 : 1 }}>
         {busy ? "…" : "Sauvegarder"}
       </button>
     </Sheet>
