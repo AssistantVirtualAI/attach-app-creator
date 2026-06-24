@@ -1,7 +1,8 @@
 import { useState, useMemo, useEffect } from "react";
 import { useOutletContext } from "react-router-dom";
-import { Search, Phone, MessageSquare, Mail, Users, Smartphone, Clock } from "lucide-react";
+import { Search, Phone, MessageSquare, Mail, Users, Smartphone, Clock, X, Calendar, ListChecks, Loader2, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import type { PlanipretMobileContext } from "../PlanipretMobile";
 
 type Tab = "maestro" | "phone" | "recents";
@@ -28,6 +29,7 @@ export default function MContacts() {
   const [maestroContacts, setMaestroContacts] = useState<any[]>([]);
   const [recents, setRecents] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [selected, setSelected] = useState<any | null>(null);
 
   useEffect(() => {
     let cancel = false;
