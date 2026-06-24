@@ -1,0 +1,798 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import {
+  Play, Pause, Download, RotateCcw, RotateCw, Sparkles, FileText, Bot,
+  Loader2, Search, Copy, Check, ChevronDown, Link2, User, Flame, Snowflake, Thermometer, ListChecks,
+} from "lucide-react";
+
+type Pipeline = {
+  cdr?: "pending" | "done" | "error";
+  transcript?: "pending" | "done" | "error";
+  ai?: "pending" | "done" | "error";
+  maestro?: "pending" | "done" | "error";
+};
+
+export type RecordingCall = {
+  id: string;
+  user_id: string;
+  ns_call_id: string | null;
+  direction: string;
+  from_number: string | null;
+  from_name: string | null;
+  to_number: string | null;
+  to_name: string | null;
+  started_at: string;
+  duration_seconds: number | null;
+  recording_url: string | null;
+  transcript: string | null;
+  transcript_segments?: any;
+  transcript_language?: string | null;
+  ai_summary: string | null;
+  ai_coaching?: any;
+  ai_key_points?: any;
+  ai_client_insights?: any;
+  ai_tasks?: any;
+  lead_score?: number | null;
+  lead_temperature?: string | null;
+  maestro_synced?: boolean | null;
+  maestro_client_id?: string | null;
+  pipeline_state?: Pipeline | null;
+};
+
+const fmtDate = (iso: string) => {
+  const d = new Date(iso);
+  const today = new Date();
+  const sameDay = d.toDateString() === today.toDateString();
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  if (sameDay) return `Aujourd'hui · ${hh}h${mm}`;
+  return `${d.toLocaleDateString("fr-CA", { day: "2-digit", month: "short" })} · ${hh}h${mm}`;
+};
+const fmtDuration = (s: number | null) => {
+  if (!s) return "—";
+  const m = Math.floor(s / 60); const sec = s % 60;
+  return m === 0 ? `${sec}s` : `${m}m ${sec}s`;
+};
+const otherLabel = (c: RecordingCall) => {
+  const out = c.direction === "outbound";
+  return (out ? c.to_name : c.from_name) || (out ? c.to_number : c.from_number) || "Inconnu";
+};
+const tempIcon = (t?: string | null) => {
+  if (t === "hot") return { Icon: Flame, color: "var(--pp-danger)", label: "Chaud" };
+  if (t === "warm") return { Icon: Thermometer, color: "var(--pp-warning, #f59e0b)", label: "Tiède" };
+  if (t === "cold") return { Icon: Snowflake, color: "var(--pp-brand-accent)", label: "Froid" };
+  return null;
+};
+
+// ===================== List =====================
+export default function RecordingsList({
+  calls,
+  loading,
+  userId,
+  onUpdated,
+}: {
+  calls: RecordingCall[];
+  loading: boolean;
+  userId: string | undefined;
+  onUpdated: (c: RecordingCall) => void;
+}) {
+  const withRec = useMemo(
+    () => calls.filter((c) => !!c.recording_url || !!c.transcript || !!c.ai_summary),
+    [calls]
+  );
+
+  // Realtime AI insights broadcast
+  useEffect(() => {
+    if (!userId) return;
+    const ch = supabase
+      .channel(`ai-insights:${userId}`)
+      .on("broadcast", { event: "analysis_ready" }, ({ payload }) => {
+        const score = payload?.lead_score;
+        const temp = payload?.lead_temperature;
+        toast.success(`🤖 Analyse prête${score != null ? ` — ${score}/100` : ""}`, {
+          description: temp === "hot" ? "🔥 Lead chaud!" : undefined,
+        });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [userId]);
+
+  if (loading) {
+    return (
+      <ul className="px-3 pt-3 pb-4 space-y-2">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <li key={i} className="rounded-2xl p-3" style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)" }}>
+            <div className="h-3 w-1/2 rounded animate-pulse mb-2" style={{ background: "var(--pp-bg-elevated)" }} />
+            <div className="h-12 w-full rounded animate-pulse" style={{ background: "var(--pp-bg-elevated)" }} />
+          </li>
+        ))}
+      </ul>
+    );
+  }
+
+  if (withRec.length === 0) {
+    return (
+      <div className="p-10 text-center">
+        <div className="w-14 h-14 mx-auto rounded-full flex items-center justify-center mb-3"
+             style={{ background: "rgba(46,155,220,0.12)", color: "var(--pp-brand-accent)" }}>
+          <Play className="w-6 h-6" />
+        </div>
+        <div className="font-semibold" style={{ color: "var(--pp-text-secondary)" }}>Aucun enregistrement</div>
+        <div className="text-xs mt-1" style={{ color: "var(--pp-text-muted)" }}>
+          Les appels enregistrés et analysés apparaîtront ici.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <ul className="px-3 pt-3 pb-4 space-y-2">
+      {withRec.map((c) => (
+        <RecordingCard key={c.id} call={c} onUpdated={onUpdated} />
+      ))}
+    </ul>
+  );
+}
+
+// ===================== Card =====================
+function RecordingCard({ call, onUpdated }: { call: RecordingCall; onUpdated: (c: RecordingCall) => void }) {
+  const [open, setOpen] = useState<"rec" | "txt" | "ai" | "crm" | null>(null);
+  const temp = tempIcon(call.lead_temperature);
+
+  return (
+    <li
+      className="rounded-2xl p-3"
+      style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)" }}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <div className="min-w-0">
+          <div className="font-semibold text-sm truncate" style={{ color: "var(--pp-text-primary)" }}>
+            {otherLabel(call)}
+          </div>
+          <div className="text-[11px] truncate" style={{ color: "var(--pp-text-muted)" }}>
+            {fmtDate(call.started_at)} · {fmtDuration(call.duration_seconds)}
+          </div>
+        </div>
+        {temp && (
+          <span
+            className="text-[10px] font-semibold px-2 py-1 rounded-full flex items-center gap-1 shrink-0"
+            style={{ background: `${temp.color}22`, color: temp.color }}
+          >
+            <temp.Icon className="w-3 h-3" />
+            {call.lead_score != null ? `${call.lead_score}` : temp.label}
+          </span>
+        )}
+      </div>
+
+      {/* Pipeline progress */}
+      <PipelineProgress state={call.pipeline_state ?? inferPipeline(call)} />
+
+      {/* Status pills */}
+      <div className="flex items-center gap-1.5 mt-2.5">
+        <Pill active={open === "rec"} hasData={!!call.recording_url} onClick={() => setOpen(open === "rec" ? null : "rec")}
+              icon={<Play className="w-3.5 h-3.5" />} label="Audio" />
+        <Pill active={open === "txt"} hasData={!!call.transcript} onClick={() => setOpen(open === "txt" ? null : "txt")}
+              icon={<FileText className="w-3.5 h-3.5" />} label="Transcript" />
+        <Pill active={open === "ai"} hasData={!!call.ai_summary} onClick={() => setOpen(open === "ai" ? null : "ai")}
+              icon={<Bot className="w-3.5 h-3.5" />} label="IA" />
+        <Pill active={open === "crm"} hasData={!!call.maestro_synced} onClick={() => setOpen(open === "crm" ? null : "crm")}
+              icon={<Link2 className="w-3.5 h-3.5" />} label="CRM" />
+      </div>
+
+      {/* Sections */}
+      {open === "rec" && <RecordingSection call={call} onUpdated={onUpdated} />}
+      {open === "txt" && <TranscriptSection call={call} onUpdated={onUpdated} />}
+      {open === "ai" && <AISection call={call} onUpdated={onUpdated} />}
+      {open === "crm" && <MaestroSyncSection call={call} onUpdated={onUpdated} />}
+    </li>
+  );
+}
+
+function inferPipeline(c: RecordingCall): Pipeline {
+  return {
+    cdr: c.ns_call_id ? "done" : "pending",
+    transcript: c.transcript ? "done" : "pending",
+    ai: c.ai_summary ? "done" : "pending",
+    maestro: c.maestro_synced ? "done" : "pending",
+  };
+}
+
+function PipelineProgress({ state }: { state: Pipeline }) {
+  const steps: Array<{ k: keyof Pipeline; label: string }> = [
+    { k: "cdr", label: "CDR" },
+    { k: "transcript", label: "Texte" },
+    { k: "ai", label: "IA" },
+    { k: "maestro", label: "CRM" },
+  ];
+  const colorFor = (s?: string) =>
+    s === "done" ? "var(--pp-success)" : s === "error" ? "var(--pp-danger)" : "var(--pp-bg-border-2)";
+  return (
+    <div className="flex items-center gap-1">
+      {steps.map((s, i) => (
+        <div key={s.k} className="flex-1 flex items-center gap-1">
+          <div
+            className="flex-1 h-1.5 rounded-full transition-all"
+            style={{ background: colorFor(state[s.k]) }}
+            title={`${s.label}: ${state[s.k] ?? "pending"}`}
+          />
+          {i < steps.length - 1 && <span className="w-0.5" />}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Pill({
+  active, hasData, onClick, icon, label,
+}: { active: boolean; hasData: boolean; onClick: () => void; icon: React.ReactNode; label: string }) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium transition"
+      style={{
+        background: active
+          ? "linear-gradient(135deg, var(--pp-brand-accent), var(--pp-brand-accent-2))"
+          : hasData ? "var(--pp-bg-elevated)" : "transparent",
+        color: active ? "white" : hasData ? "var(--pp-text-secondary)" : "var(--pp-text-muted)",
+        border: "1px solid var(--pp-bg-border-2)",
+        opacity: hasData || active ? 1 : 0.7,
+      }}
+    >
+      {icon}
+      <span>{label}</span>
+      {hasData && !active && <Check className="w-3 h-3" style={{ color: "var(--pp-success)" }} />}
+    </button>
+  );
+}
+
+// ===================== Recording =====================
+function RecordingSection({ call, onUpdated }: { call: RecordingCall; onUpdated: (c: RecordingCall) => void }) {
+  const [loading, setLoading] = useState(false);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const [speed, setSpeed] = useState(1);
+  const [cur, setCur] = useState(0);
+  const [dur, setDur] = useState(0);
+
+  const fetchRec = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("maestro-recording", {
+        body: { call_id: call.id, ns_call_id: call.ns_call_id },
+      });
+      if (error) throw error;
+      const url = (data as any)?.recording_url;
+      if (!url) throw new Error("URL non disponible");
+      onUpdated({ ...call, recording_url: url });
+      toast.success("Enregistrement chargé");
+    } catch (e: any) {
+      // fallback to ns-recordings
+      try {
+        const { data } = await supabase.functions.invoke("ns-recordings", {
+          body: { call_id: call.ns_call_id ?? call.id },
+        });
+        const url = (data as any)?.recording_url;
+        if (!url) throw new Error("nope");
+        await supabase.from("planipret_phone_calls").update({ recording_url: url }).eq("id", call.id);
+        onUpdated({ ...call, recording_url: url });
+        toast.success("Enregistrement chargé");
+      } catch {
+        toast.error("Enregistrement indisponible");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const seek = (delta: number) => {
+    if (!audioRef.current) return;
+    audioRef.current.currentTime = Math.max(0, Math.min(dur, audioRef.current.currentTime + delta));
+  };
+  const togglePlay = () => {
+    if (!audioRef.current) return;
+    if (playing) audioRef.current.pause(); else audioRef.current.play();
+  };
+  const setRate = (r: number) => {
+    setSpeed(r);
+    if (audioRef.current) audioRef.current.playbackRate = r;
+  };
+
+  return (
+    <div className="mt-3 p-3 rounded-xl space-y-2" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)" }}>
+      {!call.recording_url ? (
+        <button
+          onClick={fetchRec}
+          disabled={loading}
+          className="w-full py-2.5 rounded-lg text-sm font-medium flex items-center justify-center gap-2"
+          style={{ background: "var(--pp-bg-surface)", color: "var(--pp-text-primary)", border: "1px solid var(--pp-bg-border-2)" }}
+        >
+          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+          Charger l'enregistrement
+        </button>
+      ) : (
+        <>
+          <audio
+            ref={audioRef}
+            src={call.recording_url}
+            onPlay={() => setPlaying(true)}
+            onPause={() => setPlaying(false)}
+            onTimeUpdate={(e) => setCur((e.target as HTMLAudioElement).currentTime)}
+            onLoadedMetadata={(e) => setDur((e.target as HTMLAudioElement).duration || 0)}
+            className="hidden"
+          />
+          <div className="flex items-center gap-2">
+            <button onClick={() => seek(-15)} className="w-9 h-9 rounded-full flex items-center justify-center"
+                    style={{ background: "var(--pp-bg-surface)", color: "var(--pp-text-secondary)" }}>
+              <RotateCcw className="w-4 h-4" />
+            </button>
+            <button onClick={togglePlay} className="w-11 h-11 rounded-full flex items-center justify-center"
+                    style={{ background: "linear-gradient(135deg, var(--pp-brand-accent), var(--pp-brand-accent-2))", color: "white" }}>
+              {playing ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
+            </button>
+            <button onClick={() => seek(15)} className="w-9 h-9 rounded-full flex items-center justify-center"
+                    style={{ background: "var(--pp-bg-surface)", color: "var(--pp-text-secondary)" }}>
+              <RotateCw className="w-4 h-4" />
+            </button>
+            <div className="flex-1 mx-1">
+              <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "var(--pp-bg-border-2)" }}>
+                <div className="h-full transition-all" style={{
+                  width: dur ? `${(cur / dur) * 100}%` : "0%",
+                  background: "linear-gradient(90deg, var(--pp-brand-accent), var(--pp-brand-accent-2))",
+                }} />
+              </div>
+              <div className="flex justify-between text-[10px] mt-0.5" style={{ color: "var(--pp-text-muted)" }}>
+                <span>{formatTime(cur)}</span><span>{formatTime(dur)}</span>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1">
+              {[0.75, 1, 1.5, 2].map((r) => (
+                <button key={r} onClick={() => setRate(r)}
+                        className="text-[10px] font-semibold px-2 py-1 rounded-md"
+                        style={{
+                          background: speed === r ? "var(--pp-brand-accent-2)" : "var(--pp-bg-surface)",
+                          color: speed === r ? "white" : "var(--pp-text-secondary)",
+                        }}>
+                  {r}×
+                </button>
+              ))}
+            </div>
+            <a href={call.recording_url} download
+               className="text-[11px] flex items-center gap-1 px-2 py-1 rounded-md"
+               style={{ background: "var(--pp-bg-surface)", color: "var(--pp-text-secondary)" }}>
+              <Download className="w-3 h-3" /> MP3
+            </a>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+const formatTime = (s: number) => {
+  if (!isFinite(s)) return "0:00";
+  const m = Math.floor(s / 60); const sec = Math.floor(s % 60);
+  return `${m}:${String(sec).padStart(2, "0")}`;
+};
+
+// ===================== Transcript =====================
+function TranscriptSection({ call, onUpdated }: { call: RecordingCall; onUpdated: (c: RecordingCall) => void }) {
+  const [loading, setLoading] = useState(false);
+  const [q, setQ] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  const segments: Array<{ speaker?: string; text: string; start?: number }> = useMemo(() => {
+    if (Array.isArray(call.transcript_segments) && call.transcript_segments.length) return call.transcript_segments;
+    if (call.transcript) return [{ text: call.transcript }];
+    return [];
+  }, [call.transcript_segments, call.transcript]);
+
+  const run = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("maestro-transcript", {
+        body: { call_id: call.id },
+      });
+      if (error) throw error;
+      const next = (data as any) ?? {};
+      onUpdated({
+        ...call,
+        transcript: next.transcript ?? call.transcript,
+        transcript_segments: next.segments ?? call.transcript_segments,
+        transcript_language: next.language ?? call.transcript_language,
+      });
+      toast.success("Transcription terminée");
+    } catch (e: any) {
+      toast.error("Échec transcription", { description: e?.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const copy = async () => {
+    const txt = segments.map((s) => `${s.speaker ? s.speaker + ": " : ""}${s.text}`).join("\n");
+    await navigator.clipboard.writeText(txt);
+    setCopied(true); setTimeout(() => setCopied(false), 1500);
+  };
+
+  return (
+    <div className="mt-3 p-3 rounded-xl space-y-2" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)" }}>
+      {segments.length === 0 ? (
+        <button
+          onClick={run} disabled={loading || !call.recording_url}
+          className="w-full py-2.5 rounded-lg text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50"
+          style={{ background: "var(--pp-bg-surface)", color: "var(--pp-text-primary)", border: "1px solid var(--pp-bg-border-2)" }}
+        >
+          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+          {call.recording_url ? "Transcrire l'appel" : "Audio requis"}
+        </button>
+      ) : (
+        <>
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2" style={{ color: "var(--pp-text-muted)" }} />
+              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher..."
+                     className="w-full pl-7 pr-2 py-1.5 rounded-md text-xs outline-none"
+                     style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }} />
+            </div>
+            <button onClick={copy} className="px-2 py-1.5 rounded-md text-[11px] flex items-center gap-1"
+                    style={{ background: "var(--pp-bg-surface)", color: "var(--pp-text-secondary)" }}>
+              {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+              {copied ? "Copié" : "Copier"}
+            </button>
+          </div>
+          <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
+            {segments.filter((s) => !q || s.text.toLowerCase().includes(q.toLowerCase())).map((s, i) => {
+              const isAgent = (s.speaker || "").toLowerCase().includes("agent") || (s.speaker || "").toLowerCase().includes("courtier") || s.speaker === "A";
+              return (
+                <div key={i} className={`flex ${isAgent ? "justify-start" : "justify-end"}`}>
+                  <div className="max-w-[85%] px-2.5 py-1.5 rounded-xl text-xs"
+                       style={{
+                         background: isAgent ? "rgba(46,155,220,0.12)" : "var(--pp-bg-surface)",
+                         color: "var(--pp-text-primary)",
+                         border: "1px solid var(--pp-bg-border-2)",
+                       }}>
+                    {s.speaker && <div className="text-[9px] font-semibold mb-0.5" style={{ color: "var(--pp-text-muted)" }}>{s.speaker}</div>}
+                    <Highlight text={s.text} q={q} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function Highlight({ text, q }: { text: string; q: string }) {
+  if (!q) return <>{text}</>;
+  const parts = text.split(new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "ig"));
+  return (
+    <>
+      {parts.map((p, i) =>
+        p.toLowerCase() === q.toLowerCase()
+          ? <mark key={i} style={{ background: "rgba(245,158,11,0.4)", color: "inherit" }}>{p}</mark>
+          : <span key={i}>{p}</span>
+      )}
+    </>
+  );
+}
+
+// ===================== AI =====================
+function AISection({ call, onUpdated }: { call: RecordingCall; onUpdated: (c: RecordingCall) => void }) {
+  const [loading, setLoading] = useState(false);
+  const hasAI = !!call.ai_summary;
+
+  const run = async () => {
+    setLoading(true);
+    try {
+      if (!call.transcript) {
+        await supabase.functions.invoke("maestro-transcript", { body: { call_id: call.id } });
+      }
+      const { data, error } = await supabase.functions.invoke("maestro-ai-analysis", {
+        body: { call_id: call.id },
+      });
+      if (error) throw error;
+      onUpdated({ ...call, ...(data as any) });
+      toast.success("Analyse IA terminée");
+    } catch (e: any) {
+      toast.error("Échec analyse IA", { description: e?.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!hasAI) {
+    return (
+      <div className="mt-3 p-3 rounded-xl" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)" }}>
+        <button onClick={run} disabled={loading}
+                className="w-full py-2.5 rounded-lg text-sm font-semibold flex items-center justify-center gap-2"
+                style={{ background: "linear-gradient(135deg, var(--pp-agent), var(--pp-brand-accent-2))", color: "white" }}>
+          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+          {call.transcript ? "Analyser avec l'IA" : "Transcrire + Analyser"}
+        </button>
+      </div>
+    );
+  }
+
+  const coaching = call.ai_coaching || {};
+  const coachingScore: number | undefined = coaching.score ?? coaching.global_score;
+  const insights = call.ai_client_insights || {};
+  const objections: string[] = insights.objections || coaching.objections || [];
+  const buyingSignals: string[] = insights.buying_signals || [];
+  const keyPoints: string[] = Array.isArray(call.ai_key_points) ? call.ai_key_points : (call.ai_key_points?.points || []);
+  const tasks: any[] = Array.isArray(call.ai_tasks) ? call.ai_tasks : [];
+
+  return (
+    <div className="mt-3 space-y-2">
+      {/* Résumé */}
+      <Block title="Résumé" icon={<Bot className="w-3.5 h-3.5" />}>
+        <p className="text-xs leading-relaxed" style={{ color: "var(--pp-text-secondary)" }}>{call.ai_summary}</p>
+        {keyPoints.length > 0 && (
+          <ul className="mt-2 space-y-0.5">
+            {keyPoints.slice(0, 5).map((p, i) => (
+              <li key={i} className="text-[11px] flex gap-1.5" style={{ color: "var(--pp-text-secondary)" }}>
+                <span style={{ color: "var(--pp-brand-accent)" }}>•</span>{p}
+              </li>
+            ))}
+          </ul>
+        )}
+      </Block>
+
+      {/* Coaching */}
+      {(coachingScore != null || coaching.strengths || coaching.improvements) && (
+        <Block title="Coaching" icon={<Sparkles className="w-3.5 h-3.5" />}>
+          {coachingScore != null && (
+            <div className="flex items-center gap-3 mb-2">
+              <ScoreCircle score={coachingScore} />
+              <div className="text-[11px]" style={{ color: "var(--pp-text-muted)" }}>
+                Score global de l'appel
+              </div>
+            </div>
+          )}
+          {coaching.strengths?.length > 0 && (
+            <div className="mb-1.5">
+              <div className="text-[10px] font-semibold uppercase mb-0.5" style={{ color: "var(--pp-success)" }}>Forces</div>
+              {coaching.strengths.map((s: string, i: number) => (
+                <div key={i} className="text-[11px]" style={{ color: "var(--pp-text-secondary)" }}>✓ {s}</div>
+              ))}
+            </div>
+          )}
+          {coaching.improvements?.length > 0 && (
+            <div>
+              <div className="text-[10px] font-semibold uppercase mb-0.5" style={{ color: "var(--pp-warning, #f59e0b)" }}>À améliorer</div>
+              {coaching.improvements.map((s: string, i: number) => (
+                <div key={i} className="text-[11px]" style={{ color: "var(--pp-text-secondary)" }}>→ {s}</div>
+              ))}
+            </div>
+          )}
+        </Block>
+      )}
+
+      {/* Insights client */}
+      {(objections.length > 0 || buyingSignals.length > 0 || call.lead_score != null) && (
+        <Block title="Insights client" icon={<User className="w-3.5 h-3.5" />}>
+          {call.lead_score != null && (
+            <div className="mb-2">
+              <div className="flex justify-between text-[10px] mb-1" style={{ color: "var(--pp-text-muted)" }}>
+                <span>Lead score</span><span>{call.lead_score}/100</span>
+              </div>
+              <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "var(--pp-bg-border-2)" }}>
+                <div className="h-full" style={{
+                  width: `${Math.min(100, call.lead_score)}%`,
+                  background: call.lead_temperature === "hot"
+                    ? "var(--pp-danger)"
+                    : call.lead_temperature === "warm"
+                    ? "var(--pp-warning, #f59e0b)"
+                    : "var(--pp-brand-accent)",
+                }} />
+              </div>
+            </div>
+          )}
+          {buyingSignals.length > 0 && (
+            <div className="flex flex-wrap gap-1 mb-1.5">
+              {buyingSignals.map((s, i) => (
+                <span key={i} className="text-[10px] px-2 py-0.5 rounded-full"
+                      style={{ background: "rgba(34,197,94,0.15)", color: "var(--pp-success)" }}>✓ {s}</span>
+              ))}
+            </div>
+          )}
+          {objections.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {objections.map((s, i) => (
+                <span key={i} className="text-[10px] px-2 py-0.5 rounded-full"
+                      style={{ background: "rgba(239,68,68,0.15)", color: "var(--pp-danger)" }}>⚠ {s}</span>
+              ))}
+            </div>
+          )}
+        </Block>
+      )}
+
+      {/* Actions */}
+      {tasks.length > 0 && <TasksBlock call={call} tasks={tasks} />}
+    </div>
+  );
+}
+
+function Block({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="p-3 rounded-xl" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)" }}>
+      <div className="flex items-center gap-1.5 mb-1.5 text-[11px] font-semibold uppercase tracking-wide"
+           style={{ color: "var(--pp-text-muted)" }}>
+        {icon}{title}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function ScoreCircle({ score }: { score: number }) {
+  const pct = Math.max(0, Math.min(100, score));
+  const color = pct >= 80 ? "var(--pp-success)" : pct >= 50 ? "var(--pp-warning, #f59e0b)" : "var(--pp-danger)";
+  return (
+    <div
+      className="relative w-12 h-12 rounded-full flex items-center justify-center"
+      style={{ background: `conic-gradient(${color} ${pct * 3.6}deg, var(--pp-bg-border-2) 0)` }}
+    >
+      <div className="w-9 h-9 rounded-full flex items-center justify-center"
+           style={{ background: "var(--pp-bg-surface)", color: "var(--pp-text-primary)" }}>
+        <span className="text-xs font-bold">{Math.round(pct)}</span>
+      </div>
+    </div>
+  );
+}
+
+function TasksBlock({ call, tasks }: { call: RecordingCall; tasks: any[] }) {
+  const [busy, setBusy] = useState<number | "all" | null>(null);
+
+  const createOne = async (idx: number, t: any) => {
+    setBusy(idx);
+    try {
+      const { error } = await supabase.functions.invoke("maestro-task", {
+        body: {
+          call_id: call.id,
+          client_id: call.maestro_client_id,
+          title: t.title || t.label,
+          description: t.description,
+          priority: t.priority || "medium",
+          due_date: t.due_date,
+        },
+      });
+      if (error) throw error;
+      toast.success("Tâche créée dans Maestro");
+    } catch (e: any) {
+      toast.error("Échec création tâche", { description: e?.message });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const createAll = async () => {
+    setBusy("all");
+    try {
+      for (let i = 0; i < tasks.length; i++) await createOne(i, tasks[i]);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <Block title="Actions suggérées" icon={<ListChecks className="w-3.5 h-3.5" />}>
+      <div className="space-y-1.5">
+        {tasks.map((t, i) => (
+          <div key={i} className="flex items-start gap-2 p-2 rounded-lg"
+               style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)" }}>
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-medium" style={{ color: "var(--pp-text-primary)" }}>
+                {t.title || t.label}
+              </div>
+              {t.description && (
+                <div className="text-[10px] mt-0.5" style={{ color: "var(--pp-text-muted)" }}>{t.description}</div>
+              )}
+              {t.priority && (
+                <span className="inline-block mt-1 text-[9px] px-1.5 py-0.5 rounded-full"
+                      style={{
+                        background: t.priority === "high" ? "rgba(239,68,68,0.15)" : "rgba(46,155,220,0.15)",
+                        color: t.priority === "high" ? "var(--pp-danger)" : "var(--pp-brand-accent)",
+                      }}>{t.priority}</span>
+              )}
+            </div>
+            <button onClick={() => createOne(i, t)} disabled={busy != null}
+                    className="text-[10px] px-2 py-1 rounded-md shrink-0"
+                    style={{ background: "var(--pp-brand-accent-2)", color: "white" }}>
+              {busy === i ? <Loader2 className="w-3 h-3 animate-spin" /> : "Créer"}
+            </button>
+          </div>
+        ))}
+      </div>
+      {tasks.length > 1 && (
+        <button onClick={createAll} disabled={busy != null}
+                className="w-full mt-2 py-1.5 rounded-md text-[11px] font-semibold"
+                style={{ background: "var(--pp-bg-surface)", color: "var(--pp-text-primary)", border: "1px solid var(--pp-bg-border-2)" }}>
+          {busy === "all" ? "Création…" : "Tout créer dans Maestro"}
+        </button>
+      )}
+    </Block>
+  );
+}
+
+// ===================== Maestro Sync =====================
+function MaestroSyncSection({ call, onUpdated }: { call: RecordingCall; onUpdated: (c: RecordingCall) => void }) {
+  const [busy, setBusy] = useState<"sync" | "lookup" | null>(null);
+
+  const sync = async () => {
+    setBusy("sync");
+    try {
+      const { error } = await supabase.functions.invoke("maestro-cdr", { body: { call_id: call.id } });
+      if (error) throw error;
+      onUpdated({ ...call, maestro_synced: true });
+      toast.success("Synchronisé avec Maestro");
+    } catch (e: any) {
+      toast.error("Sync échouée", { description: e?.message });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const lookup = async () => {
+    setBusy("lookup");
+    try {
+      const phone = call.direction === "outbound" ? call.to_number : call.from_number;
+      const { data, error } = await supabase.functions.invoke("maestro-client-lookup", {
+        body: { phone, call_id: call.id },
+      });
+      if (error) throw error;
+      const clientId = (data as any)?.client_id;
+      if (clientId) {
+        onUpdated({ ...call, maestro_client_id: clientId });
+        toast.success("Client lié");
+      } else {
+        toast.info("Aucun client trouvé");
+      }
+    } catch (e: any) {
+      toast.error("Recherche échouée", { description: e?.message });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <div className="mt-3 p-3 rounded-xl space-y-2" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)" }}>
+      <div className="flex items-center justify-between">
+        <div className="text-[11px]" style={{ color: "var(--pp-text-secondary)" }}>
+          Statut Maestro
+        </div>
+        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+              style={{
+                background: call.maestro_synced ? "rgba(34,197,94,0.15)" : "var(--pp-bg-surface)",
+                color: call.maestro_synced ? "var(--pp-success)" : "var(--pp-text-muted)",
+              }}>
+          {call.maestro_synced ? "Synchronisé" : "Non synchronisé"}
+        </span>
+      </div>
+      {call.maestro_client_id && (
+        <div className="text-[11px]" style={{ color: "var(--pp-text-secondary)" }}>
+          Client : <span className="font-mono">{call.maestro_client_id}</span>
+        </div>
+      )}
+      <div className="flex gap-2">
+        <button onClick={lookup} disabled={busy != null}
+                className="flex-1 py-2 rounded-lg text-[11px] font-medium flex items-center justify-center gap-1"
+                style={{ background: "var(--pp-bg-surface)", color: "var(--pp-text-primary)", border: "1px solid var(--pp-bg-border-2)" }}>
+          {busy === "lookup" ? <Loader2 className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />}
+          Rechercher client
+        </button>
+        <button onClick={sync} disabled={busy != null}
+                className="flex-1 py-2 rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"
+                style={{ background: "linear-gradient(135deg, var(--pp-brand-accent), var(--pp-brand-accent-2))", color: "white" }}>
+          {busy === "sync" ? <Loader2 className="w-3 h-3 animate-spin" /> : <Link2 className="w-3 h-3" />}
+          {call.maestro_synced ? "Resynchroniser" : "Synchroniser"}
+        </button>
+      </div>
+    </div>
+  );
+}
