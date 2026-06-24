@@ -1,19 +1,20 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { buildWssFallbackList, type SIPConfig } from '../lib/sip/jssipProvider';
+import { supabase } from '../lib/mobileSupabase';
 
 type Result = {
   url: string;
   state: 'pending' | 'ok' | 'fail';
   ms?: number;
   reason?: string;
+  at?: string;
 };
 
+const PRIMARY_PORT = '7444';
+
 function classifyWsFailure(url: string): string {
-  // Browsers do NOT expose detailed TLS error info to JS for security reasons.
-  // If wss:// fails to open but the host/port is reachable, it is almost
-  // always: invalid SSL certificate, blocked port, or server down.
   return (
-    'Connection refused or rejected. Most common cause on port 7443: ' +
+    'Connection refused or rejected. Most common cause on port 7443/7444: ' +
     'the WSS endpoint is using a self-signed or untrusted SSL certificate ' +
     'that mobile browsers refuse. Verify by opening ' +
     url.replace('wss://', 'https://') +
@@ -29,14 +30,14 @@ function probe(url: string, timeoutMs = 5000): Promise<Result> {
     try {
       ws = new WebSocket(url, 'sip');
     } catch (e: any) {
-      resolve({ url, state: 'fail', reason: e?.message || 'WebSocket constructor failed' });
+      resolve({ url, state: 'fail', reason: e?.message || 'WebSocket constructor failed', at: new Date().toISOString() });
       return;
     }
     const done = (r: Result) => {
       if (settled) return;
       settled = true;
       try { ws.close(); } catch {}
-      resolve(r);
+      resolve({ ...r, at: new Date().toISOString() });
     };
     const timer = setTimeout(
       () => done({ url, state: 'fail', ms: Date.now() - started, reason: 'Timeout — server did not respond within ' + timeoutMs + 'ms' }),
@@ -53,27 +54,82 @@ function probe(url: string, timeoutMs = 5000): Promise<Result> {
   });
 }
 
+async function logFallback(primary: Result, fallback: Result, all: Result[]) {
+  try {
+    // Console for local diagnostics
+    // eslint-disable-next-line no-console
+    console.warn('[WSS] Fallback from', primary.url, 'to', fallback.url, {
+      at: new Date().toISOString(),
+      primary_reason: primary.reason,
+    });
+    await supabase.functions.invoke('pp-wss-fallback-log', {
+      body: {
+        primary_url: primary.url,
+        fallback_url: fallback.url,
+        primary_reason: primary.reason ?? null,
+        results: all.map((r) => ({ url: r.url, state: r.state, ms: r.ms, at: r.at, reason: r.reason })),
+      },
+    });
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.warn('[WSS] fallback log failed', e);
+  }
+}
+
 export default function WssDiagnostics({
   config,
   onClose,
+  autoRun = true,
 }: {
   config: SIPConfig | null;
   onClose: () => void;
+  autoRun?: boolean;
 }) {
   const urls = config ? buildWssFallbackList(config) : [];
   const [results, setResults] = useState<Result[]>(urls.map((url) => ({ url, state: 'pending' })));
   const [running, setRunning] = useState(false);
+  const didAutoRun = useRef(false);
+
+  const primary7444 = urls.find((u) => u.includes(`:${PRIMARY_PORT}`)) ?? urls[0];
+  const primaryResult = results.find((r) => r.url === primary7444);
 
   const run = async () => {
     if (!config) return;
     setRunning(true);
-    setResults(urls.map((url) => ({ url, state: 'pending' })));
+    const fresh: Result[] = urls.map((url) => ({ url, state: 'pending' as const }));
+    setResults(fresh);
+    const collected: Result[] = [];
     for (let i = 0; i < urls.length; i++) {
       const r = await probe(urls[i]);
+      collected.push(r);
       setResults((prev) => prev.map((p, idx) => (idx === i ? r : p)));
     }
     setRunning(false);
+
+    // Detect 7444 -> 7443 fallback and log it
+    const primary = collected.find((r) => r.url.includes(`:${PRIMARY_PORT}`));
+    if (primary && primary.state === 'fail') {
+      const fallback = collected.find((r) => r.state === 'ok' && !r.url.includes(`:${PRIMARY_PORT}`));
+      if (fallback) await logFallback(primary, fallback, collected);
+    }
   };
+
+  useEffect(() => {
+    if (!autoRun || didAutoRun.current || !config) return;
+    didAutoRun.current = true;
+    void run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config, autoRun]);
+
+  const banner = (() => {
+    if (!primaryResult || primaryResult.state === 'pending') {
+      return { color: '#f59e0b', label: `Testing port ${PRIMARY_PORT}…`, sub: primary7444 };
+    }
+    if (primaryResult.state === 'ok') {
+      return { color: '#22c55e', label: `Port ${PRIMARY_PORT} OK (${primaryResult.ms}ms)`, sub: primary7444 };
+    }
+    return { color: '#ef4444', label: `Port ${PRIMARY_PORT} FAILED — using fallback`, sub: primaryResult.reason ?? primary7444 };
+  })();
 
   return (
     <div role="dialog" aria-modal="true" style={{
@@ -91,10 +147,25 @@ export default function WssDiagnostics({
         }}>✕</button>
       </div>
 
+      {/* Primary port 7444 status banner */}
+      <div style={{
+        margin: '0 16px 8px', padding: 12, borderRadius: 12,
+        background: `${banner.color}1a`,
+        border: `1px solid ${banner.color}66`,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{
+            width: 10, height: 10, borderRadius: 999, background: banner.color,
+            boxShadow: `0 0 12px ${banner.color}`,
+          }} />
+          <strong style={{ fontSize: 13 }}>{banner.label}</strong>
+        </div>
+        <div style={{ marginTop: 4, fontSize: 11, opacity: 0.85, wordBreak: 'break-all' }}>{banner.sub}</div>
+      </div>
+
       <div style={{ padding: '0 16px 12px', fontSize: 12, opacity: 0.8 }}>
-        Tests each known SIP WebSocket endpoint and reports the failure reason.
-        Browsers hide TLS error details; a failed connection on port 7443 almost
-        always means the SSL certificate is invalid or self-signed.
+        Tests each known SIP WebSocket endpoint. Port {PRIMARY_PORT} is the primary;
+        if it fails the app falls back to 7443 and the event is logged with your user ID and timestamp.
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '0 16px 16px' }}>
@@ -110,7 +181,12 @@ export default function WssDiagnostics({
             border: `1px solid ${r.state === 'ok' ? '#22c55e55' : r.state === 'fail' ? '#ef444455' : '#f59e0b55'}`,
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-              <code style={{ fontSize: 12, wordBreak: 'break-all' }}>{r.url}</code>
+              <code style={{ fontSize: 12, wordBreak: 'break-all' }}>
+                {r.url}
+                {r.url.includes(`:${PRIMARY_PORT}`) && (
+                  <span style={{ marginLeft: 6, fontSize: 10, padding: '1px 6px', borderRadius: 4, background: '#3b82f6', color: '#fff' }}>PRIMARY</span>
+                )}
+              </code>
               <span style={{
                 fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999,
                 background: r.state === 'ok' ? '#22c55e' : r.state === 'fail' ? '#ef4444' : '#f59e0b',
@@ -119,6 +195,9 @@ export default function WssDiagnostics({
                 {r.state === 'ok' ? `OK ${r.ms}ms` : r.state === 'fail' ? 'FAIL' : 'pending'}
               </span>
             </div>
+            {r.at && (
+              <div style={{ marginTop: 4, fontSize: 10, opacity: 0.6 }}>{new Date(r.at).toLocaleTimeString()}</div>
+            )}
             {r.reason && (
               <div style={{ marginTop: 6, fontSize: 12, lineHeight: 1.4, opacity: 0.9 }}>{r.reason}</div>
             )}
@@ -127,18 +206,6 @@ export default function WssDiagnostics({
       </div>
 
       <div style={{ padding: 16, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-        <div style={{ fontSize: 11, opacity: 0.75, marginBottom: 10, lineHeight: 1.45 }}>
-          <strong>Admin fix for SSL errors:</strong> install a CA-signed certificate on
-          the WSS port. On the PBX server, run:
-          <pre style={{
-            margin: '6px 0 0', padding: 8, background: 'rgba(0,0,0,0.35)', borderRadius: 8,
-            fontSize: 11, overflowX: 'auto',
-          }}>{`sudo certbot certonly --standalone -d node.lemtelcloud.net
-# point FusionPBX/Kamailio to:
-#   /etc/letsencrypt/live/node.lemtelcloud.net/fullchain.pem
-#   /etc/letsencrypt/live/node.lemtelcloud.net/privkey.pem
-# then restart freeswitch / kamailio listening on :7443`}</pre>
-        </div>
         <button
           onClick={run}
           disabled={running || !config}
