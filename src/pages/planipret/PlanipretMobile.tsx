@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate, NavLink, Outlet, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
-import { Home, Phone, MessageSquare, Voicemail, MoreHorizontal, Phone as PhoneIcon, X, Delete, Plus, Lock } from "lucide-react";
+import { Home, Phone, MessageSquare, Users, MoreHorizontal, Phone as PhoneIcon, X, Delete, Plus, Lock } from "lucide-react";
 import { toast } from "sonner";
 import planipretLogo from "@/assets/planipret-logo.png.asset.json";
 import avaWordmark from "@/assets/ava-wordmark.svg";
@@ -22,10 +22,12 @@ export type PlanipretMobileContext = { profile: any; reloadProfile: () => Promis
 const TABS = [
   { to: "/mplanipret/home", label: "Accueil", Icon: Home },
   { to: "/mplanipret/calls", label: "Appels", Icon: Phone },
+  { to: "_fab", label: "", Icon: PhoneIcon },
   { to: "/mplanipret/messages", label: "Messages", Icon: MessageSquare },
-  { to: "/mplanipret/voicemail", label: "Boîte voc.", Icon: Voicemail },
+  { to: "/mplanipret/contacts", label: "Contacts", Icon: Users },
   { to: "/mplanipret/more", label: "Plus", Icon: MoreHorizontal },
 ];
+
 
 const KEYS: Array<{ d: string; l?: string }> = [
   { d: "1", l: "" }, { d: "2", l: "ABC" }, { d: "3", l: "DEF" },
