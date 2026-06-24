@@ -7945,6 +7945,9 @@ export type Database = {
       }
       planipret_phone_calls: {
         Row: {
+          ai_client_insights: Json | null
+          ai_coaching: Json | null
+          ai_key_points: Json | null
           ai_summary: string | null
           answered_at: string | null
           callback_reason: string | null
@@ -7959,10 +7962,14 @@ export type Database = {
           lead_score: number | null
           lead_score_reason: string | null
           lead_temperature: string | null
+          maestro_call_id: string | null
+          maestro_client_id: string | null
+          maestro_synced: boolean
           metadata: Json
           ns_call_id: string | null
           ns_domain: string | null
           organization_id: string
+          pipeline_state: Json
           recording_url: string | null
           started_at: string | null
           status: string | null
@@ -7970,10 +7977,15 @@ export type Database = {
           to_name: string | null
           to_number: string | null
           transcript: string | null
+          transcript_language: string | null
+          transcript_segments: Json | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          ai_client_insights?: Json | null
+          ai_coaching?: Json | null
+          ai_key_points?: Json | null
           ai_summary?: string | null
           answered_at?: string | null
           callback_reason?: string | null
@@ -7988,10 +8000,14 @@ export type Database = {
           lead_score?: number | null
           lead_score_reason?: string | null
           lead_temperature?: string | null
+          maestro_call_id?: string | null
+          maestro_client_id?: string | null
+          maestro_synced?: boolean
           metadata?: Json
           ns_call_id?: string | null
           ns_domain?: string | null
           organization_id?: string
+          pipeline_state?: Json
           recording_url?: string | null
           started_at?: string | null
           status?: string | null
@@ -7999,10 +8015,15 @@ export type Database = {
           to_name?: string | null
           to_number?: string | null
           transcript?: string | null
+          transcript_language?: string | null
+          transcript_segments?: Json | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          ai_client_insights?: Json | null
+          ai_coaching?: Json | null
+          ai_key_points?: Json | null
           ai_summary?: string | null
           answered_at?: string | null
           callback_reason?: string | null
@@ -8017,10 +8038,14 @@ export type Database = {
           lead_score?: number | null
           lead_score_reason?: string | null
           lead_temperature?: string | null
+          maestro_call_id?: string | null
+          maestro_client_id?: string | null
+          maestro_synced?: boolean
           metadata?: Json
           ns_call_id?: string | null
           ns_domain?: string | null
           organization_id?: string
+          pipeline_state?: Json
           recording_url?: string | null
           started_at?: string | null
           status?: string | null
@@ -8028,6 +8053,8 @@ export type Database = {
           to_name?: string | null
           to_number?: string | null
           transcript?: string | null
+          transcript_language?: string | null
+          transcript_segments?: Json | null
           updated_at?: string
           user_id?: string
         }
@@ -8168,6 +8195,9 @@ export type Database = {
           language: string
           last_eod_summary_at: string | null
           last_morning_brief_at: string | null
+          maestro_broker_id: string | null
+          maestro_broker_token: string | null
+          maestro_token_expires_at: string | null
           metadata: Json
           mobile_app_enabled: boolean
           ms365_access_token: string | null
@@ -8216,6 +8246,9 @@ export type Database = {
           language?: string
           last_eod_summary_at?: string | null
           last_morning_brief_at?: string | null
+          maestro_broker_id?: string | null
+          maestro_broker_token?: string | null
+          maestro_token_expires_at?: string | null
           metadata?: Json
           mobile_app_enabled?: boolean
           ms365_access_token?: string | null
@@ -8264,6 +8297,9 @@ export type Database = {
           language?: string
           last_eod_summary_at?: string | null
           last_morning_brief_at?: string | null
+          maestro_broker_id?: string | null
+          maestro_broker_token?: string | null
+          maestro_token_expires_at?: string | null
           metadata?: Json
           mobile_app_enabled?: boolean
           ms365_access_token?: string | null
