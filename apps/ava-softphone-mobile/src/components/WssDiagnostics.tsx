@@ -10,11 +10,11 @@ type Result = {
   at?: string;
 };
 
-const PRIMARY_PORT = '7444';
+const PRIMARY_PORT = '7443';
 
 function classifyWsFailure(url: string): string {
   return (
-    'Connection refused or rejected. Most common cause on port 7443/7444: ' +
+    'Connection refused or rejected. Most common cause on port 7443: ' +
     'the WSS endpoint is using a self-signed or untrusted SSL certificate ' +
     'that mobile browsers refuse. Verify by opening ' +
     url.replace('wss://', 'https://') +
@@ -90,8 +90,8 @@ export default function WssDiagnostics({
   const [running, setRunning] = useState(false);
   const didAutoRun = useRef(false);
 
-  const primary7444 = urls.find((u) => u.includes(`:${PRIMARY_PORT}`)) ?? urls[0];
-  const primaryResult = results.find((r) => r.url === primary7444);
+  const primaryUrl = urls.find((u) => u.includes(`:${PRIMARY_PORT}`)) ?? urls[0];
+  const primaryResult = results.find((r) => r.url === primaryUrl);
 
   const run = async () => {
     if (!config) return;
@@ -106,10 +106,10 @@ export default function WssDiagnostics({
     }
     setRunning(false);
 
-    // Detect 7444 -> 7443 fallback and log it
+    // Detect primary -> fallback and log it
     const primary = collected.find((r) => r.url.includes(`:${PRIMARY_PORT}`));
     if (primary && primary.state === 'fail') {
-      const fallback = collected.find((r) => r.state === 'ok' && !r.url.includes(`:${PRIMARY_PORT}`));
+      const fallback = collected.find((r) => r.state === 'ok' && r.url !== primary.url);
       if (fallback) await logFallback(primary, fallback, collected);
     }
   };
@@ -123,12 +123,12 @@ export default function WssDiagnostics({
 
   const banner = (() => {
     if (!primaryResult || primaryResult.state === 'pending') {
-      return { color: '#f59e0b', label: `Testing port ${PRIMARY_PORT}…`, sub: primary7444 };
+      return { color: '#f59e0b', label: `Testing port ${PRIMARY_PORT}…`, sub: primaryUrl };
     }
     if (primaryResult.state === 'ok') {
-      return { color: '#22c55e', label: `Port ${PRIMARY_PORT} OK (${primaryResult.ms}ms)`, sub: primary7444 };
+      return { color: '#22c55e', label: `Port ${PRIMARY_PORT} OK (${primaryResult.ms}ms)`, sub: primaryUrl };
     }
-    return { color: '#ef4444', label: `Port ${PRIMARY_PORT} FAILED — using fallback`, sub: primaryResult.reason ?? primary7444 };
+    return { color: '#ef4444', label: `Port ${PRIMARY_PORT} FAILED — using fallback`, sub: primaryResult.reason ?? primaryUrl };
   })();
 
   return (
@@ -147,7 +147,7 @@ export default function WssDiagnostics({
         }}>✕</button>
       </div>
 
-      {/* Primary port 7444 status banner */}
+      {/* Primary port status banner */}
       <div style={{
         margin: '0 16px 8px', padding: 12, borderRadius: 12,
         background: `${banner.color}1a`,
@@ -165,7 +165,7 @@ export default function WssDiagnostics({
 
       <div style={{ padding: '0 16px 12px', fontSize: 12, opacity: 0.8 }}>
         Tests each known SIP WebSocket endpoint. Port {PRIMARY_PORT} is the primary;
-        if it fails the app falls back to 7443 and the event is logged with your user ID and timestamp.
+        fallback events are logged with your user ID and timestamp.
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '0 16px 16px' }}>
