@@ -1004,3 +1004,81 @@ All colors MUST be HSL.
   transition: left 0.2s;
 }
 .planipret-scope .pp-toggle.on::after { left: 16px; }
+
+/* === Phase 7 — Global visual harmonization ===
+   Re-theme leftover Tailwind light surfaces inside the mobile shell so
+   any screen that still uses `bg-white` / `bg-slate-*` / `text-slate-*`
+   inherits the dark telecom palette without per-file rewrites. */
+.planipret-scope .bg-white,
+.planipret-scope .bg-slate-50,
+.planipret-scope .bg-slate-100 {
+  background-color: var(--pp-bg-surface) !important;
+}
+.planipret-scope .bg-slate-200,
+.planipret-scope .bg-slate-300 {
+  background-color: var(--pp-bg-elevated) !important;
+}
+.planipret-scope .bg-gray-50,
+.planipret-scope .bg-gray-100 {
+  background-color: var(--pp-bg-surface) !important;
+}
+.planipret-scope .bg-red-50 {
+  background-color: rgba(232, 76, 76, 0.10) !important;
+}
+.planipret-scope .text-black,
+.planipret-scope .text-slate-900,
+.planipret-scope .text-slate-800 {
+  color: var(--pp-text-primary) !important;
+}
+.planipret-scope .text-slate-700,
+.planipret-scope .text-slate-600 {
+  color: var(--pp-text-secondary) !important;
+}
+.planipret-scope .text-slate-500,
+.planipret-scope .text-slate-400 {
+  color: var(--pp-text-muted) !important;
+}
+.planipret-scope .text-slate-300,
+.planipret-scope .text-slate-200 {
+  color: var(--pp-text-faint) !important;
+}
+.planipret-scope .border-slate-100,
+.planipret-scope .border-slate-200,
+.planipret-scope .border-slate-300,
+.planipret-scope .divide-slate-100 > * + *,
+.planipret-scope .divide-slate-200 > * + * {
+  border-color: var(--pp-bg-border) !important;
+}
+.planipret-scope .shadow-sm,
+.planipret-scope .shadow,
+.planipret-scope .shadow-md,
+.planipret-scope .shadow-lg,
+.planipret-scope .shadow-xl,
+.planipret-scope .shadow-2xl {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35) !important;
+}
+.planipret-scope input,
+.planipret-scope textarea,
+.planipret-scope select {
+  background-color: var(--pp-bg-deep);
+  color: var(--pp-text-primary);
+  border-color: var(--pp-bg-border-2);
+}
+.planipret-scope input::placeholder,
+.planipret-scope textarea::placeholder {
+  color: var(--pp-text-faint);
+}
+.planipret-scope .hover\:bg-slate-50:hover,
+.planipret-scope .hover\:bg-slate-100:hover,
+.planipret-scope .active\:bg-slate-50:active,
+.planipret-scope .active\:bg-red-50:active {
+  background-color: var(--pp-bg-elevated) !important;
+}
+/* Bottom-sheet rounded white surfaces (MCalls detail, MPipeline, etc.) */
+.planipret-scope .rounded-t-3xl.bg-white,
+.planipret-scope .rounded-t-2xl.bg-white,
+.planipret-scope .rounded-2xl.bg-white {
+  background-color: var(--pp-bg-surface) !important;
+  border: 1px solid var(--pp-bg-border-2) !important;
+}
+
