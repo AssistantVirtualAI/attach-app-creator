@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { buildWssFallbackList, type SIPConfig } from '../lib/sip/jssipProvider';
-import { supabase } from '../lib/supabaseClient';
+import { supabase } from '../lib/mobileSupabase';
 
 type Result = {
   url: string;
