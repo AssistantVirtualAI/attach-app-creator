@@ -211,7 +211,7 @@ export default function PlanipretMobile() {
         </header>
 
         <UniversalSearchBar />
-        <div ref={scrollRef} className="flex-1 overflow-y-auto pb-[96px]">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto pb-[110px]">
           <PullIndicator pullDist={pullDist} refreshing={refreshing} threshold={threshold} color={ACCENT} />
           <Outlet context={{ profile, reloadProfile: loadProfile, openDialer, registerRefresh } satisfies PlanipretMobileContext} />
         </div>
@@ -221,17 +221,18 @@ export default function PlanipretMobile() {
           <OnboardingTutorial profile={profile} onDone={loadProfile} />
         )}
 
-        {/* FAB */}
+        {/* Center FAB (between Appels and Messages) */}
         <button onClick={() => setDialerOpen(true)}
           className="absolute left-1/2 -translate-x-1/2 z-20 rounded-full flex items-center justify-center text-white active:scale-95 transition"
           style={{
             background: "linear-gradient(135deg, #1A4A8A, #2E9BDC)",
-            boxShadow: "0 4px 24px rgba(46,155,220,0.5)",
-            width: 52, height: 52, bottom: 78,
+            boxShadow: "0 4px 24px rgba(46,155,220,0.6)",
+            width: 56, height: 56, bottom: 78,
           }}
           aria-label="Composer un numéro">
           <PhoneIcon className="w-6 h-6" />
         </button>
+
 
         {/* Tab bar (6 slots: 5 tabs + center FAB placeholder) */}
         <nav className="absolute bottom-[22px] inset-x-0 grid grid-cols-6 z-10"
