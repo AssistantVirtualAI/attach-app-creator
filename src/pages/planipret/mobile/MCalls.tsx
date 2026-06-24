@@ -1023,3 +1023,297 @@ function ActionBtn({ label, Icon, onClick, active, big, danger }: { label: strin
     </button>
   );
 }
+
+/* =================== Voicemails Tab (Phase 8) =================== */
+
+type VM = {
+  id: string;
+  user_id: string;
+  ns_vm_id: string | null;
+  folder: string;
+  from_number: string | null;
+  from_name: string | null;
+  duration_seconds: number | null;
+  audio_url: string | null;
+  transcript: string | null;
+  is_read: boolean;
+  received_at: string | null;
+  created_at: string;
+};
+
+function fmtVmDate(iso: string) {
+  const d = new Date(iso);
+  const now = new Date();
+  const yest = new Date(); yest.setDate(now.getDate() - 1);
+  const hh = `${String(d.getHours()).padStart(2, "0")}h${String(d.getMinutes()).padStart(2, "0")}`;
+  if (d.toDateString() === now.toDateString()) return `Aujourd'hui ${hh}`;
+  if (d.toDateString() === yest.toDateString()) return `Hier ${hh}`;
+  return d.toLocaleDateString("fr-CA", { day: "2-digit", month: "short" }) + ` ${hh}`;
+}
+function fmtVmDur(s: number | null) {
+  if (!s) return "—";
+  const m = Math.floor(s / 60); const r = s % 60;
+  return m === 0 ? `${r} sec` : `${m} min ${String(r).padStart(2, "0")} sec`;
+}
+
+function VoicemailsTab({
+  userId, openDialer, registerRefresh,
+}: { userId?: string; openDialer: (n: string) => void; registerRefresh: (fn: (() => void) | null) => void }) {
+  const [items, setItems] = useState<VM[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [folder, setFolder] = useState<"inbox" | "saved">("inbox");
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    if (!userId) return;
+    setLoading(true);
+    const sb: any = supabase;
+    const { data } = await sb
+      .from("planipret_voicemails")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+    setItems((data ?? []) as VM[]);
+    setLoading(false);
+  }, [userId]);
+
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    registerRefresh(() => load());
+    return () => registerRefresh(null);
+  }, [load, registerRefresh]);
+
+  useEffect(() => {
+    if (!userId) return;
+    const ch = supabase
+      .channel(`mcalls-vm:${userId}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "planipret_voicemails", filter: `user_id=eq.${userId}` }, (payload) => {
+        const v = payload.new as VM;
+        setItems((p) => [v, ...p]);
+        toast(`📬 Nouveau voicemail de ${v.from_number ?? "inconnu"}`);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [userId]);
+
+  const filtered = items.filter((v) => v.folder === folder);
+  const unread = items.filter((v) => v.folder === "inbox" && !v.is_read).length;
+
+  const markRead = async (vm: VM) => {
+    if (vm.is_read) return;
+    const sb: any = supabase;
+    await sb.from("planipret_voicemails").update({ is_read: true }).eq("id", vm.id);
+    setItems((p) => p.map((x) => x.id === vm.id ? { ...x, is_read: true } : x));
+  };
+  const saveVm = async (vm: VM) => {
+    const sb: any = supabase;
+    await sb.from("planipret_voicemails").update({ folder: "saved" }).eq("id", vm.id);
+    setItems((p) => p.map((x) => x.id === vm.id ? { ...x, folder: "saved" } : x));
+    toast.success("Voicemail sauvegardé");
+  };
+  const removeVm = async (vm: VM) => {
+    if (!confirm("Supprimer ce voicemail ?")) return;
+    if (vm.ns_vm_id) {
+      await supabase.functions.invoke("ns-voicemail", { method: "DELETE" as any, body: { vm_id: vm.ns_vm_id } }).catch(() => null);
+    }
+    const sb: any = supabase;
+    await sb.from("planipret_voicemails").delete().eq("id", vm.id);
+    setItems((p) => p.filter((x) => x.id !== vm.id));
+    toast.success("Voicemail supprimé");
+  };
+  const fetchTranscript = async (vm: VM) => {
+    const { data, error } = await supabase.functions.invoke("ns-transcription", { body: { vm_id: vm.ns_vm_id ?? vm.id } });
+    if (error || (data as any)?.success === false) { toast.error("Échec de la transcription"); return; }
+    const txt = (data as any)?.transcript ?? (data as any)?.data?.transcript ?? "";
+    if (txt) {
+      const sb: any = supabase;
+      await sb.from("planipret_voicemails").update({ transcript: txt }).eq("id", vm.id);
+      setItems((p) => p.map((x) => x.id === vm.id ? { ...x, transcript: txt } : x));
+    }
+  };
+
+  return (
+    <div className="px-3 pt-3 pb-4">
+      {/* Folder switch */}
+      <div className="flex gap-1 mb-3 p-1 rounded-full"
+        style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)" }}>
+        {([
+          { k: "inbox" as const, label: `Reçus${unread ? ` (${unread})` : ""}` },
+          { k: "saved" as const, label: "Sauvegardés" },
+        ]).map((f) => {
+          const active = folder === f.k;
+          return (
+            <button key={f.k} onClick={() => setFolder(f.k)}
+              className="flex-1 py-1.5 text-[11px] font-semibold rounded-full transition"
+              style={active
+                ? { background: "linear-gradient(135deg, var(--pp-brand-accent), var(--pp-brand-accent-2))", color: "#fff" }
+                : { color: "var(--pp-text-muted)" }}>
+              {f.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {loading ? (
+        <ul className="space-y-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <li key={i} className="rounded-2xl h-16 animate-pulse"
+              style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)" }} />
+          ))}
+        </ul>
+      ) : filtered.length === 0 ? (
+        <div className="p-10 text-center">
+          <div className="w-14 h-14 mx-auto rounded-full flex items-center justify-center mb-3"
+            style={{ background: "rgba(46,155,220,0.12)", color: "var(--pp-brand-accent)" }}>
+            <VmIcon className="w-6 h-6" />
+          </div>
+          <div className="font-semibold" style={{ color: "var(--pp-text-secondary)" }}>
+            {folder === "inbox" ? "Aucun voicemail reçu" : "Aucun voicemail sauvegardé"}
+          </div>
+        </div>
+      ) : (
+        <ul className="space-y-2">
+          {filtered.map((vm) => {
+            const open = expanded === vm.id;
+            return (
+              <li key={vm.id} className="rounded-2xl overflow-hidden"
+                style={{
+                  background: "var(--pp-bg-surface)",
+                  border: "1px solid var(--pp-bg-border-2)",
+                  borderLeft: vm.is_read ? "1px solid var(--pp-bg-border-2)" : "3px solid var(--pp-brand-accent)",
+                }}>
+                <button onClick={() => { setExpanded(open ? null : vm.id); markRead(vm); }}
+                  className="w-full p-3 flex items-center gap-3 text-left">
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center relative shrink-0"
+                    style={{ background: "rgba(46,155,220,0.12)", color: "var(--pp-brand-accent)" }}>
+                    <VmIcon className="w-5 h-5" />
+                    {!vm.is_read && (
+                      <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full"
+                        style={{ background: "var(--pp-brand-accent)", boxShadow: "0 0 0 2px var(--pp-bg-surface)" }} />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className={`text-sm truncate ${vm.is_read ? "" : "font-semibold"}`} style={{ color: "var(--pp-text-primary)" }}>
+                      {vm.from_name || vm.from_number || "Inconnu"}
+                    </div>
+                    <div className="text-[11px]" style={{ color: "var(--pp-text-muted)" }}>
+                      {fmtVmDate(vm.received_at ?? vm.created_at)} · {fmtVmDur(vm.duration_seconds)}
+                    </div>
+                  </div>
+                  {open ? <ChevronUp className="w-4 h-4" style={{ color: "var(--pp-text-muted)" }} />
+                        : <ChevronDown className="w-4 h-4" style={{ color: "var(--pp-text-muted)" }} />}
+                </button>
+
+                {open && (
+                  <div className="px-3 pb-3" style={{ borderTop: "1px solid var(--pp-bg-border)" }}>
+                    <VmAudio vm={vm} />
+                    <div className="mt-2">
+                      {vm.transcript ? (
+                        <div className="rounded-lg p-2 text-xs whitespace-pre-wrap"
+                          style={{ background: "var(--pp-bg-deep)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>
+                          {vm.transcript}
+                        </div>
+                      ) : (
+                        <button onClick={() => fetchTranscript(vm)}
+                          className="w-full py-2 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5"
+                          style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>
+                          <FileText className="w-3.5 h-3.5" /> Obtenir la transcription
+                        </button>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-3 gap-1.5 mt-3">
+                      <VmAction icon={<Phone className="w-4 h-4" />} label="Rappeler" onClick={() => openDialer(vm.from_number ?? "")} accent />
+                      {folder === "inbox" && <VmAction icon={<Save className="w-4 h-4" />} label="Garder" onClick={() => saveVm(vm)} />}
+                      <VmAction icon={<Trash2 className="w-4 h-4" />} label="Suppr." onClick={() => removeVm(vm)} danger />
+                    </div>
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function VmAction({ icon, label, onClick, accent, danger }:
+  { icon: React.ReactNode; label: string; onClick: () => void; accent?: boolean; danger?: boolean }) {
+  const bg = danger ? "rgba(232,76,76,0.10)" : accent ? "rgba(46,155,220,0.12)" : "var(--pp-bg-elevated)";
+  const color = danger ? "var(--pp-danger)" : accent ? "var(--pp-brand-accent)" : "var(--pp-text-secondary)";
+  const border = danger ? "rgba(232,76,76,0.25)" : accent ? "rgba(46,155,220,0.30)" : "var(--pp-bg-border-2)";
+  return (
+    <button onClick={onClick}
+      className="py-2 rounded-lg text-[11px] font-medium flex flex-col items-center gap-1 active:scale-95 transition"
+      style={{ background: bg, color, border: `1px solid ${border}` }}>
+      {icon}<span>{label}</span>
+    </button>
+  );
+}
+
+function VmAudio({ vm }: { vm: VM }) {
+  const [src, setSrc] = useState<string | null>(vm.audio_url);
+  const [playing, setPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [dur, setDur] = useState(vm.duration_seconds ?? 0);
+  const [speed, setSpeed] = useState(1);
+  const audioRef = useRef<HTMLAudioElement>(null);
+
+  useEffect(() => {
+    (async () => {
+      if (src) return;
+      const id = vm.ns_vm_id ?? vm.id;
+      const { data } = await supabase.functions.invoke("ns-voicemail", { method: "GET" as any, body: { vm_id: id, action: "fetch" } as any });
+      const url = (data as any)?.url ?? (data as any)?.audio_url;
+      if (url) setSrc(url);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vm.id]);
+
+  const toggle = () => {
+    const a = audioRef.current; if (!a) return;
+    if (a.paused) { a.play(); setPlaying(true); } else { a.pause(); setPlaying(false); }
+  };
+  const cycleSpeed = () => {
+    const next = speed === 1 ? 1.5 : speed === 1.5 ? 2 : 1;
+    setSpeed(next);
+    if (audioRef.current) audioRef.current.playbackRate = next;
+  };
+  const fmtT = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+
+  return (
+    <div className="rounded-lg p-3 mt-2"
+      style={{ background: "var(--pp-bg-deep)", border: "1px solid var(--pp-bg-border-2)" }}>
+      {src && (
+        <audio
+          ref={audioRef}
+          src={src}
+          onTimeUpdate={(e) => setProgress(e.currentTarget.currentTime)}
+          onLoadedMetadata={(e) => setDur(e.currentTarget.duration)}
+          onEnded={() => setPlaying(false)}
+          hidden
+        />
+      )}
+      <div className="flex items-center gap-2">
+        <button onClick={toggle} disabled={!src}
+          className="w-9 h-9 rounded-full flex items-center justify-center text-white disabled:opacity-40"
+          style={{ background: "linear-gradient(135deg, var(--pp-brand-accent-2), var(--pp-brand-accent))" }}>
+          {playing ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
+        </button>
+        <input type="range" min={0} max={dur || 0} step={0.1} value={progress}
+          onChange={(e) => { const v = +e.target.value; setProgress(v); if (audioRef.current) audioRef.current.currentTime = v; }}
+          className="flex-1" style={{ accentColor: "var(--pp-brand-accent)" }} />
+        <span className="text-[10px] tabular-nums" style={{ color: "var(--pp-text-muted)" }}>
+          {fmtT(progress)} / {fmtT(dur || 0)}
+        </span>
+        <button onClick={cycleSpeed}
+          className="px-2 py-1 rounded text-[10px] font-semibold"
+          style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>
+          {speed}x
+        </button>
+      </div>
+      {!src && <p className="text-[10px] mt-1" style={{ color: "var(--pp-text-faint)" }}>Chargement de l'audio…</p>}
+    </div>
+  );
+}
+
