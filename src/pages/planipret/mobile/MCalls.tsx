@@ -235,6 +235,8 @@ export default function MCalls() {
           <ActiveCallsTab userId={userId} openDialer={openDialer} />
         ) : tab === "recordings" ? (
           <RecordingsTab calls={calls} loading={loading} onTap={(c) => setSelected(c)} />
+        ) : tab === "voicemails" ? (
+          <VoicemailsTab userId={userId} openDialer={openDialer} registerRefresh={registerRefresh} />
         ) : (
           <>
             {/* Pull-to-refresh proxy */}
