@@ -2,24 +2,29 @@ import { useEffect, useState } from "react";
 import { useOutletContext, useNavigate } from "react-router-dom";
 
 import { supabase } from "@/integrations/supabase/client";
-import { Phone, PhoneMissed, MessageSquare, Voicemail, ArrowDownLeft, ArrowUpRight, X, Calendar, Headphones, Bot, BellOff, Flame } from "lucide-react";
+import {
+  Phone, PhoneMissed, MessageSquare, Voicemail,
+  ArrowDownLeft, ArrowUpRight, X, Calendar, Headphones, Bot,
+  BellOff, Flame, Sparkles, ChevronRight,
+} from "lucide-react";
 import type { PlanipretMobileContext } from "../PlanipretMobile";
 import { toast } from "sonner";
 import VoiceAgent from "@/components/VoiceAgent";
 import PWAInstallBanner from "@/components/planipret/PWAInstallBanner";
-import { TEMP_COLORS, TEMP_EMOJI } from "@/components/planipret/leadHelpers";
-
-const PRIMARY = "#1F4E79";
-const SUCCESS = "#27AE60";
-const DANGER = "#E74C3C";
-const ACCENT = "#2E86C1";
+import { TEMP_EMOJI } from "@/components/planipret/leadHelpers";
 
 function Shimmer({ className = "" }: { className?: string }) {
-  return <div className={`animate-pulse bg-slate-200 rounded ${className}`} />;
+  return (
+    <div
+      className={`animate-pulse rounded ${className}`}
+      style={{ background: "var(--pp-bg-elevated)" }}
+    />
+  );
 }
 
 export default function MHome() {
-  const { profile, registerRefresh, openDialer, reloadProfile } = useOutletContext<PlanipretMobileContext>();
+  const { profile, registerRefresh, openDialer, reloadProfile } =
+    useOutletContext<PlanipretMobileContext>();
   const navigate = useNavigate();
   const [stats, setStats] = useState({ calls: 0, missed: 0, sms: 0, voicemails: 0 });
   const [recent, setRecent] = useState<any[]>([]);
@@ -36,12 +41,17 @@ export default function MHome() {
   const openAgent = async () => {
     try {
       const p = await navigator.permissions.query({ name: "microphone" as PermissionName });
-      if (p.state === "denied") { toast.error("🎙️ Accès au microphone refusé. Autorisez-le dans votre navigateur."); return; }
+      if (p.state === "denied") {
+        toast.error("🎙️ Accès au microphone refusé. Autorisez-le dans votre navigateur.");
+        return;
+      }
     } catch { /* ignore */ }
     setAgentOpen(true);
   };
 
-  const dateLabel = new Date().toLocaleDateString("fr-CA", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const dateLabel = new Date().toLocaleDateString("fr-CA", {
+    weekday: "long", day: "numeric", month: "long",
+  });
 
   const loadStats = async () => {
     if (!profile) return;
@@ -94,7 +104,6 @@ export default function MHome() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.user_id]);
 
-
   const playBrief = async () => {
     setBriefLoading(true);
     const { data, error } = await supabase.functions.invoke("ai-daily-brief", { body: {} });
@@ -103,30 +112,66 @@ export default function MHome() {
     setBrief((data as any).briefing_text);
   };
 
-  const reconnect = async () => { await supabase.functions.invoke("ns-auth"); loadStats(); };
+  const reconnect = async () => {
+    toast.loading("Reconnexion SIP…", { id: "sip-reconnect" });
+    await supabase.functions.invoke("ns-auth");
+    toast.dismiss("sip-reconnect");
+    loadStats();
+  };
+
+  const firstName = (profile?.full_name ?? "Courtier").split(" ")[0];
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="p-4 space-y-4 pb-8" style={{ background: "var(--pp-bg-base)", minHeight: "100%" }}>
       <PWAInstallBanner />
+
+      {/* ===== Header ===== */}
       <header className="flex items-start justify-between pt-2">
-        <div>
-          <h1 className="text-xl font-bold" style={{ color: "#1A1A2E" }}>Bonjour, {profile?.full_name ?? "Courtier"}</h1>
-          <p className="text-xs text-slate-500 mt-0.5 capitalize">{dateLabel}</p>
+        <div className="min-w-0">
+          <p className="text-[11px] uppercase tracking-[0.18em]" style={{ color: "var(--pp-text-muted)" }}>
+            {dateLabel}
+          </p>
+          <h1 className="text-2xl font-bold mt-0.5" style={{ color: "var(--pp-text-primary)" }}>
+            Bonjour, <span style={{ color: "var(--pp-brand-accent)" }}>{firstName}</span>
+          </h1>
         </div>
-        <button onClick={reconnect} className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-white border border-slate-200">
-          <span className="w-2 h-2 rounded-full" style={{ background: sipOnline ? SUCCESS : DANGER }} />
-          <span style={{ color: sipOnline ? SUCCESS : DANGER }}>{sipOnline ? "En ligne" : "Hors ligne"}</span>
+        <button
+          onClick={reconnect}
+          className={sipOnline ? "pp-status-ok" : "pp-status-off"}
+          style={{
+            display: "inline-flex", alignItems: "center", gap: 6,
+            padding: "6px 10px", borderRadius: 999, fontSize: 11, fontWeight: 600,
+          }}
+        >
+          <span
+            style={{
+              width: 6, height: 6, borderRadius: 999,
+              background: sipOnline ? "var(--pp-success)" : "var(--pp-danger)",
+              boxShadow: sipOnline ? "0 0 8px var(--pp-success)" : "0 0 8px var(--pp-danger)",
+            }}
+          />
+          {sipOnline ? "En ligne" : "Hors ligne"}
         </button>
       </header>
 
-      {/* DND BANNER */}
+      {/* ===== DND BANNER ===== */}
       {profile?.dnd_enabled && (
-        <div className="rounded-xl p-3 flex items-center gap-3"
-          style={{ background: "rgba(232,76,76,0.12)", border: "1px solid rgba(232,76,76,0.35)" }}>
-          <BellOff className="w-5 h-5" style={{ color: "#E84C4C" }} />
+        <div
+          className="rounded-2xl p-3 flex items-center gap-3"
+          style={{
+            background: "rgba(232,76,76,0.08)",
+            border: "1px solid rgba(232,76,76,0.30)",
+            backdropFilter: "blur(12px)",
+          }}
+        >
+          <BellOff className="w-5 h-5" style={{ color: "var(--pp-danger)" }} />
           <div className="flex-1 min-w-0">
-            <div className="text-xs font-bold" style={{ color: "#E84C4C" }}>🔕 Mode Ne pas déranger actif</div>
-            <div className="text-[11px] text-slate-500">AVA répond à vos appels automatiquement</div>
+            <div className="text-xs font-bold" style={{ color: "var(--pp-danger)" }}>
+              Mode Ne pas déranger actif
+            </div>
+            <div className="text-[11px]" style={{ color: "var(--pp-text-secondary)" }}>
+              AVA répond à vos appels automatiquement
+            </div>
           </div>
           <button
             onClick={async () => {
@@ -134,13 +179,15 @@ export default function MHome() {
               await reloadProfile();
               toast.success("Mode DND désactivé");
             }}
-            className="text-[11px] font-semibold px-2.5 py-1 rounded-md text-white" style={{ background: "#E84C4C" }}>
+            className="text-[11px] font-semibold px-2.5 py-1 rounded-md text-white"
+            style={{ background: "var(--pp-danger)" }}
+          >
             Désactiver
           </button>
         </div>
       )}
 
-      {/* PRIORITY WIDGET */}
+      {/* ===== PRIORITY HERO ===== */}
       {(dueReminders.length > 0 || hotLeads.length > 0) && (() => {
         const overdue = dueReminders[0];
         const hot = !overdue ? hotLeads[0] : null;
@@ -152,116 +199,123 @@ export default function MHome() {
           ? `Rappel en retard${overdue.note ? ` • ${overdue.note}` : ""}`
           : `Lead chaud • Score ${hot.lead_score}/10`;
         return (
-          <section className="rounded-2xl p-4"
-            style={{ background: "linear-gradient(135deg,#1A0D0D,#3D1010)", border: "1px solid rgba(232,76,76,0.3)" }}>
-            <div className="flex items-center gap-2 mb-1">
-              <Flame className="w-4 h-4 text-red-400" />
-              <span className="text-[11px] font-bold uppercase tracking-wider text-red-300">Priorité maintenant</span>
-            </div>
-            <div className="text-lg font-bold text-white truncate">{name ?? "—"}</div>
-            <div className="text-xs text-red-200/80 mb-3">{reason}</div>
-            <div className="flex gap-2">
-              <button onClick={() => openDialer(phone ?? undefined)}
-                className="flex-1 py-2.5 rounded-lg text-white text-sm font-semibold flex items-center justify-center gap-2"
-                style={{ background: "#27AE60" }}>
-                <Phone className="w-4 h-4" /> Appeler maintenant
-              </button>
-              {overdue && (
+          <section
+            className="rounded-2xl p-4 relative overflow-hidden"
+            style={{
+              background: "linear-gradient(135deg, rgba(232,76,76,0.18), rgba(232,76,76,0.04))",
+              border: "1px solid rgba(232,76,76,0.35)",
+              boxShadow: "0 8px 32px rgba(232,76,76,0.18)",
+            }}
+          >
+            <div
+              className="absolute -top-10 -right-10 w-32 h-32 rounded-full"
+              style={{ background: "rgba(232,76,76,0.25)", filter: "blur(40px)" }}
+            />
+            <div className="relative">
+              <div className="flex items-center gap-2 mb-1">
+                <Flame className="w-4 h-4" style={{ color: "var(--pp-danger)" }} />
+                <span className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: "var(--pp-danger)" }}>
+                  Priorité maintenant
+                </span>
+              </div>
+              <div className="text-lg font-bold truncate" style={{ color: "var(--pp-text-primary)" }}>
+                {name ?? "—"}
+              </div>
+              <div className="text-xs mb-3" style={{ color: "var(--pp-text-secondary)" }}>
+                {reason}
+              </div>
+              <div className="flex gap-2">
                 <button
-                  onClick={async () => {
-                    const next = new Date(Date.now() + 3600 * 1000).toISOString();
-                    await supabase.from("planipret_reminders").update({ scheduled_at: next }).eq("id", overdue.id);
-                    loadStats();
-                  }}
-                  className="px-3 py-2.5 rounded-lg text-xs text-white/80" style={{ background: "rgba(255,255,255,0.08)" }}>
-                  ⏩ 1h
+                  onClick={() => openDialer(phone ?? undefined)}
+                  className="flex-1 py-2.5 rounded-xl text-white text-sm font-semibold flex items-center justify-center gap-2"
+                  style={{ background: "linear-gradient(135deg, var(--pp-success), #00A88A)" }}
+                >
+                  <Phone className="w-4 h-4" /> Appeler
                 </button>
-              )}
+                {overdue && (
+                  <button
+                    onClick={async () => {
+                      const next = new Date(Date.now() + 3600 * 1000).toISOString();
+                      await supabase.from("planipret_reminders").update({ scheduled_at: next }).eq("id", overdue.id);
+                      loadStats();
+                    }}
+                    className="px-3 py-2.5 rounded-xl text-xs"
+                    style={{
+                      background: "var(--pp-bg-elevated)",
+                      border: "1px solid var(--pp-bg-border-2)",
+                      color: "var(--pp-text-secondary)",
+                    }}
+                  >
+                    Reporter 1h
+                  </button>
+                )}
+              </div>
             </div>
           </section>
         );
       })()}
 
-      {/* Hot leads today */}
-      {hotLeads.length > 0 && (
-        <section className="bg-white rounded-2xl shadow-sm p-4">
-          <h2 className="text-sm font-semibold mb-3 flex items-center gap-1.5" style={{ color: PRIMARY }}>
-            🔥 Leads chauds aujourd'hui
-          </h2>
-          <ul className="divide-y divide-slate-100">
-            {hotLeads.map((l) => {
-              const name = l.from_name || l.from_number || l.to_name || l.to_number;
-              const phone = l.from_number || l.to_number;
-              return (
-                <li key={l.id} className="py-2 flex items-center gap-2">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate" style={{ color: "#1A1A2E" }}>{name ?? "—"}</p>
-                    <p className="text-[11px] text-slate-400">{TEMP_EMOJI.hot} Score {l.lead_score}/10</p>
-                  </div>
-                  <button onClick={() => openDialer(phone ?? undefined)}
-                    className="text-[11px] font-semibold px-2.5 py-1.5 rounded-md text-white"
-                    style={{ background: TEMP_COLORS.hot }}>
-                    Rappeler
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      )}
-
-      {/* Due reminders */}
-      {dueReminders.length > 0 && (
-        <section className="bg-white rounded-2xl shadow-sm p-4">
-          <h2 className="text-sm font-semibold mb-3" style={{ color: PRIMARY }}>⏰ À rappeler aujourd'hui</h2>
-          <ul className="divide-y divide-slate-100">
-            {dueReminders.map((r) => (
-              <li key={r.id} className="py-2 flex items-center gap-2">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate" style={{ color: "#1A1A2E" }}>{r.contact_name ?? r.contact_number ?? "—"}</p>
-                  {r.note && <p className="text-[11px] text-slate-400 truncate">{r.note}</p>}
-                </div>
-                <button onClick={() => openDialer(r.contact_number ?? undefined)}
-                  className="text-[11px] font-semibold px-2 py-1 rounded-md text-white" style={{ background: PRIMARY }}>📞</button>
-                <button
-                  onClick={async () => {
-                    await supabase.from("planipret_reminders").update({ status: "done" }).eq("id", r.id);
-                    loadStats();
-                  }}
-                  className="text-[11px] font-semibold px-2 py-1 rounded-md bg-slate-100 text-slate-600">✅</button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-
-
-      {/* Card 1: stats */}
-      <section className="bg-white rounded-2xl shadow-sm p-4">
-        <h2 className="text-sm font-semibold mb-3" style={{ color: PRIMARY }}>Résumé du jour</h2>
-        <div className="grid grid-cols-2 gap-3">
-          {statsLoading ? (
-            <>{[0,1,2,3].map((i) => <Shimmer key={i} className="h-20" />)}</>
-          ) : (
-            <>
-              <Stat icon={<Phone className="w-4 h-4" />} value={stats.calls} label="Appels aujourd'hui" color={PRIMARY} />
-              <Stat icon={<PhoneMissed className="w-4 h-4" />} value={stats.missed} label="Appels manqués" color={DANGER} badge />
-              <Stat icon={<MessageSquare className="w-4 h-4" />} value={stats.sms} label="SMS non lus" color={ACCENT} />
-              <Stat icon={<Voicemail className="w-4 h-4" />} value={stats.voicemails} label="Voicemails non écoutés" color={PRIMARY} />
-            </>
-          )}
-        </div>
+      {/* ===== STATS GRID ===== */}
+      <section className="grid grid-cols-2 gap-3">
+        {statsLoading ? (
+          <>{[0, 1, 2, 3].map((i) => <Shimmer key={i} className="h-24" />)}</>
+        ) : (
+          <>
+            <StatCard
+              icon={<Phone className="w-4 h-4" />}
+              value={stats.calls}
+              label="Appels"
+              accent="var(--pp-brand-accent)"
+            />
+            <StatCard
+              icon={<PhoneMissed className="w-4 h-4" />}
+              value={stats.missed}
+              label="Manqués"
+              accent="var(--pp-danger)"
+              pulse={stats.missed > 0}
+            />
+            <StatCard
+              icon={<MessageSquare className="w-4 h-4" />}
+              value={stats.sms}
+              label="SMS non lus"
+              accent="var(--pp-success)"
+            />
+            <StatCard
+              icon={<Voicemail className="w-4 h-4" />}
+              value={stats.voicemails}
+              label="Voicemails"
+              accent="var(--pp-agent)"
+            />
+          </>
+        )}
       </section>
 
-      {/* Brief IA */}
-      <section className="bg-white rounded-2xl shadow-sm p-4">
+      {/* ===== AI BRIEF ===== */}
+      <section
+        className="rounded-2xl p-4"
+        style={{
+          background: "linear-gradient(135deg, rgba(155,127,232,0.12), rgba(46,155,220,0.06))",
+          border: "1px solid rgba(155,127,232,0.25)",
+        }}
+      >
         <div className="flex items-center justify-between mb-2">
-          <h2 className="text-sm font-semibold" style={{ color: PRIMARY }}>Brief IA du jour</h2>
-          <button onClick={playBrief} disabled={briefLoading}
-            className="text-xs px-3 py-1.5 rounded-full text-white flex items-center gap-1.5 disabled:opacity-50"
-            style={{ background: PRIMARY }}>
-            <Headphones className="w-3.5 h-3.5" /> {briefLoading ? "..." : "Écouter mon brief"}
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4" style={{ color: "var(--pp-agent)" }} />
+            <h2 className="text-sm font-semibold" style={{ color: "var(--pp-text-primary)" }}>
+              Brief IA du jour
+            </h2>
+          </div>
+          <button
+            onClick={playBrief}
+            disabled={briefLoading}
+            className="text-[11px] px-3 py-1.5 rounded-full flex items-center gap-1.5 disabled:opacity-50 font-semibold"
+            style={{
+              background: "linear-gradient(135deg, var(--pp-agent), #6C3CE1)",
+              color: "white",
+              boxShadow: "0 2px 12px rgba(155,127,232,0.4)",
+            }}
+          >
+            <Headphones className="w-3 h-3" /> {briefLoading ? "..." : "Écouter"}
           </button>
         </div>
         {briefLoading ? (
@@ -271,44 +325,165 @@ export default function MHome() {
             <Shimmer className="h-3 w-2/3" />
           </div>
         ) : brief ? (
-          <p className="text-sm text-slate-700 whitespace-pre-line">{brief}</p>
+          <p className="text-sm whitespace-pre-line" style={{ color: "var(--pp-text-primary)" }}>
+            {brief}
+          </p>
         ) : (
-          <p className="text-xs text-slate-400">Touchez « Écouter mon brief » pour générer votre résumé.</p>
+          <p className="text-xs" style={{ color: "var(--pp-text-muted)" }}>
+            Touchez « Écouter » pour générer votre résumé du jour.
+          </p>
         )}
       </section>
 
-      {/* Prochains RDV */}
-      <section className="bg-white rounded-2xl shadow-sm p-4">
-        <h2 className="text-sm font-semibold mb-3 flex items-center gap-1.5" style={{ color: PRIMARY }}>
-          <Calendar className="w-4 h-4" /> Prochains rendez-vous
+      {/* ===== HOT LEADS ===== */}
+      {hotLeads.length > 0 && (
+        <section className="pp-card rounded-2xl p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold flex items-center gap-1.5" style={{ color: "var(--pp-text-primary)" }}>
+              <Flame className="w-4 h-4" style={{ color: "var(--pp-danger)" }} /> Leads chauds
+            </h2>
+            <span className="text-[10px] uppercase tracking-wider" style={{ color: "var(--pp-text-muted)" }}>
+              {hotLeads.length}
+            </span>
+          </div>
+          <ul className="space-y-1">
+            {hotLeads.map((l) => {
+              const name = l.from_name || l.from_number || l.to_name || l.to_number;
+              const phone = l.from_number || l.to_number;
+              return (
+                <li
+                  key={l.id}
+                  className="flex items-center gap-3 py-2 px-2 rounded-lg"
+                  style={{ background: "rgba(232,76,76,0.04)" }}
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate" style={{ color: "var(--pp-text-primary)" }}>
+                      {name ?? "—"}
+                    </p>
+                    <p className="text-[11px]" style={{ color: "var(--pp-text-muted)" }}>
+                      {TEMP_EMOJI.hot} Score {l.lead_score}/10
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => openDialer(phone ?? undefined)}
+                    className="text-[11px] font-semibold px-3 py-1.5 rounded-lg text-white"
+                    style={{ background: "var(--pp-danger)" }}
+                  >
+                    Rappeler
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
+      {/* ===== DUE REMINDERS ===== */}
+      {dueReminders.length > 0 && (
+        <section className="pp-card rounded-2xl p-4">
+          <h2 className="text-sm font-semibold mb-3" style={{ color: "var(--pp-text-primary)" }}>
+            ⏰ À rappeler
+          </h2>
+          <ul className="space-y-1">
+            {dueReminders.map((r) => (
+              <li key={r.id} className="flex items-center gap-2 py-2 px-2 rounded-lg" style={{ background: "var(--pp-bg-elevated)" }}>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate" style={{ color: "var(--pp-text-primary)" }}>
+                    {r.contact_name ?? r.contact_number ?? "—"}
+                  </p>
+                  {r.note && (
+                    <p className="text-[11px] truncate" style={{ color: "var(--pp-text-muted)" }}>{r.note}</p>
+                  )}
+                </div>
+                <button
+                  onClick={() => openDialer(r.contact_number ?? undefined)}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-white"
+                  style={{ background: "var(--pp-brand-accent)" }}
+                >
+                  <Phone className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={async () => {
+                    await supabase.from("planipret_reminders").update({ status: "done" }).eq("id", r.id);
+                    loadStats();
+                  }}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-xs"
+                  style={{
+                    background: "var(--pp-bg-surface)",
+                    border: "1px solid var(--pp-bg-border-2)",
+                    color: "var(--pp-success)",
+                  }}
+                >
+                  ✓
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {/* ===== APPOINTMENTS ===== */}
+      <section className="pp-card rounded-2xl p-4">
+        <h2 className="text-sm font-semibold mb-3 flex items-center gap-1.5" style={{ color: "var(--pp-text-primary)" }}>
+          <Calendar className="w-4 h-4" style={{ color: "var(--pp-brand-accent)" }} /> Prochains rendez-vous
         </h2>
         {eventsState === "loading" && (
           <div className="space-y-2"><Shimmer className="h-10" /><Shimmer className="h-10" /></div>
         )}
         {eventsState === "no_m365" && (
           <div className="text-center py-3">
-            <p className="text-xs text-slate-500 mb-2">Connectez Microsoft 365 pour voir vos RDV</p>
-            <a href="/mplanipret/more" className="inline-block text-xs px-3 py-1.5 rounded-full text-white" style={{ background: PRIMARY }}>Connecter</a>
+            <p className="text-xs mb-2" style={{ color: "var(--pp-text-muted)" }}>
+              Connectez Microsoft 365 pour voir vos RDV
+            </p>
+            <button
+              onClick={() => navigate("/mplanipret/more")}
+              className="text-xs px-3 py-1.5 rounded-full text-white font-semibold"
+              style={{ background: "var(--pp-brand-accent)" }}
+            >
+              Connecter
+            </button>
           </div>
         )}
         {eventsState === "error" && (
           <div className="text-center py-3">
-            <p className="text-xs text-slate-500 mb-2">Impossible de charger les RDV</p>
-            <button onClick={loadEvents} className="text-xs px-3 py-1.5 rounded-full border border-slate-300">Réessayer</button>
+            <p className="text-xs mb-2" style={{ color: "var(--pp-text-muted)" }}>
+              Impossible de charger les RDV
+            </p>
+            <button
+              onClick={loadEvents}
+              className="text-xs px-3 py-1.5 rounded-full"
+              style={{
+                border: "1px solid var(--pp-bg-border-2)",
+                color: "var(--pp-text-secondary)",
+              }}
+            >
+              Réessayer
+            </button>
           </div>
         )}
         {eventsState === "ready" && (events?.length === 0 ? (
-          <p className="text-xs text-slate-400 text-center py-2">Aucun rendez-vous aujourd'hui 🎉</p>
+          <p className="text-xs text-center py-2" style={{ color: "var(--pp-text-muted)" }}>
+            Aucun rendez-vous aujourd'hui 🎉
+          </p>
         ) : (
-          <ul className="divide-y divide-slate-100">
+          <ul className="space-y-2">
             {events!.map((e, i) => {
               const t = e.start?.dateTime ? new Date(e.start.dateTime + (e.start.timeZone === "UTC" ? "Z" : "")) : null;
               return (
-                <li key={i} className="py-2 flex items-center gap-2">
-                  <span className="text-xs font-semibold tabular-nums" style={{ color: PRIMARY }}>
+                <li key={i} className="flex items-center gap-3 py-2">
+                  <div
+                    className="px-2 py-1 rounded-lg text-xs font-bold tabular-nums"
+                    style={{
+                      background: "rgba(46,155,220,0.12)",
+                      color: "var(--pp-brand-accent)",
+                      border: "1px solid rgba(46,155,220,0.25)",
+                    }}
+                  >
                     {t ? t.toLocaleTimeString("fr-CA", { hour: "2-digit", minute: "2-digit" }) : "--:--"}
+                  </div>
+                  <span className="text-sm truncate" style={{ color: "var(--pp-text-primary)" }}>
+                    {e.subject ?? "(Sans titre)"}
                   </span>
-                  <span className="text-sm text-slate-700 truncate">{e.subject ?? "(Sans titre)"}</span>
                 </li>
               );
             })}
@@ -316,29 +491,54 @@ export default function MHome() {
         ))}
       </section>
 
-      {/* Card: recent calls */}
-      <section className="bg-white rounded-2xl shadow-sm p-4">
-        <h2 className="text-sm font-semibold mb-3" style={{ color: PRIMARY }}>Appels récents</h2>
+      {/* ===== RECENT CALLS ===== */}
+      <section className="pp-card rounded-2xl p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold" style={{ color: "var(--pp-text-primary)" }}>
+            Appels récents
+          </h2>
+          <button
+            onClick={() => navigate("/mplanipret/calls")}
+            className="text-[11px] flex items-center gap-0.5"
+            style={{ color: "var(--pp-brand-accent)" }}
+          >
+            Tout voir <ChevronRight className="w-3 h-3" />
+          </button>
+        </div>
         {statsLoading ? (
-          <div className="space-y-2">{[0,1,2].map((i) => <Shimmer key={i} className="h-10" />)}</div>
+          <div className="space-y-2">{[0, 1, 2].map((i) => <Shimmer key={i} className="h-10" />)}</div>
         ) : recent.length === 0 ? (
-          <p className="text-sm text-slate-400 py-4 text-center">Aucun appel</p>
+          <p className="text-sm py-4 text-center" style={{ color: "var(--pp-text-muted)" }}>
+            Aucun appel
+          </p>
         ) : (
-          <ul className="divide-y divide-slate-100">
+          <ul className="space-y-1">
             {recent.map((c) => {
               const inbound = c.direction === "inbound";
               const missed = c.direction === "missed";
               const Icon = missed ? X : inbound ? ArrowDownLeft : ArrowUpRight;
-              const color = missed ? DANGER : inbound ? ACCENT : SUCCESS;
+              const color = missed ? "var(--pp-danger)" : inbound ? "var(--pp-brand-accent)" : "var(--pp-success)";
               const name = inbound || missed ? (c.from_name || c.from_number) : (c.to_name || c.to_number);
+              const phone = inbound || missed ? c.from_number : c.to_number;
               return (
-                <li key={c.id} className="flex items-center gap-3 py-2.5">
-                  <span className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: `${color}15`, color }}>
+                <li
+                  key={c.id}
+                  className="flex items-center gap-3 py-2.5 px-2 rounded-lg active:opacity-70"
+                  onClick={() => openDialer(phone ?? undefined)}
+                >
+                  <span
+                    className="w-8 h-8 rounded-full flex items-center justify-center"
+                    style={{ background: "var(--pp-bg-elevated)", color }}
+                  >
                     <Icon className="w-3.5 h-3.5" />
                   </span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate" style={{ color: "#1A1A2E" }}>{name ?? "Inconnu"}</p>
-                    <p className="text-[11px] text-slate-400">{c.started_at ? new Date(c.started_at).toLocaleTimeString("fr-CA", { hour: "2-digit", minute: "2-digit" }) : ""}</p>
+                    <p className="text-sm font-medium truncate" style={{ color: "var(--pp-text-primary)" }}>
+                      {name ?? "Inconnu"}
+                    </p>
+                    <p className="text-[11px]" style={{ color: "var(--pp-text-muted)" }}>
+                      {c.started_at ? new Date(c.started_at).toLocaleTimeString("fr-CA", { hour: "2-digit", minute: "2-digit" }) : ""}
+                    </p>
                   </div>
                 </li>
               );
@@ -347,10 +547,18 @@ export default function MHome() {
         )}
       </section>
 
+      {/* ===== FLOATING AVA AGENT BUTTON ===== */}
       {profile?.voice_agent_enabled && (
-        <button onClick={openAgent} aria-label="Parler à AVA"
-          className={`fixed right-4 z-30 w-[52px] h-[52px] rounded-full flex items-center justify-center text-white shadow-xl active:scale-95 transition ${agentOpen ? "ring-4 ring-emerald-400/60 animate-pulse" : ""}`}
-          style={{ background: "linear-gradient(135deg, #6C3CE1, #8B5CF6)", bottom: "calc(94px + 60px + 24px)" }}>
+        <button
+          onClick={openAgent}
+          aria-label="Parler à AVA"
+          className={`fixed right-4 z-30 w-[52px] h-[52px] rounded-full flex items-center justify-center text-white active:scale-95 transition ${agentOpen ? "ring-4 ring-emerald-400/60" : ""}`}
+          style={{
+            background: "linear-gradient(135deg, var(--pp-agent), #6C3CE1)",
+            boxShadow: "0 8px 24px rgba(155,127,232,0.5)",
+            bottom: "calc(94px + 60px + 24px)",
+          }}
+        >
           <Bot className="w-6 h-6" />
         </button>
       )}
@@ -360,15 +568,47 @@ export default function MHome() {
   );
 }
 
-function Stat({ icon, value, label, color, badge }: { icon: React.ReactNode; value: number; label: string; color: string; badge?: boolean }) {
+function StatCard({
+  icon, value, label, accent, pulse,
+}: {
+  icon: React.ReactNode;
+  value: number;
+  label: string;
+  accent: string;
+  pulse?: boolean;
+}) {
   return (
-    <div className="rounded-xl p-3" style={{ background: "#F8F9FA" }}>
-      <div className="flex items-center justify-between mb-1">
-        <span style={{ color }}>{icon}</span>
-        {badge && value > 0 && <span className="text-[10px] font-bold text-white rounded-full px-1.5 py-0.5" style={{ background: DANGER }}>!</span>}
+    <div
+      className="rounded-2xl p-3 relative overflow-hidden"
+      style={{
+        background: "var(--pp-bg-surface)",
+        border: "1px solid var(--pp-bg-border-2)",
+      }}
+    >
+      <div
+        className="absolute top-0 left-0 right-0 h-[2px]"
+        style={{ background: `linear-gradient(90deg, transparent, ${accent}, transparent)`, opacity: 0.6 }}
+      />
+      <div className="flex items-center justify-between mb-2">
+        <span
+          className="w-7 h-7 rounded-lg flex items-center justify-center"
+          style={{ background: `${accent}1A`, color: accent }}
+        >
+          {icon}
+        </span>
+        {pulse && value > 0 && (
+          <span
+            className="w-2 h-2 rounded-full pp-pulse-red"
+            style={{ background: "var(--pp-danger)" }}
+          />
+        )}
       </div>
-      <div className="text-2xl font-bold" style={{ color: "#1A1A2E" }}>{value}</div>
-      <div className="text-[10px] text-slate-500 leading-tight mt-0.5">{label}</div>
+      <div className="text-2xl font-bold tabular-nums" style={{ color: "var(--pp-text-primary)" }}>
+        {value}
+      </div>
+      <div className="text-[10px] uppercase tracking-wider mt-0.5" style={{ color: "var(--pp-text-muted)" }}>
+        {label}
+      </div>
     </div>
   );
 }
