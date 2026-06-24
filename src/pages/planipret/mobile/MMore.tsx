@@ -40,7 +40,8 @@ export default function MMore() {
     (async () => {
       if (!profile?.id) return;
       const start = new Date(); start.setDate(1); start.setHours(0, 0, 0, 0);
-      const callsRes: any = await supabase
+      const sb: any = supabase;
+      const callsRes: any = await sb
         .from("planipret_phone_calls")
         .select("id, duration_seconds")
         .eq("broker_id", profile.id)
@@ -49,7 +50,7 @@ export default function MMore() {
       const total = callsArr.length;
       const connected = callsArr.filter((c) => (c.duration_seconds ?? 0) > 10).length;
       const rate = total ? Math.round((connected / total) * 100) : 0;
-      const leadsRes: any = await supabase
+      const leadsRes: any = await sb
         .from("planipret_contacts")
         .select("id")
         .eq("broker_id", profile.id)
