@@ -10,6 +10,7 @@ import {
 import type { PlanipretMobileContext } from "../PlanipretMobile";
 import { TEMP_COLORS, TEMP_EMOJI, TEMP_LABEL, tempBorder, callbackDelayToDate, delayLabel, type LeadTemp } from "@/components/planipret/leadHelpers";
 import ContactTimeline from "@/components/planipret/ContactTimeline";
+import RecordingsList from "@/components/planipret/mobile/recordings/RecordingsList";
 
 
 const PRIMARY = "var(--pp-brand-accent-2)";
@@ -39,6 +40,16 @@ type Call = {
   lead_score_reason?: string | null;
   suggested_callback_delay?: string | null;
   callback_reason?: string | null;
+  // Maestro / AI pipeline (optional)
+  maestro_synced?: boolean | null;
+  maestro_client_id?: string | null;
+  transcript_segments?: any;
+  transcript_language?: string | null;
+  ai_coaching?: any;
+  ai_key_points?: any;
+  ai_client_insights?: any;
+  ai_tasks?: any;
+  pipeline_state?: any;
 };
 
 type Insight = {
@@ -234,7 +245,12 @@ export default function MCalls() {
         {tab === "active" ? (
           <ActiveCallsTab userId={userId} openDialer={openDialer} />
         ) : tab === "recordings" ? (
-          <RecordingsTab calls={calls} loading={loading} onTap={(c) => setSelected(c)} />
+          <RecordingsList
+            calls={calls as any}
+            loading={loading}
+            userId={userId}
+            onUpdated={(c) => setCalls((prev) => prev.map((p) => (p.id === c.id ? { ...p, ...c } as any : p)))}
+          />
         ) : tab === "voicemails" ? (
           <VoicemailsTab userId={userId} openDialer={openDialer} registerRefresh={registerRefresh} />
         ) : (
