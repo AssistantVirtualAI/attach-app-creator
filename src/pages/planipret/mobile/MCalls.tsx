@@ -823,7 +823,23 @@ function ActiveCallsTab({ userId, openDialer }: { userId: string; openDialer: (n
   const [transferOpen, setTransferOpen] = useState<string | null>(null);
   const [transferTo, setTransferTo] = useState("");
   const [incoming, setIncoming] = useState<ActiveCall | null>(null);
+  const [incomingMaestro, setIncomingMaestro] = useState<any>(null);
+  const [maestroLoading, setMaestroLoading] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Maestro lookup on incoming
+  useEffect(() => {
+    if (!incoming?.number) { setIncomingMaestro(null); return; }
+    let cancel = false;
+    setMaestroLoading(true);
+    supabase.functions
+      .invoke("maestro-client-lookup", { body: { phone: incoming.number } })
+      .then(({ data }) => { if (!cancel) setIncomingMaestro((data as any) || null); })
+      .catch(() => { if (!cancel) setIncomingMaestro(null); })
+      .finally(() => { if (!cancel) setMaestroLoading(false); });
+    return () => { cancel = true; };
+  }, [incoming?.number]);
+
 
   const fetchActive = async () => {
     const { data, error } = await supabase.functions.invoke("ns-calls", { body: { action: "list" } });
