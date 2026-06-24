@@ -139,17 +139,27 @@ export default function MCalls() {
   };
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col" style={{ background: "var(--pp-bg-base)" }}>
       {/* Header */}
-      <div className="px-4 pt-5 pb-3 bg-white border-b border-slate-100">
+      <div
+        className="px-4 pt-5 pb-3"
+        style={{
+          background: "var(--pp-bg-deep)",
+          borderBottom: "1px solid var(--pp-bg-border)",
+        }}
+      >
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold" style={{ color: "#1A1A2E" }}>Appels</h1>
+          <h1 className="text-2xl font-bold" style={{ color: "var(--pp-text-primary)" }}>Appels</h1>
           <button
             onClick={() => { setSearchOpen((v) => !v); if (searchOpen) setSearch(""); }}
-            className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-slate-100"
+            className="w-9 h-9 rounded-full flex items-center justify-center"
+            style={{
+              background: searchOpen ? "var(--pp-bg-elevated)" : "transparent",
+              color: "var(--pp-text-secondary)",
+            }}
             aria-label="Rechercher"
           >
-            {searchOpen ? <X className="w-5 h-5 text-slate-600" /> : <Search className="w-5 h-5 text-slate-600" />}
+            {searchOpen ? <X className="w-5 h-5" /> : <Search className="w-5 h-5" />}
           </button>
         </div>
         {searchOpen && (
@@ -159,17 +169,25 @@ export default function MCalls() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Rechercher un numéro..."
-              className="w-full px-3 py-2 rounded-lg bg-slate-100 text-sm outline-none focus:ring-2"
-              style={{ boxShadow: `0 0 0 0 ${PRIMARY}` }}
+              className="w-full px-3 py-2 rounded-xl text-sm outline-none"
+              style={{
+                background: "var(--pp-bg-elevated)",
+                border: "1px solid var(--pp-bg-border-2)",
+                color: "var(--pp-text-primary)",
+              }}
             />
           </div>
         )}
-        {/* Tabs */}
-        <div className="mt-3 flex bg-slate-100 rounded-lg p-1">
+        {/* Pill Tabs */}
+        <div
+          className="mt-3 flex rounded-full p-1"
+          style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)" }}
+        >
           {[
             { k: "recents", label: "Récents" },
             { k: "active", label: "Actifs" },
             { k: "missed", label: "Manqués" },
+            { k: "recordings", label: "Enreg." },
           ].map((t) => {
             const active = tab === (t.k as any);
             const isMissedTab = t.k === "missed";
@@ -177,12 +195,25 @@ export default function MCalls() {
               <button
                 key={t.k}
                 onClick={() => setTab(t.k as any)}
-                className={`flex-1 py-2 text-xs font-semibold rounded-md transition flex items-center justify-center gap-1.5 ${active ? "bg-white shadow-sm" : "text-slate-500"}`}
-                style={active ? { color: PRIMARY } : undefined}
+                className="flex-1 py-2 text-xs font-semibold rounded-full transition flex items-center justify-center gap-1.5"
+                style={
+                  active
+                    ? {
+                        background: "linear-gradient(135deg, var(--pp-brand-accent), var(--pp-brand-accent-2))",
+                        color: "white",
+                        boxShadow: "0 2px 10px rgba(46,155,220,0.35)",
+                      }
+                    : { color: "var(--pp-text-muted)" }
+                }
               >
                 {t.label}
                 {isMissedTab && missedCount > 0 && (
-                  <span className="text-[10px] text-white px-1.5 rounded-full" style={{ background: DANGER }}>{missedCount}</span>
+                  <span
+                    className="text-[10px] text-white px-1.5 rounded-full"
+                    style={{ background: "var(--pp-danger)" }}
+                  >
+                    {missedCount}
+                  </span>
                 )}
               </button>
             );
@@ -194,28 +225,38 @@ export default function MCalls() {
       <div className="flex-1 overflow-y-auto">
         {tab === "active" ? (
           <ActiveCallsTab userId={userId} openDialer={openDialer} />
+        ) : tab === "recordings" ? (
+          <RecordingsTab calls={calls} loading={loading} onTap={(c) => setSelected(c)} />
         ) : (
           <>
             {/* Pull-to-refresh proxy */}
             <div className="px-4 pt-2 flex items-center justify-end">
-              <button onClick={onRefresh} className="text-xs text-slate-500 flex items-center gap-1 px-2 py-1">
+              <button
+                onClick={onRefresh}
+                className="text-xs flex items-center gap-1 px-2 py-1"
+                style={{ color: "var(--pp-text-muted)" }}
+              >
                 <RefreshCw className={`w-3 h-3 ${refreshing ? "animate-spin" : ""}`} /> Actualiser
               </button>
             </div>
             {loading ? (
               <ul className="px-3 pt-3 pb-4 space-y-1.5">
                 {Array.from({ length: 5 }).map((_, i) => (
-                  <li key={i} className="bg-white rounded-xl px-3 py-3 flex items-center gap-3 shadow-sm">
-                    <div className="w-12 h-12 rounded-full animate-pulse bg-slate-200" />
+                  <li
+                    key={i}
+                    className="rounded-xl px-3 py-3 flex items-center gap-3"
+                    style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)" }}
+                  >
+                    <div className="w-12 h-12 rounded-full animate-pulse" style={{ background: "var(--pp-bg-elevated)" }} />
                     <div className="flex-1 space-y-2">
-                      <div className="h-3 w-[70%] animate-pulse bg-slate-200 rounded" />
-                      <div className="h-3 w-[40%] animate-pulse bg-slate-200 rounded" />
+                      <div className="h-3 w-[70%] animate-pulse rounded" style={{ background: "var(--pp-bg-elevated)" }} />
+                      <div className="h-3 w-[40%] animate-pulse rounded" style={{ background: "var(--pp-bg-elevated)" }} />
                     </div>
                   </li>
                 ))}
               </ul>
             ) : filtered.length === 0 ? (
-              <EmptyState tab={tab} />
+              <EmptyState tab={tab as any} />
             ) : (
               <ul className="px-3 pb-4 space-y-1.5">
                 {filtered.map((c) => (
@@ -226,6 +267,7 @@ export default function MCalls() {
           </>
         )}
       </div>
+
 
       {selected && (
         <CallDetailSheet
