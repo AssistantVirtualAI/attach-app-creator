@@ -82,7 +82,11 @@ const frenchDuration = (s: number | null) => {
 // ---------- main ----------
 export default function MCalls() {
   const { profile, openDialer, registerRefresh } = useOutletContext<PlanipretMobileContext>();
-  const [tab, setTab] = useState<"recents" | "active" | "missed" | "recordings">("recents");
+  const [params, setParams] = useSearchParams();
+  const initialTab = (params.get("tab") as any) || "recents";
+  const [tab, setTab] = useState<"recents" | "active" | "missed" | "recordings" | "voicemails">(
+    ["recents", "active", "missed", "recordings", "voicemails"].includes(initialTab) ? initialTab : "recents"
+  );
   const [calls, setCalls] = useState<Call[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -91,6 +95,7 @@ export default function MCalls() {
   const [selected, setSelected] = useState<Call | null>(null);
 
   const userId = profile?.user_id;
+
 
   const load = useCallback(async () => {
     if (!userId) return;
