@@ -915,24 +915,75 @@ function ActiveCallsTab({ userId, openDialer }: { userId: string; openDialer: (n
         </div>
       )}
 
-      {incoming && (
-        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center text-white p-6" style={{ background: PRIMARY }}>
-          <div className="absolute inset-0 opacity-30 animate-pulse" style={{ background: PRIMARY }} />
-          <div className="relative text-center mb-10">
-            <div className="text-sm opacity-80 mb-2">Appel entrant…</div>
-            <div className="text-3xl font-bold">{incoming.name ?? incoming.number}</div>
-            {incoming.name && <div className="text-sm opacity-80 mt-1">{incoming.number}</div>}
+      {incoming && (() => {
+        const m = incomingMaestro || {};
+        const client = m.client || m;
+        const found = !!(m.client_id || client?.id);
+        const fullName = found
+          ? [client?.first_name, client?.last_name].filter(Boolean).join(" ") || client?.name
+          : null;
+        const stage = client?.mortgage_stage || client?.stage;
+        const temp = client?.lead_temperature || m.lead_temperature;
+        const prevCount = m.previous_calls_count ?? m.call_count;
+        return (
+          <div className="fixed inset-0 z-50 flex flex-col items-center justify-center text-white p-6" style={{ background: PRIMARY }}>
+            <div className="absolute inset-0 opacity-30 animate-pulse" style={{ background: PRIMARY }} />
+            <div className="relative text-center mb-8 max-w-xs">
+              <div className="text-sm opacity-80 mb-2">Appel entrant…</div>
+              <div className="text-3xl font-bold">{fullName ?? incoming.name ?? incoming.number}</div>
+              {(fullName || incoming.name) && <div className="text-sm opacity-80 mt-1">{incoming.number}</div>}
+              {maestroLoading && <div className="text-[11px] opacity-70 mt-3">Recherche Maestro…</div>}
+              {!maestroLoading && found && (
+                <div className="mt-4 space-y-1.5">
+                  {client?.company && <div className="text-xs opacity-90">🏢 {client.company}</div>}
+                  {stage && (
+                    <span className="inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full bg-white/20">
+                      {stage}
+                    </span>
+                  )}
+                  {temp && (
+                    <div className="text-xs opacity-90">
+                      {temp === "hot" ? "🔥" : temp === "warm" ? "🌡️" : "❄️"} {temp}
+                    </div>
+                  )}
+                  {prevCount > 0 && (
+                    <div className="text-[11px] opacity-80">📋 {prevCount} appel{prevCount > 1 ? "s" : ""} précédent{prevCount > 1 ? "s" : ""}</div>
+                  )}
+                </div>
+              )}
+              {!maestroLoading && !found && (
+                <div className="mt-4">
+                  <div className="text-xs opacity-90 mb-2">👤 Nouveau contact</div>
+                  <button
+                    onClick={async () => {
+                      try {
+                        await supabase.functions.invoke("maestro-client-create", {
+                          body: { phone: incoming.number, source: "inbound_call" },
+                        });
+                        toast.success("Créé dans Maestro");
+                      } catch (e: any) {
+                        toast.error("Échec création", { description: e?.message });
+                      }
+                    }}
+                    className="text-[11px] font-semibold px-3 py-1.5 rounded-full bg-white/20 backdrop-blur"
+                  >
+                    + Créer dans Maestro
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="relative flex gap-6">
+              <button onClick={() => { action("reject", incoming.id); setIncoming(null); }} className="w-16 h-16 rounded-full flex items-center justify-center shadow-lg" style={{ background: DANGER }}>
+                <PhoneOff className="w-7 h-7" />
+              </button>
+              <button onClick={() => { action("answer", incoming.id); setIncoming(null); fetchActive(); }} className="w-16 h-16 rounded-full flex items-center justify-center shadow-lg" style={{ background: SUCCESS }}>
+                <Phone className="w-7 h-7" />
+              </button>
+            </div>
           </div>
-          <div className="relative flex gap-6">
-            <button onClick={() => { action("reject", incoming.id); setIncoming(null); }} className="w-16 h-16 rounded-full flex items-center justify-center shadow-lg" style={{ background: DANGER }}>
-              <PhoneOff className="w-7 h-7" />
-            </button>
-            <button onClick={() => { action("answer", incoming.id); setIncoming(null); fetchActive(); }} className="w-16 h-16 rounded-full flex items-center justify-center shadow-lg" style={{ background: SUCCESS }}>
-              <Phone className="w-7 h-7" />
-            </button>
-          </div>
-        </div>
-      )}
+        );
+      })()}
+
     </div>
   );
 }
