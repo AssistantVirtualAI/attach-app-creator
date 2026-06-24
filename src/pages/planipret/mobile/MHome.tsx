@@ -639,3 +639,16 @@ function StatCard({
     </div>
   );
 }
+
+function MaestroBadge({ label, value, accent, onClick }: { label: string; value: number; accent: string; onClick?: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex flex-col items-center justify-center py-2 rounded-xl transition active:scale-95"
+      style={{ background: "var(--pp-bg-elevated)", border: `1px solid ${accent}33` }}
+    >
+      <div className="text-xl font-bold tabular-nums" style={{ color: accent }}>{value}</div>
+      <div className="text-[10px] uppercase tracking-wide" style={{ color: "var(--pp-text-muted)" }}>{label}</div>
+    </button>
+  );
+}
