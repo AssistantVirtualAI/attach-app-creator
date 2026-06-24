@@ -37,6 +37,7 @@ export default function MHome() {
   const [agentOpen, setAgentOpen] = useState(false);
   const [hotLeads, setHotLeads] = useState<any[]>([]);
   const [dueReminders, setDueReminders] = useState<any[]>([]);
+  const [maestroCounts, setMaestroCounts] = useState<any | null>(null);
 
   const openAgent = async () => {
     try {
@@ -97,7 +98,15 @@ export default function MHome() {
     setEventsState("ready");
   };
 
-  useEffect(() => { loadStats(); loadEvents(); /* eslint-disable-next-line */ }, [profile?.user_id]);
+  const loadMaestroCounts = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke("maestro-counts", { body: {} });
+      if (error) return;
+      setMaestroCounts((data as any)?.counts ?? data ?? null);
+    } catch { /* silent */ }
+  };
+
+  useEffect(() => { loadStats(); loadEvents(); loadMaestroCounts(); /* eslint-disable-next-line */ }, [profile?.user_id]);
   useEffect(() => {
     registerRefresh(async () => { await Promise.all([loadStats(), loadEvents()]); });
     return () => registerRefresh(null);
@@ -334,6 +343,24 @@ export default function MHome() {
           </p>
         )}
       </section>
+
+      {/* ===== MAESTRO SNAPSHOT ===== */}
+      {maestroCounts && (() => {
+        const tasks = maestroCounts.tasks_due_today ?? maestroCounts.tasks_today ?? maestroCounts.open_tasks ?? 0;
+        const appts = maestroCounts.appointments_today ?? maestroCounts.todays_appointments ?? 0;
+        const leadsToCall = maestroCounts.leads_to_call ?? maestroCounts.followups_due ?? 0;
+        if (tasks + appts + leadsToCall === 0) return null;
+        return (
+          <section
+            className="rounded-2xl p-3 grid grid-cols-3 gap-2"
+            style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)" }}
+          >
+            <MaestroBadge label="Tâches" value={tasks} accent="var(--pp-brand-accent)" onClick={() => navigate("/mplanipret/contacts")} />
+            <MaestroBadge label="RDV jour" value={appts} accent="var(--pp-agent)" onClick={() => navigate("/mplanipret/home")} />
+            <MaestroBadge label="À rappeler" value={leadsToCall} accent="var(--pp-danger)" onClick={() => navigate("/mplanipret/calls?tab=missed")} />
+          </section>
+        );
+      })()}
 
       {/* ===== HOT LEADS ===== */}
       {hotLeads.length > 0 && (
@@ -610,5 +637,18 @@ function StatCard({
         {label}
       </div>
     </div>
+  );
+}
+
+function MaestroBadge({ label, value, accent, onClick }: { label: string; value: number; accent: string; onClick?: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex flex-col items-center justify-center py-2 rounded-xl transition active:scale-95"
+      style={{ background: "var(--pp-bg-elevated)", border: `1px solid ${accent}33` }}
+    >
+      <div className="text-xl font-bold tabular-nums" style={{ color: accent }}>{value}</div>
+      <div className="text-[10px] uppercase tracking-wide" style={{ color: "var(--pp-text-muted)" }}>{label}</div>
+    </button>
   );
 }
