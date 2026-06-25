@@ -139,6 +139,18 @@ export default function TelephonyUsers() {
     else toast.success(`Welcome email sent to ${u.email}`, { id: u.id });
   };
 
+  const sendInvite = async (u: UserRow) => {
+    toast.loading('Sending invitation…', { id: `inv-${u.id}` });
+    const { data, error } = await supabase.functions.invoke('lemtel-invite-send', {
+      body: { softphone_user_id: u.id },
+    });
+    if (error || (data as any)?.error) {
+      toast.error((data as any)?.detail || (data as any)?.error || error?.message || 'Failed', { id: `inv-${u.id}` });
+    } else {
+      toast.success(`Invitation sent — link expires ${new Date((data as any).expires_at).toLocaleDateString()}`, { id: `inv-${u.id}` });
+    }
+  };
+
   const resetPassword = async (u: UserRow) => {
     if (!u.email) { toast.error('No email on file'); return; }
     const { error } = await supabase.auth.resetPasswordForEmail(u.email, {
