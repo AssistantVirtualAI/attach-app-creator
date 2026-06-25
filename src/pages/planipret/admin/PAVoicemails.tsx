@@ -5,24 +5,34 @@ import { toast } from "sonner";
 
 const ACCENT = "#2E9BDC";
 
+const PAGE = 50;
+
 export default function PAVoicemails() {
   const [rows, setRows] = useState<any[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
   const [detail, setDetail] = useState<any | null>(null);
 
-  const load = async () => {
-    const { data } = await supabase.from("planipret_voicemails")
-      .select("*, planipret_profiles!inner(full_name)")
-      .order("created_at", { ascending: false }).limit(500);
+  const load = async (p = page) => {
+    const fromIdx = (p - 1) * PAGE;
+    const { data, count } = await supabase.from("planipret_voicemails")
+      .select("*, planipret_profiles!inner(full_name)", { count: "exact" })
+      .order("created_at", { ascending: false })
+      .range(fromIdx, fromIdx + PAGE - 1);
     setRows(data ?? []);
+    setTotal(count ?? 0);
   };
 
+  useEffect(() => { load(page); /* eslint-disable-next-line */ }, [page]);
+
   useEffect(() => {
-    load();
     const ch = supabase.channel("admin-voicemails")
-      .on("postgres_changes", { event: "*", schema: "public", table: "planipret_voicemails" }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "planipret_voicemails" }, () => load(1))
       .subscribe();
     return () => { supabase.removeChannel(ch); };
+    // eslint-disable-next-line
   }, []);
+
 
   const markRead = async (v: any) => {
     const next = !v.is_read;
@@ -68,6 +78,15 @@ export default function PAVoicemails() {
               ))}
           </tbody>
         </table>
+        <div className="flex items-center justify-between px-4 py-3" style={{ borderTop: "1px solid var(--pp-bg-border-2)", fontSize: 11, color: "var(--pp-text-muted)" }}>
+          <span>{total === 0 ? 0 : (page - 1) * PAGE + 1}–{Math.min(page * PAGE, total)} sur {total}</span>
+          <div className="flex gap-1">
+            <button disabled={page === 1} onClick={() => setPage(page - 1)} className="px-2 py-1 rounded disabled:opacity-40" style={{ border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>←</button>
+            <span className="px-3 py-1">{page} / {Math.max(1, Math.ceil(total / PAGE))}</span>
+            <button disabled={page >= Math.ceil(total / PAGE)} onClick={() => setPage(page + 1)} className="px-2 py-1 rounded disabled:opacity-40" style={{ border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>→</button>
+          </div>
+        </div>
+
       </div>
       {detail && (
         <div className="fixed inset-0 z-50 bg-black/60 flex justify-end" onClick={() => setDetail(null)}>

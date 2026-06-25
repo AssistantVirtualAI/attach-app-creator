@@ -28,8 +28,12 @@ type Row = {
   metadata: any;
 };
 
+const PAGE = 100;
+
 export default function PAAuditLog() {
   const [rows, setRows] = useState<Row[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [userFilter, setUserFilter] = useState("");
   const [actionFilter, setActionFilter] = useState("");
@@ -37,18 +41,20 @@ export default function PAAuditLog() {
   const [to, setTo] = useState("");
   const [users, setUsers] = useState<Array<{ id: string; full_name: string | null; email: string }>>([]);
 
-  const load = async () => {
+  const load = async (p = page) => {
     setLoading(true);
+    const fromIdx = (p - 1) * PAGE;
     let q = supabase.from("planipret_audit_log")
-      .select("id, created_at, action, resource_type, resource_id, ip_address, user_id, metadata")
+      .select("id, created_at, action, resource_type, resource_id, ip_address, user_id, metadata", { count: "exact" })
       .order("created_at", { ascending: false })
-      .limit(500);
+      .range(fromIdx, fromIdx + PAGE - 1);
     if (userFilter) q = q.eq("user_id", userFilter);
     if (actionFilter) q = q.eq("action", actionFilter);
     if (from) q = q.gte("created_at", new Date(from).toISOString());
     if (to) q = q.lte("created_at", new Date(to + "T23:59:59").toISOString());
-    const { data } = await q;
+    const { data, count } = await q;
     setRows(data ?? []);
+    setTotal(count ?? 0);
     setLoading(false);
   };
 
@@ -59,14 +65,24 @@ export default function PAAuditLog() {
     })();
   }, []);
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [userFilter, actionFilter, from, to]);
+  useEffect(() => { setPage(1); load(1); /* eslint-disable-next-line */ }, [userFilter, actionFilter, from, to]);
+  useEffect(() => { load(page); /* eslint-disable-next-line */ }, [page]);
+
 
   const userMap = useMemo(() => new Map(users.map((u) => [u.id, u.full_name || u.email])), [users]);
 
   const exportCsv = async () => {
+    let q = supabase.from("planipret_audit_log")
+      .select("id, created_at, action, resource_type, resource_id, ip_address, user_id, metadata")
+      .order("created_at", { ascending: false }).limit(10000);
+    if (userFilter) q = q.eq("user_id", userFilter);
+    if (actionFilter) q = q.eq("action", actionFilter);
+    if (from) q = q.gte("created_at", new Date(from).toISOString());
+    if (to) q = q.lte("created_at", new Date(to + "T23:59:59").toISOString());
+    const { data: all } = await q;
     const csv = [
       ["Date", "Utilisateur", "Action", "Ressource", "IP", "Détails"].join(","),
-      ...rows.map((r) => [
+      ...(all ?? []).map((r: any) => [
         new Date(r.created_at).toISOString(),
         `"${userMap.get(r.user_id ?? "") ?? "—"}"`,
         r.action,
@@ -75,6 +91,7 @@ export default function PAAuditLog() {
         `"${JSON.stringify(r.metadata ?? {}).replace(/"/g, '""')}"`,
       ].join(",")),
     ].join("\n");
+
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -173,7 +190,16 @@ export default function PAAuditLog() {
             </tbody>
           </table>
         </div>
+        <div className="flex items-center justify-between px-4 py-3" style={{ borderTop: "1px solid var(--pp-bg-border-2)", fontSize: 11, color: "var(--pp-text-muted)" }}>
+          <span>{total === 0 ? 0 : (page - 1) * PAGE + 1}–{Math.min(page * PAGE, total)} sur {total}</span>
+          <div className="flex gap-1">
+            <button disabled={page === 1} onClick={() => setPage(page - 1)} className="px-2 py-1 rounded disabled:opacity-40" style={{ border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>←</button>
+            <span className="px-3 py-1">{page} / {Math.max(1, Math.ceil(total / PAGE))}</span>
+            <button disabled={page >= Math.ceil(total / PAGE)} onClick={() => setPage(page + 1)} className="px-2 py-1 rounded disabled:opacity-40" style={{ border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>→</button>
+          </div>
+        </div>
       </div>
+
       <p className="text-[11px] text-center" style={{ color: "var(--pp-text-muted)" }}>
         📋 Logs conservés 24 mois (Loi 25)
       </p>
