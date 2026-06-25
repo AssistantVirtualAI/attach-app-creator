@@ -381,6 +381,7 @@ const App = () => (
 
                 {/* Planiprêt — organisation distincte (séparée de Lemtel et AVA) */}
                 <Route path="/planipret/login" element={<PlanipretLogin />} />
+                <Route path="/lemtel/setup/:token" element={<SoftphoneSetup />} />
                 <Route path="/mplanipret" element={<AppSeparationGuard app="planipret"><PlanipretMobile /></AppSeparationGuard>}>
                   <Route index element={<MHome />} />
                   <Route path="home" element={<MHome />} />
