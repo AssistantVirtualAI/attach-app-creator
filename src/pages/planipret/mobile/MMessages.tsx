@@ -4,14 +4,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
   Plus, X, ArrowLeft, Phone, Send, Paperclip, MessageSquare, Zap,
-  Users, Bot, Mail, Sparkles, Loader2, RefreshCw, Mic, Reply, History, MoreVertical, Circle,
+  Users, Bot, Mail, Sparkles, Loader2, RefreshCw, Mic, Reply, History, Circle,
 } from "lucide-react";
 import type { PlanipretMobileContext } from "../PlanipretMobile";
 import SmsTemplatesSheet from "@/components/planipret/SmsTemplatesSheet";
-import AvaSummarizeSheet, { type AvaSummarizeSource } from "@/components/planipret/ava/AvaSummarizeSheet";
+import AvaSummarizeSheet from "@/components/planipret/ava/AvaSummarizeSheet";
 import AvaHistorySheet from "@/components/planipret/ava/AvaHistorySheet";
 import CoachOverlay from "@/components/planipret/ava/CoachOverlay";
-import { callAva, applyAvaSuggestion, type AvaSuggestion } from "@/services/avaProactive";
+import { callAva, type AvaSuggestion } from "@/services/avaProactive";
 import { useAvaDraft } from "@/hooks/useAvaDraft";
 
 type SubTab = "sms" | "team" | "ava" | "emails" | "roster";
