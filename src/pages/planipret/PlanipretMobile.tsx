@@ -143,6 +143,7 @@ export default function PlanipretMobile() {
     });
   }, [navigate]);
   useRealtimeManager(profile?.user_id, { onInboundRinging, onAiInsight });
+  useAvaNavigation(profile?.user_id);
 
   useEffect(() => {
     if (!profile?.user_id) return;
