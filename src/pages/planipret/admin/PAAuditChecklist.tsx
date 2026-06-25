@@ -5,6 +5,7 @@ import {
   RefreshCw, FileDown, ChevronDown, ChevronRight, ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
+import { downloadPdfBlob } from "@/lib/pdf/downloadBlob";
 
 type Status = "pass" | "fail" | "warn" | "skip" | "running";
 type Item = { id: string; name: string; description?: string; status: Status; detail?: string; ms?: number };
@@ -213,17 +214,8 @@ export default function PAAuditChecklist() {
       }
 
       const filename = `audit-planipret-${new Date().toISOString().slice(0, 10)}.pdf`;
-      // Force a real download via blob + anchor (more reliable than doc.save across browsers)
       const blob = doc.output("blob");
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      a.rel = "noopener";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      downloadPdfBlob(blob, filename);
       toast.success("PDF téléchargé");
     } catch (e: any) {
       console.error("[audit] exportPdf error", e);
