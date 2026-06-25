@@ -572,6 +572,27 @@ function AvaChat({ profile, openAva }: { profile: any; openAva: () => void }) {
             <p className="text-xs mt-1" style={{ color: "var(--pp-text-muted)" }}>
               Demandez-moi un brief, planifiez un rappel, ou cherchez un contact.
             </p>
+            <div className="flex flex-wrap justify-center gap-1.5 mt-4">
+              {[
+                "📊 Brief du jour",
+                "🔥 Mes hot leads",
+                "📅 Mes RDV",
+                "💡 Conseils du jour",
+              ].map((chip) => (
+                <button
+                  key={chip}
+                  onClick={() => setText(chip.replace(/^\S+\s/, ""))}
+                  className="text-[11px] px-3 py-1.5 rounded-full"
+                  style={{
+                    background: "rgba(155,127,232,0.10)",
+                    border: "1px solid rgba(155,127,232,0.30)",
+                    color: "var(--pp-agent)",
+                  }}
+                >
+                  {chip}
+                </button>
+              ))}
+            </div>
           </div>
         ) : (
           msgs.map((m) => {
