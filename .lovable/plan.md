@@ -1,98 +1,103 @@
-# Plan — Audit Fixes (AVA Main Dashboard / Planiprêt)
+## État actuel — ce qui existe déjà ✅
 
-Scope: AVA Main Dashboard / Planiprêt only. **Lemtel Communications, working pages, auth, mobile, dashboards, and dark mode untouched.**
+J'ai vérifié `/mplanipret` et la majorité du squelette UI est **déjà bâti** :
 
-## 1. Claude API URL fix (CRITICAL, ~2 min)
-Audit these edge functions and rewrite any Claude call to `POST https://api.anthropic.com/v1/messages` with headers `x-api-key`, `anthropic-version: 2023-06-01`, body `{ model, max_tokens, messages: [...] }`:
-- `ai-analyze-call`, `maestro-ai-analysis`, `ava-agent-config`, `ava-tool-executor`, `ai-daily-brief`, `generate-voicemail-greeting`
-- Default model: `claude-sonnet-4-5` (current stable Sonnet — `claude-sonnet-4-6` does not exist; will use the latest available and note it).
-- Add a small shared helper `supabase/functions/_shared/anthropic.ts` so future drift can't happen.
-- Deploy + smoke-test `ai-analyze-call` with a dummy transcript.
+**Coquille (`PlanipretMobile.tsx`)**
+- ✅ Cadre téléphone 390×844, bordure, ombre, fond `#060D1A`
+- ✅ Barre d'onglets en bas, FAB central bleu
+- ✅ DialerSheet (clavier 12 touches, +, appel via `ns-calls`)
+- ✅ `useRealtimeManager` (inbound, ai-insight), `InboundCallOverlay`
+- ✅ Badges non-lus messages/voicemails
+- ✅ `UniversalSearchBar`, `usePullToRefresh`, `SessionTimeoutModal`, `PrivacyConsentGate`, `OnboardingTutorial`
 
-## 2. Realtime publications (~1 min)
-Single migration:
-```sql
-ALTER PUBLICATION supabase_realtime ADD TABLE planipret_phone_calls;
-ALTER PUBLICATION supabase_realtime ADD TABLE planipret_phone_messages;
-ALTER PUBLICATION supabase_realtime ADD TABLE planipret_voicemails;
-ALTER PUBLICATION supabase_realtime ADD TABLE planipret_team_messages;
-```
-Wrap in `DO $$ ... EXCEPTION WHEN duplicate_object` so re-runs are safe.
+**Écrans existants**
+- ✅ MHome, MCalls (sous-onglets recents/active/missed/recordings/voicemails), MMessages (SMS/Équipe/AVA/Emails + Realtime `pp-team-chat` sur `planipret_team_messages`), MMore, MVoicemail, MContacts, MPipeline, MSearch, MStats
+- ✅ AvaVoiceAgent overlay, composants recordings/voicemail
 
-## 3. Graceful missing-secret handling in edge functions
-For each function below: if the required secret is missing, return `{ success:false, error, setup_required:true, setup_url:"/planipret/admin/integrations" }` (HTTP 200, no crash). Log a warning.
-- `ava-agent-config` → `ELEVENLABS_DEFAULT_AGENT_ID`
-- `generate-voicemail-greeting` → `ELEVENLABS_AVA_VOICE_ID` (fallback `XB0fDUnXU5powFXDhCwa` Charlotte, never crash)
-- `ms365-actions` (and any other ms365-* in repo) → `MICROSOFT_CLIENT_ID/SECRET/TENANT_ID`
-- All `maestro-*` functions → `MAESTRO_API_URL/MAESTRO_API_KEY` → return `skip_maestro:true`; pipeline continues without Maestro
-- `maestro-transcript` → `OPENAI_API_KEY` missing → return `whisper_available:false` instead of throwing
+**Backend (à NE PAS toucher)**
+- ✅ Edge functions `ns-calls`, `ns-sms`, `ns-auth`, `ms365-*`, `maestro-*`, `ai-analyze-call`, `generate-voicemail-greeting`, `ava-agent-config`
+- ✅ Tables `planipret_*`, Realtime publications, RLS
 
-## 4. Integrations page setup forms (`/planipret/admin/integrations`)
-Reuse existing cards; add a `MissingSecretBanner` component (red translucent card) at top of each affected card when secret is empty.
+## Écarts vs spécification ⚠️
 
-**ElevenLabs card**
-- Banner if `ELEVENLABS_DEFAULT_AGENT_ID` missing.
-- Button `🚀 Créer l'agent automatiquement` → invoke `elevenlabs-manage-agent` (`create_agent` → save secret → `sync_all_tools` → `update_voice` Charlotte).
-- Manual input + `💾 Sauvegarder` (saves to secret via new `pp-secrets-admin` edge function — super_admin only).
-- Voice ID field default `XB0fDUnXU5powFXDhCwa`, save button, `▶ Écouter Charlotte` preview (proxied via existing `elevenlabs-api-proxy`).
-
-**Microsoft 365 card**
-- 3 fields (Client ID, Client Secret, Tenant ID with default `common`) with the labeled help text from the brief.
-- `💾 Sauvegarder` saves all 3, then tests `POST https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token` (client_credentials, scope `https://graph.microsoft.com/.default`).
-- Collapsible "📋 Guide de création Azure App" with the 6 steps from the brief.
-
-**Maestro card**
-- 2 fields (URL, API Key), save + test `GET {url}/api/v1/clients?limit=1`.
-- Contact block: "📧 Contacter l'équipe Kanguru — support@kanguru.ca".
-
-**NS-API / Whisper card**
-- New sub-section "🎙️ Transcription de secours (Whisper)".
-- Input `OPENAI_API_KEY`, save + `🧪 Tester Whisper` (small static test audio).
-
-**New edge function `pp-secrets-admin`** (super_admin gated):
-- `POST` with `{ name, value }` → writes via Supabase Management API using the existing pattern in the repo (will check first); supports `test_*` ops.
-- All secret-writing UI uses this single endpoint.
-
-## 5. Audit page (`/planipret/admin/audit-checklist`) improvements
-Without breaking existing structure:
-- **Edge-function tests:** for AI fns (`ai-analyze-call`, `ai-daily-brief`, `maestro-ai-analysis`, `ava-agent-config`), replace real invocations with a presence probe (POST empty body, expect 200/400/405 ≠ 404). Pass label: `Déployée · {latency}ms`.
-- **Rate-limit handling:** if error mentions "rate limit" / "429" / "retry after", mark as ⚠️ warning, not ❌.
-- **Throttling:** `await delay(500)` between sections, `await delay(200)` between tests.
-- **Realtime test:** query `pg_publication_tables` via a tiny `pp-audit-helpers` edge function (RPC alternative); show `3/3 tables en publication Realtime` and `[➕ Ajouter au Realtime]` button when missing.
-- **Score breakdown card** (top): Database / Realtime / Secrets / Edge Functions / External APIs / Manual with X/Y and %.
-- **Priority badges** on failed items (🔴/🟠/🟡/🟢) using the mapping in the brief.
-- **Quick-fix buttons** next to each failed item (Create agent, Configure Azure, Email Kanguru `mailto:`, Add to Realtime, etc.).
-- **Estimated time** per section.
-- **"📋 Prochaines étapes recommandées"** card at bottom with the 7 prioritized actions.
-- **Manual items:**
-  - Per item: `[📋 Instructions]` expandable + `[✅ Marquer comme fait]` button persisted in `planipret_settings` (`jsonb` column `manual_checklist_state` if not present).
-  - NS-API webhook item: copy-URL / copy-secret helpers + the 7-step guide from the brief.
-  - ElevenLabs / Admin items: direct deep links.
-
-## 6. New table `planipret_consent_settings`
-Single migration: create with defaults from the brief, seed one row for `planipret.ca`, GRANTs (`authenticated` + `service_role`), enable RLS, super_admin/admin read+write policy.
-
-## 7. Maestro pipeline orchestrator naming
-- Inspect repo for `maestro-pipeline-test` and `maestro-pipeline-orchestrator`.
-- If only `*-test` exists, create `maestro-pipeline-orchestrator` (copy of working code) and keep `*-test` as a thin alias.
-- Update `ns-webhook-receiver` to call `maestro-pipeline-orchestrator`.
-
-## 8. VoiceAgent component
-When `ava-agent-config` returns `setup_required:true`, render inline message (no overlay) with `Contacter l'admin` `mailto:` button instead of crashing/empty UI.
+| # | Écart | Sévérité |
+|---|---|---|
+| 1 | Tab bar = **6 colonnes** (Accueil/Appels/FAB/Messages/**Contacts**/Plus) au lieu de **5** (la spec retire Contacts du bottom bar) | moyen |
+| 2 | FAB ne passe **pas en rouge pulsant** pendant un appel actif | moyen |
+| 3 | Bouton flottant **AVA Voice** absent du MHome (devrait être bottom:80 right:16, gated par `voice_agent_enabled`) | moyen |
+| 4 | MHome : KPIs, carte "AVA recommande", "Brief IA", "Appels récents", "Prochains RDV" à aligner sur la spec exacte (4 KPIs : Appels / Manqués / SMS non lus / Voicemails) | moyen |
+| 5 | DialerSheet : hauteur 85%, sous-lettres ABC/DEF, hold-backspace 1s = clear, états visuels (`scale 0.92` + tinted bg) | mineur |
+| 6 | RecordingDetailSheet 4 onglets (Audio / Transcript / Coaching / Maestro) à harmoniser avec la maquette détaillée (cercle de score, sections colorées) | moyen |
+| 7 | VoicemailGreetingSheet 3 étapes (voix ElevenLabs → texte avec templates + IA → génération + activation) — composant à créer dans `/more` | majeur |
+| 8 | Toast IA "slide-up" en bas du container avec actions (Voir / Plus tard) | mineur |
+| 9 | Overlay AVA : visualisations d'état (idle/connecting/listening/speaking/processing/tool_running) à compléter | moyen |
+| 10 | Overlay Inbound Call : lookup Maestro (avatar, nom, étape, "X appels précédents") à compléter | moyen |
+| 11 | Skeletons partout (KPI, listes) au lieu de "Chargement…" | mineur |
+| 12 | Transitions de page (fade 150ms entre onglets, slide pour navigation interne) | mineur |
+| 13 | Tokens CSS `--pp-*` à figer dans `index.css` selon palette de la spec | mineur |
 
 ---
 
-## Order of implementation
-1. Claude URL fix + shared helper + deploy + smoke test
-2. Realtime + consent_settings migrations (one shot)
-3. Graceful missing-secret returns in all edge functions
-4. `pp-secrets-admin` edge function
-5. Integrations page setup forms (ElevenLabs → Microsoft → Maestro → Whisper)
-6. Audit page: breakdown + priorities + quick fixes + manual checklist persistence
-7. Audit page: rate-limit + presence probes + Realtime test rewrite
-8. Orchestrator rename / alias + webhook update
-9. VoiceAgent setup_required handling
-10. Run full audit, verify score improves
+## Plan multi-phases
 
-## Explicit non-changes
-Lemtel Communications, working edge functions (52 passing), NS-API integration, ElevenLabs TTS path, auth/routing, mobile screens, dashboards, dark mode/design tokens, overall audit page structure.
+### Phase 1 — Refonte de la coquille (shell)
+- Réduire la tab bar à 5 colonnes : Accueil / Appels / **FAB** / Messages / Plus. Déplacer Contacts dans MMore (route `/mplanipret/contacts` conservée).
+- FAB : nouvel état `inCall` (rouge + animation `pulse-red 1.5s`) déclenché via Realtime/`useActiveCall`.
+- Ajouter le bouton flottant AVA Voice (bottom:80 right:16, conditionné par `profile.voice_agent_enabled`).
+- Geler les tokens CSS `--pp-bg-*`, `--pp-brand-*`, `--pp-text-*` dans `src/index.css` selon la spec.
+- Remplacer les écrans de chargement par un `<MobileSkeleton variant="…" />`.
+
+### Phase 2 — MHome conforme
+- 4 cartes KPI exactes (Appels / Manqués / SMS non lus / Voicemails) avec couleurs et `border-top` corrects.
+- Carte "🤖 AVA recommande" (3 items dynamiques + refresh + CTA "Parler à AVA").
+- Carte "🎧 Brief IA du jour" (bouton Écouter ouvre le brief audio).
+- Carte "📞 Appels récents" (3 derniers + badge AI).
+- Carte "📅 Prochains RDV" (M365 ou CTA connexion).
+- Skeletons shimmer sur chaque carte.
+
+### Phase 3 — Dialer + écran Appels
+- DialerSheet : hauteur 85%, drag-handle, sous-lettres, hold-backspace 1s, animations.
+- MCalls : sous-onglets pill-style ; cartes avec border-left coloré ; pipeline 4 étapes sur Enregistrements ; CTA Rappeler sur Manqués.
+- RecordingDetailSheet 4 onglets harmonisé avec la maquette (cercle score, sections colorées, "Tout créer" batch Maestro). Aucun changement aux Edge Functions appelées.
+- ActiveCallCard : timer, waveform, grille 2×2 (Muet/Attente/Transfer/Raccrocher).
+
+### Phase 4 — Messages (SMS / Équipe / AVA / Emails)
+- Sous-tabs pills horizontales déjà présents → ajustement visuel.
+- Bulles SMS gradient envoyé / dark reçu (border-radius spec).
+- Équipe : sidebar canaux, réactions, threading, upload fichier (Storage).
+- AVA : quick-chips, intégration micro → ouvre VoiceAgent overlay.
+- Emails : liste + détail + composer + "Résumer avec AVA".
+
+### Phase 5 — MMore + VoicemailGreetingSheet
+- Refonte MMore en sections (Mon compte / Téléphonie / **Boîte vocale IA** / Intégrations / Assistant AVA / Préférences / Aide / Déconnexion).
+- **Nouveau composant** `VoicemailGreetingSheet` (3 étapes) branché sur `generate-voicemail-greeting` + ElevenLabs voices existantes. Aucun nouveau secret.
+- EditProfileSheet, gestion DND avec horaire, export GDPR (`pp-gdpr-export`).
+- Toggles Mode sombre + Notifications (Permission API).
+
+### Phase 6 — Overlays AVA + Inbound + Toasts + Transitions
+- AvaVoiceAgent : visualisations 7 états, ToolNotification slide-down, transcript live, modal de confirmation.
+- InboundCallOverlay : lookup Maestro (skeleton → fiche), 3 rings pulse, auto-dismiss 30s + toast manqué.
+- Toast système : positionné bas du container, types (success/error/info/warning/ai), action buttons pour insights IA.
+- Transitions : fade 150ms entre tabs ; slide 300ms pour navigation interne via `framer-motion`.
+
+### Phase 7 — Recherche globale + Pull-to-refresh + QA
+- GlobalSearchOverlay branché sur `pp-search` (groupes : Appels / Messages / Voicemails / Contacts / Emails), historique localStorage.
+- Pull-to-refresh sur toutes les listes (déjà hook, à appliquer partout).
+- Tests manuels device 390×844 + responsive mobile.
+
+---
+
+## Règles strictes respectées
+
+- ❌ Aucune modification d'Edge Function, de table, de RLS, de secrets, de configuration ElevenLabs.
+- ❌ Aucune modification de Lemtel ni du dashboard admin.
+- ❌ Aucun nom de canal Realtime modifié.
+- ✅ Toutes les requêtes Supabase et signatures conservées à l'identique.
+
+## Détails techniques
+
+- Tous les overlays utilisent `position: absolute` à l'intérieur du `<Frame>` (jamais `fixed`).
+- Le FAB en mode appel s'abonne à `planipret_phone_calls` filtré par `status in ('active','ringing')` via le `useRealtimeManager` existant.
+- Le composant `VoicemailGreetingSheet` appelle uniquement `supabase.functions.invoke('generate-voicemail-greeting', { … })` — aucun changement côté serveur.
+- Les skeletons utilisent une seule keyframe `shimmer` ajoutée à `index.css`.
+- L'overlay AVA réutilise `AvaVoiceAgent.tsx` existant ; on ajoute les états visuels manquants sans toucher à la logique LLM.
