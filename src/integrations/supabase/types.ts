@@ -7934,6 +7934,30 @@ export type Database = {
         }
         Relationships: []
       }
+      planipret_elevenlabs_config: {
+        Row: {
+          id: string
+          key: string
+          updated_at: string
+          updated_by: string | null
+          value: string | null
+        }
+        Insert: {
+          id?: string
+          key: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: string | null
+        }
+        Update: {
+          id?: string
+          key?: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: string | null
+        }
+        Relationships: []
+      }
       planipret_integration_secrets: {
         Row: {
           config: Json
@@ -8385,6 +8409,9 @@ export type Database = {
           dnd_message_fr: string
           dnd_start_time: string
           elevenlabs_agent_id: string | null
+          elevenlabs_agent_status: string | null
+          elevenlabs_last_session: string | null
+          elevenlabs_session_count: number | null
           email: string | null
           extension: string | null
           first_login_at: string | null
@@ -8447,6 +8474,9 @@ export type Database = {
           dnd_message_fr?: string
           dnd_start_time?: string
           elevenlabs_agent_id?: string | null
+          elevenlabs_agent_status?: string | null
+          elevenlabs_last_session?: string | null
+          elevenlabs_session_count?: number | null
           email?: string | null
           extension?: string | null
           first_login_at?: string | null
@@ -8509,6 +8539,9 @@ export type Database = {
           dnd_message_fr?: string
           dnd_start_time?: string
           elevenlabs_agent_id?: string | null
+          elevenlabs_agent_status?: string | null
+          elevenlabs_last_session?: string | null
+          elevenlabs_session_count?: number | null
           email?: string | null
           extension?: string | null
           first_login_at?: string | null
