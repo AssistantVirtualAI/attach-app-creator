@@ -222,7 +222,7 @@ function AddSheet({ userId, onClose, onAdded }: { userId: string; onClose: () =>
     onAdded();
   };
   return (
-    <div className="fixed inset-0 z-50 flex items-end bg-black/40" onClick={onClose}>
+    <div className="absolute inset-0 z-40 flex items-end bg-black/40" onClick={onClose}>
       <div className="w-full bg-white rounded-t-3xl p-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-bold" style={{ color: "var(--pp-text-primary)" }}>Nouveau dossier</h2>

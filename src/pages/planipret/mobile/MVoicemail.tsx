@@ -262,7 +262,7 @@ function ForwardModal({ vm, onClose }: { vm: VM; onClose: () => void }) {
     onClose();
   };
   return (
-    <div className="fixed inset-0 z-40 flex items-end md:items-center md:justify-center bg-black/40" onClick={onClose}>
+    <div className="absolute inset-0 z-40 flex items-end md:items-center md:justify-center bg-black/40" onClick={onClose}>
       <div className="bg-white w-full md:w-[360px] rounded-t-2xl md:rounded-2xl p-4" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-semibold" style={{ color: "var(--pp-text-primary)" }}>Transférer le voicemail</h2>
