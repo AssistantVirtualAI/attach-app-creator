@@ -5,30 +5,42 @@ import { X, ArrowDownLeft, ArrowUpRight } from "lucide-react";
 const ACCENT = "#2E9BDC";
 const SUCCESS = "#00D4AA";
 
+const PAGE = 50;
+
 export default function PAMessages() {
   const [rows, setRows] = useState<any[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
   const [thread, setThread] = useState<any[] | null>(null);
   const [threadKey, setThreadKey] = useState<string | null>(null);
   const [direction, setDirection] = useState("");
   const [from, setFrom] = useState(""); const [to, setTo] = useState("");
 
-  const load = async () => {
-    let q = supabase.from("planipret_phone_messages").select("*, planipret_profiles!inner(full_name)").order("created_at", { ascending: false }).limit(500);
+  const load = async (p = page) => {
+    const fromIdx = (p - 1) * PAGE;
+    let q = supabase.from("planipret_phone_messages")
+      .select("*, planipret_profiles!inner(full_name)", { count: "exact" })
+      .order("created_at", { ascending: false })
+      .range(fromIdx, fromIdx + PAGE - 1);
     if (direction) q = q.eq("direction", direction);
     if (from) q = q.gte("created_at", from);
     if (to) q = q.lte("created_at", to);
-    const { data } = await q;
+    const { data, count } = await q;
     setRows(data ?? []);
+    setTotal(count ?? 0);
   };
 
+  useEffect(() => { setPage(1); load(1); /* eslint-disable-next-line */ }, [direction, from, to]);
+  useEffect(() => { load(page); /* eslint-disable-next-line */ }, [page]);
+
   useEffect(() => {
-    load();
     const ch = supabase.channel("admin-messages")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "planipret_phone_messages" }, () => load())
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "planipret_phone_messages" }, () => load(1))
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [direction, from, to]);
+    // eslint-disable-next-line
+  }, []);
+
 
   const openThread = async (m: any) => {
     const peer = m.direction === "outbound" ? m.to_number : m.from_number;
