@@ -254,28 +254,49 @@ export default function PlanipretMobile() {
           <OnboardingTutorial profile={profile} onDone={loadProfile} />
         )}
 
-        {/* Center FAB (between Appels and Messages) */}
-        <button onClick={() => setDialerOpen(true)}
+        {/* AVA Voice floating button (gated by voice_agent_enabled) */}
+        {profile?.voice_agent_enabled && (
+          <button onClick={openAva}
+            className="absolute z-20 rounded-full flex items-center justify-center text-white active:scale-95 transition"
+            style={{
+              right: 16, bottom: 152,
+              width: 52, height: 52,
+              background: "linear-gradient(135deg, #2D1A5A, #9B7FE8)",
+              boxShadow: "0 4px 20px rgba(155,127,232,0.5)",
+              animation: "pp-glow-purple 2s ease-in-out infinite",
+            }}
+            aria-label="Parler à AVA">
+            <Bot className="w-6 h-6" />
+          </button>
+        )}
+
+        {/* Center FAB — bleu (idle) ou rouge pulsant (appel actif) */}
+        <button onClick={activeCallId ? hangupActive : () => setDialerOpen(true)}
           className="absolute left-1/2 -translate-x-1/2 z-20 rounded-full flex items-center justify-center text-white active:scale-95 transition"
           style={{
-            background: "linear-gradient(135deg, #1A4A8A, #2E9BDC)",
-            boxShadow: "0 4px 24px rgba(46,155,220,0.6)",
-            width: 56, height: 56, bottom: 78,
+            background: activeCallId
+              ? "linear-gradient(135deg, #5A1010, #E84C4C)"
+              : "linear-gradient(135deg, #1A4A8A, #2E9BDC)",
+            boxShadow: activeCallId
+              ? "0 4px 24px rgba(232,76,76,0.6)"
+              : "0 4px 24px rgba(46,155,220,0.6)",
+            animation: activeCallId ? "pp-pulse-red 1.5s infinite" : undefined,
+            width: 58, height: 58, bottom: 76,
           }}
-          aria-label="Composer un numéro">
-          <PhoneIcon className="w-6 h-6" />
+          aria-label={activeCallId ? "Raccrocher" : "Composer un numéro"}>
+          {activeCallId ? <PhoneOff className="w-6 h-6" /> : <PhoneIcon className="w-6 h-6" />}
         </button>
 
 
-        {/* Tab bar (6 slots: 5 tabs + center FAB placeholder) */}
-        <nav className="absolute bottom-[22px] inset-x-0 grid grid-cols-6 z-10"
+        {/* Tab bar (5 tabs + center FAB placeholder = 5 grid columns) */}
+        <nav className="absolute bottom-[22px] inset-x-0 grid grid-cols-5 z-10"
           style={{
-            height: 72,
-            background: "rgba(4,11,22,0.98)",
+            height: 70,
+            background: "rgba(4,11,22,0.97)",
             backdropFilter: "blur(20px)",
-            borderTop: "1px solid var(--pp-bg-border)",
+            borderTop: "1px solid var(--pp-bg-border-2)",
           }}>
-          {TABS.map((t, i) => {
+          {TABS.map((t) => {
             if (t.to === "_fab") return <div key="fab-slot" />;
             const badge = t.to.endsWith("/messages") ? unreadMsg : 0;
             return (
@@ -314,6 +335,9 @@ export default function PlanipretMobile() {
 
         <Dialer open={dialerOpen} onClose={() => setDialerOpen(false)} initial={dialerInit} />
         <InboundCallOverlay call={inbound} onClose={() => setInbound(null)} />
+        {avaOpen && profile?.user_id && (
+          <AvaVoiceAgent userId={profile.user_id} onClose={() => setAvaOpen(false)} />
+        )}
         <OfflineBanner />
       </div>
     </Frame>
