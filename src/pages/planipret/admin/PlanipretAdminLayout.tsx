@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { LayoutDashboard, Users, Phone, MessageSquare, Voicemail, Plug, BarChart3, LogOut, Bell, ClipboardList, ShieldCheck, Flame, Zap, CheckSquare } from "lucide-react";
 import SessionTimeoutModal from "@/components/planipret/SessionTimeoutModal";
+import { useAdminRealtime } from "@/hooks/useAdminRealtime";
 
 const LINKS = [
   { to: "/planipret/admin/overview", label: "Vue d'ensemble", Icon: LayoutDashboard },
@@ -41,7 +42,8 @@ export default function PlanipretAdminLayout() {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [missingIntegrations, setMissingIntegrations] = useState(0);
-  const [realtimeOk, setRealtimeOk] = useState(false);
+  const { status: rtStatus } = useAdminRealtime();
+  const realtimeOk = rtStatus === "live";
 
   useEffect(() => {
     (async () => {
@@ -60,10 +62,8 @@ export default function PlanipretAdminLayout() {
     })();
   }, [navigate]);
 
-  useEffect(() => {
-    const ch = supabase.channel("admin-presence").subscribe((s) => setRealtimeOk(s === "SUBSCRIBED"));
-    return () => { supabase.removeChannel(ch); };
-  }, []);
+
+
 
   const logout = async () => { await supabase.auth.signOut(); navigate("/login", { replace: true }); };
 
