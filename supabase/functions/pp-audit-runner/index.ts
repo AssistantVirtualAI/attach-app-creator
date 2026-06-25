@@ -119,12 +119,21 @@ async function pingFunction(name: string): Promise<Item> {
       headers: { "Authorization": `Bearer ${ANON}`, apikey: ANON },
     });
     const ms = Math.round(performance.now() - start);
+    // 404 = function does not exist. Anything else (incl. 401/405/400) means deployed.
+    if (res.status === 404) return { id: `fn-${name}`, name, status: "fail", detail: "Non déployée (404)", ms };
     if (res.status >= 500) return { id: `fn-${name}`, name, status: "fail", detail: `HTTP ${res.status}`, ms };
     return { id: `fn-${name}`, name, status: "pass", detail: `Déployée · ${ms}ms`, ms };
   } catch (e: any) {
-    return { id: `fn-${name}`, name, status: "fail", detail: String(e?.message ?? e) };
+    const msg = String(e?.message ?? e);
+    // Rate limit / network blip → warning, not failure
+    if (/rate.?limit|429|retry.?after/i.test(msg)) {
+      return { id: `fn-${name}`, name, status: "warn", detail: "Rate limit temporaire — fonction déployée" };
+    }
+    return { id: `fn-${name}`, name, status: "fail", detail: msg };
   }
 }
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
