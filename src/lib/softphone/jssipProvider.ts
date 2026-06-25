@@ -462,30 +462,9 @@ class JsSipProvider {
         mediaConstraints: { audio: true, video: false },
         rtcAnswerConstraints: { offerToReceiveAudio: true, offerToReceiveVideo: false },
         sessionDescriptionHandlerModifiers: [sdpModifier],
-        pcConfig: {
-          iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' },
-            {
-              urls: 'turn:openrelay.metered.ca:80',
-              username: 'openrelayproject',
-              credential: 'openrelayproject',
-            },
-            {
-              urls: 'turn:openrelay.metered.ca:443',
-              username: 'openrelayproject',
-              credential: 'openrelayproject',
-            },
-            {
-              urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-              username: 'openrelayproject',
-              credential: 'openrelayproject',
-            },
-          ],
-          iceTransportPolicy: 'all',
-          bundlePolicy: 'balanced',
-        },
+        pcConfig: PC_CONFIG,
       });
+      sipDebug('session.answer() pcConfig', PC_CONFIG);
     } else if (this.config?.mock) {
       this.clearMockTimers();
       this.update({ callState: "active", startedAt: Date.now() });
