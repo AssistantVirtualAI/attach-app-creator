@@ -5,7 +5,7 @@ import { getCallStateVisual } from '../lib/callStateAccent';
 import CallQualityGauge from './CallQualityGauge';
 import type { AudioProfile } from '../lib/sip/audioProfile';
 import { EMPTY_QUALITY } from '../lib/sip/callQuality';
-import { isSpeakerOn, onSpeakerChange, toggleSpeaker } from '../lib/sip/audioOutput';
+import { getAudioState, onAudioStateChange, setRoute, type AudioRoute, type AudioState } from '../lib/sip/audioOutput';
 
 const PROFILE_CYCLE: AudioProfile[] = ['auto', 'hd', 'low-bandwidth'];
 
@@ -19,9 +19,24 @@ export default function ActiveCallSheet({
   const [timer, setTimer] = useState(0);
   const [showKeypad, setShowKeypad] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
-  const [speaker, setSpeakerState] = useState(isSpeakerOn());
+  const [audio, setAudio] = useState<AudioState>(getAudioState());
+  const [toast, setToast] = useState<string | null>(null);
 
-  useEffect(() => onSpeakerChange(setSpeakerState), []);
+  useEffect(() => onAudioStateChange(setAudio), []);
+  useEffect(() => {
+    if (!toast) return;
+    const id = setTimeout(() => setToast(null), 2400);
+    return () => clearTimeout(id);
+  }, [toast]);
+
+  const switchRoute = async (next: AudioRoute) => {
+    haptic(ImpactStyle.Light);
+    try {
+      await setRoute(next);
+    } catch {
+      setToast(`Impossible de basculer sur ${routeLabel(next)}`);
+    }
+  };
 
   useEffect(() => {
     if (sp.snap.callState !== 'active' && sp.snap.callState !== 'held') { setTimer(0); return; }
@@ -124,6 +139,20 @@ export default function ActiveCallSheet({
         {sp.snap.muted && inCall && (
           <div style={{ fontSize: 11, color: colors.warning, letterSpacing: 1.2, fontWeight: 700, textTransform: 'uppercase' }}>Microphone muted</div>
         )}
+        {inCall && (
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8,
+            padding: '5px 12px', borderRadius: 999,
+            background: 'rgba(255,255,255,0.06)',
+            border: `1px solid ${colors.border}`,
+            fontSize: 11, letterSpacing: 1.1, fontWeight: 700,
+            color: colors.mutedSilver, textTransform: 'uppercase',
+          }}>
+            <span style={{ fontSize: 13 }}>{routeIcon(audio.route)}</span>
+            <span>Sortie · {routeLabel(audio.route)}</span>
+            {audio.busy && <span style={{ color: colors.avaCyan }}>…</span>}
+          </div>
+        )}
       </div>
 
       {/* AI Assist drawer */}
@@ -151,8 +180,21 @@ export default function ActiveCallSheet({
             onClick={() => { haptic(); sp.snap.muted ? sp.unmute() : sp.mute(); }} />
           <Ctrl label={onHold ? 'Resume' : 'Hold'} icon="⏸" active={onHold}
             onClick={() => { haptic(); onHold ? sp.unhold() : sp.hold(); }} />
-          <Ctrl label={speaker ? 'Speaker' : 'Earpiece'} icon="🔊" active={speaker}
-            onClick={() => { haptic(); toggleSpeaker(); }} />
+          <Ctrl
+            label={audio.route === 'speaker' ? 'Speaker' : 'Speaker'}
+            icon={audio.busy && audio.route !== 'speaker' ? '…' : '🔊'}
+            active={audio.route === 'speaker'}
+            disabled={audio.busy}
+            onClick={() => switchRoute(audio.route === 'speaker' ? 'earpiece' : 'speaker')}
+          />
+          <Ctrl
+            label="Bluetooth"
+            icon={audio.busy && audio.route !== 'bluetooth' ? '…' : '🎧'}
+            active={audio.route === 'bluetooth'}
+            tone={audio.bluetoothAvailable ? 'default' : 'default'}
+            disabled={audio.busy || !audio.bluetoothAvailable}
+            onClick={() => switchRoute(audio.route === 'bluetooth' ? 'earpiece' : 'bluetooth')}
+          />
           <Ctrl label="Keypad" icon="⌨" active={showKeypad}
             onClick={() => { haptic(); setShowKeypad((v) => !v); }} />
           <Ctrl label="Transfer" icon="↗" onClick={() => { haptic(ImpactStyle.Medium); transfer(); }} />
@@ -196,19 +238,41 @@ export default function ActiveCallSheet({
           </div>
         </div>
       )}
+
+      {toast && (
+        <div style={{
+          position: 'absolute', left: 16, right: 16, bottom: 'calc(220px + var(--safe-bottom))',
+          padding: '12px 16px', borderRadius: radius.md,
+          background: 'rgba(220,38,38,0.92)', color: '#fff',
+          fontSize: 13, fontWeight: 600, textAlign: 'center',
+          boxShadow: '0 18px 40px -12px rgba(220,38,38,0.55)',
+          backdropFilter: 'blur(12px)',
+        }}>
+          {toast}
+        </div>
+      )}
     </div>
   );
 }
 
-function Ctrl({ label, icon, onClick, active, tone = 'default' }: {
+function routeLabel(r: AudioRoute) {
+  return r === 'speaker' ? 'Haut-parleur' : r === 'bluetooth' ? 'Bluetooth' : 'Écouteur';
+}
+function routeIcon(r: AudioRoute) {
+  return r === 'speaker' ? '🔊' : r === 'bluetooth' ? '🎧' : '📞';
+}
+
+function Ctrl({ label, icon, onClick, active, tone = 'default', disabled }: {
   label: string; icon: string; onClick: () => void; active?: boolean;
   tone?: 'default' | 'danger' | 'ai';
+  disabled?: boolean;
 }) {
   const accent = tone === 'danger' ? colors.danger : tone === 'ai' ? colors.avaViolet : colors.blueGlow;
   return (
-    <button onClick={onClick} style={{
+    <button onClick={onClick} disabled={disabled} style={{
       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-      background: 'transparent', border: 'none', cursor: 'pointer', color: colors.textIce,
+      background: 'transparent', border: 'none', cursor: disabled ? 'not-allowed' : 'pointer',
+      color: colors.textIce, opacity: disabled ? 0.45 : 1,
     }}>
       <span style={{
         width: 60, height: 60, borderRadius: '50%',
