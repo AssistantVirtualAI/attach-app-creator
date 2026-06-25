@@ -16,12 +16,16 @@ const SUCCESS = "#10B981";
 const DANGER = "#E84C4C";
 
 export default function MStats() {
-  const { profile } = useOutletContext<PlanipretMobileContext>();
+  const { profile, openDialer, openAva } = useOutletContext<PlanipretMobileContext>();
   const navigate = useNavigate();
   const [period, setPeriod] = useState<Period>("week");
   const [calls, setCalls] = useState<any[]>([]);
   const [leads, setLeads] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [coachOpen, setCoachOpen] = useState(false);
+  const [coachLoading, setCoachLoading] = useState(false);
+  const [coachReply, setCoachReply] = useState("");
+  const [coachSuggestions, setCoachSuggestions] = useState<AvaSuggestion[]>([]);
 
   useEffect(() => {
     if (!profile?.user_id) return;
