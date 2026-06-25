@@ -334,7 +334,21 @@ export default function MHome() {
             Touchez « Écouter » pour générer votre résumé du jour.
           </p>
         )}
+        {profile?.voice_agent_enabled && (
+          <button
+            onClick={openAva}
+            className="mt-3 w-full py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"
+            style={{
+              background: "linear-gradient(135deg, rgba(155,127,232,0.18), rgba(108,60,225,0.18))",
+              border: "1px solid rgba(155,127,232,0.35)",
+              color: "var(--pp-agent)",
+            }}
+          >
+            <Bot className="w-3.5 h-3.5" /> Parler à AVA
+          </button>
+        )}
       </section>
+
 
       {/* ===== MAESTRO SNAPSHOT ===== */}
       {maestroCounts && (() => {
