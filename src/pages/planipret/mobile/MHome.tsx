@@ -24,7 +24,7 @@ function Shimmer({ className = "" }: { className?: string }) {
 }
 
 export default function MHome() {
-  const { profile, registerRefresh, openDialer, reloadProfile } =
+  const { profile, registerRefresh, openDialer, openAva, reloadProfile } =
     useOutletContext<PlanipretMobileContext>();
   const navigate = useNavigate();
   const [stats, setStats] = useState({ calls: 0, missed: 0, sms: 0, voicemails: 0 });
@@ -35,23 +35,12 @@ export default function MHome() {
   const [briefLoading, setBriefLoading] = useState(false);
   const [statsLoading, setStatsLoading] = useState(true);
   const [sipOnline, setSipOnline] = useState(false);
-  const [agentOpen, setAgentOpen] = useState(false);
   const [hotLeads, setHotLeads] = useState<any[]>([]);
   const [dueReminders, setDueReminders] = useState<any[]>([]);
   const [maestroCounts, setMaestroCounts] = useState<any | null>(null);
 
   useMaestroPipelineToasts(profile?.user_id);
 
-  const openAgent = async () => {
-    try {
-      const p = await navigator.permissions.query({ name: "microphone" as PermissionName });
-      if (p.state === "denied") {
-        toast.error("🎙️ Accès au microphone refusé. Autorisez-le dans votre navigateur.");
-        return;
-      }
-    } catch { /* ignore */ }
-    setAgentOpen(true);
-  };
 
   const dateLabel = new Date().toLocaleDateString("fr-CA", {
     weekday: "long", day: "numeric", month: "long",
@@ -69,7 +58,7 @@ export default function MHome() {
       supabase.from("planipret_phone_calls").select("id", { count: "exact", head: true }).eq("user_id", profile.user_id).eq("direction", "missed").gte("started_at", startIso),
       supabase.from("planipret_phone_messages").select("id", { count: "exact", head: true }).eq("user_id", profile.user_id).is("read_at", null).eq("direction", "inbound"),
       supabase.from("planipret_voicemails").select("id", { count: "exact", head: true }).eq("user_id", profile.user_id).eq("is_read", false).eq("folder", "inbox"),
-      supabase.from("planipret_phone_calls").select("id, direction, from_number, from_name, to_number, to_name, started_at, lead_score, lead_temperature").eq("user_id", profile.user_id).order("started_at", { ascending: false }).limit(3),
+      supabase.from("planipret_phone_calls").select("id, direction, from_number, from_name, to_number, to_name, started_at, lead_score, lead_temperature, ai_summary").eq("user_id", profile.user_id).order("started_at", { ascending: false }).limit(3),
       supabase.from("planipret_phone_calls").select("id, from_number, from_name, to_number, to_name, lead_score, lead_temperature, started_at, direction").eq("user_id", profile.user_id).gte("started_at", startIso).gte("lead_score", 8).order("lead_score", { ascending: false }).limit(5),
       supabase.from("planipret_reminders").select("*").eq("user_id", profile.user_id).eq("status", "pending").lte("scheduled_at", nowIso).order("scheduled_at", { ascending: true }).limit(10),
     ]);
@@ -345,7 +334,21 @@ export default function MHome() {
             Touchez « Écouter » pour générer votre résumé du jour.
           </p>
         )}
+        {profile?.voice_agent_enabled && (
+          <button
+            onClick={openAva}
+            className="mt-3 w-full py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"
+            style={{
+              background: "linear-gradient(135deg, rgba(155,127,232,0.18), rgba(108,60,225,0.18))",
+              border: "1px solid rgba(155,127,232,0.35)",
+              color: "var(--pp-agent)",
+            }}
+          >
+            <Bot className="w-3.5 h-3.5" /> Parler à AVA
+          </button>
+        )}
       </section>
+
 
       {/* ===== MAESTRO SNAPSHOT ===== */}
       {maestroCounts && (() => {
@@ -563,8 +566,14 @@ export default function MHome() {
                     <Icon className="w-3.5 h-3.5" />
                   </span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate" style={{ color: "var(--pp-text-primary)" }}>
+                    <p className="text-sm font-medium truncate flex items-center gap-1.5" style={{ color: "var(--pp-text-primary)" }}>
                       {name ?? "Inconnu"}
+                      {c.ai_summary && (
+                        <span className="text-[8px] px-1.5 py-0.5 rounded-full font-bold"
+                          style={{ background: "rgba(155,127,232,0.15)", color: "var(--pp-agent)", border: "1px solid rgba(155,127,232,0.3)" }}>
+                          🤖 IA
+                        </span>
+                      )}
                     </p>
                     <p className="text-[11px]" style={{ color: "var(--pp-text-muted)" }}>
                       {c.started_at ? new Date(c.started_at).toLocaleTimeString("fr-CA", { hour: "2-digit", minute: "2-digit" }) : ""}
@@ -577,23 +586,8 @@ export default function MHome() {
         )}
       </section>
 
-      {/* ===== FLOATING AVA AGENT BUTTON ===== */}
-      {profile?.voice_agent_enabled && (
-        <button
-          onClick={openAgent}
-          aria-label="Parler à AVA"
-          className={`fixed right-4 z-30 w-[52px] h-[52px] rounded-full flex items-center justify-center text-white active:scale-95 transition ${agentOpen ? "ring-4 ring-emerald-400/60" : ""}`}
-          style={{
-            background: "linear-gradient(135deg, var(--pp-agent), #6C3CE1)",
-            boxShadow: "0 8px 24px rgba(155,127,232,0.5)",
-            bottom: "calc(94px + 60px + 24px)",
-          }}
-        >
-          <Bot className="w-6 h-6" />
-        </button>
-      )}
+      {/* Floating AVA button is now rendered by the shell (PlanipretMobile). */}
 
-      {agentOpen && profile?.user_id && <AvaVoiceAgent userId={profile.user_id} onClose={() => setAgentOpen(false)} />}
     </div>
   );
 }
