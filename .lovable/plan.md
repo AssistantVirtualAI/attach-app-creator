@@ -1,68 +1,51 @@
-… (concise)
+## A. Fix build (immédiat)
+- `src/hooks/usePullToRefresh.tsx` : ajouter prop optionnelle `color?: string` à `PullIndicator` (utilisée par `PlanipretMobile`, ligne 264).
+- `src/services/__tests__/avaProactive.test.ts` : confirmer signature `(name: string, opts?: any) => invoke(name, opts)` (typage tuple correct).
 
-## Objectif
-Garantir qu'aucune configuration ne manque sur les Phases 1→7 du module Planipret mobile, ajouter une couverture de tests minimale et appliquer des améliorations ciblées sans casser l'existant.
+## B. Fix users list — `/planipret/admin/users`
+- Vérifier composant existant (`src/pages/planipret/admin/PAUsers.tsx` ou équivalent) et corriger la requête vers `planipret_profiles` avec les colonnes listées + tri par `full_name`.
+- Admin guard layout : filtrer par `.eq("id", user.id)` (pas `user_id`), créer profil admin via insert si manquant (`role='admin'`, `ns_domain='planipret.ca'`).
+- États : skeleton (loading), message d'erreur explicite, empty state « Aucun courtier trouvé » + bouton Ajouter.
+- Si RLS bloque : ajouter migration policy « Admins can read all profiles » (`auth.uid() IN (select id from planipret_profiles where role='admin')`).
 
-## 1. Audit de configuration (lecture seule + corrections additives)
+## C. Refonte Admin Dashboard (AVA org uniquement)
+Design tokens dark navy déjà fournis (à exposer dans `index.css` sous `--pp-admin-*` pour ne pas casser le reste).
 
-### 1.1 Edge Functions
-Vérifier que toutes les fonctions appelées par le front existent et sont déployées :
-- `pp-ava-chat`, `pp-ava-proactive`, `pp-search`, `pp-ns-calls`, `pp-ns-cdr`, `pp-ns-auth`, `pp-contact-timeline`, `pp-calendar-sync`, `pp-push-notify`, `pp-vapid-public`, `pp-greeting-*`, `pp-integration-secrets`, `pp-data-retention`, `pp-gdpr-export`, `pp-audit-*`, `maestro-pipeline-orchestrator`.
-- Compléter `supabase/config.toml` avec les blocs `[functions.<name>] verify_jwt = …` manquants pour les fonctions PP (par défaut `true`, sauf webhooks publics).
-- Vérifier la présence des en-têtes CORS sur chaque fonction PP (patch additif si manquant).
+### Structure
+- `src/layouts/PlanipretAdminLayout.tsx` : sidebar 260px + topbar 64px + main scroll.
+- Nav items + badges dynamiques (intégrations manquantes, score audit).
+- Topbar : titre page, badge LIVE (Realtime), date FR, bell notifications.
 
-### 1.2 Secrets
-- Vérifier via `fetch_secrets` : `LOVABLE_API_KEY` (AVA), clés NetSapiens / Maestro / ElevenLabs / VAPID / Resend si déjà utilisées.
-- Si manquant, créer via `ai_gateway--create` (LOVABLE_API_KEY) ou demander à l'utilisateur via `add_secret` (autres).
+### Pages
+1. **Overview** (`/planipret/admin/overview`) — 4 KPI cards, 3 live cards (appels actifs, app mobile, sessions AVA), BarChart 7 jours (recharts), Donut répartition, table activité Realtime, table courtiers en ligne, statut intégrations, stats IA, sync Maestro.
+2. **Courtiers** (`/planipret/admin/users`) — stats + filtres pills + table complète avec toggles optimistes (`mobile_app_enabled`, `voice_agent_enabled`), bulk actions, modales Add/Edit/Delete via `pp-admin-user`.
+3. **Appels** (`/planipret/admin/calls`) — filtres + tabs + table + side panel détail (audio/transcript/coaching/Maestro).
+4. **Messages** (`/planipret/admin/messages`) — tabs SMS / Team / M365.
+5. **Voicemails** — table + panel audio+transcript.
+6. **Rapports** — date range, charts (activité, distributions, leaderboard podium, tendances IA), export PDF/CSV.
+7. **Intégrations** — garder existant + ajouter health bar en haut.
 
-### 1.3 RLS & GRANT
-- Lancer `supabase--linter` et corriger uniquement les findings liés aux tables touchées par les phases 1-7 (`planipret_ava_conversations`, `planipret_reminders`, `planipret_team_messages`, `planipret_contacts`, `planipret_phone_calls`, `planipret_phone_messages`, `planipret_voicemails`, `planipret_pipeline`).
-- S'assurer que chaque table a `GRANT` cohérent + policies par `user_id`/organisation.
+### Realtime
+- `src/hooks/useAdminRealtime.ts` : 4 canaux (`admin-calls`, `admin-messages`, `admin-profiles`, `admin-ava`) avec teardown propre. Indicateur live dans topbar (connecté/reconnexion).
 
-### 1.4 Routes & contextes UI
-- Vérifier que `useOutletContext` expose bien partout : `openAva`, `openDialer`, `openVoice`, `broker`, `org`.
-- Ajouter les routes/imports manquants éventuels (`MMore`, `MSearch`).
+### Responsive
+- `<768px` redirige vers `/mplanipret` avec message.
 
-## 2. Tests
+## D. Contraintes
+- Pas de modif Edge Functions ni schémas tables (seule migration possible : policy RLS admin si nécessaire à la section B).
+- Pas de Lemtel, pas de mobile, pas de landing.
+- Charts via `recharts` (déjà installé).
+- Tous les composants admin sous `src/pages/planipret/admin/` ; nouveaux composants partagés sous `src/components/planipret/admin/`.
 
-### 2.1 Tests frontend (Vitest + RTL)
-Mise en place si absente (`vitest.config.ts`, `src/test/setup.ts`).
-Tests ciblés :
-- `useAvaDraft` : write/read/debounce/effacement.
-- `avaProactive.applyAvaSuggestion` : routage `call`/`sms`/`reminder`/`maestro_action` (mocks supabase + navigate).
-- `AvaSummarizeSheet` : changement de niveau déclenche un appel, bouton copier copie le texte.
-- `AvaHistorySheet` : recherche filtre la liste, "Charger plus" pagine.
-- `CoachOverlay` : clic suggestion → callback `applyAvaSuggestion`.
+## E. Tests
+- Vitest : `useAdminRealtime` (subscribe/teardown), `PAUsers` (rendu loading/empty/erreur), filtres pills.
+- Smoke : `bunx vitest run` global doit rester vert.
 
-### 2.2 Tests Edge Functions (Deno)
-- `pp-ava-chat/index_test.ts` : OPTIONS = 200 CORS ; POST sans body = 400 ; POST valide renvoie structure `{ reply, suggestions[] }`.
-- `pp-ava-proactive/index_test.ts` : idem + fallback gracieux quand LLM down.
-- `pp-search/index_test.ts` : recherche basique + auth requise.
+## Ordre
+1. A (fix build).
+2. B (users list + admin guard).
+3. C.1 Overview + C.2 Users.
+4. C.3-7 (calls, messages, voicemails, reports).
+5. D Realtime + responsive + tests.
 
-### 2.3 Smoke E2E (Playwright via shell, optionnel)
-Charger `/mplanipret`, vérifier que les 6 onglets s'ouvrent sans erreur console.
-
-## 3. Améliorations transverses
-
-- **Gestion d'erreurs unifiée** : helper `toastError(e)` partagé, utilisé par tous les `catch` AVA / Maestro / NS.
-- **Loading & skeletons** : compléter les skeletons manquants dans `AvaHistorySheet` (pagination), `Team roster`, `CoachOverlay`.
-- **Pull-to-refresh** : extraire `usePullToRefresh` hook et l'appliquer uniformément à MHome, MMessages (chaque sous-tab), MPipeline, MStats, MContacts, MVoicemail.
-- **Debounce recherche** : 250 ms sur `AvaHistorySheet` et roster Équipe.
-- **A11y** : `aria-label` sur tous les boutons icône-only des nouveaux composants (CoachOverlay, AvaHistorySheet, AvaSummarizeSheet, InboundCallOverlay).
-- **Persist last tab** : mémoriser onglet actif Messages (`sms|team|ava|email|roster`) en `localStorage`.
-- **Optimistic UI** : envoi SMS / message Équipe / reminder → affichage immédiat puis réconciliation.
-- **AVA budget guard** : court-circuit côté client si `LOVABLE_API_KEY` retourne 402/429 → toast explicatif + désactivation temporaire (60 s).
-
-## 4. Livrables
-- `supabase/config.toml` mis à jour (verify_jwt par fonction PP).
-- Tests : `src/**/__tests__/*.test.ts(x)` + `supabase/functions/**/index_test.ts`.
-- Nouveau hook `src/hooks/usePullToRefresh.ts`, helper `src/lib/toastError.ts`.
-- Branchements dans MHome/MMessages/MPipeline/MStats/MContacts/MVoicemail.
-- Patchs additifs CORS/GRANT si findings.
-
-## 5. Hors scope
-- Pas de nouvelle table, pas de nouvelle fonctionnalité produit.
-- Pas de modif de la landing ni des composants admin.
-- Pas de rotation de clé existante.
-
-Tu valides ? Je peux aussi restreindre à un sous-ensemble (par ex. uniquement audit + tests, sans les améliorations UX) si tu préfères un périmètre plus court.
+OK pour exécuter dans cet ordre, ou je commence seulement par A+B (fix immédiat) avant la grosse refonte ?
