@@ -12,6 +12,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useTelephonyStatus } from '@/hooks/useTelephonyStatus';
 import { useSoftphone } from '@/hooks/useSoftphone';
 import { LEMTEL_ORG } from '@/hooks/usePbxData';
+import { WssHealthMonitor } from '@/components/telephony/WssHealthMonitor';
+
 
 type QaStatus = 'pending' | 'pass' | 'fail' | 'warn' | 'running';
 type QaCheck = { id: string; group: string; label: string; status: QaStatus; detail: string; fix: string; at: number };
