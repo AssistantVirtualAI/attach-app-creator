@@ -124,16 +124,18 @@ export default function MVoicemail() {
       </header>
 
       <div className="flex gap-2 mb-3">
-        {(["inbox", "saved"] as const).map((k) => (
+        {(["greeting", "inbox", "saved"] as const).map((k) => (
           <button key={k} onClick={() => setTab(k)}
             className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${tab === k ? "text-white shadow-sm" : "bg-white text-slate-600"}`}
             style={tab === k ? { background: PRIMARY } : undefined}>
-            {k === "inbox" ? "📬 Reçus" : "💾 Sauvegardés"}
+            {k === "greeting" ? "🎙️ Ma boîte" : k === "inbox" ? "📬 Reçus" : "💾 Sauvegardés"}
           </button>
         ))}
       </div>
 
-      {loading ? (
+      {tab === "greeting" ? (
+        <GreetingStudio profile={profile} onProfileChange={reloadProfile} />
+      ) : loading ? (
         <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="bg-white rounded-2xl h-16 animate-pulse" />)}</div>
       ) : filtered.length === 0 ? (
         <div className="bg-white rounded-2xl p-8 text-center shadow-sm mt-8 text-slate-500 text-sm">
