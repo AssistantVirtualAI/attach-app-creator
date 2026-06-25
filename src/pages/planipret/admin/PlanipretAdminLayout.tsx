@@ -117,7 +117,7 @@ export default function PlanipretAdminLayout() {
 
 
 
-  const logout = async () => { await supabase.auth.signOut(); navigate("/login", { replace: true }); };
+  const logout = async () => { await supabase.auth.signOut(); window.location.href = SSO_URL; };
 
   if (loading) return <div className="planipret-scope min-h-screen flex items-center justify-center" style={{ color: "var(--pp-text-muted)" }}>Chargement…</div>;
 
@@ -135,69 +135,77 @@ export default function PlanipretAdminLayout() {
         </div>
       </div>
 
-      {/* Sidebar */}
-      <aside className="hidden md:flex flex-col fixed left-0 top-0 h-screen w-[260px] z-40"
-        style={{ background: "var(--pp-bg-deep)", borderRight: "1px solid var(--pp-bg-border)" }}>
-        <div className="px-5 pt-5 pb-4" style={{ borderBottom: "1px solid var(--pp-bg-border)" }}>
-          <div style={{ fontFamily: "Inter,sans-serif", fontWeight: 700, fontSize: 16, color: "var(--pp-text-primary)", letterSpacing: "0.04em" }}>
-            PLANIPRÊT
+      {/* Sidebar — 240px */}
+      <aside className="hidden md:flex flex-col fixed left-0 top-0 h-screen w-[240px] z-40"
+        style={{ background: "#040B16", borderRight: "1px solid #0A1E35", fontFamily: "'DM Sans', sans-serif" }}>
+        <div className="px-4 pt-4 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="flex items-center justify-center" style={{
+              width: 32, height: 32, borderRadius: 8,
+              background: "linear-gradient(135deg, #1A4A8A, #2E9BDC)",
+              fontSize: 16, lineHeight: 1,
+            }}>🏠</div>
+            <div className="min-w-0">
+              <div style={{ fontFamily: "Inter, sans-serif", fontWeight: 700, fontSize: 14, color: "#E8EDF5", letterSpacing: "0.04em" }}>PLANIPRÊT</div>
+              <div style={{ fontWeight: 500, fontSize: 10, color: "#2E9BDC" }}>AI Portal · Admin</div>
+            </div>
           </div>
-          <div style={{ fontFamily: "DM Sans,sans-serif", fontWeight: 500, fontSize: 10, color: "var(--pp-brand-accent)", marginTop: 2 }}>
-            AI Portal · Admin
-          </div>
-          <div style={{ height: 1, marginTop: 12, background: "linear-gradient(90deg, var(--pp-brand-accent), transparent)", opacity: 0.4 }} />
+          <div style={{ height: 1, marginTop: 12, background: "linear-gradient(90deg, #2E9BDC, transparent)", opacity: 0.35 }} />
         </div>
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          {LINKS.map(({ to, label, Icon }) => (
+        <nav className="flex-1 px-2.5 py-3 space-y-0.5 overflow-y-auto">
+          {LINKS.map(({ to, label, Icon, badge }) => (
             <NavLink key={to} to={to}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition"
+              className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg transition"
               style={({ isActive }) => isActive
-                ? {
-                    background: "linear-gradient(135deg, #0D2A4A, #091E35)",
-                    border: "1px solid rgba(46,155,220,0.25)",
-                    color: "var(--pp-text-primary)",
-                  }
-                : { color: "var(--pp-text-muted)", border: "1px solid transparent" }
+                ? { background: "#0D2A4A", border: "1px solid rgba(46,155,220,0.2)", color: "#E8EDF5", fontSize: 13, fontWeight: 500 }
+                : { color: "#4A7FA5", border: "1px solid transparent", fontSize: 13, fontWeight: 500 }
               }>
               {({ isActive }) => (
                 <>
-                  <Icon className="w-4 h-4" style={{ color: isActive ? "var(--pp-brand-accent)" : "currentColor" }} />
+                  <Icon className="w-4 h-4" style={{ color: isActive ? "#2E9BDC" : "currentColor" }} />
                   <span className="flex-1">{label}</span>
-                  {to === "/planipret/admin/integrations" && missingIntegrations > 0 && (
-                    <span className="text-[9px] font-bold text-white rounded-full flex items-center justify-center"
-                      style={{ background: "var(--pp-danger)", width: 18, height: 18 }}>
-                      {missingIntegrations}
-                    </span>
+                  {badge === "brokers" && brokerCount > 0 && (
+                    <span style={{ fontSize: 9, fontWeight: 700, color: "#8FA8C0", background: "#0D1F35", border: "1px solid #0E2A45", borderRadius: 6, padding: "1px 6px" }}>{brokerCount}</span>
+                  )}
+                  {badge === "missed" && missedCalls > 0 && (
+                    <span style={{ fontSize: 9, fontWeight: 700, color: "#fff", background: "#E84C4C", borderRadius: 999, minWidth: 16, height: 16, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "0 5px" }}>{missedCalls}</span>
+                  )}
+                  {badge === "integrations" && missingIntegrations > 0 && (
+                    <span style={{ width: 8, height: 8, borderRadius: 999, background: "#F5A623", boxShadow: "0 0 8px rgba(245,166,35,.6)" }} />
+                  )}
+                  {badge === "audit" && auditScore !== null && (
+                    <span style={{ fontSize: 9, fontWeight: 700, color: "#F5A623", background: "#2A1A00", border: "1px solid #4A3000", borderRadius: 6, padding: "1px 6px" }}>{auditScore}%</span>
                   )}
                 </>
               )}
             </NavLink>
           ))}
         </nav>
-        <div className="px-3 py-4" style={{ borderTop: "1px solid var(--pp-bg-border)" }}>
-          <div className="flex items-center gap-3 px-2 mb-3">
-            <div className="rounded-full flex items-center justify-center text-white text-xs font-bold"
+        <div style={{ padding: 14, borderTop: "1px solid #0A1E35" }}>
+          <div className="flex items-center gap-3">
+            <div className="rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
               style={{ width: 36, height: 36, background: "linear-gradient(135deg, #1A4A8A, #2E9BDC)" }}>
               {initials(profile?.full_name)}
             </div>
-            <div className="min-w-0">
-              <p style={{ fontSize: 12, fontWeight: 600, color: "var(--pp-text-primary)" }} className="truncate">{profile?.full_name ?? "Admin"}</p>
-              <p style={{ fontSize: 10, color: "var(--pp-text-faint)" }}>Super Admin</p>
+            <div className="min-w-0 flex-1">
+              <p style={{ fontSize: 12, fontWeight: 600, color: "#E8EDF5" }} className="truncate">{profile?.full_name ?? "Admin"}</p>
+              <p style={{ fontSize: 10, color: "#4A7FA5" }}>Super Admin</p>
             </div>
+            <button onClick={logout} title="Déconnexion"
+              className="flex items-center justify-center rounded-lg transition"
+              style={{ width: 28, height: 28, color: "#4A7FA5", border: "1px solid transparent" }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "#0D1F35"; e.currentTarget.style.color = "#E84C4C"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#4A7FA5"; }}>
+              <LogOut className="w-3.5 h-3.5" />
+            </button>
           </div>
-          <button onClick={logout} className="w-full flex items-center gap-2 px-3 h-9 rounded-lg text-sm transition"
-            style={{ color: "var(--pp-text-muted)" }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = "var(--pp-bg-elevated)")}
-            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
-            <LogOut className="w-4 h-4" /> Déconnexion
-          </button>
         </div>
       </aside>
 
       {/* Main */}
-      <div className="hidden md:flex flex-1 flex-col ml-[260px]">
-        <header className="sticky top-0 h-14 flex items-center justify-between px-6 z-30"
-          style={{ background: "var(--pp-bg-base)", borderBottom: "1px solid var(--pp-bg-border)" }}>
+      <div className="hidden md:flex flex-1 flex-col ml-[240px]">
+        <header className="sticky top-0 flex items-center justify-between px-6 z-30"
+          style={{ height: 64, background: "#060D1A", borderBottom: "1px solid #0A1E35" }}>
           <h1 style={{ fontFamily: "Inter,sans-serif", fontWeight: 700, fontSize: 18, color: "var(--pp-text-primary)" }}>{title}</h1>
           <div className="flex items-center gap-4">
             <button onClick={() => setPaletteOpen(true)}
