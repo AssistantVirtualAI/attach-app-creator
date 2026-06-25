@@ -166,17 +166,24 @@ export default function PAReports() {
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-2">
-        {(["week", "month", "quarter"] as Range[]).map((r) => (
-          <button key={r} onClick={() => setRange(r)}
-            className="px-3 py-1.5 rounded-lg text-sm transition"
-            style={range === r
-              ? { background: ACCENT, color: "#fff", border: `1px solid ${ACCENT}` }
-              : { background: "var(--pp-bg-elevated)", color: "var(--pp-text-secondary)", border: "1px solid var(--pp-bg-border-2)" }}>
-            {r === "week" ? "Cette semaine" : r === "month" ? "Ce mois" : "3 derniers mois"}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex gap-2">
+          {(["week", "month", "quarter"] as Range[]).map((r) => (
+            <button key={r} onClick={() => setRange(r)}
+              className="px-3 py-1.5 rounded-lg text-sm transition"
+              style={range === r
+                ? { background: ACCENT, color: "#fff", border: `1px solid ${ACCENT}` }
+                : { background: "var(--pp-bg-elevated)", color: "var(--pp-text-secondary)", border: "1px solid var(--pp-bg-border-2)" }}>
+              {r === "week" ? "Cette semaine" : r === "month" ? "Ce mois" : "3 derniers mois"}
+            </button>
+          ))}
+        </div>
+        <button onClick={exportPdf} disabled={exporting}
+          className="pp-btn-primary flex items-center gap-2 text-sm disabled:opacity-50">
+          <FileText className="w-4 h-4" /> {exporting ? "Génération…" : "Exporter PDF"}
+        </button>
       </div>
+      <div ref={reportRef} className="space-y-4">
 
       {/* Podium */}
       {podium.length > 0 && (
