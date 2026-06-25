@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { OrganizationProvider, useOrganization } from "@/context/OrganizationContext";
 import { ThemeProvider } from "@/context/ThemeContext";
@@ -392,9 +392,11 @@ const App = () => (
                   path="/planipret/admin"
                   element={
                     <AppSeparationGuard app="planipret">
-                      <Suspense fallback={<AdminPageSkeleton />}>
-                        <PlanipretAdminLayout />
-                      </Suspense>
+                      <PlanipretOrgOnly>
+                        <Suspense fallback={<AdminPageSkeleton />}>
+                          <PlanipretAdminLayout />
+                        </Suspense>
+                      </PlanipretOrgOnly>
                     </AppSeparationGuard>
                   }
                 >
@@ -423,6 +425,9 @@ const App = () => (
                     </ProtectedRoute>
                   }
                 />
+
+                {/* Legacy AVA admin portal is now strictly hosted inside the Planipret organization. */}
+                <Route element={<ProtectedRoute><PlanipretOrgOnly><Outlet /></PlanipretOrgOnly></ProtectedRoute>}>
                 <Route
                   path="/dashboard"
                   element={
@@ -696,11 +701,13 @@ const App = () => (
                     </ProtectedRoute>
                   }
                 />
+                </Route>
                 <Route path="/privacy" element={<PrivacyPolicy />} />
                 <Route path="/terms" element={<Terms />} />
                 <Route path="/support" element={<Support />} />
                 <Route path="/legal" element={<Legal />} />
                 <Route path="/docs" element={<Docs />} />
+                <Route element={<ProtectedRoute><PlanipretOrgOnly><Outlet /></PlanipretOrgOnly></ProtectedRoute>}>
                 <Route
                   path="/demo"
                   element={
@@ -709,6 +716,7 @@ const App = () => (
                     </ProtectedRoute>
                   }
                 />
+                </Route>
                 <Route
                   path="/realtime"
                   element={
