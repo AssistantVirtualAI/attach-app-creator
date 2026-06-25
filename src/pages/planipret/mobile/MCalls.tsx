@@ -332,7 +332,7 @@ function CallRow({ call, onTap, onCall, showCallBtn }: { call: Call; onTap: () =
         <button onClick={onTap} className="flex items-center gap-3 flex-1 min-w-0 text-left">
           <div
             className="rounded-full flex items-center justify-center shrink-0"
-            style={{ width: 44, height: 44, background: "var(--pp-bg-elevated)", color }}
+            style={{ width: 44, height: 44, background: "var(--pp-bg-elevated)", color: dirColor }}
           >
             <Icon className="w-5 h-5" />
           </div>
