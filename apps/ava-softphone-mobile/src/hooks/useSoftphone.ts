@@ -599,6 +599,7 @@ export function useSoftphone(
         },
       };
       if (forcePcmu) log('call.fallback', 'secure PCMU-only SDP rewrite armed');
+      console.log('[SIP][ICE] pcConfig:', JSON.stringify(callOpts.pcConfig));
       uaRef.current.call(`sip:${number}@${config.domain}`, callOpts);
       return true;
     } catch (err: any) {
