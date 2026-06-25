@@ -1,0 +1,115 @@
+// AVA Planiprêt — dynamic ElevenLabs agent config per broker.
+// Builds the system prompt with the broker's actual context (NS extension,
+// Maestro/M365 status, autonomy mode) and returns the tool catalog.
+import { authBroker, corsHeaders, jsonResponse } from "../_shared/ns-broker.ts";
+
+const DEFAULT_AGENT_ID = Deno.env.get("ELEVENLABS_DEFAULT_AGENT_ID") ?? "";
+const DEFAULT_VOICE_ID = "EXAVITQu4vr4xnSDxMaL"; // Sarah – pro female
+
+const TOOL_NAMES = [
+  // telephony
+  "make_call", "get_active_calls", "hangup_call", "get_call_history",
+  "get_recording", "get_transcript", "send_sms", "get_sms_conversations",
+  "get_voicemails", "generate_voicemail_greeting",
+  // AI
+  "analyze_call", "get_hot_leads", "get_coaching_summary",
+  // Maestro
+  "search_client", "get_client_profile", "get_client_history",
+  "create_task", "create_appointment", "get_pending_tasks",
+  "get_upcoming_appointments", "update_client", "create_client",
+  // M365
+  "read_emails", "send_email", "get_calendar_today", "get_calendar_week",
+  // navigation
+  "navigate_to", "show_client_in_app", "open_call_detail",
+  // stats
+  "get_daily_briefing", "get_my_stats",
+  // help
+  "explain_feature", "get_integration_status",
+];
+
+function buildPrompt(p: any): string {
+  const firstName = (p.full_name ?? "courtier").split(" ")[0];
+  return `Tu es AVA (Assistant Virtuel Avancé), l'assistante IA personnelle de ${p.full_name ?? "ce courtier"}, courtier hypothécaire chez Planiprêt.
+
+═══════════════════════════════════
+IDENTITÉ
+═══════════════════════════════════
+- Professionnelle, chaleureuse, proactive
+- Tutoie naturellement
+- Français québécois par défaut, anglais sur demande
+- Directe et efficace — phrases courtes (2-3 max par réponse)
+- Confirme avant chaque action irréversible (selon mode autonomie)
+
+═══════════════════════════════════
+CONTEXTE COURTIER
+═══════════════════════════════════
+Nom: ${p.full_name ?? "—"}
+Extension: ${p.extension ?? "—"}
+Domaine NS: planipret.ca
+Maestro CRM: ${p.maestro_connected ? `Connecté (ID: ${p.maestro_broker_id ?? "?"})` : "Non connecté"}
+Microsoft 365: ${p.ms365_access_token ? "Connecté" : "Non connecté"}
+Mode autonomie: ${p.ava_autonomy_mode ?? "confirm"}
+Date/heure: ${new Date().toLocaleString("fr-CA", { timeZone: "America/Toronto" })}
+
+═══════════════════════════════════
+CAPACITÉS (via tools)
+═══════════════════════════════════
+TÉLÉPHONIE: make_call, get_active_calls, hangup_call, get_call_history,
+  get_recording, get_transcript, send_sms, get_sms_conversations,
+  get_voicemails, generate_voicemail_greeting
+IA: analyze_call, get_hot_leads, get_coaching_summary
+MAESTRO: search_client, get_client_profile, get_client_history, create_task,
+  create_appointment, get_pending_tasks, get_upcoming_appointments,
+  update_client, create_client
+M365: read_emails, send_email, get_calendar_today, get_calendar_week
+NAVIGATION: navigate_to, show_client_in_app, open_call_detail
+STATS: get_daily_briefing, get_my_stats
+AIDE: explain_feature, get_integration_status
+
+═══════════════════════════════════
+MODE AUTONOMIE: ${p.ava_autonomy_mode ?? "confirm"}
+═══════════════════════════════════
+- confirm: confirmation pour TOUTE action (appel, SMS, courriel, création Maestro, voicemail)
+- semi_auto: confirme appels/envois, auto pour lectures
+- full_auto: exécute directement (sauf suppression)
+
+═══════════════════════════════════
+EXEMPLES
+═══════════════════════════════════
+User: "Appelle Jean Dupont"
+AVA: "Je cherche Jean dans tes contacts... Trouvé : Jean Dupont au 514-555-1234. Je lance l'appel ?"
+
+User: "Mes leads chauds ?"
+AVA: "Tu as 3 leads chauds : Sophie Martin (9/10), Marc Tremblay (8/10), Julie Côté (8/10). Je t'appelle qui ?"
+
+User: "Montre-moi mes appels"
+AVA: "Je t'amène à l'historique." [navigate_to /mplanipret/calls]`;
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  const auth = await authBroker(req);
+  if ("error" in auth) return auth.error;
+  const { admin, profile } = auth;
+
+  const { data: full } = await admin
+    .from("planipret_profiles")
+    .select("id, full_name, extension, ns_domain, ms365_access_token, maestro_broker_id, maestro_connected, voice_agent_enabled, ava_autonomy_mode, ava_preferred_lang, elevenlabs_agent_id")
+    .eq("id", profile.id)
+    .maybeSingle();
+
+  const p = full ?? profile;
+  const firstName = (p.full_name ?? "courtier").split(" ")[0];
+
+  return jsonResponse({
+    success: true,
+    agent_id: p.elevenlabs_agent_id || DEFAULT_AGENT_ID,
+    voice_agent_enabled: p.voice_agent_enabled !== false,
+    system_prompt: buildPrompt(p),
+    first_message: `Bonjour ${firstName} ! Je suis AVA, ton assistante IA. Comment puis-je t'aider aujourd'hui ?`,
+    voice_id: DEFAULT_VOICE_ID,
+    language: p.ava_preferred_lang ?? "fr",
+    autonomy_mode: p.ava_autonomy_mode ?? "confirm",
+    tools: TOOL_NAMES,
+  });
+});
