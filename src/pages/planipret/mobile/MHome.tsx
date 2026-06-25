@@ -128,9 +128,55 @@ export default function MHome() {
 
   const firstName = (profile?.full_name ?? "Courtier").split(" ")[0];
 
+  const totalComms = stats.calls + stats.sms + stats.team + stats.outbound + stats.emails;
+
   return (
     <div className="p-4 space-y-4 pb-8" style={{ background: "var(--pp-bg-base)", minHeight: "100%" }}>
       <PWAInstallBanner />
+
+      {/* ===== HERO IMAGE — résumé IA visuel ===== */}
+      <section
+        className="relative rounded-2xl overflow-hidden"
+        style={{ border: "1px solid var(--pp-bg-border-2)", height: 140 }}
+      >
+        <img
+          src={heroStats.url}
+          alt=""
+          width={1280}
+          height={640}
+          className="absolute inset-0 w-full h-full object-cover"
+          style={{ opacity: 0.55 }}
+        />
+        <div
+          className="absolute inset-0"
+          style={{ background: "linear-gradient(135deg, rgba(6,13,26,0.55) 0%, rgba(6,13,26,0.92) 100%)" }}
+        />
+        <div className="relative h-full p-4 flex flex-col justify-between">
+          <div className="flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5" style={{ color: "var(--pp-agent)" }} />
+            <span className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: "var(--pp-agent)" }}>
+              Résumé IA — Aujourd'hui
+            </span>
+          </div>
+          <div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl font-bold tabular-nums" style={{ color: "var(--pp-text-primary)" }}>
+                {totalComms}
+              </span>
+              <span className="text-xs" style={{ color: "var(--pp-text-secondary)" }}>
+                communications
+              </span>
+            </div>
+            <div className="text-[11px] mt-0.5 flex items-center gap-3" style={{ color: "var(--pp-text-muted)" }}>
+              <span className="inline-flex items-center gap-1"><Phone className="w-3 h-3" />{stats.calls}</span>
+              <span className="inline-flex items-center gap-1"><MessageSquare className="w-3 h-3" />{stats.sms + stats.outbound}</span>
+              <span className="inline-flex items-center gap-1"><UsersIcon className="w-3 h-3" />{stats.team}</span>
+              <span className="inline-flex items-center gap-1"><TrendingUp className="w-3 h-3" style={{ color: "var(--pp-success)" }} /></span>
+            </div>
+          </div>
+        </div>
+      </section>
+
 
       {/* ===== Header ===== */}
       <header className="flex items-start justify-between pt-2">
