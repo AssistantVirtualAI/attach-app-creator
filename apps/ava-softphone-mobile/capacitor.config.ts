@@ -7,7 +7,17 @@ const config: CapacitorConfig = {
   server: {
     androidScheme: 'https',
   },
+  ios: {
+    allowsLinkPreview: false,
+    scrollEnabled: false,
+    contentInset: 'automatic',
+    preferredContentMode: 'mobile',
+    webContentsDebuggingEnabled: true,
+  },
   plugins: {
+    CapacitorHttp: {
+      enabled: true,
+    },
     SplashScreen: {
       launchShowDuration: 1800,
       backgroundColor: '#EEF3FB',
