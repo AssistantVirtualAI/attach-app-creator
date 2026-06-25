@@ -219,21 +219,8 @@ export default function PlanipretIntegrations() {
                     </div>
                   </div>
 
-                  {/* ElevenLabs Agent ID warning */}
-                  {card.id === "elevenlabs" && !stored?.has_keys?.includes("default_agent_id") && !forms.elevenlabs?.default_agent_id && (
-                    <div className="mb-3 p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs">
-                      <div className="flex items-start gap-2">
-                        <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                        <div className="flex-1">
-                          <p className="font-semibold text-amber-900">Agent ElevenLabs non configuré</p>
-                          <p className="text-amber-800 mt-1">Sans Agent ID, le bouton 🤖 ne fonctionnera pas pour les courtiers.</p>
-                          <a href="https://elevenlabs.io/app/conversational-ai" target="_blank" rel="noopener" className="inline-flex items-center gap-1 text-amber-900 underline mt-2">
-                            <ExternalLink className="w-3 h-3" /> Comment obtenir un Agent ID ?
-                          </a>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+
+
 
                   {/* NetSapiens webhook helper */}
                   {card.id === "nsapi" && <NSWebhookHelper />}
