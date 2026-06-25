@@ -278,6 +278,15 @@ function ContactDetailSheet({
           <QuickAction icon={<Calendar className="w-4 h-4" />} label="RDV" onClick={() => toast.info("Bientôt disponible")} />
         </div>
 
+        {history.length > 0 && (
+          <button onClick={() => setSummarizeOpen(true)}
+            className="w-full mb-3 py-2 rounded-lg flex items-center justify-center gap-1.5 text-white text-xs font-semibold"
+            style={{ background: "linear-gradient(135deg,#2D1A5A,#9B7FE8)" }}>
+            <Sparkles className="w-3.5 h-3.5" /> Résumer l'historique avec AVA
+          </button>
+        )}
+
+
         {/* Timeline */}
         <div className="text-[10px] font-semibold uppercase tracking-wide mb-2" style={{ color: "var(--pp-text-muted)" }}>
           Historique Maestro
