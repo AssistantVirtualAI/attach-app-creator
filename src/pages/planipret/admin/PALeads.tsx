@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Download, Flame } from "lucide-react";
 import { TEMP_COLORS, TEMP_EMOJI, TEMP_LABEL, type LeadTemp } from "@/components/planipret/leadHelpers";
@@ -19,48 +19,69 @@ type Row = {
   planipret_profiles?: { full_name: string };
 };
 
+const PAGE = 50;
+
 export default function PALeads() {
   const [rows, setRows] = useState<Row[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [counts, setCounts] = useState({ all: 0, hot: 0, warm: 0, cold: 0 });
   const [filter, setFilter] = useState<"all" | "hot" | "warm" | "cold">("all");
   const [loading, setLoading] = useState(true);
 
-  const load = async () => {
+  const loadCounts = async () => {
+    const base = supabase.from("planipret_phone_calls").select("id", { count: "exact", head: true }).not("lead_score", "is", null);
+    const [a, h, w, c] = await Promise.all([
+      base,
+      supabase.from("planipret_phone_calls").select("id", { count: "exact", head: true }).eq("lead_temperature", "hot"),
+      supabase.from("planipret_phone_calls").select("id", { count: "exact", head: true }).eq("lead_temperature", "warm"),
+      supabase.from("planipret_phone_calls").select("id", { count: "exact", head: true }).eq("lead_temperature", "cold"),
+    ]);
+    setCounts({ all: a.count ?? 0, hot: h.count ?? 0, warm: w.count ?? 0, cold: c.count ?? 0 });
+  };
+
+  const load = async (p = page) => {
     setLoading(true);
-    const { data } = await supabase
+    const fromIdx = (p - 1) * PAGE;
+    let q = supabase
       .from("planipret_phone_calls")
+      .select("id, user_id, direction, from_number, from_name, to_number, to_name, started_at, lead_score, lead_temperature, lead_score_reason, planipret_profiles!inner(full_name)", { count: "exact" })
+      .not("lead_score", "is", null)
+      .order("lead_score", { ascending: false })
+      .order("started_at", { ascending: false })
+      .range(fromIdx, fromIdx + PAGE - 1);
+    if (filter !== "all") q = q.eq("lead_temperature", filter);
+    const { data, count } = await q;
+    setRows((data ?? []) as any);
+    setTotal(count ?? 0);
+    setLoading(false);
+  };
+
+  useEffect(() => { setPage(1); load(1); loadCounts(); /* eslint-disable-next-line */ }, [filter]);
+  useEffect(() => { load(page); /* eslint-disable-next-line */ }, [page]);
+
+  useEffect(() => {
+    const ch = supabase.channel("admin-leads")
+      .on("postgres_changes", { event: "*", schema: "public", table: "planipret_phone_calls" }, () => { load(1); loadCounts(); })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+    // eslint-disable-next-line
+  }, []);
+
+  const filtered = rows;
+
+  const exportCsv = async () => {
+    let q = supabase.from("planipret_phone_calls")
       .select("id, user_id, direction, from_number, from_name, to_number, to_name, started_at, lead_score, lead_temperature, lead_score_reason, planipret_profiles!inner(full_name)")
       .not("lead_score", "is", null)
       .order("lead_score", { ascending: false })
       .order("started_at", { ascending: false })
-      .limit(500);
-    setRows((data ?? []) as any);
-    setLoading(false);
-  };
-
-  useEffect(() => { load(); }, []);
-
-  useEffect(() => {
-    const ch = supabase.channel("admin-leads")
-      .on("postgres_changes", { event: "*", schema: "public", table: "planipret_phone_calls" }, () => load())
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, []);
-
-  const filtered = useMemo(() =>
-    filter === "all" ? rows : rows.filter((r) => r.lead_temperature === filter),
-  [rows, filter]);
-
-  const counts = useMemo(() => ({
-    all: rows.length,
-    hot: rows.filter((r) => r.lead_temperature === "hot").length,
-    warm: rows.filter((r) => r.lead_temperature === "warm").length,
-    cold: rows.filter((r) => r.lead_temperature === "cold").length,
-  }), [rows]);
-
-  const exportCsv = () => {
+      .limit(5000);
+    if (filter !== "all") q = q.eq("lead_temperature", filter);
+    const { data: all } = await q;
     const header = ["Date", "Courtier", "Contact", "Numéro", "Direction", "Score", "Température", "Raison"];
     const lines = [header.join(",")];
-    filtered.forEach((r) => {
+    (all ?? []).forEach((r: any) => {
       const contact = r.from_name ?? r.to_name ?? "";
       const num = r.from_number ?? r.to_number ?? "";
       lines.push([
@@ -77,6 +98,7 @@ export default function PALeads() {
     a.href = url; a.download = `leads-${new Date().toISOString().slice(0,10)}.csv`; a.click();
     URL.revokeObjectURL(url);
   };
+
 
   return (
     <div className="space-y-4">
@@ -168,7 +190,16 @@ export default function PALeads() {
             </tbody>
           </table>
         </div>
+        <div className="flex items-center justify-between px-4 py-3" style={{ borderTop: "1px solid var(--pp-bg-border-2)", fontSize: 11, color: "var(--pp-text-muted)" }}>
+          <span>{total === 0 ? 0 : (page - 1) * PAGE + 1}–{Math.min(page * PAGE, total)} sur {total}</span>
+          <div className="flex gap-1">
+            <button disabled={page === 1} onClick={() => setPage(page - 1)} className="px-2 py-1 rounded disabled:opacity-40" style={{ border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>←</button>
+            <span className="px-3 py-1">{page} / {Math.max(1, Math.ceil(total / PAGE))}</span>
+            <button disabled={page >= Math.ceil(total / PAGE)} onClick={() => setPage(page + 1)} className="px-2 py-1 rounded disabled:opacity-40" style={{ border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>→</button>
+          </div>
+        </div>
       </div>
+
     </div>
   );
 }
