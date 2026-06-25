@@ -196,7 +196,7 @@ export default function PlanipretIntegrations() {
         <div className="grid md:grid-cols-2 gap-5">
           {CARDS.map((card) => {
             if (card.id === "elevenlabs") {
-              return <ElevenLabsManagementCard key="elevenlabs" userId={AVA_OWNER_USER_ID} />;
+              return <div id="elevenlabs" key="elevenlabs" className="scroll-mt-24"><ElevenLabsManagementCard userId={AVA_OWNER_USER_ID} /></div>;
             }
             const stored = items[card.id];
             const tested = testResults[card.id];
@@ -204,7 +204,7 @@ export default function PlanipretIntegrations() {
             const status = tested ? (tested.ok ? "Connecté" : "Erreur") : (configured ? "Configuré" : "Non configuré");
             const statusClass = tested?.ok ? "bg-emerald-100 text-emerald-700" : tested && !tested.ok ? "bg-red-100 text-red-700" : configured ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500";
             return (
-              <div key={card.id} className="bg-white rounded-xl shadow border-t-4 overflow-hidden" style={{ borderTopColor: card.color }}>
+              <div key={card.id} id={card.id} className="bg-white rounded-xl shadow border-t-4 overflow-hidden scroll-mt-24" style={{ borderTopColor: card.color }}>
                 <div className="p-5">
                   <div className="flex items-start gap-3 mb-3">
                     <div className="p-2 rounded-lg flex-shrink-0" style={{ background: `${card.color}15`, color: card.color }}>
@@ -218,6 +218,16 @@ export default function PlanipretIntegrations() {
                       <p className="text-xs text-slate-500 mt-0.5">{card.description}</p>
                     </div>
                   </div>
+                  {card.critical && !configured && (
+                    <div className="mb-3 rounded-xl p-3 flex items-start gap-2"
+                         style={{ background: "rgba(232,76,76,0.08)", border: "1px solid rgba(232,76,76,0.3)" }}>
+                      <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: "#E84C4C" }} />
+                      <div className="text-xs" style={{ color: "#B83A3A" }}>
+                        <div className="font-semibold mb-0.5">Configuration requise</div>
+                        <div>Cette intégration est critique pour le bon fonctionnement de la plateforme.</div>
+                      </div>
+                    </div>
+                  )}
 
 
 

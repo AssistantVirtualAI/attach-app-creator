@@ -58,7 +58,7 @@ async function callClaude(transcript: string): Promise<any> {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "claude-sonnet-4-5",
+      model: "claude-sonnet-4-20250514",
       max_tokens: 2000,
       system: ANALYSIS_SYSTEM,
       messages: [{ role: "user", content: ANALYSIS_USER(transcript) }],

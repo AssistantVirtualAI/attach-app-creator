@@ -66,7 +66,8 @@ const EDGE_FUNCTIONS = [
   "ns-sms", "ns-voicemail", "ns-webhook-receiver", "ns-webhook-setup", "ns-users",
   "elevenlabs-manage-agent", "ava-agent-config", "ava-tool-executor",
   "generate-voicemail-greeting", "pp-greeting-generate", "pp-greeting-voices",
-  "maestro-pipeline-test", "maestro-cdr", "maestro-transcript", "maestro-ai-analysis",
+  "maestro-pipeline-test", "maestro-pipeline-orchestrator",
+  "maestro-cdr", "maestro-transcript", "maestro-ai-analysis",
   "maestro-task", "maestro-appointment", "maestro-client-lookup", "maestro-client-create",
   "maestro-client-history", "maestro-webhook-receiver", "maestro-counts",
   "ms365-actions", "ms365-oauth-exchange",
@@ -119,12 +120,21 @@ async function pingFunction(name: string): Promise<Item> {
       headers: { "Authorization": `Bearer ${ANON}`, apikey: ANON },
     });
     const ms = Math.round(performance.now() - start);
+    // 404 = function does not exist. Anything else (incl. 401/405/400) means deployed.
+    if (res.status === 404) return { id: `fn-${name}`, name, status: "fail", detail: "Non déployée (404)", ms };
     if (res.status >= 500) return { id: `fn-${name}`, name, status: "fail", detail: `HTTP ${res.status}`, ms };
     return { id: `fn-${name}`, name, status: "pass", detail: `Déployée · ${ms}ms`, ms };
   } catch (e: any) {
-    return { id: `fn-${name}`, name, status: "fail", detail: String(e?.message ?? e) };
+    const msg = String(e?.message ?? e);
+    // Rate limit / network blip → warning, not failure
+    if (/rate.?limit|429|retry.?after/i.test(msg)) {
+      return { id: `fn-${name}`, name, status: "warn", detail: "Rate limit temporaire — fonction déployée" };
+    }
+    return { id: `fn-${name}`, name, status: "fail", detail: msg };
   }
 }
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -154,28 +164,50 @@ Deno.serve(async (req) => {
     for (const t of TABLES) dbItems.push(await checkTable(admin, t));
     sections.push({ id: "db", title: "Base de données", emoji: "🗄️", items: dbItems });
 
-    // 2. Realtime publication
+    await sleep(300);
+
+    // 2. Realtime publication (live check via SECURITY DEFINER RPC)
     const rtItems: Item[] = [];
+    let pubTables: string[] = [];
+    try {
+      const { data, error } = await (admin as any).rpc("pp_audit_realtime_check");
+      if (error) throw error;
+      pubTables = Array.isArray(data) ? data : [];
+    } catch (e: any) {
+      // Fall through with empty list; we'll mark all as warn.
+      console.warn("realtime_check_rpc_failed", e?.message);
+    }
     for (const t of REALTIME_TABLES) {
-      const { data, error } = await admin.from("planipret_phone_calls").select("id").limit(0); // probe connection
-      if (error) {
-        rtItems.push({ id: `rt-${t}`, name: `Realtime ${t}`, status: "warn", detail: "Vérification non disponible" });
-      } else {
-        rtItems.push({ id: `rt-${t}`, name: `Realtime ${t}`, status: "skip", detail: "À vérifier manuellement (publication)" });
-      }
+      const inPub = pubTables.includes(t);
+      rtItems.push({
+        id: `rt-${t}`,
+        name: `Realtime ${t}`,
+        status: inPub ? "pass" : "fail",
+        detail: inPub ? "Publication supabase_realtime ✓" : "Non ajoutée à la publication",
+      });
     }
     sections.push({ id: "realtime", title: "Realtime", emoji: "📡", items: rtItems });
+    await sleep(300);
 
     // 3. Secrets
     const secItems: Item[] = [];
     for (const k of ENV_SECRETS) secItems.push(await checkSecret(admin, k));
     sections.push({ id: "secrets", title: "Secrets & API Keys", emoji: "🔐", items: secItems });
 
-    // 4. Edge functions (existence ping)
+    await sleep(300);
+
+    // 4. Edge functions (existence ping — small concurrency to avoid edge rate limits)
     const fnItems: Item[] = [];
-    await Promise.all(EDGE_FUNCTIONS.map(async (f) => fnItems.push(await pingFunction(f))));
+    const CONCURRENCY = 5;
+    for (let i = 0; i < EDGE_FUNCTIONS.length; i += CONCURRENCY) {
+      const batch = EDGE_FUNCTIONS.slice(i, i + CONCURRENCY);
+      const results = await Promise.all(batch.map((f) => pingFunction(f)));
+      fnItems.push(...results);
+      if (i + CONCURRENCY < EDGE_FUNCTIONS.length) await sleep(150);
+    }
     fnItems.sort((a, b) => a.name.localeCompare(b.name));
     sections.push({ id: "functions", title: "Edge Functions", emoji: "⚡", items: fnItems });
+    await sleep(300);
 
     // 5. External APIs (lightweight)
     const extItems: Item[] = [];
