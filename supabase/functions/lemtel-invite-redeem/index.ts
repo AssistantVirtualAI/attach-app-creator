@@ -26,10 +26,11 @@ Deno.serve(async (req) => {
 
     const { data: invite, error: invErr } = await admin
       .from("lemtel_softphone_invites")
-      .select("id, softphone_user_id, organization_id, email, expires_at, view_count")
+      .select("id, softphone_user_id, organization_id, email, expires_at, view_count, revoked_at, consumed_at")
       .eq("token", token)
       .maybeSingle();
     if (invErr || !invite) return json({ error: "NOT_FOUND" }, 404);
+    if (invite.revoked_at) return json({ error: "REVOKED" }, 410);
     if (new Date(invite.expires_at).getTime() < Date.now()) {
       return json({ error: "EXPIRED", expires_at: invite.expires_at }, 410);
     }
