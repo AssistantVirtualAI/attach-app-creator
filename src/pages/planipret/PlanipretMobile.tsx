@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate, NavLink, Outlet, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
-import { Home, Phone, MessageSquare, Users, MoreHorizontal, Phone as PhoneIcon, X, Delete, Plus, Lock } from "lucide-react";
+import { Home, Phone, MessageSquare, MoreHorizontal, Phone as PhoneIcon, X, Delete, Plus, Lock, PhoneOff, Bot } from "lucide-react";
 import { toast } from "sonner";
 import planipretLogo from "@/assets/planipret-logo.png.asset.json";
 import avaWordmark from "@/assets/ava-wordmark.svg";
@@ -15,17 +15,17 @@ import PrivacyConsentGate from "@/components/planipret/PrivacyConsentGate";
 import UniversalSearchBar from "@/components/planipret/UniversalSearchBar";
 import { OnboardingTutorial } from "@/components/planipret/OnboardingTutorial";
 import { useAvaNavigation } from "@/hooks/useAvaNavigation";
+import AvaVoiceAgent from "@/components/planipret/mobile/AvaVoiceAgent";
 
 const ACCENT = "#2E9BDC";
 
-export type PlanipretMobileContext = { profile: any; reloadProfile: () => Promise<void>; openDialer: (number?: string) => void; registerRefresh: (fn: (() => Promise<void> | void) | null) => void };
+export type PlanipretMobileContext = { profile: any; reloadProfile: () => Promise<void>; openDialer: (number?: string) => void; openAva: () => void; registerRefresh: (fn: (() => Promise<void> | void) | null) => void };
 
 const TABS = [
   { to: "/mplanipret/home", label: "Accueil", Icon: Home },
   { to: "/mplanipret/calls", label: "Appels", Icon: Phone },
   { to: "_fab", label: "", Icon: PhoneIcon },
   { to: "/mplanipret/messages", label: "Messages", Icon: MessageSquare },
-  { to: "/mplanipret/contacts", label: "Contacts", Icon: Users },
   { to: "/mplanipret/more", label: "Plus", Icon: MoreHorizontal },
 ];
 
