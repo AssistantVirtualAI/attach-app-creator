@@ -292,7 +292,7 @@ export default function AvaVoiceAgent({ onClose, userId }: Props) {
   const ToolIcon = currentTool ? TOOL_ICONS[currentTool] ?? Sparkles : null;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col" style={{ background: "rgba(4,11,22,0.97)", backdropFilter: "blur(20px)" }}>
+    <div className="absolute inset-0 z-[60] flex flex-col" style={{ background: "rgba(4,11,22,0.97)", backdropFilter: "blur(20px)" }}>
       {/* Top bar */}
       <div className="flex items-center justify-between px-4 pt-4">
         <div className="flex items-center gap-2">
