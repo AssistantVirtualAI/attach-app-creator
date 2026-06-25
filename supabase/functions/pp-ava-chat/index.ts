@@ -51,6 +51,8 @@ Deno.serve(async (req) => {
     );
     const { data: u } = await sb.auth.getUser();
     if (!u?.user) return json({ error: "unauthorized" }, 401);
+    const { data: lemtelOnly } = await sb.rpc("is_lemtel_only", { _user_id: u.user.id });
+    if (lemtelOnly === true) return json({ error: "forbidden_wrong_app", app: "lemtel" }, 403);
 
     // Light Planipret context
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
