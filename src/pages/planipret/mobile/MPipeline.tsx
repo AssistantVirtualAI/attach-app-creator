@@ -107,7 +107,7 @@ export default function MPipeline() {
       )}
 
       {selected && (
-        <DetailSheet card={selected} onClose={() => setSelected(null)} onMove={moveStage} onChanged={load} />
+        <DetailSheet card={selected} profile={profile} openDialer={openDialer} openAva={openAva} onClose={() => setSelected(null)} onMove={moveStage} onChanged={load} />
       )}
       {addOpen && (
         <AddSheet userId={profile.user_id} onClose={() => setAddOpen(false)} onAdded={() => { setAddOpen(false); load(); }} />
