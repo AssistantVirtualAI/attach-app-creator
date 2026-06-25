@@ -46,6 +46,37 @@ export default function PlanipretAdminLayout() {
   const [missingIntegrations, setMissingIntegrations] = useState(0);
   const { status: rtStatus } = useAdminRealtime();
   const realtimeOk = rtStatus === "live";
+  const [paletteOpen, setPaletteOpen] = useState(false);
+
+  // Keyboard shortcuts: Cmd/Ctrl+K palette, "g <key>" navigation, "/" focus palette
+  useEffect(() => {
+    let gPressed = 0;
+    const MAP: Record<string, string> = {
+      o: "/planipret/admin/overview", u: "/planipret/admin/users",
+      c: "/planipret/admin/calls", l: "/planipret/admin/leads",
+      m: "/planipret/admin/messages", v: "/planipret/admin/voicemails",
+      r: "/planipret/admin/reports",
+    };
+    const isTyping = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (!t) return false;
+      const tag = t.tagName;
+      return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || t.isContentEditable;
+    };
+    const h = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault(); setPaletteOpen((o) => !o); return;
+      }
+      if (isTyping(e)) return;
+      if (e.key === "/") { e.preventDefault(); setPaletteOpen(true); return; }
+      if (e.key === "g") { gPressed = Date.now(); return; }
+      if (gPressed && Date.now() - gPressed < 1000 && MAP[e.key.toLowerCase()]) {
+        gPressed = 0; navigate(MAP[e.key.toLowerCase()]);
+      }
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [navigate]);
 
   useEffect(() => {
     (async () => {
