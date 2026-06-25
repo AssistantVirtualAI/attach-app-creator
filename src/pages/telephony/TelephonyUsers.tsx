@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import {
   Users, Plus, Mail, KeyRound, Settings as SettingsIcon, Trash2, RefreshCw,
   Loader2, ShieldAlert, CheckCircle2, AlertCircle, Smartphone, Apple, Monitor,
-  Globe, Laptop, Send,
+  Globe, Laptop, Send, Copy, X, Link2, Clock,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
