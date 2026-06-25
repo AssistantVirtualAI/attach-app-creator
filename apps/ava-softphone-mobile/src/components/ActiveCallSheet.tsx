@@ -5,6 +5,7 @@ import { getCallStateVisual } from '../lib/callStateAccent';
 import CallQualityGauge from './CallQualityGauge';
 import type { AudioProfile } from '../lib/sip/audioProfile';
 import { EMPTY_QUALITY } from '../lib/sip/callQuality';
+import { isSpeakerOn, onSpeakerChange, toggleSpeaker } from '../lib/sip/audioOutput';
 
 const PROFILE_CYCLE: AudioProfile[] = ['auto', 'hd', 'low-bandwidth'];
 
@@ -18,6 +19,9 @@ export default function ActiveCallSheet({
   const [timer, setTimer] = useState(0);
   const [showKeypad, setShowKeypad] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
+  const [speaker, setSpeakerState] = useState(isSpeakerOn());
+
+  useEffect(() => onSpeakerChange(setSpeakerState), []);
 
   useEffect(() => {
     if (sp.snap.callState !== 'active' && sp.snap.callState !== 'held') { setTimer(0); return; }
@@ -147,6 +151,8 @@ export default function ActiveCallSheet({
             onClick={() => { haptic(); sp.snap.muted ? sp.unmute() : sp.mute(); }} />
           <Ctrl label={onHold ? 'Resume' : 'Hold'} icon="⏸" active={onHold}
             onClick={() => { haptic(); onHold ? sp.unhold() : sp.hold(); }} />
+          <Ctrl label={speaker ? 'Speaker' : 'Earpiece'} icon="🔊" active={speaker}
+            onClick={() => { haptic(); toggleSpeaker(); }} />
           <Ctrl label="Keypad" icon="⌨" active={showKeypad}
             onClick={() => { haptic(); setShowKeypad((v) => !v); }} />
           <Ctrl label="Transfer" icon="↗" onClick={() => { haptic(ImpactStyle.Medium); transfer(); }} />
