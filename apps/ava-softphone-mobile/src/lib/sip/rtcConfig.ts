@@ -209,21 +209,30 @@ export function watchCallEstablishment(
   });
 }
 
-// ---------- Fallback ICE servers (used if Metered is unreachable) ----------
-export const FALLBACK_ICE_SERVERS: RTCIceServer[] = [
+// ---------- Fallback ICE servers (env-overridable, OpenRelay defaults) -----
+const OPENRELAY_DEFAULTS: RTCIceServer[] = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
   { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
   { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
 ];
 
+export const FALLBACK_ICE_SERVERS: RTCIceServer[] = buildIceServers({
+  stunEnv: 'VITE_STUN_FALLBACK_URLS', turnEnv: 'VITE_TURN_FALLBACK_URLS',
+  userEnv: 'VITE_TURN_FALLBACK_USERNAME', credEnv: 'VITE_TURN_FALLBACK_CREDENTIAL',
+  defaults: OPENRELAY_DEFAULTS,
+});
+
 // ---------- Diagnostic bus (UI + console) ----------------------------------
 export type IceDiagnosticEvent =
   | { kind: 'ice-state'; state: RTCIceConnectionState }
   | { kind: 'gather-state'; state: RTCIceGatheringState }
   | { kind: 'candidate'; source: string; raw: string }
-  | { kind: 'probe-result'; provider: 'metered' | 'fallback'; relayFound: boolean }
-  | { kind: 'pc-config'; provider: 'metered' | 'fallback' };
+  | { kind: 'probe-started' }
+  | { kind: 'probe-result'; provider: 'metered' | 'fallback'; relayFound: boolean; durationMs: number }
+  | { kind: 'pc-config'; provider: 'metered' | 'fallback' }
+  | { kind: 'first-relay-candidate'; latencyMs: number }
+  | { kind: 'ice-connected'; latencyMs: number };
 
 const _diagListeners = new Set<(e: IceDiagnosticEvent) => void>();
 export function onIceDiagnostic(fn: (e: IceDiagnosticEvent) => void): () => void {
@@ -233,10 +242,38 @@ export function onIceDiagnostic(fn: (e: IceDiagnosticEvent) => void): () => void
 function emitDiag(e: IceDiagnosticEvent) {
   _diagListeners.forEach((l) => { try { l(e); } catch {} });
   if (isSipDebugEnabled()) console.log('[SIP][diag]', e);
+  emitTelemetry(e);
+}
+
+// ---------- Telemetry sink -------------------------------------------------
+// Posts diagnostic events to an HTTP endpoint (VITE_SIP_TELEMETRY_URL) or to
+// a user-registered handler. Best-effort, never throws, uses sendBeacon when
+// available so navigations don't drop the event.
+export type TelemetrySink = (event: { name: string; value?: number; meta?: Record<string, unknown> }) => void;
+let _telemetrySink: TelemetrySink | null = null;
+export function setTelemetrySink(sink: TelemetrySink | null) { _telemetrySink = sink; }
+
+function emitTelemetry(e: IceDiagnosticEvent) {
+  let payload: { name: string; value?: number; meta?: Record<string, unknown> } | null = null;
+  if (e.kind === 'probe-started') payload = { name: 'sip.turn.probe_started' };
+  else if (e.kind === 'probe-result') payload = { name: 'sip.turn.probe_result', value: e.durationMs, meta: { provider: e.provider, relayFound: e.relayFound } };
+  else if (e.kind === 'pc-config') payload = { name: 'sip.turn.provider_selected', meta: { provider: e.provider } };
+  else if (e.kind === 'first-relay-candidate') payload = { name: 'sip.ice.first_relay_ms', value: e.latencyMs };
+  else if (e.kind === 'ice-connected') payload = { name: 'sip.ice.connected_ms', value: e.latencyMs };
+  if (!payload) return;
+  try { _telemetrySink?.(payload); } catch {}
+  const url = readEnv('VITE_SIP_TELEMETRY_URL');
+  if (!url || typeof navigator === 'undefined') return;
+  try {
+    const body = JSON.stringify({ ...payload, ts: Date.now(), ua: navigator.userAgent });
+    if ('sendBeacon' in navigator) navigator.sendBeacon(url, body);
+    else fetch(url, { method: 'POST', body, keepalive: true, headers: { 'content-type': 'application/json' } }).catch(() => {});
+  } catch {}
 }
 
 // ---------- TURN reachability probe + fallback -----------------------------
 let _activePcConfig: RTCConfiguration | null = null;
+let _activeProvider: 'metered' | 'fallback' = 'metered';
 let _probePromise: Promise<RTCConfiguration> | null = null;
 
 async function tryRelayCandidate(servers: RTCIceServer[], timeoutMs: number): Promise<boolean> {
@@ -267,15 +304,19 @@ async function tryRelayCandidate(servers: RTCIceServer[], timeoutMs: number): Pr
   });
 }
 
-export async function probeTurnEndpoints(timeoutMs = 5000): Promise<{ provider: 'metered' | 'fallback'; relayFound: boolean }> {
+export async function probeTurnEndpoints(timeoutMs = 5000): Promise<{ provider: 'metered' | 'fallback'; relayFound: boolean; durationMs: number }> {
+  emitDiag({ kind: 'probe-started' });
+  const t0 = (typeof performance !== 'undefined' ? performance.now() : Date.now());
   const meteredOk = await tryRelayCandidate(ICE_SERVERS, timeoutMs);
   if (meteredOk) {
-    emitDiag({ kind: 'probe-result', provider: 'metered', relayFound: true });
-    return { provider: 'metered', relayFound: true };
+    const d = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0);
+    emitDiag({ kind: 'probe-result', provider: 'metered', relayFound: true, durationMs: d });
+    return { provider: 'metered', relayFound: true, durationMs: d };
   }
   const fbOk = await tryRelayCandidate(FALLBACK_ICE_SERVERS, timeoutMs);
-  emitDiag({ kind: 'probe-result', provider: 'fallback', relayFound: fbOk });
-  return { provider: 'fallback', relayFound: fbOk };
+  const d = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0);
+  emitDiag({ kind: 'probe-result', provider: 'fallback', relayFound: fbOk, durationMs: d });
+  return { provider: 'fallback', relayFound: fbOk, durationMs: d };
 }
 
 /** Run the probe once at startup; cache the resulting PC config.
@@ -287,9 +328,11 @@ export function ensureActivePcConfig(): Promise<RTCConfiguration> {
     try {
       const res = await probeTurnEndpoints();
       const servers = res.provider === 'metered' ? ICE_SERVERS : FALLBACK_ICE_SERVERS;
+      _activeProvider = res.provider;
       _activePcConfig = { iceServers: servers, iceTransportPolicy: 'all', bundlePolicy: 'balanced' };
       emitDiag({ kind: 'pc-config', provider: res.provider });
     } catch {
+      _activeProvider = 'metered';
       _activePcConfig = PC_CONFIG;
       emitDiag({ kind: 'pc-config', provider: 'metered' });
     }
@@ -303,16 +346,40 @@ export function ensureActivePcConfig(): Promise<RTCConfiguration> {
 export function getActivePcConfig(): RTCConfiguration {
   return _activePcConfig ?? PC_CONFIG;
 }
+export function getActiveTurnProvider(): 'metered' | 'fallback' { return _activeProvider; }
 
-// Tap into ICE events so the diagnostic overlay updates live.
+/** Test-only: reset the cached probe result. */
+export function __resetActivePcConfig() {
+  _activePcConfig = null;
+  _probePromise = null;
+  _activeProvider = 'metered';
+}
+
+// Tap into ICE events so the diagnostic overlay + telemetry stay live.
 const _origInstrument = instrumentPeerConnection;
 export function instrumentPeerConnectionWithDiag(pc: RTCPeerConnection, log: IceLogger): () => void {
   const teardown = _origInstrument(pc, log);
+  const t0 = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  let firstRelaySent = false;
+  let connectedSent = false;
   const onCand = (e: RTCPeerConnectionIceEvent) => {
     if (!e.candidate) return;
-    emitDiag({ kind: 'candidate', source: classifyIceCandidate(e.candidate), raw: e.candidate.candidate });
+    const source = classifyIceCandidate(e.candidate);
+    emitDiag({ kind: 'candidate', source, raw: e.candidate.candidate });
+    if (!firstRelaySent && source.startsWith('TURN')) {
+      firstRelaySent = true;
+      const latency = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0);
+      emitDiag({ kind: 'first-relay-candidate', latencyMs: latency });
+    }
   };
-  const onIce = () => emitDiag({ kind: 'ice-state', state: pc.iceConnectionState });
+  const onIce = () => {
+    emitDiag({ kind: 'ice-state', state: pc.iceConnectionState });
+    if (!connectedSent && (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed')) {
+      connectedSent = true;
+      const latency = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0);
+      emitDiag({ kind: 'ice-connected', latencyMs: latency });
+    }
+  };
   const onGather = () => emitDiag({ kind: 'gather-state', state: pc.iceGatheringState });
   pc.addEventListener('icecandidate', onCand);
   pc.addEventListener('iceconnectionstatechange', onIce);
@@ -336,4 +403,5 @@ export function isIceDiagOverlayEnabled(): boolean {
   } catch {}
   return false;
 }
+
 
