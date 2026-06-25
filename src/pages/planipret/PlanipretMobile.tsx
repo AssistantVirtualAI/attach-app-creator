@@ -253,9 +253,24 @@ export default function PlanipretMobile() {
           style={{ background: "linear-gradient(180deg, #0A1628 0%, #060D1A 100%)", borderBottom: "1px solid var(--pp-bg-border)" }}>
           <img src={planipretLogo.url} alt="Planiprêt" className="w-8 h-8 rounded-lg object-cover" />
           <span style={{ fontFamily: "Inter,sans-serif", fontWeight: 700, fontSize: 14, color: "var(--pp-text-primary)", letterSpacing: "-0.01em" }}>Planiprêt</span>
-          <span className="ml-auto flex items-center gap-1.5">
-            <span className="pp-live-dot" />
-            <span style={{ fontSize: 10, color: "var(--pp-success)", fontWeight: 600 }}>SIP</span>
+          <span className="ml-auto flex items-center gap-2">
+            <span className="flex items-center gap-1.5">
+              <span className="pp-live-dot" />
+              <span style={{ fontSize: 10, color: "var(--pp-success)", fontWeight: 600 }}>SIP</span>
+            </span>
+            <button
+              onClick={() => navigate("/mplanipret/more")}
+              className="flex items-center justify-center rounded-full active:scale-95 transition"
+              style={{
+                width: 32, height: 32,
+                background: "var(--pp-bg-elevated)",
+                border: "1px solid var(--pp-bg-border-2)",
+                color: "var(--pp-text-secondary)",
+              }}
+              aria-label="Paramètres"
+            >
+              <SettingsIcon className="w-4 h-4" />
+            </button>
           </span>
         </header>
 
