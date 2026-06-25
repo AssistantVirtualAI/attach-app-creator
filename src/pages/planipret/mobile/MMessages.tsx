@@ -43,7 +43,7 @@ const fmtTime = (iso: string) => {
 };
 
 export default function MMessages() {
-  const { profile, openDialer, registerRefresh } = useOutletContext<PlanipretMobileContext>();
+  const { profile, openDialer, openAva, registerRefresh } = useOutletContext<PlanipretMobileContext>();
   const [sub, setSub] = useState<SubTab>("sms");
 
   return (
@@ -89,8 +89,8 @@ export default function MMessages() {
       <div className="flex-1 overflow-hidden">
         {sub === "sms" && <SmsList profile={profile} openDialer={openDialer} registerRefresh={registerRefresh} />}
         {sub === "team" && <TeamChat profile={profile} />}
-        {sub === "ava" && <AvaChat profile={profile} />}
-        {sub === "emails" && <EmailsList profile={profile} />}
+        {sub === "ava" && <AvaChat profile={profile} openAva={openAva} />}
+        {sub === "emails" && <EmailsList profile={profile} openAva={openAva} />}
       </div>
     </div>
   );
