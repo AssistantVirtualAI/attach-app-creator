@@ -28,8 +28,12 @@ type Row = {
   metadata: any;
 };
 
+const PAGE = 100;
+
 export default function PAAuditLog() {
   const [rows, setRows] = useState<Row[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [userFilter, setUserFilter] = useState("");
   const [actionFilter, setActionFilter] = useState("");
@@ -37,18 +41,20 @@ export default function PAAuditLog() {
   const [to, setTo] = useState("");
   const [users, setUsers] = useState<Array<{ id: string; full_name: string | null; email: string }>>([]);
 
-  const load = async () => {
+  const load = async (p = page) => {
     setLoading(true);
+    const fromIdx = (p - 1) * PAGE;
     let q = supabase.from("planipret_audit_log")
-      .select("id, created_at, action, resource_type, resource_id, ip_address, user_id, metadata")
+      .select("id, created_at, action, resource_type, resource_id, ip_address, user_id, metadata", { count: "exact" })
       .order("created_at", { ascending: false })
-      .limit(500);
+      .range(fromIdx, fromIdx + PAGE - 1);
     if (userFilter) q = q.eq("user_id", userFilter);
     if (actionFilter) q = q.eq("action", actionFilter);
     if (from) q = q.gte("created_at", new Date(from).toISOString());
     if (to) q = q.lte("created_at", new Date(to + "T23:59:59").toISOString());
-    const { data } = await q;
+    const { data, count } = await q;
     setRows(data ?? []);
+    setTotal(count ?? 0);
     setLoading(false);
   };
 
@@ -59,7 +65,9 @@ export default function PAAuditLog() {
     })();
   }, []);
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [userFilter, actionFilter, from, to]);
+  useEffect(() => { setPage(1); load(1); /* eslint-disable-next-line */ }, [userFilter, actionFilter, from, to]);
+  useEffect(() => { load(page); /* eslint-disable-next-line */ }, [page]);
+
 
   const userMap = useMemo(() => new Map(users.map((u) => [u.id, u.full_name || u.email])), [users]);
 
