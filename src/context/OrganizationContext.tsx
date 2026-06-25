@@ -3,7 +3,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { AVA_ORG_ID, AVA_OWNER_USER_ID } from '@/lib/avaOwner';
 
 interface Organization {
   id: string;
@@ -133,11 +132,10 @@ export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
       if (oErr) throw oErr;
       if (rErr) throw rErr;
-      let list = (orgs || []) as Organization[];
-      // Hard scope: only the AVA owner may see the AVA Main Dashboard org.
-      if (user.id !== AVA_OWNER_USER_ID) {
-        list = list.filter((o) => o.id !== AVA_ORG_ID);
-      }
+      // Show the organizations the user is explicitly linked to.
+      // Important: the historical AVA Main Dashboard UUID is now the Planipret
+      // organization, so it must never be filtered out here.
+      const list = (orgs || []) as Organization[];
       const rolesList = (roles || []) as UserRole[];
       setOrganizations(list);
       setOrganizationMemberships(

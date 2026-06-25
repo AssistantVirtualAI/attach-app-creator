@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { OrganizationProvider, useOrganization } from "@/context/OrganizationContext";
 import { ThemeProvider } from "@/context/ThemeContext";
@@ -255,6 +255,7 @@ const MyRecordings = lazy(() => import("./pages/my/Recordings"));
 const CustomerAdminAIChat = lazy(() => import("./pages/customer/AdminAIChat"));
 const CustomerSyncHealth = lazy(() => import("./pages/customer/SyncHealthCenter"));
 import { RolePortalGuard } from "./components/portals/RolePortalGuard";
+import { AVA_STANDALONE_ORG_ID, LEMTEL_ORG_ID, PLANIPRET_ORG_ID } from "./lib/avaOwner";
 import PlatformDashboard from "./pages/portals/PlatformDashboard";
 import PlatformSystemHealth from "./pages/platform/SystemHealth";
 import PlatformTelephonyQA from "./pages/platform/TelephonyQA";
@@ -286,14 +287,23 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <TrialExpiredGate>{children}</TrialExpiredGate>;
 };
 
-const LEMTEL_ORG_ID = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
-const PLANIPRET_ORG_ID_APP = '17d6507f-a9ca-409d-8e49-371d50332615';
-
 const LemtelOrgOnly = ({ children, fallback = "/dashboard" }: { children: React.ReactNode; fallback?: string }) => {
   const { selectedOrgId, isLoading } = useOrganization();
   if (isLoading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading…</div>;
   if (selectedOrgId !== LEMTEL_ORG_ID) return <Navigate to={fallback} replace />;
   return <>{children}</>;
+};
+
+const AvaPlatformOrgOnly = ({ children }: { children: React.ReactNode }) => {
+  const { selectedOrgId, organizations, setSelectedOrgId, isLoading } = useOrganization();
+  if (isLoading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading…</div>;
+  if (selectedOrgId === AVA_STANDALONE_ORG_ID) return <>{children}</>;
+  const isMember = organizations.some((org) => org.id === AVA_STANDALONE_ORG_ID);
+  if (isMember) {
+    setSelectedOrgId(AVA_STANDALONE_ORG_ID);
+    return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Switching to AVA…</div>;
+  }
+  return <Navigate to="/portal" replace />;
 };
 
 /**
@@ -304,10 +314,10 @@ const LemtelOrgOnly = ({ children, fallback = "/dashboard" }: { children: React.
 const PlanipretOrgOnly = ({ children }: { children: React.ReactNode }) => {
   const { selectedOrgId, organizations, setSelectedOrgId, isLoading } = useOrganization();
   if (isLoading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading…</div>;
-  if (selectedOrgId === PLANIPRET_ORG_ID_APP) return <>{children}</>;
-  const isMember = organizations.some((o: any) => (o.id || o.organization?.id) === PLANIPRET_ORG_ID_APP);
+  if (selectedOrgId === PLANIPRET_ORG_ID) return <>{children}</>;
+  const isMember = organizations.some((o: any) => (o.id || o.organization?.id) === PLANIPRET_ORG_ID);
   if (isMember) {
-    setSelectedOrgId(PLANIPRET_ORG_ID_APP);
+    setSelectedOrgId(PLANIPRET_ORG_ID);
     return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Switching to Planipret…</div>;
   }
   return <Navigate to="/portal" replace />;
@@ -392,9 +402,11 @@ const App = () => (
                   path="/planipret/admin"
                   element={
                     <AppSeparationGuard app="planipret">
-                      <Suspense fallback={<AdminPageSkeleton />}>
-                        <PlanipretAdminLayout />
-                      </Suspense>
+                      <PlanipretOrgOnly>
+                        <Suspense fallback={<AdminPageSkeleton />}>
+                          <PlanipretAdminLayout />
+                        </Suspense>
+                      </PlanipretOrgOnly>
                     </AppSeparationGuard>
                   }
                 >
@@ -423,6 +435,9 @@ const App = () => (
                     </ProtectedRoute>
                   }
                 />
+
+                {/* Legacy AVA admin portal is now strictly hosted inside the Planipret organization. */}
+                <Route element={<ProtectedRoute><PlanipretOrgOnly><Outlet /></PlanipretOrgOnly></ProtectedRoute>}>
                 <Route
                   path="/dashboard"
                   element={
@@ -696,11 +711,13 @@ const App = () => (
                     </ProtectedRoute>
                   }
                 />
+                </Route>
                 <Route path="/privacy" element={<PrivacyPolicy />} />
                 <Route path="/terms" element={<Terms />} />
                 <Route path="/support" element={<Support />} />
                 <Route path="/legal" element={<Legal />} />
                 <Route path="/docs" element={<Docs />} />
+                <Route element={<ProtectedRoute><PlanipretOrgOnly><Outlet /></PlanipretOrgOnly></ProtectedRoute>}>
                 <Route
                   path="/demo"
                   element={
@@ -711,36 +728,21 @@ const App = () => (
                 />
                 <Route
                   path="/realtime"
-                  element={
-                    <ProtectedRoute>
-                      <RealtimeMonitor />
-                    </ProtectedRoute>
-                  }
+                  element={<RealtimeMonitor />}
                 />
                 <Route
                   path="/api-explorer"
-                  element={
-                    <ProtectedRoute>
-                      <ApiExplorer />
-                    </ProtectedRoute>
-                  }
+                  element={<ApiExplorer />}
                 />
                 <Route
                   path="/super-admin"
-                  element={
-                    <ProtectedRoute>
-                      <SuperAdminDashboard />
-                    </ProtectedRoute>
-                  }
+                  element={<SuperAdminDashboard />}
                 />
                 <Route
                   path="/audit-logs"
-                  element={
-                    <ProtectedRoute>
-                      <AuditLogs />
-                    </ProtectedRoute>
-                  }
+                  element={<AuditLogs />}
                 />
+                </Route>
                 
                 {/* Lemtel Telecom Module — gated to Lemtel org members */}
                 <Route path="/lemtel/dashboard" element={<ProtectedRoute><LemtelGuard><LemtelDashboard /></LemtelGuard></ProtectedRoute>} />
@@ -1043,8 +1045,8 @@ const App = () => (
                 <Route path="/post-login" element={<ProtectedRoute><PostLoginRedirect /></ProtectedRoute>} />
 
                 {/* === Three-portal architecture === */}
-                {/* Platform Admin — AVA / Lemtel internal */}
-                <Route path="/platform" element={<ProtectedRoute><RolePortalGuard portal="platform"><PlatformAdminShell /></RolePortalGuard></ProtectedRoute>}>
+                {/* Platform Admin — AVA super-admin org only */}
+                <Route path="/platform" element={<ProtectedRoute><AvaPlatformOrgOnly><RolePortalGuard portal="platform"><PlatformAdminShell /></RolePortalGuard></AvaPlatformOrgOnly></ProtectedRoute>}>
                   <Route index element={<PlatformDashboard />} />
                   <Route path="organizations" element={<MasterOrganizations />} />
                   <Route path="users" element={<MasterAllUsers />} />
@@ -1055,7 +1057,7 @@ const App = () => (
                   <Route path="health" element={<PlatformSystemHealth />} />
                   <Route path="qa" element={<LemtelOrgOnly fallback="/platform"><PlatformTelephonyQA /></LemtelOrgOnly>} />
                   <Route path="audit" element={<MasterAuditLogs />} />
-                  <Route path="settings" element={<LemtelSettings />} />
+                  <Route path="settings" element={<Settings />} />
                   <Route path="ai-usage" element={<PlatformAIUsage />} />
                 </Route>
 

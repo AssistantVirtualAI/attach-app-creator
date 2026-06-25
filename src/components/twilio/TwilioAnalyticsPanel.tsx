@@ -208,7 +208,7 @@ export function TwilioAnalyticsPanel() {
                       cx="50%"
                       cy="50%"
                       outerRadius={80}
-                      label={({ status, percent }) => `${status} (${(percent * 100).toFixed(0)}%)`}
+                      label={(entry: any) => `${entry.status ?? entry.name ?? ''} (${((entry.percent ?? 0) * 100).toFixed(0)}%)`}
                     >
                       {analytics.callsByStatus.map((_, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
