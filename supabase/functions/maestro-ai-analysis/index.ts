@@ -98,15 +98,21 @@ Deno.serve(async (req) => {
     if (call.ai_summary && !force) return json({ success: true, cached: true });
 
     await setPipelineStep(admin, call_id, "ai", "running");
+    await updateCallPipeline(admin, call_id, { step: "analyzing" });
+    await pipelineLog(admin, { call_id, user_id: call.user_id, step: "ai_analysis", status: "started" });
 
     let analysis: any;
     try {
       analysis = await callClaude(call.transcript);
     } catch (e: any) {
       await setPipelineStep(admin, call_id, "ai", "error", { reason: e?.message?.slice(0, 200) });
+      await updateCallPipeline(admin, call_id, { step: "error", error: `ai_${e?.message?.slice(0, 80)}` });
+      await pipelineLog(admin, { call_id, user_id: call.user_id, step: "ai_analysis", status: "error", error_message: e?.message });
+      await broadcastPipeline(admin, call.user_id, "pipeline_error", { call_id, step: "ai_analysis", error: e?.message });
       await maestroAudit(admin, "ai_analysis_failed", { call_id, error: e?.message });
       return json({ success: false, error: e?.message ?? "ai_failed" }, 200);
     }
+
 
     await admin
       .from("planipret_phone_calls")
