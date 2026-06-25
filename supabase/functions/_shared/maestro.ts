@@ -176,3 +176,139 @@ export function normalizePhone(input?: string | null): string | null {
   if (s.length === 11 && s.startsWith("1")) return `+${s}`;
   return s.startsWith("+") ? s : `+${s}`;
 }
+
+/** Insert a row into planipret_pipeline_logs (debug per call). */
+export async function pipelineLog(
+  admin: SupabaseClient,
+  args: {
+    call_id: string | null;
+    user_id: string | null;
+    step: string;
+    status: "started" | "success" | "error" | "skipped";
+    duration_ms?: number;
+    payload?: unknown;
+    error_message?: string;
+  },
+) {
+  try {
+    await admin.from("planipret_pipeline_logs").insert({
+      call_id: args.call_id,
+      user_id: args.user_id,
+      step: args.step,
+      status: args.status,
+      duration_ms: args.duration_ms ?? null,
+      payload: args.payload ?? null,
+      error_message: args.error_message ?? null,
+    });
+  } catch (e) {
+    console.warn("pipelineLog failed", e);
+  }
+}
+
+/** Insert/append to low-level Maestro API sync log. */
+export async function maestroSyncLog(
+  admin: SupabaseClient,
+  args: {
+    user_id?: string | null;
+    action: string;
+    endpoint: string;
+    request_body?: unknown;
+    response_status: number;
+    response_body?: unknown;
+    duration_ms: number;
+    success: boolean;
+  },
+) {
+  try {
+    await admin.from("planipret_maestro_sync_log").insert({
+      user_id: args.user_id ?? null,
+      action: args.action,
+      maestro_endpoint: args.endpoint,
+      request_body: args.request_body ?? null,
+      response_status: args.response_status,
+      response_body: args.response_body ?? null,
+      duration_ms: args.duration_ms,
+      success: args.success,
+    });
+  } catch (e) {
+    console.warn("maestroSyncLog failed", e);
+  }
+}
+
+/** Update pipeline_* columns on the call row (step / error / timestamps). */
+export async function updateCallPipeline(
+  admin: SupabaseClient,
+  callId: string,
+  patch: {
+    step?: string;
+    error?: string | null;
+    started?: boolean;
+    completed?: boolean;
+    extra?: Record<string, unknown>;
+  },
+) {
+  const update: Record<string, unknown> = { ...(patch.extra ?? {}) };
+  if (patch.step !== undefined) update.pipeline_step = patch.step;
+  if (patch.error !== undefined) update.pipeline_error = patch.error;
+  if (patch.started) update.pipeline_started_at = new Date().toISOString();
+  if (patch.completed) update.pipeline_completed_at = new Date().toISOString();
+  if (Object.keys(update).length === 0) return;
+  await admin.from("planipret_phone_calls").update(update).eq("id", callId);
+}
+
+/** Broadcast a pipeline update over the per-user ai-insights channel. */
+export async function broadcastPipeline(
+  admin: SupabaseClient,
+  userId: string | null | undefined,
+  event: string,
+  payload: Record<string, unknown>,
+) {
+  if (!userId) return;
+  try {
+    await admin.channel(`ai-insights:${userId}`).send({
+      type: "broadcast",
+      event,
+      payload,
+    });
+  } catch (e) {
+    console.warn("broadcastPipeline failed", e);
+  }
+}
+
+/** Upsert into planipret_maestro_clients cache. */
+export async function cacheMaestroClient(
+  admin: SupabaseClient,
+  args: {
+    user_id: string;
+    maestro_client_id: string;
+    phone_e164?: string | null;
+    full_name?: string | null;
+    company?: string | null;
+    email?: string | null;
+    mortgage_stage?: string | null;
+    preferred_lang?: string | null;
+    tags?: unknown;
+  },
+) {
+  try {
+    await admin
+      .from("planipret_maestro_clients")
+      .upsert(
+        {
+          user_id: args.user_id,
+          maestro_client_id: args.maestro_client_id,
+          phone_e164: args.phone_e164 ?? null,
+          full_name: args.full_name ?? null,
+          company: args.company ?? null,
+          email: args.email ?? null,
+          mortgage_stage: args.mortgage_stage ?? null,
+          preferred_lang: args.preferred_lang ?? "fr",
+          tags: args.tags ?? [],
+          cached_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id,phone_e164" },
+      );
+  } catch (e) {
+    console.warn("cacheMaestroClient failed", e);
+  }
+}

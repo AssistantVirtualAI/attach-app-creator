@@ -7943,6 +7943,105 @@ export type Database = {
         }
         Relationships: []
       }
+      planipret_maestro_clients: {
+        Row: {
+          cached_at: string
+          company: string | null
+          created_at: string
+          email: string | null
+          first_name: string | null
+          full_name: string | null
+          id: string
+          last_contact_at: string | null
+          last_name: string | null
+          lead_score_avg: number | null
+          maestro_client_id: string
+          mortgage_stage: string | null
+          phone_e164: string | null
+          preferred_lang: string | null
+          tags: Json
+          total_calls: number
+          user_id: string
+        }
+        Insert: {
+          cached_at?: string
+          company?: string | null
+          created_at?: string
+          email?: string | null
+          first_name?: string | null
+          full_name?: string | null
+          id?: string
+          last_contact_at?: string | null
+          last_name?: string | null
+          lead_score_avg?: number | null
+          maestro_client_id: string
+          mortgage_stage?: string | null
+          phone_e164?: string | null
+          preferred_lang?: string | null
+          tags?: Json
+          total_calls?: number
+          user_id: string
+        }
+        Update: {
+          cached_at?: string
+          company?: string | null
+          created_at?: string
+          email?: string | null
+          first_name?: string | null
+          full_name?: string | null
+          id?: string
+          last_contact_at?: string | null
+          last_name?: string | null
+          lead_score_avg?: number | null
+          maestro_client_id?: string
+          mortgage_stage?: string | null
+          phone_e164?: string | null
+          preferred_lang?: string | null
+          tags?: Json
+          total_calls?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      planipret_maestro_sync_log: {
+        Row: {
+          action: string | null
+          created_at: string
+          duration_ms: number | null
+          id: string
+          maestro_endpoint: string | null
+          request_body: Json | null
+          response_body: Json | null
+          response_status: number | null
+          success: boolean | null
+          user_id: string | null
+        }
+        Insert: {
+          action?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          id?: string
+          maestro_endpoint?: string | null
+          request_body?: Json | null
+          response_body?: Json | null
+          response_status?: number | null
+          success?: boolean | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          id?: string
+          maestro_endpoint?: string | null
+          request_body?: Json | null
+          response_body?: Json | null
+          response_status?: number | null
+          success?: boolean | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       planipret_phone_calls: {
         Row: {
           ai_client_insights: Json | null
@@ -7962,14 +8061,23 @@ export type Database = {
           lead_score: number | null
           lead_score_reason: string | null
           lead_temperature: string | null
+          maestro_appointments_created: Json
           maestro_call_id: string | null
+          maestro_client_company: string | null
           maestro_client_id: string | null
+          maestro_client_name: string | null
+          maestro_mortgage_stage: string | null
           maestro_synced: boolean
+          maestro_tasks_created: Json
           metadata: Json
           ns_call_id: string | null
           ns_domain: string | null
           organization_id: string
+          pipeline_completed_at: string | null
+          pipeline_error: string | null
+          pipeline_started_at: string | null
           pipeline_state: Json
+          pipeline_step: string | null
           recording_url: string | null
           started_at: string | null
           status: string | null
@@ -7977,8 +8085,10 @@ export type Database = {
           to_name: string | null
           to_number: string | null
           transcript: string | null
+          transcript_confidence: number | null
           transcript_language: string | null
           transcript_segments: Json | null
+          transcript_source: string | null
           updated_at: string
           user_id: string
         }
@@ -8000,14 +8110,23 @@ export type Database = {
           lead_score?: number | null
           lead_score_reason?: string | null
           lead_temperature?: string | null
+          maestro_appointments_created?: Json
           maestro_call_id?: string | null
+          maestro_client_company?: string | null
           maestro_client_id?: string | null
+          maestro_client_name?: string | null
+          maestro_mortgage_stage?: string | null
           maestro_synced?: boolean
+          maestro_tasks_created?: Json
           metadata?: Json
           ns_call_id?: string | null
           ns_domain?: string | null
           organization_id?: string
+          pipeline_completed_at?: string | null
+          pipeline_error?: string | null
+          pipeline_started_at?: string | null
           pipeline_state?: Json
+          pipeline_step?: string | null
           recording_url?: string | null
           started_at?: string | null
           status?: string | null
@@ -8015,8 +8134,10 @@ export type Database = {
           to_name?: string | null
           to_number?: string | null
           transcript?: string | null
+          transcript_confidence?: number | null
           transcript_language?: string | null
           transcript_segments?: Json | null
+          transcript_source?: string | null
           updated_at?: string
           user_id: string
         }
@@ -8038,14 +8159,23 @@ export type Database = {
           lead_score?: number | null
           lead_score_reason?: string | null
           lead_temperature?: string | null
+          maestro_appointments_created?: Json
           maestro_call_id?: string | null
+          maestro_client_company?: string | null
           maestro_client_id?: string | null
+          maestro_client_name?: string | null
+          maestro_mortgage_stage?: string | null
           maestro_synced?: boolean
+          maestro_tasks_created?: Json
           metadata?: Json
           ns_call_id?: string | null
           ns_domain?: string | null
           organization_id?: string
+          pipeline_completed_at?: string | null
+          pipeline_error?: string | null
+          pipeline_started_at?: string | null
           pipeline_state?: Json
+          pipeline_step?: string | null
           recording_url?: string | null
           started_at?: string | null
           status?: string | null
@@ -8053,8 +8183,10 @@ export type Database = {
           to_name?: string | null
           to_number?: string | null
           transcript?: string | null
+          transcript_confidence?: number | null
           transcript_language?: string | null
           transcript_segments?: Json | null
+          transcript_source?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -8177,6 +8309,50 @@ export type Database = {
           },
         ]
       }
+      planipret_pipeline_logs: {
+        Row: {
+          call_id: string | null
+          created_at: string
+          duration_ms: number | null
+          error_message: string | null
+          id: string
+          payload: Json | null
+          status: string
+          step: string
+          user_id: string | null
+        }
+        Insert: {
+          call_id?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: string
+          payload?: Json | null
+          status: string
+          step: string
+          user_id?: string | null
+        }
+        Update: {
+          call_id?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: string
+          payload?: Json | null
+          status?: string
+          step?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planipret_pipeline_logs_call_id_fkey"
+            columns: ["call_id"]
+            isOneToOne: false
+            referencedRelation: "planipret_phone_calls"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       planipret_profiles: {
         Row: {
           avatar_url: string | null
@@ -8197,6 +8373,8 @@ export type Database = {
           last_morning_brief_at: string | null
           maestro_broker_id: string | null
           maestro_broker_token: string | null
+          maestro_connected: boolean
+          maestro_last_sync_at: string | null
           maestro_token_expires_at: string | null
           metadata: Json
           mobile_app_enabled: boolean
@@ -8248,6 +8426,8 @@ export type Database = {
           last_morning_brief_at?: string | null
           maestro_broker_id?: string | null
           maestro_broker_token?: string | null
+          maestro_connected?: boolean
+          maestro_last_sync_at?: string | null
           maestro_token_expires_at?: string | null
           metadata?: Json
           mobile_app_enabled?: boolean
@@ -8299,6 +8479,8 @@ export type Database = {
           last_morning_brief_at?: string | null
           maestro_broker_id?: string | null
           maestro_broker_token?: string | null
+          maestro_connected?: boolean
+          maestro_last_sync_at?: string | null
           maestro_token_expires_at?: string | null
           metadata?: Json
           mobile_app_enabled?: boolean

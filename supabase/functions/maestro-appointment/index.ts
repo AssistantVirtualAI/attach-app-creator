@@ -57,7 +57,22 @@ Deno.serve(async (req) => {
     }
     const apptId = res.data?.id ?? res.data?.appointment_id;
     await maestroAudit(admin, "appt_created", { appointment_id: apptId, call_id, client_id: maestro_client_id });
+
+    if (call_id) {
+      try {
+        const { data: row } = await admin
+          .from("planipret_phone_calls")
+          .select("maestro_appointments_created")
+          .eq("id", call_id)
+          .maybeSingle();
+        const arr = Array.isArray(row?.maestro_appointments_created) ? row!.maestro_appointments_created : [];
+        arr.push({ appointment_id: apptId, title, start_at, created_at: new Date().toISOString() });
+        await admin.from("planipret_phone_calls").update({ maestro_appointments_created: arr }).eq("id", call_id);
+      } catch (e) { console.warn("append appt to call failed", e); }
+    }
+
     return json({ success: true, appointment_id: apptId });
+
   } catch (e: any) {
     console.error("maestro-appointment error", e);
     return json({ success: false, error: e?.message ?? "server_error" }, 500);

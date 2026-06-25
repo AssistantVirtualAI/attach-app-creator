@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import VoiceAgent from "@/components/VoiceAgent";
 import PWAInstallBanner from "@/components/planipret/PWAInstallBanner";
 import { TEMP_EMOJI } from "@/components/planipret/leadHelpers";
+import { useMaestroPipelineToasts } from "@/hooks/useMaestroPipelineToasts";
 
 function Shimmer({ className = "" }: { className?: string }) {
   return (
@@ -38,6 +39,8 @@ export default function MHome() {
   const [hotLeads, setHotLeads] = useState<any[]>([]);
   const [dueReminders, setDueReminders] = useState<any[]>([]);
   const [maestroCounts, setMaestroCounts] = useState<any | null>(null);
+
+  useMaestroPipelineToasts(profile?.user_id);
 
   const openAgent = async () => {
     try {
