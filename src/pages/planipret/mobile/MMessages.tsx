@@ -4,12 +4,18 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
   Plus, X, ArrowLeft, Phone, Send, Paperclip, MessageSquare, Zap,
-  Users, Bot, Mail, Sparkles, Loader2, RefreshCw, Mic, Reply,
+  Users, Bot, Mail, Sparkles, Loader2, RefreshCw, Mic, Reply, History, Circle,
 } from "lucide-react";
 import type { PlanipretMobileContext } from "../PlanipretMobile";
 import SmsTemplatesSheet from "@/components/planipret/SmsTemplatesSheet";
+import AvaSummarizeSheet from "@/components/planipret/ava/AvaSummarizeSheet";
+import AvaHistorySheet from "@/components/planipret/ava/AvaHistorySheet";
+import CoachOverlay from "@/components/planipret/ava/CoachOverlay";
+import { callAva, type AvaSuggestion } from "@/services/avaProactive";
+import { useAvaDraft } from "@/hooks/useAvaDraft";
 
-type SubTab = "sms" | "team" | "ava" | "emails";
+type SubTab = "sms" | "team" | "ava" | "emails" | "roster";
+
 
 type Msg = {
   id: string;
@@ -60,6 +66,7 @@ export default function MMessages() {
           {[
             { k: "sms" as SubTab, label: "SMS", Icon: MessageSquare },
             { k: "team" as SubTab, label: "Équipe", Icon: Users },
+            { k: "roster" as SubTab, label: "Annuaire", Icon: Users },
             { k: "ava" as SubTab, label: "AVA", Icon: Bot },
             { k: "emails" as SubTab, label: "Emails", Icon: Mail },
           ].map((t) => {
@@ -89,9 +96,11 @@ export default function MMessages() {
       <div className="flex-1 overflow-hidden">
         {sub === "sms" && <SmsList profile={profile} openDialer={openDialer} registerRefresh={registerRefresh} />}
         {sub === "team" && <TeamChat profile={profile} />}
-        {sub === "ava" && <AvaChat profile={profile} openAva={openAva} />}
+        {sub === "roster" && <TeamRoster profile={profile} openDialer={openDialer} onSwitchTab={setSub} />}
+        {sub === "ava" && <AvaChat profile={profile} openAva={openAva} openDialer={openDialer} />}
         {sub === "emails" && <EmailsList profile={profile} openAva={openAva} />}
       </div>
+
     </div>
   );
 }
@@ -270,6 +279,7 @@ function ThreadView({ number, myExt, userId, messages, onBack, onCall, onSent }:
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [tplOpen, setTplOpen] = useState(false);
+  const [sumOpen, setSumOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const ordered = useMemo(() => [...messages].sort((a, b) => +new Date(a.created_at) - +new Date(b.created_at)), [messages]);
 
@@ -313,6 +323,14 @@ function ThreadView({ number, myExt, userId, messages, onBack, onCall, onSent }:
           <p className="font-semibold text-sm truncate" style={{ color: "var(--pp-text-primary)" }}>{number}</p>
           <p className="text-[11px]" style={{ color: "var(--pp-text-muted)" }}>{ordered.length} message{ordered.length > 1 ? "s" : ""}</p>
         </div>
+        <button
+          onClick={() => setSumOpen(true)}
+          className="p-1.5 rounded-full"
+          style={{ color: "var(--pp-agent)" }}
+          title="Résumer avec AVA"
+        >
+          <Sparkles className="w-4 h-4" />
+        </button>
         <button
           onClick={() => onCall(number)}
           className="px-3 py-1.5 rounded-full text-white text-xs font-semibold flex items-center gap-1.5"
@@ -361,6 +379,14 @@ function ThreadView({ number, myExt, userId, messages, onBack, onCall, onSent }:
         }
       />
       <SmsTemplatesSheet open={tplOpen} onClose={() => setTplOpen(false)} userId={userId} onPick={(body) => setText((t) => t ? `${t} ${body}` : body)} />
+      <AvaSummarizeSheet
+        open={sumOpen}
+        source="sms"
+        title={`SMS avec ${number}`}
+        content={ordered.map((m) => `${m.direction === "outbound" ? "Moi" : number}: ${m.body ?? ""}`).join("\n")}
+        onClose={() => setSumOpen(false)}
+        onInsert={(t) => setText((cur) => cur ? `${cur} ${t}` : t)}
+      />
     </div>
   );
 }
@@ -435,13 +461,24 @@ function TeamChat({ profile }: { profile: any }) {
     setText("");
   };
 
+  const [sumOpen, setSumOpen] = useState(false);
+
   return (
     <div className="absolute inset-x-0 top-[120px] bottom-0 flex flex-col">
       <div
-        className="px-4 py-2 text-[11px] uppercase tracking-wider flex items-center gap-2"
+        className="px-4 py-2 text-[11px] uppercase tracking-wider flex items-center justify-between"
         style={{ color: "var(--pp-text-muted)", borderBottom: "1px solid var(--pp-bg-border)" }}
       >
-        <Users className="w-3 h-3" /> #{channel}
+        <div className="flex items-center gap-2">
+          <Users className="w-3 h-3" /> #{channel}
+        </div>
+        <button
+          onClick={() => setSumOpen(true)}
+          className="text-[11px] flex items-center gap-1 normal-case tracking-normal"
+          style={{ color: "var(--pp-agent)" }}
+        >
+          <Sparkles className="w-3 h-3" /> Résumer
+        </button>
       </div>
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2">
         {loading ? (
@@ -474,6 +511,15 @@ function TeamChat({ profile }: { profile: any }) {
         <div ref={bottomRef} />
       </div>
       <Composer text={text} setText={setText} onSend={send} sending={sending} placeholder="Message à l'équipe…" />
+
+      <AvaSummarizeSheet
+        open={sumOpen}
+        source="team"
+        title={`#${channel}`}
+        content={msgs.map((m) => `${senderNames[m.sender_id] ?? "Membre"}: ${m.message}`).join("\n")}
+        onClose={() => setSumOpen(false)}
+        onInsert={(t) => setText((cur) => cur ? `${cur} ${t}` : t)}
+      />
     </div>
   );
 }
@@ -489,12 +535,17 @@ type AvaMsg = {
   created_at: string;
 };
 
-function AvaChat({ profile, openAva }: { profile: any; openAva: () => void }) {
+function AvaChat({ profile, openAva, openDialer }: { profile: any; openAva: () => void; openDialer: (n?: string) => void }) {
   const [msgs, setMsgs] = useState<AvaMsg[]>([]);
-  const [text, setText] = useState("");
+  const [text, setText] = useAvaDraft(profile?.user_id, "ava-chat");
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [coach, setCoach] = useState<{ open: boolean; suggestions: AvaSuggestion[]; title?: string }>({ open: false, suggestions: [] });
   const bottomRef = useRef<HTMLDivElement>(null);
+  // setText is the debounced draft updater
+  const inputRef = useRef<(v: string) => void>(setText);
+  inputRef.current = setText;
 
   const load = async () => {
     if (!profile?.user_id) return;
@@ -521,13 +572,20 @@ function AvaChat({ profile, openAva }: { profile: any; openAva: () => void }) {
     if (ins) setMsgs((p) => [...p, ins as AvaMsg]);
     setText("");
 
-    const { data, error } = await supabase.functions.invoke("pp-ava-proactive", {
-      body: { user_message: body, history: msgs.slice(-10).map((m) => ({ role: m.role, content: m.message })) },
+    const r = await callAva({
+      mode: "chat",
+      message: body,
+      history: msgs.slice(-10).map((m) => ({ role: m.role, content: m.message })),
     });
-    const reply = (data as any)?.reply ?? (data as any)?.message ?? (error ? "Désolé, je rencontre un problème pour répondre." : "…");
+
     const { data: ins2 } = await supabase.from("planipret_ava_conversations")
-      .insert({ user_id: profile.user_id, role: "assistant", message: reply }).select().single();
+      .insert({ user_id: profile.user_id, role: "assistant", message: r.reply }).select().single();
     if (ins2) setMsgs((p) => [...p, ins2 as AvaMsg]);
+
+    if (r.openVoice) openAva();
+    if (r.openCoach || r.suggestions.length) {
+      setCoach({ open: true, suggestions: r.suggestions, title: "Coach AVA" });
+    }
     setSending(false);
   };
 
@@ -546,11 +604,21 @@ function AvaChat({ profile, openAva }: { profile: any; openAva: () => void }) {
         <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider" style={{ color: "var(--pp-agent)" }}>
           <Sparkles className="w-3 h-3" /> Assistant AVA
         </div>
-        {msgs.length > 0 && (
-          <button onClick={clear} className="text-[11px]" style={{ color: "var(--pp-text-muted)" }}>
-            Effacer
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setHistoryOpen(true)}
+            className="text-[11px] flex items-center gap-1"
+            style={{ color: "var(--pp-text-muted)" }}
+            title="Historique"
+          >
+            <History className="w-3.5 h-3.5" /> Historique
           </button>
-        )}
+          {msgs.length > 0 && (
+            <button onClick={clear} className="text-[11px]" style={{ color: "var(--pp-text-muted)" }}>
+              Effacer
+            </button>
+          )}
+        </div>
       </div>
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2">
         {loading ? (
@@ -667,9 +735,19 @@ function AvaChat({ profile, openAva }: { profile: any; openAva: () => void }) {
           ) : null
         }
       />
+
+      <AvaHistorySheet open={historyOpen} userId={profile?.user_id} onClose={() => setHistoryOpen(false)} />
+      <CoachOverlay
+        open={coach.open}
+        title={coach.title}
+        suggestions={coach.suggestions}
+        ctx={{ openDialer, openAva, userId: profile?.user_id, profileId: profile?.id }}
+        onClose={() => setCoach({ open: false, suggestions: [] })}
+      />
     </div>
   );
 }
+
 
 // ============================================================
 // EMAILS TAB (M365)
@@ -816,21 +894,7 @@ function EmailDetailSheet({ email, onClose, onReply }: { email: any; onClose: ()
   const fromAddr = email.from?.emailAddress?.address ?? "";
   const subject = email.subject ?? "(Sans objet)";
   const preview = email.bodyPreview ?? "";
-  const [summary, setSummary] = useState<string | null>(null);
-  const [summarizing, setSummarizing] = useState(false);
-
-  const summarize = async () => {
-    setSummarizing(true);
-    const { data, error } = await supabase.functions.invoke("pp-ava-proactive", {
-      body: {
-        user_message: `Résume cet email en 2-3 phrases et propose une action.\n\nDe: ${from}\nObjet: ${subject}\nContenu: ${preview}`,
-        history: [],
-      },
-    });
-    const reply = (data as any)?.reply ?? (data as any)?.message ?? (error ? "Impossible de résumer." : "");
-    setSummary(reply);
-    setSummarizing(false);
-  };
+  const [sumOpen, setSumOpen] = useState(false);
 
   return (
     <div className="absolute inset-0 z-40 bg-black/60 backdrop-blur-sm flex items-end" onClick={onClose}>
@@ -855,8 +919,7 @@ function EmailDetailSheet({ email, onClose, onReply }: { email: any; onClose: ()
           </div>
 
           <button
-            onClick={summarize}
-            disabled={summarizing}
+            onClick={() => setSumOpen(true)}
             className="w-full px-3 py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
             style={{
               background: "rgba(155,127,232,0.12)",
@@ -864,22 +927,8 @@ function EmailDetailSheet({ email, onClose, onReply }: { email: any; onClose: ()
               color: "var(--pp-agent)",
             }}
           >
-            {summarizing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-            Résumer avec AVA
+            <Sparkles className="w-4 h-4" /> Résumer avec AVA
           </button>
-
-          {summary && (
-            <div
-              className="rounded-xl p-3 text-sm whitespace-pre-wrap"
-              style={{
-                background: "rgba(155,127,232,0.08)",
-                border: "1px solid rgba(155,127,232,0.25)",
-                color: "var(--pp-text-primary)",
-              }}
-            >
-              {summary}
-            </div>
-          )}
 
           <div
             className="rounded-xl p-3 text-sm whitespace-pre-wrap"
@@ -888,6 +937,7 @@ function EmailDetailSheet({ email, onClose, onReply }: { email: any; onClose: ()
             {preview || "(Aperçu non disponible)"}
           </div>
         </div>
+
         <div className="px-4 py-3 flex gap-2" style={{ borderTop: "1px solid var(--pp-bg-border)" }}>
           <button
             onClick={() => onReply({
@@ -902,9 +952,26 @@ function EmailDetailSheet({ email, onClose, onReply }: { email: any; onClose: ()
           </button>
         </div>
       </div>
+
+      <AvaSummarizeSheet
+        open={sumOpen}
+        source="email"
+        title={subject}
+        content={`De: ${from} <${fromAddr}>\nObjet: ${subject}\n\n${preview}`}
+        onClose={() => setSumOpen(false)}
+        onInsert={(text) => {
+          setSumOpen(false);
+          onReply({
+            to: fromAddr,
+            subject: subject.startsWith("Re:") ? subject : `Re: ${subject}`,
+            body: `${text}\n\n---\nDe: ${from}\n${preview}`,
+          });
+        }}
+      />
     </div>
   );
 }
+
 
 function EmailComposeSheet({ init, onClose, onSent }: { init: { to?: string; subject?: string; body?: string }; onClose: () => void; onSent: () => void }) {
   const [to, setTo] = useState(init.to ?? "");
@@ -1029,5 +1096,167 @@ function EmptyState({ Icon, title, sub }: { Icon: any; title: string; sub: strin
       <div className="font-semibold" style={{ color: "var(--pp-text-secondary)" }}>{title}</div>
       <div className="text-xs mt-1" style={{ color: "var(--pp-text-muted)" }}>{sub}</div>
     </div>
+  );
+}
+
+// ============================================================
+// TEAM ROSTER (members directory + quick actions via M365)
+// ============================================================
+type RosterMember = {
+  id: string;
+  user_id: string;
+  full_name: string | null;
+  email: string | null;
+  extension: string | null;
+  role: string | null;
+  avatar_url: string | null;
+  voice_agent_enabled: boolean | null;
+  organization_id: string | null;
+};
+
+function TeamRoster({ profile, openDialer, onSwitchTab }: { profile: any; openDialer: (n?: string) => void; onSwitchTab: (k: SubTab) => void }) {
+  const [members, setMembers] = useState<RosterMember[]>([]);
+  const [lastSeen, setLastSeen] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(true);
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [composeInit, setComposeInit] = useState<{ to?: string; subject?: string; body?: string }>({});
+
+  const load = async () => {
+    if (!profile?.organization_id) { setLoading(false); return; }
+    setLoading(true);
+    const { data } = await supabase
+      .from("planipret_profiles")
+      .select("id, user_id, full_name, email, extension, role, avatar_url, voice_agent_enabled, organization_id")
+      .eq("organization_id", profile.organization_id)
+      .order("full_name", { ascending: true })
+      .limit(200);
+    const list = ((data ?? []) as any[]).filter((m) => m.id !== profile.id) as RosterMember[];
+    setMembers(list);
+
+    // Derive "active récemment" from latest phone_call or team_message per user
+    const ids = list.map((m) => m.user_id).filter(Boolean);
+    if (ids.length) {
+      const seen: Record<string, string> = {};
+      const [{ data: calls }, { data: tmsgs }] = await Promise.all([
+        supabase.from("planipret_phone_calls").select("user_id, created_at").in("user_id", ids).order("created_at", { ascending: false }).limit(500),
+        supabase.from("planipret_team_messages").select("sender_id, created_at").in("sender_id", list.map((m) => m.id)).order("created_at", { ascending: false }).limit(500),
+      ]);
+      for (const r of (calls ?? []) as any[]) {
+        if (!seen[r.user_id] || seen[r.user_id] < r.created_at) seen[r.user_id] = r.created_at;
+      }
+      for (const r of (tmsgs ?? []) as any[]) {
+        const u = list.find((m) => m.id === r.sender_id)?.user_id;
+        if (u && (!seen[u] || seen[u] < r.created_at)) seen[u] = r.created_at;
+      }
+      setLastSeen(seen);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [profile?.organization_id]);
+
+  const statusFor = (userId: string | null) => {
+    if (!userId) return { color: "var(--pp-text-faint)", label: "—" };
+    const ts = lastSeen[userId];
+    if (!ts) return { color: "var(--pp-text-faint)", label: "Hors ligne" };
+    const age = Date.now() - +new Date(ts);
+    if (age < 2 * 60_000) return { color: "var(--pp-success)", label: "En ligne" };
+    if (age < 30 * 60_000) return { color: "var(--pp-warning, #F5A623)", label: "Inactif" };
+    return { color: "var(--pp-text-faint)", label: "Hors ligne" };
+  };
+
+  const sendMention = async (m: RosterMember) => {
+    if (!profile?.id) return;
+    const body = `@${m.full_name ?? "membre"} `;
+    const { error } = await supabase.from("planipret_team_messages").insert({
+      sender_id: profile.id, channel: "general", message: body,
+    } as any);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Mention envoyée dans #general");
+    onSwitchTab("team");
+  };
+
+  return (
+    <div className="h-full overflow-y-auto p-3">
+      {loading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="rounded-2xl h-20 animate-pulse" style={{ background: "var(--pp-bg-surface)" }} />
+          ))}
+        </div>
+      ) : members.length === 0 ? (
+        <EmptyState Icon={Users} title="Annuaire vide" sub="Aucun autre membre dans votre organisation." />
+      ) : (
+        <ul className="space-y-1.5">
+          {members.map((m) => {
+            const st = statusFor(m.user_id);
+            return (
+              <li key={m.id} className="rounded-2xl p-3" style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)" }}>
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="relative shrink-0">
+                    {m.avatar_url ? (
+                      <img src={m.avatar_url} alt="" className="w-11 h-11 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-11 h-11 rounded-full flex items-center justify-center text-white text-sm font-semibold"
+                        style={{ background: "linear-gradient(135deg, var(--pp-brand-accent), var(--pp-brand-accent-2))" }}>
+                        {initials(m.full_name ?? m.email ?? "?")}
+                      </div>
+                    )}
+                    <span
+                      className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2"
+                      style={{ background: st.color, borderColor: "var(--pp-bg-surface)" }}
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-sm truncate" style={{ color: "var(--pp-text-primary)" }}>{m.full_name ?? m.email ?? "Membre"}</p>
+                    <p className="text-[11px] truncate flex items-center gap-1.5" style={{ color: "var(--pp-text-muted)" }}>
+                      <Circle className="w-2 h-2" style={{ fill: st.color, color: st.color }} /> {st.label}
+                      {m.extension && <span style={{ color: "var(--pp-text-faint)" }}>· ext {m.extension}</span>}
+                      {m.role && <span style={{ color: "var(--pp-text-faint)" }}>· {m.role}</span>}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <ActionPill Icon={Phone} label="Appeler" disabled={!m.extension} onClick={() => m.extension && openDialer(m.extension)} />
+                  <ActionPill Icon={MessageSquare} label="SMS" disabled={!m.extension} onClick={() => { if (m.extension) { onSwitchTab("sms"); toast(`SMS vers ${m.extension}`); } }} />
+                  <ActionPill
+                    Icon={Mail}
+                    label="Email"
+                    disabled={!m.email || !profile?.ms365_access_token}
+                    onClick={() => { setComposeInit({ to: m.email ?? "" }); setComposeOpen(true); }}
+                  />
+                  <ActionPill Icon={Users} label="@Mention" onClick={() => sendMention(m)} />
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {composeOpen && (
+        <EmailComposeSheet
+          init={composeInit}
+          onClose={() => setComposeOpen(false)}
+          onSent={() => setComposeOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+function ActionPill({ Icon, label, onClick, disabled }: { Icon: any; label: string; onClick: () => void; disabled?: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="flex-1 py-1.5 rounded-full text-[11px] font-semibold flex items-center justify-center gap-1 disabled:opacity-40"
+      style={{
+        background: "var(--pp-bg-elevated)",
+        border: "1px solid var(--pp-bg-border-2)",
+        color: "var(--pp-text-secondary)",
+      }}
+    >
+      <Icon className="w-3 h-3" /> {label}
+    </button>
   );
 }

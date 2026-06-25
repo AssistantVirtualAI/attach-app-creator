@@ -1,103 +1,58 @@
-## État actuel — ce qui existe déjà ✅
+Quatre chantiers Phase 5, tous dans `/mplanipret` (org AVA), zéro changement de tables/Edge Functions existantes.
 
-J'ai vérifié `/mplanipret` et la majorité du squelette UI est **déjà bâti** :
+## 1. Historique AVA + recherche + brouillons par contact
+- Nouveau composant `AvaHistorySheet.tsx` ouvert depuis l'en-tête de l'onglet AVA (Messages) et depuis l'overlay vocal.
+- Liste groupée par jour des messages `planipret_ava_conversations` (déjà filtrés `user_id`), avec badge audio/texte (`metadata.mode`).
+- Barre de recherche locale (filtre `ilike` côté client sur le batch chargé + bouton « Charger plus »).
+- Brouillons par contact : nouveau hook `useAvaDraft(contactKey)` qui lit/écrit `localStorage` clé `pp-ava-draft:{user_id}:{contactKey}`. Auto-restauration au montage de l'AvaChat / overlay vocal quand un `contactKey` est fourni (par défaut `global`).
+- Quand on tape dans le Composer AVA → enregistrement debounce 400 ms. Quand AVA répond avec succès → brouillon effacé.
 
-**Coquille (`PlanipretMobile.tsx`)**
-- ✅ Cadre téléphone 390×844, bordure, ombre, fond `#060D1A`
-- ✅ Barre d'onglets en bas, FAB central bleu
-- ✅ DialerSheet (clavier 12 touches, +, appel via `ns-calls`)
-- ✅ `useRealtimeManager` (inbound, ai-insight), `InboundCallOverlay`
-- ✅ Badges non-lus messages/voicemails
-- ✅ `UniversalSearchBar`, `usePullToRefresh`, `SessionTimeoutModal`, `PrivacyConsentGate`, `OnboardingTutorial`
+## 2. Workflow « Résumer avec AVA » réutilisable
+- Nouveau composant `AvaSummarizeSheet.tsx` (drawer 92 %) acceptant `{ source: "sms" | "team" | "email", title, content, contextMeta }`.
+- 3 niveaux : **Court** (1 phrase), **Standard** (3 phrases + action), **Détaillé** (résumé + points clés + prochaine étape).
+- Bouton « Copier » (clipboard) et « Coller dans réponse » (callback `onInsert`).
+- Appel unique à `pp-ava-proactive` avec un prompt formé côté client selon le niveau. Aucun changement Edge Function.
+- Branchement :
+  - SMS ThreadView → menu kebab → « Résumer la conversation »
+  - Team #general → menu kebab → « Résumer le canal »
+  - Emails → remplace le bouton actuel « Résumer avec AVA » par ce composant partagé + option « Insérer dans une réponse ».
 
-**Écrans existants**
-- ✅ MHome, MCalls (sous-onglets recents/active/missed/recordings/voicemails), MMessages (SMS/Équipe/AVA/Emails + Realtime `pp-team-chat` sur `planipret_team_messages`), MMore, MVoicemail, MContacts, MPipeline, MSearch, MStats
-- ✅ AvaVoiceAgent overlay, composants recordings/voicemail
+## 3. Logique complète « pp-ava-proactive »
+- Nouveau service client `src/services/avaProactive.ts` qui wrappe `supabase.functions.invoke("pp-ava-proactive", …)` et normalise la réponse en `{ reply, suggestions: AvaSuggestion[], openCoach?: boolean, openVoice?: boolean }`.
+- Type `AvaSuggestion = { id, label, kind: "call" | "sms" | "email" | "reminder" | "maestro_action", payload }`.
+- Quand `openVoice: true` → appel `openAva()` (déjà dans le context shell).
+- Quand `openCoach: true` → ouvre `CoachOverlay` (nouveau, mini drawer 50 %) montrant les suggestions + transcript live des derniers messages.
+- Boutons d'action :
+  - `call` → `openDialer(number)`
+  - `sms` → navigation `/mplanipret/messages` + pré-remplissage du composer (param URL)
+  - `reminder` → insert dans `planipret_reminders`
+  - `maestro_action` → `supabase.functions.invoke("maestro-pipeline-orchestrator", { body: payload })` (déjà existant)
+- Card « 🤖 AVA recommande » du MHome consomme ce service au lieu de mocks.
 
-**Backend (à NE PAS toucher)**
-- ✅ Edge functions `ns-calls`, `ns-sms`, `ns-auth`, `ms365-*`, `maestro-*`, `ai-analyze-call`, `generate-voicemail-greeting`, `ava-agent-config`
-- ✅ Tables `planipret_*`, Realtime publications, RLS
-
-## Écarts vs spécification ⚠️
-
-| # | Écart | Sévérité |
-|---|---|---|
-| 1 | Tab bar = **6 colonnes** (Accueil/Appels/FAB/Messages/**Contacts**/Plus) au lieu de **5** (la spec retire Contacts du bottom bar) | moyen |
-| 2 | FAB ne passe **pas en rouge pulsant** pendant un appel actif | moyen |
-| 3 | Bouton flottant **AVA Voice** absent du MHome (devrait être bottom:80 right:16, gated par `voice_agent_enabled`) | moyen |
-| 4 | MHome : KPIs, carte "AVA recommande", "Brief IA", "Appels récents", "Prochains RDV" à aligner sur la spec exacte (4 KPIs : Appels / Manqués / SMS non lus / Voicemails) | moyen |
-| 5 | DialerSheet : hauteur 85%, sous-lettres ABC/DEF, hold-backspace 1s = clear, états visuels (`scale 0.92` + tinted bg) | mineur |
-| 6 | RecordingDetailSheet 4 onglets (Audio / Transcript / Coaching / Maestro) à harmoniser avec la maquette détaillée (cercle de score, sections colorées) | moyen |
-| 7 | VoicemailGreetingSheet 3 étapes (voix ElevenLabs → texte avec templates + IA → génération + activation) — composant à créer dans `/more` | majeur |
-| 8 | Toast IA "slide-up" en bas du container avec actions (Voir / Plus tard) | mineur |
-| 9 | Overlay AVA : visualisations d'état (idle/connecting/listening/speaking/processing/tool_running) à compléter | moyen |
-| 10 | Overlay Inbound Call : lookup Maestro (avatar, nom, étape, "X appels précédents") à compléter | moyen |
-| 11 | Skeletons partout (KPI, listes) au lieu de "Chargement…" | mineur |
-| 12 | Transitions de page (fade 150ms entre onglets, slide pour navigation interne) | mineur |
-| 13 | Tokens CSS `--pp-*` à figer dans `index.css` selon palette de la spec | mineur |
-
----
-
-## Plan multi-phases
-
-### Phase 1 — Refonte de la coquille (shell)
-- Réduire la tab bar à 5 colonnes : Accueil / Appels / **FAB** / Messages / Plus. Déplacer Contacts dans MMore (route `/mplanipret/contacts` conservée).
-- FAB : nouvel état `inCall` (rouge + animation `pulse-red 1.5s`) déclenché via Realtime/`useActiveCall`.
-- Ajouter le bouton flottant AVA Voice (bottom:80 right:16, conditionné par `profile.voice_agent_enabled`).
-- Geler les tokens CSS `--pp-bg-*`, `--pp-brand-*`, `--pp-text-*` dans `src/index.css` selon la spec.
-- Remplacer les écrans de chargement par un `<MobileSkeleton variant="…" />`.
-
-### Phase 2 — MHome conforme
-- 4 cartes KPI exactes (Appels / Manqués / SMS non lus / Voicemails) avec couleurs et `border-top` corrects.
-- Carte "🤖 AVA recommande" (3 items dynamiques + refresh + CTA "Parler à AVA").
-- Carte "🎧 Brief IA du jour" (bouton Écouter ouvre le brief audio).
-- Carte "📞 Appels récents" (3 derniers + badge AI).
-- Carte "📅 Prochains RDV" (M365 ou CTA connexion).
-- Skeletons shimmer sur chaque carte.
-
-### Phase 3 — Dialer + écran Appels
-- DialerSheet : hauteur 85%, drag-handle, sous-lettres, hold-backspace 1s, animations.
-- MCalls : sous-onglets pill-style ; cartes avec border-left coloré ; pipeline 4 étapes sur Enregistrements ; CTA Rappeler sur Manqués.
-- RecordingDetailSheet 4 onglets harmonisé avec la maquette (cercle score, sections colorées, "Tout créer" batch Maestro). Aucun changement aux Edge Functions appelées.
-- ActiveCallCard : timer, waveform, grille 2×2 (Muet/Attente/Transfer/Raccrocher).
-
-### Phase 4 — Messages (SMS / Équipe / AVA / Emails)
-- Sous-tabs pills horizontales déjà présents → ajustement visuel.
-- Bulles SMS gradient envoyé / dark reçu (border-radius spec).
-- Équipe : sidebar canaux, réactions, threading, upload fichier (Storage).
-- AVA : quick-chips, intégration micro → ouvre VoiceAgent overlay.
-- Emails : liste + détail + composer + "Résumer avec AVA".
-
-### Phase 5 — MMore + VoicemailGreetingSheet
-- Refonte MMore en sections (Mon compte / Téléphonie / **Boîte vocale IA** / Intégrations / Assistant AVA / Préférences / Aide / Déconnexion).
-- **Nouveau composant** `VoicemailGreetingSheet` (3 étapes) branché sur `generate-voicemail-greeting` + ElevenLabs voices existantes. Aucun nouveau secret.
-- EditProfileSheet, gestion DND avec horaire, export GDPR (`pp-gdpr-export`).
-- Toggles Mode sombre + Notifications (Permission API).
-
-### Phase 6 — Overlays AVA + Inbound + Toasts + Transitions
-- AvaVoiceAgent : visualisations 7 états, ToolNotification slide-down, transcript live, modal de confirmation.
-- InboundCallOverlay : lookup Maestro (skeleton → fiche), 3 rings pulse, auto-dismiss 30s + toast manqué.
-- Toast système : positionné bas du container, types (success/error/info/warning/ai), action buttons pour insights IA.
-- Transitions : fade 150ms entre tabs ; slide 300ms pour navigation interne via `framer-motion`.
-
-### Phase 7 — Recherche globale + Pull-to-refresh + QA
-- GlobalSearchOverlay branché sur `pp-search` (groupes : Appels / Messages / Voicemails / Contacts / Emails), historique localStorage.
-- Pull-to-refresh sur toutes les listes (déjà hook, à appliquer partout).
-- Tests manuels device 390×844 + responsive mobile.
-
----
-
-## Règles strictes respectées
-
-- ❌ Aucune modification d'Edge Function, de table, de RLS, de secrets, de configuration ElevenLabs.
-- ❌ Aucune modification de Lemtel ni du dashboard admin.
-- ❌ Aucun nom de canal Realtime modifié.
-- ✅ Toutes les requêtes Supabase et signatures conservées à l'identique.
+## 4. Onglet « Équipe » (membres + dispo + actions M365)
+- Nouvelle sous-tab dans `MMessages` : `team-roster` (ou intégration sous l'actuelle « Équipe » via toggle « Chat / Équipe »).
+- Requête `planipret_profiles` filtrée par même organisation (`organization_id` ou `is_planipret_member()`), champs : `full_name, email, extension, status, last_seen_at, voice_agent_enabled, avatar_url`.
+- Disponibilité visuelle : pastille verte (en ligne <2 min), jaune (idle <30 min), grise (offline). Source : `last_seen_at`.
+- Actions rapides par membre :
+  - **Appeler** → `openDialer(extension)`
+  - **SMS** → ouvre ThreadView sur l'extension
+  - **Email M365** → ouvre `EmailComposeSheet` pré-rempli (`to=email`)
+  - **Mention chat** → insert dans `planipret_team_messages` avec `@<full_name>`
+- Pull-to-refresh + skeletons.
 
 ## Détails techniques
+- Aucune nouvelle table, aucune nouvelle migration, aucun nouveau secret.
+- `pp-ava-proactive` reste tel quel — on enrichit côté client la structure attendue (fallback gracieux si les champs manquent).
+- Maestro déclenché via Edge Function existante `maestro-pipeline-orchestrator`.
+- Tous les nouveaux composants sous `src/pages/planipret/mobile/` ou `src/components/planipret/ava/`.
+- Tous les overlays restent `absolute` à l'intérieur du `<Frame>` (jamais `fixed`).
+- Recherche : pas de FTS serveur, filtre client (jusqu'à 500 derniers messages chargés).
 
-- Tous les overlays utilisent `position: absolute` à l'intérieur du `<Frame>` (jamais `fixed`).
-- Le FAB en mode appel s'abonne à `planipret_phone_calls` filtré par `status in ('active','ringing')` via le `useRealtimeManager` existant.
-- Le composant `VoicemailGreetingSheet` appelle uniquement `supabase.functions.invoke('generate-voicemail-greeting', { … })` — aucun changement côté serveur.
-- Les skeletons utilisent une seule keyframe `shimmer` ajoutée à `index.css`.
-- L'overlay AVA réutilise `AvaVoiceAgent.tsx` existant ; on ajoute les états visuels manquants sans toucher à la logique LLM.
+## Ordre d'exécution suggéré
+1. Service `avaProactive` + types (base pour les autres).
+2. `AvaSummarizeSheet` partagé + branchement SMS/Team/Email.
+3. Historique AVA + brouillons localStorage.
+4. CoachOverlay + intégration MHome card.
+5. Onglet Équipe (roster + actions M365).
+
+Tu valides cet ordre ou tu veux que je commence par un chantier précis ?
