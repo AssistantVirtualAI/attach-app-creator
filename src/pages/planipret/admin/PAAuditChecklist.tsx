@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import {
   CheckCircle2, XCircle, AlertTriangle, Loader2, MinusCircle,
   RefreshCw, FileDown, ChevronDown, ChevronRight, ShieldCheck,
+  Zap, Clock, Copy, ExternalLink, ArrowRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { downloadPdfBlob } from "@/lib/pdf/downloadBlob";
@@ -19,14 +21,32 @@ type Report = {
   sections: Section[];
 };
 
+type Priority = "critical" | "high" | "medium" | "low";
+type QuickFix = { label: string; icon: string; action: () => void };
+
 // Manual / human-only checklist items (cannot be auto-tested).
-const MANUAL_CHECKLIST: { id: string; label: string; hint: string }[] = [
+type ManualItem = { id: string; label: string; hint: string; instructions?: string[]; copyText?: string; copyLabel?: string; link?: { label: string; href: string } };
+const MANUAL_CHECKLIST: ManualItem[] = [
   { id: "m-ns-webhook", label: "Webhook NS-API CDR enregistré dans voice.ava-telecom.ca",
-    hint: "Portail NS → Settings → Webhooks → URL pointant vers /functions/v1/ns-webhook-receiver" },
+    hint: "Portail NS → Settings → Webhooks → URL pointant vers /functions/v1/ns-webhook-receiver",
+    instructions: [
+      "1. Aller sur https://voice.ava-telecom.ca/portal",
+      "2. Se connecter avec votre compte admin NetSapiens",
+      "3. Settings → Webhooks → Add Webhook",
+      "4. Event: call_cdr (ou CDR)",
+      "5. URL: voir le bouton « Copier l'URL » ci-dessous",
+      "6. Header: X-Webhook-Secret: {NS_WEBHOOK_SECRET}",
+      "7. Sauvegarder.",
+    ],
+    copyText: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ns-webhook-receiver`,
+    copyLabel: "Copier l'URL du webhook" },
   { id: "m-maestro-webhook", label: "Webhook Maestro configuré côté Kanguru",
-    hint: "Webhooks sortants vers /functions/v1/maestro-webhook-receiver" },
+    hint: "Webhooks sortants vers /functions/v1/maestro-webhook-receiver",
+    copyText: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/maestro-webhook-receiver`,
+    copyLabel: "Copier l'URL Maestro" },
   { id: "m-el-mic", label: "Agent ElevenLabs testé avec un vrai microphone",
-    hint: "Tester sur /mplanipret avec un broker actif" },
+    hint: "Tester sur /mplanipret avec un broker actif",
+    link: { label: "Configurer ElevenLabs", href: "/planipret/admin/integrations#elevenlabs" } },
   { id: "m-outbound", label: "Test appel sortant réel passé",
     hint: "Lancer un appel via le Dialer FAB et vérifier le CDR" },
   { id: "m-sms", label: "Test SMS envoyé et reçu",
@@ -36,7 +56,8 @@ const MANUAL_CHECKLIST: { id: string; label: string; hint: string }[] = [
   { id: "m-m365", label: "Test M365 OAuth flow complet",
     hint: "Un broker connecte son compte Microsoft et vérifie emails/RDV" },
   { id: "m-admin", label: "Premier admin Planiprêt créé",
-    hint: "Créer un compte admin dans /planipret/admin/users" },
+    hint: "Créer un compte admin dans /planipret/admin/users",
+    link: { label: "Créer un admin", href: "/planipret/admin/users" } },
   { id: "m-pipeline", label: "Test pipeline complet appel → analyse → Maestro",
     hint: "Appel 2+ min puis vérifier CDR, transcript, IA, coaching, Maestro" },
   { id: "m-resend", label: "SPF / DKIM Resend configuré",
@@ -45,7 +66,8 @@ const MANUAL_CHECKLIST: { id: string; label: string; hint: string }[] = [
     hint: "Layout, micro, WebRTC, SIP" },
   { id: "m-android", label: "Test sur Android Chrome réel", hint: "Même vérification" },
   { id: "m-retention", label: "Politique de rétention définie",
-    hint: "/planipret/admin/compliance" },
+    hint: "/planipret/admin/compliance",
+    link: { label: "Conformité", href: "/planipret/admin/compliance" } },
 ];
 
 const C = {
@@ -62,6 +84,46 @@ const C = {
   warn: "#F5A623",
   info: "#2E9BDC",
   skip: "#2A4A6A",
+  critical: "#E84C4C",
+  high: "#F5A623",
+  medium: "#F5D423",
+  low: "#7FA5C4",
+};
+
+// Priority mapping for known failed items
+const PRIORITY_MAP: Record<string, { priority: Priority; eta: string }> = {
+  "secret-ELEVENLABS_DEFAULT_AGENT_ID": { priority: "critical", eta: "5 min" },
+  "claude": { priority: "critical", eta: "2 min" },
+  "secret-ANTHROPIC_API_KEY": { priority: "critical", eta: "2 min" },
+  "secret-MICROSOFT_CLIENT_ID": { priority: "high", eta: "20 min" },
+  "secret-MICROSOFT_CLIENT_SECRET": { priority: "high", eta: "20 min" },
+  "secret-MICROSOFT_TENANT_ID": { priority: "high", eta: "20 min" },
+  "secret-MAESTRO_API_URL": { priority: "high", eta: "Contact Kanguru" },
+  "secret-MAESTRO_API_KEY": { priority: "high", eta: "Contact Kanguru" },
+  "secret-MAESTRO_WEBHOOK_SECRET": { priority: "high", eta: "Contact Kanguru" },
+  "secret-OPENAI_API_KEY": { priority: "medium", eta: "5 min" },
+  "secret-ELEVENLABS_AVA_VOICE_ID": { priority: "medium", eta: "1 min" },
+  "rt-planipret_phone_calls": { priority: "high", eta: "1 min" },
+  "rt-planipret_phone_messages": { priority: "high", eta: "1 min" },
+  "rt-planipret_voicemails": { priority: "high", eta: "1 min" },
+};
+
+const PRIORITY_LABEL: Record<Priority, string> = {
+  critical: "🔴 CRITIQUE",
+  high: "🟠 HAUTE",
+  medium: "🟡 MOYENNE",
+  low: "🟢 BASSE",
+};
+const PRIORITY_COLOR: Record<Priority, string> = {
+  critical: C.critical, high: C.high, medium: C.medium, low: C.low,
+};
+
+const SECTION_ETA: Record<string, string> = {
+  db: "0 min — tout est OK",
+  realtime: "~1 min — bouton corrigé via migration",
+  secrets: "~20 min — formulaires d'intégration",
+  functions: "~5 min — redéploiement si besoin",
+  external: "~30 min — secrets + tests",
 };
 
 function StatusIcon({ s }: { s: Status }) {
@@ -107,13 +169,51 @@ function ScoreCircle({ pct }: { pct: number }) {
 }
 
 export default function PAAuditChecklist() {
+  const nav = useNavigate();
   const [report, setReport] = useState<Report | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-  const [manualState, setManualState] = useState<Record<string, boolean>>(() => {
-    try { return JSON.parse(localStorage.getItem("pp-audit-manual") || "{}"); } catch { return {}; }
+  const [manualState, setManualState] = useState<Record<string, { done: boolean; at?: string }>>(() => {
+    try {
+      const raw = localStorage.getItem("pp-audit-manual");
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      // Migrate old boolean-only format
+      const out: Record<string, { done: boolean; at?: string }> = {};
+      for (const k of Object.keys(parsed)) {
+        const v = parsed[k];
+        out[k] = typeof v === "boolean" ? { done: v } : v;
+      }
+      return out;
+    } catch { return {}; }
   });
+  const [expandedManual, setExpandedManual] = useState<Record<string, boolean>>({});
+
+  // Load persisted manual state from DB
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await supabase.from("planipret_settings").select("manual_checklist_state").limit(1).maybeSingle();
+        const state = (data as any)?.manual_checklist_state;
+        if (state && typeof state === "object" && Object.keys(state).length > 0) {
+          setManualState(state);
+        }
+      } catch { /* ignore — falls back to localStorage */ }
+    })();
+  }, []);
+
+  const persistManual = async (next: Record<string, { done: boolean; at?: string }>) => {
+    localStorage.setItem("pp-audit-manual", JSON.stringify(next));
+    try {
+      const { data: row } = await supabase.from("planipret_settings").select("id").limit(1).maybeSingle();
+      if ((row as any)?.id) {
+        await supabase.from("planipret_settings").update({ manual_checklist_state: next as any }).eq("id", (row as any).id);
+      }
+    } catch (e) {
+      console.warn("persistManual failed", e);
+    }
+  };
 
   const runAudit = async () => {
     setLoading(true); setError(null);
@@ -144,8 +244,9 @@ export default function PAAuditChecklist() {
 
   const toggleManual = (id: string) => {
     setManualState((s) => {
-      const next = { ...s, [id]: !s[id] };
-      localStorage.setItem("pp-audit-manual", JSON.stringify(next));
+      const cur = s[id]?.done ?? false;
+      const next = { ...s, [id]: { done: !cur, at: !cur ? new Date().toISOString() : undefined } };
+      persistManual(next);
       return next;
     });
   };
@@ -154,6 +255,55 @@ export default function PAAuditChecklist() {
     if (!report?.generated_at) return null;
     return Math.max(0, Math.round((Date.now() - new Date(report.generated_at).getTime()) / 60000));
   }, [report]);
+
+  // Quick-fix dispatcher
+  const quickFix = (itemId: string): QuickFix | null => {
+    if (itemId === "secret-ELEVENLABS_DEFAULT_AGENT_ID") {
+      return { label: "Configurer ElevenLabs", icon: "🚀", action: () => nav("/planipret/admin/integrations#elevenlabs") };
+    }
+    if (itemId.startsWith("secret-MICROSOFT_")) {
+      return { label: "Configurer Azure", icon: "⚙️", action: () => nav("/planipret/admin/integrations#microsoft") };
+    }
+    if (itemId.startsWith("secret-MAESTRO_")) {
+      return {
+        label: "Email Kanguru", icon: "📧",
+        action: () => { window.location.href = "mailto:support@kanguru.ca?subject=Identifiants%20API%20Maestro%20pour%20Planipr%C3%AAt&body=Bonjour%2C%0A%0ANous%20avons%20besoin%20de%20MAESTRO_API_URL%20et%20MAESTRO_API_KEY%20pour%20activer%20l%27int%C3%A9gration%20Maestro%20dans%20notre%20portail%20Planipr%C3%AAt.%0A%0AMerci."; },
+      };
+    }
+    if (itemId === "secret-OPENAI_API_KEY") {
+      return { label: "Configurer OpenAI", icon: "🔑", action: () => nav("/planipret/admin/integrations#nsapi") };
+    }
+    if (itemId === "secret-ELEVENLABS_AVA_VOICE_ID") {
+      return { label: "Définir voix par défaut", icon: "🎙️", action: () => nav("/planipret/admin/integrations#elevenlabs") };
+    }
+    if (itemId === "claude" || itemId === "secret-ANTHROPIC_API_KEY") {
+      return { label: "Configurer Claude", icon: "🔧", action: () => nav("/planipret/admin/integrations#anthropic") };
+    }
+    if (itemId.startsWith("rt-")) {
+      return { label: "Voir Realtime", icon: "📡", action: () => toast.info("Realtime corrigé via migration. Relancez l'audit.") };
+    }
+    return null;
+  };
+
+  // Next-steps recommendations from current failures
+  const nextSteps = useMemo(() => {
+    if (!report) return [] as { id: string; label: string; priority: Priority; eta: string; action?: QuickFix }[];
+    const failed = report.sections.flatMap((s) => s.items).filter((i) => i.status === "fail");
+    return failed
+      .map((it) => {
+        const p = PRIORITY_MAP[it.id];
+        if (!p) return null;
+        return {
+          id: it.id, label: it.name, priority: p.priority, eta: p.eta,
+          action: quickFix(it.id) ?? undefined,
+        };
+      })
+      .filter(Boolean)
+      .sort((a: any, b: any) => {
+        const order: Record<Priority, number> = { critical: 0, high: 1, medium: 2, low: 3 };
+        return order[a.priority as Priority] - order[b.priority as Priority];
+      }) as any;
+  }, [report]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const exportPdf = () => {
     if (!report) {
@@ -208,7 +358,7 @@ export default function PAAuditChecklist() {
 
       line("Checklist manuelle", 13, true, [10, 30, 60]);
       for (const m of MANUAL_CHECKLIST) {
-        const done = manualState[m.id];
+        const done = manualState[m.id]?.done;
         line(`${done ? "[X]" : "[ ]"} ${m.label}`, 10, true, done ? [0, 130, 90] : [60, 60, 60]);
         line(m.hint, 9, false, [110, 110, 110]);
       }
@@ -274,6 +424,67 @@ export default function PAAuditChecklist() {
         </div>
       </div>
 
+      {/* Score breakdown by category */}
+      {report && (
+        <div className="rounded-2xl p-4 mb-6 grid grid-cols-2 md:grid-cols-5 gap-3"
+             style={{ background: C.surface, border: `1px solid ${C.border}` }}>
+          {report.sections.map((sec) => {
+            const sc = sectionScore(sec.items);
+            return (
+              <div key={sec.id} className="rounded-xl p-3"
+                   style={{ background: "rgba(3,8,16,0.5)", border: `1px solid ${C.border}` }}>
+                <div className="flex items-center gap-2 mb-1">
+                  <span>{sec.emoji}</span>
+                  <span className="text-[11px] uppercase tracking-wider" style={{ color: C.textMuted }}>{sec.title}</span>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-xl font-bold tabular-nums" style={{ color: scoreColor(sc.pct) }}>
+                    {sc.pass}/{sc.total}
+                  </span>
+                  <span className="text-xs" style={{ color: scoreColor(sc.pct) }}>{sc.pct}%</span>
+                </div>
+                <div className="text-[10px] mt-1" style={{ color: C.textMuted }}>{SECTION_ETA[sec.id] ?? ""}</div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Next steps card */}
+      {nextSteps.length > 0 && (
+        <div className="rounded-2xl p-5 mb-6"
+             style={{ background: "linear-gradient(135deg, rgba(46,155,220,0.08), rgba(0,212,170,0.04))",
+                      border: `1px solid ${C.borderAccent}` }}>
+          <div className="flex items-center gap-2 mb-3">
+            <Zap className="w-5 h-5" style={{ color: C.info }} />
+            <h3 className="font-semibold" style={{ color: C.text }}>📋 Prochaines étapes recommandées</h3>
+          </div>
+          <div className="space-y-2">
+            {nextSteps.slice(0, 8).map((s: any, idx: number) => (
+              <div key={s.id} className="flex items-center gap-3 p-2 rounded-lg"
+                   style={{ background: "rgba(3,8,16,0.4)" }}>
+                <span className="text-xs tabular-nums w-5" style={{ color: C.textMuted }}>{idx + 1}.</span>
+                <span className="text-[10px] px-2 py-0.5 rounded font-semibold whitespace-nowrap"
+                      style={{ background: `${PRIORITY_COLOR[s.priority]}22`, color: PRIORITY_COLOR[s.priority] }}>
+                  {PRIORITY_LABEL[s.priority]}
+                </span>
+                <span className="flex-1 text-sm truncate" style={{ color: C.text }}>{s.label}</span>
+                <span className="text-[11px] flex items-center gap-1" style={{ color: C.textMuted }}>
+                  <Clock className="w-3 h-3" />{s.eta}
+                </span>
+                {s.action && (
+                  <button onClick={s.action}
+                          className="text-[11px] px-2 py-1 rounded-md flex items-center gap-1 hover:bg-white/5"
+                          style={{ color: C.info, border: `1px solid ${C.borderAccent}` }}>
+                    {s.action.icon} {s.action.label}<ArrowRight className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Progress bar */}
       <div className="mb-6 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.04)", height: 8 }}>
         {report && (
@@ -317,31 +528,50 @@ export default function PAAuditChecklist() {
 
               {!isCollapsed && (
                 <div className="border-t" style={{ borderColor: C.border }}>
-                  {sec.items.map((item) => (
-                    <div key={item.id}
-                         className="flex items-start gap-3 px-4 py-3 border-b last:border-b-0"
-                         style={{ borderColor: "rgba(14,42,69,0.5)" }}>
-                      <div className="mt-0.5"><StatusIcon s={item.status} /></div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium" style={{ color: C.text }}>{item.name}</div>
-                        {item.description && (
-                          <div className="text-xs mt-0.5" style={{ color: C.textMuted }}>{item.description}</div>
-                        )}
-                        {item.detail && (
-                          <div className="text-xs mt-1"
-                               style={{ color: item.status === "fail" ? "#FFB4B4"
-                                              : item.status === "pass" ? "#7FE7CB"
-                                              : item.status === "warn" ? "#FFD58A"
-                                              : C.textMuted }}>
-                            {item.detail}
+                  {sec.items.map((item) => {
+                    const prio = PRIORITY_MAP[item.id];
+                    const fix = item.status === "fail" ? quickFix(item.id) : null;
+                    return (
+                      <div key={item.id}
+                           className="flex items-start gap-3 px-4 py-3 border-b last:border-b-0"
+                           style={{ borderColor: "rgba(14,42,69,0.5)" }}>
+                        <div className="mt-0.5"><StatusIcon s={item.status} /></div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-medium" style={{ color: C.text }}>{item.name}</span>
+                            {prio && item.status === "fail" && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold"
+                                    style={{ background: `${PRIORITY_COLOR[prio.priority]}22`, color: PRIORITY_COLOR[prio.priority] }}>
+                                {PRIORITY_LABEL[prio.priority]}
+                              </span>
+                            )}
                           </div>
+                          {item.description && (
+                            <div className="text-xs mt-0.5" style={{ color: C.textMuted }}>{item.description}</div>
+                          )}
+                          {item.detail && (
+                            <div className="text-xs mt-1"
+                                 style={{ color: item.status === "fail" ? "#FFB4B4"
+                                                : item.status === "pass" ? "#7FE7CB"
+                                                : item.status === "warn" ? "#FFD58A"
+                                                : C.textMuted }}>
+                              {item.detail}
+                            </div>
+                          )}
+                        </div>
+                        {fix && (
+                          <button onClick={fix.action}
+                                  className="text-[11px] px-2.5 py-1 rounded-md flex items-center gap-1 hover:bg-white/5 shrink-0"
+                                  style={{ color: C.info, border: `1px solid ${C.borderAccent}` }}>
+                            {fix.icon} {fix.label}
+                          </button>
+                        )}
+                        {item.ms != null && (
+                          <div className="text-[11px] tabular-nums shrink-0" style={{ color: C.textMuted }}>{item.ms}ms</div>
                         )}
                       </div>
-                      {item.ms != null && (
-                        <div className="text-[11px] tabular-nums shrink-0" style={{ color: C.textMuted }}>{item.ms}ms</div>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -356,25 +586,67 @@ export default function PAAuditChecklist() {
             <span className="font-semibold" style={{ color: C.text }}>Vérifications manuelles</span>
             <span className="text-xs px-2 py-0.5 rounded-full"
                   style={{ background: "rgba(255,255,255,0.04)", color: C.textMuted }}>
-              {Object.values(manualState).filter(Boolean).length}/{MANUAL_CHECKLIST.length}
+              {Object.values(manualState).filter((v) => v?.done).length}/{MANUAL_CHECKLIST.length}
             </span>
+            <span className="ml-auto text-[11px]" style={{ color: C.textMuted }}>~2h — tests physiques requis</span>
           </div>
           {MANUAL_CHECKLIST.map((m) => {
-            const checked = !!manualState[m.id];
+            const checked = !!manualState[m.id]?.done;
+            const doneAt = manualState[m.id]?.at;
+            const showInstr = !!expandedManual[m.id];
+            const hasInstr = (m.instructions?.length ?? 0) > 0 || m.copyText || m.link;
             return (
-              <label key={m.id}
-                     className="flex items-start gap-3 px-4 py-3 border-b last:border-b-0 cursor-pointer hover:bg-white/[0.02]"
-                     style={{ borderColor: "rgba(14,42,69,0.5)" }}>
-                <input type="checkbox" checked={checked} onChange={() => toggleManual(m.id)}
-                       className="mt-1 accent-cyan-500" />
-                <div className="flex-1">
-                  <div className="text-sm" style={{ color: checked ? C.textMuted : C.text,
-                                                    textDecoration: checked ? "line-through" : undefined }}>
-                    {m.label}
+              <div key={m.id}
+                   className="px-4 py-3 border-b last:border-b-0"
+                   style={{ borderColor: "rgba(14,42,69,0.5)" }}>
+                <div className="flex items-start gap-3">
+                  <input type="checkbox" checked={checked} onChange={() => toggleManual(m.id)}
+                         className="mt-1 accent-cyan-500 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm" style={{ color: checked ? C.textMuted : C.text,
+                                                      textDecoration: checked ? "line-through" : undefined }}>
+                      {m.label}
+                    </div>
+                    <div className="text-xs mt-0.5" style={{ color: C.textMuted }}>{m.hint}</div>
+                    {doneAt && (
+                      <div className="text-[10px] mt-1" style={{ color: C.pass }}>
+                        ✓ Marqué fait le {new Date(doneAt).toLocaleString("fr-CA")}
+                      </div>
+                    )}
                   </div>
-                  <div className="text-xs mt-0.5" style={{ color: C.textMuted }}>{m.hint}</div>
+                  {hasInstr && (
+                    <button onClick={() => setExpandedManual((s) => ({ ...s, [m.id]: !s[m.id] }))}
+                            className="text-[11px] px-2 py-1 rounded-md shrink-0 hover:bg-white/5"
+                            style={{ color: C.textSecondary, border: `1px solid ${C.border}` }}>
+                      📋 {showInstr ? "Masquer" : "Instructions"}
+                    </button>
+                  )}
                 </div>
-              </label>
+                {showInstr && hasInstr && (
+                  <div className="mt-3 ml-7 p-3 rounded-lg space-y-2"
+                       style={{ background: "rgba(3,8,16,0.5)", border: `1px solid ${C.border}` }}>
+                    {m.instructions?.map((step, i) => (
+                      <div key={i} className="text-xs" style={{ color: C.textSecondary }}>{step}</div>
+                    ))}
+                    <div className="flex gap-2 flex-wrap pt-1">
+                      {m.copyText && (
+                        <button onClick={() => { navigator.clipboard.writeText(m.copyText!); toast.success("Copié"); }}
+                                className="text-[11px] px-2 py-1 rounded-md flex items-center gap-1 hover:bg-white/5"
+                                style={{ color: C.info, border: `1px solid ${C.borderAccent}` }}>
+                          <Copy className="w-3 h-3" /> {m.copyLabel ?? "Copier"}
+                        </button>
+                      )}
+                      {m.link && (
+                        <button onClick={() => nav(m.link!.href)}
+                                className="text-[11px] px-2 py-1 rounded-md flex items-center gap-1 hover:bg-white/5"
+                                style={{ color: C.info, border: `1px solid ${C.borderAccent}` }}>
+                          <ExternalLink className="w-3 h-3" /> {m.link.label}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>
