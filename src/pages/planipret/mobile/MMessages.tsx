@@ -461,13 +461,24 @@ function TeamChat({ profile }: { profile: any }) {
     setText("");
   };
 
+  const [sumOpen, setSumOpen] = useState(false);
+
   return (
     <div className="absolute inset-x-0 top-[120px] bottom-0 flex flex-col">
       <div
-        className="px-4 py-2 text-[11px] uppercase tracking-wider flex items-center gap-2"
+        className="px-4 py-2 text-[11px] uppercase tracking-wider flex items-center justify-between"
         style={{ color: "var(--pp-text-muted)", borderBottom: "1px solid var(--pp-bg-border)" }}
       >
-        <Users className="w-3 h-3" /> #{channel}
+        <div className="flex items-center gap-2">
+          <Users className="w-3 h-3" /> #{channel}
+        </div>
+        <button
+          onClick={() => setSumOpen(true)}
+          className="text-[11px] flex items-center gap-1 normal-case tracking-normal"
+          style={{ color: "var(--pp-agent)" }}
+        >
+          <Sparkles className="w-3 h-3" /> Résumer
+        </button>
       </div>
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2">
         {loading ? (
@@ -500,6 +511,15 @@ function TeamChat({ profile }: { profile: any }) {
         <div ref={bottomRef} />
       </div>
       <Composer text={text} setText={setText} onSend={send} sending={sending} placeholder="Message à l'équipe…" />
+
+      <AvaSummarizeSheet
+        open={sumOpen}
+        source="team"
+        title={`#${channel}`}
+        content={msgs.map((m) => `${senderNames[m.sender_id] ?? "Membre"}: ${m.message}`).join("\n")}
+        onClose={() => setSumOpen(false)}
+        onInsert={(t) => setText((cur) => cur ? `${cur} ${t}` : t)}
+      />
     </div>
   );
 }
