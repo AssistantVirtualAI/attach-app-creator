@@ -238,8 +238,28 @@ export default function ActiveCallSheet({
           </div>
         </div>
       )}
+
+      {toast && (
+        <div style={{
+          position: 'absolute', left: 16, right: 16, bottom: 'calc(220px + var(--safe-bottom))',
+          padding: '12px 16px', borderRadius: radius.md,
+          background: 'rgba(220,38,38,0.92)', color: '#fff',
+          fontSize: 13, fontWeight: 600, textAlign: 'center',
+          boxShadow: '0 18px 40px -12px rgba(220,38,38,0.55)',
+          backdropFilter: 'blur(12px)',
+        }}>
+          {toast}
+        </div>
+      )}
     </div>
   );
+}
+
+function routeLabel(r: AudioRoute) {
+  return r === 'speaker' ? 'Haut-parleur' : r === 'bluetooth' ? 'Bluetooth' : 'Écouteur';
+}
+function routeIcon(r: AudioRoute) {
+  return r === 'speaker' ? '🔊' : r === 'bluetooth' ? '🎧' : '📞';
 }
 
 function Ctrl({ label, icon, onClick, active, tone = 'default' }: {
