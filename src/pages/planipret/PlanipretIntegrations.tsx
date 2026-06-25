@@ -196,7 +196,7 @@ export default function PlanipretIntegrations() {
         <div className="grid md:grid-cols-2 gap-5">
           {CARDS.map((card) => {
             if (card.id === "elevenlabs") {
-              return <ElevenLabsManagementCard key="elevenlabs" userId={AVA_OWNER_USER_ID} />;
+              return <div id="elevenlabs" key="elevenlabs" className="scroll-mt-24"><ElevenLabsManagementCard userId={AVA_OWNER_USER_ID} /></div>;
             }
             const stored = items[card.id];
             const tested = testResults[card.id];
