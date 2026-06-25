@@ -41,8 +41,8 @@ const fmtDate = (iso: string) => {
 };
 
 export default function MVoicemail() {
-  const { profile, openDialer, registerRefresh } = useOutletContext<PlanipretMobileContext>();
-  const [tab, setTab] = useState<"inbox" | "saved">("inbox");
+  const { profile, openDialer, registerRefresh, reloadProfile } = useOutletContext<PlanipretMobileContext>();
+  const [tab, setTab] = useState<"greeting" | "inbox" | "saved">("greeting");
   const [items, setItems] = useState<VM[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
