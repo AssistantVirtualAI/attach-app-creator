@@ -1,7 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, CartesianGrid } from "recharts";
-import { Download, Trophy } from "lucide-react";
+import { Download, Trophy, FileText } from "lucide-react";
+import { toast } from "sonner";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 
 type Range = "week" | "month" | "quarter";
 
@@ -31,6 +34,8 @@ export default function PAReports() {
   const [range, setRange] = useState<Range>("week");
   const [calls, setCalls] = useState<any[]>([]);
   const [brokers, setBrokers] = useState<Record<string, string>>({});
+  const [exporting, setExporting] = useState(false);
+  const reportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const start = new Date();
@@ -114,19 +119,71 @@ export default function PAReports() {
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `rapport-${Date.now()}.csv`; a.click();
   };
 
+  const exportPdf = async () => {
+    if (!reportRef.current) return;
+    setExporting(true);
+    try {
+      const canvas = await html2canvas(reportRef.current, {
+        backgroundColor: "#0B1437",
+        scale: 2,
+        useCORS: true,
+        logging: false,
+      });
+      const img = canvas.toDataURL("image/png");
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const imgW = pageW - 20;
+      const imgH = (canvas.height * imgW) / canvas.width;
+      const dateLabel = new Date().toLocaleDateString("fr-CA");
+      pdf.setFillColor(11, 20, 55); pdf.rect(0, 0, pageW, pageH, "F");
+      pdf.setTextColor(255, 255, 255); pdf.setFontSize(16);
+      pdf.text("Planiprêt — Rapport admin", 10, 12);
+      pdf.setFontSize(9); pdf.setTextColor(143, 168, 192);
+      pdf.text(`Période : ${range === "week" ? "7 jours" : range === "month" ? "30 jours" : "90 jours"} · Généré le ${dateLabel}`, 10, 18);
+      let y = 24, remaining = imgH, srcY = 0;
+      const ratio = canvas.width / imgW;
+      while (remaining > 0) {
+        const sliceH = Math.min(pageH - y - 8, remaining);
+        const sliceCanvas = document.createElement("canvas");
+        sliceCanvas.width = canvas.width;
+        sliceCanvas.height = sliceH * ratio;
+        const ctx = sliceCanvas.getContext("2d")!;
+        ctx.drawImage(canvas, 0, srcY, canvas.width, sliceCanvas.height, 0, 0, canvas.width, sliceCanvas.height);
+        pdf.addImage(sliceCanvas.toDataURL("image/png"), "PNG", 10, y, imgW, sliceH);
+        srcY += sliceCanvas.height;
+        remaining -= sliceH;
+        if (remaining > 0) { pdf.addPage(); pdf.setFillColor(11, 20, 55); pdf.rect(0, 0, pageW, pageH, "F"); y = 10; }
+      }
+      pdf.save(`planipret-rapport-${range}-${new Date().toISOString().slice(0,10)}.pdf`);
+      toast.success("PDF généré");
+    } catch (e: any) {
+      toast.error("Échec de l'export PDF : " + (e?.message ?? "erreur"));
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
-      <div className="flex gap-2">
-        {(["week", "month", "quarter"] as Range[]).map((r) => (
-          <button key={r} onClick={() => setRange(r)}
-            className="px-3 py-1.5 rounded-lg text-sm transition"
-            style={range === r
-              ? { background: ACCENT, color: "#fff", border: `1px solid ${ACCENT}` }
-              : { background: "var(--pp-bg-elevated)", color: "var(--pp-text-secondary)", border: "1px solid var(--pp-bg-border-2)" }}>
-            {r === "week" ? "Cette semaine" : r === "month" ? "Ce mois" : "3 derniers mois"}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex gap-2">
+          {(["week", "month", "quarter"] as Range[]).map((r) => (
+            <button key={r} onClick={() => setRange(r)}
+              className="px-3 py-1.5 rounded-lg text-sm transition"
+              style={range === r
+                ? { background: ACCENT, color: "#fff", border: `1px solid ${ACCENT}` }
+                : { background: "var(--pp-bg-elevated)", color: "var(--pp-text-secondary)", border: "1px solid var(--pp-bg-border-2)" }}>
+              {r === "week" ? "Cette semaine" : r === "month" ? "Ce mois" : "3 derniers mois"}
+            </button>
+          ))}
+        </div>
+        <button onClick={exportPdf} disabled={exporting}
+          className="pp-btn-primary flex items-center gap-2 text-sm disabled:opacity-50">
+          <FileText className="w-4 h-4" /> {exporting ? "Génération…" : "Exporter PDF"}
+        </button>
       </div>
+      <div ref={reportRef} className="space-y-4">
 
       {/* Podium */}
       {podium.length > 0 && (
@@ -220,6 +277,7 @@ export default function PAReports() {
             ))}
           </tbody>
         </table>
+      </div>
       </div>
     </div>
   );
