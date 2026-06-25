@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { LayoutDashboard, Users, Phone, MessageSquare, Voicemail, Plug, BarChart3, LogOut, Bell, ClipboardList, ShieldCheck, Flame, Zap, CheckSquare } from "lucide-react";
+import { LayoutDashboard, Users, Phone, MessageSquare, Voicemail, Plug, BarChart3, LogOut, ClipboardList, ShieldCheck, Flame, Zap, CheckSquare } from "lucide-react";
 import SessionTimeoutModal from "@/components/planipret/SessionTimeoutModal";
 import { useAdminRealtime } from "@/hooks/useAdminRealtime";
+import NotificationsBell from "@/components/planipret/admin/NotificationsBell";
 
 const LINKS = [
   { to: "/planipret/admin/overview", label: "Vue d'ensemble", Icon: LayoutDashboard },
@@ -159,12 +160,7 @@ export default function PlanipretAdminLayout() {
                 {realtimeOk ? "En direct" : "Reconnexion…"}
               </span>
             </div>
-            <button className="relative w-9 h-9 rounded-full flex items-center justify-center transition"
-              style={{ color: "var(--pp-text-secondary)" }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "var(--pp-bg-elevated)")}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
-              <Bell className="w-4 h-4" />
-            </button>
+            <NotificationsBell />
             <span className="capitalize" style={{ fontSize: 10, color: "var(--pp-text-muted)" }}>{dateLabel}</span>
           </div>
         </header>

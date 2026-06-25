@@ -1,67 +1,38 @@
-## Phase A — Vérifier/provisionner ton compte admin
+## État actuel
 
-Constat actuel sur `planipret_profiles` :
-- 1 seule ligne : `mhassoun@assistantvirtualai.com` (role=admin)
-- Ton compte connecté `jlemme@lemtel.com` (uid `8afdf7d5-36ad-4bf7-8317-bb730de59ffc`) **n'a aucun profil** → la RLS `is_planipret_admin()` te bloque, d'où la liste vide.
+Refonte navy/glass terminée sur : Layout, Overview, Users, Calls, Messages, Voicemails, Reports + hook `useAdminRealtime`.
 
-Action (insert via outil dédié, pas de migration) :
+## Phases manquantes / améliorations restantes
 
-```sql
-INSERT INTO planipret_profiles (user_id, email, full_name, role, is_active)
-VALUES ('8afdf7d5-36ad-4bf7-8317-bb730de59ffc', 'jlemme@lemtel.com', 'Juliano Lemme', 'admin', true)
-ON CONFLICT (user_id) DO UPDATE SET role='admin', is_active=true;
-```
+### C1. Pages secondaires non refondues (encore style legacy)
+- **PALeads.tsx** (132 l.) — pipeline & hot leads navy + Realtime
+- **PATemplates.tsx** (95 l.) — éditeur SMS templates avec variables dynamiques
+- **PAAuditLog.tsx** (182 l.) — table journal navy, filtres action/user/date, export CSV
+- **PACompliance.tsx** (233 l.) — cartes RGPD/Loi 25 (consentements, rétention, exports)
+- **PAAuditChecklist.tsx** (681 l.) — déjà gros, juste harmoniser tokens navy
 
-Vérification : re-SELECT pour confirmer role=admin sur les 2 comptes.
+### C2. Polish UX transverse
+- Skeleton loaders cohérents (au lieu de "Chargement…") sur toutes les pages admin
+- Empty states illustrés (icône + message + CTA) quand 0 résultats
+- Toast global "Nouvelle activité" branché sur badge compteur sidebar (utilise `eventCount` du hook)
+- Raccourcis clavier : `g o` Overview, `g u` Users, `g c` Calls, `/` focus recherche globale
 
-## Phase B — Refonte Admin Dashboard (navy / glass)
+### C3. Recherche globale (topbar)
+- Champ recherche dans header → command palette (Ctrl/Cmd+K)
+- Recherche cross-table : courtiers, appels (numéro), messages, leads
 
-Design system : navy `#0B1437` bg, surface `#111A3D`, accent `#0023e6`, succès `#10B981`, danger `#EF4444`. Inter, 4px grid, glass-morphism + subtle borders `rgba(255,255,255,0.06)`.
+### C4. Notifications panel
+- Bouton cloche actuel ne fait rien → dropdown listant les N derniers events Realtime
+- Lien vers la page concernée au clic
 
-### B1. Layout (`src/components/planipret/admin/PlanipretAdminLayout.tsx`)
-- Sidebar gauche (Overview, Courtiers, Appels, Messages, Voicemails, Rapports, Intégrations, Conformité, Audit).
-- Topbar : recherche globale, badge "● Live" Realtime, avatar.
-- Redirect mobile → `/mplanipret`.
+### C5. Export & rapports
+- Bouton "Exporter PDF" sur Reports (jspdf déjà dispo ?)
+- Rapport hebdo auto par email (Edge function existante `useWeeklyReport` ?)
 
-### B2. Overview (`src/pages/planipret/admin/PAOverview.tsx`)
-- 4 KPI cards : Courtiers actifs, Appels 24h, Messages 24h, Voicemails non lus.
-- 3 status cards : Twilio, ElevenLabs, Maestro (ping via fonctions existantes, lecture seule).
-- Charts `recharts` :
-  - Area chart appels/messages 7j
-  - Pie chart distribution direction (inbound/outbound/missed)
-  - Bar chart top 5 courtiers
+### C6. Performance
+- Pagination serveur sur Calls/Messages (actuellement filtre client)
+- Index DB sur `planipret_phone_calls.started_at`, `planipret_phone_messages.created_at` (à vérifier)
 
-### B3. Users redesign (`src/pages/planipret/admin/PAUsers.tsx`)
-- Table navy avec avatar, status pill, toggles optimistes **App** et **AVA** (update `planipret_profiles.app_enabled` / `ava_enabled`).
-- Filtres : rôle, actif, recherche.
-- Side panel détail (créé/dernière activité/n° assigné).
+## Question
 
-### B4. Appels (`PACalls.tsx`)
-- Liste paginée `planipret_phone_calls`, filtres direction/courtier/date.
-- Side panel : transcript, audio player, sentiment, AI insights (`planipret_ai_insights`).
-
-### B5. Messages (`PAMessages.tsx`)
-- Threads `planipret_phone_messages` regroupés par contact.
-- Aperçu conversation à droite.
-
-### B6. Voicemails (`PAVoicemails.tsx`)
-- Cards : audio player, transcription, marquer lu/non lu.
-
-### B7. Rapports (`PAReports.tsx`)
-- Podium Top 3 courtiers (appels traités).
-- Export CSV (volumes, durées moyennes, taux missed).
-
-### B8. Realtime (`src/hooks/useAdminRealtime.ts`)
-- Channels Supabase : `planipret_phone_calls`, `planipret_phone_messages`, `planipret_ava_conversations`.
-- Toast discret + auto-refresh KPIs.
-
-## Hors scope (intouchable)
-- Edge Functions, schémas tables, auth, mobile `/mplanipret/*`, intégrations existantes, secrets, ElevenLabs config, channels Realtime names.
-
-## Ordre d'exécution
-1. Insert admin profile + vérif SELECT.
-2. Layout + Overview (charts + Realtime).
-3. Users redesign + toggles.
-4. Calls / Messages / Voicemails.
-5. Reports + export.
-6. Smoke test : navigation, Realtime, toggles, RLS OK.
+Quelle phase prioriser ? Tout C1 d'un coup, ou cherry-pick (ex: C1 + C3 command palette + C4 notifications) ?
