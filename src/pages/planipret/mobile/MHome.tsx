@@ -58,7 +58,7 @@ export default function MHome() {
       supabase.from("planipret_phone_calls").select("id", { count: "exact", head: true }).eq("user_id", profile.user_id).eq("direction", "missed").gte("started_at", startIso),
       supabase.from("planipret_phone_messages").select("id", { count: "exact", head: true }).eq("user_id", profile.user_id).is("read_at", null).eq("direction", "inbound"),
       supabase.from("planipret_voicemails").select("id", { count: "exact", head: true }).eq("user_id", profile.user_id).eq("is_read", false).eq("folder", "inbox"),
-      supabase.from("planipret_phone_calls").select("id, direction, from_number, from_name, to_number, to_name, started_at, lead_score, lead_temperature").eq("user_id", profile.user_id).order("started_at", { ascending: false }).limit(3),
+      supabase.from("planipret_phone_calls").select("id, direction, from_number, from_name, to_number, to_name, started_at, lead_score, lead_temperature, ai_summary").eq("user_id", profile.user_id).order("started_at", { ascending: false }).limit(3),
       supabase.from("planipret_phone_calls").select("id, from_number, from_name, to_number, to_name, lead_score, lead_temperature, started_at, direction").eq("user_id", profile.user_id).gte("started_at", startIso).gte("lead_score", 8).order("lead_score", { ascending: false }).limit(5),
       supabase.from("planipret_reminders").select("*").eq("user_id", profile.user_id).eq("status", "pending").lte("scheduled_at", nowIso).order("scheduled_at", { ascending: true }).limit(10),
     ]);
