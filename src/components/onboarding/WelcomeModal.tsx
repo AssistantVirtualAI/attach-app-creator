@@ -100,10 +100,11 @@ export function WelcomeModal() {
       const updates: Record<string, any> = { primary_color: primaryColor };
       if (logoUrl) updates.logo_dashboard_url = logoUrl;
 
-      const { error } = await supabase
-        .from('organizations')
+      const { error } = await (supabase
+        .from('organizations') as any)
         .update(updates)
         .eq('id', selectedOrgId);
+
 
       if (error) throw error;
       
