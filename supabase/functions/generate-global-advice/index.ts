@@ -208,7 +208,7 @@ serve(async (req) => {
     }
 
     // Get user's organization (user may belong to multiple orgs — pick first)
-    const { data: orgMembers, error: orgErr } = await supabase
+    const { data: orgMembers, error: orgErr } = await supabaseAdmin
       .from('organization_members')
       .select('organization_id, created_at')
       .eq('user_id', user.id)
