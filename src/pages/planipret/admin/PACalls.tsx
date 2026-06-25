@@ -60,9 +60,17 @@ export default function PACalls() {
   const totalPages = Math.max(1, Math.ceil(total / PAGE));
 
 
-  const exportCsv = () => {
+  const exportCsv = async () => {
+    let q = supabase.from("planipret_phone_calls").select("*, planipret_profiles!inner(full_name)").order("started_at", { ascending: false }).limit(5000);
+    if (filters.broker) q = q.eq("user_id", filters.broker);
+    if (filters.from) q = q.gte("started_at", filters.from);
+    if (filters.to) q = q.lte("started_at", filters.to);
+    if (filters.direction) q = q.eq("direction", filters.direction);
+    if (filters.status) q = q.eq("status", filters.status);
+    if (filters.search) q = q.or(`from_number.ilike.%${filters.search}%,to_number.ilike.%${filters.search}%`);
+    const { data: all } = await q;
     const headers = ["Courtier", "Direction", "De", "Vers", "Durée", "Date"];
-    const lines = [headers.join(",")].concat(rows.map((r) =>
+    const lines = [headers.join(",")].concat((all ?? []).map((r: any) =>
       [r.planipret_profiles?.full_name, r.direction, r.from_number, r.to_number, r.duration_seconds, r.started_at].map((v) => `"${v ?? ""}"`).join(",")
     ));
     const blob = new Blob([lines.join("\n")], { type: "text/csv" });
@@ -70,6 +78,7 @@ export default function PACalls() {
     const a = document.createElement("a"); a.href = url; a.download = `appels-${Date.now()}.csv`; a.click();
     URL.revokeObjectURL(url);
   };
+
 
   return (
     <div className="space-y-4">
