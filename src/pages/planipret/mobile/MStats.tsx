@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useOutletContext, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowLeft, Phone, TrendingUp, Award, Flame } from "lucide-react";
+import { ArrowLeft, Phone, TrendingUp, Award, Flame, Sparkles, Loader2 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, PieChart, Pie, Cell, Legend } from "recharts";
 import type { PlanipretMobileContext } from "../PlanipretMobile";
+import CoachOverlay from "@/components/planipret/ava/CoachOverlay";
+import { callAva, type AvaSuggestion } from "@/services/avaProactive";
+import { useNavigate as useNav2 } from "react-router-dom";
 
 type Period = "week" | "month" | "quarter";
 
