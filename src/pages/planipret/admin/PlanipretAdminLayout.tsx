@@ -29,6 +29,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/planipret/admin/integrations": "Intégrations",
   "/planipret/admin/reports": "Rapports",
   "/planipret/admin/audit": "Journal d'audit",
+  "/planipret/admin/audit-checklist": "Audit système",
   "/planipret/admin/compliance": "Conformité",
 };
 
