@@ -285,37 +285,37 @@ export default function PlanipretMobile() {
           <OnboardingTutorial profile={profile} onDone={loadProfile} />
         )}
 
-        {/* AVA Voice floating button (gated by voice_agent_enabled) */}
-        {profile?.voice_agent_enabled && (
+        {/* Center FAB — AVA voice agent */}
+        {profile?.voice_agent_enabled !== false && (
           <button onClick={openAva}
-            className="absolute z-20 rounded-full flex items-center justify-center text-white active:scale-95 transition"
+            className="absolute left-1/2 -translate-x-1/2 z-20 rounded-full flex items-center justify-center text-white active:scale-95 transition"
             style={{
-              right: 16, bottom: 152,
-              width: 52, height: 52,
               background: "linear-gradient(135deg, #2D1A5A, #9B7FE8)",
-              boxShadow: "0 4px 20px rgba(155,127,232,0.5)",
+              boxShadow: "0 4px 24px rgba(155,127,232,0.6)",
               animation: "pp-glow-purple 2s ease-in-out infinite",
+              width: 58, height: 58, bottom: 76,
             }}
             aria-label="Parler à AVA">
-            <Bot className="w-6 h-6" />
+            <Bot className="w-7 h-7" />
           </button>
         )}
 
-        {/* Center FAB — bleu (idle) ou rouge pulsant (appel actif) */}
+        {/* Right FAB — Keypad (bleu) ou raccrocher (rouge) si appel actif */}
         <button onClick={activeCallId ? hangupActive : () => setDialerOpen(true)}
-          className="absolute left-1/2 -translate-x-1/2 z-20 rounded-full flex items-center justify-center text-white active:scale-95 transition"
+          className="absolute z-20 rounded-full flex items-center justify-center text-white active:scale-95 transition"
           style={{
+            right: 18, bottom: 84,
             background: activeCallId
               ? "linear-gradient(135deg, #5A1010, #E84C4C)"
               : "linear-gradient(135deg, #1A4A8A, #2E9BDC)",
             boxShadow: activeCallId
-              ? "0 4px 24px rgba(232,76,76,0.6)"
-              : "0 4px 24px rgba(46,155,220,0.6)",
+              ? "0 4px 20px rgba(232,76,76,0.6)"
+              : "0 4px 20px rgba(46,155,220,0.55)",
             animation: activeCallId ? "pp-pulse-red 1.5s infinite" : undefined,
-            width: 58, height: 58, bottom: 76,
+            width: 50, height: 50,
           }}
           aria-label={activeCallId ? "Raccrocher" : "Composer un numéro"}>
-          {activeCallId ? <PhoneOff className="w-6 h-6" /> : <PhoneIcon className="w-6 h-6" />}
+          {activeCallId ? <PhoneOff className="w-5 h-5" /> : <PhoneIcon className="w-5 h-5" />}
         </button>
 
 
