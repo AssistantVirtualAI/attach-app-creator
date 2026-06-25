@@ -83,8 +83,9 @@ Deno.serve(async (req) => {
     if (!canGrant) return json({ error: "FORBIDDEN" }, 403);
 
     const body = await req.json().catch(() => ({}));
-    const { softphone_user_id } = body || {};
+    const { softphone_user_id, ttl_hours } = body || {};
     if (!softphone_user_id) return json({ error: "MISSING_SOFTPHONE_ID" }, 400);
+    const ttl = Math.max(1, Math.min(Number(ttl_hours) || 168, 720)); // 1h..30d, default 7d
 
     // Load softphone user + email
     const { data: spu, error: spuErr } = await admin
@@ -105,8 +106,19 @@ Deno.serve(async (req) => {
     }
     if (!email) return json({ error: "NO_EMAIL_FOR_USER" }, 400);
 
+    // Revoke any previous active invite for this user (one-active rule)
+    await admin.from("lemtel_softphone_invites")
+      .update({ revoked_at: new Date().toISOString(), revoked_by: user.id })
+      .eq("softphone_user_id", spu.id)
+      .is("revoked_at", null)
+      .is("consumed_at", null);
+
     // Create invite token
     const token = randomToken(32);
+    const expires_at = new Date(Date.now() + ttl * 3600_000).toISOString();
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null;
+    const ua = req.headers.get("user-agent") || null;
+
     const { data: invite, error: invErr } = await admin
       .from("lemtel_softphone_invites")
       .insert({
@@ -115,12 +127,15 @@ Deno.serve(async (req) => {
         organization_id: spu.organization_id,
         email,
         created_by: user.id,
+        expires_at,
+        ip_address: ip,
+        user_agent: ua,
       })
-      .select("token, expires_at")
+      .select("id, token, expires_at")
       .single();
     if (invErr) return json({ error: "INVITE_CREATE_FAILED", detail: invErr.message }, 500);
 
-    const setupUrl = `${APP_ORIGIN}/lemtel/setup/${token}`;
+    const setupUrl = `${APP_ORIGIN}/lemtel/redeem/${token}`;
 
     // Send via Resend
     let emailSent = false; let emailError: string | null = null;
@@ -137,13 +152,26 @@ Deno.serve(async (req) => {
           }),
         });
         emailSent = res.ok;
-        if (!res.ok) emailError = await res.text();
-      } catch (e: any) { emailError = e?.message || String(e); }
+        if (!res.ok) emailError = (await res.text()).slice(0, 500);
+      } catch (e: any) { emailError = (e?.message || String(e)).slice(0, 500); }
     } else {
-      emailError = "RESEND_API_KEY missing";
+      emailError = "RESEND_API_KEY missing — invite link created but no email sent";
     }
 
-    return json({ ok: true, invite_url: setupUrl, expires_at: invite.expires_at, email_sent: emailSent, email_error: emailError });
+    // Persist delivery audit
+    await admin.from("lemtel_softphone_invites")
+      .update({ email_sent: emailSent, email_error: emailError })
+      .eq("id", invite.id);
+
+    return json({
+      ok: true,
+      invite_id: invite.id,
+      invite_url: setupUrl,
+      expires_at: invite.expires_at,
+      email,
+      email_sent: emailSent,
+      email_error: emailError,
+    });
   } catch (e: any) {
     return json({ error: "INTERNAL", detail: e?.message || String(e) }, 500);
   }

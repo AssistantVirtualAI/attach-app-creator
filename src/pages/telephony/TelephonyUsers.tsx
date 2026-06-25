@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import {
   Users, Plus, Mail, KeyRound, Settings as SettingsIcon, Trash2, RefreshCw,
   Loader2, ShieldAlert, CheckCircle2, AlertCircle, Smartphone, Apple, Monitor,
-  Globe, Laptop, Send,
+  Globe, Laptop, Send, Copy, X, Link2, Clock,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
@@ -140,15 +140,28 @@ export default function TelephonyUsers() {
   };
 
   const sendInvite = async (u: UserRow) => {
-    toast.loading('Sending invitation…', { id: `inv-${u.id}` });
+    const choice = window.prompt(
+      `Send Lemtel setup invitation to ${u.display_name || u.extension}?\n\nLink validity (hours): 24, 72, 168 (7d), 720 (30d)`,
+      '168'
+    );
+    if (choice === null) return;
+    const ttl_hours = Math.max(1, Math.min(parseInt(choice, 10) || 168, 720));
+
+    toast.loading(`Sending invitation (${ttl_hours}h)…`, { id: `inv-${u.id}` });
     const { data, error } = await supabase.functions.invoke('lemtel-invite-send', {
-      body: { softphone_user_id: u.id },
+      body: { softphone_user_id: u.id, ttl_hours },
     });
-    if (error || (data as any)?.error) {
-      toast.error((data as any)?.detail || (data as any)?.error || error?.message || 'Failed', { id: `inv-${u.id}` });
-    } else {
-      toast.success(`Invitation sent — link expires ${new Date((data as any).expires_at).toLocaleDateString()}`, { id: `inv-${u.id}` });
+    const payload = data as any;
+    if (error || payload?.error) {
+      toast.error(payload?.detail || payload?.error || error?.message || 'Failed to send invitation', { id: `inv-${u.id}` });
+      return;
     }
+    if (payload?.email_sent === false) {
+      toast.warning(`Link created but email failed: ${payload?.email_error || 'unknown'}`, { id: `inv-${u.id}`, duration: 8000 });
+    } else {
+      toast.success(`Invitation sent to ${payload.email} — expires ${new Date(payload.expires_at).toLocaleString()}`, { id: `inv-${u.id}` });
+    }
+    qc.invalidateQueries({ queryKey: ['lemtel', 'invites'] });
   };
 
   const resetPassword = async (u: UserRow) => {
@@ -330,8 +343,141 @@ export default function TelephonyUsers() {
         </CardContent>
       </Card>
 
+      <InvitesTable isAdmin={isAdmin} />
+
       <AddUserDialog open={open} onOpenChange={setOpen} suggestedExtension={nextExtension} />
     </div>
+  );
+}
+
+// ===================================================================
+// Invitations table (sent setup links, with resend / revoke)
+// ===================================================================
+type InviteRow = {
+  id: string;
+  softphone_user_id: string;
+  email: string;
+  status: 'pending' | 'sent' | 'viewed' | 'used' | 'expired' | 'revoked';
+  created_at: string;
+  expires_at: string;
+  consumed_at: string | null;
+  revoked_at: string | null;
+  last_viewed_at: string | null;
+  view_count: number;
+  email_sent: boolean;
+  email_error: string | null;
+  setup_url: string;
+};
+
+function InvitesTable({ isAdmin }: { isAdmin: boolean }) {
+  const qc = useQueryClient();
+  const { data: invites = [], isLoading } = useQuery({
+    queryKey: ['lemtel', 'invites'],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke('lemtel-invite-list', { body: {} });
+      if (error) throw error;
+      return ((data as any)?.invites || []) as InviteRow[];
+    },
+    refetchInterval: 30_000,
+  });
+
+  const STATUS_STYLE: Record<InviteRow['status'], string> = {
+    pending: 'bg-slate-100 text-slate-700',
+    sent: 'bg-blue-100 text-blue-700',
+    viewed: 'bg-amber-100 text-amber-800',
+    used: 'bg-emerald-100 text-emerald-700',
+    expired: 'bg-slate-200 text-slate-500',
+    revoked: 'bg-rose-100 text-rose-700',
+  };
+
+  const copy = async (url: string) => {
+    try { await navigator.clipboard.writeText(url); toast.success('Setup link copied'); } catch { toast.error('Copy failed'); }
+  };
+
+  const resend = async (inv: InviteRow) => {
+    toast.loading('Resending…', { id: `re-${inv.id}` });
+    const { data, error } = await supabase.functions.invoke('lemtel-invite-send', {
+      body: { softphone_user_id: inv.softphone_user_id, ttl_hours: 168 },
+    });
+    const p = data as any;
+    if (error || p?.error) toast.error(p?.detail || p?.error || error?.message || 'Failed', { id: `re-${inv.id}` });
+    else toast.success(`Resent to ${p.email}`, { id: `re-${inv.id}` });
+    qc.invalidateQueries({ queryKey: ['lemtel', 'invites'] });
+  };
+
+  const revoke = async (inv: InviteRow) => {
+    if (!confirm(`Revoke invitation for ${inv.email}? The link will stop working immediately.`)) return;
+    toast.loading('Revoking…', { id: `rv-${inv.id}` });
+    const { data, error } = await supabase.functions.invoke('lemtel-invite-revoke', { body: { invite_id: inv.id } });
+    const p = data as any;
+    if (error || p?.error) toast.error(p?.detail || p?.error || error?.message || 'Failed', { id: `rv-${inv.id}` });
+    else toast.success('Invitation revoked', { id: `rv-${inv.id}` });
+    qc.invalidateQueries({ queryKey: ['lemtel', 'invites'] });
+  };
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle className="flex items-center gap-2"><Send className="w-4 h-4" /> Setup invitations</CardTitle>
+        <Badge variant="outline">{invites.length} total</Badge>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-10 bg-muted/40 rounded animate-pulse" />)}</div>
+        ) : invites.length === 0 ? (
+          <div className="text-sm text-muted-foreground text-center py-6">No invitations sent yet.</div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Recipient</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Sent</TableHead>
+                <TableHead>Expires</TableHead>
+                <TableHead>Views</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {invites.map(inv => {
+                const dead = inv.status === 'expired' || inv.status === 'revoked' || inv.status === 'used';
+                return (
+                  <TableRow key={inv.id}>
+                    <TableCell className="font-medium">{inv.email}</TableCell>
+                    <TableCell>
+                      <span className={`inline-block px-2 py-0.5 rounded text-[11px] font-semibold capitalize ${STATUS_STYLE[inv.status]}`}>{inv.status}</span>
+                      {inv.email_sent === false && inv.email_error && (
+                        <div className="text-[10px] text-rose-600 mt-0.5 max-w-[220px] truncate" title={inv.email_error}>{inv.email_error}</div>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {formatDistanceToNow(new Date(inv.created_at), { addSuffix: true })}
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      <span className={dead ? 'text-muted-foreground' : ''}>
+                        <Clock className="inline w-3 h-3 mr-1" />
+                        {formatDistanceToNow(new Date(inv.expires_at), { addSuffix: true })}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-xs">{inv.view_count}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="inline-flex gap-1">
+                        <Button size="icon" variant="ghost" title="Copy setup link" onClick={() => copy(inv.setup_url)} disabled={dead}><Copy className="w-4 h-4" /></Button>
+                        <Button size="icon" variant="ghost" title="Open setup page" asChild disabled={dead}>
+                          <a href={inv.setup_url} target="_blank" rel="noreferrer"><Link2 className="w-4 h-4" /></a>
+                        </Button>
+                        <Button size="icon" variant="ghost" title="Resend" onClick={() => resend(inv)} disabled={!isAdmin}><RefreshCw className="w-4 h-4" /></Button>
+                        <Button size="icon" variant="ghost" title="Revoke" onClick={() => revoke(inv)} disabled={!isAdmin || dead}><X className="w-4 h-4 text-rose-600" /></Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

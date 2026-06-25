@@ -89,7 +89,8 @@ export default function SoftphoneSetup() {
           <h1 className="text-xl font-bold text-slate-900 mb-2">Invitation invalide</h1>
           <p className="text-slate-600 text-sm mb-6">
             {error === "EXPIRED" ? "Ce lien a expiré. Demandez une nouvelle invitation à votre administrateur."
-              : error === "NOT_FOUND" ? "Ce lien n'existe pas ou a été révoqué."
+              : error === "REVOKED" ? "Ce lien a été révoqué par un administrateur. Demandez-en un nouveau."
+              : error === "NOT_FOUND" ? "Ce lien n'existe pas ou a été remplacé par un plus récent."
               : "Une erreur est survenue. Veuillez réessayer ou contacter votre administrateur."}
           </p>
           <a href="mailto:support@assistantvirtualai.com" className="inline-block bg-slate-900 text-white px-5 py-2.5 rounded-lg text-sm font-semibold">Contact support</a>
