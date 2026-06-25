@@ -8,6 +8,7 @@ import {
 import { AudioProfile, loadAudioProfile, saveAudioProfile, PROFILE_OPUS } from '../lib/sip/audioProfile';
 import { CallQuality, EMPTY_QUALITY, SamplerState, sampleCallQuality, chooseAdaptiveBitrate } from '../lib/sip/callQuality';
 import { showMobileToast } from '../lib/mobileToast';
+import { PC_CONFIG, instrumentPeerConnection, watchCallEstablishment, isSipDebugEnabled, sipDebug } from '../lib/sip/rtcConfig';
 
 export type SIPStatus = 'idle' | 'connecting' | 'registered' | 'retrying' | 'error';
 export type CallState = 'idle' | 'ringing' | 'active' | 'ended';
@@ -278,14 +279,11 @@ export function useSoftphone(
             log('session.new', `${session.direction} ${remoteNumber}`);
             if (session.direction === 'incoming') setCallState('ringing');
             session.on('peerconnection', (e: any) => {
-              const pc = e?.peerconnection;
+              const pc: RTCPeerConnection | undefined = e?.peerconnection;
               if (pc) {
-                pc.onicecandidate = (ice: any) => {
-                  console.log('[SIP][ICE] candidate:', JSON.stringify(ice?.candidate));
-                };
-                pc.oniceconnectionstatechange = () => {
-                  console.log('[SIP][ICE] state:', pc.iceConnectionState);
-                };
+                instrumentPeerConnection(pc, (event, detail, level = 'info') => {
+                  log(event, detail, level);
+                });
               }
             });
             // ---- SDP introspection: log offer/answer codecs before INVITE is sent.
@@ -304,14 +302,29 @@ export function useSoftphone(
                 if (data?.originator === 'local') {
                   setOfferedCodecs(codecs);
                   log('sdp.offer', `codecs=[${codecs.join(', ')}] (${sdp.length}b)`);
-                  console.log('[SIP][SDP][local offer]\n' + sdp);
+                  if (isSipDebugEnabled()) console.log('[SIP][SDP][local offer]\n' + sdp);
                 } else {
                   log('sdp.remote', `codecs=[${codecs.join(', ')}]`);
-                  console.log('[SIP][SDP][remote ' + data?.type + ']\n' + sdp);
+                  if (isSipDebugEnabled()) console.log('[SIP][SDP][remote ' + data?.type + ']\n' + sdp);
                 }
               } catch (e: any) {
                 log('sdp.parse-failed', e?.message || '', 'warn');
               }
+            });
+
+            // Post-INVITE health-check: warn if session/ICE never reach connected.
+            watchCallEstablishment(session, session.connection, 15000).then((res) => {
+              if (res.ok) {
+                log('call.established', `ice=${res.iceState}`);
+                return;
+              }
+              const msg =
+                res.reason === 'timeout-session' ? 'Appel non confirmé (pas d’ACK en 15 s)'
+                : res.reason === 'timeout-ice'   ? `ICE bloqué (state=${res.iceState ?? '?'}) — STUN/TURN probablement filtré`
+                : res.reason === 'ice-failed'    ? 'Échec ICE — chemin média bloqué'
+                : 'Établissement de l’appel échoué';
+              log('call.establishment-failed', `${res.reason} ice=${res.iceState}`, 'error');
+              try { showMobileToast(msg, 'error'); } catch {}
             });
             session.on('confirmed', () => {
               setCallState('active');
@@ -601,32 +614,10 @@ export function useSoftphone(
           offerToReceiveVideo: false,
           voiceActivityDetection: false,
         },
-        pcConfig: {
-          iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' },
-            {
-              urls: 'turn:openrelay.metered.ca:80',
-              username: 'openrelayproject',
-              credential: 'openrelayproject',
-            },
-            {
-              urls: 'turn:openrelay.metered.ca:443',
-              username: 'openrelayproject',
-              credential: 'openrelayproject',
-            },
-            {
-              urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-              username: 'openrelayproject',
-              credential: 'openrelayproject',
-            },
-          ],
-          iceTransportPolicy: 'all',
-          bundlePolicy: 'balanced',
-        },
+        pcConfig: PC_CONFIG,
       };
       if (forcePcmu) log('call.fallback', 'secure PCMU-only SDP rewrite armed');
-      console.log('[SIP][ICE] pcConfig:', JSON.stringify(callOpts.pcConfig));
+      sipDebug('placeCallInternal pcConfig', PC_CONFIG);
       uaRef.current.call(`sip:${number}@${config.domain}`, callOpts);
       return true;
     } catch (err: any) {
@@ -653,29 +644,7 @@ export function useSoftphone(
   const answer = () =>
     sessionRef.current?.answer({
       mediaConstraints: { audio: true, video: false },
-      pcConfig: {
-        iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' },
-          {
-            urls: 'turn:openrelay.metered.ca:80',
-            username: 'openrelayproject',
-            credential: 'openrelayproject',
-          },
-          {
-            urls: 'turn:openrelay.metered.ca:443',
-            username: 'openrelayproject',
-            credential: 'openrelayproject',
-          },
-          {
-            urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-            username: 'openrelayproject',
-            credential: 'openrelayproject',
-          },
-        ],
-        iceTransportPolicy: 'all',
-        bundlePolicy: 'balanced',
-      },
+      pcConfig: PC_CONFIG,
     });
   const mute = () => { sessionRef.current?.mute({ audio: true }); setIsMuted(true); };
   const unmute = () => { sessionRef.current?.unmute({ audio: true }); setIsMuted(false); };
