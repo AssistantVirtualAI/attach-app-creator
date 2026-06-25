@@ -166,9 +166,9 @@ export default function PlanipretMobile() {
 
   const loadProfile = async () => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { navigate("/planipret/login", { replace: true }); return; }
+    if (!user) { navigate("/planipret/login?redirect=/mplanipret", { replace: true }); return; }
     const { data } = await supabase.from("planipret_profiles").select("*").eq("user_id", user.id).maybeSingle();
-    if (!data) { navigate("/planipret/login", { replace: true }); return; }
+    if (!data) { navigate("/planipret/login?redirect=/mplanipret", { replace: true }); return; }
     setProfile(data);
     setLoading(false);
   };

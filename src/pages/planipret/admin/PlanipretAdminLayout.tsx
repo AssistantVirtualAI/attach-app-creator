@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { LayoutDashboard, Users, Phone, MessageSquare, Voicemail, Plug, BarChart3, LogOut, Bell, ClipboardList, ShieldCheck, Flame, Zap } from "lucide-react";
+import { LayoutDashboard, Users, Phone, MessageSquare, Voicemail, Plug, BarChart3, LogOut, Bell, ClipboardList, ShieldCheck, Flame, Zap, CheckSquare } from "lucide-react";
 import SessionTimeoutModal from "@/components/planipret/SessionTimeoutModal";
 
 const LINKS = [
@@ -15,6 +15,7 @@ const LINKS = [
   { to: "/planipret/admin/reports", label: "Rapports", Icon: BarChart3 },
   { to: "/planipret/admin/audit", label: "Journal d'audit", Icon: ClipboardList },
   { to: "/planipret/admin/compliance", label: "Conformité", Icon: ShieldCheck },
+  { to: "/planipret/admin/audit-checklist", label: "Audit système", Icon: CheckSquare },
   { to: "/planipret/admin/integrations", label: "Intégrations", Icon: Plug },
 ];
 
@@ -28,6 +29,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/planipret/admin/integrations": "Intégrations",
   "/planipret/admin/reports": "Rapports",
   "/planipret/admin/audit": "Journal d'audit",
+  "/planipret/admin/audit-checklist": "Audit système",
   "/planipret/admin/compliance": "Conformité",
 };
 
