@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { downloadPdfBlob } from "@/lib/pdf/downloadBlob";
+import { jsPDF } from "jspdf";
 
 type Status = "pass" | "fail" | "warn" | "skip" | "running";
 type Item = { id: string; name: string; description?: string; status: Status; detail?: string; ms?: number };
@@ -154,13 +155,12 @@ export default function PAAuditChecklist() {
     return Math.max(0, Math.round((Date.now() - new Date(report.generated_at).getTime()) / 60000));
   }, [report]);
 
-  const exportPdf = async () => {
+  const exportPdf = () => {
     if (!report) {
       toast.error("Aucun rapport à exporter");
       return;
     }
     try {
-      const { jsPDF } = await import("jspdf");
       const doc = new jsPDF({ unit: "pt", format: "a4" });
       const pageW = doc.internal.pageSize.getWidth();
       const pageH = doc.internal.pageSize.getHeight();
