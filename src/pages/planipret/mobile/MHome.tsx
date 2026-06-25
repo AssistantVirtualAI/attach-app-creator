@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import type { PlanipretMobileContext } from "../PlanipretMobile";
 import { toast } from "sonner";
-import VoiceAgent from "@/components/VoiceAgent";
+import AvaVoiceAgent from "@/components/planipret/mobile/AvaVoiceAgent";
 import PWAInstallBanner from "@/components/planipret/PWAInstallBanner";
 import { TEMP_EMOJI } from "@/components/planipret/leadHelpers";
 import { useMaestroPipelineToasts } from "@/hooks/useMaestroPipelineToasts";
