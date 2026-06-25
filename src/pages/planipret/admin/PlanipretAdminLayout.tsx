@@ -160,12 +160,7 @@ export default function PlanipretAdminLayout() {
                 {realtimeOk ? "En direct" : "Reconnexion…"}
               </span>
             </div>
-            <button className="relative w-9 h-9 rounded-full flex items-center justify-center transition"
-              style={{ color: "var(--pp-text-secondary)" }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "var(--pp-bg-elevated)")}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
-              <Bell className="w-4 h-4" />
-            </button>
+            <NotificationsBell />
             <span className="capitalize" style={{ fontSize: 10, color: "var(--pp-text-muted)" }}>{dateLabel}</span>
           </div>
         </header>
