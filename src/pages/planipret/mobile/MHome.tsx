@@ -339,6 +339,18 @@ export default function MHome() {
               label="Voicemails"
               accent="var(--pp-agent)"
             />
+            <StatCard
+              icon={<UsersIcon className="w-4 h-4" />}
+              value={stats.team}
+              label="Équipe"
+              accent="#9B7FE8"
+            />
+            <StatCard
+              icon={<Mail className="w-4 h-4" />}
+              value={stats.outbound}
+              label="SMS envoyés"
+              accent="#FFB347"
+            />
           </>
         )}
       </section>
