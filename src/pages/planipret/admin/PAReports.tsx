@@ -34,6 +34,8 @@ export default function PAReports() {
   const [range, setRange] = useState<Range>("week");
   const [calls, setCalls] = useState<any[]>([]);
   const [brokers, setBrokers] = useState<Record<string, string>>({});
+  const [exporting, setExporting] = useState(false);
+  const reportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const start = new Date();
