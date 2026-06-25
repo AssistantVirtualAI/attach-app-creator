@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { LayoutDashboard, Users, Phone, MessageSquare, Voicemail, Plug, BarChart3, LogOut, ClipboardList, ShieldCheck, Flame, Zap, CheckSquare } from "lucide-react";
+import { LayoutDashboard, Users, Phone, MessageSquare, Voicemail, Plug, BarChart3, LogOut, ClipboardList, ShieldCheck, Flame, Zap, CheckSquare, Search } from "lucide-react";
 import SessionTimeoutModal from "@/components/planipret/SessionTimeoutModal";
 import { useAdminRealtime } from "@/hooks/useAdminRealtime";
 import NotificationsBell from "@/components/planipret/admin/NotificationsBell";
+import CommandPalette from "@/components/planipret/admin/CommandPalette";
 
 const LINKS = [
   { to: "/planipret/admin/overview", label: "Vue d'ensemble", Icon: LayoutDashboard },
@@ -45,6 +46,37 @@ export default function PlanipretAdminLayout() {
   const [missingIntegrations, setMissingIntegrations] = useState(0);
   const { status: rtStatus } = useAdminRealtime();
   const realtimeOk = rtStatus === "live";
+  const [paletteOpen, setPaletteOpen] = useState(false);
+
+  // Keyboard shortcuts: Cmd/Ctrl+K palette, "g <key>" navigation, "/" focus palette
+  useEffect(() => {
+    let gPressed = 0;
+    const MAP: Record<string, string> = {
+      o: "/planipret/admin/overview", u: "/planipret/admin/users",
+      c: "/planipret/admin/calls", l: "/planipret/admin/leads",
+      m: "/planipret/admin/messages", v: "/planipret/admin/voicemails",
+      r: "/planipret/admin/reports",
+    };
+    const isTyping = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (!t) return false;
+      const tag = t.tagName;
+      return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || t.isContentEditable;
+    };
+    const h = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault(); setPaletteOpen((o) => !o); return;
+      }
+      if (isTyping(e)) return;
+      if (e.key === "/") { e.preventDefault(); setPaletteOpen(true); return; }
+      if (e.key === "g") { gPressed = Date.now(); return; }
+      if (gPressed && Date.now() - gPressed < 1000 && MAP[e.key.toLowerCase()]) {
+        gPressed = 0; navigate(MAP[e.key.toLowerCase()]);
+      }
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [navigate]);
 
   useEffect(() => {
     (async () => {
@@ -149,6 +181,16 @@ export default function PlanipretAdminLayout() {
           style={{ background: "var(--pp-bg-base)", borderBottom: "1px solid var(--pp-bg-border)" }}>
           <h1 style={{ fontFamily: "Inter,sans-serif", fontWeight: 700, fontSize: 18, color: "var(--pp-text-primary)" }}>{title}</h1>
           <div className="flex items-center gap-4">
+            <button onClick={() => setPaletteOpen(true)}
+              className="flex items-center gap-2 px-3 h-8 rounded-lg text-xs transition"
+              style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border)", color: "var(--pp-text-muted)", minWidth: 220 }}
+              onMouseEnter={(e) => (e.currentTarget.style.borderColor = "var(--pp-brand-accent)")}
+              onMouseLeave={(e) => (e.currentTarget.style.borderColor = "var(--pp-bg-border)")}>
+              <Search className="w-3.5 h-3.5" />
+              <span className="flex-1 text-left">Rechercher…</span>
+              <kbd className="font-mono text-[10px] px-1.5 py-0.5 rounded"
+                style={{ background: "var(--pp-bg-deep)", border: "1px solid var(--pp-bg-border)" }}>⌘K</kbd>
+            </button>
             <div className="flex items-center gap-1.5"
               style={{
                 background: realtimeOk ? "#0D3D2A" : "var(--pp-bg-elevated)",
@@ -168,6 +210,7 @@ export default function PlanipretAdminLayout() {
           <Outlet context={{ profile }} />
         </main>
       </div>
+      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
       <SessionTimeoutModal />
     </div>
   );
