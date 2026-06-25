@@ -7,33 +7,30 @@ import { useAdminRealtime } from "@/hooks/useAdminRealtime";
 import NotificationsBell from "@/components/planipret/admin/NotificationsBell";
 import CommandPalette from "@/components/planipret/admin/CommandPalette";
 
+const SSO_URL = "https://avastatistic.ca/login?redirect=planipret";
+
 const LINKS = [
-  { to: "/planipret/admin/overview", label: "Vue d'ensemble", Icon: LayoutDashboard },
-  { to: "/planipret/admin/users", label: "Utilisateurs", Icon: Users },
-  { to: "/planipret/admin/calls", label: "Appels", Icon: Phone },
-  { to: "/planipret/admin/leads", label: "Leads & Pipeline", Icon: Flame },
-  { to: "/planipret/admin/messages", label: "Messages", Icon: MessageSquare },
-  { to: "/planipret/admin/voicemails", label: "Voicemails", Icon: Voicemail },
-  { to: "/planipret/admin/templates", label: "Templates SMS", Icon: Zap },
-  { to: "/planipret/admin/reports", label: "Rapports", Icon: BarChart3 },
-  { to: "/planipret/admin/audit", label: "Journal d'audit", Icon: ClipboardList },
-  { to: "/planipret/admin/compliance", label: "Conformité", Icon: ShieldCheck },
-  { to: "/planipret/admin/audit-checklist", label: "Audit système", Icon: CheckSquare },
-  { to: "/planipret/admin/integrations", label: "Intégrations", Icon: Plug },
+  { to: "/planipret/admin/overview", label: "Vue d'ensemble", Icon: LayoutDashboard, emoji: "🏠" },
+  { to: "/planipret/admin/users", label: "Courtiers", Icon: Users, emoji: "👥", badge: "brokers" as const },
+  { to: "/planipret/admin/calls", label: "Appels", Icon: Phone, emoji: "📞", badge: "missed" as const },
+  { to: "/planipret/admin/messages", label: "Messages", Icon: MessageSquare, emoji: "💬" },
+  { to: "/planipret/admin/voicemails", label: "Voicemails", Icon: Voicemail, emoji: "📬" },
+  { to: "/planipret/admin/reports", label: "Rapports", Icon: BarChart3, emoji: "📊" },
+  { to: "/planipret/admin/integrations", label: "Intégrations", Icon: Plug, emoji: "🔌", badge: "integrations" as const },
+  { to: "/planipret/admin/compliance", label: "Conformité", Icon: ShieldCheck, emoji: "🔏" },
+  { to: "/planipret/admin/audit-checklist", label: "Audit système", Icon: CheckSquare, emoji: "✅", badge: "audit" as const },
 ];
 
 const PAGE_TITLES: Record<string, string> = {
   "/planipret/admin/overview": "Vue d'ensemble",
-  "/planipret/admin/users": "Gestion des utilisateurs",
-  "/planipret/admin/calls": "Appels",
-  "/planipret/admin/leads": "Leads & Pipeline",
+  "/planipret/admin/users": "Gestion des courtiers",
+  "/planipret/admin/calls": "Historique des appels",
   "/planipret/admin/messages": "Messages",
-  "/planipret/admin/voicemails": "Voicemails",
+  "/planipret/admin/voicemails": "Boîtes vocales",
   "/planipret/admin/integrations": "Intégrations",
-  "/planipret/admin/reports": "Rapports",
-  "/planipret/admin/audit": "Journal d'audit",
+  "/planipret/admin/reports": "Rapports & Analytics",
   "/planipret/admin/audit-checklist": "Audit système",
-  "/planipret/admin/compliance": "Conformité",
+  "/planipret/admin/compliance": "Conformité PIPEDA · Loi 25",
 };
 
 const initials = (n?: string) => (n ?? "A").split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase()).join("") || "A";
