@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { X } from "lucide-react";
+import { X, ArrowDownLeft, ArrowUpRight } from "lucide-react";
+
+const ACCENT = "#2E9BDC";
+const SUCCESS = "#00D4AA";
 
 export default function PAMessages() {
   const [rows, setRows] = useState<any[]>([]);
@@ -17,7 +20,15 @@ export default function PAMessages() {
     const { data } = await q;
     setRows(data ?? []);
   };
-  useEffect(() => { load(); }, [direction, from, to]);
+
+  useEffect(() => {
+    load();
+    const ch = supabase.channel("admin-messages")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "planipret_phone_messages" }, () => load())
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [direction, from, to]);
 
   const openThread = async (m: any) => {
     const peer = m.direction === "outbound" ? m.to_number : m.from_number;
@@ -27,49 +38,67 @@ export default function PAMessages() {
     setThread(data ?? []);
   };
 
+  const inputStyle = { background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" };
+
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-xl shadow-sm p-4 flex flex-wrap items-end gap-2">
-        <select value={direction} onChange={(e) => setDirection(e.target.value)} className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm">
-          <option value="">Toutes directions</option><option value="inbound">Entrant</option><option value="outbound">Sortant</option>
+      <div className="pp-card p-4 flex flex-wrap items-end gap-2">
+        <select value={direction} onChange={(e) => setDirection(e.target.value)} className="px-3 py-1.5 rounded-lg text-sm" style={inputStyle}>
+          <option value="" style={{ background: "var(--pp-bg-deep)" }}>Toutes directions</option>
+          <option value="inbound" style={{ background: "var(--pp-bg-deep)" }}>Entrant</option>
+          <option value="outbound" style={{ background: "var(--pp-bg-deep)" }}>Sortant</option>
         </select>
-        <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm" />
-        <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm" />
+        <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="px-3 py-1.5 rounded-lg text-sm" style={inputStyle} />
+        <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="px-3 py-1.5 rounded-lg text-sm" style={inputStyle} />
       </div>
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+      <div className="pp-card overflow-hidden">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500 text-left">
-            <tr><th className="p-3">Courtier</th><th>Dir.</th><th>De</th><th>Vers</th><th>Aperçu</th><th>Date</th></tr>
+          <thead style={{ background: "var(--pp-bg-elevated)" }}>
+            <tr style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--pp-text-faint)" }} className="text-left">
+              <th className="p-3">Courtier</th><th>Dir.</th><th>De</th><th>Vers</th><th>Aperçu</th><th>Date</th>
+            </tr>
           </thead>
           <tbody>
-            {rows.length === 0 ? <tr><td colSpan={6} className="p-8 text-center text-slate-400">Aucun message</td></tr> :
-              rows.map((m) => (
-                <tr key={m.id} className="border-t border-slate-100 hover:bg-slate-50 cursor-pointer" onClick={() => openThread(m)}>
-                  <td className="p-3">{m.planipret_profiles?.full_name ?? "—"}</td>
-                  <td>{m.direction === "outbound" ? "↗" : "↙"}</td>
-                  <td className="text-slate-600">{m.from_number}</td>
-                  <td className="text-slate-600">{m.to_number}</td>
-                  <td className="text-slate-500 truncate max-w-[300px]">{(m.body ?? "").slice(0, 60)}</td>
-                  <td className="text-slate-400 text-xs">{new Date(m.created_at).toLocaleString("fr-CA")}</td>
-                </tr>
-              ))}
+            {rows.length === 0 ? <tr><td colSpan={6} className="p-8 text-center" style={{ color: "var(--pp-text-faint)" }}>Aucun message</td></tr> :
+              rows.map((m) => {
+                const out = m.direction === "outbound";
+                const Icon = out ? ArrowUpRight : ArrowDownLeft;
+                return (
+                  <tr key={m.id} className="cursor-pointer hover:bg-white/[0.02]" style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }} onClick={() => openThread(m)}>
+                    <td className="p-3" style={{ color: "var(--pp-text-primary)" }}>{m.planipret_profiles?.full_name ?? "—"}</td>
+                    <td><Icon className="w-3.5 h-3.5" style={{ color: out ? SUCCESS : ACCENT }} /></td>
+                    <td style={{ color: "var(--pp-text-secondary)" }}>{m.from_number}</td>
+                    <td style={{ color: "var(--pp-text-secondary)" }}>{m.to_number}</td>
+                    <td className="truncate max-w-[300px]" style={{ color: "var(--pp-text-muted)" }}>{(m.body ?? "").slice(0, 60)}</td>
+                    <td style={{ fontSize: 11, color: "var(--pp-text-faint)" }}>{new Date(m.created_at).toLocaleString("fr-CA")}</td>
+                  </tr>
+                );
+              })}
           </tbody>
         </table>
       </div>
       {thread && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex justify-end" onClick={() => setThread(null)}>
-          <div className="bg-white w-full max-w-md h-full overflow-y-auto p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 bg-black/60 flex justify-end" onClick={() => setThread(null)}>
+          <div className="h-full w-full max-w-md overflow-y-auto p-5" style={{ background: "var(--pp-bg-surface)", borderLeft: "1px solid var(--pp-bg-border-2)" }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold">Conversation · {threadKey}</h3>
-              <button onClick={() => setThread(null)}><X className="w-4 h-4" /></button>
+              <h3 style={{ fontWeight: 600, color: "var(--pp-text-primary)" }}>Conversation · {threadKey}</h3>
+              <button onClick={() => setThread(null)}><X className="w-4 h-4" style={{ color: "var(--pp-text-muted)" }} /></button>
             </div>
             <div className="space-y-2">
-              {thread.map((m) => (
-                <div key={m.id} className={`p-2 rounded-lg text-sm ${m.direction === "outbound" ? "bg-blue-50 ml-8" : "bg-slate-100 mr-8"}`}>
-                  <p>{m.body}</p>
-                  <p className="text-[10px] text-slate-400 mt-1">{new Date(m.created_at).toLocaleString("fr-CA")}</p>
-                </div>
-              ))}
+              {thread.map((m) => {
+                const out = m.direction === "outbound";
+                return (
+                  <div key={m.id} className={`p-2.5 rounded-lg text-sm ${out ? "ml-8" : "mr-8"}`}
+                    style={{
+                      background: out ? "rgba(46,155,220,0.12)" : "var(--pp-bg-elevated)",
+                      border: `1px solid ${out ? "rgba(46,155,220,0.25)" : "var(--pp-bg-border-2)"}`,
+                      color: "var(--pp-text-primary)",
+                    }}>
+                    <p>{m.body}</p>
+                    <p style={{ fontSize: 10, color: "var(--pp-text-faint)", marginTop: 4 }}>{new Date(m.created_at).toLocaleString("fr-CA")}</p>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
