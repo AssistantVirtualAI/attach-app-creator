@@ -2746,13 +2746,19 @@ export type Database = {
           created_at: string
           created_by: string | null
           email: string
+          email_error: string | null
+          email_sent: boolean
           expires_at: string
           id: string
+          ip_address: unknown
           last_viewed_at: string | null
           organization_id: string
+          revoked_at: string | null
+          revoked_by: string | null
           softphone_user_id: string
           token: string
           updated_at: string
+          user_agent: string | null
           view_count: number
         }
         Insert: {
@@ -2760,13 +2766,19 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           email: string
+          email_error?: string | null
+          email_sent?: boolean
           expires_at?: string
           id?: string
+          ip_address?: unknown
           last_viewed_at?: string | null
           organization_id: string
+          revoked_at?: string | null
+          revoked_by?: string | null
           softphone_user_id: string
           token: string
           updated_at?: string
+          user_agent?: string | null
           view_count?: number
         }
         Update: {
@@ -2774,13 +2786,19 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           email?: string
+          email_error?: string | null
+          email_sent?: boolean
           expires_at?: string
           id?: string
+          ip_address?: unknown
           last_viewed_at?: string | null
           organization_id?: string
+          revoked_at?: string | null
+          revoked_by?: string | null
           softphone_user_id?: string
           token?: string
           updated_at?: string
+          user_agent?: string | null
           view_count?: number
         }
         Relationships: []
