@@ -131,7 +131,7 @@ export default function PACalls() {
           </tbody>
         </table>
         <div className="flex items-center justify-between px-4 py-3" style={{ borderTop: "1px solid var(--pp-bg-border-2)", fontSize: 11, color: "var(--pp-text-muted)" }}>
-          <span>Affichage {(page - 1) * PAGE + 1}–{Math.min(page * PAGE, rows.length)} sur {rows.length} appels</span>
+          <span>{loading ? "Chargement…" : `Affichage ${total === 0 ? 0 : (page - 1) * PAGE + 1}–${Math.min(page * PAGE, total)} sur ${total} appels`}</span>
           <div className="flex gap-1">
             <button disabled={page === 1} onClick={() => setPage(page - 1)} className="px-2 py-1 rounded disabled:opacity-40" style={{ border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>←</button>
             <span className="px-3 py-1">{page} / {totalPages}</span>
