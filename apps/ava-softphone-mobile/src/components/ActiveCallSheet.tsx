@@ -19,9 +19,24 @@ export default function ActiveCallSheet({
   const [timer, setTimer] = useState(0);
   const [showKeypad, setShowKeypad] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
-  const [speaker, setSpeakerState] = useState(isSpeakerOn());
+  const [audio, setAudio] = useState<AudioState>(getAudioState());
+  const [toast, setToast] = useState<string | null>(null);
 
-  useEffect(() => onSpeakerChange(setSpeakerState), []);
+  useEffect(() => onAudioStateChange(setAudio), []);
+  useEffect(() => {
+    if (!toast) return;
+    const id = setTimeout(() => setToast(null), 2400);
+    return () => clearTimeout(id);
+  }, [toast]);
+
+  const switchRoute = async (next: AudioRoute) => {
+    haptic(ImpactStyle.Light);
+    try {
+      await setRoute(next);
+    } catch {
+      setToast(`Impossible de basculer sur ${routeLabel(next)}`);
+    }
+  };
 
   useEffect(() => {
     if (sp.snap.callState !== 'active' && sp.snap.callState !== 'held') { setTimer(0); return; }
