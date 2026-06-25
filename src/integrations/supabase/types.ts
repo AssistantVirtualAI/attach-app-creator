@@ -7705,27 +7705,45 @@ export type Database = {
       }
       planipret_ava_conversations: {
         Row: {
+          audio_url: string | null
           created_at: string
+          duration_ms: number | null
           id: string
-          message: string
+          message: string | null
           role: string
+          session_id: string | null
           tool_calls: Json | null
+          tool_name: string | null
+          tool_params: Json | null
+          tool_result: Json | null
           user_id: string
         }
         Insert: {
+          audio_url?: string | null
           created_at?: string
+          duration_ms?: number | null
           id?: string
-          message: string
+          message?: string | null
           role: string
+          session_id?: string | null
           tool_calls?: Json | null
+          tool_name?: string | null
+          tool_params?: Json | null
+          tool_result?: Json | null
           user_id: string
         }
         Update: {
+          audio_url?: string | null
           created_at?: string
+          duration_ms?: number | null
           id?: string
-          message?: string
+          message?: string | null
           role?: string
+          session_id?: string | null
           tool_calls?: Json | null
+          tool_name?: string | null
+          tool_params?: Json | null
+          tool_result?: Json | null
           user_id?: string
         }
         Relationships: []
@@ -8355,6 +8373,10 @@ export type Database = {
       }
       planipret_profiles: {
         Row: {
+          ava_autonomy_mode: string
+          ava_last_session_at: string | null
+          ava_preferred_lang: string
+          ava_sessions_count: number
           avatar_url: string | null
           created_at: string
           dnd_auto_schedule: boolean
@@ -8406,8 +8428,17 @@ export type Database = {
           updated_at: string
           user_id: string
           voice_agent_enabled: boolean
+          voicemail_greeting_active: boolean
+          voicemail_greeting_audio_url: string | null
+          voicemail_greeting_text: string | null
+          voicemail_greeting_updated_at: string | null
+          voicemail_greeting_voice_id: string | null
         }
         Insert: {
+          ava_autonomy_mode?: string
+          ava_last_session_at?: string | null
+          ava_preferred_lang?: string
+          ava_sessions_count?: number
           avatar_url?: string | null
           created_at?: string
           dnd_auto_schedule?: boolean
@@ -8459,8 +8490,17 @@ export type Database = {
           updated_at?: string
           user_id: string
           voice_agent_enabled?: boolean
+          voicemail_greeting_active?: boolean
+          voicemail_greeting_audio_url?: string | null
+          voicemail_greeting_text?: string | null
+          voicemail_greeting_updated_at?: string | null
+          voicemail_greeting_voice_id?: string | null
         }
         Update: {
+          ava_autonomy_mode?: string
+          ava_last_session_at?: string | null
+          ava_preferred_lang?: string
+          ava_sessions_count?: number
           avatar_url?: string | null
           created_at?: string
           dnd_auto_schedule?: boolean
@@ -8512,6 +8552,11 @@ export type Database = {
           updated_at?: string
           user_id?: string
           voice_agent_enabled?: boolean
+          voicemail_greeting_active?: boolean
+          voicemail_greeting_audio_url?: string | null
+          voicemail_greeting_text?: string | null
+          voicemail_greeting_updated_at?: string | null
+          voicemail_greeting_voice_id?: string | null
         }
         Relationships: []
       }
