@@ -5,24 +5,34 @@ import { toast } from "sonner";
 
 const ACCENT = "#2E9BDC";
 
+const PAGE = 50;
+
 export default function PAVoicemails() {
   const [rows, setRows] = useState<any[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
   const [detail, setDetail] = useState<any | null>(null);
 
-  const load = async () => {
-    const { data } = await supabase.from("planipret_voicemails")
-      .select("*, planipret_profiles!inner(full_name)")
-      .order("created_at", { ascending: false }).limit(500);
+  const load = async (p = page) => {
+    const fromIdx = (p - 1) * PAGE;
+    const { data, count } = await supabase.from("planipret_voicemails")
+      .select("*, planipret_profiles!inner(full_name)", { count: "exact" })
+      .order("created_at", { ascending: false })
+      .range(fromIdx, fromIdx + PAGE - 1);
     setRows(data ?? []);
+    setTotal(count ?? 0);
   };
 
+  useEffect(() => { load(page); /* eslint-disable-next-line */ }, [page]);
+
   useEffect(() => {
-    load();
     const ch = supabase.channel("admin-voicemails")
-      .on("postgres_changes", { event: "*", schema: "public", table: "planipret_voicemails" }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "planipret_voicemails" }, () => load(1))
       .subscribe();
     return () => { supabase.removeChannel(ch); };
+    // eslint-disable-next-line
   }, []);
+
 
   const markRead = async (v: any) => {
     const next = !v.is_read;
