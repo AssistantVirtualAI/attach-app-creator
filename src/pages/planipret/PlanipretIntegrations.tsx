@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { AVA_OWNER_USER_ID } from "@/lib/avaOwner";
+import ElevenLabsManagementCard from "@/components/planipret/admin/integrations/ElevenLabsManagementCard";
 import { Phone, Mic, Sparkles, Database, Cloud, ArrowLeft, CheckCircle2, AlertCircle, Loader2, ExternalLink, X, Bell } from "lucide-react";
 
 type Provider = "nsapi" | "elevenlabs" | "anthropic" | "maestro" | "microsoft" | "webpush";
