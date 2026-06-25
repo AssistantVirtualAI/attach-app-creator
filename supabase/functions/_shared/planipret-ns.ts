@@ -110,6 +110,15 @@ export async function requirePlanipretBroker(
   }
   const userId = claimsData.claims.sub as string;
 
+  // App-separation guard: block Lemtel-only users outright
+  const { data: lemtelOnly } = await supabase.rpc("is_lemtel_only", { _user_id: userId });
+  if (lemtelOnly === true) {
+    return new Response(JSON.stringify({ error: "forbidden_wrong_app", app: "lemtel" }), {
+      status: 403,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   // AVA scope check via security definer helper
   const { data: isMember, error: rpcErr } = await supabase.rpc("is_planipret_member", {
     _user_id: userId,
