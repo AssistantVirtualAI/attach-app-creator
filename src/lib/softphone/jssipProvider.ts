@@ -445,31 +445,10 @@ class JsSipProvider {
         mediaConstraints: { audio: true, video: false },
         rtcOfferConstraints: { offerToReceiveAudio: true, offerToReceiveVideo: false },
         sessionDescriptionHandlerModifiers: [sdpModifier],
-        pcConfig: {
-          iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' },
-            {
-              urls: 'turn:openrelay.metered.ca:80',
-              username: 'openrelayproject',
-              credential: 'openrelayproject',
-            },
-            {
-              urls: 'turn:openrelay.metered.ca:443',
-              username: 'openrelayproject',
-              credential: 'openrelayproject',
-            },
-            {
-              urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-              username: 'openrelayproject',
-              credential: 'openrelayproject',
-            },
-          ],
-          iceTransportPolicy: 'all',
-          bundlePolicy: 'balanced',
-        },
+        pcConfig: PC_CONFIG,
         sessionTimersExpires: 120,
       });
+      sipDebug('ua.call() pcConfig', PC_CONFIG);
     } catch (err: any) {
       const msg = String(err?.message || err);
       this.logCall("error", `ua.call() threw: ${msg}`);
