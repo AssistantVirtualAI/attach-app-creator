@@ -498,12 +498,17 @@ type AvaMsg = {
   created_at: string;
 };
 
-function AvaChat({ profile, openAva }: { profile: any; openAva: () => void }) {
+function AvaChat({ profile, openAva, openDialer }: { profile: any; openAva: () => void; openDialer: (n?: string) => void }) {
   const [msgs, setMsgs] = useState<AvaMsg[]>([]);
-  const [text, setText] = useState("");
+  const [text, setText] = useAvaDraft(profile?.user_id, "ava-chat");
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [coach, setCoach] = useState<{ open: boolean; suggestions: AvaSuggestion[]; title?: string }>({ open: false, suggestions: [] });
   const bottomRef = useRef<HTMLDivElement>(null);
+  // setText is the debounced draft updater
+  const inputRef = useRef<(v: string) => void>(setText);
+  inputRef.current = setText;
 
   const load = async () => {
     if (!profile?.user_id) return;
@@ -530,13 +535,20 @@ function AvaChat({ profile, openAva }: { profile: any; openAva: () => void }) {
     if (ins) setMsgs((p) => [...p, ins as AvaMsg]);
     setText("");
 
-    const { data, error } = await supabase.functions.invoke("pp-ava-proactive", {
-      body: { user_message: body, history: msgs.slice(-10).map((m) => ({ role: m.role, content: m.message })) },
+    const r = await callAva({
+      mode: "chat",
+      message: body,
+      history: msgs.slice(-10).map((m) => ({ role: m.role, content: m.message })),
     });
-    const reply = (data as any)?.reply ?? (data as any)?.message ?? (error ? "Désolé, je rencontre un problème pour répondre." : "…");
+
     const { data: ins2 } = await supabase.from("planipret_ava_conversations")
-      .insert({ user_id: profile.user_id, role: "assistant", message: reply }).select().single();
+      .insert({ user_id: profile.user_id, role: "assistant", message: r.reply }).select().single();
     if (ins2) setMsgs((p) => [...p, ins2 as AvaMsg]);
+
+    if (r.openVoice) openAva();
+    if (r.openCoach || r.suggestions.length) {
+      setCoach({ open: true, suggestions: r.suggestions, title: "Coach AVA" });
+    }
     setSending(false);
   };
 
@@ -555,11 +567,21 @@ function AvaChat({ profile, openAva }: { profile: any; openAva: () => void }) {
         <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider" style={{ color: "var(--pp-agent)" }}>
           <Sparkles className="w-3 h-3" /> Assistant AVA
         </div>
-        {msgs.length > 0 && (
-          <button onClick={clear} className="text-[11px]" style={{ color: "var(--pp-text-muted)" }}>
-            Effacer
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setHistoryOpen(true)}
+            className="text-[11px] flex items-center gap-1"
+            style={{ color: "var(--pp-text-muted)" }}
+            title="Historique"
+          >
+            <History className="w-3.5 h-3.5" /> Historique
           </button>
-        )}
+          {msgs.length > 0 && (
+            <button onClick={clear} className="text-[11px]" style={{ color: "var(--pp-text-muted)" }}>
+              Effacer
+            </button>
+          )}
+        </div>
       </div>
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2">
         {loading ? (
@@ -676,9 +698,19 @@ function AvaChat({ profile, openAva }: { profile: any; openAva: () => void }) {
           ) : null
         }
       />
+
+      <AvaHistorySheet open={historyOpen} userId={profile?.user_id} onClose={() => setHistoryOpen(false)} />
+      <CoachOverlay
+        open={coach.open}
+        title={coach.title}
+        suggestions={coach.suggestions}
+        ctx={{ openDialer, openAva, userId: profile?.user_id, profileId: profile?.id }}
+        onClose={() => setCoach({ open: false, suggestions: [] })}
+      />
     </div>
   );
 }
+
 
 // ============================================================
 // EMAILS TAB (M365)
