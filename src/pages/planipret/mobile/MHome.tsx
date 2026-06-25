@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   Phone, PhoneMissed, MessageSquare, Voicemail,
   ArrowDownLeft, ArrowUpRight, X, Calendar, Headphones, Bot,
-  BellOff, Flame, Sparkles, ChevronRight,
+  BellOff, Flame, Sparkles, ChevronRight, Mail, Users as UsersIcon, TrendingUp,
 } from "lucide-react";
 import type { PlanipretMobileContext } from "../PlanipretMobile";
 import { toast } from "sonner";
@@ -13,6 +13,7 @@ import AvaVoiceAgent from "@/components/planipret/mobile/AvaVoiceAgent";
 import PWAInstallBanner from "@/components/planipret/PWAInstallBanner";
 import { TEMP_EMOJI } from "@/components/planipret/leadHelpers";
 import { useMaestroPipelineToasts } from "@/hooks/useMaestroPipelineToasts";
+import heroStats from "@/assets/planipret-hero-stats.jpg.asset.json";
 
 function Shimmer({ className = "" }: { className?: string }) {
   return (
