@@ -40,6 +40,8 @@ export default function MHome() {
   const [dueReminders, setDueReminders] = useState<any[]>([]);
   const [maestroCounts, setMaestroCounts] = useState<any | null>(null);
 
+  useMaestroPipelineToasts(profile?.user_id);
+
   const openAgent = async () => {
     try {
       const p = await navigator.permissions.query({ name: "microphone" as PermissionName });
