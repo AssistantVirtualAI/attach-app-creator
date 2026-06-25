@@ -279,6 +279,7 @@ function ThreadView({ number, myExt, userId, messages, onBack, onCall, onSent }:
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [tplOpen, setTplOpen] = useState(false);
+  const [sumOpen, setSumOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const ordered = useMemo(() => [...messages].sort((a, b) => +new Date(a.created_at) - +new Date(b.created_at)), [messages]);
 
