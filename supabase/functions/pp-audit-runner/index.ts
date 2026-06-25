@@ -163,17 +163,30 @@ Deno.serve(async (req) => {
     for (const t of TABLES) dbItems.push(await checkTable(admin, t));
     sections.push({ id: "db", title: "Base de données", emoji: "🗄️", items: dbItems });
 
-    // 2. Realtime publication
+    await sleep(300);
+
+    // 2. Realtime publication (live check via SECURITY DEFINER RPC)
     const rtItems: Item[] = [];
+    let pubTables: string[] = [];
+    try {
+      const { data, error } = await (admin as any).rpc("pp_audit_realtime_check");
+      if (error) throw error;
+      pubTables = Array.isArray(data) ? data : [];
+    } catch (e: any) {
+      // Fall through with empty list; we'll mark all as warn.
+      console.warn("realtime_check_rpc_failed", e?.message);
+    }
     for (const t of REALTIME_TABLES) {
-      const { data, error } = await admin.from("planipret_phone_calls").select("id").limit(0); // probe connection
-      if (error) {
-        rtItems.push({ id: `rt-${t}`, name: `Realtime ${t}`, status: "warn", detail: "Vérification non disponible" });
-      } else {
-        rtItems.push({ id: `rt-${t}`, name: `Realtime ${t}`, status: "skip", detail: "À vérifier manuellement (publication)" });
-      }
+      const inPub = pubTables.includes(t);
+      rtItems.push({
+        id: `rt-${t}`,
+        name: `Realtime ${t}`,
+        status: inPub ? "pass" : "fail",
+        detail: inPub ? "Publication supabase_realtime ✓" : "Non ajoutée à la publication",
+      });
     }
     sections.push({ id: "realtime", title: "Realtime", emoji: "📡", items: rtItems });
+    await sleep(300);
 
     // 3. Secrets
     const secItems: Item[] = [];
