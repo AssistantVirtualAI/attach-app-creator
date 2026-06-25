@@ -62,10 +62,8 @@ export default function PlanipretAdminLayout() {
     })();
   }, [navigate]);
 
-  useEffect(() => {
-    const ch = supabase.channel("admin-presence").subscribe((s) => setRealtimeOk(s === "SUBSCRIBED"));
-    return () => { supabase.removeChannel(ch); };
-  }, []);
+
+
 
   const logout = async () => { await supabase.auth.signOut(); navigate("/login", { replace: true }); };
 
