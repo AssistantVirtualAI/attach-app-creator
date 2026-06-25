@@ -489,7 +489,7 @@ type AvaMsg = {
   created_at: string;
 };
 
-function AvaChat({ profile }: { profile: any }) {
+function AvaChat({ profile, openAva }: { profile: any; openAva: () => void }) {
   const [msgs, setMsgs] = useState<AvaMsg[]>([]);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
