@@ -324,6 +324,14 @@ function ThreadView({ number, myExt, userId, messages, onBack, onCall, onSent }:
           <p className="text-[11px]" style={{ color: "var(--pp-text-muted)" }}>{ordered.length} message{ordered.length > 1 ? "s" : ""}</p>
         </div>
         <button
+          onClick={() => setSumOpen(true)}
+          className="p-1.5 rounded-full"
+          style={{ color: "var(--pp-agent)" }}
+          title="Résumer avec AVA"
+        >
+          <Sparkles className="w-4 h-4" />
+        </button>
+        <button
           onClick={() => onCall(number)}
           className="px-3 py-1.5 rounded-full text-white text-xs font-semibold flex items-center gap-1.5"
           style={{ background: "linear-gradient(135deg, var(--pp-success), #00A88A)" }}
