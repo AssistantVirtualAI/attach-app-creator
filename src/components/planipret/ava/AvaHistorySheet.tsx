@@ -32,12 +32,12 @@ export default function AvaHistorySheet({
       setLoading(true);
       const { data } = await supabase
         .from("planipret_ava_conversations")
-        .select("id, user_id, role, message, created_at, metadata")
+        .select("id, user_id, role, message, created_at")
         .eq("user_id", userId)
         .order("created_at", { ascending: false })
         .limit(limit);
       if (!cancelled) {
-        setRows((data ?? []) as Row[]);
+        setRows(((data ?? []) as any[]) as Row[]);
         setLoading(false);
       }
     })();
