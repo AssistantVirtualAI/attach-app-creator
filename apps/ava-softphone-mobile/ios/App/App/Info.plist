@@ -56,5 +56,10 @@
 	<string>AVA Softphone needs photo library access to set your profile picture.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>AVA Softphone needs local network access for SIP calls.</string>
+	<key>WebKitICECandidateFilteringEnabled</key>
+	<false/>
+	<key>WebKitEnumeratingAllNetworkInterfacesEnabled</key>
+	<true/>
 </dict>
+
 </plist>
