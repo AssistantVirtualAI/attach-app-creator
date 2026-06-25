@@ -72,9 +72,17 @@ export default function PAAuditLog() {
   const userMap = useMemo(() => new Map(users.map((u) => [u.id, u.full_name || u.email])), [users]);
 
   const exportCsv = async () => {
+    let q = supabase.from("planipret_audit_log")
+      .select("id, created_at, action, resource_type, resource_id, ip_address, user_id, metadata")
+      .order("created_at", { ascending: false }).limit(10000);
+    if (userFilter) q = q.eq("user_id", userFilter);
+    if (actionFilter) q = q.eq("action", actionFilter);
+    if (from) q = q.gte("created_at", new Date(from).toISOString());
+    if (to) q = q.lte("created_at", new Date(to + "T23:59:59").toISOString());
+    const { data: all } = await q;
     const csv = [
       ["Date", "Utilisateur", "Action", "Ressource", "IP", "Détails"].join(","),
-      ...rows.map((r) => [
+      ...(all ?? []).map((r: any) => [
         new Date(r.created_at).toISOString(),
         `"${userMap.get(r.user_id ?? "") ?? "—"}"`,
         r.action,
@@ -83,6 +91,7 @@ export default function PAAuditLog() {
         `"${JSON.stringify(r.metadata ?? {}).replace(/"/g, '""')}"`,
       ].join(",")),
     ].join("\n");
+
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
