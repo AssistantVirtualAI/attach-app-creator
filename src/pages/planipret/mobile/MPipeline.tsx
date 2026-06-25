@@ -150,7 +150,7 @@ function DetailSheet({ card, profile, openDialer, openAva, onClose, onMove, onCh
 
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end bg-black/40" onClick={onClose}>
+    <div className="absolute inset-0 z-40 flex items-end bg-black/40" onClick={onClose}>
       <div className="w-full bg-white rounded-t-3xl p-5 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-bold" style={{ color: "var(--pp-text-primary)" }}>{card.contact_name}</h2>
@@ -159,6 +159,12 @@ function DetailSheet({ card, profile, openDialer, openAva, onClose, onMove, onCh
         {card.contact_number && (
           <p className="text-sm text-slate-500 mb-3">{card.contact_number}</p>
         )}
+
+        <button onClick={askCoach}
+          className="w-full mb-3 py-2 rounded-lg flex items-center justify-center gap-1.5 text-white text-sm font-semibold"
+          style={{ background: "linear-gradient(135deg,#2D1A5A,#9B7FE8)" }}>
+          <Sparkles className="w-4 h-4" /> Conseil AVA
+        </button>
 
         <label className="block text-xs text-slate-500 mb-1">Étape</label>
         <select value={card.stage} onChange={(e) => onMove(card.id, e.target.value)}
@@ -188,6 +194,15 @@ function DetailSheet({ card, profile, openDialer, openAva, onClose, onMove, onCh
           )}
         </div>
       </div>
+
+      <CoachOverlay
+        open={coachOpen}
+        title={`Conseil AVA — ${card.contact_name}`}
+        subtitle={coachLoading ? "AVA réfléchit…" : coachReply}
+        suggestions={coachSuggestions}
+        ctx={{ openDialer, openAva, userId: profile?.user_id }}
+        onClose={() => setCoachOpen(false)}
+      />
     </div>
   );
 }
