@@ -333,6 +333,15 @@ function ContactDetailSheet({
           </button>
         )}
       </div>
+
+      <AvaSummarizeSheet
+        open={summarizeOpen}
+        source="team"
+        title={`Historique — ${name}`}
+        content={history.slice(0, 30).map((h: any) => `[${h.created_at || h.date || ""}] ${h.type || h.kind || ""}: ${h.title || h.summary || h.subject || ""}${h.description ? " — " + h.description : ""}`).join("\n")}
+        contextMeta={{ contact_name: name, phone, email: contact.email }}
+        onClose={() => setSummarizeOpen(false)}
+      />
     </div>
   );
 }
