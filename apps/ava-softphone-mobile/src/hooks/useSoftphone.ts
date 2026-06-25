@@ -316,6 +316,7 @@ export function useSoftphone(
             session.on('confirmed', () => {
               setCallState('active');
               log('session.confirmed', remoteNumber);
+              console.log('[SIP][info] session.confirmed — call connected');
               timerRef.current = setInterval(() => setCallTimer((t) => t + 1), 1000);
               // Read the codec actually negotiated by the PBX.
               readNegotiatedCodec(session.connection);
