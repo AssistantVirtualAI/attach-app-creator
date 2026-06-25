@@ -444,13 +444,9 @@ const App = () => (
                 <Route element={<ProtectedRoute><PlanipretOrgOnly><Outlet /></PlanipretOrgOnly></ProtectedRoute>}>
                 <Route
                   path="/dashboard"
-                  element={
-                    <ProtectedRoute>
-                      <PlanipretOrgOnly><Dashboard /></PlanipretOrgOnly>
-                    </ProtectedRoute>
-
-                  }
+                  element={<Navigate to="/planipret/admin/overview" replace />}
                 />
+
                 <Route
                   path="/analytics"
                   element={
