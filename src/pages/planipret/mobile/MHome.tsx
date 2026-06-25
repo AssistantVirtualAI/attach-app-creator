@@ -54,7 +54,7 @@ export default function MHome() {
     const startIso = start.toISOString();
     const nowIso = new Date().toISOString();
 
-    const [callsRes, missedRes, smsRes, vmRes, recentRes, hotRes, remRes] = await Promise.all([
+    const [callsRes, missedRes, smsRes, vmRes, recentRes, hotRes, remRes, teamRes, outboundRes] = await Promise.all([
       supabase.from("planipret_phone_calls").select("id", { count: "exact", head: true }).eq("user_id", profile.user_id).gte("started_at", startIso),
       supabase.from("planipret_phone_calls").select("id", { count: "exact", head: true }).eq("user_id", profile.user_id).eq("direction", "missed").gte("started_at", startIso),
       supabase.from("planipret_phone_messages").select("id", { count: "exact", head: true }).eq("user_id", profile.user_id).is("read_at", null).eq("direction", "inbound"),
@@ -62,6 +62,8 @@ export default function MHome() {
       supabase.from("planipret_phone_calls").select("id, direction, from_number, from_name, to_number, to_name, started_at, lead_score, lead_temperature, ai_summary").eq("user_id", profile.user_id).order("started_at", { ascending: false }).limit(3),
       supabase.from("planipret_phone_calls").select("id, from_number, from_name, to_number, to_name, lead_score, lead_temperature, started_at, direction").eq("user_id", profile.user_id).gte("started_at", startIso).gte("lead_score", 8).order("lead_score", { ascending: false }).limit(5),
       supabase.from("planipret_reminders").select("*").eq("user_id", profile.user_id).eq("status", "pending").lte("scheduled_at", nowIso).order("scheduled_at", { ascending: true }).limit(10),
+      supabase.from("planipret_team_messages").select("id", { count: "exact", head: true }).gte("created_at", startIso),
+      supabase.from("planipret_phone_messages").select("id", { count: "exact", head: true }).eq("user_id", profile.user_id).eq("direction", "outbound").gte("created_at", startIso),
     ]);
 
     setStats({
@@ -69,6 +71,9 @@ export default function MHome() {
       missed: missedRes.count ?? 0,
       sms: smsRes.count ?? 0,
       voicemails: vmRes.count ?? 0,
+      team: teamRes.count ?? 0,
+      emails: 0,
+      outbound: outboundRes.count ?? 0,
     });
     setRecent(recentRes.data ?? []);
     setHotLeads(hotRes.data ?? []);
