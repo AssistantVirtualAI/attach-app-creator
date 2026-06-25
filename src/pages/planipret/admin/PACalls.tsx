@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ArrowDownLeft, ArrowUpRight, X, Mic, Sparkles, Download, Eye } from "lucide-react";
 
@@ -10,8 +10,10 @@ const AGENT = "#9B7FE8";
 
 export default function PACalls() {
   const [rows, setRows] = useState<any[]>([]);
+  const [total, setTotal] = useState(0);
   const [brokers, setBrokers] = useState<any[]>([]);
   const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState({ broker: "", from: "", to: "", direction: "", status: "", search: "" });
   const [detail, setDetail] = useState<any | null>(null);
 
@@ -22,36 +24,53 @@ export default function PACalls() {
     })();
   }, []);
 
-  const load = async () => {
+  const load = async (p = page) => {
+    setLoading(true);
+    const fromIdx = (p - 1) * PAGE;
+    const toIdx = fromIdx + PAGE - 1;
     let q = supabase.from("planipret_phone_calls")
-      .select("*, planipret_profiles!inner(full_name)")
-      .order("started_at", { ascending: false }).limit(500);
+      .select("*, planipret_profiles!inner(full_name)", { count: "exact" })
+      .order("started_at", { ascending: false })
+      .range(fromIdx, toIdx);
     if (filters.broker) q = q.eq("user_id", filters.broker);
     if (filters.from) q = q.gte("started_at", filters.from);
     if (filters.to) q = q.lte("started_at", filters.to);
     if (filters.direction) q = q.eq("direction", filters.direction);
     if (filters.status) q = q.eq("status", filters.status);
     if (filters.search) q = q.or(`from_number.ilike.%${filters.search}%,to_number.ilike.%${filters.search}%`);
-    const { data } = await q;
+    const { data, count } = await q;
     setRows(data ?? []);
-    setPage(1);
+    setTotal(count ?? 0);
+    setLoading(false);
   };
 
   useEffect(() => {
-    load();
+    setPage(1);
+    load(1);
     const ch = supabase.channel("admin-calls")
-      .on("postgres_changes", { event: "*", schema: "public", table: "planipret_phone_calls" }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "planipret_phone_calls" }, () => load(1))
       .subscribe();
     return () => { supabase.removeChannel(ch); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.broker, filters.from, filters.to, filters.direction, filters.status, filters.search]);
 
-  const paged = useMemo(() => rows.slice((page - 1) * PAGE, page * PAGE), [rows, page]);
-  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE));
+  useEffect(() => { load(page); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [page]);
 
-  const exportCsv = () => {
+  const paged = rows;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE));
+
+
+  const exportCsv = async () => {
+    let q = supabase.from("planipret_phone_calls").select("*, planipret_profiles!inner(full_name)").order("started_at", { ascending: false }).limit(5000);
+    if (filters.broker) q = q.eq("user_id", filters.broker);
+    if (filters.from) q = q.gte("started_at", filters.from);
+    if (filters.to) q = q.lte("started_at", filters.to);
+    if (filters.direction) q = q.eq("direction", filters.direction);
+    if (filters.status) q = q.eq("status", filters.status);
+    if (filters.search) q = q.or(`from_number.ilike.%${filters.search}%,to_number.ilike.%${filters.search}%`);
+    const { data: all } = await q;
     const headers = ["Courtier", "Direction", "De", "Vers", "Durée", "Date"];
-    const lines = [headers.join(",")].concat(rows.map((r) =>
+    const lines = [headers.join(",")].concat((all ?? []).map((r: any) =>
       [r.planipret_profiles?.full_name, r.direction, r.from_number, r.to_number, r.duration_seconds, r.started_at].map((v) => `"${v ?? ""}"`).join(",")
     ));
     const blob = new Blob([lines.join("\n")], { type: "text/csv" });
@@ -59,6 +78,7 @@ export default function PACalls() {
     const a = document.createElement("a"); a.href = url; a.download = `appels-${Date.now()}.csv`; a.click();
     URL.revokeObjectURL(url);
   };
+
 
   return (
     <div className="space-y-4">
@@ -111,7 +131,7 @@ export default function PACalls() {
           </tbody>
         </table>
         <div className="flex items-center justify-between px-4 py-3" style={{ borderTop: "1px solid var(--pp-bg-border-2)", fontSize: 11, color: "var(--pp-text-muted)" }}>
-          <span>Affichage {(page - 1) * PAGE + 1}–{Math.min(page * PAGE, rows.length)} sur {rows.length} appels</span>
+          <span>{loading ? "Chargement…" : `Affichage ${total === 0 ? 0 : (page - 1) * PAGE + 1}–${Math.min(page * PAGE, total)} sur ${total} appels`}</span>
           <div className="flex gap-1">
             <button disabled={page === 1} onClick={() => setPage(page - 1)} className="px-2 py-1 rounded disabled:opacity-40" style={{ border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>←</button>
             <span className="px-3 py-1">{page} / {totalPages}</span>
