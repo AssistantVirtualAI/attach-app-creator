@@ -313,6 +313,7 @@ export default function TelephonyUsers() {
                     <TableCell className="text-right">
                       <div className="inline-flex gap-1">
                         <Button size="icon" variant="ghost" title="Sync PBX password to portal/desktop/mobile" onClick={() => syncSipPassword(u)} disabled={!isAdmin}><RefreshCw className="w-4 h-4" /></Button>
+                        <Button size="icon" variant="ghost" title="Send setup invitation (Lemtel branded)" onClick={() => sendInvite(u)} disabled={!isAdmin}><Send className="w-4 h-4 text-primary" /></Button>
                         <Button size="icon" variant="ghost" title="Resend welcome" onClick={() => resendWelcome(u)} disabled={!isAdmin}><Mail className="w-4 h-4" /></Button>
                         <Button size="icon" variant="ghost" title="Reset password (email)" onClick={() => resetPassword(u)} disabled={!isAdmin}><KeyRound className="w-4 h-4" /></Button>
                         <Button size="icon" variant="ghost" title="Deactivate" onClick={() => deactivate(u)} disabled={!isAdmin}><Trash2 className="w-4 h-4" /></Button>
