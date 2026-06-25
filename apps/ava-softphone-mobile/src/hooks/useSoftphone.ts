@@ -277,6 +277,17 @@ export function useSoftphone(
             setActiveCallNumber(remoteNumber);
             log('session.new', `${session.direction} ${remoteNumber}`);
             if (session.direction === 'incoming') setCallState('ringing');
+            session.on('peerconnection', (e: any) => {
+              const pc = e?.peerconnection;
+              if (pc) {
+                pc.onicecandidate = (ice: any) => {
+                  console.log('[SIP][ICE] candidate:', JSON.stringify(ice?.candidate));
+                };
+                pc.oniceconnectionstatechange = () => {
+                  console.log('[SIP][ICE] state:', pc.iceConnectionState);
+                };
+              }
+            });
             // ---- SDP introspection: log offer/answer codecs before INVITE is sent.
             session.on('sdp', (data: any) => {
               try {
