@@ -1,6 +1,7 @@
 // JsSIP UA lifecycle manager + event emitter.
 // Used by useSoftphone hook; do not import directly into components.
 import JsSIP from "jssip";
+import { PC_CONFIG, instrumentPeerConnection, watchCallEstablishment, isSipDebugEnabled, sipDebug } from "./rtcConfig";
 
 // SDP rewriter — forces audio-only PCMU/PCMA, removes DTLS/SRTP, drops video.
 // Mirrors the desktop app fix that resolves FusionPBX 488 Not Acceptable Here.
@@ -364,7 +365,27 @@ class JsSipProvider {
           this.audioEl.play().catch(() => {});
         }
       });
+      // Verbose ICE/SDP instrumentation routed through the snapshot logger.
+      instrumentPeerConnection(pc, (event, detail, level = 'info') => {
+        this.logCall(level, `[ice] ${event}`, detail);
+      });
     }
+
+    // Post-INVITE health-check: confirm SIP session reaches `confirmed`
+    // AND ICE reaches connected/completed. Surface a clear error otherwise.
+    watchCallEstablishment(session, pc, 15000).then((res) => {
+      if (res.ok) {
+        this.logCall('info', `[ice] call established (ice=${res.iceState})`);
+        return;
+      }
+      const msg =
+        res.reason === 'timeout-session' ? 'Call did not connect (no ACK within 15s)'
+        : res.reason === 'timeout-ice'   ? `ICE did not connect (state=${res.iceState ?? '?'}) — likely STUN/TURN blocked`
+        : res.reason === 'ice-failed'    ? 'ICE negotiation failed — media path blocked'
+        : 'Call setup failed';
+      this.logCall('error', `[ice] ${msg}`);
+      this.update({ lastCallError: msg });
+    });
   }
 
   private resetCall() {
