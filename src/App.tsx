@@ -427,8 +427,9 @@ const App = () => (
                   path="/dashboard"
                   element={
                     <ProtectedRoute>
-                      <Dashboard />
+                      <PlanipretOrgOnly><Dashboard /></PlanipretOrgOnly>
                     </ProtectedRoute>
+
                   }
                 />
                 <Route
