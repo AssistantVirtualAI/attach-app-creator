@@ -99,15 +99,18 @@ Deno.serve(async (req) => {
     }
 
     await setPipelineStep(admin, call_id, "transcript", "running");
+    await updateCallPipeline(admin, call_id, { step: "transcribing" });
+    await pipelineLog(admin, { call_id, user_id: call.user_id, step: "transcript", status: "started" });
 
+    const t0 = Date.now();
     // 1. Try NS-API
     let result = await tryNsTranscript(admin, call.ns_call_id);
-    let source: "ns" | "lovable" | null = result ? "ns" : null;
+    let source: "ns" | "lovable" | null = result ? "netsapiens" as any : null;
 
     // 2. Fallback to Lovable AI Gateway (Whisper-style)
     if (!result && call.recording_url) {
       result = await transcribeViaLovable(call.recording_url);
-      source = result ? "lovable" : null;
+      source = result ? "lovable" as any : null;
     }
 
     // 2b. Try fetching recording URL from Maestro if still nothing
@@ -122,13 +125,15 @@ Deno.serve(async (req) => {
         });
         if (recRes.ok && recRes.data?.url) {
           result = await transcribeViaLovable(recRes.data.url);
-          source = result ? "lovable" : null;
+          source = result ? "lovable" as any : null;
         }
       }
     }
 
     if (!result) {
       await setPipelineStep(admin, call_id, "transcript", "error", { reason: "no_audio_or_transcript" });
+      await updateCallPipeline(admin, call_id, { step: "complete", completed: true });
+      await pipelineLog(admin, { call_id, user_id: call.user_id, step: "transcript", status: "skipped", duration_ms: Date.now() - t0, payload: { reason: "no_transcript_available" } });
       return json({ success: false, error: "transcript_unavailable" }, 200);
     }
 
@@ -139,6 +144,8 @@ Deno.serve(async (req) => {
         transcript: result.text,
         transcript_segments: result.segments,
         transcript_language: "fr-CA",
+        transcript_source: source,
+        transcript_confidence: 0.92,
       })
       .eq("id", call.id);
 
@@ -165,7 +172,14 @@ Deno.serve(async (req) => {
     }
 
     await setPipelineStep(admin, call_id, "transcript", "done", { source });
+    await pipelineLog(admin, { call_id, user_id: call.user_id, step: "transcript", status: "success", duration_ms: Date.now() - t0, payload: { source, chars: result.text.length } });
     await maestroAudit(admin, "transcript_ready", { call_id, source, chars: result.text.length });
+    await broadcastPipeline(admin, call.user_id, "pipeline_step", {
+      call_id,
+      step: "transcript_ready",
+      label: "Transcription prête 📝",
+      transcript_preview: result.text.substring(0, 100) + "...",
+    });
 
     // 5. Trigger AI analysis (fire and forget)
     triggerAi(call_id);
@@ -178,6 +192,7 @@ Deno.serve(async (req) => {
       source,
     });
   } catch (e: any) {
+
     console.error("maestro-transcript error", e);
     return json({ success: false, error: e?.message ?? "server_error" }, 500);
   }
