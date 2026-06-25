@@ -172,27 +172,31 @@ Deno.serve(async (req) => {
       lead_score: analysis.lead_score,
       coaching_score: analysis.coaching?.score,
     });
+    await updateCallPipeline(admin, call_id, { step: "complete", completed: true });
+    await pipelineLog(admin, {
+      call_id,
+      user_id: call.user_id,
+      step: "ai_analysis",
+      status: "success",
+      payload: { lead_score: analysis.lead_score, lead_temperature: analysis.lead_temperature, coaching_score: analysis.coaching?.score },
+    });
     await maestroAudit(admin, "ai_analysis_done", {
       call_id,
       lead_score: analysis.lead_score,
       lead_temperature: analysis.lead_temperature,
     });
 
-    // Realtime broadcast
-    try {
-      if (call.user_id) {
-        await admin.channel(`ai-insights:${call.user_id}`).send({
-          type: "broadcast",
-          event: "analysis_ready",
-          payload: {
-            call_id,
-            lead_score: analysis.lead_score,
-            lead_temperature: analysis.lead_temperature,
-            coaching_score: analysis.coaching?.score,
-          },
-        });
-      }
-    } catch {}
+    // Rich pipeline_complete broadcast
+    await broadcastPipeline(admin, call.user_id, "pipeline_complete", {
+      call_id,
+      client_name: null,
+      lead_score: analysis.lead_score,
+      lead_temperature: analysis.lead_temperature,
+      coaching_score: analysis.coaching?.score,
+      has_transcript: true,
+      maestro_synced: true,
+      tasks_created: (analysis.next_actions ?? []).filter((a: any) => a.priority === "high").length,
+    });
 
     return json({ success: true, analysis });
   } catch (e: any) {
@@ -200,3 +204,4 @@ Deno.serve(async (req) => {
     return json({ success: false, error: e?.message ?? "server_error" }, 500);
   }
 });
+
