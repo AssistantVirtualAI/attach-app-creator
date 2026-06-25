@@ -41,6 +41,9 @@ export default function PlanipretAdminLayout() {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [missingIntegrations, setMissingIntegrations] = useState(0);
+  const [missedCalls, setMissedCalls] = useState(0);
+  const [brokerCount, setBrokerCount] = useState(0);
+  const [auditScore, setAuditScore] = useState<number | null>(null);
   const { status: rtStatus } = useAdminRealtime();
   const realtimeOk = rtStatus === "live";
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -50,9 +53,9 @@ export default function PlanipretAdminLayout() {
     let gPressed = 0;
     const MAP: Record<string, string> = {
       o: "/planipret/admin/overview", u: "/planipret/admin/users",
-      c: "/planipret/admin/calls", l: "/planipret/admin/leads",
-      m: "/planipret/admin/messages", v: "/planipret/admin/voicemails",
-      r: "/planipret/admin/reports",
+      c: "/planipret/admin/calls", m: "/planipret/admin/messages",
+      v: "/planipret/admin/voicemails", r: "/planipret/admin/reports",
+      i: "/planipret/admin/integrations",
     };
     const isTyping = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
@@ -77,17 +80,36 @@ export default function PlanipretAdminLayout() {
 
   useEffect(() => {
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { navigate("/planipret/login", { replace: true }); return; }
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) { window.location.href = SSO_URL; return; }
+      const user = session.user;
       const { data } = await supabase.from("planipret_profiles").select("*").eq("user_id", user.id).maybeSingle();
-      if (!data || data.role !== "admin") { navigate("/mplanipret", { replace: true }); return; }
+      if (!data) { window.location.href = SSO_URL; return; }
+      if (data.role !== "admin") { navigate("/mplanipret", { replace: true }); return; }
       setProfile(data);
       setLoading(false);
+
+      // Sidebar badges
+      try {
+        const { count: bc } = await supabase.from("planipret_profiles").select("*", { count: "exact", head: true });
+        setBrokerCount(bc ?? 0);
+      } catch { /* ignore */ }
+      try {
+        const since = new Date(); since.setHours(0, 0, 0, 0);
+        const { count: mc } = await supabase
+          .from("planipret_phone_calls").select("*", { count: "exact", head: true })
+          .eq("direction", "inbound").eq("status", "missed").gte("created_at", since.toISOString());
+        setMissedCalls(mc ?? 0);
+      } catch { /* ignore */ }
       try {
         const { data: sec } = await supabase.functions.invoke("pp-integration-secrets");
         const present = new Set(((sec as any)?.items ?? []).filter((i: any) => i.has_keys?.length).map((i: any) => i.provider));
         const required = ["elevenlabs", "anthropic", "maestro", "microsoft"];
         setMissingIntegrations(required.filter((p) => !present.has(p)).length);
+      } catch { /* ignore */ }
+      try {
+        const cached = localStorage.getItem("pp:audit:score");
+        if (cached) setAuditScore(Number(cached));
       } catch { /* ignore */ }
     })();
   }, [navigate]);
