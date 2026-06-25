@@ -8787,6 +8787,7 @@ export type Database = {
           language: string | null
           m365_connected: boolean
           maestro_connected: boolean
+          manual_checklist_state: Json
           max_concurrent_sessions: number
           notifications_enabled: boolean
           organization_id: string
@@ -8805,6 +8806,7 @@ export type Database = {
           language?: string | null
           m365_connected?: boolean
           maestro_connected?: boolean
+          manual_checklist_state?: Json
           max_concurrent_sessions?: number
           notifications_enabled?: boolean
           organization_id?: string
@@ -8823,6 +8825,7 @@ export type Database = {
           language?: string | null
           m365_connected?: boolean
           maestro_connected?: boolean
+          manual_checklist_state?: Json
           max_concurrent_sessions?: number
           notifications_enabled?: boolean
           organization_id?: string
@@ -12617,6 +12620,7 @@ export type Database = {
       }
       pin_chat_message: { Args: { _message_id: string }; Returns: undefined }
       planipret_ava_org_id: { Args: never; Returns: string }
+      pp_audit_realtime_check: { Args: never; Returns: Json }
       reconcile_pbx_call_records: { Args: { _org_id: string }; Returns: Json }
       relink_my_softphone_user: { Args: never; Returns: Json }
       resolve_org_by_domain_name: {
