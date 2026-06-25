@@ -7,39 +7,60 @@
 // across roots. Keep both files byte-identical — edit one, copy to the other.
 // ---------------------------------------------------------------------------
 
-/** Single source of truth for STUN/TURN. iOS WebView blocks external STUN
- *  and the OpenRelay TURN did not respond, so we use Metered.ca TURN
- *  including TURNS (TURN over TLS) on port 443 to bypass iOS firewalls. */
-export const ICE_SERVERS: RTCIceServer[] = [
+// ---------- Env-driven ICE provider configuration -------------------------
+// Defaults target Metered.ca (TURN/TURNS on 80/443, see docs/turn-ios-metered.md).
+// Override per environment (prod/staging) with Vite env vars:
+//   VITE_TURN_URLS              comma-separated turn:/turns: urls
+//   VITE_TURN_USERNAME          shared username for the urls above
+//   VITE_TURN_CREDENTIAL        shared credential
+//   VITE_STUN_URLS              comma-separated stun: urls (optional)
+//   VITE_TURN_FALLBACK_URLS     fallback turn urls if probe fails
+//   VITE_TURN_FALLBACK_USERNAME / VITE_TURN_FALLBACK_CREDENTIAL
+function readEnv(name: string): string | undefined {
+  try {
+    // @ts-ignore — Vite env
+    const v = typeof import.meta !== 'undefined' ? import.meta?.env?.[name] : undefined;
+    return typeof v === 'string' && v.length ? v : undefined;
+  } catch { return undefined; }
+}
+function buildIceServers(opts: {
+  stunEnv: string; turnEnv: string; userEnv: string; credEnv: string;
+  defaults: RTCIceServer[];
+}): RTCIceServer[] {
+  const turnUrls = readEnv(opts.turnEnv)?.split(',').map(s => s.trim()).filter(Boolean);
+  if (!turnUrls?.length) return opts.defaults;
+  const username = readEnv(opts.userEnv) ?? '';
+  const credential = readEnv(opts.credEnv) ?? '';
+  const stunUrls = readEnv(opts.stunEnv)?.split(',').map(s => s.trim()).filter(Boolean)
+    ?? ['stun:stun.l.google.com:19302', 'stun:stun.cloudflare.com:3478'];
+  return [
+    ...stunUrls.map((urls) => ({ urls })),
+    ...turnUrls.map((urls) => ({ urls, username, credential })),
+  ];
+}
+
+const METERED_DEFAULTS: RTCIceServer[] = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun.cloudflare.com:3478' },
-  {
-    urls: 'turn:global.relay.metered.ca:80',
-    username: 'e499486ca9b7d5a03a01e915',
-    credential: 'uMFpNAFBoFFUHOdF',
-  },
-  {
-    urls: 'turn:global.relay.metered.ca:80?transport=tcp',
-    username: 'e499486ca9b7d5a03a01e915',
-    credential: 'uMFpNAFBoFFUHOdF',
-  },
-  {
-    urls: 'turn:global.relay.metered.ca:443',
-    username: 'e499486ca9b7d5a03a01e915',
-    credential: 'uMFpNAFBoFFUHOdF',
-  },
-  {
-    urls: 'turns:global.relay.metered.ca:443?transport=tcp',
-    username: 'e499486ca9b7d5a03a01e915',
-    credential: 'uMFpNAFBoFFUHOdF',
-  },
+  { urls: 'turn:global.relay.metered.ca:80', username: 'e499486ca9b7d5a03a01e915', credential: 'uMFpNAFBoFFUHOdF' },
+  { urls: 'turn:global.relay.metered.ca:80?transport=tcp', username: 'e499486ca9b7d5a03a01e915', credential: 'uMFpNAFBoFFUHOdF' },
+  { urls: 'turn:global.relay.metered.ca:443', username: 'e499486ca9b7d5a03a01e915', credential: 'uMFpNAFBoFFUHOdF' },
+  { urls: 'turns:global.relay.metered.ca:443?transport=tcp', username: 'e499486ca9b7d5a03a01e915', credential: 'uMFpNAFBoFFUHOdF' },
 ];
+
+/** Primary STUN/TURN — env-overridable, defaults to Metered.ca. */
+export const ICE_SERVERS: RTCIceServer[] = buildIceServers({
+  stunEnv: 'VITE_STUN_URLS', turnEnv: 'VITE_TURN_URLS',
+  userEnv: 'VITE_TURN_USERNAME', credEnv: 'VITE_TURN_CREDENTIAL',
+  defaults: METERED_DEFAULTS,
+});
 
 export const PC_CONFIG: RTCConfiguration = {
   iceServers: ICE_SERVERS,
   iceTransportPolicy: 'all',
   bundlePolicy: 'balanced',
 };
+
 
 // ---------- Debug mode -----------------------------------------------------
 // Toggle without code changes:
