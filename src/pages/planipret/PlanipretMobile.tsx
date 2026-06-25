@@ -127,7 +127,10 @@ export default function PlanipretMobile() {
   const [unreadMsg, setUnreadMsg] = useState(0);
   const [unreadVm, setUnreadVm] = useState(0);
   const [inbound, setInbound] = useState<InboundCall>(null);
+  const [avaOpen, setAvaOpen] = useState(false);
+  const [activeCallId, setActiveCallId] = useState<string | null>(null);
   const openDialer = (n?: string) => { setDialerInit(n); setDialerOpen(true); };
+  const openAva = () => setAvaOpen(true);
   const refreshFn = useRef<(() => Promise<void> | void) | null>(null);
   const registerRefresh = (fn: (() => Promise<void> | void) | null) => { refreshFn.current = fn; };
   const handlePull = async () => { if (refreshFn.current) await refreshFn.current(); };
@@ -145,6 +148,34 @@ export default function PlanipretMobile() {
   }, [navigate]);
   useRealtimeManager(profile?.user_id, { onInboundRinging, onAiInsight });
   useAvaNavigation(profile?.user_id);
+
+  // Detect active outbound/in-progress call → FAB pulses red & hangs up on tap
+  useEffect(() => {
+    if (!profile?.user_id) return;
+    const refreshActive = async () => {
+      const { data } = await supabase
+        .from("planipret_phone_calls")
+        .select("id,status")
+        .eq("user_id", profile.user_id)
+        .in("status", ["active", "in_progress", "answered", "ringing"])
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      setActiveCallId((data as any)?.id ?? null);
+    };
+    refreshActive();
+    const ch = supabase
+      .channel("mplanipret-active-call")
+      .on("postgres_changes", { event: "*", schema: "public", table: "planipret_phone_calls", filter: `user_id=eq.${profile.user_id}` }, refreshActive)
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [profile?.user_id]);
+
+  const hangupActive = async () => {
+    if (!activeCallId) return;
+    const { error } = await supabase.functions.invoke("ns-calls", { body: { action: "hangup", call_id: activeCallId } });
+    if (error) toast.error("Échec raccrocher"); else toast.success("Appel raccroché");
+  };
 
   useEffect(() => {
     if (!profile?.user_id) return;
