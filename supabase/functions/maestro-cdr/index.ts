@@ -1,7 +1,10 @@
 // POST /functions/v1/maestro-cdr
-// Body: { call_id: uuid }  — reads call row, pushes CDR to Maestro, triggers transcript pipeline.
+// Body: { call_id: uuid }
+// Step 1 of pipeline: client lookup → push CDR to Maestro → trigger transcript.
 import {
   adminClient,
+  broadcastPipeline,
+  cacheMaestroClient,
   corsHeaders,
   getBrokerAuth,
   getMaestroConfig,
@@ -9,7 +12,9 @@ import {
   maestroAudit,
   maestroFetch,
   normalizePhone,
+  pipelineLog,
   setPipelineStep,
+  updateCallPipeline,
 } from "../_shared/maestro.ts";
 
 Deno.serve(async (req) => {
@@ -36,33 +41,93 @@ Deno.serve(async (req) => {
 
     const cfg = await getMaestroConfig(admin);
     if (!cfg.url || !cfg.key) {
+      await updateCallPipeline(admin, call_id, { step: "error", error: "maestro_not_configured" });
       await setPipelineStep(admin, call_id, "cdr", "error", { reason: "not_configured" });
       return json({ success: false, error: "maestro_not_configured" }, 200);
     }
 
-    await setPipelineStep(admin, call_id, "cdr", "running");
+    await updateCallPipeline(admin, call_id, { step: "client_lookup", started: true, error: null });
+    await pipelineLog(admin, { call_id, user_id: call.user_id, step: "client_lookup", status: "started" });
+
     const auth = await getBrokerAuth(admin, call.user_id);
 
-    // Inline client lookup if not already set
+    // ── STEP 1: client lookup (cache-first) ─────────────────────
     let maestroClientId = call.maestro_client_id ?? null;
-    if (!maestroClientId) {
-      const lookupPhone = call.direction === "inbound"
-        ? normalizePhone(call.from_number)
-        : normalizePhone(call.to_number);
-      if (lookupPhone) {
+    let clientName: string | null = null;
+    let clientCompany: string | null = null;
+    let mortgageStage: string | null = null;
+
+    const contactPhone = call.direction === "inbound"
+      ? normalizePhone(call.from_number)
+      : normalizePhone(call.to_number);
+
+    if (contactPhone && call.user_id) {
+      const { data: cached } = await admin
+        .from("planipret_maestro_clients")
+        .select("*")
+        .eq("user_id", call.user_id)
+        .eq("phone_e164", contactPhone)
+        .maybeSingle();
+      const fresh = cached && new Date(cached.cached_at).getTime() > Date.now() - 3600_000;
+      if (fresh) {
+        maestroClientId = cached.maestro_client_id;
+        clientName = cached.full_name;
+        clientCompany = cached.company;
+        mortgageStage = cached.mortgage_stage;
+        await pipelineLog(admin, { call_id, user_id: call.user_id, step: "client_lookup", status: "success", payload: { source: "cache", client_id: maestroClientId } });
+      } else {
+        const t0 = Date.now();
         const lookup = await maestroFetch(cfg, {
           method: "GET",
-          path: `/api/v1/clients/lookup?phone=${encodeURIComponent(lookupPhone)}`,
+          path: `/api/v1/clients/lookup?phone=${encodeURIComponent(contactPhone)}`,
           token: auth.token,
+        });
+        await pipelineLog(admin, {
+          call_id,
+          user_id: call.user_id,
+          step: "client_lookup",
+          status: lookup.ok ? "success" : "skipped",
+          duration_ms: Date.now() - t0,
+          payload: { source: "maestro", status: lookup.status },
         });
         if (lookup.ok && lookup.data) {
           const c = lookup.data?.client ?? lookup.data;
           maestroClientId = c?.id ?? c?.client_id ?? null;
+          clientName = c?.full_name ?? c?.name ?? [c?.first_name, c?.last_name].filter(Boolean).join(" ") || null;
+          clientCompany = c?.company ?? null;
+          mortgageStage = c?.mortgage_stage ?? null;
+          if (maestroClientId) {
+            await cacheMaestroClient(admin, {
+              user_id: call.user_id,
+              maestro_client_id: maestroClientId,
+              phone_e164: contactPhone,
+              full_name: clientName,
+              company: clientCompany,
+              email: c?.email ?? null,
+              mortgage_stage: mortgageStage,
+              preferred_lang: c?.preferred_lang ?? "fr",
+              tags: c?.tags ?? [],
+            });
+          }
         }
       }
     }
 
-    // Fetch broker extension
+    await admin
+      .from("planipret_phone_calls")
+      .update({
+        maestro_client_id: maestroClientId,
+        maestro_client_name: clientName,
+        maestro_client_company: clientCompany,
+        maestro_mortgage_stage: mortgageStage,
+      })
+      .eq("id", call_id);
+
+    // ── STEP 2: push CDR ────────────────────────────────────────
+    await updateCallPipeline(admin, call_id, { step: "cdr_sync" });
+    await setPipelineStep(admin, call_id, "cdr", "running");
+    await pipelineLog(admin, { call_id, user_id: call.user_id, step: "cdr_sync", status: "started" });
+
     const { data: profile } = await admin
       .from("planipret_profiles")
       .select("ns_extension")
@@ -82,6 +147,7 @@ Deno.serve(async (req) => {
       maestro_client_id: maestroClientId,
     };
 
+    const t0 = Date.now();
     const res = await maestroFetch(cfg, {
       method: "POST",
       path: "/api/v1/calls/cdr",
@@ -89,25 +155,39 @@ Deno.serve(async (req) => {
       body,
       idempotencyKey: call.id,
     });
+    const ms = Date.now() - t0;
 
-    // 409 = already exists in Maestro; treat as success
     if (res.ok || res.status === 409) {
       await admin
         .from("planipret_phone_calls")
         .update({
           maestro_synced: true,
           maestro_call_id: res.data?.id ?? res.data?.call_id ?? null,
-          maestro_client_id: maestroClientId,
         })
         .eq("id", call.id);
+      await updateCallPipeline(admin, call_id, { step: "cdr_sent" });
       await setPipelineStep(admin, call_id, "cdr", "done", { conflict: res.status === 409 });
+      await pipelineLog(admin, {
+        call_id,
+        user_id: call.user_id,
+        step: "cdr_sync",
+        status: "success",
+        duration_ms: ms,
+        payload: { maestro_call_id: res.data?.id ?? null, conflict: res.status === 409 },
+      });
       await maestroAudit(admin, "cdr_pushed", { call_id, status: res.status, client_id: maestroClientId });
+      await broadcastPipeline(admin, call.user_id, "pipeline_step", {
+        call_id,
+        step: "cdr_sent",
+        label: "CDR synchronisé avec Maestro ✅",
+        client_found: !!maestroClientId,
+        client_name: clientName,
+      });
 
-      // Fire-and-forget transcript trigger (delayed via separate invocation)
+      // Trigger transcript (fire and forget)
       try {
         const supaUrl = Deno.env.get("SUPABASE_URL")!;
         const anon = Deno.env.get("SUPABASE_ANON_KEY")!;
-        // Don't await — fire and forget
         fetch(`${supaUrl}/functions/v1/maestro-transcript`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${anon}` },
@@ -118,8 +198,11 @@ Deno.serve(async (req) => {
       return json({ success: true, maestro_call_id: res.data?.id ?? null, client_id: maestroClientId });
     }
 
+    await updateCallPipeline(admin, call_id, { step: "error", error: `cdr_${res.status}` });
     await setPipelineStep(admin, call_id, "cdr", "error", { status: res.status });
+    await pipelineLog(admin, { call_id, user_id: call.user_id, step: "cdr_sync", status: "error", duration_ms: ms, error_message: `status_${res.status}` });
     await maestroAudit(admin, "cdr_failed", { call_id, status: res.status, data: res.data });
+    await broadcastPipeline(admin, call.user_id, "pipeline_error", { call_id, step: "cdr_sync", error: `HTTP ${res.status}` });
     return json({ success: false, status: res.status, details: res.data }, 200);
   } catch (e: any) {
     console.error("maestro-cdr error", e);
