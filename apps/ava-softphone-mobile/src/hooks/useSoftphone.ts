@@ -590,7 +590,10 @@ export function useSoftphone(
           voiceActivityDetection: false,
         },
         pcConfig: {
-          iceServers: [],
+          iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+          ],
           iceTransportPolicy: 'all',
           bundlePolicy: 'balanced',
         },
@@ -622,7 +625,14 @@ export function useSoftphone(
   const answer = () =>
     sessionRef.current?.answer({
       mediaConstraints: { audio: true, video: false },
-      pcConfig: { iceServers: [], iceTransportPolicy: 'all', bundlePolicy: 'balanced' },
+      pcConfig: {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+        ],
+        iceTransportPolicy: 'all',
+        bundlePolicy: 'balanced',
+      },
     });
   const mute = () => { sessionRef.current?.mute({ audio: true }); setIsMuted(true); };
   const unmute = () => { sessionRef.current?.unmute({ audio: true }); setIsMuted(false); };
