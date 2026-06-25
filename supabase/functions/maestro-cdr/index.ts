@@ -93,7 +93,7 @@ Deno.serve(async (req) => {
         if (lookup.ok && lookup.data) {
           const c = lookup.data?.client ?? lookup.data;
           maestroClientId = c?.id ?? c?.client_id ?? null;
-          clientName = c?.full_name ?? c?.name ?? [c?.first_name, c?.last_name].filter(Boolean).join(" ") || null;
+          clientName = c?.full_name ?? c?.name ?? ([c?.first_name, c?.last_name].filter(Boolean).join(" ") || null);
           clientCompany = c?.company ?? null;
           mortgageStage = c?.mortgage_stage ?? null;
           if (maestroClientId) {
