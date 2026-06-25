@@ -16,6 +16,8 @@ Deno.serve(async (req) => {
     const { data: userRes } = await supa.auth.getUser();
     const userId = userRes?.user?.id;
     if (!userId) return json({ error: "unauthorized" }, 401);
+    const { data: lemtelOnly } = await supa.rpc("is_lemtel_only", { _user_id: userId });
+    if (lemtelOnly === true) return json({ error: "forbidden_wrong_app", app: "lemtel" }, 403);
 
     const norm = number.replace(/\D/g, "");
     const like = `%${norm.slice(-10)}%`;
