@@ -470,6 +470,17 @@ Deno.serve(async (req) => {
   const auth = await authBroker(req);
   if ("error" in auth) return auth.error;
 
+  // GATING: AVA est activée uniquement pour les courtiers sélectionnés par un admin
+  // via le toggle "Agent IA" dans Gestion Utilisateurs (planipret_profiles.voice_agent_enabled).
+  const { data: gate } = await auth.admin
+    .from("planipret_profiles")
+    .select("voice_agent_enabled")
+    .eq("id", auth.profile.id)
+    .maybeSingle();
+  if (gate?.voice_agent_enabled === false) {
+    return jsonResponse({ success: false, error: "ava_not_enabled_for_user" }, 403);
+  }
+
   const body = await req.json().catch(() => ({}));
   const { tool_name, parameters, session_id } = body ?? {};
   if (!tool_name || typeof tool_name !== "string") {
