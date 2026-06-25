@@ -14,6 +14,7 @@ import SessionTimeoutModal from "@/components/planipret/SessionTimeoutModal";
 import PrivacyConsentGate from "@/components/planipret/PrivacyConsentGate";
 import UniversalSearchBar from "@/components/planipret/UniversalSearchBar";
 import { OnboardingTutorial } from "@/components/planipret/OnboardingTutorial";
+import { useAvaNavigation } from "@/hooks/useAvaNavigation";
 
 const ACCENT = "#2E9BDC";
 
@@ -143,6 +144,7 @@ export default function PlanipretMobile() {
     });
   }, [navigate]);
   useRealtimeManager(profile?.user_id, { onInboundRinging, onAiInsight });
+  useAvaNavigation(profile?.user_id);
 
   useEffect(() => {
     if (!profile?.user_id) return;

@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Mic, Play, Pause, Phone, Save, Forward, Trash2, FileText, X } from "lucide-react";
 import type { PlanipretMobileContext } from "../PlanipretMobile";
+import GreetingStudio from "@/components/planipret/mobile/voicemail/GreetingStudio";
 
 const PRIMARY = "var(--pp-brand-accent-2)";
 
@@ -40,8 +41,8 @@ const fmtDate = (iso: string) => {
 };
 
 export default function MVoicemail() {
-  const { profile, openDialer, registerRefresh } = useOutletContext<PlanipretMobileContext>();
-  const [tab, setTab] = useState<"inbox" | "saved">("inbox");
+  const { profile, openDialer, registerRefresh, reloadProfile } = useOutletContext<PlanipretMobileContext>();
+  const [tab, setTab] = useState<"greeting" | "inbox" | "saved">("greeting");
   const [items, setItems] = useState<VM[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -123,16 +124,18 @@ export default function MVoicemail() {
       </header>
 
       <div className="flex gap-2 mb-3">
-        {(["inbox", "saved"] as const).map((k) => (
+        {(["greeting", "inbox", "saved"] as const).map((k) => (
           <button key={k} onClick={() => setTab(k)}
             className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${tab === k ? "text-white shadow-sm" : "bg-white text-slate-600"}`}
             style={tab === k ? { background: PRIMARY } : undefined}>
-            {k === "inbox" ? "📬 Reçus" : "💾 Sauvegardés"}
+            {k === "greeting" ? "🎙️ Ma boîte" : k === "inbox" ? "📬 Reçus" : "💾 Sauvegardés"}
           </button>
         ))}
       </div>
 
-      {loading ? (
+      {tab === "greeting" ? (
+        <GreetingStudio profile={profile} onProfileChange={reloadProfile} />
+      ) : loading ? (
         <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="bg-white rounded-2xl h-16 animate-pulse" />)}</div>
       ) : filtered.length === 0 ? (
         <div className="bg-white rounded-2xl p-8 text-center shadow-sm mt-8 text-slate-500 text-sm">
