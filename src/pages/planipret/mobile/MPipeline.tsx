@@ -116,9 +116,13 @@ export default function MPipeline() {
   );
 }
 
-function DetailSheet({ card, onClose, onMove, onChanged }: { card: Card; onClose: () => void; onMove: (id: string, stage: string) => void; onChanged: () => void }) {
+function DetailSheet({ card, profile, openDialer, openAva, onClose, onMove, onChanged }: { card: Card; profile: any; openDialer: (n?: string) => void; openAva: () => void; onClose: () => void; onMove: (id: string, stage: string) => void; onChanged: () => void }) {
   const [notes, setNotes] = useState(card.notes ?? "");
   const [busy, setBusy] = useState(false);
+  const [coachOpen, setCoachOpen] = useState(false);
+  const [coachReply, setCoachReply] = useState("");
+  const [coachLoading, setCoachLoading] = useState(false);
+  const [coachSuggestions, setCoachSuggestions] = useState<AvaSuggestion[]>([]);
 
   const saveNotes = async () => {
     setBusy(true);
@@ -127,6 +131,23 @@ function DetailSheet({ card, onClose, onMove, onChanged }: { card: Card; onClose
     toast.success("Notes enregistrées");
     onChanged();
   };
+
+  const askCoach = async () => {
+    setCoachOpen(true);
+    setCoachLoading(true);
+    setCoachReply("");
+    setCoachSuggestions([]);
+    const stageLabel = STAGES.find((s) => s.key === card.stage)?.label ?? card.stage;
+    const res = await callAva({
+      mode: "recommend",
+      message: `Dossier "${card.contact_name}" à l'étape "${stageLabel}". Quelle est la meilleure prochaine action pour faire avancer ce deal ?`,
+      context: { card: { name: card.contact_name, number: card.contact_number, stage: card.stage, notes: card.notes }, broker: profile?.full_name },
+    });
+    setCoachReply(res.reply);
+    setCoachSuggestions(res.suggestions);
+    setCoachLoading(false);
+  };
+
 
   return (
     <div className="fixed inset-0 z-50 flex items-end bg-black/40" onClick={onClose}>
