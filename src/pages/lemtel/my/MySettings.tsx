@@ -112,7 +112,7 @@ function ProfileTab() {
 
   const save = async (patch: Record<string, any>) => {
     setBusy(true);
-    const { error } = await supabase.from("profiles").update(patch).eq("id", profile.id);
+    const { error } = await (supabase.from("profiles") as any).update(patch).eq("id", profile.id);
     setBusy(false);
     if (error) toast.error(error.message);
     else { toast.success("Saved"); setProfile({ ...profile, ...patch }); }
