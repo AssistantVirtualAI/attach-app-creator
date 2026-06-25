@@ -42,7 +42,8 @@ export default function PlanipretAdminLayout() {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [missingIntegrations, setMissingIntegrations] = useState(0);
-  const [realtimeOk, setRealtimeOk] = useState(false);
+  const { status: rtStatus } = useAdminRealtime();
+  const realtimeOk = rtStatus === "live";
 
   useEffect(() => {
     (async () => {
