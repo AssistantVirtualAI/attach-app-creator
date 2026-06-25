@@ -55,13 +55,13 @@ export function usePullToRefresh(onRefresh: () => void | Promise<void>, threshol
 }
 
 /** Visual indicator rendered above the scroll content. */
-export function PullIndicator({ pullDist, refreshing, threshold = 70 }: { pullDist: number; refreshing: boolean; threshold?: number }) {
+export function PullIndicator({ pullDist, refreshing, threshold = 70, color }: { pullDist: number; refreshing: boolean; threshold?: number; color?: string }) {
   const visible = pullDist > 0 || refreshing;
   if (!visible) return null;
   const progress = Math.min(pullDist / threshold, 1);
   return (
     <div
-      style={{ height: Math.max(pullDist, refreshing ? 40 : 0), opacity: refreshing ? 1 : progress }}
+      style={{ height: Math.max(pullDist, refreshing ? 40 : 0), opacity: refreshing ? 1 : progress, color }}
       className="flex items-center justify-center text-xs text-muted-foreground transition-opacity"
       aria-hidden={!visible}
     >
