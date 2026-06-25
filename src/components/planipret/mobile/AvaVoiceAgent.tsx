@@ -135,8 +135,22 @@ export default function AvaVoiceAgent({ onClose, userId }: Props) {
     (async () => {
       try {
         setState("connecting");
-        try { await navigator.mediaDevices.getUserMedia({ audio: true }); }
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          micStreamRef.current = stream;
+          const Ctx = (window.AudioContext || (window as any).webkitAudioContext);
+          if (Ctx) {
+            const ac = new Ctx();
+            audioCtxRef.current = ac;
+            const src = ac.createMediaStreamSource(stream);
+            const analyser = ac.createAnalyser();
+            analyser.fftSize = 64;
+            src.connect(analyser);
+            analyserRef.current = analyser;
+          }
+        }
         catch { setMicError(true); setState("error"); return; }
+
 
         const { data: cfg, error } = await supabase.functions.invoke("ava-agent-config", { body: {} });
         if (error || !(cfg as any)?.success) {
