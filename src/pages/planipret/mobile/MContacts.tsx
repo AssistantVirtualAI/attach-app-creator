@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useOutletContext } from "react-router-dom";
-import { Search, Phone, MessageSquare, Mail, Users, Smartphone, Clock, X, Calendar, ListChecks, Loader2, ExternalLink } from "lucide-react";
+import { Search, Phone, MessageSquare, Mail, Users, Smartphone, Clock, X, Calendar, ListChecks, Loader2, ExternalLink, Sparkles } from "lucide-react";
+import AvaSummarizeSheet from "@/components/planipret/ava/AvaSummarizeSheet";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { PlanipretMobileContext } from "../PlanipretMobile";
