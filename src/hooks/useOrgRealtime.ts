@@ -33,7 +33,6 @@ export function useOrgRealtime(opts: {
     const channel = supabase
       .channel(`rt:${table}:${orgId}`)
       .on(
-        // @ts-expect-error supabase-js typings
         "postgres_changes",
         { event, schema: "public", table, filter: `organization_id=eq.${orgId}` },
         () => schedule()

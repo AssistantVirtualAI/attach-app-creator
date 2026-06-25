@@ -1045,7 +1045,7 @@ const App = () => (
                 <Route path="/post-login" element={<ProtectedRoute><PostLoginRedirect /></ProtectedRoute>} />
 
                 {/* === Three-portal architecture === */}
-                {/* Platform Admin — AVA / Lemtel internal */}
+                {/* Platform Admin — AVA super-admin org only */}
                 <Route path="/platform" element={<ProtectedRoute><AvaPlatformOrgOnly><RolePortalGuard portal="platform"><PlatformAdminShell /></RolePortalGuard></AvaPlatformOrgOnly></ProtectedRoute>}>
                   <Route index element={<PlatformDashboard />} />
                   <Route path="organizations" element={<MasterOrganizations />} />
@@ -1057,7 +1057,7 @@ const App = () => (
                   <Route path="health" element={<PlatformSystemHealth />} />
                   <Route path="qa" element={<LemtelOrgOnly fallback="/platform"><PlatformTelephonyQA /></LemtelOrgOnly>} />
                   <Route path="audit" element={<MasterAuditLogs />} />
-                  <Route path="settings" element={<LemtelSettings />} />
+                  <Route path="settings" element={<Settings />} />
                   <Route path="ai-usage" element={<PlatformAIUsage />} />
                 </Route>
 

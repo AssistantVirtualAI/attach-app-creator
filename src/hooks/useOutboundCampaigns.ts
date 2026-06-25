@@ -103,9 +103,10 @@ export const useOutboundCampaigns = () => {
 
   const updateCampaign = useMutation({
     mutationFn: async ({ id, ...updates }: Partial<OutboundCampaign> & { id: string }) => {
+      const { agents, ...updateData } = updates as any;
       const { data, error } = await supabase
         .from('outbound_campaigns')
-        .update(updates)
+        .update(updateData)
         .eq('id', id)
         .select()
         .single();

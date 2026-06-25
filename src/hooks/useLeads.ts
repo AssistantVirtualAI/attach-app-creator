@@ -78,7 +78,7 @@ export function useLeads() {
 
   const updateLead = useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Lead> & { id: string }) => {
-      const updateData: Record<string, unknown> = { ...updates };
+      const updateData = { ...updates } as any;
       
       if (updates.status === 'qualified' && !updates.qualified_at) {
         updateData.qualified_at = new Date().toISOString();
