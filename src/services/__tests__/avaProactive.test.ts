@@ -7,7 +7,7 @@ const from = vi.fn(() => ({ insert }));
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     functions: { invoke: (name: string, opts?: any) => invoke(name, opts) },
-    from: (...a: any[]) => from(...a),
+    from: (table: string) => from(table),
   },
 }));
 
