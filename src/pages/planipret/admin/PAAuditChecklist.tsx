@@ -4,6 +4,7 @@ import {
   CheckCircle2, XCircle, AlertTriangle, Loader2, MinusCircle,
   RefreshCw, FileDown, ChevronDown, ChevronRight, ShieldCheck,
 } from "lucide-react";
+import { toast } from "sonner";
 
 type Status = "pass" | "fail" | "warn" | "skip" | "running";
 type Item = { id: string; name: string; description?: string; status: Status; detail?: string; ms?: number };
