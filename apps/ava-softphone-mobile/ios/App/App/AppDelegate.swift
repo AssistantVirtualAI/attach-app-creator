@@ -25,7 +25,19 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             NSLog("AVAudioSession config failed: \(error)")
         }
 
+        // Disable WebRTC mDNS ICE candidates — FusionPBX cannot resolve .local mDNS addresses
+        if #available(iOS 14.0, *) {
+            let preferences = WKWebpagePreferences()
+            preferences.allowsContentJavaScript = true
+        }
+
+        // Force WebRTC to use real IP addresses instead of mDNS obfuscation
+        UserDefaults.standard.set(false, forKey: "WebKitICECandidateFilteringEnabled")
+        UserDefaults.standard.set(true, forKey: "WebKitEnumeratingAllNetworkInterfacesEnabled")
+        UserDefaults.standard.synchronize()
+
         return true
+
     }
 
     func applicationWillResignActive(_ application: UIApplication) {
