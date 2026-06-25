@@ -6,7 +6,7 @@ import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, PieChart, Pi
 import type { PlanipretMobileContext } from "../PlanipretMobile";
 import CoachOverlay from "@/components/planipret/ava/CoachOverlay";
 import { callAva, type AvaSuggestion } from "@/services/avaProactive";
-import { useNavigate as useNav2 } from "react-router-dom";
+
 
 type Period = "week" | "month" | "quarter";
 
