@@ -7,25 +7,31 @@
 // across roots. Keep both files byte-identical — edit one, copy to the other.
 // ---------------------------------------------------------------------------
 
-/** Single source of truth for STUN/TURN. iOS WebView blocks external STUN,
- *  so a public TURN relay (OpenRelay) is included on 80/443/443-TCP. */
+/** Single source of truth for STUN/TURN. iOS WebView blocks external STUN
+ *  and the OpenRelay TURN did not respond, so we use Metered.ca TURN
+ *  including TURNS (TURN over TLS) on port 443 to bypass iOS firewalls. */
 export const ICE_SERVERS: RTCIceServer[] = [
   { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'stun:stun.cloudflare.com:3478' },
   {
-    urls: 'turn:openrelay.metered.ca:80',
-    username: 'openrelayproject',
-    credential: 'openrelayproject',
+    urls: 'turn:global.relay.metered.ca:80',
+    username: 'e499486ca9b7d5a03a01e915',
+    credential: 'uMFpNAFBoFFUHOdF',
   },
   {
-    urls: 'turn:openrelay.metered.ca:443',
-    username: 'openrelayproject',
-    credential: 'openrelayproject',
+    urls: 'turn:global.relay.metered.ca:80?transport=tcp',
+    username: 'e499486ca9b7d5a03a01e915',
+    credential: 'uMFpNAFBoFFUHOdF',
   },
   {
-    urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-    username: 'openrelayproject',
-    credential: 'openrelayproject',
+    urls: 'turn:global.relay.metered.ca:443',
+    username: 'e499486ca9b7d5a03a01e915',
+    credential: 'uMFpNAFBoFFUHOdF',
+  },
+  {
+    urls: 'turns:global.relay.metered.ca:443?transport=tcp',
+    username: 'e499486ca9b7d5a03a01e915',
+    credential: 'uMFpNAFBoFFUHOdF',
   },
 ];
 
