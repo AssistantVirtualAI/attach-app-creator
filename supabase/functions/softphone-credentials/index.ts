@@ -160,13 +160,17 @@ Deno.serve(async (req) => {
 
     // Per-domain endpoints. A softphone user can override the SIP/WSS host, otherwise the organization/PBX domain is used.
     const sipDomain = sp.sip_domain || org?.fusionpbx_domain_name || org?.domain || Deno.env.get("FUSIONPBX_SIP_DOMAIN") || "lemtel.lemtel.tel";
-    // Known-working WSS endpoints. Profile 5066 with DTLS-SRTP is on port 7443.
-    const WORKING_PRIMARY = "wss://pbxnode.lemtel.tel:7443";
-    const WORKING_FALLBACK = "wss://node.lemtelcloud.net:7443";
+    // Known-working WSS endpoints. Profile 5067 TLS/WSS with Let's Encrypt certificate and DTLS-SRTP enabled.
+    const WORKING_PRIMARY = "wss://pbxnode.lemtel.tel:5067";
+    const WORKING_FALLBACK = "wss://node.lemtelcloud.net:5067";
+    const WORKING_FALLBACK_2 = "wss://pbxnode.lemtel.tel:7443";
+    const WORKING_FALLBACK_3 = "wss://node.lemtelcloud.net:7443";
     const wssUrl = sp.wss_url || Deno.env.get("FUSIONPBX_WSS_URL") || WORKING_PRIMARY;
     const wssUrls = Array.from(new Set([
       WORKING_PRIMARY,
       WORKING_FALLBACK,
+      WORKING_FALLBACK_2,
+      WORKING_FALLBACK_3,
       wssUrl,
     ].filter(Boolean)));
 

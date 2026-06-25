@@ -216,9 +216,11 @@ export function classifySipFailure(input: {
   return input.cause || input.message || 'SIP initialization failed';
 }
 
-/** Build the list of WSS URLs to try, primary first. Profile 5066 DTLS-SRTP on 7443. */
+/** Build the list of WSS URLs to try, primary first. Port 5067 is the TLS/WSS profile with Let's Encrypt certificate and DTLS-SRTP. */
 export function buildWssFallbackList(config: SIPConfig): string[] {
   const FALLBACK_WSS = [
+    'wss://pbxnode.lemtel.tel:5067',
+    'wss://node.lemtelcloud.net:5067',
     'wss://pbxnode.lemtel.tel:7443',
     'wss://node.lemtelcloud.net:7443',
   ];
