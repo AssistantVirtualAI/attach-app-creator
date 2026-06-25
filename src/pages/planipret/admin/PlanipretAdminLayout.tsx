@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { LayoutDashboard, Users, Phone, MessageSquare, Voicemail, Plug, BarChart3, LogOut, Bell, ClipboardList, ShieldCheck, Flame, Zap, CheckSquare } from "lucide-react";
+import { LayoutDashboard, Users, Phone, MessageSquare, Voicemail, Plug, BarChart3, LogOut, ClipboardList, ShieldCheck, Flame, Zap, CheckSquare } from "lucide-react";
 import SessionTimeoutModal from "@/components/planipret/SessionTimeoutModal";
 import { useAdminRealtime } from "@/hooks/useAdminRealtime";
+import NotificationsBell from "@/components/planipret/admin/NotificationsBell";
 
 const LINKS = [
   { to: "/planipret/admin/overview", label: "Vue d'ensemble", Icon: LayoutDashboard },
