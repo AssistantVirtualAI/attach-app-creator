@@ -153,61 +153,81 @@ export default function PAAuditChecklist() {
   }, [report]);
 
   const exportPdf = async () => {
-    if (!report) return;
-    const { jsPDF } = await import("jspdf");
-    const doc = new jsPDF({ unit: "pt", format: "a4" });
-    const pageW = doc.internal.pageSize.getWidth();
-    const pageH = doc.internal.pageSize.getHeight();
-    const margin = 40;
-    let y = margin;
+    if (!report) {
+      toast.error("Aucun rapport à exporter");
+      return;
+    }
+    try {
+      const { jsPDF } = await import("jspdf");
+      const doc = new jsPDF({ unit: "pt", format: "a4" });
+      const pageW = doc.internal.pageSize.getWidth();
+      const pageH = doc.internal.pageSize.getHeight();
+      const margin = 40;
+      let y = margin;
 
-    const line = (txt: string, size = 10, bold = false, color: [number, number, number] = [20, 20, 20]) => {
-      doc.setFont("helvetica", bold ? "bold" : "normal");
-      doc.setFontSize(size);
-      doc.setTextColor(...color);
-      const wrapped = doc.splitTextToSize(txt, pageW - margin * 2);
-      for (const l of wrapped) {
+      const line = (txt: string, size = 10, bold = false, color: [number, number, number] = [20, 20, 20]) => {
+        doc.setFont("helvetica", bold ? "bold" : "normal");
+        doc.setFontSize(size);
+        doc.setTextColor(color[0], color[1], color[2]);
+        const wrapped = doc.splitTextToSize(String(txt ?? ""), pageW - margin * 2);
+        for (const l of wrapped) {
+          if (y > pageH - margin) { doc.addPage(); y = margin; }
+          doc.text(l, margin, y);
+          y += size * 1.25;
+        }
+      };
+      const hr = () => {
         if (y > pageH - margin) { doc.addPage(); y = margin; }
-        doc.text(l, margin, y);
-        y += size * 1.25;
-      }
-    };
-    const hr = () => {
-      if (y > pageH - margin) { doc.addPage(); y = margin; }
-      doc.setDrawColor(200); doc.line(margin, y, pageW - margin, y); y += 8;
-    };
+        doc.setDrawColor(200); doc.line(margin, y, pageW - margin, y); y += 8;
+      };
 
-    line("Audit Système — Planiprêt AI Portal", 18, true, [10, 30, 60]);
-    line(`Généré le ${new Date(report.generated_at).toLocaleString("fr-CA")}`, 9, false, [100, 100, 100]);
-    y += 6;
-    line(`Score global: ${report.score}%`, 14, true, [0, 100, 80]);
-    line(`✓ Complété: ${report.totals.pass}   ⚠ Partiel: ${report.totals.warn}   ✗ Manquant: ${report.totals.fail}   ⏭ Ignoré: ${report.totals.skip}   (Total ${report.totals.total})`, 10);
-    hr();
-
-    const icon = (s: Status) => s === "pass" ? "[OK]" : s === "fail" ? "[X]" : s === "warn" ? "[!]" : s === "skip" ? "[-]" : "[..]";
-
-    for (const sec of report.sections) {
-      y += 4;
-      line(`${sec.emoji} ${sec.title}`, 13, true, [10, 30, 60]);
-      for (const it of sec.items) {
-        const color: [number, number, number] =
-          it.status === "pass" ? [0, 130, 90] :
-          it.status === "fail" ? [180, 40, 40] :
-          it.status === "warn" ? [180, 120, 0] : [110, 110, 110];
-        line(`${icon(it.status)} ${it.name}`, 10, true, color);
-        if (it.detail) line(it.detail, 9, false, [80, 80, 80]);
-      }
+      line("Audit Systeme - Planipret AI Portal", 18, true, [10, 30, 60]);
+      line(`Genere le ${new Date(report.generated_at).toLocaleString("fr-CA")}`, 9, false, [100, 100, 100]);
+      y += 6;
+      line(`Score global: ${report.score}%`, 14, true, [0, 100, 80]);
+      line(`[OK] ${report.totals.pass}   [!] ${report.totals.warn}   [X] ${report.totals.fail}   [-] ${report.totals.skip}   (Total ${report.totals.total})`, 10);
       hr();
-    }
 
-    line("Checklist manuelle", 13, true, [10, 30, 60]);
-    for (const m of MANUAL_CHECKLIST) {
-      const done = manualState[m.id];
-      line(`${done ? "[X]" : "[ ]"} ${m.label}`, 10, true, done ? [0, 130, 90] : [60, 60, 60]);
-      line(m.hint, 9, false, [110, 110, 110]);
-    }
+      const icon = (s: Status) => s === "pass" ? "[OK]" : s === "fail" ? "[X]" : s === "warn" ? "[!]" : s === "skip" ? "[-]" : "[..]";
 
-    doc.save(`audit-planipret-${new Date().toISOString().slice(0, 10)}.pdf`);
+      for (const sec of report.sections) {
+        y += 4;
+        line(`${sec.title}`, 13, true, [10, 30, 60]);
+        for (const it of sec.items) {
+          const color: [number, number, number] =
+            it.status === "pass" ? [0, 130, 90] :
+            it.status === "fail" ? [180, 40, 40] :
+            it.status === "warn" ? [180, 120, 0] : [110, 110, 110];
+          line(`${icon(it.status)} ${it.name}`, 10, true, color);
+          if (it.detail) line(it.detail, 9, false, [80, 80, 80]);
+        }
+        hr();
+      }
+
+      line("Checklist manuelle", 13, true, [10, 30, 60]);
+      for (const m of MANUAL_CHECKLIST) {
+        const done = manualState[m.id];
+        line(`${done ? "[X]" : "[ ]"} ${m.label}`, 10, true, done ? [0, 130, 90] : [60, 60, 60]);
+        line(m.hint, 9, false, [110, 110, 110]);
+      }
+
+      const filename = `audit-planipret-${new Date().toISOString().slice(0, 10)}.pdf`;
+      // Force a real download via blob + anchor (more reliable than doc.save across browsers)
+      const blob = doc.output("blob");
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.rel = "noopener";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      toast.success("PDF téléchargé");
+    } catch (e: any) {
+      console.error("[audit] exportPdf error", e);
+      toast.error(`Échec export PDF: ${e?.message || e}`);
+    }
   };
 
   return (
