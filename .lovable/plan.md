@@ -1,58 +1,68 @@
-Quatre chantiers Phase 5, tous dans `/mplanipret` (org AVA), zéro changement de tables/Edge Functions existantes.
+… (concise)
 
-## 1. Historique AVA + recherche + brouillons par contact
-- Nouveau composant `AvaHistorySheet.tsx` ouvert depuis l'en-tête de l'onglet AVA (Messages) et depuis l'overlay vocal.
-- Liste groupée par jour des messages `planipret_ava_conversations` (déjà filtrés `user_id`), avec badge audio/texte (`metadata.mode`).
-- Barre de recherche locale (filtre `ilike` côté client sur le batch chargé + bouton « Charger plus »).
-- Brouillons par contact : nouveau hook `useAvaDraft(contactKey)` qui lit/écrit `localStorage` clé `pp-ava-draft:{user_id}:{contactKey}`. Auto-restauration au montage de l'AvaChat / overlay vocal quand un `contactKey` est fourni (par défaut `global`).
-- Quand on tape dans le Composer AVA → enregistrement debounce 400 ms. Quand AVA répond avec succès → brouillon effacé.
+## Objectif
+Garantir qu'aucune configuration ne manque sur les Phases 1→7 du module Planipret mobile, ajouter une couverture de tests minimale et appliquer des améliorations ciblées sans casser l'existant.
 
-## 2. Workflow « Résumer avec AVA » réutilisable
-- Nouveau composant `AvaSummarizeSheet.tsx` (drawer 92 %) acceptant `{ source: "sms" | "team" | "email", title, content, contextMeta }`.
-- 3 niveaux : **Court** (1 phrase), **Standard** (3 phrases + action), **Détaillé** (résumé + points clés + prochaine étape).
-- Bouton « Copier » (clipboard) et « Coller dans réponse » (callback `onInsert`).
-- Appel unique à `pp-ava-proactive` avec un prompt formé côté client selon le niveau. Aucun changement Edge Function.
-- Branchement :
-  - SMS ThreadView → menu kebab → « Résumer la conversation »
-  - Team #general → menu kebab → « Résumer le canal »
-  - Emails → remplace le bouton actuel « Résumer avec AVA » par ce composant partagé + option « Insérer dans une réponse ».
+## 1. Audit de configuration (lecture seule + corrections additives)
 
-## 3. Logique complète « pp-ava-proactive »
-- Nouveau service client `src/services/avaProactive.ts` qui wrappe `supabase.functions.invoke("pp-ava-proactive", …)` et normalise la réponse en `{ reply, suggestions: AvaSuggestion[], openCoach?: boolean, openVoice?: boolean }`.
-- Type `AvaSuggestion = { id, label, kind: "call" | "sms" | "email" | "reminder" | "maestro_action", payload }`.
-- Quand `openVoice: true` → appel `openAva()` (déjà dans le context shell).
-- Quand `openCoach: true` → ouvre `CoachOverlay` (nouveau, mini drawer 50 %) montrant les suggestions + transcript live des derniers messages.
-- Boutons d'action :
-  - `call` → `openDialer(number)`
-  - `sms` → navigation `/mplanipret/messages` + pré-remplissage du composer (param URL)
-  - `reminder` → insert dans `planipret_reminders`
-  - `maestro_action` → `supabase.functions.invoke("maestro-pipeline-orchestrator", { body: payload })` (déjà existant)
-- Card « 🤖 AVA recommande » du MHome consomme ce service au lieu de mocks.
+### 1.1 Edge Functions
+Vérifier que toutes les fonctions appelées par le front existent et sont déployées :
+- `pp-ava-chat`, `pp-ava-proactive`, `pp-search`, `pp-ns-calls`, `pp-ns-cdr`, `pp-ns-auth`, `pp-contact-timeline`, `pp-calendar-sync`, `pp-push-notify`, `pp-vapid-public`, `pp-greeting-*`, `pp-integration-secrets`, `pp-data-retention`, `pp-gdpr-export`, `pp-audit-*`, `maestro-pipeline-orchestrator`.
+- Compléter `supabase/config.toml` avec les blocs `[functions.<name>] verify_jwt = …` manquants pour les fonctions PP (par défaut `true`, sauf webhooks publics).
+- Vérifier la présence des en-têtes CORS sur chaque fonction PP (patch additif si manquant).
 
-## 4. Onglet « Équipe » (membres + dispo + actions M365)
-- Nouvelle sous-tab dans `MMessages` : `team-roster` (ou intégration sous l'actuelle « Équipe » via toggle « Chat / Équipe »).
-- Requête `planipret_profiles` filtrée par même organisation (`organization_id` ou `is_planipret_member()`), champs : `full_name, email, extension, status, last_seen_at, voice_agent_enabled, avatar_url`.
-- Disponibilité visuelle : pastille verte (en ligne <2 min), jaune (idle <30 min), grise (offline). Source : `last_seen_at`.
-- Actions rapides par membre :
-  - **Appeler** → `openDialer(extension)`
-  - **SMS** → ouvre ThreadView sur l'extension
-  - **Email M365** → ouvre `EmailComposeSheet` pré-rempli (`to=email`)
-  - **Mention chat** → insert dans `planipret_team_messages` avec `@<full_name>`
-- Pull-to-refresh + skeletons.
+### 1.2 Secrets
+- Vérifier via `fetch_secrets` : `LOVABLE_API_KEY` (AVA), clés NetSapiens / Maestro / ElevenLabs / VAPID / Resend si déjà utilisées.
+- Si manquant, créer via `ai_gateway--create` (LOVABLE_API_KEY) ou demander à l'utilisateur via `add_secret` (autres).
 
-## Détails techniques
-- Aucune nouvelle table, aucune nouvelle migration, aucun nouveau secret.
-- `pp-ava-proactive` reste tel quel — on enrichit côté client la structure attendue (fallback gracieux si les champs manquent).
-- Maestro déclenché via Edge Function existante `maestro-pipeline-orchestrator`.
-- Tous les nouveaux composants sous `src/pages/planipret/mobile/` ou `src/components/planipret/ava/`.
-- Tous les overlays restent `absolute` à l'intérieur du `<Frame>` (jamais `fixed`).
-- Recherche : pas de FTS serveur, filtre client (jusqu'à 500 derniers messages chargés).
+### 1.3 RLS & GRANT
+- Lancer `supabase--linter` et corriger uniquement les findings liés aux tables touchées par les phases 1-7 (`planipret_ava_conversations`, `planipret_reminders`, `planipret_team_messages`, `planipret_contacts`, `planipret_phone_calls`, `planipret_phone_messages`, `planipret_voicemails`, `planipret_pipeline`).
+- S'assurer que chaque table a `GRANT` cohérent + policies par `user_id`/organisation.
 
-## Ordre d'exécution suggéré
-1. Service `avaProactive` + types (base pour les autres).
-2. `AvaSummarizeSheet` partagé + branchement SMS/Team/Email.
-3. Historique AVA + brouillons localStorage.
-4. CoachOverlay + intégration MHome card.
-5. Onglet Équipe (roster + actions M365).
+### 1.4 Routes & contextes UI
+- Vérifier que `useOutletContext` expose bien partout : `openAva`, `openDialer`, `openVoice`, `broker`, `org`.
+- Ajouter les routes/imports manquants éventuels (`MMore`, `MSearch`).
 
-Tu valides cet ordre ou tu veux que je commence par un chantier précis ?
+## 2. Tests
+
+### 2.1 Tests frontend (Vitest + RTL)
+Mise en place si absente (`vitest.config.ts`, `src/test/setup.ts`).
+Tests ciblés :
+- `useAvaDraft` : write/read/debounce/effacement.
+- `avaProactive.applyAvaSuggestion` : routage `call`/`sms`/`reminder`/`maestro_action` (mocks supabase + navigate).
+- `AvaSummarizeSheet` : changement de niveau déclenche un appel, bouton copier copie le texte.
+- `AvaHistorySheet` : recherche filtre la liste, "Charger plus" pagine.
+- `CoachOverlay` : clic suggestion → callback `applyAvaSuggestion`.
+
+### 2.2 Tests Edge Functions (Deno)
+- `pp-ava-chat/index_test.ts` : OPTIONS = 200 CORS ; POST sans body = 400 ; POST valide renvoie structure `{ reply, suggestions[] }`.
+- `pp-ava-proactive/index_test.ts` : idem + fallback gracieux quand LLM down.
+- `pp-search/index_test.ts` : recherche basique + auth requise.
+
+### 2.3 Smoke E2E (Playwright via shell, optionnel)
+Charger `/mplanipret`, vérifier que les 6 onglets s'ouvrent sans erreur console.
+
+## 3. Améliorations transverses
+
+- **Gestion d'erreurs unifiée** : helper `toastError(e)` partagé, utilisé par tous les `catch` AVA / Maestro / NS.
+- **Loading & skeletons** : compléter les skeletons manquants dans `AvaHistorySheet` (pagination), `Team roster`, `CoachOverlay`.
+- **Pull-to-refresh** : extraire `usePullToRefresh` hook et l'appliquer uniformément à MHome, MMessages (chaque sous-tab), MPipeline, MStats, MContacts, MVoicemail.
+- **Debounce recherche** : 250 ms sur `AvaHistorySheet` et roster Équipe.
+- **A11y** : `aria-label` sur tous les boutons icône-only des nouveaux composants (CoachOverlay, AvaHistorySheet, AvaSummarizeSheet, InboundCallOverlay).
+- **Persist last tab** : mémoriser onglet actif Messages (`sms|team|ava|email|roster`) en `localStorage`.
+- **Optimistic UI** : envoi SMS / message Équipe / reminder → affichage immédiat puis réconciliation.
+- **AVA budget guard** : court-circuit côté client si `LOVABLE_API_KEY` retourne 402/429 → toast explicatif + désactivation temporaire (60 s).
+
+## 4. Livrables
+- `supabase/config.toml` mis à jour (verify_jwt par fonction PP).
+- Tests : `src/**/__tests__/*.test.ts(x)` + `supabase/functions/**/index_test.ts`.
+- Nouveau hook `src/hooks/usePullToRefresh.ts`, helper `src/lib/toastError.ts`.
+- Branchements dans MHome/MMessages/MPipeline/MStats/MContacts/MVoicemail.
+- Patchs additifs CORS/GRANT si findings.
+
+## 5. Hors scope
+- Pas de nouvelle table, pas de nouvelle fonctionnalité produit.
+- Pas de modif de la landing ni des composants admin.
+- Pas de rotation de clé existante.
+
+Tu valides ? Je peux aussi restreindre à un sous-ensemble (par ex. uniquement audit + tests, sans les améliorations UX) si tu préfères un périmètre plus court.
