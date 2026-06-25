@@ -7451,6 +7451,42 @@ export type Database = {
         }
         Relationships: []
       }
+      pbx_wss_health_checks: {
+        Row: {
+          checked_at: string
+          created_at: string
+          error: string | null
+          host: string
+          id: string
+          latency_ms: number
+          ok: boolean
+          port: number
+          url: string
+        }
+        Insert: {
+          checked_at?: string
+          created_at?: string
+          error?: string | null
+          host: string
+          id?: string
+          latency_ms?: number
+          ok: boolean
+          port: number
+          url: string
+        }
+        Update: {
+          checked_at?: string
+          created_at?: string
+          error?: string | null
+          host?: string
+          id?: string
+          latency_ms?: number
+          ok?: boolean
+          port?: number
+          url?: string
+        }
+        Relationships: []
+      }
       performance_metrics: {
         Row: {
           appointments_booked: number | null

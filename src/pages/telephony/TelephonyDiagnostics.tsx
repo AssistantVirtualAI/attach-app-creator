@@ -12,6 +12,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useTelephonyStatus } from '@/hooks/useTelephonyStatus';
 import { useSoftphone } from '@/hooks/useSoftphone';
 import { LEMTEL_ORG } from '@/hooks/usePbxData';
+import { WssHealthMonitor } from '@/components/telephony/WssHealthMonitor';
+
 
 type QaStatus = 'pending' | 'pass' | 'fail' | 'warn' | 'running';
 type QaCheck = { id: string; group: string; label: string; status: QaStatus; detail: string; fix: string; at: number };
@@ -153,6 +155,10 @@ export default function TelephonyDiagnostics() {
           <div className="md:col-span-2"><Label>Expected test call number</Label><Input value={testNumber} onChange={(e) => setTestNumber(e.target.value)} placeholder="Optional caller/destination number for CDR match" /></div>
         </CardContent>
       </Card>
+
+      <WssHealthMonitor />
+
+
 
       <Card>
         <CardHeader><CardTitle className="text-base"><PhoneIncoming className="inline w-4 h-4 mr-2" />Inbound readiness checklist</CardTitle><CardDescription>Each item includes the recommended fix from backend signals.</CardDescription></CardHeader>
