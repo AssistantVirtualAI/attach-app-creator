@@ -156,6 +156,10 @@ export default function TelephonyDiagnostics() {
         </CardContent>
       </Card>
 
+      <WssHealthMonitor />
+
+
+
       <Card>
         <CardHeader><CardTitle className="text-base"><PhoneIncoming className="inline w-4 h-4 mr-2" />Inbound readiness checklist</CardTitle><CardDescription>Each item includes the recommended fix from backend signals.</CardDescription></CardHeader>
         <CardContent className="space-y-2">{visible.map((c) => <StatusRow key={c.id} check={c} />)}</CardContent>
