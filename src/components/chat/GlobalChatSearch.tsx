@@ -69,7 +69,7 @@ export function GlobalChatSearch({
                     {m.channel_type === "dm" ? <AtSign className="h-2.5 w-2.5" /> : m.channel_type === "private" ? <UsersIcon className="h-2.5 w-2.5" /> : <Hash className="h-2.5 w-2.5" />}
                     {m.channel_name} • {m.sender_name}
                   </div>
-                  <div className="text-xs" dangerouslySetInnerHTML={{ __html: m.snippet || m.content }} />
+                  <div className="text-xs" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(m.snippet || m.content || "", { ALLOWED_TAGS: ["mark", "b", "strong", "em", "i"], ALLOWED_ATTR: [] }) }} />
                 </button>
               ))}
             </div>
