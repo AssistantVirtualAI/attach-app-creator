@@ -16,7 +16,7 @@ import Landing from "./pages/Landing";
 import AuthPage from "./pages/Auth";
 import AgencyHome from "./pages/AgencyHome";
 import PostLoginRedirect from "./pages/PostLoginRedirect";
-import PlanipretLogin from "./pages/planipret/PlanipretLogin";
+// PlanipretLogin removed — auth handled via avastatistic.ca SSO
 import PlanipretMobile from "./pages/planipret/PlanipretMobile";
 import { AppSeparationGuard } from "./components/auth/AppSeparationGuard";
 import MHome from "./pages/planipret/mobile/MHome";
@@ -379,8 +379,9 @@ const App = () => (
                 {/* Admin auth (legacy, redirects to /login) */}
                 <Route path="/auth" element={<Navigate to="/login" replace />} />
 
-                {/* Planiprêt — organisation distincte (séparée de Lemtel et AVA) */}
-                <Route path="/planipret/login" element={<PlanipretLogin />} />
+                {/* Planiprêt — auth via avastatistic.ca SSO */}
+                <Route path="/planipret" element={<Navigate to="/planipret/admin/overview" replace />} />
+                <Route path="/planipret/login" element={<Navigate to="/planipret/admin/overview" replace />} />
                 <Route path="/lemtel/setup/:token" element={<SoftphoneSetup />} />
                 <Route path="/lemtel/redeem/:token" element={<SoftphoneSetup />} />
                 <Route path="/mplanipret" element={<AppSeparationGuard app="planipret"><PlanipretMobile /></AppSeparationGuard>}>
