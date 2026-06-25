@@ -53,6 +53,8 @@ configureMobileApi({
 import { configureAudit, audit } from './lib/audit';
 import { edgeCall, supabase } from './lib/mobileSupabase';
 import PerfOverlay from './components/PerfOverlay';
+import IceDiagnosticsOverlay from './components/IceDiagnosticsOverlay';
+import { ensureActivePcConfig } from './lib/sip/rtcConfig';
 import ScreenSkeleton from './components/ScreenSkeleton';
 import SessionExpired from './components/SessionExpired';
 import { startPrefetch, prefetchForTab } from './lib/prefetch';
@@ -108,6 +110,9 @@ export default function MobileApp() {
       setTimeout(() => setBooting(false), 700);
     });
     initBackgroundSync().catch(() => {});
+    // Sonde les endpoints TURN au démarrage pour basculer sur le fallback
+    // si Metered.ca n'est pas joignable depuis ce réseau / cet OS.
+    ensureActivePcConfig().catch(() => {});
     // Préchargement opportuniste des écrans les plus consultés.
     try { startPrefetch(); } catch {}
     let unsubDeepLink: (() => void) | undefined;
@@ -129,9 +134,9 @@ export default function MobileApp() {
 
 
   if (loading || booting) return <SplashAva />;
-  if (!creds) return <MobileI18nProvider><ThemeProvider><AuthScreen onAuthenticated={setCreds} /><PerfOverlay /></ThemeProvider></MobileI18nProvider>;
+  if (!creds) return <MobileI18nProvider><ThemeProvider><AuthScreen onAuthenticated={setCreds} /><PerfOverlay /><IceDiagnosticsOverlay /></ThemeProvider></MobileI18nProvider>;
 
-  return <MobileI18nProvider><ThemeProvider><AuthenticatedShell creds={creds} setCreds={setCreds} tab={tab} setTab={setTab} onSignOut={clearCreds} preferClickToCall={preferC2C} onTogglePreferC2C={() => {}} /><PerfOverlay /></ThemeProvider></MobileI18nProvider>;
+  return <MobileI18nProvider><ThemeProvider><AuthenticatedShell creds={creds} setCreds={setCreds} tab={tab} setTab={setTab} onSignOut={clearCreds} preferClickToCall={preferC2C} onTogglePreferC2C={() => {}} /><PerfOverlay /><IceDiagnosticsOverlay /></ThemeProvider></MobileI18nProvider>;
 }
 
 function AuthenticatedShell({

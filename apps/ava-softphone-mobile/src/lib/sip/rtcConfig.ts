@@ -187,3 +187,132 @@ export function watchCallEstablishment(
     }, timeoutMs);
   });
 }
+
+// ---------- Fallback ICE servers (used if Metered is unreachable) ----------
+export const FALLBACK_ICE_SERVERS: RTCIceServer[] = [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
+];
+
+// ---------- Diagnostic bus (UI + console) ----------------------------------
+export type IceDiagnosticEvent =
+  | { kind: 'ice-state'; state: RTCIceConnectionState }
+  | { kind: 'gather-state'; state: RTCIceGatheringState }
+  | { kind: 'candidate'; source: string; raw: string }
+  | { kind: 'probe-result'; provider: 'metered' | 'fallback'; relayFound: boolean }
+  | { kind: 'pc-config'; provider: 'metered' | 'fallback' };
+
+const _diagListeners = new Set<(e: IceDiagnosticEvent) => void>();
+export function onIceDiagnostic(fn: (e: IceDiagnosticEvent) => void): () => void {
+  _diagListeners.add(fn);
+  return () => _diagListeners.delete(fn);
+}
+function emitDiag(e: IceDiagnosticEvent) {
+  _diagListeners.forEach((l) => { try { l(e); } catch {} });
+  if (isSipDebugEnabled()) console.log('[SIP][diag]', e);
+}
+
+// ---------- TURN reachability probe + fallback -----------------------------
+let _activePcConfig: RTCConfiguration | null = null;
+let _probePromise: Promise<RTCConfiguration> | null = null;
+
+async function tryRelayCandidate(servers: RTCIceServer[], timeoutMs: number): Promise<boolean> {
+  if (typeof RTCPeerConnection === 'undefined') return true;
+  return new Promise<boolean>((resolve) => {
+    let done = false;
+    const pc = new RTCPeerConnection({ iceServers: servers, iceTransportPolicy: 'relay' });
+    const finish = (v: boolean) => {
+      if (done) return;
+      done = true;
+      try { pc.close(); } catch {}
+      resolve(v);
+    };
+    pc.addEventListener('icecandidate', (e) => {
+      const c = e.candidate;
+      if (!c) { finish(false); return; }
+      const isRelay = (c as any).type === 'relay' || /\styp\srelay/.test(c.candidate);
+      if (isRelay) finish(true);
+    });
+    pc.addEventListener('icegatheringstatechange', () => {
+      if (pc.iceGatheringState === 'complete') finish(false);
+    });
+    try {
+      pc.addTransceiver('audio', { direction: 'recvonly' });
+      pc.createOffer().then((o) => pc.setLocalDescription(o)).catch(() => finish(false));
+    } catch { finish(false); }
+    setTimeout(() => finish(false), timeoutMs);
+  });
+}
+
+export async function probeTurnEndpoints(timeoutMs = 5000): Promise<{ provider: 'metered' | 'fallback'; relayFound: boolean }> {
+  const meteredOk = await tryRelayCandidate(ICE_SERVERS, timeoutMs);
+  if (meteredOk) {
+    emitDiag({ kind: 'probe-result', provider: 'metered', relayFound: true });
+    return { provider: 'metered', relayFound: true };
+  }
+  const fbOk = await tryRelayCandidate(FALLBACK_ICE_SERVERS, timeoutMs);
+  emitDiag({ kind: 'probe-result', provider: 'fallback', relayFound: fbOk });
+  return { provider: 'fallback', relayFound: fbOk };
+}
+
+/** Run the probe once at startup; cache the resulting PC config.
+ *  Subsequent calls reuse the cached result. */
+export function ensureActivePcConfig(): Promise<RTCConfiguration> {
+  if (_activePcConfig) return Promise.resolve(_activePcConfig);
+  if (_probePromise) return _probePromise;
+  _probePromise = (async () => {
+    try {
+      const res = await probeTurnEndpoints();
+      const servers = res.provider === 'metered' ? ICE_SERVERS : FALLBACK_ICE_SERVERS;
+      _activePcConfig = { iceServers: servers, iceTransportPolicy: 'all', bundlePolicy: 'balanced' };
+      emitDiag({ kind: 'pc-config', provider: res.provider });
+    } catch {
+      _activePcConfig = PC_CONFIG;
+      emitDiag({ kind: 'pc-config', provider: 'metered' });
+    }
+    return _activePcConfig!;
+  })();
+  return _probePromise;
+}
+
+/** Synchronous accessor — returns the probed config if available,
+ *  otherwise the default Metered config. */
+export function getActivePcConfig(): RTCConfiguration {
+  return _activePcConfig ?? PC_CONFIG;
+}
+
+// Tap into ICE events so the diagnostic overlay updates live.
+const _origInstrument = instrumentPeerConnection;
+export function instrumentPeerConnectionWithDiag(pc: RTCPeerConnection, log: IceLogger): () => void {
+  const teardown = _origInstrument(pc, log);
+  const onCand = (e: RTCPeerConnectionIceEvent) => {
+    if (!e.candidate) return;
+    emitDiag({ kind: 'candidate', source: classifyIceCandidate(e.candidate), raw: e.candidate.candidate });
+  };
+  const onIce = () => emitDiag({ kind: 'ice-state', state: pc.iceConnectionState });
+  const onGather = () => emitDiag({ kind: 'gather-state', state: pc.iceGatheringState });
+  pc.addEventListener('icecandidate', onCand);
+  pc.addEventListener('iceconnectionstatechange', onIce);
+  pc.addEventListener('icegatheringstatechange', onGather);
+  return () => {
+    teardown();
+    pc.removeEventListener('icecandidate', onCand);
+    pc.removeEventListener('iceconnectionstatechange', onIce);
+    pc.removeEventListener('icegatheringstatechange', onGather);
+  };
+}
+
+/** Returns true when the iOS ICE diagnostic overlay should render. */
+export function isIceDiagOverlayEnabled(): boolean {
+  if (isSipDebugEnabled()) return true;
+  try {
+    const url = new URLSearchParams(window.location.search);
+    if (url.get('iceDiag') === '1') return true;
+    const ls = window.localStorage?.getItem('sip:iceDiag');
+    if (ls === '1' || ls === 'true') return true;
+  } catch {}
+  return false;
+}
+
