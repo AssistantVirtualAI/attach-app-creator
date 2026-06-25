@@ -302,14 +302,29 @@ export function useSoftphone(
                 if (data?.originator === 'local') {
                   setOfferedCodecs(codecs);
                   log('sdp.offer', `codecs=[${codecs.join(', ')}] (${sdp.length}b)`);
-                  console.log('[SIP][SDP][local offer]\n' + sdp);
+                  if (isSipDebugEnabled()) console.log('[SIP][SDP][local offer]\n' + sdp);
                 } else {
                   log('sdp.remote', `codecs=[${codecs.join(', ')}]`);
-                  console.log('[SIP][SDP][remote ' + data?.type + ']\n' + sdp);
+                  if (isSipDebugEnabled()) console.log('[SIP][SDP][remote ' + data?.type + ']\n' + sdp);
                 }
               } catch (e: any) {
                 log('sdp.parse-failed', e?.message || '', 'warn');
               }
+            });
+
+            // Post-INVITE health-check: warn if session/ICE never reach connected.
+            watchCallEstablishment(session, session.connection, 15000).then((res) => {
+              if (res.ok) {
+                log('call.established', `ice=${res.iceState}`);
+                return;
+              }
+              const msg =
+                res.reason === 'timeout-session' ? 'Appel non confirmé (pas d’ACK en 15 s)'
+                : res.reason === 'timeout-ice'   ? `ICE bloqué (state=${res.iceState ?? '?'}) — STUN/TURN probablement filtré`
+                : res.reason === 'ice-failed'    ? 'Échec ICE — chemin média bloqué'
+                : 'Établissement de l’appel échoué';
+              log('call.establishment-failed', `${res.reason} ice=${res.iceState}`, 'error');
+              try { showMobileToast(msg, 'error'); } catch {}
             });
             session.on('confirmed', () => {
               setCallState('active');
