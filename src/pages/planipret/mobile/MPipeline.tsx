@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Plus, X, Phone } from "lucide-react";
+import { Plus, X, Phone, Sparkles } from "lucide-react";
+import CoachOverlay from "@/components/planipret/ava/CoachOverlay";
+import { callAva, type AvaSuggestion } from "@/services/avaProactive";
 import type { PlanipretMobileContext } from "../PlanipretMobile";
 
 type Card = {
