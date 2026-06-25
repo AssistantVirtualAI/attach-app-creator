@@ -651,7 +651,22 @@ function AvaChat({ profile, openAva }: { profile: any; openAva: () => void }) {
         )}
         <div ref={bottomRef} />
       </div>
-      <Composer text={text} setText={setText} onSend={send} sending={sending} placeholder="Demandez à AVA…" accent="agent" />
+      <Composer
+        text={text} setText={setText} onSend={send} sending={sending}
+        placeholder="Demandez à AVA…" accent="agent"
+        leftAction={
+          profile?.voice_agent_enabled ? (
+            <button
+              onClick={openAva}
+              className="p-2 rounded-full"
+              style={{ color: "var(--pp-agent)" }}
+              title="Mode vocal"
+            >
+              <Mic className="w-5 h-5" />
+            </button>
+          ) : null
+        }
+      />
     </div>
   );
 }
