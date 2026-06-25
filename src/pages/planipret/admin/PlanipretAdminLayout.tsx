@@ -5,6 +5,7 @@ import { LayoutDashboard, Users, Phone, MessageSquare, Voicemail, Plug, BarChart
 import SessionTimeoutModal from "@/components/planipret/SessionTimeoutModal";
 import { useAdminRealtime } from "@/hooks/useAdminRealtime";
 import NotificationsBell from "@/components/planipret/admin/NotificationsBell";
+import CommandPalette from "@/components/planipret/admin/CommandPalette";
 
 const LINKS = [
   { to: "/planipret/admin/overview", label: "Vue d'ensemble", Icon: LayoutDashboard },
