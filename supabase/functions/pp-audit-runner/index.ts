@@ -149,6 +149,12 @@ Deno.serve(async (req) => {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    const { data: lemtelOnly } = await supaUser.rpc("is_lemtel_only", { _user_id: user.id });
+    if (lemtelOnly === true) {
+      return new Response(JSON.stringify({ error: "forbidden_wrong_app", app: "lemtel" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     const admin = createClient(SUPA_URL, SERVICE);
     const { data: profile } = await admin.from("planipret_profiles").select("role").eq("user_id", user.id).maybeSingle();
     if (!profile || (profile as any).role !== "admin") {

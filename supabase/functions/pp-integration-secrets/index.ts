@@ -30,6 +30,14 @@ Deno.serve(async (req) => {
     });
   }
 
+  const { data: lemtelOnly } = await supaUser.rpc("is_lemtel_only", { _user_id: user.id });
+  if (lemtelOnly === true) {
+    return new Response(JSON.stringify({ error: "forbidden_wrong_app", app: "lemtel" }), {
+      status: 403,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   const admin = createClient(supaUrl, service);
   const url = new URL(req.url);
   const action = url.searchParams.get("action") ?? "get";

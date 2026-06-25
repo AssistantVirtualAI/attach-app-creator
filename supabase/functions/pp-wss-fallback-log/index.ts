@@ -27,6 +27,8 @@ Deno.serve(async (req) => {
     });
     const { data: userRes, error: userErr } = await userClient.auth.getUser();
     if (userErr || !userRes?.user) return json({ error: "unauthorized" }, 401);
+    const { data: lemtelOnly } = await userClient.rpc("is_lemtel_only", { _user_id: userRes.user.id });
+    if (lemtelOnly === true) return json({ error: "forbidden_wrong_app", app: "lemtel" }, 403);
 
     const body = await req.json().catch(() => ({}));
     const primary = String(body.primary_url ?? "");
