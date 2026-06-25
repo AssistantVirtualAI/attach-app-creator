@@ -1,40 +1,43 @@
 import { useEffect, useRef, useState } from "react";
 
 /**
- * Lightweight pull-to-refresh hook for mobile tabs.
- * Attach `bind` to a scrollable element; calls `onRefresh` when user pulls past threshold.
+ * Pull-to-refresh hook for mobile scrollable views.
+ * Returns `ref` to attach to the scroll container, current `pullDist`, and `refreshing` flag.
  */
 export function usePullToRefresh(onRefresh: () => void | Promise<void>, threshold = 70) {
-  const ref = useRef<HTMLDivElement | null>(null);
-  const [pulling, setPulling] = useState(0);
+  const ref = useRef<HTMLDivElement>(null!);
+  const [pullDist, setPullDist] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
   const startY = useRef<number | null>(null);
-  const refreshing = useRef(false);
+  const busy = useRef(false);
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
 
     const onStart = (e: TouchEvent) => {
-      if (el.scrollTop > 0 || refreshing.current) return;
+      if (el.scrollTop > 0 || busy.current) return;
       startY.current = e.touches[0].clientY;
     };
     const onMove = (e: TouchEvent) => {
       if (startY.current == null) return;
       const dy = e.touches[0].clientY - startY.current;
-      if (dy > 0) setPulling(Math.min(dy, threshold * 1.5));
+      if (dy > 0) setPullDist(Math.min(dy, threshold * 1.5));
     };
     const onEnd = async () => {
       if (startY.current == null) return;
-      const dy = pulling;
+      const dy = pullDist;
       startY.current = null;
-      if (dy >= threshold && !refreshing.current) {
-        refreshing.current = true;
+      if (dy >= threshold && !busy.current) {
+        busy.current = true;
+        setRefreshing(true);
         try { await onRefresh(); } finally {
-          refreshing.current = false;
-          setPulling(0);
+          busy.current = false;
+          setRefreshing(false);
+          setPullDist(0);
         }
       } else {
-        setPulling(0);
+        setPullDist(0);
       }
     };
 
@@ -46,7 +49,27 @@ export function usePullToRefresh(onRefresh: () => void | Promise<void>, threshol
       el.removeEventListener("touchmove", onMove);
       el.removeEventListener("touchend", onEnd);
     };
-  }, [onRefresh, threshold, pulling]);
+  }, [onRefresh, threshold, pullDist]);
 
-  return { ref, pulling, threshold };
+  return { ref, pullDist, refreshing, threshold };
+}
+
+/** Visual indicator rendered above the scroll content. */
+export function PullIndicator({ pullDist, refreshing, threshold = 70 }: { pullDist: number; refreshing: boolean; threshold?: number }) {
+  const visible = pullDist > 0 || refreshing;
+  if (!visible) return null;
+  const progress = Math.min(pullDist / threshold, 1);
+  return (
+    <div
+      style={{ height: Math.max(pullDist, refreshing ? 40 : 0), opacity: refreshing ? 1 : progress }}
+      className="flex items-center justify-center text-xs text-muted-foreground transition-opacity"
+      aria-hidden={!visible}
+    >
+      {refreshing ? (
+        <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+      ) : (
+        <span>{progress >= 1 ? "Relâcher" : "Tirer pour actualiser"}</span>
+      )}
+    </div>
+  );
 }
