@@ -552,8 +552,14 @@ export default function MHome() {
                     <Icon className="w-3.5 h-3.5" />
                   </span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate" style={{ color: "var(--pp-text-primary)" }}>
+                    <p className="text-sm font-medium truncate flex items-center gap-1.5" style={{ color: "var(--pp-text-primary)" }}>
                       {name ?? "Inconnu"}
+                      {c.ai_summary && (
+                        <span className="text-[8px] px-1.5 py-0.5 rounded-full font-bold"
+                          style={{ background: "rgba(155,127,232,0.15)", color: "var(--pp-agent)", border: "1px solid rgba(155,127,232,0.3)" }}>
+                          🤖 IA
+                        </span>
+                      )}
                     </p>
                     <p className="text-[11px]" style={{ color: "var(--pp-text-muted)" }}>
                       {c.started_at ? new Date(c.started_at).toLocaleTimeString("fr-CA", { hour: "2-digit", minute: "2-digit" }) : ""}
