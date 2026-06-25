@@ -915,9 +915,26 @@ function EmailDetailSheet({ email, onClose, onReply }: { email: any; onClose: ()
           </button>
         </div>
       </div>
+
+      <AvaSummarizeSheet
+        open={sumOpen}
+        source="email"
+        title={subject}
+        content={`De: ${from} <${fromAddr}>\nObjet: ${subject}\n\n${preview}`}
+        onClose={() => setSumOpen(false)}
+        onInsert={(text) => {
+          setSumOpen(false);
+          onReply({
+            to: fromAddr,
+            subject: subject.startsWith("Re:") ? subject : `Re: ${subject}`,
+            body: `${text}\n\n---\nDe: ${from}\n${preview}`,
+          });
+        }}
+      />
     </div>
   );
 }
+
 
 function EmailComposeSheet({ init, onClose, onSent }: { init: { to?: string; subject?: string; body?: string }; onClose: () => void; onSent: () => void }) {
   const [to, setTo] = useState(init.to ?? "");
