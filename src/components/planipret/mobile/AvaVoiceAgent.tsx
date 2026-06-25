@@ -60,6 +60,11 @@ export default function AvaVoiceAgent({ onClose, userId }: Props) {
   const sessionIdRef = useRef<string>(`s_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`);
   const scrollRef = useRef<HTMLDivElement>(null);
   const startTimeRef = useRef<number>(Date.now());
+  const micStreamRef = useRef<MediaStream | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const [micLevels, setMicLevels] = useState<number[]>(Array.from({ length: 7 }, () => 20));
+
 
   const sessionId = sessionIdRef.current;
 
