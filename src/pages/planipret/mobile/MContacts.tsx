@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useOutletContext } from "react-router-dom";
-import { Search, Phone, MessageSquare, Mail, Users, Smartphone, Clock, X, Calendar, ListChecks, Loader2, ExternalLink } from "lucide-react";
+import { Search, Phone, MessageSquare, Mail, Users, Smartphone, Clock, X, Calendar, ListChecks, Loader2, ExternalLink, Sparkles } from "lucide-react";
+import AvaSummarizeSheet from "@/components/planipret/ava/AvaSummarizeSheet";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { PlanipretMobileContext } from "../PlanipretMobile";
@@ -203,6 +204,7 @@ function ContactDetailSheet({
   const [history, setHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [creatingTask, setCreatingTask] = useState(false);
+  const [summarizeOpen, setSummarizeOpen] = useState(false);
 
   const name = `${contact.first_name ?? ""} ${contact.last_name ?? ""}`.trim() || contact.phone || "Contact";
   const phone: string | undefined = contact.phone;
@@ -252,7 +254,7 @@ function ContactDetailSheet({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+    <div className="absolute inset-0 z-40 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div
         className="w-full sm:max-w-md max-h-[88vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl p-4"
         style={{ background: "var(--pp-bg-base)", border: "1px solid var(--pp-bg-border-2)" }}
@@ -275,6 +277,15 @@ function ContactDetailSheet({
           <QuickAction icon={creatingTask ? <Loader2 className="w-4 h-4 animate-spin" /> : <ListChecks className="w-4 h-4" />} label="Tâche" onClick={createTask} disabled={creatingTask} />
           <QuickAction icon={<Calendar className="w-4 h-4" />} label="RDV" onClick={() => toast.info("Bientôt disponible")} />
         </div>
+
+        {history.length > 0 && (
+          <button onClick={() => setSummarizeOpen(true)}
+            className="w-full mb-3 py-2 rounded-lg flex items-center justify-center gap-1.5 text-white text-xs font-semibold"
+            style={{ background: "linear-gradient(135deg,#2D1A5A,#9B7FE8)" }}>
+            <Sparkles className="w-3.5 h-3.5" /> Résumer l'historique avec AVA
+          </button>
+        )}
+
 
         {/* Timeline */}
         <div className="text-[10px] font-semibold uppercase tracking-wide mb-2" style={{ color: "var(--pp-text-muted)" }}>
@@ -322,6 +333,15 @@ function ContactDetailSheet({
           </button>
         )}
       </div>
+
+      <AvaSummarizeSheet
+        open={summarizeOpen}
+        source="team"
+        title={`Historique — ${name}`}
+        content={history.slice(0, 30).map((h: any) => `[${h.created_at || h.date || ""}] ${h.type || h.kind || ""}: ${h.title || h.summary || h.subject || ""}${h.description ? " — " + h.description : ""}`).join("\n")}
+        contextMeta={{ contact_name: name, phone, email: contact.email }}
+        onClose={() => setSummarizeOpen(false)}
+      />
     </div>
   );
 }
