@@ -67,12 +67,33 @@ Deno.serve(async (req) => {
 
       switch (event) {
         case "client.created":
+          // Invalidate any stale cache for this id
+          if (data?.client_id ?? data?.id) {
+            await admin.from("planipret_maestro_clients").delete().eq("maestro_client_id", data?.client_id ?? data?.id);
+          }
           await broadcast(admin, brokerId, "client_created", {
             title: "👤 Nouveau client Maestro",
             body: data?.name ?? data?.client?.name ?? "Nouveau client",
             client_id: data?.id ?? data?.client_id,
           });
           break;
+        case "client.phone_updated": {
+          const cid = data?.client_id ?? data?.id;
+          const newPhone = data?.new_phone ?? data?.phone ?? null;
+          if (cid) {
+            await admin
+              .from("planipret_maestro_clients")
+              .update({ phone_e164: newPhone, cached_at: new Date().toISOString() })
+              .eq("maestro_client_id", cid);
+          }
+          await broadcast(admin, brokerId, "client_phone_updated", {
+            title: "📱 Téléphone client mis à jour",
+            client_id: cid,
+            new_phone: newPhone,
+          });
+          break;
+        }
+
         case "appointment.updated":
           await broadcast(admin, brokerId, "appointment_updated", {
             title: "📅 RDV modifié",
