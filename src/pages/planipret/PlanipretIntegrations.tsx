@@ -233,6 +233,7 @@ export default function PlanipretIntegrations() {
 
                   {/* NetSapiens webhook helper */}
                   {card.id === "nsapi" && <NSWebhookHelper />}
+                  {card.id === "maestro" && <MaestroPanel />}
 
 
 
