@@ -2740,6 +2740,51 @@ export type Database = {
           },
         ]
       }
+      lemtel_softphone_invites: {
+        Row: {
+          consumed_at: string | null
+          created_at: string
+          created_by: string | null
+          email: string
+          expires_at: string
+          id: string
+          last_viewed_at: string | null
+          organization_id: string
+          softphone_user_id: string
+          token: string
+          updated_at: string
+          view_count: number
+        }
+        Insert: {
+          consumed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          email: string
+          expires_at?: string
+          id?: string
+          last_viewed_at?: string | null
+          organization_id: string
+          softphone_user_id: string
+          token: string
+          updated_at?: string
+          view_count?: number
+        }
+        Update: {
+          consumed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string
+          expires_at?: string
+          id?: string
+          last_viewed_at?: string | null
+          organization_id?: string
+          softphone_user_id?: string
+          token?: string
+          updated_at?: string
+          view_count?: number
+        }
+        Relationships: []
+      }
       lemtel_softphone_users: {
         Row: {
           created_at: string

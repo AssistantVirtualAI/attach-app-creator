@@ -30,6 +30,7 @@ import MSearch from "./pages/planipret/mobile/MSearch";
 import MStats from "./pages/planipret/mobile/MStats";
 import PlanipretAudit from "./pages/planipret/PlanipretAudit";
 import Ms365Callback from "./pages/planipret/Ms365Callback";
+import SoftphoneSetup from "./pages/lemtel/SoftphoneSetup";
 // Lazy-load admin pages (each is its own chunk)
 const PlanipretAdminLayout = lazy(() => import("./pages/planipret/admin/PlanipretAdminLayout"));
 const PAOverview = lazy(() => import("./pages/planipret/admin/PAOverview"));
@@ -380,6 +381,7 @@ const App = () => (
 
                 {/* Planiprêt — organisation distincte (séparée de Lemtel et AVA) */}
                 <Route path="/planipret/login" element={<PlanipretLogin />} />
+                <Route path="/lemtel/setup/:token" element={<SoftphoneSetup />} />
                 <Route path="/mplanipret" element={<AppSeparationGuard app="planipret"><PlanipretMobile /></AppSeparationGuard>}>
                   <Route index element={<MHome />} />
                   <Route path="home" element={<MHome />} />
