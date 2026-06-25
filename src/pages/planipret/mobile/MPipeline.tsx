@@ -30,7 +30,7 @@ const STAGES: Array<{ key: string; label: string; emoji: string }> = [
 const PRIMARY = "var(--pp-brand-accent-2)";
 
 export default function MPipeline() {
-  const { profile, openDialer } = useOutletContext<PlanipretMobileContext>();
+  const { profile, openDialer, openAva } = useOutletContext<PlanipretMobileContext>();
   const [cards, setCards] = useState<Card[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Card | null>(null);
