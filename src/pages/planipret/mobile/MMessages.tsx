@@ -379,6 +379,14 @@ function ThreadView({ number, myExt, userId, messages, onBack, onCall, onSent }:
         }
       />
       <SmsTemplatesSheet open={tplOpen} onClose={() => setTplOpen(false)} userId={userId} onPick={(body) => setText((t) => t ? `${t} ${body}` : body)} />
+      <AvaSummarizeSheet
+        open={sumOpen}
+        source="sms"
+        title={`SMS avec ${number}`}
+        content={ordered.map((m) => `${m.direction === "outbound" ? "Moi" : number}: ${m.body ?? ""}`).join("\n")}
+        onClose={() => setSumOpen(false)}
+        onInsert={(t) => setText((cur) => cur ? `${cur} ${t}` : t)}
+      />
     </div>
   );
 }
