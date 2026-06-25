@@ -311,7 +311,7 @@ export default function MHome() {
       {/* ===== STATS GRID ===== */}
       <section className="grid grid-cols-2 gap-3">
         {statsLoading ? (
-          <>{[0, 1, 2, 3].map((i) => <Shimmer key={i} className="h-24" />)}</>
+          <>{[0, 1, 2, 3, 4, 5].map((i) => <Shimmer key={i} className="h-24" />)}</>
         ) : (
           <>
             <StatCard
