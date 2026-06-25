@@ -674,18 +674,21 @@ function AvaChat({ profile, openAva }: { profile: any; openAva: () => void }) {
 // ============================================================
 // EMAILS TAB (M365)
 // ============================================================
-function EmailsList({ profile }: { profile: any }) {
+function EmailsList({ profile, openAva: _openAva }: { profile: any; openAva: () => void }) {
   const [emails, setEmails] = useState<any[] | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "no_m365" | "error">("loading");
+  const [active, setActive] = useState<any | null>(null);
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [composeInit, setComposeInit] = useState<{ to?: string; subject?: string; body?: string }>({});
 
   const load = async () => {
     if (!profile?.ms365_access_token) { setState("no_m365"); return; }
     setState("loading");
     const { data, error } = await supabase.functions.invoke("ms365-actions", {
-      body: { action: "list_messages", payload: { top: 25 } },
+      body: { action: "read_emails", payload: { top: 25 } },
     });
     if (error || !(data as any)?.success) { setState("error"); return; }
-    setEmails(((data as any).messages ?? (data as any).emails ?? []));
+    setEmails(((data as any).emails ?? (data as any).messages ?? []));
     setState("ready");
   };
 
@@ -693,7 +696,17 @@ function EmailsList({ profile }: { profile: any }) {
 
   return (
     <div className="h-full overflow-y-auto p-3">
-      <div className="flex justify-end mb-2">
+      <div className="flex items-center justify-between mb-2">
+        <button
+          onClick={() => { setComposeInit({}); setComposeOpen(true); }}
+          className="px-3 py-1.5 rounded-full flex items-center gap-1.5 text-xs font-semibold text-white"
+          style={{
+            background: "linear-gradient(135deg, var(--pp-brand-accent), var(--pp-brand-accent-2))",
+            boxShadow: "0 2px 12px rgba(46,155,220,0.4)",
+          }}
+        >
+          <Plus className="w-3.5 h-3.5" /> Composer
+        </button>
         <button
           onClick={load}
           className="text-xs flex items-center gap-1 px-2 py-1"
@@ -755,28 +768,206 @@ function EmailsList({ profile }: { profile: any }) {
             const received = e.receivedDateTime ?? e.created_at;
             const unread = e.isRead === false;
             return (
-              <li
-                key={e.id ?? i}
-                className="rounded-2xl p-3"
-                style={{
-                  background: "var(--pp-bg-surface)",
-                  border: "1px solid var(--pp-bg-border-2)",
-                  borderLeft: unread ? "3px solid var(--pp-brand-accent)" : "1px solid var(--pp-bg-border-2)",
-                }}
-              >
-                <div className="flex items-start justify-between gap-2 mb-1">
-                  <p className="font-semibold text-sm truncate" style={{ color: "var(--pp-text-primary)" }}>{from}</p>
-                  <span className="text-[10px] shrink-0" style={{ color: "var(--pp-text-faint)" }}>
-                    {received ? fmtTime(received) : ""}
-                  </span>
-                </div>
-                <p className="text-xs truncate mb-1" style={{ color: "var(--pp-text-secondary)" }}>{subject}</p>
-                <p className="text-[11px] line-clamp-2" style={{ color: "var(--pp-text-muted)" }}>{preview}</p>
+              <li key={e.id ?? i}>
+                <button
+                  onClick={() => setActive(e)}
+                  className="w-full text-left rounded-2xl p-3 active:opacity-80"
+                  style={{
+                    background: "var(--pp-bg-surface)",
+                    border: "1px solid var(--pp-bg-border-2)",
+                    borderLeft: unread ? "3px solid var(--pp-brand-accent)" : "1px solid var(--pp-bg-border-2)",
+                  }}
+                >
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <p className="font-semibold text-sm truncate" style={{ color: "var(--pp-text-primary)" }}>{from}</p>
+                    <span className="text-[10px] shrink-0" style={{ color: "var(--pp-text-faint)" }}>
+                      {received ? fmtTime(received) : ""}
+                    </span>
+                  </div>
+                  <p className="text-xs truncate mb-1" style={{ color: "var(--pp-text-secondary)" }}>{subject}</p>
+                  <p className="text-[11px] line-clamp-2" style={{ color: "var(--pp-text-muted)" }}>{preview}</p>
+                </button>
               </li>
             );
           })}
         </ul>
       ))}
+
+      {active && (
+        <EmailDetailSheet
+          email={active}
+          onClose={() => setActive(null)}
+          onReply={(init) => { setActive(null); setComposeInit(init); setComposeOpen(true); }}
+        />
+      )}
+      {composeOpen && (
+        <EmailComposeSheet
+          init={composeInit}
+          onClose={() => setComposeOpen(false)}
+          onSent={() => { setComposeOpen(false); load(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function EmailDetailSheet({ email, onClose, onReply }: { email: any; onClose: () => void; onReply: (init: { to?: string; subject?: string; body?: string }) => void }) {
+  const from = email.from?.emailAddress?.name ?? email.from?.emailAddress?.address ?? "Expéditeur";
+  const fromAddr = email.from?.emailAddress?.address ?? "";
+  const subject = email.subject ?? "(Sans objet)";
+  const preview = email.bodyPreview ?? "";
+  const [summary, setSummary] = useState<string | null>(null);
+  const [summarizing, setSummarizing] = useState(false);
+
+  const summarize = async () => {
+    setSummarizing(true);
+    const { data, error } = await supabase.functions.invoke("pp-ava-proactive", {
+      body: {
+        user_message: `Résume cet email en 2-3 phrases et propose une action.\n\nDe: ${from}\nObjet: ${subject}\nContenu: ${preview}`,
+        history: [],
+      },
+    });
+    const reply = (data as any)?.reply ?? (data as any)?.message ?? (error ? "Impossible de résumer." : "");
+    setSummary(reply);
+    setSummarizing(false);
+  };
+
+  return (
+    <div className="absolute inset-0 z-40 bg-black/60 backdrop-blur-sm flex items-end" onClick={onClose}>
+      <div
+        className="w-full rounded-t-3xl flex flex-col"
+        style={{ background: "var(--pp-bg-base)", border: "1px solid var(--pp-bg-border-2)", height: "92%" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-4 pt-3 pb-2" style={{ borderBottom: "1px solid var(--pp-bg-border)" }}>
+          <button onClick={onClose} className="p-1.5 rounded-full" style={{ color: "var(--pp-text-secondary)" }}>
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <p className="text-xs uppercase tracking-wider" style={{ color: "var(--pp-text-muted)" }}>Email</p>
+          <div className="w-7" />
+        </div>
+        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+          <div>
+            <p className="text-base font-semibold" style={{ color: "var(--pp-text-primary)" }}>{subject}</p>
+            <p className="text-xs mt-1" style={{ color: "var(--pp-text-muted)" }}>
+              De <span style={{ color: "var(--pp-text-secondary)" }}>{from}</span> {fromAddr && `<${fromAddr}>`}
+            </p>
+          </div>
+
+          <button
+            onClick={summarize}
+            disabled={summarizing}
+            className="w-full px-3 py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
+            style={{
+              background: "rgba(155,127,232,0.12)",
+              border: "1px solid rgba(155,127,232,0.30)",
+              color: "var(--pp-agent)",
+            }}
+          >
+            {summarizing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+            Résumer avec AVA
+          </button>
+
+          {summary && (
+            <div
+              className="rounded-xl p-3 text-sm whitespace-pre-wrap"
+              style={{
+                background: "rgba(155,127,232,0.08)",
+                border: "1px solid rgba(155,127,232,0.25)",
+                color: "var(--pp-text-primary)",
+              }}
+            >
+              {summary}
+            </div>
+          )}
+
+          <div
+            className="rounded-xl p-3 text-sm whitespace-pre-wrap"
+            style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}
+          >
+            {preview || "(Aperçu non disponible)"}
+          </div>
+        </div>
+        <div className="px-4 py-3 flex gap-2" style={{ borderTop: "1px solid var(--pp-bg-border)" }}>
+          <button
+            onClick={() => onReply({
+              to: fromAddr,
+              subject: subject.startsWith("Re:") ? subject : `Re: ${subject}`,
+              body: `\n\n---\nDe: ${from}\n${preview}`,
+            })}
+            className="flex-1 py-2.5 rounded-full text-white font-semibold text-sm flex items-center justify-center gap-2"
+            style={{ background: "linear-gradient(135deg, var(--pp-brand-accent), var(--pp-brand-accent-2))" }}
+          >
+            <Reply className="w-4 h-4" /> Répondre
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EmailComposeSheet({ init, onClose, onSent }: { init: { to?: string; subject?: string; body?: string }; onClose: () => void; onSent: () => void }) {
+  const [to, setTo] = useState(init.to ?? "");
+  const [subject, setSubject] = useState(init.subject ?? "");
+  const [body, setBody] = useState(init.body ?? "");
+  const [sending, setSending] = useState(false);
+
+  const send = async () => {
+    if (!to.trim()) { toast.error("Destinataire requis"); return; }
+    setSending(true);
+    const { data, error } = await supabase.functions.invoke("ms365-actions", {
+      body: { action: "send_email", payload: { to: to.split(",").map((s) => s.trim()).filter(Boolean), subject, body: body.replace(/\n/g, "<br/>") } },
+    });
+    setSending(false);
+    if (error || !(data as any)?.success) {
+      toast.error("Échec de l'envoi");
+      return;
+    }
+    toast.success("Email envoyé");
+    onSent();
+  };
+
+  return (
+    <div className="absolute inset-0 z-40 bg-black/60 backdrop-blur-sm flex items-end" onClick={onClose}>
+      <div
+        className="w-full rounded-t-3xl flex flex-col"
+        style={{ background: "var(--pp-bg-base)", border: "1px solid var(--pp-bg-border-2)", height: "92%" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-4 pt-3 pb-2" style={{ borderBottom: "1px solid var(--pp-bg-border)" }}>
+          <button onClick={onClose} className="p-1.5 rounded-full" style={{ color: "var(--pp-text-secondary)" }}>
+            <X className="w-5 h-5" />
+          </button>
+          <p className="text-xs uppercase tracking-wider" style={{ color: "var(--pp-text-muted)" }}>Nouveau message</p>
+          <button
+            onClick={send}
+            disabled={sending || !to.trim()}
+            className="px-3 py-1 rounded-full text-white text-xs font-semibold flex items-center gap-1 disabled:opacity-50"
+            style={{ background: "linear-gradient(135deg, var(--pp-brand-accent), var(--pp-brand-accent-2))" }}
+          >
+            {sending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+            Envoyer
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+          <input
+            value={to} onChange={(e) => setTo(e.target.value)} placeholder="À : email@exemple.com"
+            className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+            style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }}
+          />
+          <input
+            value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Objet"
+            className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+            style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }}
+          />
+          <textarea
+            value={body} onChange={(e) => setBody(e.target.value)} placeholder="Votre message…"
+            rows={14}
+            className="w-full px-3 py-2 rounded-lg text-sm outline-none resize-none"
+            style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }}
+          />
+        </div>
+      </div>
     </div>
   );
 }
