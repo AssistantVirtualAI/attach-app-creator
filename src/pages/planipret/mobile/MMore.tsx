@@ -390,7 +390,7 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
 function NotificationsSection({ profile, reloadProfile }: { profile: any; reloadProfile: () => Promise<void> }) {
   const { subscribe, sendTest, busy } = usePlanipretPush();
   const setPref = async (field: string, val: boolean) => {
-    await supabase.from("planipret_profiles").update({ [field]: val }).eq("user_id", profile.user_id);
+    await (supabase.from("planipret_profiles") as any).update({ [field]: val }).eq("user_id", profile.user_id);
     await reloadProfile();
   };
   const enablePush = async () => {

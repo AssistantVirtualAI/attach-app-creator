@@ -287,6 +287,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const LEMTEL_ORG_ID = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
+const PLANIPRET_ORG_ID_APP = '17d6507f-a9ca-409d-8e49-371d50332615';
 
 const LemtelOrgOnly = ({ children, fallback = "/dashboard" }: { children: React.ReactNode; fallback?: string }) => {
   const { selectedOrgId, isLoading } = useOrganization();
@@ -294,6 +295,24 @@ const LemtelOrgOnly = ({ children, fallback = "/dashboard" }: { children: React.
   if (selectedOrgId !== LEMTEL_ORG_ID) return <Navigate to={fallback} replace />;
   return <>{children}</>;
 };
+
+/**
+ * Restrict the AVA admin portal (the main /dashboard and its sub-routes)
+ * to the Planipret organization. If the user is a member of Planipret but
+ * has another org selected, auto-switch. Otherwise redirect to /portal.
+ */
+const PlanipretOrgOnly = ({ children }: { children: React.ReactNode }) => {
+  const { selectedOrgId, organizations, setSelectedOrgId, isLoading } = useOrganization();
+  if (isLoading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading…</div>;
+  if (selectedOrgId === PLANIPRET_ORG_ID_APP) return <>{children}</>;
+  const isMember = organizations.some((o: any) => (o.id || o.organization?.id) === PLANIPRET_ORG_ID_APP);
+  if (isMember) {
+    setSelectedOrgId(PLANIPRET_ORG_ID_APP);
+    return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Switching to Planipret…</div>;
+  }
+  return <Navigate to="/portal" replace />;
+};
+
 
 const LemtelAdminPage = ({ children }: { children: React.ReactNode }) => (
   <ProtectedRoute><LemtelGuard><ImpersonationProvider><AdminPortalLayout>{children}</AdminPortalLayout></ImpersonationProvider></LemtelGuard></ProtectedRoute>
@@ -315,12 +334,8 @@ const App = () => (
           <TooltipProvider>
             <Toaster />
           <Sonner />
-          <BrowserRouter
-            future={{
-              v7_startTransition: true,
-              v7_relativeSplatPath: true,
-            }}
-          >
+          <BrowserRouter>
+
             <OrganizationProvider>
               <Suspense fallback={<div>Loading...</div>}>
               <Routes>
@@ -412,8 +427,9 @@ const App = () => (
                   path="/dashboard"
                   element={
                     <ProtectedRoute>
-                      <Dashboard />
+                      <PlanipretOrgOnly><Dashboard /></PlanipretOrgOnly>
                     </ProtectedRoute>
+
                   }
                 />
                 <Route
