@@ -24,7 +24,7 @@ function Shimmer({ className = "" }: { className?: string }) {
 }
 
 export default function MHome() {
-  const { profile, registerRefresh, openDialer, reloadProfile } =
+  const { profile, registerRefresh, openDialer, openAva, reloadProfile } =
     useOutletContext<PlanipretMobileContext>();
   const navigate = useNavigate();
   const [stats, setStats] = useState({ calls: 0, missed: 0, sms: 0, voicemails: 0 });
