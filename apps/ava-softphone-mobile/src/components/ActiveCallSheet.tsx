@@ -139,6 +139,20 @@ export default function ActiveCallSheet({
         {sp.snap.muted && inCall && (
           <div style={{ fontSize: 11, color: colors.warning, letterSpacing: 1.2, fontWeight: 700, textTransform: 'uppercase' }}>Microphone muted</div>
         )}
+        {inCall && (
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8,
+            padding: '5px 12px', borderRadius: 999,
+            background: 'rgba(255,255,255,0.06)',
+            border: `1px solid ${colors.border}`,
+            fontSize: 11, letterSpacing: 1.1, fontWeight: 700,
+            color: colors.mutedSilver, textTransform: 'uppercase',
+          }}>
+            <span style={{ fontSize: 13 }}>{routeIcon(audio.route)}</span>
+            <span>Sortie · {routeLabel(audio.route)}</span>
+            {audio.busy && <span style={{ color: colors.avaCyan }}>…</span>}
+          </div>
+        )}
       </div>
 
       {/* AI Assist drawer */}
