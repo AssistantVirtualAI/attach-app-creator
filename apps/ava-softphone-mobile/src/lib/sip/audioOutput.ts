@@ -1,48 +1,106 @@
-// Manages remote audio output routing (earpiece vs speaker).
+// Manages remote audio output routing (earpiece / speaker / bluetooth).
 // Frontend best-effort: uses HTMLMediaElement.setSinkId when supported.
 // On iOS WKWebView, native AVAudioSession (configured in AppDelegate with
 // .defaultToSpeaker + .allowBluetooth) handles physical routing; this module
-// still tracks the toggle state so the UI reflects user intent.
+// tracks UI intent and surfaces failures to the caller.
+
+export type AudioRoute = 'earpiece' | 'speaker' | 'bluetooth';
 
 let audioEl: HTMLAudioElement | null = null;
-let speakerOn = false;
-const listeners = new Set<(on: boolean) => void>();
+let route: AudioRoute = 'earpiece';
+let busy = false;
+let bluetoothAvailable = false;
+const listeners = new Set<(s: AudioState) => void>();
+
+export type AudioState = {
+  route: AudioRoute;
+  busy: boolean;
+  bluetoothAvailable: boolean;
+};
+
+function emit() {
+  const s: AudioState = { route, busy, bluetoothAvailable };
+  listeners.forEach((l) => l(s));
+}
+
+export function getAudioState(): AudioState {
+  return { route, busy, bluetoothAvailable };
+}
+
+export function onAudioStateChange(cb: (s: AudioState) => void) {
+  listeners.add(cb);
+  return () => { listeners.delete(cb); };
+}
 
 export function registerRemoteAudioElement(el: HTMLAudioElement | null) {
   audioEl = el;
-  if (el && speakerOn) void applySink(el, true);
+  if (el) void applySink(el, route);
+  void probeBluetooth();
 }
 
-export function isSpeakerOn() {
-  return speakerOn;
-}
-
+// Legacy compatibility -------------------------------------------------------
+export function isSpeakerOn() { return route === 'speaker'; }
 export function onSpeakerChange(cb: (on: boolean) => void) {
-  listeners.add(cb);
-  return () => listeners.delete(cb);
+  return onAudioStateChange((s) => cb(s.route === 'speaker'));
 }
-
-export async function setSpeaker(on: boolean): Promise<boolean> {
-  speakerOn = on;
-  if (audioEl) await applySink(audioEl, on);
-  listeners.forEach((l) => l(on));
-  return on;
-}
-
 export async function toggleSpeaker(): Promise<boolean> {
-  return setSpeaker(!speakerOn);
+  const next: AudioRoute = route === 'speaker' ? 'earpiece' : 'speaker';
+  const ok = await setRoute(next);
+  return ok && route === 'speaker';
 }
 
-async function applySink(el: HTMLAudioElement, on: boolean) {
-  try {
-    // setSinkId is non-standard; iOS WKWebView ignores it (native session routes audio).
-    const anyEl = el as any;
-    if (typeof anyEl.setSinkId === 'function') {
-      await anyEl.setSinkId(on ? 'communications' : 'default').catch(() => {});
-    }
-    // Maximize playback volume when on speaker
-    el.volume = 1.0;
-  } catch (e) {
-    console.info('[audioOutput] setSinkId not supported', e);
+// New API --------------------------------------------------------------------
+export async function setRoute(next: AudioRoute): Promise<boolean> {
+  if (busy) return false;
+  if (next === 'bluetooth' && !bluetoothAvailable) {
+    // allow attempt anyway — native side may still route
   }
+  busy = true; emit();
+  try {
+    if (audioEl) await applySink(audioEl, next);
+    route = next;
+    emit();
+    return true;
+  } catch (e) {
+    console.warn('[audioOutput] setRoute failed', next, e);
+    emit();
+    throw e;
+  } finally {
+    busy = false;
+    emit();
+  }
+}
+
+async function applySink(el: HTMLAudioElement, target: AudioRoute) {
+  const anyEl = el as any;
+  el.volume = 1.0;
+  if (typeof anyEl.setSinkId !== 'function') return; // iOS WKWebView path
+  // Map to the limited sink ids the browser exposes. The native layer does
+  // the real routing; this only nudges devices that support setSinkId.
+  const sinkId =
+    target === 'speaker' ? 'communications' :
+    target === 'bluetooth' ? 'communications' :
+    'default';
+  await anyEl.setSinkId(sinkId);
+}
+
+async function probeBluetooth() {
+  try {
+    const md: any = navigator.mediaDevices;
+    if (!md?.enumerateDevices) return;
+    const devices: MediaDeviceInfo[] = await md.enumerateDevices();
+    const next = devices.some((d) =>
+      d.kind === 'audiooutput' && /bluetooth|airpods|bt|headset/i.test(d.label || '')
+    );
+    if (next !== bluetoothAvailable) {
+      bluetoothAvailable = next;
+      emit();
+    }
+  } catch { /* ignore */ }
+}
+
+if (typeof navigator !== 'undefined' && (navigator as any).mediaDevices?.addEventListener) {
+  try {
+    (navigator as any).mediaDevices.addEventListener('devicechange', probeBluetooth);
+  } catch { /* ignore */ }
 }
