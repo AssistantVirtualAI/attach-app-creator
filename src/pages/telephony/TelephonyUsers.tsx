@@ -140,15 +140,28 @@ export default function TelephonyUsers() {
   };
 
   const sendInvite = async (u: UserRow) => {
-    toast.loading('Sending invitation…', { id: `inv-${u.id}` });
+    const choice = window.prompt(
+      `Send Lemtel setup invitation to ${u.display_name || u.extension}?\n\nLink validity (hours): 24, 72, 168 (7d), 720 (30d)`,
+      '168'
+    );
+    if (choice === null) return;
+    const ttl_hours = Math.max(1, Math.min(parseInt(choice, 10) || 168, 720));
+
+    toast.loading(`Sending invitation (${ttl_hours}h)…`, { id: `inv-${u.id}` });
     const { data, error } = await supabase.functions.invoke('lemtel-invite-send', {
-      body: { softphone_user_id: u.id },
+      body: { softphone_user_id: u.id, ttl_hours },
     });
-    if (error || (data as any)?.error) {
-      toast.error((data as any)?.detail || (data as any)?.error || error?.message || 'Failed', { id: `inv-${u.id}` });
-    } else {
-      toast.success(`Invitation sent — link expires ${new Date((data as any).expires_at).toLocaleDateString()}`, { id: `inv-${u.id}` });
+    const payload = data as any;
+    if (error || payload?.error) {
+      toast.error(payload?.detail || payload?.error || error?.message || 'Failed to send invitation', { id: `inv-${u.id}` });
+      return;
     }
+    if (payload?.email_sent === false) {
+      toast.warning(`Link created but email failed: ${payload?.email_error || 'unknown'}`, { id: `inv-${u.id}`, duration: 8000 });
+    } else {
+      toast.success(`Invitation sent to ${payload.email} — expires ${new Date(payload.expires_at).toLocaleString()}`, { id: `inv-${u.id}` });
+    }
+    qc.invalidateQueries({ queryKey: ['lemtel', 'invites'] });
   };
 
   const resetPassword = async (u: UserRow) => {
