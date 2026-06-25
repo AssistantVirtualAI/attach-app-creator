@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   Phone, PhoneMissed, MessageSquare, Voicemail,
   ArrowDownLeft, ArrowUpRight, X, Calendar, Headphones, Bot,
-  BellOff, Flame, Sparkles, ChevronRight,
+  BellOff, Flame, Sparkles, ChevronRight, Mail, Users as UsersIcon, TrendingUp,
 } from "lucide-react";
 import type { PlanipretMobileContext } from "../PlanipretMobile";
 import { toast } from "sonner";
@@ -13,6 +13,7 @@ import AvaVoiceAgent from "@/components/planipret/mobile/AvaVoiceAgent";
 import PWAInstallBanner from "@/components/planipret/PWAInstallBanner";
 import { TEMP_EMOJI } from "@/components/planipret/leadHelpers";
 import { useMaestroPipelineToasts } from "@/hooks/useMaestroPipelineToasts";
+import heroStats from "@/assets/planipret-hero-stats.jpg.asset.json";
 
 function Shimmer({ className = "" }: { className?: string }) {
   return (
@@ -27,7 +28,7 @@ export default function MHome() {
   const { profile, registerRefresh, openDialer, openAva, reloadProfile } =
     useOutletContext<PlanipretMobileContext>();
   const navigate = useNavigate();
-  const [stats, setStats] = useState({ calls: 0, missed: 0, sms: 0, voicemails: 0 });
+  const [stats, setStats] = useState({ calls: 0, missed: 0, sms: 0, voicemails: 0, team: 0, emails: 0, outbound: 0 });
   const [recent, setRecent] = useState<any[]>([]);
   const [events, setEvents] = useState<any[] | null>(null);
   const [eventsState, setEventsState] = useState<"loading" | "ready" | "no_m365" | "error">("loading");
@@ -53,7 +54,7 @@ export default function MHome() {
     const startIso = start.toISOString();
     const nowIso = new Date().toISOString();
 
-    const [callsRes, missedRes, smsRes, vmRes, recentRes, hotRes, remRes] = await Promise.all([
+    const [callsRes, missedRes, smsRes, vmRes, recentRes, hotRes, remRes, teamRes, outboundRes] = await Promise.all([
       supabase.from("planipret_phone_calls").select("id", { count: "exact", head: true }).eq("user_id", profile.user_id).gte("started_at", startIso),
       supabase.from("planipret_phone_calls").select("id", { count: "exact", head: true }).eq("user_id", profile.user_id).eq("direction", "missed").gte("started_at", startIso),
       supabase.from("planipret_phone_messages").select("id", { count: "exact", head: true }).eq("user_id", profile.user_id).is("read_at", null).eq("direction", "inbound"),
@@ -61,6 +62,8 @@ export default function MHome() {
       supabase.from("planipret_phone_calls").select("id, direction, from_number, from_name, to_number, to_name, started_at, lead_score, lead_temperature, ai_summary").eq("user_id", profile.user_id).order("started_at", { ascending: false }).limit(3),
       supabase.from("planipret_phone_calls").select("id, from_number, from_name, to_number, to_name, lead_score, lead_temperature, started_at, direction").eq("user_id", profile.user_id).gte("started_at", startIso).gte("lead_score", 8).order("lead_score", { ascending: false }).limit(5),
       supabase.from("planipret_reminders").select("*").eq("user_id", profile.user_id).eq("status", "pending").lte("scheduled_at", nowIso).order("scheduled_at", { ascending: true }).limit(10),
+      supabase.from("planipret_team_messages").select("id", { count: "exact", head: true }).gte("created_at", startIso),
+      supabase.from("planipret_phone_messages").select("id", { count: "exact", head: true }).eq("user_id", profile.user_id).eq("direction", "outbound").gte("created_at", startIso),
     ]);
 
     setStats({
@@ -68,6 +71,9 @@ export default function MHome() {
       missed: missedRes.count ?? 0,
       sms: smsRes.count ?? 0,
       voicemails: vmRes.count ?? 0,
+      team: teamRes.count ?? 0,
+      emails: 0,
+      outbound: outboundRes.count ?? 0,
     });
     setRecent(recentRes.data ?? []);
     setHotLeads(hotRes.data ?? []);
@@ -122,9 +128,55 @@ export default function MHome() {
 
   const firstName = (profile?.full_name ?? "Courtier").split(" ")[0];
 
+  const totalComms = stats.calls + stats.sms + stats.team + stats.outbound + stats.emails;
+
   return (
     <div className="p-4 space-y-4 pb-8" style={{ background: "var(--pp-bg-base)", minHeight: "100%" }}>
       <PWAInstallBanner />
+
+      {/* ===== HERO IMAGE — résumé IA visuel ===== */}
+      <section
+        className="relative rounded-2xl overflow-hidden"
+        style={{ border: "1px solid var(--pp-bg-border-2)", height: 140 }}
+      >
+        <img
+          src={heroStats.url}
+          alt=""
+          width={1280}
+          height={640}
+          className="absolute inset-0 w-full h-full object-cover"
+          style={{ opacity: 0.55 }}
+        />
+        <div
+          className="absolute inset-0"
+          style={{ background: "linear-gradient(135deg, rgba(6,13,26,0.55) 0%, rgba(6,13,26,0.92) 100%)" }}
+        />
+        <div className="relative h-full p-4 flex flex-col justify-between">
+          <div className="flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5" style={{ color: "var(--pp-agent)" }} />
+            <span className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: "var(--pp-agent)" }}>
+              Résumé IA — Aujourd'hui
+            </span>
+          </div>
+          <div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl font-bold tabular-nums" style={{ color: "var(--pp-text-primary)" }}>
+                {totalComms}
+              </span>
+              <span className="text-xs" style={{ color: "var(--pp-text-secondary)" }}>
+                communications
+              </span>
+            </div>
+            <div className="text-[11px] mt-0.5 flex items-center gap-3" style={{ color: "var(--pp-text-muted)" }}>
+              <span className="inline-flex items-center gap-1"><Phone className="w-3 h-3" />{stats.calls}</span>
+              <span className="inline-flex items-center gap-1"><MessageSquare className="w-3 h-3" />{stats.sms + stats.outbound}</span>
+              <span className="inline-flex items-center gap-1"><UsersIcon className="w-3 h-3" />{stats.team}</span>
+              <span className="inline-flex items-center gap-1"><TrendingUp className="w-3 h-3" style={{ color: "var(--pp-success)" }} /></span>
+            </div>
+          </div>
+        </div>
+      </section>
+
 
       {/* ===== Header ===== */}
       <header className="flex items-start justify-between pt-2">
@@ -259,7 +311,7 @@ export default function MHome() {
       {/* ===== STATS GRID ===== */}
       <section className="grid grid-cols-2 gap-3">
         {statsLoading ? (
-          <>{[0, 1, 2, 3].map((i) => <Shimmer key={i} className="h-24" />)}</>
+          <>{[0, 1, 2, 3, 4, 5].map((i) => <Shimmer key={i} className="h-24" />)}</>
         ) : (
           <>
             <StatCard
@@ -286,6 +338,18 @@ export default function MHome() {
               value={stats.voicemails}
               label="Voicemails"
               accent="var(--pp-agent)"
+            />
+            <StatCard
+              icon={<UsersIcon className="w-4 h-4" />}
+              value={stats.team}
+              label="Équipe"
+              accent="#9B7FE8"
+            />
+            <StatCard
+              icon={<Mail className="w-4 h-4" />}
+              value={stats.outbound}
+              label="SMS envoyés"
+              accent="#FFB347"
             />
           </>
         )}
