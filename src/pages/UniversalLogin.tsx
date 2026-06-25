@@ -27,6 +27,20 @@ const UniversalLoginContent = () => {
   const { t } = useTranslation();
   const { language, toggleLanguage } = useLanguage();
 
+  // If a session already exists, route the user to the right dashboard immediately.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase.auth.getSession();
+      const uid = data.session?.user?.id;
+      if (!uid || cancelled) return;
+      const route = await getPostLoginRoute(uid);
+      if (!cancelled) navigate(route, { replace: true });
+    })();
+    return () => { cancelled = true; };
+  }, [navigate]);
+
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
