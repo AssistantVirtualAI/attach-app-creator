@@ -1,9 +1,31 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
-import { Download } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, CartesianGrid } from "recharts";
+import { Download, Trophy } from "lucide-react";
 
 type Range = "week" | "month" | "quarter";
+
+const ACCENT = "#2E9BDC";
+const SUCCESS = "#00D4AA";
+const DANGER = "#E84C4C";
+const GOLD = "#F5C842";
+const SILVER = "#C0C0C0";
+const BRONZE = "#CD7F32";
+
+const TooltipDark = ({ active, payload, label }: any) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div style={{ background: "var(--pp-bg-deep)", border: "1px solid var(--pp-bg-border-2)", borderRadius: 8, padding: "8px 12px", fontSize: 11, color: "var(--pp-text-primary)" }}>
+      {label && <div style={{ color: "var(--pp-text-muted)", marginBottom: 4 }}>{label}</div>}
+      {payload.map((p: any, i: number) => (
+        <div key={i} className="flex items-center gap-2">
+          <span style={{ width: 8, height: 8, borderRadius: "50%", background: p.color || p.fill }} />
+          <span>{p.name}: <strong>{p.value}</strong></span>
+        </div>
+      ))}
+    </div>
+  );
+};
 
 export default function PAReports() {
   const [range, setRange] = useState<Range>("week");
@@ -41,9 +63,9 @@ export default function PAReports() {
     const m = { inbound: 0, outbound: 0, missed: 0 };
     calls.forEach((c) => { if (c.direction in m) (m as any)[c.direction]++; });
     return [
-      { name: "Entrant", value: m.inbound, color: "#27AE60" },
-      { name: "Sortant", value: m.outbound, color: "#2E86C1" },
-      { name: "Manqué", value: m.missed, color: "#E74C3C" },
+      { name: "Entrant", value: m.inbound, color: ACCENT },
+      { name: "Sortant", value: m.outbound, color: SUCCESS },
+      { name: "Manqué", value: m.missed, color: DANGER },
     ];
   }, [calls]);
 
@@ -58,7 +80,7 @@ export default function PAReports() {
     const h: Record<number, number> = {};
     calls.forEach((c) => { const hh = new Date(c.started_at).getHours(); h[hh] = (h[hh] ?? 0) + 1; });
     const top = Object.entries(h).sort((a, b) => b[1] - a[1])[0];
-    return top ? `Entre ${top[0]}h et ${+top[0] + 1}h` : "—";
+    return top ? `${top[0]}h–${+top[0] + 1}h` : "—";
   }, [calls]);
 
   const answerRate = useMemo(() => {
@@ -81,6 +103,8 @@ export default function PAReports() {
     return Object.values(m).sort((a: any, b: any) => b.total - a.total);
   }, [calls, brokers]);
 
+  const podium = (byBroker as any[]).slice(0, 3);
+
   const exportCsv = () => {
     const headers = ["Courtier", "Total", "Entrants", "Sortants", "Manqués", "Durée moy."];
     const lines = [headers.join(",")].concat((byBroker as any[]).map((b: any) =>
@@ -95,33 +119,67 @@ export default function PAReports() {
       <div className="flex gap-2">
         {(["week", "month", "quarter"] as Range[]).map((r) => (
           <button key={r} onClick={() => setRange(r)}
-            className={`px-3 py-1.5 rounded-lg text-sm ${range === r ? "bg-blue-600 text-white" : "bg-white border border-slate-200 text-slate-600"}`}>
+            className="px-3 py-1.5 rounded-lg text-sm transition"
+            style={range === r
+              ? { background: ACCENT, color: "#fff", border: `1px solid ${ACCENT}` }
+              : { background: "var(--pp-bg-elevated)", color: "var(--pp-text-secondary)", border: "1px solid var(--pp-bg-border-2)" }}>
             {r === "week" ? "Cette semaine" : r === "month" ? "Ce mois" : "3 derniers mois"}
           </button>
         ))}
       </div>
 
+      {/* Podium */}
+      {podium.length > 0 && (
+        <div className="pp-card p-5">
+          <h3 className="flex items-center gap-2 mb-4" style={{ fontWeight: 600, color: "var(--pp-text-primary)" }}>
+            <Trophy className="w-4 h-4" style={{ color: GOLD }} /> Podium courtiers
+          </h3>
+          <div className="grid grid-cols-3 gap-3 items-end">
+            {[1, 0, 2].map((idx) => {
+              const b = podium[idx];
+              if (!b) return <div key={idx} />;
+              const colors = [GOLD, SILVER, BRONZE];
+              const heights = [120, 90, 70];
+              const labels = ["🥇", "🥈", "🥉"];
+              const c = colors[idx]; const h = heights[idx];
+              return (
+                <div key={idx} className="text-center">
+                  <div style={{ fontSize: 28, marginBottom: 4 }}>{labels[idx]}</div>
+                  <div className="truncate mb-2" style={{ fontSize: 12, fontWeight: 600, color: "var(--pp-text-primary)" }}>{b.name}</div>
+                  <div className="rounded-t-lg flex items-end justify-center pb-2" style={{ height: h, background: `linear-gradient(180deg, ${c}40, ${c}10)`, border: `1px solid ${c}66`, borderBottom: "none" }}>
+                    <span style={{ fontSize: 20, fontWeight: 700, color: c }}>{b.total}</span>
+                  </div>
+                  <div style={{ fontSize: 10, color: "var(--pp-text-muted)", marginTop: 4 }}>{b.in} entrants · {b.out} sortants</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="bg-white rounded-xl shadow-sm p-5">
-          <h3 className="font-semibold mb-3">Appels par jour</h3>
+        <div className="pp-card p-5">
+          <h3 className="mb-3" style={{ fontWeight: 600, color: "var(--pp-text-primary)" }}>Appels par jour</h3>
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={byDay}>
-              <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip />
-              <Bar dataKey="count" fill="#2E86C1" radius={[4, 4, 0, 0]} />
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+              <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#4A7FA5" }} />
+              <YAxis tick={{ fontSize: 11, fill: "#4A7FA5" }} />
+              <Tooltip content={<TooltipDark />} cursor={{ fill: "rgba(46,155,220,0.08)" }} />
+              <Bar dataKey="count" name="Appels" fill={ACCENT} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm p-5">
-          <h3 className="font-semibold mb-3">Répartition des appels</h3>
+        <div className="pp-card p-5">
+          <h3 className="mb-3" style={{ fontWeight: 600, color: "var(--pp-text-primary)" }}>Répartition des appels</h3>
           <ResponsiveContainer width="100%" height={240}>
             <PieChart>
-              <Pie data={byDirection} dataKey="value" nameKey="name" innerRadius={50} outerRadius={80} label>
-                {byDirection.map((e, i) => <Cell key={i} fill={e.color} />)}
+              <Pie data={byDirection} dataKey="value" nameKey="name" innerRadius={50} outerRadius={80} paddingAngle={4}>
+                {byDirection.map((e, i) => <Cell key={i} fill={e.color} stroke="var(--pp-bg-surface)" strokeWidth={2} />)}
               </Pie>
-              <Tooltip /><Legend />
+              <Tooltip content={<TooltipDark />} />
+              <Legend wrapperStyle={{ fontSize: 11, color: "#8FA8C0" }} />
             </PieChart>
           </ResponsiveContainer>
         </div>
@@ -133,23 +191,31 @@ export default function PAReports() {
         <Stat label="Taux de réponse" value={answerRate} />
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm p-5">
+      <div className="pp-card p-5">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold">Performance par courtier</h3>
-          <button onClick={exportCsv} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-xs">
+          <h3 style={{ fontWeight: 600, color: "var(--pp-text-primary)" }}>Performance par courtier</h3>
+          <button onClick={exportCsv} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs"
+            style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>
             <Download className="w-3.5 h-3.5" /> Exporter CSV
           </button>
         </div>
         <table className="w-full text-sm">
-          <thead className="text-[11px] uppercase tracking-wider text-slate-500 text-left">
-            <tr><th className="py-2">Courtier</th><th>Appels</th><th>Entrants</th><th>Sortants</th><th>Manqués</th><th>Durée moy.</th></tr>
+          <thead>
+            <tr style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--pp-text-faint)", borderBottom: "1px solid var(--pp-bg-border-2)" }} className="text-left">
+              <th className="py-2">Courtier</th><th>Appels</th><th>Entrants</th><th>Sortants</th><th>Manqués</th><th>Durée moy.</th>
+            </tr>
           </thead>
           <tbody>
-            {(byBroker as any[]).map((b: any) => (
-              <tr key={b.name} className="border-t border-slate-100">
-                <td className="py-2">{b.name}</td>
-                <td>{b.total}</td><td>{b.in}</td><td>{b.out}</td><td>{b.missed}</td>
-                <td>{b.durCount ? `${Math.round(b.totalDur / b.durCount)}s` : "—"}</td>
+            {(byBroker as any[]).length === 0 ? (
+              <tr><td colSpan={6} className="py-6 text-center" style={{ color: "var(--pp-text-faint)" }}>Aucune donnée</td></tr>
+            ) : (byBroker as any[]).map((b: any) => (
+              <tr key={b.name} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                <td className="py-2" style={{ color: "var(--pp-text-primary)" }}>{b.name}</td>
+                <td style={{ color: "var(--pp-text-secondary)" }}>{b.total}</td>
+                <td style={{ color: ACCENT }}>{b.in}</td>
+                <td style={{ color: SUCCESS }}>{b.out}</td>
+                <td style={{ color: DANGER }}>{b.missed}</td>
+                <td style={{ color: "var(--pp-text-muted)" }}>{b.durCount ? `${Math.round(b.totalDur / b.durCount)}s` : "—"}</td>
               </tr>
             ))}
           </tbody>
@@ -161,9 +227,9 @@ export default function PAReports() {
 
 function Stat({ label, value }: any) {
   return (
-    <div className="bg-white rounded-xl shadow-sm p-5">
-      <p className="text-xs text-slate-500">{label}</p>
-      <p className="text-2xl font-bold mt-1" style={{ color: "#0F1924" }}>{value}</p>
+    <div className="pp-card p-5">
+      <p style={{ fontSize: 11, color: "var(--pp-text-muted)" }}>{label}</p>
+      <p style={{ fontSize: 24, fontWeight: 700, marginTop: 4, color: "var(--pp-text-primary)" }}>{value}</p>
     </div>
   );
 }
