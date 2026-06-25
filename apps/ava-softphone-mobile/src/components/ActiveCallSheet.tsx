@@ -180,8 +180,21 @@ export default function ActiveCallSheet({
             onClick={() => { haptic(); sp.snap.muted ? sp.unmute() : sp.mute(); }} />
           <Ctrl label={onHold ? 'Resume' : 'Hold'} icon="⏸" active={onHold}
             onClick={() => { haptic(); onHold ? sp.unhold() : sp.hold(); }} />
-          <Ctrl label={speaker ? 'Speaker' : 'Earpiece'} icon="🔊" active={speaker}
-            onClick={() => { haptic(); toggleSpeaker(); }} />
+          <Ctrl
+            label={audio.route === 'speaker' ? 'Speaker' : 'Speaker'}
+            icon={audio.busy && audio.route !== 'speaker' ? '…' : '🔊'}
+            active={audio.route === 'speaker'}
+            disabled={audio.busy}
+            onClick={() => switchRoute(audio.route === 'speaker' ? 'earpiece' : 'speaker')}
+          />
+          <Ctrl
+            label="Bluetooth"
+            icon={audio.busy && audio.route !== 'bluetooth' ? '…' : '🎧'}
+            active={audio.route === 'bluetooth'}
+            tone={audio.bluetoothAvailable ? 'default' : 'default'}
+            disabled={audio.busy || !audio.bluetoothAvailable}
+            onClick={() => switchRoute(audio.route === 'bluetooth' ? 'earpiece' : 'bluetooth')}
+          />
           <Ctrl label="Keypad" icon="⌨" active={showKeypad}
             onClick={() => { haptic(); setShowKeypad((v) => !v); }} />
           <Ctrl label="Transfer" icon="↗" onClick={() => { haptic(ImpactStyle.Medium); transfer(); }} />
