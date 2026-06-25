@@ -222,11 +222,37 @@ export default function AvaVoiceAgent({ onClose, userId }: Props) {
     return () => {
       cancelled = true;
       try { convRef.current?.endSession(); } catch (_) { /* */ }
+      try { micStreamRef.current?.getTracks().forEach((t) => t.stop()); } catch (_) { /* */ }
+      try { audioCtxRef.current?.close(); } catch (_) { /* */ }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => { scrollRef.current?.scrollTo({ top: 999999, behavior: "smooth" }); }, [transcript.length]);
+
+  // Live mic-level loop while listening
+  useEffect(() => {
+    if (state !== "listening" || !analyserRef.current) return;
+    const analyser = analyserRef.current;
+    const buf = new Uint8Array(analyser.frequencyBinCount);
+    let raf = 0;
+    const tick = () => {
+      analyser.getByteFrequencyData(buf);
+      const bins = 7;
+      const step = Math.floor(buf.length / bins);
+      const levels: number[] = [];
+      for (let i = 0; i < bins; i++) {
+        let sum = 0;
+        for (let j = 0; j < step; j++) sum += buf[i * step + j];
+        const avg = sum / step;
+        levels.push(Math.max(20, Math.min(100, (avg / 255) * 140)));
+      }
+      setMicLevels(levels);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [state]);
 
   const endSession = async () => {
     const dur = Math.round((Date.now() - startTimeRef.current) / 1000);
