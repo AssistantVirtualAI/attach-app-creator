@@ -278,6 +278,7 @@ export default function PAReports() {
           </tbody>
         </table>
       </div>
+      </div>
     </div>
   );
 }
