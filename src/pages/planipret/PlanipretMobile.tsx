@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate, NavLink, Outlet, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
-import { Home, Phone, MessageSquare, MoreHorizontal, Phone as PhoneIcon, X, Delete, Plus, Lock, PhoneOff, Bot } from "lucide-react";
+import { Home, Phone, MessageSquare, Users, Phone as PhoneIcon, X, Delete, Plus, Lock, PhoneOff, Bot, Settings as SettingsIcon } from "lucide-react";
 import { toast } from "sonner";
 import planipretLogo from "@/assets/planipret-logo.png.asset.json";
 import avaWordmark from "@/assets/ava-wordmark.svg";
@@ -24,9 +24,9 @@ export type PlanipretMobileContext = { profile: any; reloadProfile: () => Promis
 const TABS = [
   { to: "/mplanipret/home", label: "Accueil", Icon: Home },
   { to: "/mplanipret/calls", label: "Appels", Icon: Phone },
-  { to: "_fab", label: "", Icon: PhoneIcon },
+  { to: "_fab", label: "", Icon: Bot },
   { to: "/mplanipret/messages", label: "Messages", Icon: MessageSquare },
-  { to: "/mplanipret/more", label: "Plus", Icon: MoreHorizontal },
+  { to: "/mplanipret/contacts", label: "Contacts", Icon: Users },
 ];
 
 
