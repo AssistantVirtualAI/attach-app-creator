@@ -4,12 +4,18 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
   Plus, X, ArrowLeft, Phone, Send, Paperclip, MessageSquare, Zap,
-  Users, Bot, Mail, Sparkles, Loader2, RefreshCw, Mic, Reply,
+  Users, Bot, Mail, Sparkles, Loader2, RefreshCw, Mic, Reply, History, MoreVertical, Circle,
 } from "lucide-react";
 import type { PlanipretMobileContext } from "../PlanipretMobile";
 import SmsTemplatesSheet from "@/components/planipret/SmsTemplatesSheet";
+import AvaSummarizeSheet, { type AvaSummarizeSource } from "@/components/planipret/ava/AvaSummarizeSheet";
+import AvaHistorySheet from "@/components/planipret/ava/AvaHistorySheet";
+import CoachOverlay from "@/components/planipret/ava/CoachOverlay";
+import { callAva, applyAvaSuggestion, type AvaSuggestion } from "@/services/avaProactive";
+import { useAvaDraft } from "@/hooks/useAvaDraft";
 
-type SubTab = "sms" | "team" | "ava" | "emails";
+type SubTab = "sms" | "team" | "ava" | "emails" | "roster";
+
 
 type Msg = {
   id: string;
