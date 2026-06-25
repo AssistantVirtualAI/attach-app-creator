@@ -60,6 +60,11 @@ export default function AvaVoiceAgent({ onClose, userId }: Props) {
   const sessionIdRef = useRef<string>(`s_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`);
   const scrollRef = useRef<HTMLDivElement>(null);
   const startTimeRef = useRef<number>(Date.now());
+  const micStreamRef = useRef<MediaStream | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const [micLevels, setMicLevels] = useState<number[]>(Array.from({ length: 7 }, () => 20));
+
 
   const sessionId = sessionIdRef.current;
 
@@ -130,8 +135,22 @@ export default function AvaVoiceAgent({ onClose, userId }: Props) {
     (async () => {
       try {
         setState("connecting");
-        try { await navigator.mediaDevices.getUserMedia({ audio: true }); }
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          micStreamRef.current = stream;
+          const Ctx = (window.AudioContext || (window as any).webkitAudioContext);
+          if (Ctx) {
+            const ac = new Ctx();
+            audioCtxRef.current = ac;
+            const src = ac.createMediaStreamSource(stream);
+            const analyser = ac.createAnalyser();
+            analyser.fftSize = 64;
+            src.connect(analyser);
+            analyserRef.current = analyser;
+          }
+        }
         catch { setMicError(true); setState("error"); return; }
+
 
         const { data: cfg, error } = await supabase.functions.invoke("ava-agent-config", { body: {} });
         if (error || !(cfg as any)?.success) {
@@ -203,11 +222,37 @@ export default function AvaVoiceAgent({ onClose, userId }: Props) {
     return () => {
       cancelled = true;
       try { convRef.current?.endSession(); } catch (_) { /* */ }
+      try { micStreamRef.current?.getTracks().forEach((t) => t.stop()); } catch (_) { /* */ }
+      try { audioCtxRef.current?.close(); } catch (_) { /* */ }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => { scrollRef.current?.scrollTo({ top: 999999, behavior: "smooth" }); }, [transcript.length]);
+
+  // Live mic-level loop while listening
+  useEffect(() => {
+    if (state !== "listening" || !analyserRef.current) return;
+    const analyser = analyserRef.current;
+    const buf = new Uint8Array(analyser.frequencyBinCount);
+    let raf = 0;
+    const tick = () => {
+      analyser.getByteFrequencyData(buf);
+      const bins = 7;
+      const step = Math.floor(buf.length / bins);
+      const levels: number[] = [];
+      for (let i = 0; i < bins; i++) {
+        let sum = 0;
+        for (let j = 0; j < step; j++) sum += buf[i * step + j];
+        const avg = sum / step;
+        levels.push(Math.max(20, Math.min(100, (avg / 255) * 140)));
+      }
+      setMicLevels(levels);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [state]);
 
   const endSession = async () => {
     const dur = Math.round((Date.now() - startTimeRef.current) / 1000);
@@ -247,7 +292,7 @@ export default function AvaVoiceAgent({ onClose, userId }: Props) {
   const ToolIcon = currentTool ? TOOL_ICONS[currentTool] ?? Sparkles : null;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col" style={{ background: "rgba(4,11,22,0.97)", backdropFilter: "blur(20px)" }}>
+    <div className="absolute inset-0 z-[60] flex flex-col" style={{ background: "rgba(4,11,22,0.97)", backdropFilter: "blur(20px)" }}>
       {/* Top bar */}
       <div className="flex items-center justify-between px-4 pt-4">
         <div className="flex items-center gap-2">
@@ -291,6 +336,12 @@ export default function AvaVoiceAgent({ onClose, userId }: Props) {
                 <div className="absolute inset-0 rounded-full animate-pulse" style={{ background: "rgba(46,155,220,0.1)" }} />
                 <div className="absolute inset-3 rounded-full animate-pulse" style={{ background: "rgba(46,155,220,0.2)", animationDelay: "0.3s" }} />
                 <div className="absolute inset-6 rounded-full animate-pulse" style={{ background: "rgba(46,155,220,0.4)", animationDelay: "0.6s" }} />
+                <div className="absolute inset-0 flex items-end justify-center gap-1 px-10 pb-12 pointer-events-none">
+                  {micLevels.map((h, i) => (
+                    <div key={i} className="w-1.5 rounded-full transition-all duration-75"
+                      style={{ background: "linear-gradient(180deg,#7FD8FF,#2E9BDC)", height: `${h}%` }} />
+                  ))}
+                </div>
               </>
             )}
             {state === "speaking" && (
