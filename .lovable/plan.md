@@ -1,51 +1,67 @@
-## A. Fix build (immédiat)
-- `src/hooks/usePullToRefresh.tsx` : ajouter prop optionnelle `color?: string` à `PullIndicator` (utilisée par `PlanipretMobile`, ligne 264).
-- `src/services/__tests__/avaProactive.test.ts` : confirmer signature `(name: string, opts?: any) => invoke(name, opts)` (typage tuple correct).
+## Phase A — Vérifier/provisionner ton compte admin
 
-## B. Fix users list — `/planipret/admin/users`
-- Vérifier composant existant (`src/pages/planipret/admin/PAUsers.tsx` ou équivalent) et corriger la requête vers `planipret_profiles` avec les colonnes listées + tri par `full_name`.
-- Admin guard layout : filtrer par `.eq("id", user.id)` (pas `user_id`), créer profil admin via insert si manquant (`role='admin'`, `ns_domain='planipret.ca'`).
-- États : skeleton (loading), message d'erreur explicite, empty state « Aucun courtier trouvé » + bouton Ajouter.
-- Si RLS bloque : ajouter migration policy « Admins can read all profiles » (`auth.uid() IN (select id from planipret_profiles where role='admin')`).
+Constat actuel sur `planipret_profiles` :
+- 1 seule ligne : `mhassoun@assistantvirtualai.com` (role=admin)
+- Ton compte connecté `jlemme@lemtel.com` (uid `8afdf7d5-36ad-4bf7-8317-bb730de59ffc`) **n'a aucun profil** → la RLS `is_planipret_admin()` te bloque, d'où la liste vide.
 
-## C. Refonte Admin Dashboard (AVA org uniquement)
-Design tokens dark navy déjà fournis (à exposer dans `index.css` sous `--pp-admin-*` pour ne pas casser le reste).
+Action (insert via outil dédié, pas de migration) :
 
-### Structure
-- `src/layouts/PlanipretAdminLayout.tsx` : sidebar 260px + topbar 64px + main scroll.
-- Nav items + badges dynamiques (intégrations manquantes, score audit).
-- Topbar : titre page, badge LIVE (Realtime), date FR, bell notifications.
+```sql
+INSERT INTO planipret_profiles (user_id, email, full_name, role, is_active)
+VALUES ('8afdf7d5-36ad-4bf7-8317-bb730de59ffc', 'jlemme@lemtel.com', 'Juliano Lemme', 'admin', true)
+ON CONFLICT (user_id) DO UPDATE SET role='admin', is_active=true;
+```
 
-### Pages
-1. **Overview** (`/planipret/admin/overview`) — 4 KPI cards, 3 live cards (appels actifs, app mobile, sessions AVA), BarChart 7 jours (recharts), Donut répartition, table activité Realtime, table courtiers en ligne, statut intégrations, stats IA, sync Maestro.
-2. **Courtiers** (`/planipret/admin/users`) — stats + filtres pills + table complète avec toggles optimistes (`mobile_app_enabled`, `voice_agent_enabled`), bulk actions, modales Add/Edit/Delete via `pp-admin-user`.
-3. **Appels** (`/planipret/admin/calls`) — filtres + tabs + table + side panel détail (audio/transcript/coaching/Maestro).
-4. **Messages** (`/planipret/admin/messages`) — tabs SMS / Team / M365.
-5. **Voicemails** — table + panel audio+transcript.
-6. **Rapports** — date range, charts (activité, distributions, leaderboard podium, tendances IA), export PDF/CSV.
-7. **Intégrations** — garder existant + ajouter health bar en haut.
+Vérification : re-SELECT pour confirmer role=admin sur les 2 comptes.
 
-### Realtime
-- `src/hooks/useAdminRealtime.ts` : 4 canaux (`admin-calls`, `admin-messages`, `admin-profiles`, `admin-ava`) avec teardown propre. Indicateur live dans topbar (connecté/reconnexion).
+## Phase B — Refonte Admin Dashboard (navy / glass)
 
-### Responsive
-- `<768px` redirige vers `/mplanipret` avec message.
+Design system : navy `#0B1437` bg, surface `#111A3D`, accent `#0023e6`, succès `#10B981`, danger `#EF4444`. Inter, 4px grid, glass-morphism + subtle borders `rgba(255,255,255,0.06)`.
 
-## D. Contraintes
-- Pas de modif Edge Functions ni schémas tables (seule migration possible : policy RLS admin si nécessaire à la section B).
-- Pas de Lemtel, pas de mobile, pas de landing.
-- Charts via `recharts` (déjà installé).
-- Tous les composants admin sous `src/pages/planipret/admin/` ; nouveaux composants partagés sous `src/components/planipret/admin/`.
+### B1. Layout (`src/components/planipret/admin/PlanipretAdminLayout.tsx`)
+- Sidebar gauche (Overview, Courtiers, Appels, Messages, Voicemails, Rapports, Intégrations, Conformité, Audit).
+- Topbar : recherche globale, badge "● Live" Realtime, avatar.
+- Redirect mobile → `/mplanipret`.
 
-## E. Tests
-- Vitest : `useAdminRealtime` (subscribe/teardown), `PAUsers` (rendu loading/empty/erreur), filtres pills.
-- Smoke : `bunx vitest run` global doit rester vert.
+### B2. Overview (`src/pages/planipret/admin/PAOverview.tsx`)
+- 4 KPI cards : Courtiers actifs, Appels 24h, Messages 24h, Voicemails non lus.
+- 3 status cards : Twilio, ElevenLabs, Maestro (ping via fonctions existantes, lecture seule).
+- Charts `recharts` :
+  - Area chart appels/messages 7j
+  - Pie chart distribution direction (inbound/outbound/missed)
+  - Bar chart top 5 courtiers
 
-## Ordre
-1. A (fix build).
-2. B (users list + admin guard).
-3. C.1 Overview + C.2 Users.
-4. C.3-7 (calls, messages, voicemails, reports).
-5. D Realtime + responsive + tests.
+### B3. Users redesign (`src/pages/planipret/admin/PAUsers.tsx`)
+- Table navy avec avatar, status pill, toggles optimistes **App** et **AVA** (update `planipret_profiles.app_enabled` / `ava_enabled`).
+- Filtres : rôle, actif, recherche.
+- Side panel détail (créé/dernière activité/n° assigné).
 
-OK pour exécuter dans cet ordre, ou je commence seulement par A+B (fix immédiat) avant la grosse refonte ?
+### B4. Appels (`PACalls.tsx`)
+- Liste paginée `planipret_phone_calls`, filtres direction/courtier/date.
+- Side panel : transcript, audio player, sentiment, AI insights (`planipret_ai_insights`).
+
+### B5. Messages (`PAMessages.tsx`)
+- Threads `planipret_phone_messages` regroupés par contact.
+- Aperçu conversation à droite.
+
+### B6. Voicemails (`PAVoicemails.tsx`)
+- Cards : audio player, transcription, marquer lu/non lu.
+
+### B7. Rapports (`PAReports.tsx`)
+- Podium Top 3 courtiers (appels traités).
+- Export CSV (volumes, durées moyennes, taux missed).
+
+### B8. Realtime (`src/hooks/useAdminRealtime.ts`)
+- Channels Supabase : `planipret_phone_calls`, `planipret_phone_messages`, `planipret_ava_conversations`.
+- Toast discret + auto-refresh KPIs.
+
+## Hors scope (intouchable)
+- Edge Functions, schémas tables, auth, mobile `/mplanipret/*`, intégrations existantes, secrets, ElevenLabs config, channels Realtime names.
+
+## Ordre d'exécution
+1. Insert admin profile + vérif SELECT.
+2. Layout + Overview (charts + Realtime).
+3. Users redesign + toggles.
+4. Calls / Messages / Voicemails.
+5. Reports + export.
+6. Smoke test : navigation, Realtime, toggles, RLS OK.
