@@ -336,6 +336,12 @@ export default function AvaVoiceAgent({ onClose, userId }: Props) {
                 <div className="absolute inset-0 rounded-full animate-pulse" style={{ background: "rgba(46,155,220,0.1)" }} />
                 <div className="absolute inset-3 rounded-full animate-pulse" style={{ background: "rgba(46,155,220,0.2)", animationDelay: "0.3s" }} />
                 <div className="absolute inset-6 rounded-full animate-pulse" style={{ background: "rgba(46,155,220,0.4)", animationDelay: "0.6s" }} />
+                <div className="absolute inset-0 flex items-end justify-center gap-1 px-10 pb-12 pointer-events-none">
+                  {micLevels.map((h, i) => (
+                    <div key={i} className="w-1.5 rounded-full transition-all duration-75"
+                      style={{ background: "linear-gradient(180deg,#7FD8FF,#2E9BDC)", height: `${h}%` }} />
+                  ))}
+                </div>
               </>
             )}
             {state === "speaking" && (
