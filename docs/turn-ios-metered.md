@@ -69,3 +69,38 @@ location.reload();
 ```
 
 Ou via URL : `?sipDebug=1&iceDiag=1`.
+
+## Configuration par environnement (prod / staging)
+
+Le choix des serveurs STUN/TURN se fait via variables Vite — la valeur par
+défaut (Metered.ca) est conservée si aucune variable n'est définie, et la
+sonde bascule automatiquement sur `FALLBACK_ICE_SERVERS` en cas d'échec.
+
+| Variable                            | Rôle                                       |
+| ----------------------------------- | ------------------------------------------ |
+| `VITE_TURN_URLS`                    | Liste CSV des `turn:` / `turns:` primaires |
+| `VITE_TURN_USERNAME`                | Username partagé pour les URLs ci-dessus   |
+| `VITE_TURN_CREDENTIAL`              | Credential partagé                         |
+| `VITE_STUN_URLS`                    | Liste CSV des `stun:` primaires (optionnel) |
+| `VITE_TURN_FALLBACK_URLS`           | TURN de secours (OpenRelay par défaut)     |
+| `VITE_TURN_FALLBACK_USERNAME`       | Username de secours                        |
+| `VITE_TURN_FALLBACK_CREDENTIAL`     | Credential de secours                      |
+| `VITE_STUN_FALLBACK_URLS`           | STUN de secours (optionnel)                |
+| `VITE_SIP_TELEMETRY_URL`            | Endpoint HTTP qui reçoit les événements    |
+| `VITE_SIP_DEBUG`                    | `1` → logs SIP/ICE/SDP toujours actifs     |
+
+## Télémétrie
+
+Événements postés via `navigator.sendBeacon` vers `VITE_SIP_TELEMETRY_URL`
+(ou via un sink JS enregistré avec `setTelemetrySink`) :
+
+| Nom                              | Valeur (ms) | Méta                          |
+| -------------------------------- | ----------- | ----------------------------- |
+| `sip.turn.probe_started`         | —           | —                             |
+| `sip.turn.probe_result`          | durée sonde | `{ provider, relayFound }`    |
+| `sip.turn.provider_selected`     | —           | `{ provider }` metered/fallback |
+| `sip.ice.first_relay_ms`         | latence     | délai PC→1er candidat relay   |
+| `sip.ice.connected_ms`           | latence     | délai PC→iceConnectionState connected |
+
+Permet de mesurer les taux d'échec iOS, et de comparer la latence STUN vs
+TURN par version d'OS / opérateur mobile côté backend d'analyse.
