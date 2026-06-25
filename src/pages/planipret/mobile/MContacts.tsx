@@ -204,6 +204,7 @@ function ContactDetailSheet({
   const [history, setHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [creatingTask, setCreatingTask] = useState(false);
+  const [summarizeOpen, setSummarizeOpen] = useState(false);
 
   const name = `${contact.first_name ?? ""} ${contact.last_name ?? ""}`.trim() || contact.phone || "Contact";
   const phone: string | undefined = contact.phone;
