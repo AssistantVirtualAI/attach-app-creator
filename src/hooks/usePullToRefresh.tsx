@@ -1,37 +1,38 @@
 import { useEffect, useRef, useState } from "react";
 
 /**
- * Pull-to-refresh hook for mobile scrollable containers.
- * Attach the returned ref to the scrollable element.
+ * Pull-to-refresh hook for mobile scrollable views.
+ * Returns `ref` to attach to the scroll container, current `pullDist`, and `refreshing` flag.
  */
-export function usePullToRefresh(onRefresh: () => Promise<void> | void, threshold = 80) {
-  const ref = useRef<HTMLDivElement | null>(null);
+export function usePullToRefresh(onRefresh: () => void | Promise<void>, threshold = 70) {
+  const ref = useRef<HTMLDivElement>(null!);
   const [pullDist, setPullDist] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const startY = useRef<number | null>(null);
+  const busy = useRef(false);
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
 
     const onStart = (e: TouchEvent) => {
-      if (el.scrollTop > 0) { startY.current = null; return; }
+      if (el.scrollTop > 0 || busy.current) return;
       startY.current = e.touches[0].clientY;
     };
     const onMove = (e: TouchEvent) => {
-      if (startY.current == null || refreshing) return;
+      if (startY.current == null) return;
       const dy = e.touches[0].clientY - startY.current;
-      if (dy > 0 && el.scrollTop === 0) {
-        setPullDist(Math.min(dy, threshold * 1.5));
-      }
+      if (dy > 0) setPullDist(Math.min(dy, threshold * 1.5));
     };
     const onEnd = async () => {
       if (startY.current == null) return;
-      const dist = pullDist;
+      const dy = pullDist;
       startY.current = null;
-      if (dist >= threshold && !refreshing) {
+      if (dy >= threshold && !busy.current) {
+        busy.current = true;
         setRefreshing(true);
         try { await onRefresh(); } finally {
+          busy.current = false;
           setRefreshing(false);
           setPullDist(0);
         }
@@ -48,28 +49,27 @@ export function usePullToRefresh(onRefresh: () => Promise<void> | void, threshol
       el.removeEventListener("touchmove", onMove);
       el.removeEventListener("touchend", onEnd);
     };
-  }, [onRefresh, pullDist, refreshing, threshold]);
+  }, [onRefresh, threshold, pullDist]);
 
   return { ref, pullDist, refreshing, threshold };
 }
 
-export function PullIndicator({ pullDist, refreshing, threshold, color = "#1F4E79" }: { pullDist: number; refreshing: boolean; threshold: number; color?: string }) {
-  const visible = pullDist > 8 || refreshing;
+/** Visual indicator rendered above the scroll content. */
+export function PullIndicator({ pullDist, refreshing, threshold = 70 }: { pullDist: number; refreshing: boolean; threshold?: number }) {
+  const visible = pullDist > 0 || refreshing;
   if (!visible) return null;
   const progress = Math.min(pullDist / threshold, 1);
   return (
-    <div className="flex justify-center items-center transition-all" style={{ height: refreshing ? 40 : Math.min(pullDist, 60) }}>
-      <div
-        className={refreshing ? "animate-spin" : ""}
-        style={{
-          width: 22, height: 22,
-          border: `2.5px solid ${color}`,
-          borderTopColor: "transparent",
-          borderRadius: "50%",
-          opacity: refreshing ? 1 : 0.4 + progress * 0.6,
-          transform: refreshing ? "none" : `rotate(${progress * 360}deg)`,
-        }}
-      />
+    <div
+      style={{ height: Math.max(pullDist, refreshing ? 40 : 0), opacity: refreshing ? 1 : progress }}
+      className="flex items-center justify-center text-xs text-muted-foreground transition-opacity"
+      aria-hidden={!visible}
+    >
+      {refreshing ? (
+        <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+      ) : (
+        <span>{progress >= 1 ? "Relâcher" : "Tirer pour actualiser"}</span>
+      )}
     </div>
   );
 }
