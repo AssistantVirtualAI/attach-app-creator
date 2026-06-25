@@ -315,7 +315,7 @@ export default function MCalls() {
 function CallRow({ call, onTap, onCall, showCallBtn }: { call: Call; onTap: () => void; onCall: () => void; showCallBtn?: boolean }) {
   const missed = isMissed(call);
   const out = isOutbound(call);
-  const color = missed ? "var(--pp-danger)" : out ? "var(--pp-success)" : "var(--pp-brand-accent)";
+  const dirColor = missed ? "var(--pp-danger)" : out ? "var(--pp-success)" : "var(--pp-brand-accent)";
   const Icon = missed ? PhoneMissed : out ? PhoneOutgoing : PhoneIncoming;
   const hasAi = !!call.ai_summary;
 
@@ -326,7 +326,7 @@ function CallRow({ call, onTap, onCall, showCallBtn }: { call: Call; onTap: () =
         style={{
           background: "var(--pp-bg-surface)",
           border: "1px solid var(--pp-bg-border-2)",
-          borderLeft: tempBorder(call.lead_temperature as LeadTemp) || "1px solid var(--pp-bg-border-2)",
+          borderLeft: `3px solid ${dirColor}`,
         }}
       >
         <button onClick={onTap} className="flex items-center gap-3 flex-1 min-w-0 text-left">
