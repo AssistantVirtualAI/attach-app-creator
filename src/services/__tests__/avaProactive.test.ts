@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const invoke = vi.fn();
 const insert = vi.fn(() => Promise.resolve({ error: null }));
-const from = vi.fn(() => ({ insert }));
+const from = vi.fn((_table: string) => ({ insert }));
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
