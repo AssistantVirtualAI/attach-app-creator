@@ -12542,6 +12542,7 @@ export type Database = {
       is_cc_supervisor: { Args: { _user_id: string }; Returns: boolean }
       is_lemtel_admin: { Args: { _user_id: string }; Returns: boolean }
       is_lemtel_member: { Args: { _user_id: string }; Returns: boolean }
+      is_lemtel_only: { Args: { _user_id: string }; Returns: boolean }
       is_master_admin: { Args: { _user_id: string }; Returns: boolean }
       is_member_of_org: { Args: { _org: string }; Returns: boolean }
       is_my_extension_call:
@@ -12580,6 +12581,7 @@ export type Database = {
           }
       is_planipret_admin: { Args: { _user_id: string }; Returns: boolean }
       is_planipret_member: { Args: { _user_id: string }; Returns: boolean }
+      is_planipret_only: { Args: { _user_id: string }; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       lemtel_can_grant_app_access: { Args: { _uid: string }; Returns: boolean }
       log_access_violation: {
