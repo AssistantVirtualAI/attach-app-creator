@@ -1072,3 +1072,165 @@ function EmptyState({ Icon, title, sub }: { Icon: any; title: string; sub: strin
     </div>
   );
 }
+
+// ============================================================
+// TEAM ROSTER (members directory + quick actions via M365)
+// ============================================================
+type RosterMember = {
+  id: string;
+  user_id: string;
+  full_name: string | null;
+  email: string | null;
+  extension: string | null;
+  role: string | null;
+  avatar_url: string | null;
+  voice_agent_enabled: boolean | null;
+  organization_id: string | null;
+};
+
+function TeamRoster({ profile, openDialer, onSwitchTab }: { profile: any; openDialer: (n?: string) => void; onSwitchTab: (k: SubTab) => void }) {
+  const [members, setMembers] = useState<RosterMember[]>([]);
+  const [lastSeen, setLastSeen] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(true);
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [composeInit, setComposeInit] = useState<{ to?: string; subject?: string; body?: string }>({});
+
+  const load = async () => {
+    if (!profile?.organization_id) { setLoading(false); return; }
+    setLoading(true);
+    const { data } = await supabase
+      .from("planipret_profiles")
+      .select("id, user_id, full_name, email, extension, role, avatar_url, voice_agent_enabled, organization_id")
+      .eq("organization_id", profile.organization_id)
+      .order("full_name", { ascending: true })
+      .limit(200);
+    const list = ((data ?? []) as any[]).filter((m) => m.id !== profile.id) as RosterMember[];
+    setMembers(list);
+
+    // Derive "active récemment" from latest phone_call or team_message per user
+    const ids = list.map((m) => m.user_id).filter(Boolean);
+    if (ids.length) {
+      const seen: Record<string, string> = {};
+      const [{ data: calls }, { data: tmsgs }] = await Promise.all([
+        supabase.from("planipret_phone_calls").select("user_id, created_at").in("user_id", ids).order("created_at", { ascending: false }).limit(500),
+        supabase.from("planipret_team_messages").select("sender_id, created_at").in("sender_id", list.map((m) => m.id)).order("created_at", { ascending: false }).limit(500),
+      ]);
+      for (const r of (calls ?? []) as any[]) {
+        if (!seen[r.user_id] || seen[r.user_id] < r.created_at) seen[r.user_id] = r.created_at;
+      }
+      for (const r of (tmsgs ?? []) as any[]) {
+        const u = list.find((m) => m.id === r.sender_id)?.user_id;
+        if (u && (!seen[u] || seen[u] < r.created_at)) seen[u] = r.created_at;
+      }
+      setLastSeen(seen);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [profile?.organization_id]);
+
+  const statusFor = (userId: string | null) => {
+    if (!userId) return { color: "var(--pp-text-faint)", label: "—" };
+    const ts = lastSeen[userId];
+    if (!ts) return { color: "var(--pp-text-faint)", label: "Hors ligne" };
+    const age = Date.now() - +new Date(ts);
+    if (age < 2 * 60_000) return { color: "var(--pp-success)", label: "En ligne" };
+    if (age < 30 * 60_000) return { color: "var(--pp-warning, #F5A623)", label: "Inactif" };
+    return { color: "var(--pp-text-faint)", label: "Hors ligne" };
+  };
+
+  const sendMention = async (m: RosterMember) => {
+    if (!profile?.id) return;
+    const body = `@${m.full_name ?? "membre"} `;
+    const { error } = await supabase.from("planipret_team_messages").insert({
+      sender_id: profile.id, channel: "general", message: body,
+    } as any);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Mention envoyée dans #general");
+    onSwitchTab("team");
+  };
+
+  return (
+    <div className="h-full overflow-y-auto p-3">
+      {loading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="rounded-2xl h-20 animate-pulse" style={{ background: "var(--pp-bg-surface)" }} />
+          ))}
+        </div>
+      ) : members.length === 0 ? (
+        <EmptyState Icon={Users} title="Annuaire vide" sub="Aucun autre membre dans votre organisation." />
+      ) : (
+        <ul className="space-y-1.5">
+          {members.map((m) => {
+            const st = statusFor(m.user_id);
+            return (
+              <li key={m.id} className="rounded-2xl p-3" style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)" }}>
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="relative shrink-0">
+                    {m.avatar_url ? (
+                      <img src={m.avatar_url} alt="" className="w-11 h-11 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-11 h-11 rounded-full flex items-center justify-center text-white text-sm font-semibold"
+                        style={{ background: "linear-gradient(135deg, var(--pp-brand-accent), var(--pp-brand-accent-2))" }}>
+                        {initials(m.full_name ?? m.email ?? "?")}
+                      </div>
+                    )}
+                    <span
+                      className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2"
+                      style={{ background: st.color, borderColor: "var(--pp-bg-surface)" }}
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-sm truncate" style={{ color: "var(--pp-text-primary)" }}>{m.full_name ?? m.email ?? "Membre"}</p>
+                    <p className="text-[11px] truncate flex items-center gap-1.5" style={{ color: "var(--pp-text-muted)" }}>
+                      <Circle className="w-2 h-2" style={{ fill: st.color, color: st.color }} /> {st.label}
+                      {m.extension && <span style={{ color: "var(--pp-text-faint)" }}>· ext {m.extension}</span>}
+                      {m.role && <span style={{ color: "var(--pp-text-faint)" }}>· {m.role}</span>}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <ActionPill Icon={Phone} label="Appeler" disabled={!m.extension} onClick={() => m.extension && openDialer(m.extension)} />
+                  <ActionPill Icon={MessageSquare} label="SMS" disabled={!m.extension} onClick={() => { if (m.extension) { onSwitchTab("sms"); toast(`SMS vers ${m.extension}`); } }} />
+                  <ActionPill
+                    Icon={Mail}
+                    label="Email"
+                    disabled={!m.email || !profile?.ms365_access_token}
+                    onClick={() => { setComposeInit({ to: m.email ?? "" }); setComposeOpen(true); }}
+                  />
+                  <ActionPill Icon={Users} label="@Mention" onClick={() => sendMention(m)} />
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {composeOpen && (
+        <EmailComposeSheet
+          init={composeInit}
+          onClose={() => setComposeOpen(false)}
+          onSent={() => setComposeOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+function ActionPill({ Icon, label, onClick, disabled }: { Icon: any; label: string; onClick: () => void; disabled?: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="flex-1 py-1.5 rounded-full text-[11px] font-semibold flex items-center justify-center gap-1 disabled:opacity-40"
+      style={{
+        background: "var(--pp-bg-elevated)",
+        border: "1px solid var(--pp-bg-border-2)",
+        color: "var(--pp-text-secondary)",
+      }}
+    >
+      <Icon className="w-3 h-3" /> {label}
+    </button>
+  );
+}
