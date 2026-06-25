@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Search, Hash, AtSign, Users as UsersIcon } from "lucide-react";
+import DOMPurify from "dompurify";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useGlobalChatSearch } from "@/hooks/useOrgChat";
