@@ -207,12 +207,19 @@ serve(async (req) => {
       });
     }
 
-    // Get user's organization
-    const { data: orgMember } = await supabase
+    // Get user's organization (user may belong to multiple orgs — pick first)
+    const { data: orgMembers, error: orgErr } = await supabase
       .from('organization_members')
-      .select('organization_id')
+      .select('organization_id, created_at')
       .eq('user_id', user.id)
-      .single();
+      .order('created_at', { ascending: true })
+      .limit(1);
+
+    if (orgErr) {
+      console.error('[global-advice] org lookup error:', orgErr);
+    }
+
+    const orgMember = orgMembers && orgMembers.length > 0 ? orgMembers[0] : null;
 
     if (!orgMember) {
       return new Response(JSON.stringify({ error: 'No organization found' }), {
