@@ -41,10 +41,13 @@ async function llmGreeting(tone: string, name: string, org: string): Promise<str
   return (j.choices?.[0]?.message?.content ?? "").trim();
 }
 
-async function tts(text: string, voiceId = "EXAVITQu4vr4xnSDxMaL"): Promise<Uint8Array | null> {
+async function tts(text: string, voiceId?: string): Promise<Uint8Array | null> {
   const key = Deno.env.get("ELEVENLABS_API_KEY");
   if (!key) return null;
-  const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+  // Fallback chain: param → ELEVENLABS_AVA_VOICE_ID secret → Charlotte (XB0fDUnXU5powFXDhCwa).
+  // Charlotte is the documented Planiprêt default; never crash when the secret is unset.
+  const vid = voiceId || Deno.env.get("ELEVENLABS_AVA_VOICE_ID") || "XB0fDUnXU5powFXDhCwa";
+  const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${vid}`, {
     method: "POST",
     headers: { "xi-api-key": key, "Content-Type": "application/json", Accept: "audio/mpeg" },
     body: JSON.stringify({ text, model_id: "eleven_turbo_v2_5", voice_settings: { stability: 0.5, similarity_boost: 0.75 } }),
