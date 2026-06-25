@@ -352,9 +352,9 @@ const App = () => (
                 {/* Admin auth (legacy, redirects to /login) */}
                 <Route path="/auth" element={<Navigate to="/login" replace />} />
 
-                {/* Planiprêt (AVA-scoped) */}
+                {/* Planiprêt — organisation distincte (séparée de Lemtel et AVA) */}
                 <Route path="/planipret/login" element={<PlanipretLogin />} />
-                <Route path="/mplanipret" element={<PlanipretMobile />}>
+                <Route path="/mplanipret" element={<AppSeparationGuard app="planipret"><PlanipretMobile /></AppSeparationGuard>}>
                   <Route index element={<MHome />} />
                   <Route path="home" element={<MHome />} />
                   <Route path="calls" element={<MCalls />} />
@@ -369,15 +369,17 @@ const App = () => (
                 <Route path="/planipret/dashboard" element={<Navigate to="/planipret/admin/overview" replace />} />
                 <Route path="/planipret/integrations" element={<Navigate to="/planipret/admin/integrations" replace />} />
                 <Route path="/auth/ms365/callback" element={<Ms365Callback />} />
-                <Route path="/planipret/audit" element={<PlanipretAudit />} />
+                <Route path="/planipret/audit" element={<AppSeparationGuard app="planipret"><PlanipretAudit /></AppSeparationGuard>} />
 
                 {/* Planipret Admin sub-routes (layout with sidebar) — lazy-loaded */}
                 <Route
                   path="/planipret/admin"
                   element={
-                    <Suspense fallback={<AdminPageSkeleton />}>
-                      <PlanipretAdminLayout />
-                    </Suspense>
+                    <AppSeparationGuard app="planipret">
+                      <Suspense fallback={<AdminPageSkeleton />}>
+                        <PlanipretAdminLayout />
+                      </Suspense>
+                    </AppSeparationGuard>
                   }
                 >
                   <Route index element={<Suspense fallback={<AdminPageSkeleton />}><PAOverview /></Suspense>} />
