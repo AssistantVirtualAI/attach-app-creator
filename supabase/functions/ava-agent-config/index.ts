@@ -99,12 +99,16 @@ Deno.serve(async (req) => {
     .maybeSingle();
 
   const p = full ?? profile;
+  // GATING: réservé aux courtiers activés depuis l'admin (toggle "Agent IA").
+  if (p.voice_agent_enabled === false) {
+    return jsonResponse({ success: false, error: "ava_not_enabled_for_user" }, 403);
+  }
   const firstName = (p.full_name ?? "courtier").split(" ")[0];
 
   return jsonResponse({
     success: true,
     agent_id: p.elevenlabs_agent_id || DEFAULT_AGENT_ID,
-    voice_agent_enabled: p.voice_agent_enabled !== false,
+    voice_agent_enabled: true,
     system_prompt: buildPrompt(p),
     first_message: `Bonjour ${firstName} ! Je suis AVA, ton assistante IA. Comment puis-je t'aider aujourd'hui ?`,
     voice_id: DEFAULT_VOICE_ID,
