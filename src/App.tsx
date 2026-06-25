@@ -38,6 +38,7 @@ const PAMessages = lazy(() => import("./pages/planipret/admin/PAMessages"));
 const PAVoicemails = lazy(() => import("./pages/planipret/admin/PAVoicemails"));
 const PAReports = lazy(() => import("./pages/planipret/admin/PAReports"));
 const PAAuditLog = lazy(() => import("./pages/planipret/admin/PAAuditLog"));
+const PAAuditChecklist = lazy(() => import("./pages/planipret/admin/PAAuditChecklist"));
 const PACompliance = lazy(() => import("./pages/planipret/admin/PACompliance"));
 const PALeads = lazy(() => import("./pages/planipret/admin/PALeads"));
 const PATemplates = lazy(() => import("./pages/planipret/admin/PATemplates"));
