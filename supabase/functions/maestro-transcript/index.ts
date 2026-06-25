@@ -3,14 +3,18 @@
 // Pipeline: NS-API transcript → Lovable AI Gateway transcription fallback → store + push to Maestro → trigger AI analysis.
 import {
   adminClient,
+  broadcastPipeline,
   corsHeaders,
   getBrokerAuth,
   getMaestroConfig,
   json,
   maestroAudit,
   maestroFetch,
+  pipelineLog,
   setPipelineStep,
+  updateCallPipeline,
 } from "../_shared/maestro.ts";
+
 
 async function transcribeViaLovable(audioUrl: string): Promise<{ text: string; segments: any[] } | null> {
   const apiKey = Deno.env.get("LOVABLE_API_KEY");
