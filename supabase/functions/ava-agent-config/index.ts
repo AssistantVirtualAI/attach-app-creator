@@ -103,15 +103,30 @@ Deno.serve(async (req) => {
   if (p.voice_agent_enabled === false) {
     return jsonResponse({ success: false, error: "ava_not_enabled_for_user" }, 403);
   }
+
+  const agentId = p.elevenlabs_agent_id || DEFAULT_AGENT_ID;
+  // Graceful setup_required when ELEVENLABS_DEFAULT_AGENT_ID is missing AND broker
+  // has no per-user agent_id configured. Frontend shows an inline setup banner.
+  if (!agentId) {
+    return jsonResponse({
+      success: false,
+      error: "ELEVENLABS_DEFAULT_AGENT_ID not configured",
+      setup_required: true,
+      setup_url: "/planipret/admin/integrations",
+      missing_secret: "ELEVENLABS_DEFAULT_AGENT_ID",
+    }, 200);
+  }
+
   const firstName = (p.full_name ?? "courtier").split(" ")[0];
+  const voiceId = Deno.env.get("ELEVENLABS_AVA_VOICE_ID") || DEFAULT_VOICE_ID;
 
   return jsonResponse({
     success: true,
-    agent_id: p.elevenlabs_agent_id || DEFAULT_AGENT_ID,
+    agent_id: agentId,
     voice_agent_enabled: true,
     system_prompt: buildPrompt(p),
     first_message: `Bonjour ${firstName} ! Je suis AVA, ton assistante IA. Comment puis-je t'aider aujourd'hui ?`,
-    voice_id: DEFAULT_VOICE_ID,
+    voice_id: voiceId,
     language: p.ava_preferred_lang ?? "fr",
     autonomy_mode: p.ava_autonomy_mode ?? "confirm",
     tools: TOOL_NAMES,
