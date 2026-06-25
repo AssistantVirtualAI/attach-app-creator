@@ -1,7 +1,10 @@
-// Hardcoded owner of the AVA Main Dashboard organization.
-// Only this user may access AVA org content and the AI Usage page.
+// Organization separation: Planipret, AVA, Lemtel are three distinct orgs.
+// The historical "AVA Main Dashboard" UUID is now the Planipret org — never mix with Lemtel.
 export const AVA_OWNER_USER_ID = "e5d025c9-eef2-4422-b97d-3190388b7376";
-export const AVA_ORG_ID = "17d6507f-a9ca-409d-8e49-371d50332615";
+export const PLANIPRET_ORG_ID = "17d6507f-a9ca-409d-8e49-371d50332615";
+// Back-compat alias: legacy code that imports AVA_ORG_ID for Planipret data must keep working.
+export const AVA_ORG_ID = PLANIPRET_ORG_ID;
+export const AVA_STANDALONE_ORG_ID = "a7a0c1d2-1111-4aaa-9aaa-a0a0a0a0a0a1";
 export const LEMTEL_ORG_ID = "71755d33-ed64-4ad5-a828-61c9d2029eb7";
 
 // Rough Lovable AI Gateway pricing (USD per 1M tokens) — adjust as needed.
