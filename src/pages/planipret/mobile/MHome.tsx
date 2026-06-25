@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import VoiceAgent from "@/components/VoiceAgent";
 import PWAInstallBanner from "@/components/planipret/PWAInstallBanner";
 import { TEMP_EMOJI } from "@/components/planipret/leadHelpers";
+import { useMaestroPipelineToasts } from "@/hooks/useMaestroPipelineToasts";
 
 function Shimmer({ className = "" }: { className?: string }) {
   return (
