@@ -181,6 +181,16 @@ export default function PlanipretAdminLayout() {
           style={{ background: "var(--pp-bg-base)", borderBottom: "1px solid var(--pp-bg-border)" }}>
           <h1 style={{ fontFamily: "Inter,sans-serif", fontWeight: 700, fontSize: 18, color: "var(--pp-text-primary)" }}>{title}</h1>
           <div className="flex items-center gap-4">
+            <button onClick={() => setPaletteOpen(true)}
+              className="flex items-center gap-2 px-3 h-8 rounded-lg text-xs transition"
+              style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border)", color: "var(--pp-text-muted)", minWidth: 220 }}
+              onMouseEnter={(e) => (e.currentTarget.style.borderColor = "var(--pp-brand-accent)")}
+              onMouseLeave={(e) => (e.currentTarget.style.borderColor = "var(--pp-bg-border)")}>
+              <Search className="w-3.5 h-3.5" />
+              <span className="flex-1 text-left">Rechercher…</span>
+              <kbd className="font-mono text-[10px] px-1.5 py-0.5 rounded"
+                style={{ background: "var(--pp-bg-deep)", border: "1px solid var(--pp-bg-border)" }}>⌘K</kbd>
+            </button>
             <div className="flex items-center gap-1.5"
               style={{
                 background: realtimeOk ? "#0D3D2A" : "var(--pp-bg-elevated)",
@@ -200,6 +210,7 @@ export default function PlanipretAdminLayout() {
           <Outlet context={{ profile }} />
         </main>
       </div>
+      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
       <SessionTimeoutModal />
     </div>
   );
