@@ -593,7 +593,7 @@ export default function MHome() {
         </button>
       )}
 
-      {agentOpen && <VoiceAgent onClose={() => setAgentOpen(false)} />}
+      {agentOpen && profile?.user_id && <AvaVoiceAgent userId={profile.user_id} onClose={() => setAgentOpen(false)} />}
     </div>
   );
 }
