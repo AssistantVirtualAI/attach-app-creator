@@ -199,6 +199,15 @@ export default function MStats() {
           <div className="text-sm">⚡ Performance solide ce {period === "week" ? "semaine" : "mois"}</div>
         </div>
       </div>
+
+      <CoachOverlay
+        open={coachOpen}
+        title="Coach AVA"
+        subtitle={coachLoading ? "AVA analyse vos performances…" : coachReply}
+        suggestions={coachSuggestions}
+        ctx={{ openDialer, openAva, userId: profile?.user_id }}
+        onClose={() => setCoachOpen(false)}
+      />
     </div>
   );
 }
