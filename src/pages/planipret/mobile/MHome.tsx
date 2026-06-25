@@ -28,7 +28,7 @@ export default function MHome() {
   const { profile, registerRefresh, openDialer, openAva, reloadProfile } =
     useOutletContext<PlanipretMobileContext>();
   const navigate = useNavigate();
-  const [stats, setStats] = useState({ calls: 0, missed: 0, sms: 0, voicemails: 0 });
+  const [stats, setStats] = useState({ calls: 0, missed: 0, sms: 0, voicemails: 0, team: 0, emails: 0, outbound: 0 });
   const [recent, setRecent] = useState<any[]>([]);
   const [events, setEvents] = useState<any[] | null>(null);
   const [eventsState, setEventsState] = useState<"loading" | "ready" | "no_m365" | "error">("loading");
