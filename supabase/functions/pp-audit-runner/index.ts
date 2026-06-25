@@ -194,11 +194,20 @@ Deno.serve(async (req) => {
     for (const k of ENV_SECRETS) secItems.push(await checkSecret(admin, k));
     sections.push({ id: "secrets", title: "Secrets & API Keys", emoji: "🔐", items: secItems });
 
-    // 4. Edge functions (existence ping)
+    await sleep(300);
+
+    // 4. Edge functions (existence ping — small concurrency to avoid edge rate limits)
     const fnItems: Item[] = [];
-    await Promise.all(EDGE_FUNCTIONS.map(async (f) => fnItems.push(await pingFunction(f))));
+    const CONCURRENCY = 5;
+    for (let i = 0; i < EDGE_FUNCTIONS.length; i += CONCURRENCY) {
+      const batch = EDGE_FUNCTIONS.slice(i, i + CONCURRENCY);
+      const results = await Promise.all(batch.map((f) => pingFunction(f)));
+      fnItems.push(...results);
+      if (i + CONCURRENCY < EDGE_FUNCTIONS.length) await sleep(150);
+    }
     fnItems.sort((a, b) => a.name.localeCompare(b.name));
     sections.push({ id: "functions", title: "Edge Functions", emoji: "⚡", items: fnItems });
+    await sleep(300);
 
     // 5. External APIs (lightweight)
     const extItems: Item[] = [];
