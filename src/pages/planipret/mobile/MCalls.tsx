@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { motion } from "framer-motion";
 import { useOutletContext, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -414,7 +415,7 @@ function CallDetailSheet({
   const [aiLoading, setAiLoading] = useState(false);
   const [taskState, setTaskState] = useState<Record<string, { creating?: boolean; createdId?: string }>>({});
   const [eventState, setEventState] = useState<Record<string, { creating?: boolean; createdId?: string }>>({});
-  const [activeTab, setActiveTab] = useState<"details" | "history">("details");
+  const [activeTab, setActiveTab] = useState<"audio" | "transcript" | "coaching" | "maestro">("audio");
   const peerNumber = (call.direction === "outbound" ? call.to_number : call.from_number) ?? "";
 
   // Load insight
@@ -530,192 +531,280 @@ function CallDetailSheet({
   const coaching = insight?.coaching_notes || meta.ai_coaching || "";
   const summary = insight?.summary || call.ai_summary || "";
 
+  const score = call.lead_score ?? null;
+  const scoreColor = score == null ? "var(--pp-text-muted)" : score >= 8 ? "var(--pp-success)" : score >= 5 ? "var(--pp-warning)" : "var(--pp-danger)";
+
   return (
     <div className="absolute inset-0 z-40 flex items-end" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/40" />
-      <div
+      <div className="absolute inset-0" style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(2px)" }} />
+      <motion.div
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full bg-white rounded-t-3xl shadow-2xl flex flex-col"
-        style={{ height: "90%" }}
+        initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+        transition={{ type: "spring", damping: 28, stiffness: 280 }}
+        className="relative w-full flex flex-col"
+        style={{
+          height: "95%",
+          background: "var(--pp-bg-base)",
+          borderTop: "1px solid var(--pp-bg-border-2)",
+          borderRadius: "24px 24px 0 0",
+          boxShadow: "0 -8px 32px rgba(0,0,0,0.5)",
+        }}
       >
-        <div className="pt-2 pb-1 flex flex-col items-center relative shrink-0">
-          <div className="w-10 h-1.5 rounded-full bg-slate-300" />
-          <button onClick={onClose} className="absolute right-3 top-2 p-1.5 rounded-full hover:bg-slate-100">
-            <X className="w-5 h-5 text-slate-600" />
+        {/* Drag handle + close */}
+        <div className="pt-3 pb-2 flex flex-col items-center relative shrink-0">
+          <div style={{ width: 36, height: 4, background: "var(--pp-bg-border-2)", borderRadius: 2 }} />
+          <button onClick={onClose} className="absolute right-3 top-2 p-2.5 rounded-full" style={{ minWidth: 44, minHeight: 44, color: "var(--pp-text-secondary)" }} aria-label="Fermer">
+            <X className="w-5 h-5 mx-auto" />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-5 pb-8">
-          {/* Tabs */}
-          <div className="flex gap-1 bg-slate-100 rounded-full p-1 text-xs mt-2 mb-3">
-            <button onClick={() => setActiveTab("details")} className="flex-1 py-1.5 rounded-full font-medium transition"
-              style={{ background: activeTab === "details" ? "white" : "transparent", color: activeTab === "details" ? PRIMARY : "#64748b" }}>📋 Détails</button>
-            <button onClick={() => setActiveTab("history")} className="flex-1 py-1.5 rounded-full font-medium transition"
-              style={{ background: activeTab === "history" ? "white" : "transparent", color: activeTab === "history" ? PRIMARY : "#64748b" }}>👤 Historique contact</button>
+        {/* Caller header */}
+        <div className="px-5 pb-3 shrink-0" style={{ borderBottom: "1px solid var(--pp-bg-border)" }}>
+          <div className="text-lg font-bold truncate" style={{ color: "var(--pp-text-primary)" }}>{displayLabel(call)}</div>
+          {otherName(call) && <div className="text-xs mt-0.5" style={{ color: "var(--pp-text-muted)" }}>{otherNumber(call)}</div>}
+          <div className="mt-1.5 flex items-center gap-2 text-[11px]" style={{ color: "var(--pp-text-secondary)" }}>
+            <span className="px-2 py-0.5 rounded-full font-semibold" style={{ background: `${dirColor}1F`, color: dirColor, border: `1px solid ${dirColor}55` }}>{direction}</span>
+            <span>{frenchDateTime(call.started_at)}</span>
+            <span style={{ color: "var(--pp-text-faint)" }}>·</span>
+            <span>{frenchDuration(call.duration_seconds)}</span>
           </div>
-          {activeTab === "history" ? (
-            <div className="pt-2"><ContactTimeline number={peerNumber} /></div>
-          ) : (<>
-          {/* SECTION 1 */}
-          <div className="text-center pt-4 pb-5 border-b border-slate-100">
-            <div className="text-xl font-bold" style={{ color: "var(--pp-text-primary)" }}>{displayLabel(call)}</div>
-            {otherName(call) && <div className="text-xs text-slate-400 mt-0.5">{otherNumber(call)}</div>}
-            <div className="mt-2 flex items-center justify-center gap-2 text-xs">
-              <span className="px-2 py-0.5 rounded-full font-medium" style={{ background: `${dirColor}15`, color: dirColor }}>{direction}</span>
-              <span className="text-slate-500">{frenchDateTime(call.started_at)}</span>
-              <span className="text-slate-300">·</span>
-              <span className="text-slate-500">{frenchDuration(call.duration_seconds)}</span>
-            </div>
+          <div className="mt-3 flex gap-2">
             <button
               onClick={() => { openDialer(otherNumber(call)); onClose(); }}
-              className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-white text-sm font-semibold shadow"
-              style={{ background: PRIMARY }}
+              className="flex-1 py-2 rounded-xl text-white text-sm font-semibold flex items-center justify-center gap-2"
+              style={{ background: "linear-gradient(135deg, var(--pp-brand-accent-2), var(--pp-brand-accent))" }}
             >
               <Phone className="w-4 h-4" /> Rappeler
             </button>
+            <button
+              onClick={() => setActiveTab("transcript")}
+              className="px-3 py-2 rounded-xl text-xs font-semibold"
+              style={{ background: "var(--pp-bg-elevated)", color: "var(--pp-text-secondary)", border: "1px solid var(--pp-bg-border-2)" }}
+            >
+              <FileText className="w-4 h-4" />
+            </button>
           </div>
-
-          {/* LEAD SCORE */}
-          {call.lead_temperature && call.lead_score != null && (
-            <div className="mt-4 rounded-xl p-3 flex items-center gap-3"
-              style={{ background: `${TEMP_COLORS[call.lead_temperature]}12`, border: `1px solid ${TEMP_COLORS[call.lead_temperature]}40` }}>
-              <div className="text-3xl">{TEMP_EMOJI[call.lead_temperature]}</div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-bold" style={{ color: TEMP_COLORS[call.lead_temperature] }}>
-                  Lead {TEMP_LABEL[call.lead_temperature].toLowerCase()} — Score {call.lead_score}/10
-                </div>
-                {call.lead_score_reason && (
-                  <div className="text-xs text-slate-500 mt-0.5">{call.lead_score_reason}</div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* CALLBACK SUGGESTION */}
-          {call.suggested_callback_delay && (
-            <CallbackSuggestion call={call} onScheduled={() => toast.success("Rappel programmé ✅")} />
-          )}
-
-
-
-          {/* SECTION 2 - Recording */}
-          <Section title="🎙️ Enregistrement">
-            {call.recording_url ? (
-              <audio controls className="w-full mt-1" style={{ accentColor: PRIMARY }} src={call.recording_url} />
-            ) : (
-              <button onClick={fetchRecording} disabled={recLoading} className="w-full py-2.5 rounded-lg text-sm font-medium border border-slate-200 text-slate-700 active:bg-slate-50 disabled:opacity-50 flex items-center justify-center gap-2">
-                {recLoading && <Loader2 className="w-4 h-4 animate-spin" />} Obtenir l'enregistrement
-              </button>
-            )}
-          </Section>
-
-          {/* SECTION 3 - Transcript */}
-          <Section title="📝 Transcription">
-            {call.transcript ? (
-              <div className="relative">
-                <button onClick={copyTranscript} className="absolute right-1 top-1 text-[11px] px-2 py-1 rounded-md bg-white/90 border border-slate-200 hover:bg-slate-50 flex items-center gap-1">
-                  <Copy className="w-3 h-3" /> Copier
-                </button>
-                <div className="bg-slate-50 rounded-lg p-3 pt-7 text-xs text-slate-700 whitespace-pre-wrap overflow-y-auto" style={{ maxHeight: 200 }}>
-                  {call.transcript}
-                </div>
-              </div>
-            ) : (
-              <button onClick={fetchTranscript} disabled={txLoading} className="w-full py-2.5 rounded-lg text-sm font-medium border border-slate-200 text-slate-700 active:bg-slate-50 disabled:opacity-50 flex items-center justify-center gap-2">
-                {txLoading && <Loader2 className="w-4 h-4 animate-spin" />} Obtenir la transcription
-              </button>
-            )}
-          </Section>
-
-          {/* SECTION 4 - AI Analysis */}
-          <Section title="🤖 Analyse IA">
-            {summary ? (
-              <div className="space-y-2">
-                <Accordion title="📋 Résumé" defaultOpen>
-                  <p className="text-xs text-slate-700 whitespace-pre-wrap">{summary}</p>
-                </Accordion>
-                {coaching && (
-                  <Accordion title="🎯 Coaching">
-                    <p className="text-xs text-slate-700 whitespace-pre-wrap">{coaching}</p>
-                  </Accordion>
-                )}
-                {objections.length > 0 && (
-                  <Accordion title="⚠️ Objections">
-                    <div className="flex flex-wrap gap-1.5">
-                      {objections.map((o, i) => (
-                        <span key={i} className="text-[11px] px-2 py-1 rounded-full border" style={{ borderColor: DANGER, color: DANGER }}>{o}</span>
-                      ))}
-                    </div>
-                  </Accordion>
-                )}
-                {buyingSignals.length > 0 && (
-                  <Accordion title="✅ Signaux d'achat">
-                    <div className="flex flex-wrap gap-1.5">
-                      {buyingSignals.map((o, i) => (
-                        <span key={i} className="text-[11px] px-2 py-1 rounded-full border" style={{ borderColor: SUCCESS, color: SUCCESS }}>{o}</span>
-                      ))}
-                    </div>
-                  </Accordion>
-                )}
-                {nextAction && (
-                  <Accordion title="➡️ Prochaine étape">
-                    <div className="text-xs p-2.5 rounded-lg" style={{ background: `${PRIMARY}10`, color: PRIMARY }}>{nextAction}</div>
-                  </Accordion>
-                )}
-              </div>
-            ) : call.transcript ? (
-              <button onClick={analyzeAI} disabled={aiLoading} className="w-full py-2.5 rounded-lg text-sm font-semibold text-white disabled:opacity-50 flex items-center justify-center gap-2" style={{ background: PURPLE }}>
-                {aiLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Analyse en cours…</> : <><Sparkles className="w-4 h-4" /> Analyser avec l'IA</>}
-              </button>
-            ) : (
-              <p className="text-xs text-slate-400 italic">Obtenez d'abord la transcription pour analyser l'appel.</p>
-            )}
-          </Section>
-
-          {/* SECTION 5 - AI Actions */}
-          {(aiTasks.length > 0 || aiEvents.length > 0) && (
-            <Section title="⚡ Actions suggérées">
-              <div className="space-y-2">
-                {aiTasks.map((t: any, i: number) => {
-                  const st = taskState[String(i)] ?? {};
-                  return (
-                    <ActionRow
-                      key={`t-${i}`}
-                      icon="📌"
-                      title={t.title ?? t.name ?? "Tâche"}
-                      sub={t.due_date ?? t.due ?? ""}
-                      done={!!st.createdId}
-                      loading={!!st.creating}
-                      doneLabel={st.createdId ? `Créé · ${String(st.createdId).slice(0, 8)}` : undefined}
-                      onCreate={() => createOne("task", t, i)}
-                    />
-                  );
-                })}
-                {aiEvents.map((e: any, i: number) => {
-                  const st = eventState[String(i)] ?? {};
-                  return (
-                    <ActionRow
-                      key={`e-${i}`}
-                      icon="📅"
-                      title={e.title ?? e.subject ?? "Événement"}
-                      sub={e.start ?? e.suggested_time ?? ""}
-                      done={!!st.createdId}
-                      loading={!!st.creating}
-                      onCreate={() => createOne("event", e, i)}
-                    />
-                  );
-                })}
-                {aiTasks.length + aiEvents.length > 1 && (
-                  <button onClick={createAll} className="w-full mt-2 py-2.5 rounded-lg text-sm font-semibold text-white flex items-center justify-center gap-2" style={{ background: PRIMARY }}>
-                    <Sparkles className="w-4 h-4" /> Tout créer dans Maestro
-                  </button>
-                )}
-              </div>
-            </Section>
-          )}
-          </>)}
         </div>
-      </div>
+
+        {/* 4 Tabs */}
+        <div className="px-3 pt-3 shrink-0">
+          <div className="flex rounded-full p-1" style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)" }}>
+            {[
+              { k: "audio", label: "🎙️ Audio" },
+              { k: "transcript", label: "📝 Texte" },
+              { k: "coaching", label: "🤖 Coach" },
+              { k: "maestro", label: "🏢 CRM" },
+            ].map((t) => {
+              const active = activeTab === (t.k as any);
+              return (
+                <button
+                  key={t.k}
+                  onClick={() => setActiveTab(t.k as any)}
+                  className="flex-1 py-2 rounded-full text-[11px] font-semibold transition"
+                  style={active
+                    ? { background: "linear-gradient(135deg, var(--pp-brand-accent), var(--pp-brand-accent-2))", color: "white", boxShadow: "0 2px 10px rgba(46,155,220,0.35)" }
+                    : { color: "var(--pp-text-muted)" }}
+                >
+                  {t.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+
+          {/* ===== TAB AUDIO ===== */}
+          {activeTab === "audio" && (
+            <>
+              {call.recording_url ? (
+                <div className="pp-card p-4">
+                  <audio controls className="w-full" style={{ accentColor: "var(--pp-brand-accent)" }} src={call.recording_url} />
+                  <a href={call.recording_url} download className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold" style={{ color: "var(--pp-brand-accent)" }}>
+                    ⬇ Télécharger
+                  </a>
+                </div>
+              ) : (
+                <button onClick={fetchRecording} disabled={recLoading}
+                  className="w-full py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
+                  style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }}>
+                  {recLoading && <Loader2 className="w-4 h-4 animate-spin" />} Charger l'enregistrement
+                </button>
+              )}
+            </>
+          )}
+
+          {/* ===== TAB TRANSCRIPT ===== */}
+          {activeTab === "transcript" && (
+            <>
+              {call.transcript ? (
+                <div className="pp-card p-4">
+                  <div className="flex justify-end mb-2">
+                    <button onClick={copyTranscript} className="text-[11px] px-2.5 py-1 rounded-md flex items-center gap-1"
+                      style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>
+                      <Copy className="w-3 h-3" /> Copier
+                    </button>
+                  </div>
+                  <div className="text-xs whitespace-pre-wrap leading-relaxed" style={{ color: "var(--pp-text-primary)", maxHeight: 360, overflowY: "auto" }}>
+                    {call.transcript}
+                  </div>
+                </div>
+              ) : (
+                <button onClick={fetchTranscript} disabled={txLoading}
+                  className="w-full py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
+                  style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }}>
+                  {txLoading && <Loader2 className="w-4 h-4 animate-spin" />} Obtenir la transcription
+                </button>
+              )}
+            </>
+          )}
+
+          {/* ===== TAB COACHING ===== */}
+          {activeTab === "coaching" && (
+            <>
+              {/* Score circle */}
+              {score != null && (
+                <div className="flex items-center gap-4 pp-card p-4">
+                  <div className="relative w-20 h-20 shrink-0 rounded-full flex items-center justify-center"
+                    style={{ background: "var(--pp-bg-elevated)", border: `3px solid ${scoreColor}` }}>
+                    <div className="text-2xl font-bold" style={{ color: scoreColor, fontFamily: "Inter,sans-serif" }}>{score}</div>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs uppercase tracking-wider font-bold" style={{ color: scoreColor }}>Score lead /10</div>
+                    {call.lead_score_reason && <div className="text-xs italic mt-1" style={{ color: "var(--pp-text-secondary)" }}>{call.lead_score_reason}</div>}
+                  </div>
+                </div>
+              )}
+
+              {summary && (
+                <div className="rounded-xl p-3" style={{ background: "rgba(46,155,220,0.06)", border: "1px solid rgba(46,155,220,0.15)", borderLeft: "3px solid var(--pp-brand-accent)" }}>
+                  <div className="text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "var(--pp-brand-accent)" }}>📋 Résumé</div>
+                  <p className="text-xs whitespace-pre-wrap" style={{ color: "var(--pp-text-primary)" }}>{summary}</p>
+                </div>
+              )}
+
+              {buyingSignals.length > 0 && (
+                <div className="rounded-xl p-3" style={{ background: "rgba(0,212,170,0.06)", border: "1px solid rgba(0,212,170,0.15)", borderLeft: "3px solid var(--pp-success)" }}>
+                  <div className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--pp-success)" }}>✅ Points forts</div>
+                  <ul className="space-y-1.5">
+                    {buyingSignals.map((s, i) => (
+                      <li key={i} className="text-xs flex items-start gap-2" style={{ color: "var(--pp-text-primary)" }}>
+                        <span style={{ color: "var(--pp-success)" }}>●</span> {s}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {objections.length > 0 && (
+                <div className="rounded-xl p-3" style={{ background: "rgba(245,166,35,0.06)", border: "1px solid rgba(245,166,35,0.15)", borderLeft: "3px solid var(--pp-warning)" }}>
+                  <div className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--pp-warning)" }}>⚠️ Axes d'amélioration</div>
+                  <ul className="space-y-1.5">
+                    {objections.map((o, i) => (
+                      <li key={i} className="text-xs flex items-start gap-2" style={{ color: "var(--pp-text-primary)" }}>
+                        <span style={{ color: "var(--pp-warning)" }}>●</span> {o}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {nextAction && (
+                <div className="rounded-xl p-3" style={{ background: "rgba(155,127,232,0.06)", border: "1px solid rgba(155,127,232,0.15)", borderLeft: "3px solid var(--pp-agent)" }}>
+                  <div className="text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "var(--pp-agent)" }}>💡 Prochaine étape</div>
+                  <p className="text-xs" style={{ color: "var(--pp-text-primary)" }}>{nextAction}</p>
+                </div>
+              )}
+
+              {coaching && (
+                <div className="rounded-xl p-4" style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)", borderLeft: "4px solid var(--pp-agent)" }}>
+                  <p className="text-xs italic whitespace-pre-wrap" style={{ color: "var(--pp-text-primary)" }}>« {coaching} »</p>
+                  <div className="text-[10px] mt-2 font-semibold" style={{ color: "var(--pp-agent)" }}>— AVA, Coach IA</div>
+                </div>
+              )}
+
+              {/* Suggested actions */}
+              {(aiTasks.length > 0 || aiEvents.length > 0) && (
+                <div className="space-y-2">
+                  <div className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--pp-text-secondary)" }}>⚡ Actions suggérées</div>
+                  {aiTasks.map((t: any, i: number) => {
+                    const st = taskState[String(i)] ?? {};
+                    return (
+                      <ActionRow key={`t-${i}`} icon="📌" title={t.title ?? t.name ?? "Tâche"} sub={t.due_date ?? t.due ?? ""}
+                        done={!!st.createdId} loading={!!st.creating}
+                        doneLabel={st.createdId ? `Créé · ${String(st.createdId).slice(0, 8)}` : undefined}
+                        onCreate={() => createOne("task", t, i)} />
+                    );
+                  })}
+                  {aiEvents.map((e: any, i: number) => {
+                    const st = eventState[String(i)] ?? {};
+                    return (
+                      <ActionRow key={`e-${i}`} icon="📅" title={e.title ?? e.subject ?? "Événement"} sub={e.start ?? e.suggested_time ?? ""}
+                        done={!!st.createdId} loading={!!st.creating} onCreate={() => createOne("event", e, i)} />
+                    );
+                  })}
+                  {aiTasks.length + aiEvents.length > 1 && (
+                    <button onClick={createAll} className="w-full mt-1 py-2.5 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2"
+                      style={{ background: "linear-gradient(135deg, var(--pp-brand-accent-2), var(--pp-brand-accent))" }}>
+                      <Sparkles className="w-4 h-4" /> Tout créer dans Maestro
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Empty / analyze CTA */}
+              {!summary && !coaching && (
+                call.transcript ? (
+                  <button onClick={analyzeAI} disabled={aiLoading}
+                    className="w-full py-3 rounded-xl text-sm font-semibold text-white disabled:opacity-50 flex items-center justify-center gap-2"
+                    style={{ background: "linear-gradient(135deg, #6C3CE1, var(--pp-agent))" }}>
+                    {aiLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Analyse en cours…</> : <><Sparkles className="w-4 h-4" /> Analyser avec l'IA</>}
+                  </button>
+                ) : (
+                  <button onClick={async () => { await fetchTranscript(); }} disabled={txLoading}
+                    className="w-full py-3 rounded-xl text-sm font-semibold text-white disabled:opacity-50 flex items-center justify-center gap-2"
+                    style={{ background: "linear-gradient(135deg, var(--pp-brand-accent-2), var(--pp-brand-accent))" }}>
+                    📝 Obtenir transcription + Analyse
+                  </button>
+                )
+              )}
+
+              {/* Callback suggestion */}
+              {call.suggested_callback_delay && (
+                <CallbackSuggestion call={call} onScheduled={() => toast.success("Rappel programmé ✅")} />
+              )}
+            </>
+          )}
+
+          {/* ===== TAB MAESTRO ===== */}
+          {activeTab === "maestro" && (
+            <>
+              <div className="pp-card p-4">
+                <div className="flex items-center justify-between">
+                  <div className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--pp-text-secondary)" }}>Statut sync</div>
+                  <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold" style={{
+                    background: call.maestro_synced ? "rgba(0,212,170,0.15)" : "rgba(245,166,35,0.15)",
+                    color: call.maestro_synced ? "var(--pp-success)" : "var(--pp-warning)",
+                  }}>
+                    {call.maestro_synced ? "✅ Synchronisé" : "⏳ En attente"}
+                  </span>
+                </div>
+                {call.maestro_client_id && (
+                  <div className="text-xs mt-2" style={{ color: "var(--pp-text-secondary)" }}>
+                    Client : <span style={{ color: "var(--pp-text-primary)", fontFamily: "monospace" }}>{String(call.maestro_client_id).slice(0, 12)}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="pp-card p-4">
+                <div className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: "var(--pp-text-secondary)" }}>Historique du contact</div>
+                <ContactTimeline number={peerNumber} />
+              </div>
+            </>
+          )}
+
+        </div>
+      </motion.div>
     </div>
   );
 }
