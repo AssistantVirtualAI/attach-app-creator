@@ -95,7 +95,7 @@ export const trackPortalGuardEvent = (event: string, details: Record<string, unk
   }
 
   if (!flushTimer && typeof window !== "undefined") {
-    flushTimer = window.setTimeout(() => {
+    flushTimer = setTimeout(() => {
       flushTimer = null;
       flushPortalGuardEvents().catch(() => undefined);
     }, 500);
