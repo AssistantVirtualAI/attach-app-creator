@@ -3,14 +3,18 @@
 // Runs Claude (via ANTHROPIC_API_KEY) on the transcript and writes coaching/insights.
 import {
   adminClient,
+  broadcastPipeline,
   corsHeaders,
   getBrokerAuth,
   getMaestroConfig,
   json,
   maestroAudit,
   maestroFetch,
+  pipelineLog,
   setPipelineStep,
+  updateCallPipeline,
 } from "../_shared/maestro.ts";
+
 
 const ANALYSIS_SYSTEM = `Tu es un expert en coaching de courtiers hypothécaires. Analyse cette transcription d'appel et retourne UNIQUEMENT un JSON valide sans markdown, sans bloc de code, sans commentaire — juste l'objet JSON brut.`;
 
