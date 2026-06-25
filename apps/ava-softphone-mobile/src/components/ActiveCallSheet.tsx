@@ -262,15 +262,17 @@ function routeIcon(r: AudioRoute) {
   return r === 'speaker' ? '🔊' : r === 'bluetooth' ? '🎧' : '📞';
 }
 
-function Ctrl({ label, icon, onClick, active, tone = 'default' }: {
+function Ctrl({ label, icon, onClick, active, tone = 'default', disabled }: {
   label: string; icon: string; onClick: () => void; active?: boolean;
   tone?: 'default' | 'danger' | 'ai';
+  disabled?: boolean;
 }) {
   const accent = tone === 'danger' ? colors.danger : tone === 'ai' ? colors.avaViolet : colors.blueGlow;
   return (
-    <button onClick={onClick} style={{
+    <button onClick={onClick} disabled={disabled} style={{
       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-      background: 'transparent', border: 'none', cursor: 'pointer', color: colors.textIce,
+      background: 'transparent', border: 'none', cursor: disabled ? 'not-allowed' : 'pointer',
+      color: colors.textIce, opacity: disabled ? 0.45 : 1,
     }}>
       <span style={{
         width: 60, height: 60, borderRadius: '50%',
