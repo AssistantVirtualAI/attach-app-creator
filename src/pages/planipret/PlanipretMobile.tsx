@@ -40,9 +40,15 @@ const KEYS: Array<{ d: string; l?: string }> = [
 function Dialer({ open, onClose, initial }: { open: boolean; onClose: () => void; initial?: string }) {
   const [number, setNumber] = useState("");
   const [calling, setCalling] = useState(false);
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => { if (open) setNumber(initial ?? ""); }, [open, initial]);
   const append = (c: string) => setNumber((n) => (n + c).slice(0, 20));
   const back = () => setNumber((n) => n.slice(0, -1));
+  const startHold = () => {
+    if (holdTimer.current) clearTimeout(holdTimer.current);
+    holdTimer.current = setTimeout(() => { setNumber(""); holdTimer.current = null; }, 1000);
+  };
+  const endHold = () => { if (holdTimer.current) { clearTimeout(holdTimer.current); holdTimer.current = null; back(); } };
   const startCall = async () => {
     if (!number) return;
     setCalling(true);
@@ -60,52 +66,62 @@ function Dialer({ open, onClose, initial }: { open: boolean; onClose: () => void
   return (
     <AnimatePresence>
       {open && (
-        <motion.div className="absolute inset-0 z-30 flex flex-col"
-          style={{ background: "var(--pp-bg-surface)", borderTop: "1px solid var(--pp-bg-border-2)", borderRadius: "24px 24px 0 0" }}
+        <motion.div className="absolute inset-x-0 bottom-0 z-30 flex flex-col"
+          style={{
+            height: "85%",
+            background: "var(--pp-bg-surface)",
+            border: "1px solid var(--pp-bg-border-2)",
+            borderRadius: "24px 24px 0 0",
+            boxShadow: "0 -8px 32px rgba(0,0,0,0.5)",
+          }}
           initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 28, stiffness: 280 }}>
           <div className="pt-3 pb-2 flex flex-col items-center relative">
             <div style={{ width: 36, height: 4, background: "var(--pp-bg-border-2)", borderRadius: 2 }} />
-            <button onClick={onClose} className="absolute right-3 top-3 p-1.5 rounded-full" style={{ color: "var(--pp-text-secondary)" }}><X className="w-5 h-5" /></button>
+            <button onClick={onClose} className="absolute right-3 top-3 p-2.5 rounded-full" style={{ color: "var(--pp-text-secondary)", minWidth: 44, minHeight: 44 }} aria-label="Fermer"><X className="w-5 h-5 mx-auto" /></button>
           </div>
-          <div className="flex-1 flex flex-col px-6 pt-4">
-            <div className="text-center min-h-[60px] flex items-center justify-center">
+          <div className="flex-1 flex flex-col px-6 pt-4 overflow-hidden">
+            <div className="text-center min-h-[56px] flex items-center justify-center px-5 py-5">
               <span style={{
                 fontFamily: "Inter, sans-serif",
-                fontWeight: 600,
-                fontSize: number ? 34 : 16,
+                fontWeight: 300,
+                fontSize: number ? 32 : 16,
                 color: number ? "var(--pp-text-primary)" : "var(--pp-text-faint)",
                 letterSpacing: "-0.01em",
               }}>
                 {number || "Entrer un numéro…"}
               </span>
             </div>
-            <div className="grid grid-cols-3 gap-3 mt-6 mx-auto" style={{ maxWidth: 280 }}>
+            <div className="grid grid-cols-3 gap-3 mt-2 mx-auto" style={{ maxWidth: 288 }}>
               {KEYS.map((k) => (
                 <button key={k.d} onClick={() => append(k.d)}
-                  className="flex flex-col items-center justify-center transition active:scale-95"
+                  className="flex flex-col items-center justify-center transition active:scale-[0.92] pp-keypad-btn"
                   style={{
-                    width: 64, height: 64, borderRadius: "50%",
+                    width: 72, height: 72, borderRadius: "50%",
                     background: "var(--pp-bg-elevated)",
                     border: "1px solid var(--pp-bg-border-2)",
                   }}>
-                  <span style={{ fontFamily: "Inter, sans-serif", fontWeight: 600, fontSize: 22, color: "var(--pp-text-primary)", lineHeight: 1 }}>{k.d}</span>
-                  {k.l && <span style={{ fontSize: 9, color: "var(--pp-text-muted)", marginTop: 2, letterSpacing: "0.05em" }}>{k.l}</span>}
+                  <span style={{ fontFamily: "Inter, sans-serif", fontWeight: 600, fontSize: 26, color: "var(--pp-text-primary)", lineHeight: 1 }}>{k.d}</span>
+                  {k.l && <span style={{ fontFamily: "DM Sans, sans-serif", fontSize: 9, color: "var(--pp-text-muted)", marginTop: 3, letterSpacing: "0.05em" }}>{k.l}</span>}
                 </button>
               ))}
             </div>
-            <div className="grid grid-cols-3 items-center gap-3 mt-6 mx-auto" style={{ maxWidth: 280 }}>
-              <button onClick={() => append("+")} className="mx-auto flex items-center justify-center"
-                style={{ width: 56, height: 56, borderRadius: "50%", background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>
+            <div className="grid grid-cols-3 items-center gap-3 mt-5 mx-auto" style={{ maxWidth: 288 }}>
+              <button onClick={() => append("+")} className="mx-auto flex items-center justify-center active:scale-95 transition"
+                style={{ width: 48, height: 48, borderRadius: "50%", background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-muted)" }} aria-label="Plus">
                 <Plus className="w-5 h-5" />
               </button>
               <button onClick={startCall} disabled={!number || calling}
                 className="mx-auto flex items-center justify-center text-white disabled:opacity-50 active:scale-95 transition"
-                style={{ width: 64, height: 64, borderRadius: "50%", background: "linear-gradient(135deg, #0D5C2A, #00D4AA)", boxShadow: "0 4px 20px rgba(0,212,170,0.4)" }}>
+                style={{ width: 72, height: 72, borderRadius: "50%", background: "linear-gradient(135deg, #0D5C2A, #00D4AA)", boxShadow: "0 4px 20px rgba(0,212,170,0.5)" }} aria-label="Appeler">
                 <PhoneIcon className="w-7 h-7" />
               </button>
-              <button onClick={back} onContextMenu={(e) => { e.preventDefault(); setNumber(""); }}
-                className="mx-auto flex items-center justify-center"
-                style={{ width: 56, height: 56, borderRadius: "50%", background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>
+              <button
+                onPointerDown={startHold}
+                onPointerUp={endHold}
+                onPointerLeave={() => { if (holdTimer.current) { clearTimeout(holdTimer.current); holdTimer.current = null; } }}
+                onContextMenu={(e) => { e.preventDefault(); setNumber(""); }}
+                className="mx-auto flex items-center justify-center active:scale-95 transition"
+                style={{ width: 48, height: 48, borderRadius: "50%", background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-muted)" }} aria-label="Effacer (hold 1s pour tout effacer)">
                 <Delete className="w-5 h-5" />
               </button>
             </div>

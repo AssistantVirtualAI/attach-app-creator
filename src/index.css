@@ -817,6 +817,10 @@ All colors MUST be HSL.
   animation: pp-shimmer 1.8s ease-in-out infinite;
   border-radius: 8px;
 }
+.planipret-scope .pp-keypad-btn:active {
+  background: rgba(46,155,220,0.15) !important;
+  border-color: rgba(46,155,220,0.35) !important;
+}
 
 /* === Planiprêt design tokens (Phase 1) === */
 .planipret-scope {
