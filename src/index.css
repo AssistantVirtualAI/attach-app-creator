@@ -802,6 +802,21 @@ All colors MUST be HSL.
   0%, 100% { box-shadow: 0 4px 16px rgba(155,127,232,0.4); }
   50%      { box-shadow: 0 4px 28px rgba(155,127,232,0.7); }
 }
+@keyframes pp-pulse-red {
+  0%   { box-shadow: 0 0 0 0 rgba(232,76,76,0.7); }
+  70%  { box-shadow: 0 0 0 14px rgba(232,76,76,0); }
+  100% { box-shadow: 0 0 0 0 rgba(232,76,76,0); }
+}
+@keyframes pp-shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+.planipret-scope .pp-skeleton {
+  background: linear-gradient(90deg, #0A1E35 25%, #0E2A45 50%, #0A1E35 75%);
+  background-size: 200% 100%;
+  animation: pp-shimmer 1.8s ease-in-out infinite;
+  border-radius: 8px;
+}
 
 /* === Planiprêt design tokens (Phase 1) === */
 .planipret-scope {

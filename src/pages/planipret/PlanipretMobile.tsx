@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate, NavLink, Outlet, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
-import { Home, Phone, MessageSquare, Users, MoreHorizontal, Phone as PhoneIcon, X, Delete, Plus, Lock } from "lucide-react";
+import { Home, Phone, MessageSquare, MoreHorizontal, Phone as PhoneIcon, X, Delete, Plus, Lock, PhoneOff, Bot } from "lucide-react";
 import { toast } from "sonner";
 import planipretLogo from "@/assets/planipret-logo.png.asset.json";
 import avaWordmark from "@/assets/ava-wordmark.svg";
@@ -15,17 +15,17 @@ import PrivacyConsentGate from "@/components/planipret/PrivacyConsentGate";
 import UniversalSearchBar from "@/components/planipret/UniversalSearchBar";
 import { OnboardingTutorial } from "@/components/planipret/OnboardingTutorial";
 import { useAvaNavigation } from "@/hooks/useAvaNavigation";
+import AvaVoiceAgent from "@/components/planipret/mobile/AvaVoiceAgent";
 
 const ACCENT = "#2E9BDC";
 
-export type PlanipretMobileContext = { profile: any; reloadProfile: () => Promise<void>; openDialer: (number?: string) => void; registerRefresh: (fn: (() => Promise<void> | void) | null) => void };
+export type PlanipretMobileContext = { profile: any; reloadProfile: () => Promise<void>; openDialer: (number?: string) => void; openAva: () => void; registerRefresh: (fn: (() => Promise<void> | void) | null) => void };
 
 const TABS = [
   { to: "/mplanipret/home", label: "Accueil", Icon: Home },
   { to: "/mplanipret/calls", label: "Appels", Icon: Phone },
   { to: "_fab", label: "", Icon: PhoneIcon },
   { to: "/mplanipret/messages", label: "Messages", Icon: MessageSquare },
-  { to: "/mplanipret/contacts", label: "Contacts", Icon: Users },
   { to: "/mplanipret/more", label: "Plus", Icon: MoreHorizontal },
 ];
 
@@ -127,7 +127,10 @@ export default function PlanipretMobile() {
   const [unreadMsg, setUnreadMsg] = useState(0);
   const [unreadVm, setUnreadVm] = useState(0);
   const [inbound, setInbound] = useState<InboundCall>(null);
+  const [avaOpen, setAvaOpen] = useState(false);
+  const [activeCallId, setActiveCallId] = useState<string | null>(null);
   const openDialer = (n?: string) => { setDialerInit(n); setDialerOpen(true); };
+  const openAva = () => setAvaOpen(true);
   const refreshFn = useRef<(() => Promise<void> | void) | null>(null);
   const registerRefresh = (fn: (() => Promise<void> | void) | null) => { refreshFn.current = fn; };
   const handlePull = async () => { if (refreshFn.current) await refreshFn.current(); };
@@ -145,6 +148,34 @@ export default function PlanipretMobile() {
   }, [navigate]);
   useRealtimeManager(profile?.user_id, { onInboundRinging, onAiInsight });
   useAvaNavigation(profile?.user_id);
+
+  // Detect active outbound/in-progress call → FAB pulses red & hangs up on tap
+  useEffect(() => {
+    if (!profile?.user_id) return;
+    const refreshActive = async () => {
+      const { data } = await supabase
+        .from("planipret_phone_calls")
+        .select("id,status")
+        .eq("user_id", profile.user_id)
+        .in("status", ["active", "in_progress", "answered", "ringing"])
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      setActiveCallId((data as any)?.id ?? null);
+    };
+    refreshActive();
+    const ch = supabase
+      .channel("mplanipret-active-call")
+      .on("postgres_changes", { event: "*", schema: "public", table: "planipret_phone_calls", filter: `user_id=eq.${profile.user_id}` }, refreshActive)
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [profile?.user_id]);
+
+  const hangupActive = async () => {
+    if (!activeCallId) return;
+    const { error } = await supabase.functions.invoke("ns-calls", { body: { action: "hangup", call_id: activeCallId } });
+    if (error) toast.error("Échec raccrocher"); else toast.success("Appel raccroché");
+  };
 
   useEffect(() => {
     if (!profile?.user_id) return;
@@ -215,7 +246,7 @@ export default function PlanipretMobile() {
         <UniversalSearchBar />
         <div ref={scrollRef} className="flex-1 overflow-y-auto pb-[110px]">
           <PullIndicator pullDist={pullDist} refreshing={refreshing} threshold={threshold} color={ACCENT} />
-          <Outlet context={{ profile, reloadProfile: loadProfile, openDialer, registerRefresh } satisfies PlanipretMobileContext} />
+          <Outlet context={{ profile, reloadProfile: loadProfile, openDialer, openAva, registerRefresh } satisfies PlanipretMobileContext} />
         </div>
         <SessionTimeoutModal />
         {profile && <PrivacyConsentGate profile={profile} onAccepted={loadProfile} />}
@@ -223,28 +254,49 @@ export default function PlanipretMobile() {
           <OnboardingTutorial profile={profile} onDone={loadProfile} />
         )}
 
-        {/* Center FAB (between Appels and Messages) */}
-        <button onClick={() => setDialerOpen(true)}
+        {/* AVA Voice floating button (gated by voice_agent_enabled) */}
+        {profile?.voice_agent_enabled && (
+          <button onClick={openAva}
+            className="absolute z-20 rounded-full flex items-center justify-center text-white active:scale-95 transition"
+            style={{
+              right: 16, bottom: 152,
+              width: 52, height: 52,
+              background: "linear-gradient(135deg, #2D1A5A, #9B7FE8)",
+              boxShadow: "0 4px 20px rgba(155,127,232,0.5)",
+              animation: "pp-glow-purple 2s ease-in-out infinite",
+            }}
+            aria-label="Parler à AVA">
+            <Bot className="w-6 h-6" />
+          </button>
+        )}
+
+        {/* Center FAB — bleu (idle) ou rouge pulsant (appel actif) */}
+        <button onClick={activeCallId ? hangupActive : () => setDialerOpen(true)}
           className="absolute left-1/2 -translate-x-1/2 z-20 rounded-full flex items-center justify-center text-white active:scale-95 transition"
           style={{
-            background: "linear-gradient(135deg, #1A4A8A, #2E9BDC)",
-            boxShadow: "0 4px 24px rgba(46,155,220,0.6)",
-            width: 56, height: 56, bottom: 78,
+            background: activeCallId
+              ? "linear-gradient(135deg, #5A1010, #E84C4C)"
+              : "linear-gradient(135deg, #1A4A8A, #2E9BDC)",
+            boxShadow: activeCallId
+              ? "0 4px 24px rgba(232,76,76,0.6)"
+              : "0 4px 24px rgba(46,155,220,0.6)",
+            animation: activeCallId ? "pp-pulse-red 1.5s infinite" : undefined,
+            width: 58, height: 58, bottom: 76,
           }}
-          aria-label="Composer un numéro">
-          <PhoneIcon className="w-6 h-6" />
+          aria-label={activeCallId ? "Raccrocher" : "Composer un numéro"}>
+          {activeCallId ? <PhoneOff className="w-6 h-6" /> : <PhoneIcon className="w-6 h-6" />}
         </button>
 
 
-        {/* Tab bar (6 slots: 5 tabs + center FAB placeholder) */}
-        <nav className="absolute bottom-[22px] inset-x-0 grid grid-cols-6 z-10"
+        {/* Tab bar (5 tabs + center FAB placeholder = 5 grid columns) */}
+        <nav className="absolute bottom-[22px] inset-x-0 grid grid-cols-5 z-10"
           style={{
-            height: 72,
-            background: "rgba(4,11,22,0.98)",
+            height: 70,
+            background: "rgba(4,11,22,0.97)",
             backdropFilter: "blur(20px)",
-            borderTop: "1px solid var(--pp-bg-border)",
+            borderTop: "1px solid var(--pp-bg-border-2)",
           }}>
-          {TABS.map((t, i) => {
+          {TABS.map((t) => {
             if (t.to === "_fab") return <div key="fab-slot" />;
             const badge = t.to.endsWith("/messages") ? unreadMsg : 0;
             return (
@@ -283,6 +335,9 @@ export default function PlanipretMobile() {
 
         <Dialer open={dialerOpen} onClose={() => setDialerOpen(false)} initial={dialerInit} />
         <InboundCallOverlay call={inbound} onClose={() => setInbound(null)} />
+        {avaOpen && profile?.user_id && (
+          <AvaVoiceAgent userId={profile.user_id} onClose={() => setAvaOpen(false)} />
+        )}
         <OfflineBanner />
       </div>
     </Frame>
