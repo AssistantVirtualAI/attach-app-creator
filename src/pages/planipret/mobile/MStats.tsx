@@ -106,6 +106,34 @@ export default function MStats() {
         ))}
       </div>
 
+      <button
+        onClick={async () => {
+          setCoachOpen(true);
+          setCoachLoading(true);
+          setCoachReply("");
+          setCoachSuggestions([]);
+          const res = await callAva({
+            mode: "recommend",
+            message: `Analyse mes performances sur la période (${period}) et donne-moi 3 conseils actionnables pour améliorer mon taux de conversion.`,
+            context: {
+              period,
+              kpi,
+              funnel,
+              best_day: bestDay,
+              broker: profile?.full_name,
+            },
+          });
+          setCoachReply(res.reply);
+          setCoachSuggestions(res.suggestions);
+          setCoachLoading(false);
+        }}
+        className="w-full mb-4 py-2.5 rounded-xl flex items-center justify-center gap-2 text-white font-semibold text-sm shadow-md active:scale-[0.98] transition"
+        style={{ background: "linear-gradient(135deg,#2D1A5A,#9B7FE8)", boxShadow: "0 4px 16px rgba(155,127,232,0.35)" }}
+      >
+        <Sparkles className="w-4 h-4" /> Coach AVA — analyser mes perfs
+      </button>
+
+
       <div className="grid grid-cols-2 gap-2 mb-4">
         <Kpi label="Total appels" value={kpi.total} icon={<Phone className="w-4 h-4" />} />
         <Kpi label="Taux réponse" value={`${kpi.response}%`} icon={<TrendingUp className="w-4 h-4" />} />
