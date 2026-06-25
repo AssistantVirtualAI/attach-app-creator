@@ -119,6 +119,51 @@ export default function PAReports() {
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `rapport-${Date.now()}.csv`; a.click();
   };
 
+  const exportPdf = async () => {
+    if (!reportRef.current) return;
+    setExporting(true);
+    try {
+      const canvas = await html2canvas(reportRef.current, {
+        backgroundColor: "#0B1437",
+        scale: 2,
+        useCORS: true,
+        logging: false,
+      });
+      const img = canvas.toDataURL("image/png");
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const imgW = pageW - 20;
+      const imgH = (canvas.height * imgW) / canvas.width;
+      const dateLabel = new Date().toLocaleDateString("fr-CA");
+      pdf.setFillColor(11, 20, 55); pdf.rect(0, 0, pageW, pageH, "F");
+      pdf.setTextColor(255, 255, 255); pdf.setFontSize(16);
+      pdf.text("Planiprêt — Rapport admin", 10, 12);
+      pdf.setFontSize(9); pdf.setTextColor(143, 168, 192);
+      pdf.text(`Période : ${range === "week" ? "7 jours" : range === "month" ? "30 jours" : "90 jours"} · Généré le ${dateLabel}`, 10, 18);
+      let y = 24, remaining = imgH, srcY = 0;
+      const ratio = canvas.width / imgW;
+      while (remaining > 0) {
+        const sliceH = Math.min(pageH - y - 8, remaining);
+        const sliceCanvas = document.createElement("canvas");
+        sliceCanvas.width = canvas.width;
+        sliceCanvas.height = sliceH * ratio;
+        const ctx = sliceCanvas.getContext("2d")!;
+        ctx.drawImage(canvas, 0, srcY, canvas.width, sliceCanvas.height, 0, 0, canvas.width, sliceCanvas.height);
+        pdf.addImage(sliceCanvas.toDataURL("image/png"), "PNG", 10, y, imgW, sliceH);
+        srcY += sliceCanvas.height;
+        remaining -= sliceH;
+        if (remaining > 0) { pdf.addPage(); pdf.setFillColor(11, 20, 55); pdf.rect(0, 0, pageW, pageH, "F"); y = 10; }
+      }
+      pdf.save(`planipret-rapport-${range}-${new Date().toISOString().slice(0,10)}.pdf`);
+      toast.success("PDF généré");
+    } catch (e: any) {
+      toast.error("Échec de l'export PDF : " + (e?.message ?? "erreur"));
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex gap-2">
