@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useOutletContext, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowLeft, Phone, TrendingUp, Award, Flame, Sparkles, Loader2 } from "lucide-react";
+import { ArrowLeft, Phone, TrendingUp, Award, Flame, Sparkles } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, PieChart, Pie, Cell, Legend } from "recharts";
 import type { PlanipretMobileContext } from "../PlanipretMobile";
 import CoachOverlay from "@/components/planipret/ava/CoachOverlay";
