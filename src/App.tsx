@@ -388,6 +388,7 @@ const App = () => (
                   <Route path="voicemails" element={<Suspense fallback={<AdminPageSkeleton />}><PAVoicemails /></Suspense>} />
                   <Route path="reports" element={<Suspense fallback={<AdminPageSkeleton />}><PAReports /></Suspense>} />
                   <Route path="audit" element={<Suspense fallback={<AdminPageSkeleton />}><PAAuditLog /></Suspense>} />
+                  <Route path="audit-checklist" element={<Suspense fallback={<AdminPageSkeleton />}><PAAuditChecklist /></Suspense>} />
                   <Route path="compliance" element={<Suspense fallback={<AdminPageSkeleton />}><PACompliance /></Suspense>} />
                   <Route path="leads" element={<Suspense fallback={<AdminPageSkeleton />}><PALeads /></Suspense>} />
                   <Route path="templates" element={<Suspense fallback={<AdminPageSkeleton />}><PATemplates /></Suspense>} />
