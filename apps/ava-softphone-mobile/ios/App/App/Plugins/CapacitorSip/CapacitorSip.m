@@ -5,8 +5,9 @@
 // Wire transport: raw NSStream TCP socket to the SIP server (port 5060).
 // No third-party SIP stack required. No Swift code involved.
 
+@import Capacitor;
+
 #import <Foundation/Foundation.h>
-#import <Capacitor/Capacitor.h>
 #import <CommonCrypto/CommonDigest.h>
 #import <ifaddrs.h>
 #import <arpa/inet.h>
