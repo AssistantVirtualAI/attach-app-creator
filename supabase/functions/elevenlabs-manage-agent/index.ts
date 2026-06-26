@@ -107,8 +107,26 @@ Deno.serve(async (req) => {
         if (!agentId) return json({ success: false, error: "no_agent_configured" });
         const r = await elFetch(apiKey, `/convai/agents/${agentId}`);
         if (!r.ok) return json({ success: false, error: r.error, status: r.status });
+        // Resolve tool_ids → tool names so the UI's tool-status panel stays accurate.
+        const prompt = r.data?.conversation_config?.agent?.prompt ?? {};
+        const inlineTools: any[] = prompt.tools ?? [];
+        const toolIds: string[] = prompt.tool_ids ?? [];
+        if (toolIds.length && inlineTools.length === 0) {
+          const reg = await elFetch(apiKey, "/convai/tools");
+          if (reg.ok) {
+            const all: any[] = reg.data?.tools ?? [];
+            const idSet = new Set(toolIds);
+            const synthesized = all
+              .filter((t) => idSet.has(t?.id ?? t?.tool_id))
+              .map((t) => ({ name: t?.tool_config?.name ?? t?.name, description: t?.tool_config?.description ?? "" }));
+            if (synthesized.length) {
+              r.data.conversation_config.agent.prompt.tools = synthesized;
+            }
+          }
+        }
         return json({ success: true, agent: r.data, agent_id: agentId });
       }
+
 
       case "list_llms": {
         const r = await elFetch(apiKey, "/convai/llm-prices");
