@@ -224,6 +224,10 @@ final class RTPAudioSession {
         }
         guard let ptr = outBuf.int16ChannelData?[0] else { return }
         let n = Int(outBuf.frameLength)
+        // Mic peak (linear 0..1) for diagnostics
+        var peak: Int16 = 0
+        for i in 0..<n { let a = abs(ptr[i]); if a > peak { peak = a } }
+        micPeak = Float(peak) / 32767.0
         if isMuted {
             sendBuffer.append(contentsOf: repeatElement(0, count: n))
         } else {
