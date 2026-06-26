@@ -349,7 +349,7 @@ final class RTPAudioSession {
 
         // Stream format: 8kHz mono Int16 packed.
         var asbd = AudioStreamBasicDescription(
-            mSampleRate: sampleRate,
+            mSampleRate: hwSampleRate,
             mFormatID: kAudioFormatLinearPCM,
             mFormatFlags: kAudioFormatFlagIsSignedInteger | kAudioFormatFlagIsPacked,
             mBytesPerPacket: 2,
@@ -369,7 +369,7 @@ final class RTPAudioSession {
             NSLog("[RTP] \(lastEngineError)")
             AudioComponentInstanceDispose(io); return false
         }
-        NSLog("[RTP] RemoteIO input callback format=I16 8000Hz ch=1 framesPerPacket=1")
+        NSLog("[RTP] RemoteIO input callback format=I16 \(Int(hwSampleRate))Hz ch=1")
         // Format we feed to speaker (element 0, input scope).
         status = AudioUnitSetProperty(io, kAudioUnitProperty_StreamFormat,
                                       kAudioUnitScope_Input, 0,
