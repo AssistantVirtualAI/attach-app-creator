@@ -290,16 +290,19 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
 
   const call = (number: string) => {
     if (sipStatus !== 'registered') return false;
-    emitNativeCallSnapshot({ callState: 'ringing', activeCallNumber: number, isMuted: false, isOnHold: false });
+    emitNativeCallSnapshot({ callState: 'ringing', activeCallNumber: number, isMuted: false, isOnHold: false, direction: 'out', endReason: null });
+    startRingback();
     CapacitorPjsip.makeCall({ number }).catch((e) => {
-      emitNativeCallSnapshot({ callState: 'idle', activeCallNumber: '', isMuted: false, isOnHold: false });
+      stopRingback();
+      emitNativeCallSnapshot({ callState: 'idle', activeCallNumber: '', isMuted: false, isOnHold: false, direction: null, endReason: 'Échec de l’appel' });
       setSipError(e?.message || 'makeCall failed');
     });
     return true;
   };
   const hangup = () => {
+    stopRingback();
     CapacitorPjsip.hangup().catch((e) => console.warn('[NativeSIP] hangup failed', e));
-    emitNativeCallSnapshot({ callState: 'idle', activeCallNumber: '', isMuted: false, isOnHold: false });
+    emitNativeCallSnapshot({ callState: 'idle', activeCallNumber: '', isMuted: false, isOnHold: false, direction: null, endReason: null });
   };
   const answer = () => { CapacitorPjsip.answer().catch(() => {}); };
   const mute   = () => { CapacitorPjsip.setMute({ muted: true }).catch(() => {});  setIsMuted(true); };
