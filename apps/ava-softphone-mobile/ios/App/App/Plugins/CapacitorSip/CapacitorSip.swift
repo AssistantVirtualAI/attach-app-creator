@@ -762,7 +762,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     }
 
     private func sendRegister(authHeader: String?) {
-        let localIp = "0.0.0.0"
+        let localIp = sigLocalIp()
         let transport = "TCP"
         let br = branch
         var msg = ""
@@ -880,13 +880,13 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         let sdp = buildSdp()
         var msg = ""
         msg += "INVITE \(uri) SIP/2.0\r\n"
-        msg += "Via: SIP/2.0/TCP 0.0.0.0;branch=\(br);rport\r\n"
+        msg += "Via: SIP/2.0/TCP \(sigLocalIp());branch=\(br);rport\r\n"
         msg += "Max-Forwards: 70\r\n"
         msg += "From: \"\(displayName)\" <sip:\(username)@\(domain)>;tag=\(callLocalTag)\r\n"
         msg += "To: <\(uri)>\r\n"
         msg += "Call-ID: \(callActiveId)\r\n"
         msg += "CSeq: \(callCseq) INVITE\r\n"
-        msg += "Contact: <sip:\(username)@0.0.0.0;transport=tcp>\r\n"
+        msg += "Contact: <sip:\(username)@\(sigLocalIp());transport=tcp>\r\n"
         msg += "User-Agent: CapacitorPjsip/1.0\r\n"
         msg += "Allow: INVITE, ACK, CANCEL, BYE, INFO, OPTIONS, NOTIFY\r\n"
         if let auth = authHeader { msg += auth }
@@ -901,7 +901,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         let toH = headerValue(response, "To") ?? ""
         let fromH = headerValue(response, "From") ?? ""
         let callid = headerValue(response, "Call-ID") ?? callActiveId
-        let viaH = headerValue(response, "Via") ?? "SIP/2.0/TCP 0.0.0.0;branch=\(branch)"
+        let viaH = headerValue(response, "Via") ?? "SIP/2.0/TCP \(sigLocalIp());branch=\(branch)"
         let target = withinDialog ? callRemoteContact : callRemoteUri
         var msg = ""
         msg += "ACK \(target) SIP/2.0\r\n"
@@ -921,7 +921,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         let br = branch
         var msg = ""
         msg += "BYE \(callRemoteContact.isEmpty ? callRemoteUri : callRemoteContact) SIP/2.0\r\n"
-        msg += "Via: SIP/2.0/TCP 0.0.0.0;branch=\(br);rport\r\n"
+        msg += "Via: SIP/2.0/TCP \(sigLocalIp());branch=\(br);rport\r\n"
         msg += "Max-Forwards: 70\r\n"
         msg += "From: \"\(displayName)\" <sip:\(username)@\(domain)>;tag=\(callLocalTag)\r\n"
         msg += "To: <\(callRemoteUri)>" + (callRemoteTag.isEmpty ? "" : ";tag=\(callRemoteTag)") + "\r\n"
@@ -938,7 +938,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         let cancelCseq = callInviteCseq
         var msg = ""
         msg += "CANCEL \(callRemoteUri) SIP/2.0\r\n"
-        msg += "Via: SIP/2.0/TCP 0.0.0.0;branch=\(br);rport\r\n"
+        msg += "Via: SIP/2.0/TCP \(sigLocalIp());branch=\(br);rport\r\n"
         msg += "Max-Forwards: 70\r\n"
         msg += "From: \"\(displayName)\" <sip:\(username)@\(domain)>;tag=\(callLocalTag)\r\n"
         msg += "To: <\(callRemoteUri)>\r\n"
@@ -955,13 +955,13 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         let sdp = buildSdp(hold: hold)
         var msg = ""
         msg += "INVITE \(target) SIP/2.0\r\n"
-        msg += "Via: SIP/2.0/TCP 0.0.0.0;branch=\(br);rport\r\n"
+        msg += "Via: SIP/2.0/TCP \(sigLocalIp());branch=\(br);rport\r\n"
         msg += "Max-Forwards: 70\r\n"
         msg += "From: \"\(displayName)\" <sip:\(username)@\(domain)>;tag=\(callLocalTag)\r\n"
         msg += "To: <\(callRemoteUri)>" + (callRemoteTag.isEmpty ? "" : ";tag=\(callRemoteTag)") + "\r\n"
         msg += "Call-ID: \(callActiveId)\r\n"
         msg += "CSeq: \(callCseq) INVITE\r\n"
-        msg += "Contact: <sip:\(username)@0.0.0.0;transport=tcp>\r\n"
+        msg += "Contact: <sip:\(username)@\(sigLocalIp());transport=tcp>\r\n"
         msg += "Content-Type: application/sdp\r\n"
         msg += "Content-Length: \(sdp.utf8.count)\r\n\r\n"
         msg += sdp
@@ -975,7 +975,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         let target = callRemoteContact.isEmpty ? callRemoteUri : callRemoteContact
         var msg = ""
         msg += "INFO \(target) SIP/2.0\r\n"
-        msg += "Via: SIP/2.0/TCP 0.0.0.0;branch=\(br);rport\r\n"
+        msg += "Via: SIP/2.0/TCP \(sigLocalIp());branch=\(br);rport\r\n"
         msg += "Max-Forwards: 70\r\n"
         msg += "From: \"\(displayName)\" <sip:\(username)@\(domain)>;tag=\(callLocalTag)\r\n"
         msg += "To: <\(callRemoteUri)>" + (callRemoteTag.isEmpty ? "" : ";tag=\(callRemoteTag)") + "\r\n"
@@ -1007,7 +1007,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         resp += callid + "\r\n"
         resp += cseqH + "\r\n"
         if code == 200 {
-            resp += "Contact: <sip:\(username)@0.0.0.0;transport=tcp>\r\n"
+            resp += "Contact: <sip:\(username)@\(sigLocalIp());transport=tcp>\r\n"
         }
         if withSdp && code == 200 {
             let sdp = buildSdp()
