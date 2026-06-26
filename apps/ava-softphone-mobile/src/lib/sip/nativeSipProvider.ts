@@ -7,6 +7,7 @@ export interface CapacitorSipPlugin {
     password: string;
     host: string;
   }): Promise<void>;
+  disconnect(): Promise<void>;
   makeCall(options: { number: string }): Promise<void>;
   hangup(): Promise<void>;
   answer(): Promise<void>;
