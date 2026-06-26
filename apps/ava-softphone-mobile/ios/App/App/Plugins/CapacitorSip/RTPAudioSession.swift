@@ -99,12 +99,38 @@ final class RTPAudioSession {
 
     // MARK: - Audio
     private func startAudio() {
+        // Make absolutely sure the audio session is active in playAndRecord
+        // before reading inputNode.outputFormat — otherwise sr/ch can be 0
+        // and AVAudioConverter init triggers the
+        // "IsFormatSampleRateAndChannelCountValid(format)" assert.
+        let session = AVAudioSession.sharedInstance()
+        do {
+            try session.setCategory(.playAndRecord, mode: .voiceChat,
+                                    options: [.allowBluetooth, .allowBluetoothA2DP, .defaultToSpeaker, .duckOthers])
+            try session.setActive(true, options: [])
+        } catch {
+            NSLog("[RTP] audio session activate failed: \(error.localizedDescription)")
+        }
+
         let input = engine.inputNode
-        let hwFormat = input.outputFormat(forBus: 0)
+        var hwFormat = input.outputFormat(forBus: 0)
         NSLog("[RTP] hw input format sr=\(hwFormat.sampleRate) ch=\(hwFormat.channelCount)")
 
+        // Fallback if the engine hasn't latched a sane format yet.
+        if hwFormat.sampleRate <= 0 || hwFormat.channelCount == 0 {
+            let sr = session.sampleRate > 0 ? session.sampleRate : 48000
+            if let fb = AVAudioFormat(standardFormatWithSampleRate: sr, channels: 1) {
+                NSLog("[RTP] fallback hw format sr=\(sr) ch=1")
+                hwFormat = fb
+            } else {
+                NSLog("[RTP] cannot derive valid hw format — aborting audio start")
+                return
+            }
+        }
+
         guard let conv = AVAudioConverter(from: hwFormat, to: playFormat) else {
-            NSLog("[RTP] cannot create converter"); return
+            NSLog("[RTP] cannot create converter from \(hwFormat) to \(playFormat)")
+            return
         }
         self.converter = conv
 

@@ -253,8 +253,8 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         }
         let id = callActiveId
         stopRtp()
-        resetCallState()
         emitCallEnded("local_hangup", callId: id)
+        resetCallState()
         call.resolve(["ok": true])
     }
 
@@ -414,16 +414,16 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
             send200OK(to: msg)
             let id = callActiveId
             stopRtp()
-            resetCallState()
             emitCallEnded("remote_bye", callId: id)
+            resetCallState()
         case "CANCEL":
             send200OK(to: msg)
             if callState == "incoming" {
                 sendResponseToInvite(code: 487, reason: "Request Terminated")
                 let id = callActiveId
                 stopRtp()
-                resetCallState()
                 emitCallEnded("remote_cancel", callId: id)
+                resetCallState()
             }
 
         case "INFO", "NOTIFY", "OPTIONS", "MESSAGE":
@@ -522,8 +522,8 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
                     log("INVITE \(code) missing auth header")
                     let id = callActiveId
                     stopRtp()
-                    resetCallState()
                     emitCallEnded("INVITE \(code) without auth header", callId: id)
+                    resetCallState()
                 }
             } else if code == "200" {
                 callRemoteTag = extractTag(headerValue(msg, "To") ?? "")
@@ -539,8 +539,8 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
                 sendAck(to: msg, withinDialog: false)
                 let id = callActiveId
                 stopRtp()
-                resetCallState()
                 emitCallEnded(firstLine, callId: id)
+                resetCallState()
             }
 
         }
