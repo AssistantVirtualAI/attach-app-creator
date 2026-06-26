@@ -32,6 +32,6 @@ describe('classifySipFailure SSL/TLS handling', () => {
     expect(classifySipFailure({ cause: 'WebSocket transport error' })).toMatch(/cannot reach phone server/i);
     expect(classifySipFailure({ cause: 'DNS lookup failed' })).toMatch(/dns/i);
     expect(classifySipFailure({ cause: 'Proxy Authentication Required', status_code: 407 })).toMatch(/authentication failed/i);
-    expect(classifySipFailure({ cause: 'Request Timeout', status_code: 408 })).toMatch(/timeout/i);
+    expect(classifySipFailure({ cause: 'Request Timeout', status_code: 408 })).toMatch(/phone server not responding/i);
   });
 });
