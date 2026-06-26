@@ -66,21 +66,30 @@ function ensureNativeCallEventBridge() {
         activeCallNumber: d?.from || d?.number || 'Unknown',
         direction: 'in',
         endReason: null,
+        callPhase: 'ringing',
+        lastSipCode: null,
       });
     });
     const callStateHandle = await CapacitorPjsip.addListener('callStateChanged', (d: any) => {
-      console.log(`[NativeSIP] CALL_EVENT|callStateChanged|state=${d?.state || ''}|stage=${d?.stage || ''}`, d);
+      console.log(`[NativeSIP] CALL_EVENT|callStateChanged|state=${d?.state || ''}|stage=${d?.stage || ''}|code=${d?.code || ''}`, d);
       const dir: NativeCallDirection = d?.direction === 'in' ? 'in' : d?.direction === 'out' ? 'out' : nativeCallSnapshot.direction;
+      const stage: string = d?.stage || '';
+      const code: string | null = d?.code ?? null;
       if (d?.state === 'active') {
         stopRingback();
-        emitNativeCallSnapshot({ callState: 'active', activeCallNumber: d?.number || nativeCallSnapshot.activeCallNumber, direction: dir, endReason: null });
+        emitNativeCallSnapshot({ callState: 'active', activeCallNumber: d?.number || nativeCallSnapshot.activeCallNumber, direction: dir, endReason: null, callPhase: 'active', lastSipCode: code });
       }
       if (d?.state === 'ringing' || d?.state === 'calling') {
-        // Outgoing local ringback when no early media (stage != 'early_media').
-        const hasEarlyMedia = d?.stage === 'early_media';
-        if (dir === 'out' && !hasEarlyMedia) startRingback();
+        // Map signaling stages to a richer call phase.
+        let phase: CallPhase = 'dialing';
+        if (stage === 'before_invite' || stage === 'invite_sent') phase = 'dialing';
+        else if (stage === 'remote_ringing') phase = 'ringing';
+        else if (stage === 'early_media') phase = 'early-media';
+        else if (dir === 'in') phase = 'ringing';
+        // Local ringback: only when outgoing AND no early media from PBX.
+        if (dir === 'out' && phase !== 'early-media' && phase !== 'active') startRingback();
         else stopRingback();
-        emitNativeCallSnapshot({ callState: 'ringing', activeCallNumber: d?.number || nativeCallSnapshot.activeCallNumber, direction: dir, endReason: null });
+        emitNativeCallSnapshot({ callState: 'ringing', activeCallNumber: d?.number || nativeCallSnapshot.activeCallNumber, direction: dir, endReason: null, callPhase: phase, lastSipCode: code });
       }
     });
     const callEndedHandle = await CapacitorPjsip.addListener('callEnded', (d: any) => {
