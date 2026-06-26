@@ -207,26 +207,49 @@ serve(async (req) => {
       });
     }
 
-    // Get user's organization (user may belong to multiple orgs — pick first)
-    const { data: orgMembers, error: orgErr } = await supabaseAdmin
-      .from('organization_members')
-      .select('organization_id, created_at')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: true })
-      .limit(1);
+    // Resolve user organization — check both membership tables (organization_members and org_members)
+    const [omRes, omLegacyRes] = await Promise.all([
+      supabaseAdmin
+        .from('organization_members')
+        .select('organization_id, created_at')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: true })
+        .limit(1),
+      supabaseAdmin
+        .from('org_members')
+        .select('org_id, created_at')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: true })
+        .limit(1),
+    ]);
 
-    if (orgErr) {
-      console.error('[global-advice] org lookup error:', orgErr);
+    let organizationId: string | null =
+      omRes.data?.[0]?.organization_id ?? omLegacyRes.data?.[0]?.org_id ?? null;
+
+    // Super admin fallback: if no membership, use any active org
+    if (!organizationId) {
+      const { data: isSuper } = await supabaseAdmin.rpc('is_super_admin', { _user_id: user.id });
+      if (isSuper) {
+        const { data: anyOrg } = await supabaseAdmin
+          .from('organizations')
+          .select('id')
+          .eq('is_active', true)
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        organizationId = anyOrg?.id ?? null;
+      }
     }
 
-    const orgMember = orgMembers && orgMembers.length > 0 ? orgMembers[0] : null;
-
-    if (!orgMember) {
+    if (!organizationId) {
       return new Response(JSON.stringify({ error: 'No organization found' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    const orgMember = { organization_id: organizationId };
+
 
     console.log(`[global-advice] Generating for organization: ${orgMember.organization_id}, language: ${language}, days: ${days}`);
 
