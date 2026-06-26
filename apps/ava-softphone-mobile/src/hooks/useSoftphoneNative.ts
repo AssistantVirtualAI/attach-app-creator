@@ -15,6 +15,77 @@ import { startNativeSipTracking, setNativeRegStatus } from '../lib/sip/nativeSip
 import { attachNativeAutoReconnect } from '../lib/sip/nativeAutoReconnect';
 import type { UseSoftphoneReturn, SIPStatus, CallState } from './useSoftphone';
 
+type NativeCallSnapshot = {
+  callState: CallState;
+  activeCallNumber: string;
+  isMuted: boolean;
+  isOnHold: boolean;
+};
+
+const nativeCallSubscribers = new Set<(snapshot: NativeCallSnapshot) => void>();
+let nativeCallSnapshot: NativeCallSnapshot = {
+  callState: 'idle',
+  activeCallNumber: '',
+  isMuted: false,
+  isOnHold: false,
+};
+let nativeCallBridgePromise: Promise<void> | null = null;
+
+function emitNativeCallSnapshot(patch: Partial<NativeCallSnapshot>) {
+  nativeCallSnapshot = { ...nativeCallSnapshot, ...patch };
+  nativeCallSubscribers.forEach((subscriber) => subscriber(nativeCallSnapshot));
+}
+
+function subscribeNativeCallEvents(subscriber: (snapshot: NativeCallSnapshot) => void) {
+  nativeCallSubscribers.add(subscriber);
+  subscriber(nativeCallSnapshot);
+  return () => { nativeCallSubscribers.delete(subscriber); };
+}
+
+function ensureNativeCallEventBridge() {
+  if (nativeCallBridgePromise) return nativeCallBridgePromise;
+  nativeCallBridgePromise = (async () => {
+    const callReceivedHandle = await CapacitorPjsip.addListener('callReceived', (d: any) => {
+      console.log('[NativeSIP] CALL_EVENT|callReceived', d);
+      emitNativeCallSnapshot({
+        callState: 'ringing',
+        activeCallNumber: d?.from || d?.number || 'Unknown',
+      });
+    });
+    const callStateHandle = await CapacitorPjsip.addListener('callStateChanged', (d: any) => {
+      console.log(`[NativeSIP] CALL_EVENT|callStateChanged|state=${d?.state || ''}|stage=${d?.stage || ''}`, d);
+      if (d?.state === 'active') {
+        emitNativeCallSnapshot({ callState: 'active', activeCallNumber: d?.number || nativeCallSnapshot.activeCallNumber });
+      }
+      if (d?.state === 'ringing' || d?.state === 'calling') {
+        emitNativeCallSnapshot({ callState: 'ringing', activeCallNumber: d?.number || nativeCallSnapshot.activeCallNumber });
+      }
+    });
+    const callEndedHandle = await CapacitorPjsip.addListener('callEnded', (d: any) => {
+      console.log('[NativeSIP] CALL_EVENT|callEnded', d);
+      emitNativeCallSnapshot({ callState: 'idle', activeCallNumber: '', isMuted: false, isOnHold: false });
+    });
+    const muteHandle = await CapacitorPjsip.addListener('muteChanged', (d: any) => {
+      emitNativeCallSnapshot({ isMuted: !!d?.muted });
+    });
+    const holdHandle = await CapacitorPjsip.addListener('holdChanged', (d: any) => {
+      emitNativeCallSnapshot({ isOnHold: !!(d?.held ?? d?.onHold) });
+    });
+
+    // Intentionally keep these native listeners for the lifetime of the JS app.
+    // React remounts/StrictMode cleanups were removing call listeners before
+    // 407/180/200 INVITE events arrived, leaving the UI stuck in idle/connecting.
+    (globalThis as any).__lemtelNativeCallHandles = [
+      callReceivedHandle,
+      callStateHandle,
+      callEndedHandle,
+      muteHandle,
+      holdHandle,
+    ];
+  })();
+  return nativeCallBridgePromise;
+}
+
 export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn {
   const [sipStatus, setSipStatus] = useState<SIPStatus>('idle');
   const [sipError, setSipError] = useState('');
@@ -40,6 +111,18 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
     timerRef.current = null;
   };
 
+  useEffect(() => {
+    ensureNativeCallEventBridge().catch((e) => console.warn('[NativeSIP] call event bridge failed', e));
+    return subscribeNativeCallEvents((snapshot) => {
+      setActiveCallNumber(snapshot.activeCallNumber);
+      setIsMuted(snapshot.isMuted);
+      setIsOnHold(snapshot.isOnHold);
+      setCallState(snapshot.callState);
+      if (snapshot.callState === 'active') startTimer();
+      if (snapshot.callState === 'idle') stopTimer();
+    });
+  }, []);
+
   // Register account on config change.
   useEffect(() => {
     if (!config) return;
@@ -48,7 +131,7 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
     // Keep the registration listener alive across React StrictMode re-renders.
     // Only detach it when the credentials actually change.
     if (activeInitKeyRef.current === initKey && regHandleRef.current) {
-      console.log('[NativeSIP] registration listener already active for %s, skip initAccount', initKey);
+      console.log('[NativeSIP] native listeners already active for %s, skip initAccount', initKey);
       return;
     }
     if (initInFlightRef.current && activeInitKeyRef.current === initKey) {
@@ -59,6 +142,7 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
       console.log('[NativeSIP] removing old registration listener for %s', activeInitKeyRef.current);
       regHandleRef.current.remove().catch(() => {});
       regHandleRef.current = null;
+      emitNativeCallSnapshot({ callState: 'idle', activeCallNumber: '', isMuted: false, isOnHold: false });
     }
     activeInitKeyRef.current = initKey;
     initInFlightRef.current = true;
@@ -100,24 +184,6 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
         });
         regHandleRef.current = regHandle;
 
-        cleanups.push(await onNativeSipEvent('callReceived', (d) => {
-          if (cancelled) return;
-          setActiveCallNumber(d?.from || 'Unknown');
-          setCallState('ringing');
-        }));
-        cleanups.push(await onNativeSipEvent('callStateChanged', (d) => {
-          if (cancelled) return;
-          if (d?.state === 'active')  { setCallState('active'); startTimer(); }
-          if (d?.state === 'ringing') { setCallState('ringing'); if (d?.number) setActiveCallNumber(d.number); }
-        }));
-        cleanups.push(await onNativeSipEvent('callEnded', () => {
-          if (cancelled) return;
-          setCallState('idle');
-          setActiveCallNumber('');
-          setIsMuted(false);
-          setIsOnHold(false);
-          stopTimer();
-        }));
         cleanups.push(await onNativeSipEvent('log', (e: any) => {
           // Bubble native logs to JS console for on-device debugging.
           console.log('[CapacitorPjsip][native]', e?.message ?? e);
@@ -153,8 +219,8 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
       cancelled = true;
       if (watchdog) { clearTimeout(watchdog); watchdog = null; }
       cleanups.forEach((c) => { try { c(); } catch {} });
-      // The registration listener is intentionally kept alive across React
-      // StrictMode re-renders. It is removed only on credential change or unmount.
+      // Registration + call listeners are intentionally kept alive across React
+      // StrictMode re-renders. They are removed only on credential change/unmount.
       stopTimer();
     };
   }, [config]);
@@ -170,15 +236,17 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
 
   const call = (number: string) => {
     if (sipStatus !== 'registered') return false;
-    setActiveCallNumber(number);
-    setCallState('ringing');
+    emitNativeCallSnapshot({ callState: 'ringing', activeCallNumber: number, isMuted: false, isOnHold: false });
     CapacitorPjsip.makeCall({ number }).catch((e) => {
-      setCallState('idle');
+      emitNativeCallSnapshot({ callState: 'idle', activeCallNumber: '', isMuted: false, isOnHold: false });
       setSipError(e?.message || 'makeCall failed');
     });
     return true;
   };
-  const hangup = () => { CapacitorPjsip.hangup().catch(() => {}); };
+  const hangup = () => {
+    CapacitorPjsip.hangup().catch((e) => console.warn('[NativeSIP] hangup failed', e));
+    emitNativeCallSnapshot({ callState: 'idle', activeCallNumber: '', isMuted: false, isOnHold: false });
+  };
   const answer = () => { CapacitorPjsip.answer().catch(() => {}); };
   const mute   = () => { CapacitorPjsip.setMute({ muted: true }).catch(() => {});  setIsMuted(true); };
   const unmute = () => { CapacitorPjsip.setMute({ muted: false }).catch(() => {}); setIsMuted(false); };
