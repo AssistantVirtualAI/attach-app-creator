@@ -131,7 +131,7 @@ Deno.serve(async (req) => {
             || "gemini-2.0-flash-001";
         }
 
-        const createBody = {
+        const createBody: any = {
           name: payload?.name || "AVA — Planiprêt AI Portal",
           conversation_config: {
             agent: {
@@ -140,7 +140,7 @@ Deno.serve(async (req) => {
                 llm: chosenLlm,
                 temperature: payload?.temperature ?? 0.7,
                 max_tokens: payload?.max_tokens ?? 500,
-                tools: [],
+                tool_ids: [],
               },
               first_message: payload?.first_message || "Bonjour! Je suis AVA, votre assistante IA Planiprêt. Comment puis-je vous aider?",
               language: payload?.language || "fr",
@@ -193,23 +193,76 @@ Deno.serve(async (req) => {
 
       case "sync_all_tools": {
         if (!agentId) return json({ success: false, error: "no_agent_configured" });
-        const tools = buildAvaToolsArray(SUPABASE_URL, SUPABASE_ANON_KEY);
-        // Broadcast progress per tool (optimistic — real PATCH is single call).
-        for (let i = 0; i < tools.length; i++) {
-          await broadcastSetup(admin, user.id, { type: "tool_added", tool_name: tools[i].name, count: i + 1, total: tools.length });
+
+        // 1. Load existing registry tools and index by name.
+        const listRes = await elFetch(apiKey, "/convai/tools");
+        if (!listRes.ok) {
+          await broadcastSetup(admin, user.id, { type: "setup_error", step: "list_tools", error: listRes.error });
+          return json({ success: false, error: `Impossible de lister les outils ElevenLabs: ${listRes.error}`, status: listRes.status });
         }
-        const r = await elFetch(apiKey, `/convai/agents/${agentId}`, {
+        const existing: any[] = listRes.data?.tools ?? [];
+        const byName = new Map<string, any>(existing.map((t) => [t?.tool_config?.name ?? t?.name, t]));
+
+        // 2. Upsert each AVA tool in the registry.
+        const desired = buildAvaToolConfigs(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const ids: string[] = [];
+        const errors: string[] = [];
+
+        for (let i = 0; i < desired.length; i++) {
+          const cfg = desired[i];
+          const name = cfg.tool_config.name;
+          const existingTool = byName.get(name);
+          let toolId: string | undefined = existingTool?.id ?? existingTool?.tool_id;
+          let upRes;
+          if (toolId) {
+            upRes = await elFetch(apiKey, `/convai/tools/${toolId}`, { method: "PATCH", body: JSON.stringify(cfg) });
+          } else {
+            upRes = await elFetch(apiKey, "/convai/tools", { method: "POST", body: JSON.stringify(cfg) });
+            toolId = upRes.data?.id ?? upRes.data?.tool_id;
+          }
+          if (!upRes.ok || !toolId) {
+            errors.push(`${name}: ${upRes.error ?? "no id"}`);
+            await broadcastSetup(admin, user.id, { type: "setup_error", step: name, error: upRes.error ?? "no id" });
+            continue;
+          }
+          ids.push(toolId);
+          await broadcastSetup(admin, user.id, { type: "tool_added", tool_name: name, count: i + 1, total: desired.length });
+        }
+
+        if (ids.length === 0) {
+          return json({ success: false, error: `Aucun outil créé. Erreurs: ${errors.join(" | ")}` });
+        }
+
+        // 3. Attach tool_ids on the agent.
+        const patchRes = await elFetch(apiKey, `/convai/agents/${agentId}`, {
           method: "PATCH",
-          body: JSON.stringify({ conversation_config: { agent: { prompt: { tools } } } }),
+          body: JSON.stringify({ conversation_config: { agent: { prompt: { tool_ids: ids } } } }),
         });
-        if (!r.ok) {
-          await broadcastSetup(admin, user.id, { type: "setup_error", step: "sync_all_tools", error: r.error });
-          return json({ success: false, error: r.error, status: r.status });
+
+        // 4. Legacy fallback: some installs still accept inline `tools`.
+        if (!patchRes.ok) {
+          const legacyTools = buildAvaToolsArray(SUPABASE_URL, SUPABASE_ANON_KEY);
+          const legacyRes = await elFetch(apiKey, `/convai/agents/${agentId}`, {
+            method: "PATCH",
+            body: JSON.stringify({ conversation_config: { agent: { prompt: { tools: legacyTools } } } }),
+          });
+          if (!legacyRes.ok) {
+            await broadcastSetup(admin, user.id, { type: "setup_error", step: "attach_tools", error: patchRes.error });
+            return json({ success: false, error: `Attache outils impossible: ${patchRes.error}`, status: patchRes.status });
+          }
         }
-        await setConfig(admin, "tools_count", String(tools.length), user.id);
+
+        await setConfig(admin, "tools_count", String(ids.length), user.id);
         await setConfig(admin, "tools_synced_at", new Date().toISOString(), user.id);
-        await broadcastSetup(admin, user.id, { type: "setup_complete", agent_id: agentId, tools_count: tools.length });
-        return json({ success: true, tools_synced: tools.length, agent_id: agentId, message: `${tools.length} outils synchronisés avec succès` });
+        await broadcastSetup(admin, user.id, { type: "setup_complete", agent_id: agentId, tools_count: ids.length });
+        return json({
+          success: true,
+          tools_synced: ids.length,
+          total_expected: desired.length,
+          errors: errors.length ? errors : undefined,
+          agent_id: agentId,
+          message: `${ids.length}/${desired.length} outils synchronisés${errors.length ? ` (${errors.length} erreur(s))` : ""}`,
+        });
       }
 
       case "update_voice": {
