@@ -376,14 +376,26 @@ export function instrumentPeerConnectionWithDiag(pc: RTCPeerConnection, log: Ice
     if (!e.candidate) return;
     const source = classifyIceCandidate(e.candidate);
     emitDiag({ kind: 'candidate', source, raw: e.candidate.candidate });
+    if (isMdnsCandidate(e.candidate)) {
+      emitDiag({ kind: 'mdns-candidate', raw: e.candidate.candidate });
+    }
     if (!firstRelaySent && source.startsWith('TURN')) {
       firstRelaySent = true;
       const latency = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0);
       emitDiag({ kind: 'first-relay-candidate', latencyMs: latency });
     }
   };
+  const onCandErr = (e: Event) => {
+    const err: any = e;
+    const msg = `code=${err.errorCode ?? '?'} url=${err.url ?? '?'} ${err.errorText ?? ''}`.trim();
+    emitDiag({ kind: 'webrtc-error', message: msg, where: 'icecandidateerror' });
+    log('ice.candidate.error', msg, 'warn');
+  };
   const onIce = () => {
     emitDiag({ kind: 'ice-state', state: pc.iceConnectionState });
+    if (pc.iceConnectionState === 'failed') {
+      emitDiag({ kind: 'webrtc-error', message: 'iceConnectionState=failed', where: 'pc.iceconnectionstatechange' });
+    }
     if (!connectedSent && (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed')) {
       connectedSent = true;
       const latency = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0);
@@ -392,11 +404,40 @@ export function instrumentPeerConnectionWithDiag(pc: RTCPeerConnection, log: Ice
   };
   const onGather = () => emitDiag({ kind: 'gather-state', state: pc.iceGatheringState });
   pc.addEventListener('icecandidate', onCand);
+  pc.addEventListener('icecandidateerror', onCandErr as any);
   pc.addEventListener('iceconnectionstatechange', onIce);
   pc.addEventListener('icegatheringstatechange', onGather);
+
+  // ---- Auto-fallback: if ICE stalls in 'new'/'checking' for too long
+  // while we still have mDNS .local host candidates (iOS WKWebView
+  // mDNS obfuscation that FusionPBX cannot resolve), force a
+  // relay-only restart so we go through TURN exclusively.
+  let mdnsSeen = false;
+  const mdnsTap = (e: RTCPeerConnectionIceEvent) => { if (isMdnsCandidate(e.candidate)) mdnsSeen = true; };
+  pc.addEventListener('icecandidate', mdnsTap);
+  const stallTimer = setTimeout(() => {
+    if (connectedSent) return;
+    const s = pc.iceConnectionState;
+    if (s !== 'new' && s !== 'checking') return;
+    const reason = mdnsSeen
+      ? 'ice-stalled-with-mdns-candidates (iOS WKWebView .local unresolvable by FusionPBX)'
+      : 'ice-stalled';
+    emitDiag({ kind: 'ice-fallback', from: 'all', to: 'relay', reason });
+    log('ice.fallback', reason, 'warn');
+    try {
+      pc.setConfiguration({ ...getActivePcConfig(), iceTransportPolicy: 'relay' });
+      (pc as any).restartIce?.();
+    } catch (err: any) {
+      emitDiag({ kind: 'webrtc-error', message: String(err?.message ?? err), where: 'restartIce' });
+    }
+  }, 6000);
+
   return () => {
     teardown();
+    clearTimeout(stallTimer);
     pc.removeEventListener('icecandidate', onCand);
+    pc.removeEventListener('icecandidate', mdnsTap);
+    pc.removeEventListener('icecandidateerror', onCandErr as any);
     pc.removeEventListener('iceconnectionstatechange', onIce);
     pc.removeEventListener('icegatheringstatechange', onGather);
   };
