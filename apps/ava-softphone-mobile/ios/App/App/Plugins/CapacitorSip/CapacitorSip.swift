@@ -17,6 +17,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "setHold", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "sendDTMF", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setLogLevel", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "requestMicrophonePermission", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "unregister", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setAudioRoute", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getAudioRoute", returnType: CAPPluginReturnPromise),
@@ -254,43 +255,57 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         self.cseq = 1
 
         log("initAccount server=\(server):\(port) user=\(username) domain=\(self.domain)")
-        configureAudioSession()
         requestMicPermission { [weak self] granted in
             guard let self = self else { return }
             self.log("mic permission granted=\(granted)")
+            let deniedReason = self.microphoneDeniedReason()
             self.notifyListeners("micPermission", data: [
                 "granted": granted,
                 "status": granted ? "granted" : "denied",
-                "reason": granted ? "" : "Microphone access is required for two-way audio. Enable it in iOS Settings."
+                "reason": granted ? "" : deniedReason
             ])
             if !granted {
                 self.notifyListeners("registration", data: [
                     "state": "error",
                     "status": "error",
-                    "reason": "Microphone access is required for two-way audio. Enable it in iOS Settings."
+                    "reason": deniedReason
                 ])
-                self.notifyListeners("registrationFailed", data: ["reason": "Microphone access is required for two-way audio. Enable it in iOS Settings."])
+                self.notifyListeners("registrationFailed", data: ["reason": deniedReason])
+                call.reject(deniedReason)
                 return
             }
+            self.configureAudioSession()
             self.connectAndRegister()
+            call.resolve(["ok": true])
         }
-        call.resolve(["ok": true])
     }
 
     // MARK: - Audio
     private func configureAudioSession() {
         let session = AVAudioSession.sharedInstance()
         do {
+            log("AVAudioSession configure begin permission=\(session.recordPermission.rawValue) route=\(audioRouteSummary())")
             try session.setCategory(.playAndRecord,
                                     mode: .voiceChat,
                                     options: [.allowBluetooth, .allowBluetoothA2DP, .defaultToSpeaker, .duckOthers])
-            try session.setPreferredSampleRate(48000)
+            try session.setPreferredSampleRate(8000)
             try session.setPreferredIOBufferDuration(0.02)
             try session.setActive(true, options: [])
-            log("AVAudioSession configured (playAndRecord/voiceChat)")
+            log("AVAudioSession configured cat=\(session.category.rawValue) mode=\(session.mode.rawValue) sr=\(Int(session.sampleRate))Hz io=\(Int(session.ioBufferDuration * 1000))ms route=\(audioRouteSummary())")
         } catch {
             log("AVAudioSession error: \(error.localizedDescription)")
         }
+    }
+
+    private func microphoneDeniedReason() -> String {
+        return "Microphone access is required for calls and two-way audio. Enable it in iOS Settings → Lemtel → Microphone, then reopen the app."
+    }
+
+    private func audioRouteSummary() -> String {
+        let session = AVAudioSession.sharedInstance()
+        let outputs = session.currentRoute.outputs.map { "\($0.portType.rawValue):\($0.portName)" }.joined(separator: ",")
+        let inputs = session.currentRoute.inputs.map { "\($0.portType.rawValue):\($0.portName)" }.joined(separator: ",")
+        return "in=[\(inputs)] out=[\(outputs)]"
     }
 
     private func requestMicPermission(_ cb: @escaping (Bool) -> Void) {
@@ -306,6 +321,21 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
             log("mic permission state=undetermined — requesting")
             session.requestRecordPermission { granted in DispatchQueue.main.async { cb(granted) } }
         @unknown default: cb(false)
+        }
+    }
+
+    @objc func requestMicrophonePermission(_ call: CAPPluginCall) {
+        log("explicit microphone permission request from JS")
+        requestMicPermission { [weak self] granted in
+            guard let self = self else { return }
+            let reason = granted ? "" : self.microphoneDeniedReason()
+            self.notifyListeners("micPermission", data: [
+                "granted": granted,
+                "status": granted ? "granted" : "denied",
+                "reason": reason
+            ])
+            if granted { self.configureAudioSession() }
+            call.resolve(["ok": true, "granted": granted, "status": granted ? "granted" : "denied", "reason": reason])
         }
     }
 
@@ -362,15 +392,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         let muted = call.getBool("muted") ?? !isMuted
         isMuted = muted
         rtp?.setMuted(muted)
-
-        let session = AVAudioSession.sharedInstance()
-        do {
-            try session.setCategory(.playAndRecord, mode: .voiceChat,
-                                    options: muted ? [.allowBluetooth, .defaultToSpeaker] : [.allowBluetooth, .allowBluetoothA2DP, .defaultToSpeaker, .duckOthers])
-            try session.setActive(true, options: [])
-        } catch {
-            log("setMute audio session error: \(error.localizedDescription)")
-        }
+        log("mute changed muted=\(muted) — RTP samples \(muted ? "zeroed" : "live"), AVAudioSession unchanged")
         notifyListeners("muteChanged", data: ["muted": muted])
         call.resolve(["ok": true, "muted": muted])
     }
