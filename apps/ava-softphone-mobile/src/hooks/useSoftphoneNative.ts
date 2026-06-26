@@ -26,6 +26,8 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
   const [audioProfile, setAudioProfileState] = useState<AudioProfile>(() => loadAudioProfile());
   const [quality] = useState<CallQuality>(EMPTY_QUALITY);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastInitKeyRef = useRef<string | null>(null);
+  const initInFlightRef = useRef<boolean>(false);
 
   const startTimer = () => {
     if (timerRef.current) clearInterval(timerRef.current);
@@ -40,6 +42,20 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
   // Register account on config change.
   useEffect(() => {
     if (!config) return;
+    // Guard: avoid re-initialising the native account if the same credentials
+    // are already in flight or have just been registered. React StrictMode and
+    // parent re-renders otherwise spam initAccount and starve the watchdog.
+    const initKey = `${config.extension}@${config.domain}|${config.password}|${config.wssUrl ?? ''}`;
+    if (initInFlightRef.current && lastInitKeyRef.current === initKey) {
+      console.log('[NativeSIP] initAccount skipped — already in flight for same config');
+      return;
+    }
+    if (lastInitKeyRef.current === initKey && (sipStatus === 'registered' || sipStatus === 'connecting')) {
+      console.log('[NativeSIP] initAccount skipped — same config, status=%s', sipStatus);
+      return;
+    }
+    lastInitKeyRef.current = initKey;
+    initInFlightRef.current = true;
     let cancelled = false;
     const cleanups: Array<() => void> = [];
     let watchdog: ReturnType<typeof setTimeout> | null = null;
@@ -55,6 +71,7 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
         cleanups.push(await onNativeSipEvent('registered', () => {
           if (cancelled) return;
           if (watchdog) { clearTimeout(watchdog); watchdog = null; }
+          initInFlightRef.current = false;
           console.log('[NativeSIP] registered ✓');
           setSipStatus('registered'); setSipError('');
           setNativeRegStatus('registered', null);
@@ -62,6 +79,7 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
         cleanups.push(await onNativeSipEvent('registrationFailed', (d) => {
           if (cancelled) return;
           if (watchdog) { clearTimeout(watchdog); watchdog = null; }
+          initInFlightRef.current = false;
           const msg = d?.reason || `Registration failed${d?.code ? ` (${d.code})` : ''}`;
           console.warn('[NativeSIP] registrationFailed', d);
           setSipStatus('error');
@@ -91,15 +109,15 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
           console.log('[CapacitorPjsip][native]', e?.message ?? e);
         }));
 
-        // Watchdog: if the native plugin never answers in 15s we surface a
-        // clear error instead of leaving the UI on "connecting" forever
-        // (typical when the JS plugin name didn't match the native one).
+        // Watchdog: if the native plugin never answers in 30s we surface a
+        // clear error instead of leaving the UI on "connecting" forever.
         watchdog = setTimeout(() => {
           if (cancelled) return;
-          console.error('[NativeSIP] watchdog timeout — no registration event in 15s');
+          initInFlightRef.current = false;
+          console.error('[NativeSIP] watchdog timeout — no registration event in 30s');
           setSipStatus('error');
           setSipError('Native SIP timeout — plugin did not respond');
-        }, 15000);
+        }, 30000);
 
         await CapacitorPjsip.initAccount({
           extension: config.extension,
@@ -110,6 +128,7 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
       } catch (e: any) {
         if (cancelled) return;
         if (watchdog) { clearTimeout(watchdog); watchdog = null; }
+        initInFlightRef.current = false;
         console.error('[NativeSIP] initAccount threw', e);
         setSipStatus('error');
         setSipError(e?.message || 'Native SIP init failed');
@@ -120,7 +139,10 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
       cancelled = true;
       if (watchdog) { clearTimeout(watchdog); watchdog = null; }
       cleanups.forEach((c) => { try { c(); } catch {} });
-      CapacitorPjsip.removeAllListeners().catch(() => {});
+      // Do NOT removeAllListeners or reset initInFlightRef here: in React
+      // StrictMode the effect is torn down and re-run synchronously, which
+      // would kill the listeners right before the native registration event
+      // arrives. The next effect run will overwrite listeners as needed.
       stopTimer();
     };
   }, [config]);
