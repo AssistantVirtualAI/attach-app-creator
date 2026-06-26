@@ -9,7 +9,11 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const extension = body?.ns_extension ?? profile.extension;
-    if (!extension) return jsonResponse({ success: false, error: "ns_extension manquante", code: 400 }, 400);
+    if (!extension) return jsonResponse({
+      success: false,
+      error: "Aucune extension NetSapiens liée à ce compte. Demande à un admin de la synchroniser depuis Gestion Utilisateurs.",
+      code: 400,
+    }, 400);
 
     const { token, refresh, expiresIn } = await obtainBrokerJwt(extension);
     await admin.from("planipret_profiles").update({
