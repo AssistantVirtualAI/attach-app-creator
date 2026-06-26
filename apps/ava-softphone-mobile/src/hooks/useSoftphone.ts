@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { createSIPUA, JsSIPUnavailableError, SIPConfig, classifySipFailure, hasWebRTC, rewriteSdpForFusionPBX, WEBRTC_UNAVAILABLE_MESSAGE } from '../lib/sip/jssipProvider';
+import { createSIPUA, JsSIPUnavailableError, SIPConfig, classifySipFailure, rewriteSdpForFusionPBX } from '../lib/sip/jssipProvider';
 import {
   appendSipLog, clearSipLog as clearPersistedLog, clearPersistedStatus, loadPersistedError, loadPersistedStatus,
   loadSipLog, MAX_AUTO_RETRIES, PersistedSipError, probeWss, RETRY_BACKOFF_MS, savePersistedError, savePersistedStatus,
@@ -157,19 +157,9 @@ export function useSoftphoneJsSip(
     }
   }, []);
 
-  // WebRTC capability check on mount — surfaces clear error immediately so
-  // UI doesn't sit on "connecting…" for ever.
-  useEffect(() => {
-    if (typeof window !== 'undefined' && !hasWebRTC()) {
-      setSipStatus('error');
-      setSipError(WEBRTC_UNAVAILABLE_MESSAGE);
-      log('webrtc.unavailable', WEBRTC_UNAVAILABLE_MESSAGE, 'error');
-    }
-  }, [log, setSipError, setSipStatus]);
-
+  // SIP/TLS transport does not require WebRTC, mDNS or TURN.
   useEffect(() => {
     if (!config) return;
-    if (typeof window !== 'undefined' && !hasWebRTC()) return;
     let cancelled = false;
 
     const ctx = { extension: config.extension, domain: config.domain };
@@ -482,17 +472,18 @@ export function useSoftphoneJsSip(
         return;
       }
 
-      // Quick WSS reachability probe — if the server is unreachable, skip the
-      // back-off wait and surface the error immediately. The user can retry manually.
-      log('probe.start', config.wssUrl);
-      const probe = await probeWss(config.wssUrl, 3500);
-      if (cancelled) return;
-      log(probe.ok ? 'probe.ok' : 'probe.fail', `${config.wssUrl} ${probe.reason || ''} ${probe.ms}ms`, probe.ok ? 'info' : 'warn');
-      if (!probe.ok) {
-        setSipStatus('error');
-        setSipError(`Phone server unreachable (${probe.reason || 'no response'}). Check network / WSS endpoint.`, ctx);
-        setNextRetryAt(null);
-        return;
+      // Reachability probe for WSS only. SIP/TLS relies on the SIP registration itself.
+      if (config.wssUrl?.startsWith('wss://')) {
+        log('probe.start', config.wssUrl);
+        const probe = await probeWss(config.wssUrl, 3500);
+        if (cancelled) return;
+        log(probe.ok ? 'probe.ok' : 'probe.fail', `${config.wssUrl} ${probe.reason || ''} ${probe.ms}ms`, probe.ok ? 'info' : 'warn');
+        if (!probe.ok) {
+          setSipStatus('error');
+          setSipError(`Phone server unreachable (${probe.reason || 'no response'}). Check network / WSS endpoint.`, ctx);
+          setNextRetryAt(null);
+          return;
+        }
       }
 
       const delay = RETRY_BACKOFF_MS[Math.min(attempt, RETRY_BACKOFF_MS.length - 1)];

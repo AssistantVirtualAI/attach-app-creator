@@ -1,27 +1,44 @@
 /**
- * WebRTC capability + WSS SSL/handshake failure surfacing.
+ * SIP/TLS failure surfacing (no WebRTC required).
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useSoftphone } from '../hooks/useSoftphone';
 import { classifySipFailure } from '../lib/sip/jssipProvider';
+
+const originalJsSIP = (window as any).JsSIP;
+
+beforeEach(() => {
+  const fakeUA = {
+    on: vi.fn(),
+    start: vi.fn(),
+    stop: vi.fn(),
+    isConnected: vi.fn().mockReturnValue(false),
+  };
+  (window as any).JsSIP = {
+    Socket: vi.fn().mockImplementation(() => ({ url: 'sips://pbxnode.lemtel.tel:5061' })),
+    UA: vi.fn().mockImplementation(() => fakeUA),
+  };
+});
+
+afterEach(() => {
+  (window as any).JsSIP = originalJsSIP;
+});
 
 const cfg = {
   extension: '300',
   password: 'pw',
   domain: 'lemtel.lemtel.tel',
-  wssUrl: 'wss://node.lemtelcloud.net:7443',
+  wssUrl: 'sips://pbxnode.lemtel.tel:5061',
 };
 
-const originalRTC = (window as any).RTCPeerConnection;
-beforeEach(() => { delete (window as any).RTCPeerConnection; });
-afterEach(() => { (window as any).RTCPeerConnection = originalRTC; });
-
-describe('WebRTC capability check', () => {
-  it('immediately surfaces a detailed error when RTCPeerConnection is missing', () => {
+describe('SIP/TLS transport', () => {
+  it('does not block the softphone when WebRTC is unavailable', () => {
+    const originalRTC = (window as any).RTCPeerConnection;
+    delete (window as any).RTCPeerConnection;
     const { result } = renderHook(() => useSoftphone(cfg));
-    expect(result.current.sipStatus).toBe('error');
-    expect(result.current.sipError).toMatch(/WebRTC not supported/i);
+    expect(result.current.sipError).not.toMatch(/WebRTC not supported/i);
+    (window as any).RTCPeerConnection = originalRTC;
   });
 });
 
@@ -30,10 +47,10 @@ describe('classifySipFailure SSL/TLS handling', () => {
     expect(classifySipFailure({ cause: 'SSL handshake failed' })).toMatch(/ssl certificate rejected|untrusted certificate/i);
     expect(classifySipFailure({ cause: 'TLS certificate error' })).toMatch(/ssl certificate rejected|untrusted certificate/i);
   });
-  it('still classifies plain WSS / DNS / auth / timeout reasons', () => {
-    expect(classifySipFailure({ cause: 'WebSocket transport error' })).toMatch(/wss connection failed/i);
+  it('still classifies transport / DNS / auth / timeout reasons', () => {
+    expect(classifySipFailure({ cause: 'WebSocket transport error' })).toMatch(/cannot reach phone server/i);
     expect(classifySipFailure({ cause: 'DNS lookup failed' })).toMatch(/dns/i);
-    expect(classifySipFailure({ cause: 'Forbidden', status_code: 403 })).toMatch(/authentication failed/i);
-    expect(classifySipFailure({ cause: 'Request Timeout', status_code: 408 })).toMatch(/timeout/i);
+    expect(classifySipFailure({ cause: 'Proxy Authentication Required', status_code: 407 })).toMatch(/authentication failed/i);
+    expect(classifySipFailure({ cause: 'Request Timeout', status_code: 408 })).toMatch(/phone server not responding/i);
   });
 });

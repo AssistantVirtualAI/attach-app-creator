@@ -1,6 +1,4 @@
 import * as JsSIPModule from 'jssip';
-import { Capacitor } from '@capacitor/core';
-
 
 declare global {
   interface Window {
@@ -40,11 +38,11 @@ export const WEBRTC_UNAVAILABLE_MESSAGE =
 
 function bundledJsSIP() {
   const mod: any = JsSIPModule as any;
-  return mod?.UA && mod?.WebSocketInterface ? mod : mod?.default || null;
+  return mod?.UA && (mod?.Socket || mod?.WebSocketInterface) ? mod : mod?.default || null;
 }
 
 /** Resolves the bundled JsSIP module, falling back to window.JsSIP if present. */
-export function waitForJsSIP(timeoutMs = 8000, intervalMs = 100): Promise<any> {
+export function waitForJsSIP(timeoutMs = 8000, intervalMs = 100, requireWebRTC = true): Promise<any> {
   return new Promise((resolve, reject) => {
     if (typeof window === 'undefined') {
       const bundled = bundledJsSIP();
@@ -52,7 +50,7 @@ export function waitForJsSIP(timeoutMs = 8000, intervalMs = 100): Promise<any> {
       else reject(new JsSIPUnavailableError('No window (SSR/non-browser)'));
       return;
     }
-    if (!hasWebRTC()) {
+    if (requireWebRTC && !hasWebRTC()) {
       reject(new JsSIPUnavailableError(WEBRTC_UNAVAILABLE_MESSAGE));
       return;
     }
@@ -226,35 +224,26 @@ export function buildWssFallbackList(config: SIPConfig): string[] {
     config.wssUrl,
     ...(config.wssUrls || []),
     ...FALLBACK_WSS,
-  ].filter(Boolean)));
+  ].filter((url): url is string => typeof url === 'string' && url.startsWith('wss://'))));
 }
 
 export async function createSIPUA(config: SIPConfig, timeoutMs = 8000) {
-  const JsSIP = await waitForJsSIP(timeoutMs);
-  const wssUrls = buildWssFallbackList(config);
-  const sockets = wssUrls.map((url) => new JsSIP.WebSocketInterface(url));
-  sockets.forEach((s: any) => { try { s.via_transport = 'wss'; } catch {} });
-  // IMPORTANT: config must match portal/desktop exactly to avoid SIP 403
-  // portal src/lib/softphone/jssipProvider.ts works — copy same params
-  // EXACT same config as portal src/lib/softphone/jssipProvider.ts (confirmed working)
-  // EXACT same config as portal src/lib/softphone/jssipProvider.ts, plus
-  // Capacitor-native hacks so the Contact/Via headers carry a real IP when
-  // running inside the iOS/Android shell (where the WebView IP is unusable).
-  const isNative = (() => { try { return Capacitor.isNativePlatform(); } catch { return false; } })();
+  const JsSIP = await waitForJsSIP(timeoutMs, 100, false);
+  // SIP/TLS over TCP 5061 — no WebRTC, no mDNS, no TURN.
+  const socket = new JsSIP.Socket(`sips:pbxnode.lemtel.tel:5061;transport=tls`);
   return new JsSIP.UA({
-    sockets,
+    sockets: [socket],
     uri: `sip:${config.extension}@${config.domain}`,
     password: config.password,
     authorization_user: config.extension,
     realm: config.domain,
-    contact_uri: `sip:${config.extension}@${config.domain};transport=wss`,
+    display_name: config.displayName || config.extension,
+    contact_uri: `sip:${config.extension}@${config.domain};transport=tls`,
     register: true,
     session_timers: false,
     register_expires: 300,
     connection_recovery_min_interval: 2,
     connection_recovery_max_interval: 30,
     user_agent: "AVA Softphone 1.1",
-    hack_ip_in_contact: isNative,
-    hack_via_tcp: isNative,
   } as any);
 }
