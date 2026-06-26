@@ -100,6 +100,7 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
   const [callTimer, setCallTimer] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [isOnHold, setIsOnHold] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
   const [activeCallNumber, setActiveCallNumber] = useState('');
   const [audioProfile, setAudioProfileState] = useState<AudioProfile>(() => loadAudioProfile());
   const [quality] = useState<CallQuality>(EMPTY_QUALITY);
