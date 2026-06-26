@@ -263,12 +263,14 @@ final class RTPAudioSession {
         // Let the session settle before reading/forcing hardware format.
         NSLog("[RTP] sleeping 100ms after setCategory to let session settle")
         Thread.sleep(forTimeInterval: 0.1)
-        // Read the actual hardware rate iOS negotiated. RemoteIO MUST use this
-        // rate — passing 8000Hz here is what triggers kAudioUnitErr_FormatNotSupported.
+        // hwSampleRate is PINNED to 48000Hz. Do NOT read from AVAudioSession
+        // here — it may return 0 mid-setup. We requested 48000 via
+        // setPreferredSampleRate; if iOS gave us something else the resampler
+        // still works (fractional phase accumulator), but RemoteIO is now
+        // configured for 48000 which is universally supported.
         let actual = AVAudioSession.sharedInstance().sampleRate
-        if actual >= 8000 { hwSampleRate = actual }
-        tapFormatDesc = "RemoteIO I16 \(Int(hwSampleRate))Hz ch=1 → RTP 8000Hz"
-        NSLog("[RTP] negotiated hwSampleRate=\(Int(hwSampleRate))Hz (RTP rate=\(Int(rtpSampleRate))Hz)")
+        tapFormatDesc = "RemoteIO I16 \(Int(hwSampleRate))Hz ch=1 → RTP 8000Hz (session=\(Int(actual))Hz)"
+        NSLog("[RTP] hwSampleRate=\(Int(hwSampleRate))Hz pinned (session reports \(Int(actual))Hz, RTP=\(Int(rtpSampleRate))Hz)")
         logSessionState("post-settle")
         if buildAndStartIOUnit() {
             engineRestartAttempts = 0
