@@ -134,6 +134,8 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
   const [isRecording, setIsRecording] = useState(false);
   const [activeCallNumber, setActiveCallNumber] = useState('');
   const [endReason, setEndReason] = useState<string | null>(null);
+  const [callPhase, setCallPhase] = useState<CallPhase>('idle');
+  const [lastSipCode, setLastSipCode] = useState<string | null>(null);
   const [audioProfile, setAudioProfileState] = useState<AudioProfile>(() => loadAudioProfile());
   const [quality] = useState<CallQuality>(EMPTY_QUALITY);
   const [audioStatus, setAudioStatus] = useState<'idle' | 'starting' | 'running' | 'retrying' | 'error'>('idle');
