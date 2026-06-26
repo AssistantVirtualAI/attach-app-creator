@@ -21,7 +21,12 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "setAudioRoute", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getAudioRoute", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "playTestTone", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "getRtpStats", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "getRtpStats", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "startRecord", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "stopRecord", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "transfer", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "park", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "addCall", returnType: CAPPluginReturnPromise)
     ]
 
     public override func load() {
