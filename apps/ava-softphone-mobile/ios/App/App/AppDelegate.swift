@@ -10,10 +10,22 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
 
-        // Configure audio session for VoIP
+        // Configure audio session for VoIP (full-duplex, BT + speaker route).
         let audioSession = AVAudioSession.sharedInstance()
-        try? audioSession.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetooth, .allowBluetoothA2DP, .defaultToSpeaker])
-        try? audioSession.setActive(true)
+        try? audioSession.setCategory(
+            .playAndRecord,
+            mode: .voiceChat,
+            options: [.allowBluetooth, .allowBluetoothA2DP, .defaultToSpeaker, .duckOthers]
+        )
+        try? audioSession.setPreferredSampleRate(48000)
+        try? audioSession.setPreferredIOBufferDuration(0.02)
+        try? audioSession.setActive(true, options: [])
+
+        // Proactively request microphone permission so the system prompt
+        // appears on first launch rather than on first call.
+        audioSession.requestRecordPermission { granted in
+            NSLog("[AVA] Microphone permission granted: \(granted)")
+        }
 
         // Disable mDNS ICE candidate obfuscation in WKWebView
         let webConfig = WKWebViewConfiguration()
