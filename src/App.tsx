@@ -313,11 +313,14 @@ const AvaPlatformOrgOnly = ({ children }: { children: React.ReactNode }) => {
  * has another org selected, auto-switch. Otherwise redirect to /portal.
  */
 const PlanipretOrgOnly = ({ children }: { children: React.ReactNode }) => {
-  const { selectedOrgId, organizations, setSelectedOrgId, isLoading } = useOrganization();
+  const { selectedOrgId, organizations, setSelectedOrgId, isLoading, isSuperAdmin } = useOrganization();
   if (isLoading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading…</div>;
   if (selectedOrgId === PLANIPRET_ORG_ID) return <>{children}</>;
   const isMember = organizations.some((o: any) => (o.id || o.organization?.id) === PLANIPRET_ORG_ID);
-  if (isMember) {
+  // Super admins always force-load the Planipret context, even if they are
+  // not an explicit member of the organization. This guarantees that
+  // /planipret/admin/* never inherits a stale "default" org from localStorage.
+  if (isMember || isSuperAdmin) {
     setSelectedOrgId(PLANIPRET_ORG_ID);
     return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Switching to Planipret…</div>;
   }
