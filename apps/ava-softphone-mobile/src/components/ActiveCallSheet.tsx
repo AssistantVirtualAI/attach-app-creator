@@ -391,7 +391,9 @@ const callButtonCss = `
 .call-ctrl.is-disabled{cursor:not-allowed;opacity:.48;filter:saturate(.6);}
 .call-ctrl.is-disabled .call-ctrl-orb{box-shadow:inset 0 1px 0 rgba(255,255,255,.16),inset 0 -18px 28px rgba(0,0,0,.28);}
 @media (prefers-reduced-motion:reduce){.call-ctrl-orb,.call-big-orb,.call-ctrl-orb::before,.call-big-orb::before{transition:none;}}
+@keyframes rec-pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.45;transform:scale(1.35);}}
 `;
+
 
 const sheetStyle: React.CSSProperties = {
   position: 'fixed', inset: 0, zIndex: 100,
