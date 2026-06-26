@@ -1,13 +1,16 @@
 // Manages remote audio output routing (earpiece / speaker / bluetooth).
-// Frontend best-effort: uses HTMLMediaElement.setSinkId when supported.
-// On iOS WKWebView, native AVAudioSession (configured in AppDelegate with
-// .defaultToSpeaker + .allowBluetooth) handles physical routing; this module
-// tracks UI intent and surfaces failures to the caller.
+// On Capacitor iOS we route through the native CapacitorPjsip plugin which
+// drives AVAudioSession.overrideOutputAudioPort. On web we fall back to
+// HTMLMediaElement.setSinkId where supported.
+
+import { Capacitor } from '@capacitor/core';
+import { CapacitorSipNative } from './nativeSipProvider';
 
 export type AudioRoute = 'earpiece' | 'speaker' | 'bluetooth';
 
 let audioEl: HTMLAudioElement | null = null;
 let route: AudioRoute = 'earpiece';
+
 let busy = false;
 let bluetoothAvailable = false;
 const listeners = new Set<(s: AudioState) => void>();
