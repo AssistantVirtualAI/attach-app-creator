@@ -64,6 +64,22 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         self.notifyListeners("log", data: ["message": msg])
     }
 
+    private func emitCallState(_ state: String, direction: String? = nil, number: String? = nil, stage: String? = nil, code: String? = nil) {
+        var data: [String: Any] = ["state": state, "callId": callActiveId]
+        if let direction = direction ?? (callDirection.isEmpty ? nil : callDirection) { data["direction"] = direction }
+        if let number = number { data["number"] = number }
+        if let stage = stage { data["stage"] = stage }
+        if let code = code { data["code"] = code }
+        log("CALL_EVENT|callStateChanged|state=\(state)|stage=\(stage ?? "")|code=\(code ?? "")|callState=\(callState)|callId=\(callActiveId)")
+        notifyListeners("callStateChanged", data: data)
+    }
+
+    private func emitCallEnded(_ reason: String, callId id: String? = nil) {
+        let endedId = id ?? callActiveId
+        log("CALL_EVENT|callEnded|reason=\(reason)|callId=\(endedId)")
+        notifyListeners("callEnded", data: ["callId": endedId, "reason": reason])
+    }
+
     // MARK: - Plugin methods
     @objc func initAccount(_ call: CAPPluginCall) {
         // Accept both legacy (server/username) and JS-side (domain/extension) param names.
@@ -158,8 +174,9 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         callState = "calling"
         isMuted = false
         isOnHold = false
+        emitCallState("ringing", direction: "out", number: number, stage: "before_invite")
         sendInvite(to: number, authHeader: nil)
-        notifyListeners("callStateChanged", data: ["state": "ringing", "direction": "out", "number": number, "callId": callActiveId, "stage": "invite_sent"])
+        emitCallState("ringing", direction: "out", number: number, stage: "invite_sent")
         call.resolve(["ok": true, "callId": callActiveId])
     }
 
@@ -174,7 +191,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         }
         let id = callActiveId
         resetCallState()
-        notifyListeners("callEnded", data: ["callId": id, "reason": "local_hangup"])
+        emitCallEnded("local_hangup", callId: id)
         call.resolve(["ok": true])
     }
 
@@ -182,7 +199,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         if callState != "incoming" { call.reject("no incoming call"); return }
         sendResponseToInvite(code: 200, reason: "OK", withSdp: true)
         callState = "active"
-        notifyListeners("callStateChanged", data: ["state": "active", "direction": "in", "callId": callActiveId])
+        emitCallState("active", direction: "in")
         call.resolve(["ok": true])
     }
 
@@ -328,14 +345,14 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
             send200OK(to: msg)
             let id = callActiveId
             resetCallState()
-            notifyListeners("callEnded", data: ["callId": id, "reason": "remote_bye"])
+            emitCallEnded("remote_bye", callId: id)
         case "CANCEL":
             send200OK(to: msg)
             if callState == "incoming" {
                 sendResponseToInvite(code: 487, reason: "Request Terminated")
                 let id = callActiveId
                 resetCallState()
-                notifyListeners("callEnded", data: ["callId": id, "reason": "remote_cancel"])
+                emitCallEnded("remote_cancel", callId: id)
             }
         case "INFO", "NOTIFY", "OPTIONS", "MESSAGE":
             send200OK(to: msg)
@@ -358,7 +375,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         sendResponseToInvite(code: 100, reason: "Trying")
         sendResponseToInvite(code: 180, reason: "Ringing")
         notifyListeners("callReceived", data: ["from": fromNumber, "callId": callActiveId])
-        notifyListeners("callStateChanged", data: ["state": "ringing", "direction": "in", "number": fromNumber, "callId": callActiveId])
+        emitCallState("ringing", direction: "in", number: fromNumber)
     }
 
     private func send200OK(to request: String) {
