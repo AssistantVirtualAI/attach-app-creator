@@ -101,7 +101,7 @@ export default function PlanipretIntegrations() {
       if (!user || user.id !== AVA_OWNER_USER_ID) { setAuthorized(false); return; }
       setAuthorized(true);
       reload();
-      runAllTests();
+      // Tests run on-demand via the "Re-tester" button to avoid noisy 403/404/500 on mount
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
