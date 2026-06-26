@@ -292,7 +292,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
             try session.setCategory(.playAndRecord,
                                     mode: .voiceChat,
                                     options: [.allowBluetooth, .allowBluetoothA2DP, .defaultToSpeaker, .duckOthers])
-            try session.setPreferredSampleRate(8000)
+            try session.setPreferredSampleRate(48000)
             try session.setPreferredIOBufferDuration(0.02)
             try session.setActive(true, options: [])
             log("AVAudioSession configured cat=\(session.category.rawValue) mode=\(session.mode.rawValue) sr=\(Int(session.sampleRate))Hz io=\(Int(session.ioBufferDuration * 1000))ms route=\(audioRouteSummary())")
