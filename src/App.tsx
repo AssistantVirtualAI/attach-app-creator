@@ -440,12 +440,19 @@ const App = () => (
                   }
                 />
 
-                {/* Legacy AVA admin portal is now strictly hosted inside the Planipret organization. */}
-                <Route element={<ProtectedRoute><PlanipretOrgOnly><Outlet /></PlanipretOrgOnly></ProtectedRoute>}>
+                {/* Main multi-org dashboard (org switcher with Planipret / Lemtel / AVA) */}
                 <Route
                   path="/dashboard"
-                  element={<Navigate to="/planipret/admin/overview" replace />}
+                  element={
+                    <ProtectedRoute>
+                      <Dashboard />
+                    </ProtectedRoute>
+                  }
                 />
+
+                {/* Legacy AVA admin portal is now strictly hosted inside the Planipret organization. */}
+                <Route element={<ProtectedRoute><PlanipretOrgOnly><Outlet /></PlanipretOrgOnly></ProtectedRoute>}>
+
 
                 <Route
                   path="/analytics"
