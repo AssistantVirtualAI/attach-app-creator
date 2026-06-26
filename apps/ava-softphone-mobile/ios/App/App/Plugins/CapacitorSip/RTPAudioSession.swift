@@ -235,13 +235,22 @@ final class RTPAudioSession {
     }
 
     private func handleCapturedBuffer(_ buf: AVAudioPCMBuffer) {
+        let bufDesc = describeFormat(buf.format)
+        if tapFormatDesc != bufDesc {
+            tapFormatDesc = bufDesc
+            NSLog("[RTP] tap buffer format=\(bufDesc) frames=\(buf.frameLength)")
+        }
         // Rebuild converter if tap delivered a different format than expected.
         if converter == nil || converter?.inputFormat != buf.format {
             if let c = AVAudioConverter(from: buf.format, to: playFormat) {
                 converter = c
-                NSLog("[RTP] converter rebuilt \(buf.format) → \(playFormat)")
+                converterFormatDesc = "\(bufDesc) → \(describeFormat(playFormat))"
+                converterRebuilds += 1
+                NSLog("[RTP] converter rebuilt #\(converterRebuilds) \(converterFormatDesc)")
             } else {
-                NSLog("[RTP] cannot build converter for \(buf.format)")
+                convertErrors += 1
+                lastConvertError = "build failed for \(bufDesc)"
+                NSLog("[RTP] cannot build converter for \(bufDesc)")
                 return
             }
         }
@@ -259,7 +268,10 @@ final class RTPAudioSession {
             return buf
         }
         if status == .error || convErr != nil {
-            NSLog("[RTP] convert error: \(convErr?.localizedDescription ?? "?")")
+            convertErrors += 1
+            lastConvertError = convErr?.localizedDescription ?? "unknown"
+            NSLog("[RTP] convert error: \(lastConvertError) — resetting converter")
+            converter = nil
             return
         }
         guard let ptr = outBuf.int16ChannelData?[0] else { return }
