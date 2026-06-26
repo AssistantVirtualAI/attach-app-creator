@@ -53,7 +53,7 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
       callHandlesRef.current = [];
     };
 
-    if (activeInitKeyRef.current === initKey && regHandleRef.current) {
+    if (activeInitKeyRef.current === initKey && regHandleRef.current && callHandlesRef.current.length >= 3) {
       console.log('[NativeSIP] native listeners already active for %s, skip initAccount', initKey);
       return;
     }
@@ -109,14 +109,12 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
 
         const callReceivedHandle = await CapacitorPjsip.addListener('callReceived', (d: any) => {
           if (activeInitKeyRef.current !== initKey) return;
-          if (cancelled) return;
           console.log('[NativeSIP] callReceived event', d);
           setActiveCallNumber(d?.from || 'Unknown');
           setCallState('ringing');
         });
         const callStateHandle = await CapacitorPjsip.addListener('callStateChanged', (d: any) => {
           if (activeInitKeyRef.current !== initKey) return;
-          if (cancelled) return;
           console.log('[NativeSIP] callStateChanged event', d);
           if (d?.state === 'active') { setCallState('active'); startTimer(); }
           if (d?.state === 'ringing' || d?.state === 'calling') {
@@ -126,7 +124,6 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
         });
         const callEndedHandle = await CapacitorPjsip.addListener('callEnded', (d: any) => {
           if (activeInitKeyRef.current !== initKey) return;
-          if (cancelled) return;
           console.log('[NativeSIP] callEnded event', d);
           setCallState('idle');
           setActiveCallNumber('');
