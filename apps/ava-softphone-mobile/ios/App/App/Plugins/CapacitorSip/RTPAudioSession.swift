@@ -222,6 +222,7 @@ final class RTPAudioSession {
         if sockfd >= 0 { close(sockfd); sockfd = -1 }
         sendBuffer.removeAll()
         hasRemote = false
+        emitAudio("idle")
     }
 
     func setMuted(_ muted: Bool) { isMuted = muted }
