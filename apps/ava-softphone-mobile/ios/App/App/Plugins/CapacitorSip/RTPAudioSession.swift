@@ -44,6 +44,24 @@ final class RTPAudioSession {
     private(set) var micPeak: Float = 0
     private(set) var rxPeak: Float = 0
     private(set) var startedAt: Date?
+    private(set) var tapFormatDesc: String = ""
+    private(set) var converterFormatDesc: String = ""
+    private(set) var converterRebuilds: Int = 0
+    private(set) var convertErrors: Int = 0
+    private(set) var lastConvertError: String = ""
+
+    private func describeFormat(_ f: AVAudioFormat) -> String {
+        let cf: String
+        switch f.commonFormat {
+        case .pcmFormatFloat32: cf = "F32"
+        case .pcmFormatFloat64: cf = "F64"
+        case .pcmFormatInt16: cf = "I16"
+        case .pcmFormatInt32: cf = "I32"
+        case .otherFormat: cf = "other"
+        @unknown default: cf = "?"
+        }
+        return "\(cf) \(Int(f.sampleRate))Hz ch=\(f.channelCount) il=\(f.isInterleaved)"
+    }
 
     func snapshot() -> [String: Any] {
         return [
@@ -61,7 +79,12 @@ final class RTPAudioSession {
             "micPeak": micPeak,
             "rxPeak": rxPeak,
             "uptimeMs": startedAt.map { Int(Date().timeIntervalSince($0) * 1000) } ?? 0,
-            "route": currentRouteDescription()
+            "route": currentRouteDescription(),
+            "tapFormat": tapFormatDesc,
+            "converterFormat": converterFormatDesc,
+            "converterRebuilds": converterRebuilds,
+            "convertErrors": convertErrors,
+            "lastConvertError": lastConvertError
         ]
     }
 
