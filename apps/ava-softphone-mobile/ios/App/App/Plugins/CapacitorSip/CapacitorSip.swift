@@ -459,6 +459,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
             } else if code == "401" || code == "407" {
                 log("INVITE auth challenge \(code) — keeping call ringing and retrying with digest auth")
                 callState = "ringing"
+                log("INVITE|\(code)|callState=\(callState)|callId=\(callActiveId)")
                 emitCallState("ringing", direction: "out", stage: "auth_challenge", code: code)
                 if let wwwLine = msg.split(separator: "\r\n").first(where: {
                     $0.lowercased().hasPrefix("www-authenticate:") || $0.lowercased().hasPrefix("proxy-authenticate:")
