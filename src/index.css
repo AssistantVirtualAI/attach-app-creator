@@ -1129,3 +1129,145 @@ All colors MUST be HSL.
 }
 
 
+
+/* =========================================================================
+   Futuristic glassy buttons
+   - Shine sweep on hover (::before diagonal gradient)
+   - Glassy pulse on click (::after radial flash + scale-down on :active)
+   - Subtle inner highlight + outer glow tuned per variant
+   ========================================================================= */
+@layer components {
+  .btn-futuristic {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+    backdrop-filter: blur(10px) saturate(140%);
+    -webkit-backdrop-filter: blur(10px) saturate(140%);
+    box-shadow:
+      0 1px 0 0 hsl(0 0% 100% / 0.18) inset,
+      0 -1px 0 0 hsl(0 0% 0% / 0.18) inset,
+      0 6px 18px -8px hsl(var(--primary) / 0.45),
+      0 2px 6px -2px hsl(0 0% 0% / 0.25);
+    transition:
+      transform 180ms cubic-bezier(.2,.7,.2,1),
+      box-shadow 220ms ease,
+      background-color 200ms ease,
+      filter 200ms ease;
+    will-change: transform, box-shadow;
+  }
+
+  /* Shine sweep */
+  .btn-futuristic::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      115deg,
+      transparent 30%,
+      hsl(0 0% 100% / 0.35) 50%,
+      transparent 70%
+    );
+    transform: translateX(-120%);
+    transition: transform 700ms cubic-bezier(.2,.7,.2,1);
+    pointer-events: none;
+    z-index: 1;
+    mix-blend-mode: overlay;
+  }
+  .btn-futuristic:hover::before { transform: translateX(120%); }
+
+  /* Glassy click flash */
+  .btn-futuristic::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      circle at center,
+      hsl(0 0% 100% / 0.55) 0%,
+      hsl(0 0% 100% / 0.15) 40%,
+      transparent 70%
+    );
+    opacity: 0;
+    transform: scale(0.6);
+    transition: opacity 260ms ease, transform 320ms ease;
+    pointer-events: none;
+    z-index: 1;
+    border-radius: inherit;
+  }
+  .btn-futuristic:active::after {
+    opacity: 1;
+    transform: scale(1.05);
+    transition-duration: 0ms, 0ms;
+  }
+
+  .btn-futuristic:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.06);
+    box-shadow:
+      0 1px 0 0 hsl(0 0% 100% / 0.25) inset,
+      0 -1px 0 0 hsl(0 0% 0% / 0.20) inset,
+      0 10px 28px -8px hsl(var(--primary) / 0.6),
+      0 4px 12px -2px hsl(0 0% 0% / 0.3);
+  }
+  .btn-futuristic:active {
+    transform: translateY(0) scale(0.97);
+    box-shadow:
+      0 1px 0 0 hsl(0 0% 100% / 0.15) inset,
+      0 0 0 1px hsl(0 0% 100% / 0.18) inset,
+      0 4px 12px -6px hsl(var(--primary) / 0.5);
+  }
+
+  /* Keep label/icon above the sheen layers */
+  .btn-futuristic > * { position: relative; z-index: 2; }
+
+  /* Variant tints */
+  .btn-futuristic-primary {
+    background-image: linear-gradient(
+      135deg,
+      hsl(var(--primary)) 0%,
+      hsl(var(--primary-glow, var(--primary))) 100%
+    );
+  }
+  .btn-futuristic-destructive {
+    background-image: linear-gradient(
+      135deg,
+      hsl(var(--destructive)) 0%,
+      hsl(var(--destructive) / 0.75) 100%
+    );
+    box-shadow:
+      0 1px 0 0 hsl(0 0% 100% / 0.18) inset,
+      0 -1px 0 0 hsl(0 0% 0% / 0.18) inset,
+      0 6px 18px -8px hsl(var(--destructive) / 0.55),
+      0 2px 6px -2px hsl(0 0% 0% / 0.25);
+  }
+  .btn-futuristic-secondary {
+    background-image: linear-gradient(
+      135deg,
+      hsl(var(--secondary)) 0%,
+      hsl(var(--secondary) / 0.78) 100%
+    );
+  }
+  .btn-futuristic-glass {
+    background-color: hsl(var(--background) / 0.55);
+    border: 1px solid hsl(var(--border) / 0.7);
+    box-shadow:
+      0 1px 0 0 hsl(0 0% 100% / 0.35) inset,
+      0 -1px 0 0 hsl(0 0% 0% / 0.10) inset,
+      0 8px 24px -10px hsl(var(--primary) / 0.25);
+  }
+  .btn-futuristic-ghost {
+    background-color: transparent;
+    box-shadow: none;
+  }
+  .btn-futuristic-ghost:hover {
+    background-color: hsl(var(--accent) / 0.6);
+    box-shadow:
+      0 6px 18px -10px hsl(var(--primary) / 0.35);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .btn-futuristic,
+    .btn-futuristic::before,
+    .btn-futuristic::after { transition: none !important; }
+    .btn-futuristic:hover { transform: none; }
+  }
+}
