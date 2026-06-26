@@ -2,6 +2,7 @@ import Foundation
 import Capacitor
 import Network
 import CommonCrypto
+import AVFoundation
 
 @objc(CapacitorPjsip)
 public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
