@@ -104,3 +104,52 @@ sonde bascule automatiquement sur `FALLBACK_ICE_SERVERS` en cas d'échec.
 
 Permet de mesurer les taux d'échec iOS, et de comparer la latence STUN vs
 TURN par version d'OS / opérateur mobile côté backend d'analyse.
+
+## mDNS / .local sur iOS WKWebView
+
+Depuis iOS 14, WebKit obfusque les IP locales avec des hostnames mDNS
+`<uuid>.local`. FusionPBX ne peut pas résoudre ces adresses : les candidats
+sont rejetés et l'état ICE reste `new`/`checking` jusqu'au timeout.
+
+Mitigations en place dans le code :
+
+1. **Info.plist + AppDelegate** activent `WebKitICECandidateFilteringEnabled=false`
+   et `WebKitEnumeratingAllNetworkInterfacesEnabled=true` → WebKit émet
+   les vraies IP host quand l'autorisation micro est accordée.
+2. **Détection client** : `isMdnsCandidate()` dans `rtcConfig.ts` flague
+   chaque candidat `.local` (event `mdns-candidate`, visible dans l'overlay).
+3. **Fallback automatique** : si la PC reste `new`/`checking` après 6 s et
+   qu'au moins un candidat mDNS a été émis, on bascule en
+   `iceTransportPolicy: 'relay'` et on appelle `restartIce()` pour ne
+   garder que les candidats TURN (résolvables par FusionPBX).
+4. **Logs** : tous les `icecandidateerror` et passages ICE → `failed`
+   sont émis comme `webrtc-error` et affichés dans l'overlay + console.
+
+## Test manuel iOS (build ad-hoc / TestFlight / App Store)
+
+Procédure à exécuter sur **chaque** configuration de build (Debug, Release,
+Ad-Hoc, TestFlight, App Store) pour confirmer que les clés WebKit sont bien
+appliquées — Apple peut filtrer certains flags privés selon le profil.
+
+Pré-requis : activer `localStorage.setItem('sip:iceDiag','1')` ou ajouter
+`?iceDiag=1` à l'URL, puis lancer un appel SIP sortant.
+
+| # | Étape                                          | Attendu                                                 |
+|---|------------------------------------------------|---------------------------------------------------------|
+| 1 | Appel sortant vers un poste FusionPBX          | `iceConnectionState` → `connected` < 5 s                |
+| 2 | Vérifier overlay « mDNS »                      | `0` candidats `.local` (clé WebKit appliquée)           |
+| 3 | Vérifier « 1st relay » et « connected »        | Valeurs en ms renseignées                               |
+| 4 | Couper Wi-Fi pendant l'appel, repasser en LTE  | ICE → `disconnected` puis `connected` après restart     |
+| 5 | Forcer un échec (TURN bloqué via VPN strict)   | Overlay affiche `fallback: all → relay` puis erreur    |
+| 6 | Bouton « Copier diagnostic »                   | Rapport texte contient `iceServers`, candidats, erreurs |
+
+À répéter sur :
+
+- iOS 16 / 17 / 18, iPhone SE → 15 Pro Max
+- Réseaux : Wi-Fi domestique, LTE Bell/Telus/Rogers, hotspot, VPN d'entreprise
+- Profils de signature : Development, Ad-Hoc, TestFlight, App Store
+
+Si `mDNS > 0` apparaît en TestFlight ou App Store alors qu'il est à 0 en
+Debug, c'est qu'Apple a stripé les clés `WebKit*` privées du `Info.plist`
+final → le fallback `iceTransportPolicy: 'relay'` (point 3 ci-dessus) doit
+prendre le relais et l'appel doit quand même aboutir.
