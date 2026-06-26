@@ -439,6 +439,9 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         callState = "incoming"
         callActiveId = headerValue(msg, "Call-ID") ?? UUID().uuidString
         callLocalTag = String(UUID().uuidString.prefix(8))
+        ensureRtpSocket()
+        parseRemoteSdp(msg)
+
         let fromH = headerValue(msg, "From") ?? ""
         callRemoteUri = extractUri(fromH)
         callRemoteContact = extractUri(headerValue(msg, "Contact") ?? fromH)
