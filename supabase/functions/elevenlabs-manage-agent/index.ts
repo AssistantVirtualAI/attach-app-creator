@@ -110,14 +110,34 @@ Deno.serve(async (req) => {
         return json({ success: true, agent: r.data, agent_id: agentId });
       }
 
+      case "list_llms": {
+        const r = await elFetch(apiKey, "/convai/llm-prices");
+        if (!r.ok) return json({ success: false, error: r.error, status: r.status });
+        const llms = (r.data?.llm_prices ?? r.data?.llms ?? []).map((x: any) => x.llm ?? x.model ?? x).filter(Boolean);
+        return json({ success: true, llms });
+      }
+
       case "create_agent": {
+        // Pick a supported Claude model dynamically (the old "claude-3-5-sonnet" is deprecated by ElevenLabs).
+        let chosenLlm = payload?.llm as string | undefined;
+        if (!chosenLlm) {
+          const pricesRes = await elFetch(apiKey, "/convai/llm-prices");
+          const llms: string[] = ((pricesRes.data?.llm_prices ?? pricesRes.data?.llms ?? []) as any[])
+            .map((x) => x.llm ?? x.model ?? x).filter(Boolean);
+          chosenLlm = llms.find((m) => /claude.*sonnet/i.test(m))
+            || llms.find((m) => /claude/i.test(m))
+            || llms.find((m) => /gemini.*flash/i.test(m))
+            || llms[0]
+            || "gemini-2.0-flash-001";
+        }
+
         const createBody = {
           name: payload?.name || "AVA — Planiprêt AI Portal",
           conversation_config: {
             agent: {
               prompt: {
                 prompt: payload?.system_prompt || "Tu es AVA, l'assistante vocale IA de Planiprêt. Tu aides les courtiers hypothécaires à gérer leurs appels, SMS, emails et tâches CRM. Tu parles en français canadien. Tu es professionnelle et efficace.",
-                llm: payload?.llm || "claude-3-5-sonnet",
+                llm: chosenLlm,
                 temperature: payload?.temperature ?? 0.7,
                 max_tokens: payload?.max_tokens ?? 500,
                 tools: [],
@@ -139,8 +159,21 @@ Deno.serve(async (req) => {
           },
           platform_settings: { widget: { is_disabled: true } },
         };
-        const r = await elFetch(apiKey, "/convai/agents/create", { method: "POST", body: JSON.stringify(createBody) });
-        if (!r.ok) return json({ success: false, error: r.error, status: r.status });
+        let r = await elFetch(apiKey, "/convai/agents/create", { method: "POST", body: JSON.stringify(createBody) });
+
+        // Retry once with a guaranteed-available fallback if the LLM was rejected.
+        if (!r.ok && /llm|model/i.test(String(r.error))) {
+          await broadcastSetup(admin, user.id, { type: "setup_error", step: "create_agent", error: `LLM ${chosenLlm} refusé — retry avec gemini-2.0-flash-001` });
+          createBody.conversation_config.agent.prompt.llm = "gemini-2.0-flash-001";
+          r = await elFetch(apiKey, "/convai/agents/create", { method: "POST", body: JSON.stringify(createBody) });
+        }
+
+        if (!r.ok) {
+          const hint = /llm|model/i.test(String(r.error))
+            ? `Modèle LLM rejeté par ElevenLabs (${chosenLlm}). La clé Claude (ANTHROPIC_API_KEY) n'est pas utilisée ici — c'est ElevenLabs qui choisit le modèle.`
+            : r.error;
+          return json({ success: false, error: hint, status: r.status, raw: r.data });
+        }
         const newId = r.data?.agent_id;
         if (newId) {
           await setConfig(admin, "agent_id", newId, user.id);
@@ -148,7 +181,7 @@ Deno.serve(async (req) => {
           await setConfig(admin, "llm", createBody.conversation_config.agent.prompt.llm, user.id);
           await setConfig(admin, "setup_completed", "true", user.id);
         }
-        return json({ success: true, agent_id: newId });
+        return json({ success: true, agent_id: newId, llm_used: createBody.conversation_config.agent.prompt.llm });
       }
 
       case "update_agent": {
