@@ -114,7 +114,8 @@ const PortalLoginContent = () => {
         console.error('Error loading agent:', error);
         setError('Erreur lors du chargement de l\'agent');
       } else if (!data) {
-        setError('Agent non trouvé');
+        navigate('/login', { replace: true });
+        return;
       } else {
         setAgentInfo(data);
         if (data.organization_id) {
