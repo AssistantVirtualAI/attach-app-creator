@@ -1,0 +1,10 @@
+{
+  "name": "capacitor-pjsip",
+  "version": "1.0.0",
+  "main": "dist/plugin.js",
+  "capacitor": {
+    "ios": {
+      "src": "ios"
+    }
+  }
+}
