@@ -11,6 +11,8 @@ import type { SIPConfig } from '../lib/sip/jssipProvider';
 import { CapacitorPjsip, onNativeSipEvent } from '../lib/sip/nativeSipProvider';
 import { EMPTY_QUALITY, type CallQuality } from '../lib/sip/callQuality';
 import { loadAudioProfile, saveAudioProfile, type AudioProfile } from '../lib/sip/audioProfile';
+import { startNativeSipTracking, setNativeRegStatus } from '../lib/sip/nativeSipState';
+import { attachNativeAutoReconnect } from '../lib/sip/nativeAutoReconnect';
 import type { UseSoftphoneReturn, SIPStatus, CallState } from './useSoftphone';
 
 export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn {
