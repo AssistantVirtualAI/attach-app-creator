@@ -351,6 +351,9 @@ function UserModal({ mode, user, onClose, onSaved }: { mode: "add" | "edit"; use
     if (!firstName || !lastName || !email || !extension || (!isEdit && !password)) {
       toast.error("Champs requis manquants"); return;
     }
+    if (/@lemtel\.com$/i.test(email.trim())) {
+      toast.error("Les emails @lemtel.com appartiennent à Lemtel — utilisez un autre domaine."); return;
+    }
     setBusy(true);
     const full_name = `${firstName} ${lastName}`.trim();
     if (isEdit) {
