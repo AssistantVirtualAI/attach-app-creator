@@ -71,8 +71,11 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         requestMicPermission { [weak self] granted in
             guard let self = self else { return }
             self.log("mic permission granted=\(granted)")
+            self.notifyListeners("micPermission", data: ["granted": granted, "status": granted ? "granted" : "denied"])
             if !granted {
-                self.notifyListeners("registrationFailed", data: ["reason": "microphone permission denied"])
+                self.notifyListeners("registration", data: ["state": "error", "status": "error", "reason": "microphone permission denied"])
+                self.notifyListeners("registrationFailed", data: ["reason": "Microphone permission denied — enable it in iOS Settings"])
+                return
             }
             self.connectAndRegister()
         }
