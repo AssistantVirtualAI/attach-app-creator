@@ -26,8 +26,9 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
   const [audioProfile, setAudioProfileState] = useState<AudioProfile>(() => loadAudioProfile());
   const [quality] = useState<CallQuality>(EMPTY_QUALITY);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const lastInitKeyRef = useRef<string | null>(null);
   const initInFlightRef = useRef<boolean>(false);
+  const regHandleRef = useRef<{ remove(): Promise<void> } | null>(null);
+  const activeInitKeyRef = useRef<string | null>(null);
 
   const startTimer = () => {
     if (timerRef.current) clearInterval(timerRef.current);
@@ -42,20 +43,26 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
   // Register account on config change.
   useEffect(() => {
     if (!config) return;
-    // Guard: avoid re-initialising the native account if the same credentials
-    // are already in flight or have just been registered. React StrictMode and
-    // parent re-renders otherwise spam initAccount and starve the watchdog.
     const initKey = `${config.extension}@${config.domain}|${config.password}|${config.wssUrl ?? ''}`;
-    if (initInFlightRef.current && lastInitKeyRef.current === initKey) {
-      console.log('[NativeSIP] initAccount skipped — already in flight for same config');
+
+    // Keep the registration listener alive across React StrictMode re-renders.
+    // Only detach it when the credentials actually change.
+    if (activeInitKeyRef.current === initKey && regHandleRef.current) {
+      console.log('[NativeSIP] registration listener already active for %s, skip initAccount', initKey);
       return;
     }
-    if (lastInitKeyRef.current === initKey && (sipStatus === 'registered' || sipStatus === 'connecting')) {
-      console.log('[NativeSIP] initAccount skipped — same config, status=%s', sipStatus);
+    if (initInFlightRef.current && activeInitKeyRef.current === initKey) {
+      console.log('[NativeSIP] initAccount already in flight for %s, skip duplicate', initKey);
       return;
     }
-    lastInitKeyRef.current = initKey;
+    if (activeInitKeyRef.current && activeInitKeyRef.current !== initKey && regHandleRef.current) {
+      console.log('[NativeSIP] removing old registration listener for %s', activeInitKeyRef.current);
+      regHandleRef.current.remove().catch(() => {});
+      regHandleRef.current = null;
+    }
+    activeInitKeyRef.current = initKey;
     initInFlightRef.current = true;
+
     let cancelled = false;
     const cleanups: Array<() => void> = [];
     let watchdog: ReturnType<typeof setTimeout> | null = null;
@@ -68,10 +75,11 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
 
     (async () => {
       try {
-        // Direct listener on the unified `registration` event so we don't
-        // miss it if React re-renders. Accept both `status` and `state`.
+        // Direct listener on the unified `registration` event. This listener is
+        // intentionally kept alive across React re-renders so it is still there
+        // when the native 200 OK arrives after a StrictMode cleanup cycle.
         const regHandle = await CapacitorPjsip.addListener('registration', (d: any) => {
-          if (cancelled) return;
+          if (activeInitKeyRef.current !== initKey) return;
           console.log('[NativeSIP] registration event', d);
           const s = d?.status ?? d?.state;
           if (s === 'registered') {
@@ -90,7 +98,8 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
             setNativeRegStatus('error', msg);
           }
         });
-        cleanups.push(() => { regHandle.remove().catch(() => {}); });
+        regHandleRef.current = regHandle;
+
         cleanups.push(await onNativeSipEvent('callReceived', (d) => {
           if (cancelled) return;
           setActiveCallNumber(d?.from || 'Unknown');
@@ -144,13 +153,20 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
       cancelled = true;
       if (watchdog) { clearTimeout(watchdog); watchdog = null; }
       cleanups.forEach((c) => { try { c(); } catch {} });
-      // Do NOT removeAllListeners or reset initInFlightRef here: in React
-      // StrictMode the effect is torn down and re-run synchronously, which
-      // would kill the listeners right before the native registration event
-      // arrives. The next effect run will overwrite listeners as needed.
+      // The registration listener is intentionally kept alive across React
+      // StrictMode re-renders. It is removed only on credential change or unmount.
       stopTimer();
     };
   }, [config]);
+
+  // Remove the long-lived registration listener only when the hook truly
+  // unmounts. Credential changes are handled inside the effect above.
+  useEffect(() => {
+    return () => {
+      regHandleRef.current?.remove().catch(() => {});
+      regHandleRef.current = null;
+    };
+  }, []);
 
   const call = (number: string) => {
     if (sipStatus !== 'registered') return false;
