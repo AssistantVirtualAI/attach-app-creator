@@ -34,6 +34,15 @@ final class RTPAudioSession {
     private var isMuted = false
     private var running = false
 
+    // MARK: - Engine recovery (auto-reconnect with backoff)
+    private var engineRestartAttempts: Int = 0
+    private var engineRestartTimer: DispatchSourceTimer?
+    private var routeChangeObserver: NSObjectProtocol?
+    private var interruptionObserver: NSObjectProtocol?
+    private var mediaServicesResetObserver: NSObjectProtocol?
+    private(set) var lastEngineError: String = ""
+    private(set) var engineRestartTotal: Int = 0
+
     // MARK: - Diagnostics
     private(set) var txPackets: UInt64 = 0
     private(set) var rxPackets: UInt64 = 0
