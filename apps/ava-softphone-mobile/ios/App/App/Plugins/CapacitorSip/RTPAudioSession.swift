@@ -256,6 +256,12 @@ final class RTPAudioSession {
     }
 
     private func attachAndPrepareEngine() {
+        // Always remove any prior tap and reset the engine BEFORE reconfiguring —
+        // installTap twice without removeTap is invalid and triggers 561017449.
+        engine.inputNode.removeTap(onBus: 0)
+        if engine.isRunning { engine.stop() }
+        engine.reset()
+        NSLog("[RTP] engine reset before prepare")
         if playerNode.engine == nil { engine.attach(playerNode) }
         engine.connect(playerNode, to: engine.mainMixerNode, format: playFormat)
         engine.prepare()
