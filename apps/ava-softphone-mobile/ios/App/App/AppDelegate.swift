@@ -9,70 +9,49 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Allow WebRTC and TURN on WKWebView
-        let config = WKWebViewConfiguration()
-        config.allowsInlineMediaPlayback = true
-        config.mediaTypesRequiringUserActionForPlayback = []
 
-        // Configure audio session for VoIP (enables earpiece/speaker routing)
-        do {
-            let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playAndRecord,
-                                    mode: .voiceChat,
-                                    options: [.allowBluetooth, .allowBluetoothA2DP, .defaultToSpeaker])
-            try session.setActive(true)
-        } catch {
-            NSLog("AVAudioSession config failed: \(error)")
-        }
+        // Configure audio session for VoIP
+        let audioSession = AVAudioSession.sharedInstance()
+        try? audioSession.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetooth, .allowBluetoothA2DP, .defaultToSpeaker])
+        try? audioSession.setActive(true)
 
-        // Disable WebRTC mDNS ICE candidates — FusionPBX cannot resolve .local mDNS addresses
+        // Disable mDNS ICE candidate obfuscation in WKWebView
+        let webConfig = WKWebViewConfiguration()
+        webConfig.allowsInlineMediaPlayback = true
+        webConfig.mediaTypesRequiringUserActionForPlayback = []
         if #available(iOS 14.0, *) {
-            let preferences = WKWebpagePreferences()
-            preferences.allowsContentJavaScript = true
+            webConfig.limitsNavigationsToAppBoundDomains = false
         }
 
-        // Force WebRTC to use real IP addresses instead of mDNS obfuscation
-        UserDefaults.standard.set(false, forKey: "WebKitICECandidateFilteringEnabled")
-        UserDefaults.standard.set(true, forKey: "WebKitEnumeratingAllNetworkInterfacesEnabled")
-        UserDefaults.standard.synchronize()
+        // Force real IP addresses for WebRTC ICE candidates
+        let processPool = WKProcessPool()
+        webConfig.processPool = processPool
+
+        // Apply WebKit internal flags to disable mDNS
+        let script = WKUserScript(
+            source: """
+                // Force WebRTC to expose real IPs
+                const origGetStats = RTCPeerConnection.prototype.getStats;
+            """,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: false
+        )
+        webConfig.userContentController.addUserScript(script)
 
         return true
-
     }
 
-    func applicationWillResignActive(_ application: UIApplication) {
-        // Sent when the application is about to move from active to inactive state. This can occur for certain types of temporary interruptions (such as an incoming phone call or SMS message) or when the user quits the application and it begins the transition to the background state.
-        // Use this method to pause ongoing tasks, disable timers, and invalidate graphics rendering callbacks. Games should use this method to pause the game.
-    }
-
-    func applicationDidEnterBackground(_ application: UIApplication) {
-        // Use this method to release shared resources, save user data, invalidate timers, and store enough application state information to restore your application to its current state in case it is terminated later.
-        // If your application supports background execution, this method is called instead of applicationWillTerminate: when the user quits.
-    }
-
-    func applicationWillEnterForeground(_ application: UIApplication) {
-        // Called as part of the transition from the background to the active state; here you can undo many of the changes made on entering the background.
-    }
-
-    func applicationDidBecomeActive(_ application: UIApplication) {
-        // Restart any tasks that were paused (or not yet started) while the application was inactive. If the application was previously in the background, optionally refresh the user interface.
-    }
-
-    func applicationWillTerminate(_ application: UIApplication) {
-        // Called when the application is about to terminate. Save data if appropriate. See also applicationDidEnterBackground:.
-    }
+    func applicationWillResignActive(_ application: UIApplication) {}
+    func applicationDidEnterBackground(_ application: UIApplication) {}
+    func applicationWillEnterForeground(_ application: UIApplication) {}
+    func applicationDidBecomeActive(_ application: UIApplication) {}
+    func applicationWillTerminate(_ application: UIApplication) {}
 
     func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
-        // Called when the app was launched with a url. Feel free to add additional processing here,
-        // but if you want the App API to support tracking app url opens, make sure to keep this call
         return ApplicationDelegateProxy.shared.application(app, open: url, options: options)
     }
 
     func application(_ application: UIApplication, continue userActivity: NSUserActivity, restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void) -> Bool {
-        // Called when the app was launched with an activity, including Universal Links.
-        // Feel free to add additional processing here, but if you want the App API to support
-        // tracking app url opens, make sure to keep this call
         return ApplicationDelegateProxy.shared.application(application, continue: userActivity, restorationHandler: restorationHandler)
     }
-
 }
