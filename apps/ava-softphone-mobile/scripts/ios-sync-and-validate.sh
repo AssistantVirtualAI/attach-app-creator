@@ -30,6 +30,15 @@ grep -q "CapacitorSip.m in Sources" "$PBX" && green "  ✓ CapacitorSip.m is in 
 grep -q "AppBridgeViewController" "$STORYBOARD" && green "  ✓ Main.storyboard uses AppBridgeViewController" || { red "  ✗ Main.storyboard still uses CAPBridgeViewController"; exit 1; }
 grep -q "registerPluginInstance" ios/App/App/Plugins/CapacitorSip/CapacitorSip.m && green "  ✓ Local plugin registered in capacitorDidLoad" || { red "  ✗ Missing registerPluginInstance"; exit 1; }
 
+echo "==> 1c. Verify RTPAudioSession is RemoteIO-only"
+RTP="ios/App/App/Plugins/CapacitorSip/RTPAudioSession.swift"
+if grep -Eq "AVAudioEngine|AVAudioPlayerNode|installTap|removeTap" "$RTP"; then
+  red "  ✗ RTPAudioSession.swift still references AVAudioEngine/AVAudioPlayerNode/installTap/removeTap"
+  grep -En "AVAudioEngine|AVAudioPlayerNode|installTap|removeTap" "$RTP" || true
+  exit 1
+fi
+grep -q "kAudioUnitSubType_RemoteIO" "$RTP" && green "  ✓ RTPAudioSession uses RemoteIO AudioUnit" || { red "  ✗ RemoteIO AudioUnit not found in RTPAudioSession.swift"; exit 1; }
+
 echo "==> 2. Verify Info.plist keys"
 PLIST="ios/App/App/Info.plist"
 if [ -f "$PLIST" ]; then
