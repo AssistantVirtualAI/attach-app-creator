@@ -79,7 +79,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         self.username = username
         self.authUser = call.getString("authUser") ?? username
         self.password = password
-        self.domain = call.getString("domain") ?? server
+        self.domain = domainParam ?? server
         self.displayName = call.getString("displayName") ?? username
         self.localTag = String(UUID().uuidString.prefix(8))
         self.callId = UUID().uuidString
