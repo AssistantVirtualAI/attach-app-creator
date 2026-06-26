@@ -44,17 +44,17 @@ beforeEach(() => { delete (window as any).JsSIP; });
 afterEach(() => { delete (window as any).JsSIP; });
 
 describe('mobile softphone end-to-end flow', () => {
-  it('registers on the configured WSS endpoint and places the call via JsSIP (no PBX originate)', async () => {
+  it('registers on the configured SIP/TLS endpoint and places the call via JsSIP (no PBX originate)', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(JSON.stringify({ ok: true, mode: 'webrtc' }), { status: 200 }),
+      new Response(JSON.stringify({ ok: true, mode: 'tls' }), { status: 200 }),
     );
 
     const ua = installFakeJsSIP();
     const { result } = renderHook(() => useSoftphone(cfg));
 
     await waitFor(() => expect(ua.start).toHaveBeenCalled());
-    // Primary WSS endpoint is wired in as the first socket.
-    expect(ua.__sockets[0]).toBe('wss://node.lemtelcloud.net:7443');
+    // Primary SIP/TLS endpoint is wired in as the first socket.
+    expect(ua.__sockets[0]).toBe('sips:pbxnode.lemtel.tel:5061;transport=tls');
 
     // PBX accepts REGISTER → status goes to 'registered'.
     act(() => ua.emit('registered'));
