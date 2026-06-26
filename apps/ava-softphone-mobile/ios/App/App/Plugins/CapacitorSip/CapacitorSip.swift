@@ -273,6 +273,8 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     @objc func setMute(_ call: CAPPluginCall) {
         let muted = call.getBool("muted") ?? !isMuted
         isMuted = muted
+        rtp?.setMuted(muted)
+
         let session = AVAudioSession.sharedInstance()
         do {
             try session.setCategory(.playAndRecord, mode: .voiceChat,
