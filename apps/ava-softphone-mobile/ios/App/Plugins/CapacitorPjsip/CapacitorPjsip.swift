@@ -138,10 +138,9 @@ public class CapacitorPjsip: CAPPlugin {
         } catch {
             call.reject("Linphone init failed: \(error.localizedDescription)")
         }
-        #else
-        call.reject("linphone-sdk not linked. See ios/App/LINPHONE_SETUP.md")
-        #endif
     }
+    #endif
+
 
     // MARK: - makeCall
 
