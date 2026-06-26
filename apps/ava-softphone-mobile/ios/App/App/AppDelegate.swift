@@ -10,6 +10,26 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
 
+        // ---- Boot guard: ensure storyboard wires the custom bridge VC, not raw CAPBridgeViewController ----
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            guard let root = self.window?.rootViewController else {
+                NSLog("[BootGuard] ❌ No rootViewController after launch")
+                return
+            }
+            let cls = type(of: root)
+            let name = String(describing: cls)
+            NSLog("[BootGuard] rootViewController class = \(name)")
+            if root is AppBridgeViewController {
+                NSLog("[BootGuard] ✅ AppBridgeViewController loaded — plugin registration path active")
+            } else if name == "CAPBridgeViewController" {
+                NSLog("[BootGuard] ❌ FATAL: Storyboard is using raw CAPBridgeViewController. Local plugins (CapacitorPjsip) will NOT be registered. Update Main.storyboard customClass to AppBridgeViewController (customModule=\"App\").")
+                self.showBootError(message: "Configuration error: Main.storyboard must reference AppBridgeViewController, not CAPBridgeViewController. Plugin CapacitorPjsip cannot load.")
+            } else {
+                NSLog("[BootGuard] ⚠️ Unexpected rootViewController: \(name)")
+            }
+        }
+
+
         // Configure audio session for VoIP (full-duplex, BT + speaker route).
         let audioSession = AVAudioSession.sharedInstance()
         try? audioSession.setCategory(
@@ -66,4 +86,28 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication, continue userActivity: NSUserActivity, restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void) -> Bool {
         return ApplicationDelegateProxy.shared.application(application, continue: userActivity, restorationHandler: restorationHandler)
     }
+
+    // Display an opaque error overlay if the storyboard is mis-wired so the
+    // app does not silently sit in "connecting" forever.
+    private func showBootError(message: String) {
+        guard let window = self.window else { return }
+        let overlay = UIViewController()
+        overlay.view.backgroundColor = UIColor(red: 0.10, green: 0.02, blue: 0.05, alpha: 1)
+        let label = UILabel()
+        label.text = "⚠️ Boot error\n\n\(message)"
+        label.numberOfLines = 0
+        label.textColor = .white
+        label.textAlignment = .center
+        label.font = .systemFont(ofSize: 16, weight: .medium)
+        label.translatesAutoresizingMaskIntoConstraints = false
+        overlay.view.addSubview(label)
+        NSLayoutConstraint.activate([
+            label.centerXAnchor.constraint(equalTo: overlay.view.centerXAnchor),
+            label.centerYAnchor.constraint(equalTo: overlay.view.centerYAnchor),
+            label.leadingAnchor.constraint(equalTo: overlay.view.leadingAnchor, constant: 24),
+            label.trailingAnchor.constraint(equalTo: overlay.view.trailingAnchor, constant: -24)
+        ])
+        window.rootViewController?.present(overlay, animated: false)
+    }
 }
+

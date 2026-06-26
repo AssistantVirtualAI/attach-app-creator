@@ -7,6 +7,22 @@ import Capacitor
 /// here in `capacitorDidLoad()`.
 @objc(AppBridgeViewController)
 class AppBridgeViewController: CAPBridgeViewController {
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        NSLog("[AppBridge] init(coder:) — AppBridgeViewController instantiated from storyboard")
+    }
+
+    override init(nibName nibNameOrNil: String?, bundle nibBundleOrNil: Bundle?) {
+        super.init(nibName: nibNameOrNil, bundle: nibBundleOrNil)
+        NSLog("[AppBridge] init(nibName:) — AppBridgeViewController instantiated")
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        NSLog("[AppBridge] viewDidLoad — class=\(String(describing: type(of: self)))")
+    }
+
     override func capacitorDidLoad() {
         NSLog("[AppBridge] capacitorDidLoad — registering local plugins")
         let plugin = CapacitorPjsip()
