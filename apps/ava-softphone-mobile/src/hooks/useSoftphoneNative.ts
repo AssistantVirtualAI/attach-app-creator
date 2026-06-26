@@ -17,6 +17,7 @@ import { startRingback, stopRingback, describeEndReason } from '../lib/sip/ringb
 import type { UseSoftphoneReturn, SIPStatus, CallState } from './useSoftphone';
 
 type NativeCallDirection = 'in' | 'out' | null;
+export type CallPhase = 'idle' | 'dialing' | 'ringing' | 'early-media' | 'active' | 'ended';
 type NativeCallSnapshot = {
   callState: CallState;
   activeCallNumber: string;
@@ -25,6 +26,8 @@ type NativeCallSnapshot = {
   isRecording: boolean;
   direction: NativeCallDirection;
   endReason: string | null;
+  callPhase: CallPhase;
+  lastSipCode: string | null;
 };
 
 const nativeCallSubscribers = new Set<(snapshot: NativeCallSnapshot) => void>();
@@ -36,6 +39,8 @@ let nativeCallSnapshot: NativeCallSnapshot = {
   isRecording: false,
   direction: null,
   endReason: null,
+  callPhase: 'idle',
+  lastSipCode: null,
 };
 let nativeCallBridgePromise: Promise<void> | null = null;
 
