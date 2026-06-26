@@ -318,6 +318,7 @@ public class CapacitorSip: CAPPlugin, CXProviderDelegate {
             call.reject("Missing number")
             return
         }
+        log(3, "call", "makeCall to \(number)")
         currentCallId = UUID().uuidString
         startOutgoingCallKit(number: number)
 
@@ -349,13 +350,17 @@ public class CapacitorSip: CAPPlugin, CXProviderDelegate {
         Content-Length: \(sdp.utf8.count)\r\n\r\n\(sdp)
         """
 
+        log(5, "sip-out", "\n\(invite)")
         let data = invite.data(using: .utf8)!
-        connection?.send(content: data, completion: .contentProcessed { _ in })
+        connection?.send(content: data, completion: .contentProcessed { [weak self] err in
+            if let err = err { self?.log(1, "sip-out", "send INVITE failed: \(err)") }
+        })
         notifyListeners("callStateChanged", data: ["state": "ringing"])
         call.resolve()
     }
 
     @objc func hangup(_ call: CAPPluginCall) {
+        log(3, "call", "hangup() — sending BYE")
         let bye = """
         BYE sip:\(sipDomain) SIP/2.0\r\n\
         Via: SIP/2.0/TLS \(sipHost):\(sipPort);branch=z9hG4bK\(UUID().uuidString.replacingOccurrences(of: "-", with: ""))\r\n\
@@ -373,8 +378,10 @@ public class CapacitorSip: CAPPlugin, CXProviderDelegate {
     }
 
     @objc func answer(_ call: CAPPluginCall) {
+        log(3, "call", "answer() invoked")
         call.resolve()
     }
+
 
     @objc func setMute(_ call: CAPPluginCall) {
         let muted = call.getBool("muted") ?? false
