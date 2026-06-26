@@ -472,17 +472,18 @@ export function useSoftphoneJsSip(
         return;
       }
 
-      // Quick WSS reachability probe — if the server is unreachable, skip the
-      // back-off wait and surface the error immediately. The user can retry manually.
-      log('probe.start', config.wssUrl);
-      const probe = await probeWss(config.wssUrl, 3500);
-      if (cancelled) return;
-      log(probe.ok ? 'probe.ok' : 'probe.fail', `${config.wssUrl} ${probe.reason || ''} ${probe.ms}ms`, probe.ok ? 'info' : 'warn');
-      if (!probe.ok) {
-        setSipStatus('error');
-        setSipError(`Phone server unreachable (${probe.reason || 'no response'}). Check network / WSS endpoint.`, ctx);
-        setNextRetryAt(null);
-        return;
+      // Reachability probe for WSS only. SIP/TLS relies on the SIP registration itself.
+      if (config.wssUrl?.startsWith('wss://')) {
+        log('probe.start', config.wssUrl);
+        const probe = await probeWss(config.wssUrl, 3500);
+        if (cancelled) return;
+        log(probe.ok ? 'probe.ok' : 'probe.fail', `${config.wssUrl} ${probe.reason || ''} ${probe.ms}ms`, probe.ok ? 'info' : 'warn');
+        if (!probe.ok) {
+          setSipStatus('error');
+          setSipError(`Phone server unreachable (${probe.reason || 'no response'}). Check network / WSS endpoint.`, ctx);
+          setNextRetryAt(null);
+          return;
+        }
       }
 
       const delay = RETRY_BACKOFF_MS[Math.min(attempt, RETRY_BACKOFF_MS.length - 1)];
