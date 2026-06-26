@@ -256,8 +256,8 @@ export interface ChatReply { answer: string }
 
 const meMock: MeResponse = {
   user: { id: 'u1', name: 'Alex Morin', email: 'alex@lemtel.tel' },
-  organization: { id: 'org-lemtel', name: 'Lemtel Communications', sipDomain: 'lemtel.lemtel.tel', portalUrl: 'https://avastatistic.ca', wssUrl: 'wss://pbxnode.lemtel.tel:7443' },
-  domain: { organizationId: 'org-lemtel', sipDomain: 'lemtel.lemtel.tel', portalUrl: 'https://avastatistic.ca', wssUrl: 'wss://pbxnode.lemtel.tel:7443' },
+  organization: { id: 'org-lemtel', name: 'Lemtel Communications', sipDomain: 'lemtel.lemtel.tel', portalUrl: 'https://avastatistic.ca', wssUrl: 'sips://pbxnode.lemtel.tel:5061' },
+  domain: { organizationId: 'org-lemtel', sipDomain: 'lemtel.lemtel.tel', portalUrl: 'https://avastatistic.ca', wssUrl: 'sips://pbxnode.lemtel.tel:5061' },
   extension: { number: '1042', displayName: 'Alex M.', sipDomain: 'lemtel.lemtel.tel' },
   role: 'org_admin',
   dataScope: 'domain_admin',
@@ -360,7 +360,7 @@ export const mobileApi = {
 
   webphoneToken: () => call<{ token: string; expiresAt: string; wssUrl: string }>(
     '/softphone-credentials', { method: 'POST' },
-    { token: 'mock', expiresAt: new Date(Date.now() + 30*60e3).toISOString(), wssUrl: 'wss://node.lemtelcloud.net:7443' },
+    { token: 'mock', expiresAt: new Date(Date.now() + 30*60e3).toISOString(), wssUrl: 'sips://pbxnode.lemtel.tel:5061' },
   ),
 
   startCall: (to: string, mode?: 'webrtc' | 'click_to_call') => call<{ callId: string; mode: 'webrtc' | 'click_to_call'; to?: string; from?: string }>(

@@ -202,10 +202,11 @@ function AuthenticatedShell({
     return () => { cancelled = true; };
   }, []);
 
-  // Build SIP config from the same backend credentials used by desktop/portal,
-  // but keep the mobile transport pinned to CA-signed WSS endpoints.
+  // Build SIP config from the same backend credentials used by desktop/portal.
+  // Mobile pins SIP/TLS (port 5061) as the primary transport — no WebRTC required.
   const sipPassword = creds.sipPassword;
   const WORKING_WSS = [
+    'sips://pbxnode.lemtel.tel:5061',
     'wss://pbxnode.lemtel.tel:7443',
     'wss://node.lemtelcloud.net:7443',
   ];
