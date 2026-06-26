@@ -427,6 +427,42 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         } else if let n = Int(code), n >= 400, cseqMethod == "REGISTER" {
             notifyListeners("registrationFailed", data: ["reason": firstLine])
         }
+
+        // INVITE responses (outgoing call leg)
+        if cseqMethod == "INVITE" && callDirection == "out" && !callActiveId.isEmpty {
+            if code == "100" {
+                // Trying — noop
+            } else if code == "180" || code == "183" {
+                callState = "ringing"
+                notifyListeners("callStateChanged", data: ["state": "ringing", "direction": "out", "callId": callActiveId])
+            } else if code == "401" || code == "407" {
+                if let wwwLine = msg.split(separator: "\r\n").first(where: {
+                    $0.lowercased().hasPrefix("www-authenticate:") || $0.lowercased().hasPrefix("proxy-authenticate:")
+                }).map(String.init) {
+                    let (realm, nonce) = parseAuth(wwwLine)
+                    callCseq += 1
+                    let target = extractUser(callRemoteUri)
+                    let auth = buildAuthHeader(method: "INVITE", uri: callRemoteUri, realm: realm, nonce: nonce)
+                    sendAck(to: msg, withinDialog: false)
+                    sendInvite(to: target, authHeader: auth)
+                }
+            } else if code == "200" {
+                callRemoteTag = extractTag(headerValue(msg, "To") ?? "")
+                if let contact = headerValue(msg, "Contact") { callRemoteContact = extractUri(contact) }
+                sendAck(to: msg, withinDialog: true)
+                callState = "active"
+                notifyListeners("callStateChanged", data: ["state": "active", "direction": "out", "callId": callActiveId])
+            } else if let n = Int(code), n >= 300 {
+                sendAck(to: msg, withinDialog: false)
+                let id = callActiveId
+                resetCallState()
+                notifyListeners("callEnded", data: ["callId": id, "reason": firstLine])
+            }
+        }
+        // BYE response — clean up
+        if cseqMethod == "BYE" {
+            // already notified locally on hangup
+        }
     }
 
     private func parseAuth(_ header: String) -> (String, String) {
