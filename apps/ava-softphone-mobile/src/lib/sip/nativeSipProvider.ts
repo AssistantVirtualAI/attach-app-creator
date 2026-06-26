@@ -38,7 +38,7 @@ export const NATIVE_SIP_ENABLED =
  * `registration` event emitted by the new TLS plugin.
  */
 export async function onNativeSipEvent(
-  event: 'registered' | 'registrationFailed' | 'callReceived' | 'callStateChanged' | 'callEnded',
+  event: 'registered' | 'registrationFailed' | 'callReceived' | 'callStateChanged' | 'callEnded' | 'log' | 'muteChanged' | 'holdChanged',
   cb: (data: any) => void,
 ): Promise<() => void> {
   if (event === 'registered' || event === 'registrationFailed') {
@@ -50,4 +50,22 @@ export async function onNativeSipEvent(
   }
   const handle = await CapacitorSipNative.addListener(event, cb);
   return () => { handle.remove().catch(() => {}); };
+}
+
+/**
+ * Convenience: forward native SIP log events to the JS console. Call once at app
+ * boot when you need verbose on-device diagnostics. Returns a cleanup function.
+ *
+ * Example:
+ *   await CapacitorSipNative.setLogLevel({ level: 5 });
+ *   const stop = await attachNativeSipLogger();
+ */
+export async function attachNativeSipLogger(): Promise<() => void> {
+  return onNativeSipEvent('log', (e: any) => {
+    const tag = `[CapacitorSip][${e?.tag ?? '?'}][${e?.category ?? '?'}]`;
+    const lvl = e?.level ?? 3;
+    const fn = lvl <= 1 ? 'error' : lvl === 2 ? 'warn' : lvl >= 4 ? 'debug' : 'info';
+    // eslint-disable-next-line no-console
+    (console as any)[fn](tag, e?.message);
+  });
 }
