@@ -244,7 +244,9 @@
 				62C0A1112D47000100C0FFEE /* CapacitorSip.m in Sources */,
 				62C0A1152D47000100C0FFEE /* CapacitorSip.swift in Sources */,
 				62C0A1162D47000100C0FFEE /* AppBridgeViewController.swift in Sources */,
+				62C0A1182D47000100C0FFEE /* RTPAudioSession.swift in Sources */,
 			);
+
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
