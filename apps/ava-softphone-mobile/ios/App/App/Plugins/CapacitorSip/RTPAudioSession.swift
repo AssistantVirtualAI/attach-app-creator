@@ -219,6 +219,11 @@ final class RTPAudioSession {
         logSessionState("pre-start")
         installAudioObservers()
         configureSessionCategory()
+        // 100ms delay lets AVAudioSession fully apply the new category before we
+        // read inputNode.inputFormat — otherwise sampleRate can come back as 0Hz.
+        NSLog("[RTP] sleeping 100ms after setCategory to let session settle")
+        Thread.sleep(forTimeInterval: 0.1)
+        logSessionState("post-settle")
         attachAndPrepareEngine()
         if startEngineWithRetry() {
             engineRestartAttempts = 0
