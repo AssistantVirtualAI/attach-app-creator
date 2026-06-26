@@ -83,15 +83,20 @@ public class CapacitorSip: CAPPlugin, CXProviderDelegate {
         sipDomain = call.getString("domain") ?? ""
         sipPassword = call.getString("password") ?? ""
         sipHost = call.getString("host") ?? "pbxnode.lemtel.tel"
+        if let lvl = call.getInt("logLevel") { logLevel = max(0, min(5, lvl)) }
         fromTag = String(UUID().uuidString.prefix(8))
         callId = UUID().uuidString
         shouldReconnect = true
 
+        log(3, "init", "initAccount ext=\(sipExtension) domain=\(sipDomain) host=\(sipHost):\(sipPort) logLevel=\(logLevelNames[logLevel])")
+
         AVAudioSession.sharedInstance().requestRecordPermission { granted in
             guard granted else {
+                self.log(1, "audio", "Microphone permission denied")
                 DispatchQueue.main.async { call.reject("Microphone permission denied") }
                 return
             }
+            self.log(3, "audio", "Microphone permission granted; configuring AVAudioSession (playAndRecord/voiceChat, BT+speaker)")
 
             try? AVAudioSession.sharedInstance().setCategory(
                 .playAndRecord,
@@ -106,7 +111,7 @@ public class CapacitorSip: CAPPlugin, CXProviderDelegate {
     }
 
     private func startTlsConnection() {
-        // TLS parameters with SNI + strict cert validation
+        log(3, "tls", "Opening TLS connection to \(sipHost):\(sipPort) SNI=\(sipHost) minTLS=1.2")
         let tlsOptions = NWProtocolTLS.Options()
         let secOptions = tlsOptions.securityProtocolOptions
         sec_protocol_options_set_tls_server_name(secOptions, sipHost)
@@ -129,12 +134,18 @@ public class CapacitorSip: CAPPlugin, CXProviderDelegate {
         self.connection?.stateUpdateHandler = { [weak self] state in
             guard let self = self else { return }
             switch state {
+            case .preparing:
+                self.log(4, "tls", "NWConnection preparing")
+            case .waiting(let err):
+                self.log(2, "tls", "NWConnection waiting: \(err.localizedDescription)")
             case .ready:
+                self.log(3, "tls", "NWConnection ready (TLS handshake OK) — sending initial REGISTER")
                 self.cseq = 1
                 self.lastAuthHeader = nil
                 self.sendRegister(cseq: self.cseq, authHeader: nil)
                 self.startReceiving()
             case .failed(let error):
+                self.log(1, "tls", "NWConnection failed: \(error.localizedDescription)")
                 DispatchQueue.main.async {
                     self.notifyListeners("registration", data: [
                         "status": "error",
@@ -143,6 +154,7 @@ public class CapacitorSip: CAPPlugin, CXProviderDelegate {
                 }
                 self.scheduleReconnect()
             case .cancelled:
+                self.log(3, "tls", "NWConnection cancelled")
                 self.isRegistered = false
             default:
                 break
@@ -150,6 +162,7 @@ public class CapacitorSip: CAPPlugin, CXProviderDelegate {
         }
         self.connection?.start(queue: .global(qos: .userInitiated))
     }
+
 
     private func scheduleReconnect() {
         guard shouldReconnect else { return }
