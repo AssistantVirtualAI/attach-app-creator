@@ -308,11 +308,11 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
 
   const call = (number: string) => {
     if (sipStatus !== 'registered') return false;
-    emitNativeCallSnapshot({ callState: 'ringing', activeCallNumber: number, isMuted: false, isOnHold: false, direction: 'out', endReason: null });
-    startRingback();
+    emitNativeCallSnapshot({ callState: 'ringing', activeCallNumber: number, isMuted: false, isOnHold: false, direction: 'out', endReason: null, callPhase: 'dialing', lastSipCode: null });
+    // Do not start local ringback until 180 arrives — avoids overlap with PBX early media.
     CapacitorPjsip.makeCall({ number }).catch((e) => {
       stopRingback();
-      emitNativeCallSnapshot({ callState: 'idle', activeCallNumber: '', isMuted: false, isOnHold: false, direction: null, endReason: 'Échec de l’appel' });
+      emitNativeCallSnapshot({ callState: 'idle', activeCallNumber: '', isMuted: false, isOnHold: false, direction: null, endReason: 'Échec de l’appel', callPhase: 'ended', lastSipCode: null });
       setSipError(e?.message || 'makeCall failed');
     });
     return true;
@@ -320,7 +320,7 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
   const hangup = () => {
     stopRingback();
     CapacitorPjsip.hangup().catch((e) => console.warn('[NativeSIP] hangup failed', e));
-    emitNativeCallSnapshot({ callState: 'idle', activeCallNumber: '', isMuted: false, isOnHold: false, direction: null, endReason: null });
+    emitNativeCallSnapshot({ callState: 'idle', activeCallNumber: '', isMuted: false, isOnHold: false, direction: null, endReason: null, callPhase: 'ended', lastSipCode: null });
   };
   const answer = () => { CapacitorPjsip.answer().catch(() => {}); };
   const mute   = () => { CapacitorPjsip.setMute({ muted: true }).catch(() => {});  setIsMuted(true); };
