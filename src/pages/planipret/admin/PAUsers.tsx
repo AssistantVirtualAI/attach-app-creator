@@ -33,10 +33,42 @@ export default function PAUsers() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [highlightId, setHighlightId] = useState<string | null>(null);
 
+  const [nsError, setNsError] = useState<string | null>(null);
+  const [nsDomain, setNsDomain] = useState<string | null>(null);
+
   const load = async () => {
     setLoading(true);
-    const { data } = await supabase.from("planipret_profiles").select("*").order("full_name", { ascending: true });
-    setRows((data ?? []) as Profile[]);
+    setNsError(null);
+
+    // 1) Local profiles (admins + provisioned brokers with app/agent toggles)
+    const { data: localProfiles } = await supabase
+      .from("planipret_profiles").select("*").order("full_name", { ascending: true });
+    const localList = (localProfiles ?? []) as Profile[];
+
+    // 2) Live brokers from NetSapiens (full directory, 350+)
+    let merged: Profile[] = localList;
+    try {
+      const { data: nsRes, error: nsErr } = await supabase.functions.invoke("pp-ns-users", { body: {} });
+      if (nsErr) throw new Error(nsErr.message);
+      if ((nsRes as any)?.ok) {
+        const nsBrokers = ((nsRes as any).brokers ?? []) as Profile[];
+        setNsDomain((nsRes as any).domain ?? null);
+        // dedupe: keep local profile when it shares the same extension
+        const byExt = new Map<string, Profile>();
+        nsBrokers.forEach((b) => byExt.set(b.extension, b));
+        localList.forEach((p) => { if (p.extension) byExt.set(p.extension, { ...byExt.get(p.extension), ...p }); });
+        // local-only rows without extension (e.g. admins) keep their place
+        const extKeys = new Set(byExt.keys());
+        const adminsOnly = localList.filter((p) => !p.extension || !extKeys.has(p.extension));
+        merged = [...adminsOnly, ...Array.from(byExt.values())]
+          .sort((a, b) => (a.full_name || "").localeCompare(b.full_name || ""));
+      } else if ((nsRes as any)?.error) {
+        setNsError((nsRes as any).error);
+      }
+    } catch (e: any) {
+      setNsError(e?.message ?? "NS-API indisponible");
+    }
+    setRows(merged);
 
     const start = new Date(); start.setDate(1); start.setHours(0, 0, 0, 0);
     const { data: calls } = await supabase.from("planipret_phone_calls")
