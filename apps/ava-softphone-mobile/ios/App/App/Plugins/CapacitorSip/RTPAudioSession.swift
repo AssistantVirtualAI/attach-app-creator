@@ -607,30 +607,29 @@ final class RTPAudioSession {
         let abl = UnsafeMutableAudioBufferListPointer(ioData)
         let needed = Int(inNumberFrames)
 
-        // Upsample 8000Hz playQueue → hwSampleRate using fractional phase
-        // (zero-order hold / sample repeat). Pulls one 8kHz sample whenever
-        // the phase rolls past 1.0; otherwise reuses the previous sample.
-        let step = rtpSampleRate / hwSampleRate
+        // Integer upsample 8000 → 48000 (sample-and-hold, repeat each x6).
+        // rxPhase carries the remaining repeat count for the held sample
+        // across callbacks so hwFrames boundaries don't cause clicks.
         var out = [Int16](repeating: 0, count: needed)
-        var phase = rxPhase
         var hold = rxHoldSample
+        var repeatsLeft = Int(rxPhase)
         var drained = 0
         audioLock.lock()
         let available = playQueue.count
         for i in 0..<needed {
-            phase += step
-            if phase >= 1.0 {
-                phase -= 1.0
+            if repeatsLeft == 0 {
                 if !playQueue.isEmpty {
                     hold = playQueue.removeFirst()
                     drained += 1
                 } else {
                     hold = 0
                 }
+                repeatsLeft = decimation
             }
             out[i] = hold
+            repeatsLeft -= 1
         }
-        rxPhase = phase
+        rxPhase = Double(repeatsLeft)
         rxHoldSample = hold
         let remaining = playQueue.count
         audioLock.unlock()
