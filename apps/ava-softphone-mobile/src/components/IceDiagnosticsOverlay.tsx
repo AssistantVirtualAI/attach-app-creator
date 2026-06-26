@@ -76,10 +76,14 @@ export default function IceDiagnosticsOverlay() {
       `gather   : ${gatherState}`,
       `first relay candidate: ${firstRelayMs ?? '—'} ms`,
       `ice connected       : ${connectedMs ?? '—'} ms`,
+      `mdns candidates     : ${mdnsCount}`,
+      `fallback            : ${fallback ?? '—'}`,
       `iceServers (${cfg.iceServers?.length ?? 0}):`,
       ...(cfg.iceServers ?? []).map((s, i) => `  [${i}] ${Array.isArray(s.urls) ? s.urls.join(', ') : s.urls}`),
       '--- recent candidates ---',
       ...(candidates.length ? candidates.map((c) => `  ${c.source}  ${c.raw}`) : ['  (none yet)']),
+      '--- recent errors ---',
+      ...(errors.length ? errors.map((er) => `  [${er.where}] ${er.message}`) : ['  (none)']),
     ];
     return lines.join('\n');
   };
