@@ -324,7 +324,7 @@ const PlanipretOrgOnly = ({ children }: { children: React.ReactNode }) => {
     setSelectedOrgId(PLANIPRET_ORG_ID);
     return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Switching to Planipret…</div>;
   }
-  return <Navigate to="/portal" replace />;
+  return <Navigate to="/login" replace />;
 };
 
 
