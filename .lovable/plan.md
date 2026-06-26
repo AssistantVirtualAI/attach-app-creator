@@ -1,69 +1,78 @@
-## Scope
-Fix three remaining mobile-app issues in the Planipret softphone. Frontend + iOS native plugin only — no backend schema, no Lemtel changes.
+# Plan — Softphone timeline, ringback early-media, Planipret header & freeze fix
 
----
+## 1. Call state timeline (mobile softphone)
 
-### 1. Record button — no visible indication that the call is being recorded
+Add a compact visual timeline at the top of `ActiveCallSheet.tsx` (and outgoing pre-answer view) showing the SIP progression with live status dots:
 
-**Root cause**
-- `ActiveCallSheet` only shows the label `Record / Stop Rec` on a small icon; users don't notice the toggle.
-- `CapacitorSip.swift::startRecord` calls `call.reject("no active call")` when `callState != "active"`, but the JS layer (`useSoftphoneNative.startRecording`) just `console.warn`s the rejection — no toast, no state change. So if the toggle silently fails, the UI looks identical.
-- After a successful `startRecord`, the only signal is the small icon label change; no banner/pulse.
-
-**Fix (frontend only)**
-- In `ActiveCallSheet.tsx`:
-  - Add a prominent "● REC" pill (red, pulsing) near the status strip whenever `sp.snap.recording === true`. Show it next to the call timer, similar to the existing audio-engine banner.
-  - Surface record errors through the existing `toast` state when `sp.startRecord/stopRecord` rejects.
-- In `useSoftphoneNative.ts`:
-  - Make `startRecording` / `stopRecording` re-throw the native rejection so the caller can show a toast (instead of swallowing with `console.warn`).
-  - Only flip `isRecording` after the native promise resolves (remove the optimistic `setIsRecording(true)` before await).
-- In `ActiveCallSheet.tsx::record`, wrap the call in try/catch and call `setToast("Impossible de démarrer l'enregistrement: …")` on failure.
-
----
-
-### 2. Speaker / Bluetooth toggle throws an error
-
-**Root cause**
-`src/lib/sip/audioOutput.ts::setRoute` only tries `HTMLMediaElement.setSinkId(...)`, which on iOS WKWebView is either missing or rejects — the catch then throws and `ActiveCallSheet` shows "Impossible de basculer sur Haut-parleur". The real iOS routing is implemented in `CapacitorSip.swift::setAudioRoute` (already exposed in `nativeSipProvider.ts`) but never called.
-
-**Fix (frontend only)**
-- In `audioOutput.ts::setRoute`, when running on Capacitor native (`Capacitor.isNativePlatform()` or `VITE_NATIVE_SIP` flag), call `CapacitorPjsip.setAudioRoute({ route })` first; only fall back to `setSinkId` on web.
-- Treat `setSinkId` `NotSupportedError` / missing as a silent skip (don't throw) — the native side did the routing.
-- Update `route` from the native response (`outputs` string) so the UI pill reflects the actual port (e.g. detect `BluetoothHFP` → `bluetooth`, `Speaker` → `speaker`, else `earpiece`).
-- Keep the existing `busy` guard and event emission.
-
----
-
-### 3. Call transcription always fails
-
-**Diagnosis (already confirmed via Edge logs)**
-`ai-transcribe-call` returns `RECORDING_NOT_FOUND` on both `fusion-signed` and `fusion` proxies for `call_record_id=b1e19218-…`:
 ```
-fetchErrors: ["fusion-signed:RECORDING_NOT_FOUND","fusion:RECORDING_NOT_FOUND"]
+● Composition → ● Sonnerie → ● Connecté
+                ↘ Occupé / Refusé / Indisponible / Échec
 ```
-The function correctly maps that to `reason: "recording-not-synced"` with a retry hint, but `useCallAi` surfaces it as a generic "Transcription failed".
 
-Two contributing factors:
-1. The call was never actually recorded on the PBX (SIP INFO `Record: on` may not be honored on this Fusion install — or recording wasn't toggled before hangup), so there's no file to fetch.
-2. Even when a recording exists, the `xml_cdr` row often isn't synced into Supabase yet at the moment the user taps "Transcribe", so `recording_path/name` are empty.
+- New component `apps/ava-softphone-mobile/src/components/CallTimeline.tsx`
+  - Steps: `dialing` → `ringing` → `early-media` → `active` → `ended(reason)`
+  - Glass pills with pulse animation on the active step, red glow on failure
+  - French labels + sub-text (e.g. "Sonnerie chez le destinataire", "Ligne occupée")
+- Wire from `useSoftphoneNative.ts` exposing a new `callPhase` + `callEndReason` already captured from native `callEnded`
+- Map SIP/native reason codes → phase:
+  - 100 Trying → `dialing`
+  - 180 Ringing (no SDP) → `ringing`
+  - 183 Session Progress (SDP) → `early-media`
+  - 200 OK → `active`
+  - 486/600 → `busy`, 603 → `declined`, 480/408 → `unavailable`, 487 → `cancelled`
 
-**Fix (frontend only — no backend change in this plan)**
-- In `useCallAi.ts`:
-  - When `t?.reason === 'recording-not-synced'` or `t?.reason === 'no-recording'`, surface a clear French message: "Enregistrement non disponible (l'appel n'a pas été enregistré ou la synchro PBX n'est pas encore terminée). Réessayez dans ~30 s."
-  - Honor `t.retry_after_ms` by exposing a `retryAt` value so the UI can show a countdown / disable the button.
-- In `CallDetailScreen.tsx` (or wherever the "Transcribe" button lives), show the retry hint instead of the raw "stub" error.
+## 2. Early-media ringback handling
 
-**Open question for the user** (asked separately below): do you want us to also force-enable per-extension recording on the PBX side so every call is recorded automatically? That's a backend change (`pbx_extensions.record_all_calls = true` + Fusion sync) and is out of scope unless confirmed.
+In `CapacitorSip.swift`:
+- Distinguish 180 without SDP (play local ringback) vs 183 with SDP (start RTP, stop local ringback)
+- Emit new native events: `provisional` with `{ code, hasSdp }`
+- On 183: call `prewarmAudio` + open RTP session immediately so PBX tones (announcements/queues) are audible
+- Stop local ringback as soon as RTP packets arrive OR on 200 OK
 
----
+In `useSoftphoneNative.ts` + `src/lib/sip/ringback.ts`:
+- Start local ringback only when phase = `ringing` AND no early-media
+- Stop on `early-media`, `active`, or `ended`
+- Guarantee single instance (existing `ringback.ts` already uses Web Audio)
+
+## 3. Planipret portal — top-right profile menu + bell
+
+Target: `/planipret` desktop (PlanipretDashboard layout).
+
+- Mount `WorkspaceHeaderExtras` (reused) in the Planipret top bar, positioned **above** the existing bell button (right column, stacked: profile menu on top, bell below)
+- Enhance bell (`NotificationsSheet` or current bell trigger):
+  - Realtime subscription to `planipret_phone_calls` (missed), `planipret_phone_messages` (inbound SMS), `planipret_voicemails`
+  - Unread badge count, sound ping on new event, list with deep-links to MCalls/MMessages/MVoicemail
+  - RLS already exists; use `supabase.channel` subscriptions in `useEffect` with cleanup
+
+## 4. Auto page-switch freeze (desktop /planipret)
+
+Symptom: portal flips between login ↔ dashboard by itself. Root cause investigation:
+- `[AVA] build-version poll failed` in console + `vite server connection lost` suggests `buildVersionPoller.ts` triggers a reload loop
+- Likely culprits to inspect & fix:
+  - `src/lib/buildVersionPoller.ts` — JSON parse SyntaxError causes silent reload trigger
+  - `PlanipretDashboard.tsx` / `PostLoginRedirect.tsx` auth guard re-evaluating on token refresh and bouncing user
+  - `usePresencePing` / realtime subscription resubscribing on each render causing remount
+
+Fix:
+- Harden `buildVersionPoller`: try/catch JSON, ignore non-JSON responses, back-off on failure, never reload in preview origin
+- Stabilize Planipret auth guard: wait for `loading === false` before redirecting; memoize redirect decision; guard against repeated `navigate()` on same path
+- Audit `useEffect` deps in Planipret layout for missing cleanup causing re-subscribe loops
+
+## Technical notes
+
+- All native changes require `npx cap sync ios` + Xcode rebuild after `git pull`
+- No backend schema changes; only new realtime subscriptions on existing tables
+- No edits to Lemtel components or edge functions
 
 ## Files touched
+
+- `apps/ava-softphone-mobile/src/components/CallTimeline.tsx` *(new)*
 - `apps/ava-softphone-mobile/src/components/ActiveCallSheet.tsx`
 - `apps/ava-softphone-mobile/src/hooks/useSoftphoneNative.ts`
-- `apps/ava-softphone-mobile/src/lib/sip/audioOutput.ts`
-- `apps/ava-softphone-mobile/src/hooks/useCallAi.ts`
-- `apps/ava-softphone-mobile/src/screens/CallDetailScreen.tsx`
-
-No native Swift changes required for these three fixes — the existing `setAudioRoute`, `startRecord`, `stopRecord`, and `recordingChanged` bridge are already in place.
-
-After approval the user will need to `git pull` + `npx cap sync ios` + rebuild to ship.
+- `apps/ava-softphone-mobile/src/lib/sip/ringback.ts`
+- `apps/ava-softphone-mobile/ios/App/App/CapacitorSip.swift`
+- `src/pages/planipret/PlanipretDashboard.tsx` (header slot)
+- `src/pages/planipret/mobile/MHome.tsx` (bell wiring if shared)
+- New `src/components/planipret/PlanipretBell.tsx` with realtime hooks
+- `src/lib/buildVersionPoller.ts` (harden)
+- Planipret auth guard file (TBD after inspection)

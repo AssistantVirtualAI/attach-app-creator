@@ -17,6 +17,7 @@ import { startRingback, stopRingback, describeEndReason } from '../lib/sip/ringb
 import type { UseSoftphoneReturn, SIPStatus, CallState } from './useSoftphone';
 
 type NativeCallDirection = 'in' | 'out' | null;
+export type CallPhase = 'idle' | 'dialing' | 'ringing' | 'early-media' | 'active' | 'ended';
 type NativeCallSnapshot = {
   callState: CallState;
   activeCallNumber: string;
@@ -25,6 +26,8 @@ type NativeCallSnapshot = {
   isRecording: boolean;
   direction: NativeCallDirection;
   endReason: string | null;
+  callPhase: CallPhase;
+  lastSipCode: string | null;
 };
 
 const nativeCallSubscribers = new Set<(snapshot: NativeCallSnapshot) => void>();
@@ -36,6 +39,8 @@ let nativeCallSnapshot: NativeCallSnapshot = {
   isRecording: false,
   direction: null,
   endReason: null,
+  callPhase: 'idle',
+  lastSipCode: null,
 };
 let nativeCallBridgePromise: Promise<void> | null = null;
 
@@ -61,28 +66,37 @@ function ensureNativeCallEventBridge() {
         activeCallNumber: d?.from || d?.number || 'Unknown',
         direction: 'in',
         endReason: null,
+        callPhase: 'ringing',
+        lastSipCode: null,
       });
     });
     const callStateHandle = await CapacitorPjsip.addListener('callStateChanged', (d: any) => {
-      console.log(`[NativeSIP] CALL_EVENT|callStateChanged|state=${d?.state || ''}|stage=${d?.stage || ''}`, d);
+      console.log(`[NativeSIP] CALL_EVENT|callStateChanged|state=${d?.state || ''}|stage=${d?.stage || ''}|code=${d?.code || ''}`, d);
       const dir: NativeCallDirection = d?.direction === 'in' ? 'in' : d?.direction === 'out' ? 'out' : nativeCallSnapshot.direction;
+      const stage: string = d?.stage || '';
+      const code: string | null = d?.code ?? null;
       if (d?.state === 'active') {
         stopRingback();
-        emitNativeCallSnapshot({ callState: 'active', activeCallNumber: d?.number || nativeCallSnapshot.activeCallNumber, direction: dir, endReason: null });
+        emitNativeCallSnapshot({ callState: 'active', activeCallNumber: d?.number || nativeCallSnapshot.activeCallNumber, direction: dir, endReason: null, callPhase: 'active', lastSipCode: code });
       }
       if (d?.state === 'ringing' || d?.state === 'calling') {
-        // Outgoing local ringback when no early media (stage != 'early_media').
-        const hasEarlyMedia = d?.stage === 'early_media';
-        if (dir === 'out' && !hasEarlyMedia) startRingback();
+        // Map signaling stages to a richer call phase.
+        let phase: CallPhase = 'dialing';
+        if (stage === 'before_invite' || stage === 'invite_sent') phase = 'dialing';
+        else if (stage === 'remote_ringing') phase = 'ringing';
+        else if (stage === 'early_media') phase = 'early-media';
+        else if (dir === 'in') phase = 'ringing';
+        // Local ringback: only when outgoing AND no early media from PBX.
+        if (dir === 'out' && phase !== 'early-media') startRingback();
         else stopRingback();
-        emitNativeCallSnapshot({ callState: 'ringing', activeCallNumber: d?.number || nativeCallSnapshot.activeCallNumber, direction: dir, endReason: null });
+        emitNativeCallSnapshot({ callState: 'ringing', activeCallNumber: d?.number || nativeCallSnapshot.activeCallNumber, direction: dir, endReason: null, callPhase: phase, lastSipCode: code });
       }
     });
     const callEndedHandle = await CapacitorPjsip.addListener('callEnded', (d: any) => {
       console.log('[NativeSIP] CALL_EVENT|callEnded', d);
       stopRingback();
       const friendly = describeEndReason(d?.reason);
-      emitNativeCallSnapshot({ callState: 'idle', activeCallNumber: '', isMuted: false, isOnHold: false, isRecording: false, direction: null, endReason: friendly });
+      emitNativeCallSnapshot({ callState: 'idle', activeCallNumber: '', isMuted: false, isOnHold: false, isRecording: false, direction: null, endReason: friendly, callPhase: 'ended', lastSipCode: d?.code ?? null });
     });
     const muteHandle = await CapacitorPjsip.addListener('muteChanged', (d: any) => {
       emitNativeCallSnapshot({ isMuted: !!d?.muted });
@@ -120,6 +134,8 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
   const [isRecording, setIsRecording] = useState(false);
   const [activeCallNumber, setActiveCallNumber] = useState('');
   const [endReason, setEndReason] = useState<string | null>(null);
+  const [callPhase, setCallPhase] = useState<CallPhase>('idle');
+  const [lastSipCode, setLastSipCode] = useState<string | null>(null);
   const [audioProfile, setAudioProfileState] = useState<AudioProfile>(() => loadAudioProfile());
   const [quality] = useState<CallQuality>(EMPTY_QUALITY);
   const [audioStatus, setAudioStatus] = useState<'idle' | 'starting' | 'running' | 'retrying' | 'error'>('idle');
@@ -149,6 +165,8 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
       setIsRecording(snapshot.isRecording);
       setCallState(snapshot.callState);
       setEndReason(snapshot.endReason);
+      setCallPhase(snapshot.callPhase);
+      setLastSipCode(snapshot.lastSipCode);
       if (snapshot.callState === 'active') startTimer();
       if (snapshot.callState === 'idle') stopTimer();
     });
@@ -290,11 +308,11 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
 
   const call = (number: string) => {
     if (sipStatus !== 'registered') return false;
-    emitNativeCallSnapshot({ callState: 'ringing', activeCallNumber: number, isMuted: false, isOnHold: false, direction: 'out', endReason: null });
-    startRingback();
+    emitNativeCallSnapshot({ callState: 'ringing', activeCallNumber: number, isMuted: false, isOnHold: false, direction: 'out', endReason: null, callPhase: 'dialing', lastSipCode: null });
+    // Do not start local ringback until 180 arrives — avoids overlap with PBX early media.
     CapacitorPjsip.makeCall({ number }).catch((e) => {
       stopRingback();
-      emitNativeCallSnapshot({ callState: 'idle', activeCallNumber: '', isMuted: false, isOnHold: false, direction: null, endReason: 'Échec de l’appel' });
+      emitNativeCallSnapshot({ callState: 'idle', activeCallNumber: '', isMuted: false, isOnHold: false, direction: null, endReason: 'Échec de l’appel', callPhase: 'ended', lastSipCode: null });
       setSipError(e?.message || 'makeCall failed');
     });
     return true;
@@ -302,7 +320,7 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
   const hangup = () => {
     stopRingback();
     CapacitorPjsip.hangup().catch((e) => console.warn('[NativeSIP] hangup failed', e));
-    emitNativeCallSnapshot({ callState: 'idle', activeCallNumber: '', isMuted: false, isOnHold: false, direction: null, endReason: null });
+    emitNativeCallSnapshot({ callState: 'idle', activeCallNumber: '', isMuted: false, isOnHold: false, direction: null, endReason: null, callPhase: 'ended', lastSipCode: null });
   };
   const answer = () => { CapacitorPjsip.answer().catch(() => {}); };
   const mute   = () => { CapacitorPjsip.setMute({ muted: true }).catch(() => {});  setIsMuted(true); };
@@ -407,5 +425,7 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
     addCall,
     endReason,
     lastEndReason: endReason,
+    callPhase,
+    lastSipCode,
   } as UseSoftphoneReturn;
 }

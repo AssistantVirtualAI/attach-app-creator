@@ -6,6 +6,7 @@ import CallQualityGauge from './CallQualityGauge';
 import type { AudioProfile } from '../lib/sip/audioProfile';
 import { EMPTY_QUALITY } from '../lib/sip/callQuality';
 import { getAudioState, onAudioStateChange, setRoute, type AudioRoute, type AudioState } from '../lib/sip/audioOutput';
+import CallTimeline, { type CallPhase } from './CallTimeline';
 
 const PROFILE_CYCLE: AudioProfile[] = ['auto', 'hd', 'low-bandwidth'];
 
@@ -128,6 +129,12 @@ export default function ActiveCallSheet({
   return (
     <div style={sheetStyle}>
       <style>{callButtonCss}</style>
+      {/* Call state timeline (composition → sonnerie → connecté) */}
+      <CallTimeline
+        phase={(sp.callPhase as CallPhase) ?? (isOutgoing ? 'dialing' : isIncoming ? 'ringing' : inCall ? 'active' : isEnded ? 'ended' : 'dialing')}
+        endReason={endReasonText}
+        endCode={sp.lastSipCode ?? null}
+      />
       {/* Top brand strip */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 16px 8px', padding: '10px 12px', borderRadius: radius.lg, background: 'rgba(255,255,255,0.04)', border: `1px solid ${stateAccent}55`, boxShadow: shadow.glass }}>
         <span style={{ fontSize: 10, letterSpacing: 1.6, fontWeight: 800, color: stateAccent, textTransform: 'uppercase' }}>

@@ -6,6 +6,7 @@ import SessionTimeoutModal from "@/components/planipret/SessionTimeoutModal";
 import { useAdminRealtime } from "@/hooks/useAdminRealtime";
 import NotificationsBell from "@/components/planipret/admin/NotificationsBell";
 import CommandPalette from "@/components/planipret/admin/CommandPalette";
+import { WorkspaceHeaderExtras } from "@/components/portals/WorkspaceHeaderExtras";
 
 const SSO_URL = "https://avastatistic.ca/login?redirect=planipret";
 
@@ -79,39 +80,56 @@ export default function PlanipretAdminLayout() {
   }, [navigate]);
 
   useEffect(() => {
-    (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) { window.location.href = SSO_URL; return; }
-      const user = session.user;
+    let cancelled = false;
+    const loadProfile = async (user: any) => {
       const { data } = await supabase.from("planipret_profiles").select("*").eq("user_id", user.id).maybeSingle();
+      if (cancelled) return;
       if (!data) { window.location.href = SSO_URL; return; }
       if (data.role !== "admin") { navigate("/mplanipret", { replace: true }); return; }
       setProfile(data);
       setLoading(false);
 
-      // Sidebar badges
       try {
         const { count: bc } = await supabase.from("planipret_profiles").select("*", { count: "exact", head: true });
-        setBrokerCount(bc ?? 0);
+        if (!cancelled) setBrokerCount(bc ?? 0);
       } catch { /* ignore */ }
       try {
         const since = new Date(); since.setHours(0, 0, 0, 0);
         const { count: mc } = await supabase
           .from("planipret_phone_calls").select("*", { count: "exact", head: true })
           .eq("direction", "inbound").eq("status", "missed").gte("created_at", since.toISOString());
-        setMissedCalls(mc ?? 0);
+        if (!cancelled) setMissedCalls(mc ?? 0);
       } catch { /* ignore */ }
       try {
         const { data: sec } = await supabase.functions.invoke("pp-integration-secrets");
         const present = new Set(((sec as any)?.items ?? []).filter((i: any) => i.has_keys?.length).map((i: any) => i.provider));
         const required = ["elevenlabs", "anthropic", "maestro", "microsoft"];
-        setMissingIntegrations(required.filter((p) => !present.has(p)).length);
+        if (!cancelled) setMissingIntegrations(required.filter((p) => !present.has(p)).length);
       } catch { /* ignore */ }
       try {
         const cached = localStorage.getItem("pp:audit:score");
-        if (cached) setAuditScore(Number(cached));
+        if (cached && !cancelled) setAuditScore(Number(cached));
       } catch { /* ignore */ }
+    };
+
+    (async () => {
+      // Wait up to 2s for the session to hydrate before bouncing to SSO.
+      // Prevents the login ↔ dashboard ping-pong on cold reloads.
+      let session = (await supabase.auth.getSession()).data.session;
+      if (!session?.user) {
+        await new Promise<void>((resolve) => {
+          const sub = supabase.auth.onAuthStateChange((_e, s) => {
+            if (s?.user) { session = s; sub.data.subscription.unsubscribe(); resolve(); }
+          });
+          setTimeout(() => { sub.data.subscription.unsubscribe(); resolve(); }, 2000);
+        });
+      }
+      if (cancelled) return;
+      if (!session?.user) { window.location.href = SSO_URL; return; }
+      await loadProfile(session.user);
     })();
+
+    return () => { cancelled = true; };
   }, [navigate]);
 
 
@@ -229,7 +247,10 @@ export default function PlanipretAdminLayout() {
                 {realtimeOk ? "En direct" : "Reconnexion…"}
               </span>
             </div>
-            <NotificationsBell />
+            <div className="flex flex-col items-end gap-1">
+              <WorkspaceHeaderExtras />
+              <NotificationsBell />
+            </div>
             <span className="capitalize" style={{ fontSize: 10, color: "var(--pp-text-muted)" }}>{dateLabel}</span>
           </div>
         </header>
