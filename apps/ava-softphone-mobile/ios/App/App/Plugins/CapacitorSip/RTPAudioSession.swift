@@ -21,12 +21,15 @@ final class RTPAudioSession {
 
     // MARK: - RemoteIO AudioUnit
     private var ioUnit: AudioUnit?
-    /// Hardware/native sample rate negotiated with AVAudioSession.
-    /// iOS RemoteIO does NOT accept 8000Hz on modern devices — we run RemoteIO
-    /// at the native rate (typically 48000Hz) and resample to/from 8000Hz for RTP.
-    private var hwSampleRate: Double = 48000
+    /// Hardware sample rate. PINNED to 48000Hz — iOS RemoteIO rejects 8000Hz
+    /// (kAudioUnitErr_FormatNotSupported / 561017449) and reading the session
+    /// rate mid-setup can return 0Hz. We hard-pin to 48000 and request it via
+    /// setPreferredSampleRate; resample to/from 8000Hz for RTP PCMU.
+    private let hwSampleRate: Double = 48000
     /// RTP/PCMU codec rate (G.711 μ-law).
     private let rtpSampleRate: Double = 8000
+    /// Integer decimation factor 48000 → 8000.
+    private let decimation: Int = 6
     private let channels: UInt32 = 1
     /// Scratch buffer used inside the input callback to receive captured PCM.
     private var captureScratch: UnsafeMutablePointer<Int16>?
