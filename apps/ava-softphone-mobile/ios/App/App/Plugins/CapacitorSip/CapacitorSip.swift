@@ -455,11 +455,11 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
                 // Trying — noop
             } else if code == "180" || code == "183" {
                 callState = "ringing"
-                notifyListeners("callStateChanged", data: ["state": "ringing", "direction": "out", "callId": callActiveId])
+                emitCallState("ringing", direction: "out", stage: code == "180" ? "remote_ringing" : "early_media", code: code)
             } else if code == "401" || code == "407" {
                 log("INVITE auth challenge \(code) — keeping call ringing and retrying with digest auth")
                 callState = "ringing"
-                notifyListeners("callStateChanged", data: ["state": "ringing", "direction": "out", "callId": callActiveId, "stage": "auth_challenge", "code": code])
+                emitCallState("ringing", direction: "out", stage: "auth_challenge", code: code)
                 if let wwwLine = msg.split(separator: "\r\n").first(where: {
                     $0.lowercased().hasPrefix("www-authenticate:") || $0.lowercased().hasPrefix("proxy-authenticate:")
                 }).map(String.init) {
@@ -474,19 +474,19 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
                     log("INVITE \(code) missing auth header")
                     let id = callActiveId
                     resetCallState()
-                    notifyListeners("callEnded", data: ["callId": id, "reason": "INVITE \(code) without auth header"])
+                    emitCallEnded("INVITE \(code) without auth header", callId: id)
                 }
             } else if code == "200" {
                 callRemoteTag = extractTag(headerValue(msg, "To") ?? "")
                 if let contact = headerValue(msg, "Contact") { callRemoteContact = extractUri(contact) }
                 sendAck(to: msg, withinDialog: true)
                 callState = "active"
-                notifyListeners("callStateChanged", data: ["state": "active", "direction": "out", "callId": callActiveId])
+                emitCallState("active", direction: "out", stage: "answered", code: code)
             } else if let n = Int(code), n >= 300 {
                 sendAck(to: msg, withinDialog: false)
                 let id = callActiveId
                 resetCallState()
-                notifyListeners("callEnded", data: ["callId": id, "reason": firstLine])
+                emitCallEnded(firstLine, callId: id)
             }
         }
         // BYE response — clean up
