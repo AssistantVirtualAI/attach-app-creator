@@ -201,6 +201,9 @@ final class RTPAudioSession {
         guard running else { return }
         running = false
         NSLog("[RTP] stop")
+        engineRestartTimer?.cancel(); engineRestartTimer = nil
+        engineRestartAttempts = 0
+        removeAudioObservers()
         engine.inputNode.removeTap(onBus: 0)
         if engine.isRunning { engine.stop() }
         playerNode.stop()
@@ -213,24 +216,42 @@ final class RTPAudioSession {
 
     // MARK: - Audio engine
     private func startAudio() {
+        logSessionState("pre-start")
+        installAudioObservers()
+        configureSessionCategory()
+        attachAndPrepareEngine()
+        if startEngineWithRetry() {
+            engineRestartAttempts = 0
+        } else {
+            // Engine refused to start synchronously — schedule a backoff retry
+            // so the call doesn't permanently lose audio.
+            scheduleEngineRestart()
+        }
+    }
+
+    private static let voipSessionOptions: AVAudioSession.CategoryOptions = [
+        .allowBluetooth, .allowBluetoothA2DP, .defaultToSpeaker, .duckOthers
+    ]
+
+    private func configureSessionCategory() {
         let session = AVAudioSession.sharedInstance()
         // NOTE: The AVAudioSession is already activated by CapacitorSip when the
         // call is set up. Do NOT call setActive(true) here — doing so races with
         // the SIP plugin and yields "Session activation failed".
-        // We only (re)assert the category/mode so AVAudioEngine can attach to a
-        // compatible .playAndRecord / .voiceChat route. 561017449 ('!cat') means
-        // the active category is incompatible with input+output.
-        let sessionOptions: AVAudioSession.CategoryOptions = [
-            .allowBluetooth, .allowBluetoothA2DP, .defaultToSpeaker, .duckOthers
-        ]
+        // 561017449 ('!cat') means the active category is incompatible with
+        // simultaneous input+output, so we (re)assert .playAndRecord/.voiceChat.
         do {
-            try session.setCategory(.playAndRecord, mode: .voiceChat, options: sessionOptions)
-            NSLog("[RTP] audio session category=playAndRecord/voiceChat (already active, skip setActive)")
+            try session.setCategory(.playAndRecord, mode: .voiceChat,
+                                    options: RTPAudioSession.voipSessionOptions)
+            NSLog("[RTP] setCategory playAndRecord/voiceChat ok (skip setActive — owned by SIP)")
         } catch {
-            NSLog("[RTP] setCategory failed: \(error.localizedDescription) — continuing with current category")
+            NSLog("[RTP] setCategory failed: \(error.localizedDescription) — keeping current category")
         }
+        logSessionState("post-category")
+    }
 
-        engine.attach(playerNode)
+    private func attachAndPrepareEngine() {
+        if playerNode.engine == nil { engine.attach(playerNode) }
         engine.connect(playerNode, to: engine.mainMixerNode, format: playFormat)
         engine.prepare()
 
@@ -238,12 +259,13 @@ final class RTPAudioSession {
         var hwFormat = input.outputFormat(forBus: 0)
         NSLog("[RTP] hw input format=\(describeFormat(hwFormat))")
         if hwFormat.sampleRate <= 0 || hwFormat.channelCount == 0 {
-            let sr = session.sampleRate > 0 ? session.sampleRate : 48000
+            let sr = AVAudioSession.sharedInstance().sampleRate > 0
+                ? AVAudioSession.sharedInstance().sampleRate : 48000
             if let fb = AVAudioFormat(standardFormatWithSampleRate: sr, channels: 1) {
                 hwFormat = fb
                 NSLog("[RTP] fallback hw format=\(describeFormat(fb))")
             } else {
-                NSLog("[RTP] cannot derive hw format — aborting")
+                NSLog("[RTP] cannot derive hw format — aborting prepare")
                 return
             }
         }
@@ -257,32 +279,115 @@ final class RTPAudioSession {
             NSLog("[RTP] cannot create initial converter \(describeFormat(hwFormat)) → \(describeFormat(playFormat)) — will rebuild from first tap buffer")
         }
 
-        // Pass nil so CoreAudio uses the node's actual native format (avoids
-        // "Failed to create tap due to format mismatch" when hw is 48k Float32
-        // and our cached hwFormat is stale or different).
+        // format: nil → CoreAudio uses the node's actual native format,
+        // sidestepping "Failed to create tap due to format mismatch".
+        input.removeTap(onBus: 0)
         input.installTap(onBus: 0, bufferSize: 1024, format: nil) { [weak self] buf, _ in
             self?.handleCapturedBuffer(buf)
         }
         NSLog("[RTP] tap installed (format=nil, native bus0)")
+    }
 
+    @discardableResult
+    private func startEngineWithRetry() -> Bool {
         do {
             try engine.start()
             playerNode.play()
+            lastEngineError = ""
+            logSessionState("engine-running")
             NSLog("[RTP] audio engine started, route=\(currentRouteDescription())")
+            return true
         } catch let nsErr as NSError {
+            lastEngineError = "code=\(nsErr.code) \(nsErr.localizedDescription)"
             NSLog("[RTP] engine start failed: code=\(nsErr.code) domain=\(nsErr.domain) desc=\(nsErr.localizedDescription)")
-            // 561017449 = kAudioSessionIncompatibleCategory ('!cat'). Retry once
-            // after forcing the category, in case the SIP plugin had set
-            // .playback or another incompatible category.
+            logSessionState("engine-failed")
+            // One synchronous retry after re-forcing category — covers the
+            // common case where CapacitorSip just bumped category to .playback.
             do {
-                try session.setCategory(.playAndRecord, mode: .voiceChat, options: sessionOptions)
+                try AVAudioSession.sharedInstance().setCategory(.playAndRecord, mode: .voiceChat,
+                                                                options: RTPAudioSession.voipSessionOptions)
                 try engine.start()
                 playerNode.play()
+                lastEngineError = ""
                 NSLog("[RTP] audio engine started on retry, route=\(currentRouteDescription())")
+                return true
             } catch {
+                lastEngineError = "retry: \(error.localizedDescription)"
                 NSLog("[RTP] engine start retry failed: \(error.localizedDescription)")
+                return false
             }
         }
+    }
+
+    /// Exponential backoff (0.5s, 1s, 2s, 4s, 8s, capped at 10s, 8 attempts).
+    private func scheduleEngineRestart() {
+        guard running else { return }
+        engineRestartAttempts += 1
+        if engineRestartAttempts > 8 {
+            NSLog("[RTP] engine restart abandoned after \(engineRestartAttempts) attempts")
+            return
+        }
+        let delay = min(10.0, 0.5 * pow(2.0, Double(engineRestartAttempts - 1)))
+        NSLog("[RTP] scheduling engine restart #\(engineRestartAttempts) in \(delay)s")
+        engineRestartTimer?.cancel()
+        let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.global(qos: .userInitiated))
+        timer.schedule(deadline: .now() + delay)
+        timer.setEventHandler { [weak self] in self?.performEngineRestart() }
+        engineRestartTimer = timer
+        timer.resume()
+    }
+
+    private func performEngineRestart() {
+        guard running else { return }
+        engineRestartTotal += 1
+        NSLog("[RTP] restarting engine (attempt #\(engineRestartAttempts), total=\(engineRestartTotal))")
+        engine.inputNode.removeTap(onBus: 0)
+        if engine.isRunning { engine.stop() }
+        playerNode.stop()
+        configureSessionCategory()
+        attachAndPrepareEngine()
+        if startEngineWithRetry() {
+            engineRestartAttempts = 0
+        } else {
+            scheduleEngineRestart()
+        }
+    }
+
+    // MARK: - Audio system observers
+    private func installAudioObservers() {
+        removeAudioObservers()
+        let nc = NotificationCenter.default
+        routeChangeObserver = nc.addObserver(forName: AVAudioSession.routeChangeNotification,
+                                             object: nil, queue: .main) { [weak self] note in
+            guard let self = self else { return }
+            let reason = (note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt) ?? 0
+            NSLog("[RTP] routeChange reason=\(reason) route=\(self.currentRouteDescription())")
+        }
+        interruptionObserver = nc.addObserver(forName: AVAudioSession.interruptionNotification,
+                                              object: nil, queue: .main) { [weak self] note in
+            guard let self = self else { return }
+            let typeRaw = (note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt) ?? 0
+            let type = AVAudioSession.InterruptionType(rawValue: typeRaw)
+            NSLog("[RTP] interruption type=\(typeRaw)")
+            if type == .ended, self.running, !self.engine.isRunning {
+                self.scheduleEngineRestart()
+            }
+        }
+        mediaServicesResetObserver = nc.addObserver(forName: AVAudioSession.mediaServicesWereResetNotification,
+                                                    object: nil, queue: .main) { [weak self] _ in
+            guard let self = self, self.running else { return }
+            NSLog("[RTP] mediaServicesWereReset — full engine rebuild")
+            self.engine.inputNode.removeTap(onBus: 0)
+            if self.engine.isRunning { self.engine.stop() }
+            self.scheduleEngineRestart()
+        }
+    }
+
+    private func removeAudioObservers() {
+        let nc = NotificationCenter.default
+        if let o = routeChangeObserver { nc.removeObserver(o); routeChangeObserver = nil }
+        if let o = interruptionObserver { nc.removeObserver(o); interruptionObserver = nil }
+        if let o = mediaServicesResetObserver { nc.removeObserver(o); mediaServicesResetObserver = nil }
     }
 
     private func handleCapturedBuffer(_ buf: AVAudioPCMBuffer) {
