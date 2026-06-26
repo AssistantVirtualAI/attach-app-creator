@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import type { Creds } from '../lib/creds';
 import { Store } from '../lib/creds';
 import { colors } from '../lib/theme';
+import NativeStatePanel from '../components/sip/NativeStatePanel';
 
 export default function SipConfigScreen({
   initial,
