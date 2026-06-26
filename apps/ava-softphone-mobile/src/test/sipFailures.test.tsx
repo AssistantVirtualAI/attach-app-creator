@@ -1,11 +1,29 @@
 /**
  * SIP/TLS failure surfacing (no WebRTC required).
  */
-import { describe, it, expect } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useSoftphone } from '../hooks/useSoftphone';
 import { classifySipFailure } from '../lib/sip/jssipProvider';
-import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
+
+const originalJsSIP = (window as any).JsSIP;
+
+beforeEach(() => {
+  const fakeUA = {
+    on: vi.fn(),
+    start: vi.fn(),
+    stop: vi.fn(),
+    isConnected: vi.fn().mockReturnValue(false),
+  };
+  (window as any).JsSIP = {
+    Socket: vi.fn().mockImplementation(() => ({ url: 'sips://pbxnode.lemtel.tel:5061' })),
+    UA: vi.fn().mockImplementation(() => fakeUA),
+  };
+});
+
+afterEach(() => {
+  (window as any).JsSIP = originalJsSIP;
+});
 
 const cfg = {
   extension: '300',
