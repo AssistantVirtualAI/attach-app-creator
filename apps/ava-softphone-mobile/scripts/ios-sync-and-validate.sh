@@ -28,7 +28,7 @@ PBX="ios/App/App.xcodeproj/project.pbxproj"
 STORYBOARD="ios/App/App/Base.lproj/Main.storyboard"
 grep -q "CapacitorSip.m in Sources" "$PBX" && green "  ✓ CapacitorSip.m is in Xcode Sources" || { red "  ✗ CapacitorSip.m is NOT in Xcode Sources — plugin will never load"; exit 1; }
 grep -q "AppBridgeViewController" "$STORYBOARD" && green "  ✓ Main.storyboard uses AppBridgeViewController" || { red "  ✗ Main.storyboard still uses CAPBridgeViewController"; exit 1; }
-grep -q "registerPluginInstance" ios/App/App/Plugins/CapacitorSip/CapacitorSip.m && green "  ✓ Local plugin registered in capacitorDidLoad" || { red "  ✗ Missing registerPluginInstance"; exit 1; }
+grep -q "registerPluginInstance" ios/App/App/AppBridgeViewController.swift && green "  ✓ Local plugin registered in capacitorDidLoad" || { red "  ✗ Missing registerPluginInstance in AppBridgeViewController.swift"; exit 1; }
 
 echo "==> 1c. Verify RTPAudioSession is RemoteIO-only"
 RTP="ios/App/App/Plugins/CapacitorSip/RTPAudioSession.swift"
