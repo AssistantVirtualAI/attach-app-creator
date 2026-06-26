@@ -95,7 +95,7 @@ export function useCallAi(callId: string | null, meta: CallAiMeta | undefined, o
         }
         const err: any = new Error(friendly);
         err.reason = reason;
-        err.retryAfterMs = t.retry_after_ms;
+        err.retryAfterMs = (t as any).retry_after_ms;
         throw err;
       }
 
