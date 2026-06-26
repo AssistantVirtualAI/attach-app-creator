@@ -11,7 +11,20 @@ import linphonesw
 ///
 /// Setup: see `ios/App/LINPHONE_SETUP.md` for SwiftPM package URL + version.
 @objc(CapacitorPjsip)
-public class CapacitorPjsip: CAPPlugin {
+public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
+    public let identifier = "CapacitorPjsip"
+    public let jsName = "CapacitorPjsip"
+    public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "initAccount", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "makeCall", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "hangup", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "answer", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setMute", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setHold", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "sendDTMF", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "addListener", returnType: CAPPluginReturnCallback),
+        CAPPluginMethod(name: "removeAllListeners", returnType: CAPPluginReturnPromise),
+    ]
 
     #if canImport(linphonesw)
     private var core: Core?
