@@ -30,7 +30,107 @@ body {
   user-select: none;
 }
 
-/* Shiny glass button — reusable across the mobile app */
+/* Futuristic glass button system — automatic shine for icon/spinner buttons */
+:root {
+  --ava-btn-glass: linear-gradient(145deg, rgba(255,255,255,0.16), rgba(255,255,255,0.055) 52%, rgba(35,214,255,0.09));
+  --ava-btn-glass-active: linear-gradient(145deg, rgba(35,214,255,0.22), rgba(0,35,230,0.18) 54%, rgba(224,168,0,0.14));
+  --ava-btn-border: rgba(255,255,255,0.18);
+  --ava-btn-text: #E8EEFB;
+  --ava-btn-shadow: 0 18px 44px -22px rgba(0,35,230,0.78), inset 0 1px 0 rgba(255,255,255,0.28), inset 0 -1px 0 rgba(0,0,0,0.25);
+  --ava-btn-shine: rgba(255,255,255,0.62);
+}
+
+body[data-theme="light"] {
+  --ava-btn-glass: linear-gradient(145deg, rgba(255,255,255,0.96), rgba(232,238,255,0.82) 52%, rgba(0,35,230,0.08));
+  --ava-btn-glass-active: linear-gradient(145deg, rgba(255,255,255,1), rgba(0,35,230,0.12) 54%, rgba(8,145,178,0.12));
+  --ava-btn-border: rgba(0,35,230,0.18);
+  --ava-btn-text: #0d1426;
+  --ava-btn-shadow: 0 18px 42px -24px rgba(0,35,230,0.40), inset 0 1px 0 rgba(255,255,255,0.92), inset 0 -1px 0 rgba(0,35,230,0.08);
+  --ava-btn-shine: rgba(255,255,255,0.92);
+}
+
+button {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  touch-action: manipulation;
+  -webkit-backdrop-filter: blur(18px) saturate(170%);
+  backdrop-filter: blur(18px) saturate(170%);
+  transition: transform .16s cubic-bezier(.2,.8,.2,1), box-shadow .22s ease, filter .22s ease, border-color .22s ease;
+}
+
+button > svg,
+button .spin,
+button [role="status"] { pointer-events: none; }
+
+button::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(118deg, transparent 20%, rgba(255,255,255,0.08) 36%, var(--ava-btn-shine) 50%, rgba(35,214,255,0.18) 58%, transparent 76%);
+  transform: translateX(-150%) skewX(-18deg);
+  opacity: 0;
+  transition: transform .58s cubic-bezier(.2,.8,.2,1), opacity .2s ease;
+}
+
+button:hover::before,
+button:focus-visible::before,
+button:active::before,
+button:has(svg:hover)::before,
+button:has(.spin:hover)::before {
+  transform: translateX(150%) skewX(-18deg);
+  opacity: .95;
+}
+
+button:active { transform: scale(.965); filter: saturate(1.18) brightness(1.05); }
+
+.ava-glass-button,
+.ava-tab-button {
+  background: var(--ava-btn-glass) !important;
+  border: 1px solid var(--ava-btn-border) !important;
+  color: var(--ava-btn-text) !important;
+  box-shadow: var(--ava-btn-shadow) !important;
+}
+
+.ava-glass-button-primary {
+  background: linear-gradient(135deg, #0023e6 0%, #2a4dff 52%, #23d6ff 120%) !important;
+  color: #fff !important;
+  border-color: rgba(255,255,255,0.34) !important;
+}
+
+.ava-dialpad-key {
+  border-radius: 26px !important;
+  box-shadow: 0 16px 36px -24px rgba(35,214,255,0.72), inset 0 1px 0 rgba(255,255,255,0.24) !important;
+}
+
+.ava-control-button { overflow: visible; }
+.ava-control-orb,
+.ava-big-call-orb {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background: var(--ava-btn-glass-active) !important;
+  border-color: color-mix(in srgb, var(--btn-accent, #23d6ff) 62%, var(--ava-btn-border)) !important;
+  box-shadow: 0 18px 44px -20px var(--btn-accent, #23d6ff), inset 0 1px 0 rgba(255,255,255,0.35), inset 0 -8px 18px rgba(0,0,0,0.18) !important;
+}
+.ava-control-orb::after,
+.ava-big-call-orb::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(135deg, rgba(255,255,255,0.42), transparent 34%, rgba(255,255,255,0.08) 68%, rgba(255,255,255,0.24));
+  opacity: .72;
+}
+.ava-control-button:hover .ava-control-orb,
+.ava-big-call-button:hover .ava-big-call-orb {
+  transform: translateY(-2px) scale(1.04);
+  filter: brightness(1.12) saturate(1.24);
+}
+
+/* Legacy alias kept for existing screens */
 .lemtel-shiny-btn {
   position: relative;
   background: linear-gradient(135deg, #0052CC 0%, #2D7BE5 55%, #4F9CFF 100%);

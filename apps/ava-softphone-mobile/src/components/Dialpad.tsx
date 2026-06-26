@@ -32,6 +32,7 @@ export default function Dialpad({
       {KEYS.map((k) => (
         <button
           key={k.d}
+          className="ava-glass-button ava-dialpad-key"
           type="button"
           onPointerDown={(e) => {
             // Guard against any duplicate event in the same tick.

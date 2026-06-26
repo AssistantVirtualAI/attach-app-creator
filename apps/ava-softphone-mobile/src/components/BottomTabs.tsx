@@ -79,6 +79,7 @@ function TabBtn({ label, Icon, active, onPress, badge }: { label: string; Icon: 
   const accent = colors.lemtelBlue;
   return (
     <button
+      className="ava-tab-button"
       onClick={onPress}
       style={{
         position: 'relative', minHeight: 50, display: 'flex', flexDirection: 'column',
