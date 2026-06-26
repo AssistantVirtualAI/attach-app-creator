@@ -44,6 +44,24 @@ final class RTPAudioSession {
     private(set) var micPeak: Float = 0
     private(set) var rxPeak: Float = 0
     private(set) var startedAt: Date?
+    private(set) var tapFormatDesc: String = ""
+    private(set) var converterFormatDesc: String = ""
+    private(set) var converterRebuilds: Int = 0
+    private(set) var convertErrors: Int = 0
+    private(set) var lastConvertError: String = ""
+
+    private func describeFormat(_ f: AVAudioFormat) -> String {
+        let cf: String
+        switch f.commonFormat {
+        case .pcmFormatFloat32: cf = "F32"
+        case .pcmFormatFloat64: cf = "F64"
+        case .pcmFormatInt16: cf = "I16"
+        case .pcmFormatInt32: cf = "I32"
+        case .otherFormat: cf = "other"
+        @unknown default: cf = "?"
+        }
+        return "\(cf) \(Int(f.sampleRate))Hz ch=\(f.channelCount) il=\(f.isInterleaved)"
+    }
 
     func snapshot() -> [String: Any] {
         return [
@@ -61,7 +79,12 @@ final class RTPAudioSession {
             "micPeak": micPeak,
             "rxPeak": rxPeak,
             "uptimeMs": startedAt.map { Int(Date().timeIntervalSince($0) * 1000) } ?? 0,
-            "route": currentRouteDescription()
+            "route": currentRouteDescription(),
+            "tapFormat": tapFormatDesc,
+            "converterFormat": converterFormatDesc,
+            "converterRebuilds": converterRebuilds,
+            "convertErrors": convertErrors,
+            "lastConvertError": lastConvertError
         ]
     }
 
@@ -173,23 +196,26 @@ final class RTPAudioSession {
 
         let input = engine.inputNode
         var hwFormat = input.outputFormat(forBus: 0)
-        NSLog("[RTP] hw input sr=\(hwFormat.sampleRate) ch=\(hwFormat.channelCount)")
+        NSLog("[RTP] hw input format=\(describeFormat(hwFormat))")
         if hwFormat.sampleRate <= 0 || hwFormat.channelCount == 0 {
             let sr = session.sampleRate > 0 ? session.sampleRate : 48000
             if let fb = AVAudioFormat(standardFormatWithSampleRate: sr, channels: 1) {
                 hwFormat = fb
-                NSLog("[RTP] fallback hw sr=\(sr) ch=1")
+                NSLog("[RTP] fallback hw format=\(describeFormat(fb))")
             } else {
                 NSLog("[RTP] cannot derive hw format — aborting")
                 return
             }
         }
 
-        guard let conv = AVAudioConverter(from: hwFormat, to: playFormat) else {
-            NSLog("[RTP] cannot create converter \(hwFormat) → \(playFormat)")
-            return
+        if let conv = AVAudioConverter(from: hwFormat, to: playFormat) {
+            self.converter = conv
+            self.converterFormatDesc = "\(describeFormat(hwFormat)) → \(describeFormat(playFormat))"
+            self.converterRebuilds += 1
+            NSLog("[RTP] converter init #\(converterRebuilds) \(converterFormatDesc)")
+        } else {
+            NSLog("[RTP] cannot create initial converter \(describeFormat(hwFormat)) → \(describeFormat(playFormat)) — will rebuild from first tap buffer")
         }
-        self.converter = conv
 
         // Pass nil so CoreAudio uses the node's actual native format (avoids
         // "Failed to create tap due to format mismatch" when hw is 48k Float32
@@ -197,6 +223,7 @@ final class RTPAudioSession {
         input.installTap(onBus: 0, bufferSize: 1024, format: nil) { [weak self] buf, _ in
             self?.handleCapturedBuffer(buf)
         }
+        NSLog("[RTP] tap installed (format=nil, native bus0)")
 
         do {
             try engine.start()
@@ -208,13 +235,22 @@ final class RTPAudioSession {
     }
 
     private func handleCapturedBuffer(_ buf: AVAudioPCMBuffer) {
+        let bufDesc = describeFormat(buf.format)
+        if tapFormatDesc != bufDesc {
+            tapFormatDesc = bufDesc
+            NSLog("[RTP] tap buffer format=\(bufDesc) frames=\(buf.frameLength)")
+        }
         // Rebuild converter if tap delivered a different format than expected.
         if converter == nil || converter?.inputFormat != buf.format {
             if let c = AVAudioConverter(from: buf.format, to: playFormat) {
                 converter = c
-                NSLog("[RTP] converter rebuilt \(buf.format) → \(playFormat)")
+                converterFormatDesc = "\(bufDesc) → \(describeFormat(playFormat))"
+                converterRebuilds += 1
+                NSLog("[RTP] converter rebuilt #\(converterRebuilds) \(converterFormatDesc)")
             } else {
-                NSLog("[RTP] cannot build converter for \(buf.format)")
+                convertErrors += 1
+                lastConvertError = "build failed for \(bufDesc)"
+                NSLog("[RTP] cannot build converter for \(bufDesc)")
                 return
             }
         }
@@ -232,7 +268,10 @@ final class RTPAudioSession {
             return buf
         }
         if status == .error || convErr != nil {
-            NSLog("[RTP] convert error: \(convErr?.localizedDescription ?? "?")")
+            convertErrors += 1
+            lastConvertError = convErr?.localizedDescription ?? "unknown"
+            NSLog("[RTP] convert error: \(lastConvertError) — resetting converter")
+            converter = nil
             return
         }
         guard let ptr = outBuf.int16ChannelData?[0] else { return }

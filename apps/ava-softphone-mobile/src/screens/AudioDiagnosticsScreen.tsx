@@ -110,6 +110,11 @@ export default function AudioDiagnosticsScreen() {
             {row('Pic RX', `${((stats.rxPeak ?? 0) * 100).toFixed(1)}%`)}
             {row('Uptime', `${(((stats.uptimeMs ?? 0) / 1000) | 0)} s`)}
             {row('Route', stats.route)}
+            {row('Tap format', (stats as any).tapFormat || '—')}
+            {row('Converter', (stats as any).converterFormat || '—')}
+            {row('Reconstructions', (stats as any).converterRebuilds ?? 0)}
+            {row('Erreurs conv.', (stats as any).convertErrors ?? 0)}
+            {((stats as any).lastConvertError) && row('Dernière erreur', (stats as any).lastConvertError)}
           </div>
         ) : (
           <p style={{ color: '#94a3b8', fontSize: 12 }}>Aucun appel actif. Les stats apparaîtront pendant l'appel.</p>
