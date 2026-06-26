@@ -293,7 +293,7 @@ static NSString *ChallengeParam(NSString *header, NSString *key) {
         } else if (code >= 400) {
             NSString *reason = parts.count > 2 ? [[parts subarrayWithRange:NSMakeRange(2, parts.count - 2)] componentsJoinedByString:@" "] : @"REGISTER failed";
             [self emitRegistrationFailed:reason code:code];
-            if (self.pendingRegister) { [self.pendingRegister reject:[NSString stringWithFormat:@"REGISTER failed %ld %@", (long)code, reason]]; self.pendingRegister = nil; }
+            if (self.pendingRegister) { [self.pendingRegister reject:[NSString stringWithFormat:@"REGISTER failed %ld %@", (long)code, reason] :nil :nil :nil]; self.pendingRegister = nil; }
         }
     } else if (isInvite) {
         if (code >= 100 && code < 200) {
