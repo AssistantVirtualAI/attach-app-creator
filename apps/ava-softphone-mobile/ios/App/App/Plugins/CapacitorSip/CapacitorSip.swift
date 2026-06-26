@@ -41,6 +41,21 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     private var registerTimer: Timer?
     private var rxBuffer: String = ""
 
+    // MARK: - Call state
+    private var callActiveId: String = ""
+    private var callLocalTag: String = ""
+    private var callRemoteTag: String = ""
+    private var callRemoteUri: String = ""
+    private var callRemoteContact: String = ""
+    private var callCseq: Int = 1
+    private var callDirection: String = "" // "out" | "in"
+    private var callState: String = "idle"
+    private var lastInviteRequest: String = ""
+    private var lastInviteAuth: String? = nil
+    private var isMuted: Bool = false
+    private var isOnHold: Bool = false
+    private var localSdpPort: Int = 40000
+
     // MARK: - Logging
     private func log(_ msg: String) {
         NSLog("[CapacitorPjsip] \(msg)")
