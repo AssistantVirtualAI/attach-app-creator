@@ -137,6 +137,13 @@ export default function IceDiagnosticsOverlay() {
           <div>probe: <span style={{ color: '#cbd5e1' }}>{probe} {probeMs != null && `(${probeMs}ms)`}</span></div>
           <div>1st relay: <span style={{ color: '#cbd5e1' }}>{firstRelayMs != null ? `${firstRelayMs}ms` : '—'}</span></div>
           <div>connected: <span style={{ color: '#cbd5e1' }}>{connectedMs != null ? `${connectedMs}ms` : '—'}</span></div>
+          <div>mDNS: <span style={{ color: mdnsCount > 0 ? '#f59e0b' : '#cbd5e1' }}>{mdnsCount > 0 ? `${mdnsCount} (.local — iOS WKWebView)` : '0'}</span></div>
+          {fallback && <div style={{ color: '#f59e0b' }}>fallback: {fallback}</div>}
+          {errors.length > 0 && (
+            <div style={{ marginTop: 4, color: '#ef4444' }}>
+              ⚠ {errors[0].where}: {errors[0].message.slice(0, 80)}
+            </div>
+          )}
           <div style={{ marginTop: 6, color: '#64748b' }}>candidats (5 récents)</div>
           {candidates.length === 0 && <div style={{ color: '#475569' }}>—</div>}
           {candidates.map((c, i) => (
