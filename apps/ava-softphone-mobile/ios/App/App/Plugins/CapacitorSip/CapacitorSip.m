@@ -10,4 +10,5 @@ CAP_PLUGIN(CapacitorSip, "CapacitorSip",
     CAP_PLUGIN_METHOD(setMute, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(setHold, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(sendDTMF, CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(setLogLevel, CAPPluginReturnPromise);
 )

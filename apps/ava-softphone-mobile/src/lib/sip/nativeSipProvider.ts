@@ -1,5 +1,8 @@
 import { registerPlugin } from '@capacitor/core';
 
+export type CapacitorSipLogLevel = 0 | 1 | 2 | 3 | 4 | 5;
+// 0=off 1=error 2=warn 3=info 4=debug 5=verbose (full SIP frames)
+
 export interface CapacitorSipPlugin {
   initAccount(options: {
     extension: string;
@@ -7,6 +10,7 @@ export interface CapacitorSipPlugin {
     password: string;
     host?: string;
     wssUrl?: string; // legacy, ignored by native TLS plugin
+    logLevel?: CapacitorSipLogLevel;
   }): Promise<void>;
   disconnect(): Promise<void>;
   makeCall(options: { number: string }): Promise<void>;
@@ -15,6 +19,7 @@ export interface CapacitorSipPlugin {
   setMute(options: { muted: boolean }): Promise<void>;
   setHold(options: { held?: boolean; onHold?: boolean }): Promise<void>;
   sendDTMF(options: { digits?: string; digit?: string }): Promise<void>;
+  setLogLevel(options: { level: CapacitorSipLogLevel }): Promise<{ level: number }>;
   addListener(event: string, callback: (data: any) => void): Promise<{ remove: () => Promise<void> }>;
   removeAllListeners(): Promise<void>;
 }
@@ -33,7 +38,7 @@ export const NATIVE_SIP_ENABLED =
  * `registration` event emitted by the new TLS plugin.
  */
 export async function onNativeSipEvent(
-  event: 'registered' | 'registrationFailed' | 'callReceived' | 'callStateChanged' | 'callEnded',
+  event: 'registered' | 'registrationFailed' | 'callReceived' | 'callStateChanged' | 'callEnded' | 'log' | 'muteChanged' | 'holdChanged',
   cb: (data: any) => void,
 ): Promise<() => void> {
   if (event === 'registered' || event === 'registrationFailed') {
@@ -45,4 +50,22 @@ export async function onNativeSipEvent(
   }
   const handle = await CapacitorSipNative.addListener(event, cb);
   return () => { handle.remove().catch(() => {}); };
+}
+
+/**
+ * Convenience: forward native SIP log events to the JS console. Call once at app
+ * boot when you need verbose on-device diagnostics. Returns a cleanup function.
+ *
+ * Example:
+ *   await CapacitorSipNative.setLogLevel({ level: 5 });
+ *   const stop = await attachNativeSipLogger();
+ */
+export async function attachNativeSipLogger(): Promise<() => void> {
+  return onNativeSipEvent('log', (e: any) => {
+    const tag = `[CapacitorSip][${e?.tag ?? '?'}][${e?.category ?? '?'}]`;
+    const lvl = e?.level ?? 3;
+    const fn = lvl <= 1 ? 'error' : lvl === 2 ? 'warn' : lvl >= 4 ? 'debug' : 'info';
+    // eslint-disable-next-line no-console
+    (console as any)[fn](tag, e?.message);
+  });
 }

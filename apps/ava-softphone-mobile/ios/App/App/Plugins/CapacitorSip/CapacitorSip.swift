@@ -25,6 +25,44 @@ public class CapacitorSip: CAPPlugin, CXProviderDelegate {
     private let registerIntervalSec: Int = 240 // refresh well before 300s Expires
     private var shouldReconnect = true
 
+    // MARK: - Logging
+    // 0=off, 1=error, 2=warn, 3=info, 4=debug, 5=verbose (full SIP frames)
+    private var logLevel: Int = 3
+    private let logLevelNames = ["OFF", "ERROR", "WARN", "INFO", "DEBUG", "VERBOSE"]
+
+    @objc func setLogLevel(_ call: CAPPluginCall) {
+        let lvl = call.getInt("level") ?? 3
+        logLevel = max(0, min(5, lvl))
+        log(3, "log", "Log level set to \(logLevelNames[logLevel]) (\(logLevel))")
+        call.resolve(["level": logLevel])
+    }
+
+    private func log(_ level: Int, _ category: String, _ message: String) {
+        guard level <= logLevel else { return }
+        let tag = logLevelNames[level]
+        let line = "[CapacitorSip][\(tag)][\(category)] \(message)"
+        NSLog("%@", line)
+        DispatchQueue.main.async {
+            self.notifyListeners("log", data: [
+                "level": level,
+                "tag": tag,
+                "category": category,
+                "message": message,
+                "ts": Date().timeIntervalSince1970
+            ])
+        }
+    }
+
+    private func redactSip(_ frame: String) -> String {
+        // Avoid leaking password / Digest response in verbose dumps
+        var out = frame
+        out = out.replacingOccurrences(of: sipPassword, with: "***")
+        if let re = try? NSRegularExpression(pattern: "response=\"[^\"]*\"") {
+            out = re.stringByReplacingMatches(in: out, range: NSRange(out.startIndex..., in: out), withTemplate: "response=\"***\"")
+        }
+        return out
+    }
+
     // MARK: - CallKit
     private lazy var callProvider: CXProvider = {
         let config = CXProviderConfiguration(localizedName: "AVA Softphone")
@@ -45,15 +83,20 @@ public class CapacitorSip: CAPPlugin, CXProviderDelegate {
         sipDomain = call.getString("domain") ?? ""
         sipPassword = call.getString("password") ?? ""
         sipHost = call.getString("host") ?? "pbxnode.lemtel.tel"
+        if let lvl = call.getInt("logLevel") { logLevel = max(0, min(5, lvl)) }
         fromTag = String(UUID().uuidString.prefix(8))
         callId = UUID().uuidString
         shouldReconnect = true
 
+        log(3, "init", "initAccount ext=\(sipExtension) domain=\(sipDomain) host=\(sipHost):\(sipPort) logLevel=\(logLevelNames[logLevel])")
+
         AVAudioSession.sharedInstance().requestRecordPermission { granted in
             guard granted else {
+                self.log(1, "audio", "Microphone permission denied")
                 DispatchQueue.main.async { call.reject("Microphone permission denied") }
                 return
             }
+            self.log(3, "audio", "Microphone permission granted; configuring AVAudioSession (playAndRecord/voiceChat, BT+speaker)")
 
             try? AVAudioSession.sharedInstance().setCategory(
                 .playAndRecord,
@@ -68,7 +111,7 @@ public class CapacitorSip: CAPPlugin, CXProviderDelegate {
     }
 
     private func startTlsConnection() {
-        // TLS parameters with SNI + strict cert validation
+        log(3, "tls", "Opening TLS connection to \(sipHost):\(sipPort) SNI=\(sipHost) minTLS=1.2")
         let tlsOptions = NWProtocolTLS.Options()
         let secOptions = tlsOptions.securityProtocolOptions
         sec_protocol_options_set_tls_server_name(secOptions, sipHost)
@@ -91,12 +134,18 @@ public class CapacitorSip: CAPPlugin, CXProviderDelegate {
         self.connection?.stateUpdateHandler = { [weak self] state in
             guard let self = self else { return }
             switch state {
+            case .preparing:
+                self.log(4, "tls", "NWConnection preparing")
+            case .waiting(let err):
+                self.log(2, "tls", "NWConnection waiting: \(err.localizedDescription)")
             case .ready:
+                self.log(3, "tls", "NWConnection ready (TLS handshake OK) — sending initial REGISTER")
                 self.cseq = 1
                 self.lastAuthHeader = nil
                 self.sendRegister(cseq: self.cseq, authHeader: nil)
                 self.startReceiving()
             case .failed(let error):
+                self.log(1, "tls", "NWConnection failed: \(error.localizedDescription)")
                 DispatchQueue.main.async {
                     self.notifyListeners("registration", data: [
                         "status": "error",
@@ -105,6 +154,7 @@ public class CapacitorSip: CAPPlugin, CXProviderDelegate {
                 }
                 self.scheduleReconnect()
             case .cancelled:
+                self.log(3, "tls", "NWConnection cancelled")
                 self.isRegistered = false
             default:
                 break
@@ -112,6 +162,7 @@ public class CapacitorSip: CAPPlugin, CXProviderDelegate {
         }
         self.connection?.start(queue: .global(qos: .userInitiated))
     }
+
 
     private func scheduleReconnect() {
         guard shouldReconnect else { return }
@@ -123,11 +174,13 @@ public class CapacitorSip: CAPPlugin, CXProviderDelegate {
 
     private func startRegisterTimer() {
         registerTimer?.cancel()
+        log(3, "register", "Starting REGISTER refresh timer every \(registerIntervalSec)s")
         let timer = DispatchSource.makeTimerSource(queue: .global())
         timer.schedule(deadline: .now() + .seconds(registerIntervalSec), repeating: .seconds(registerIntervalSec))
         timer.setEventHandler { [weak self] in
             guard let self = self else { return }
             self.cseq += 1
+            self.log(3, "register", "Refresh REGISTER cseq=\(self.cseq)")
             self.sendRegister(cseq: self.cseq, authHeader: self.lastAuthHeader)
         }
         timer.resume()
@@ -135,12 +188,13 @@ public class CapacitorSip: CAPPlugin, CXProviderDelegate {
     }
 
     @objc func disconnect(_ call: CAPPluginCall) {
+        log(3, "register", "disconnect() — sending UNREGISTER (Expires: 0)")
         shouldReconnect = false
         registerTimer?.cancel()
         registerTimer = nil
-        // Send UNREGISTER (Expires: 0) before closing
         sendRegister(cseq: cseq + 1, authHeader: lastAuthHeader, expires: 0)
         DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.log(3, "tls", "Closing NWConnection after UNREGISTER")
             self?.connection?.cancel()
             self?.connection = nil
             self?.isRegistered = false
@@ -169,17 +223,25 @@ public class CapacitorSip: CAPPlugin, CXProviderDelegate {
         }
         headers += "Content-Length: 0\r\n\r\n"
 
+        log(4, "sip-out", "REGISTER cseq=\(cseq) expires=\(expires) auth=\(authHeader != nil ? "yes" : "no")")
+        log(5, "sip-out", "\n\(redactSip(headers))")
+
         let data = headers.data(using: .utf8)!
-        connection?.send(content: data, completion: .contentProcessed { _ in })
+        connection?.send(content: data, completion: .contentProcessed { [weak self] err in
+            if let err = err { self?.log(1, "sip-out", "send REGISTER failed: \(err)") }
+        })
     }
 
     private func startReceiving() {
         connection?.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, _, error in
             guard let self = self else { return }
             if let data = data, let response = String(data: data, encoding: .utf8) {
+                self.log(5, "sip-in", "\n\(self.redactSip(response))")
                 self.handleSipResponse(response)
             }
-            if error == nil {
+            if let error = error {
+                self.log(1, "sip-in", "receive error: \(error)")
+            } else {
                 self.startReceiving()
             }
         }
@@ -189,6 +251,7 @@ public class CapacitorSip: CAPPlugin, CXProviderDelegate {
         if response.contains("SIP/2.0 401") || response.contains("SIP/2.0 407") {
             let realm = self.extractValue(from: response, key: "realm")
             let nonce = self.extractValue(from: response, key: "nonce")
+            log(3, "register", "Auth challenge received — realm=\(realm) nonce.len=\(nonce.count)")
             let ha1 = self.md5("\(sipExtension):\(realm):\(sipPassword)")
             let ha2 = self.md5("REGISTER:sip:\(sipDomain)")
             let digestResp = self.md5("\(ha1):\(nonce):\(ha2)")
@@ -197,6 +260,7 @@ public class CapacitorSip: CAPPlugin, CXProviderDelegate {
             self.cseq += 1
             self.sendRegister(cseq: self.cseq, authHeader: authHeader)
         } else if response.hasPrefix("SIP/2.0 200") && response.contains("REGISTER") {
+            log(3, "register", "200 OK REGISTER — registered as \(sipExtension)@\(sipDomain)")
             DispatchQueue.main.async {
                 self.isRegistered = true
                 self.notifyListeners("registration", data: [
@@ -206,27 +270,33 @@ public class CapacitorSip: CAPPlugin, CXProviderDelegate {
             }
             self.startRegisterTimer()
         } else if response.hasPrefix("SIP/2.0 180") {
+            log(3, "call", "180 Ringing")
             DispatchQueue.main.async {
+
                 self.notifyListeners("callStateChanged", data: ["state": "ringing"])
             }
         } else if response.hasPrefix("SIP/2.0 200") && response.contains("INVITE") {
+            log(3, "call", "200 OK INVITE — sending ACK, call active")
             self.sendAck(response: response)
             DispatchQueue.main.async {
                 self.notifyListeners("callStateChanged", data: ["state": "active"])
             }
         } else if response.hasPrefix("BYE") {
+            log(3, "call", "BYE received — ending call")
             DispatchQueue.main.async {
                 self.endActiveCallKitCall()
                 self.notifyListeners("callEnded", data: [:])
             }
         } else if response.hasPrefix("INVITE") {
             let callerNumber = self.extractCallerNumber(from: response)
+            log(3, "call", "Incoming INVITE from \(callerNumber)")
             self.reportIncomingCallKit(number: callerNumber)
             DispatchQueue.main.async {
                 self.notifyListeners("callReceived", data: ["number": callerNumber])
             }
         }
     }
+
 
     private func sendAck(response: String) {
         let ack = """
@@ -248,6 +318,7 @@ public class CapacitorSip: CAPPlugin, CXProviderDelegate {
             call.reject("Missing number")
             return
         }
+        log(3, "call", "makeCall to \(number)")
         currentCallId = UUID().uuidString
         startOutgoingCallKit(number: number)
 
@@ -279,13 +350,17 @@ public class CapacitorSip: CAPPlugin, CXProviderDelegate {
         Content-Length: \(sdp.utf8.count)\r\n\r\n\(sdp)
         """
 
+        log(5, "sip-out", "\n\(invite)")
         let data = invite.data(using: .utf8)!
-        connection?.send(content: data, completion: .contentProcessed { _ in })
+        connection?.send(content: data, completion: .contentProcessed { [weak self] err in
+            if let err = err { self?.log(1, "sip-out", "send INVITE failed: \(err)") }
+        })
         notifyListeners("callStateChanged", data: ["state": "ringing"])
         call.resolve()
     }
 
     @objc func hangup(_ call: CAPPluginCall) {
+        log(3, "call", "hangup() — sending BYE")
         let bye = """
         BYE sip:\(sipDomain) SIP/2.0\r\n\
         Via: SIP/2.0/TLS \(sipHost):\(sipPort);branch=z9hG4bK\(UUID().uuidString.replacingOccurrences(of: "-", with: ""))\r\n\
@@ -303,22 +378,41 @@ public class CapacitorSip: CAPPlugin, CXProviderDelegate {
     }
 
     @objc func answer(_ call: CAPPluginCall) {
+        log(3, "call", "answer() invoked")
         call.resolve()
     }
 
+
     @objc func setMute(_ call: CAPPluginCall) {
         let muted = call.getBool("muted") ?? false
-        let session = AVAudioSession.sharedInstance()
-        try? session.setActive(!muted)
+        log(3, "call", "setMute(\(muted))")
+        if let uuid = activeCallUUID {
+            let action = CXSetMutedCallAction(call: uuid, muted: muted)
+            callController.request(CXTransaction(action: action)) { [weak self] err in
+                if let err = err { self?.log(1, "callkit", "setMute tx error: \(err)") }
+            }
+        } else {
+            let session = AVAudioSession.sharedInstance()
+            try? session.setActive(!muted)
+        }
         call.resolve()
     }
 
     @objc func setHold(_ call: CAPPluginCall) {
+        let held = call.getBool("held") ?? false
+        log(3, "call", "setHold(\(held))")
+        if let uuid = activeCallUUID {
+            let action = CXSetHeldCallAction(call: uuid, onHold: held)
+            callController.request(CXTransaction(action: action)) { [weak self] err in
+                if let err = err { self?.log(1, "callkit", "setHold tx error: \(err)") }
+            }
+        }
         call.resolve()
     }
 
     @objc func sendDTMF(_ call: CAPPluginCall) {
         let digits = call.getString("digits") ?? ""
+        log(3, "call", "sendDTMF \(digits)")
         let body = "Signal=\(digits)\r\nDuration=250\r\n"
         let info = """
         INFO sip:\(sipDomain) SIP/2.0\r\n\
@@ -339,47 +433,73 @@ public class CapacitorSip: CAPPlugin, CXProviderDelegate {
     private func reportIncomingCallKit(number: String) {
         let uuid = UUID()
         activeCallUUID = uuid
+        log(3, "callkit", "reportNewIncomingCall uuid=\(uuid) number=\(number)")
         let update = CXCallUpdate()
         update.remoteHandle = CXHandle(type: .phoneNumber, value: number)
         update.hasVideo = false
-        callProvider.reportNewIncomingCall(with: uuid, update: update) { _ in }
+        callProvider.reportNewIncomingCall(with: uuid, update: update) { [weak self] err in
+            if let err = err { self?.log(1, "callkit", "reportNewIncomingCall error: \(err)") }
+            else { self?.log(4, "callkit", "Incoming call reported to system") }
+        }
     }
 
     private func startOutgoingCallKit(number: String) {
         let uuid = UUID()
         activeCallUUID = uuid
+        log(3, "callkit", "CXStartCallAction uuid=\(uuid) handle=\(number)")
         let handle = CXHandle(type: .phoneNumber, value: number)
         let action = CXStartCallAction(call: uuid, handle: handle)
-        callController.request(CXTransaction(action: action)) { _ in }
+        callController.request(CXTransaction(action: action)) { [weak self] err in
+            if let err = err { self?.log(1, "callkit", "CXStartCallAction error: \(err)") }
+        }
     }
 
     private func endActiveCallKitCall() {
         guard let uuid = activeCallUUID else { return }
+        log(3, "callkit", "CXEndCallAction uuid=\(uuid)")
         let action = CXEndCallAction(call: uuid)
-        callController.request(CXTransaction(action: action)) { _ in }
+        callController.request(CXTransaction(action: action)) { [weak self] err in
+            if let err = err { self?.log(1, "callkit", "CXEndCallAction error: \(err)") }
+        }
         activeCallUUID = nil
     }
 
     // MARK: - CXProviderDelegate
     public func providerDidReset(_ provider: CXProvider) {
+        log(2, "callkit", "providerDidReset — clearing active call")
         activeCallUUID = nil
     }
     public func provider(_ provider: CXProvider, perform action: CXAnswerCallAction) {
+        log(3, "callkit", "CXAnswerCallAction fulfilled")
         notifyListeners("callStateChanged", data: ["state": "active"])
         action.fulfill()
     }
     public func provider(_ provider: CXProvider, perform action: CXEndCallAction) {
+        log(3, "callkit", "CXEndCallAction fulfilled")
         notifyListeners("callEnded", data: [:])
         action.fulfill()
     }
     public func provider(_ provider: CXProvider, perform action: CXStartCallAction) {
+        log(3, "callkit", "CXStartCallAction fulfilled")
         action.fulfill()
     }
     public func provider(_ provider: CXProvider, perform action: CXSetMutedCallAction) {
-        let session = AVAudioSession.sharedInstance()
-        try? session.setActive(!action.isMuted)
+        log(3, "callkit", "CXSetMutedCallAction muted=\(action.isMuted)")
+        notifyListeners("muteChanged", data: ["muted": action.isMuted])
         action.fulfill()
     }
+    public func provider(_ provider: CXProvider, perform action: CXSetHeldCallAction) {
+        log(3, "callkit", "CXSetHeldCallAction onHold=\(action.isOnHold)")
+        notifyListeners("holdChanged", data: ["held": action.isOnHold])
+        action.fulfill()
+    }
+    public func provider(_ provider: CXProvider, didActivate audioSession: AVAudioSession) {
+        log(4, "callkit", "didActivate audio session")
+    }
+    public func provider(_ provider: CXProvider, didDeactivate audioSession: AVAudioSession) {
+        log(4, "callkit", "didDeactivate audio session")
+    }
+
 
     // MARK: - Parsing helpers
     private func extractCallerNumber(from message: String) -> String {
