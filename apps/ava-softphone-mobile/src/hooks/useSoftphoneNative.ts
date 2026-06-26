@@ -150,15 +150,28 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
   const reconnect = useCallback(() => {
     setSipError('');
     setSipStatus('connecting');
+    setNativeRegStatus('connecting');
     if (config) {
       CapacitorPjsip.initAccount({
         extension: config.extension,
         domain: config.domain,
         password: config.password,
         wssUrl: config.wssUrl,
-      }).catch((e) => { setSipStatus('error'); setSipError(e?.message || 'reconnect failed'); });
+      }).catch((e) => {
+        const msg = e?.message || 'reconnect failed';
+        setSipStatus('error'); setSipError(msg); setNativeRegStatus('error', msg);
+      });
     }
   }, [config]);
+
+  // Auto-reconnect when the app returns to foreground or the network recovers.
+  useEffect(() => {
+    let cleanup: (() => void) | null = null;
+    attachNativeAutoReconnect(() => {
+      if (sipStatus !== 'registered') reconnect();
+    }).then((c) => { cleanup = c; });
+    return () => { if (cleanup) cleanup(); };
+  }, [reconnect, sipStatus]);
 
   return {
     sipStatus, sipError, callState, callTimer, isMuted, isOnHold, activeCallNumber,
