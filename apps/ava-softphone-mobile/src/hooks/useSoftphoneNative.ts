@@ -71,6 +71,7 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
         cleanups.push(await onNativeSipEvent('registered', () => {
           if (cancelled) return;
           if (watchdog) { clearTimeout(watchdog); watchdog = null; }
+          initInFlightRef.current = false;
           console.log('[NativeSIP] registered ✓');
           setSipStatus('registered'); setSipError('');
           setNativeRegStatus('registered', null);
@@ -78,6 +79,7 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
         cleanups.push(await onNativeSipEvent('registrationFailed', (d) => {
           if (cancelled) return;
           if (watchdog) { clearTimeout(watchdog); watchdog = null; }
+          initInFlightRef.current = false;
           const msg = d?.reason || `Registration failed${d?.code ? ` (${d.code})` : ''}`;
           console.warn('[NativeSIP] registrationFailed', d);
           setSipStatus('error');
