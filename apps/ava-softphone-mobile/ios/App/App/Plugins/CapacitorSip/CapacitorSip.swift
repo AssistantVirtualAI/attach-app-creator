@@ -258,10 +258,18 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         requestMicPermission { [weak self] granted in
             guard let self = self else { return }
             self.log("mic permission granted=\(granted)")
-            self.notifyListeners("micPermission", data: ["granted": granted, "status": granted ? "granted" : "denied"])
+            self.notifyListeners("micPermission", data: [
+                "granted": granted,
+                "status": granted ? "granted" : "denied",
+                "reason": granted ? "" : "Microphone access is required for two-way audio. Enable it in iOS Settings."
+            ])
             if !granted {
-                self.notifyListeners("registration", data: ["state": "error", "status": "error", "reason": "microphone permission denied"])
-                self.notifyListeners("registrationFailed", data: ["reason": "Microphone permission denied — enable it in iOS Settings"])
+                self.notifyListeners("registration", data: [
+                    "state": "error",
+                    "status": "error",
+                    "reason": "Microphone access is required for two-way audio. Enable it in iOS Settings."
+                ])
+                self.notifyListeners("registrationFailed", data: ["reason": "Microphone access is required for two-way audio. Enable it in iOS Settings."])
                 return
             }
             self.connectAndRegister()
@@ -288,9 +296,15 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     private func requestMicPermission(_ cb: @escaping (Bool) -> Void) {
         let session = AVAudioSession.sharedInstance()
         switch session.recordPermission {
-        case .granted: cb(true)
-        case .denied:  cb(false)
-        case .undetermined: session.requestRecordPermission { granted in DispatchQueue.main.async { cb(granted) } }
+        case .granted:
+            log("mic permission state=granted")
+            cb(true)
+        case .denied:
+            log("mic permission state=denied")
+            cb(false)
+        case .undetermined:
+            log("mic permission state=undetermined — requesting")
+            session.requestRecordPermission { granted in DispatchQueue.main.async { cb(granted) } }
         @unknown default: cb(false)
         }
     }
