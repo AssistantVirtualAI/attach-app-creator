@@ -125,31 +125,62 @@ Mitigations en place dans le code :
 4. **Logs** : tous les `icecandidateerror` et passages ICE → `failed`
    sont émis comme `webrtc-error` et affichés dans l'overlay + console.
 
-## Test manuel iOS (build ad-hoc / TestFlight / App Store)
+## Test manuel iOS — vérification mDNS & fallback relay
 
-Procédure à exécuter sur **chaque** configuration de build (Debug, Release,
-Ad-Hoc, TestFlight, App Store) pour confirmer que les clés WebKit sont bien
-appliquées — Apple peut filtrer certains flags privés selon le profil.
+Procédure à exécuter sur **chaque profil de signature** (Debug, Release,
+Ad-Hoc, TestFlight, App Store). Apple peut filtrer les clés privées
+`WebKit*` selon le profil, donc Debug ≠ TestFlight ≠ App Store.
 
-Pré-requis : activer `localStorage.setItem('sip:iceDiag','1')` ou ajouter
-`?iceDiag=1` à l'URL, puis lancer un appel SIP sortant.
+### Pré-requis build
 
-| # | Étape                                          | Attendu                                                 |
-|---|------------------------------------------------|---------------------------------------------------------|
-| 1 | Appel sortant vers un poste FusionPBX          | `iceConnectionState` → `connected` < 5 s                |
-| 2 | Vérifier overlay « mDNS »                      | `0` candidats `.local` (clé WebKit appliquée)           |
-| 3 | Vérifier « 1st relay » et « connected »        | Valeurs en ms renseignées                               |
-| 4 | Couper Wi-Fi pendant l'appel, repasser en LTE  | ICE → `disconnected` puis `connected` après restart     |
-| 5 | Forcer un échec (TURN bloqué via VPN strict)   | Overlay affiche `fallback: all → relay` puis erreur    |
-| 6 | Bouton « Copier diagnostic »                   | Rapport texte contient `iceServers`, candidats, erreurs |
+1. `git pull` puis `npx cap sync ios`.
+2. Vérifier dans `ios/App/App/Info.plist` (avant archive) la présence de :
+   - `NSLocalNetworkUsageDescription` + `NSBonjourServices` (`_sip._tcp`, `_sip._udp`)
+   - `WebKitICECandidateFilteringEnabled = false`
+   - `WebKitEnumeratingAllNetworkInterfacesEnabled = true`
+3. Archive Xcode → exporter en Ad-Hoc (Distribution → Ad Hoc) **et** uploader sur TestFlight.
+4. Sur l'appareil de test : activer le diag via `?iceDiag=1` dans l'URL serveur,
+   ou `localStorage.setItem('sip:iceDiag','1')` au premier lancement.
+5. Accepter la pop-up iOS « Réseau local » au premier appel SIP.
 
-À répéter sur :
+### Scénario A — pas de candidats .local (cas nominal)
 
-- iOS 16 / 17 / 18, iPhone SE → 15 Pro Max
-- Réseaux : Wi-Fi domestique, LTE Bell/Telus/Rogers, hotspot, VPN d'entreprise
-- Profils de signature : Development, Ad-Hoc, TestFlight, App Store
+| # | Étape                                                    | Attendu                                                       |
+|---|----------------------------------------------------------|---------------------------------------------------------------|
+| 1 | Appel sortant vers un poste FusionPBX                    | `iceConnectionState` → `connected` en < 5 s, audio bidir.     |
+| 2 | Overlay diag → compteur **mDNS**                         | `0` (clés WebKit appliquées, pas d'obfuscation `.local`)      |
+| 3 | Overlay → liste candidats locaux                         | IPs réelles (`192.168.x` / `10.x` / IPv6), aucun `*.local`    |
+| 4 | Overlay → « 1st relay » et « connected »                 | Valeurs ms renseignées, pas de `webrtc-error`                 |
+| 5 | Bouton « Copier diagnostic » → coller dans note          | Rapport contient `iceServers`, candidats, `mDNS=0`, telemetry |
 
-Si `mDNS > 0` apparaît en TestFlight ou App Store alors qu'il est à 0 en
-Debug, c'est qu'Apple a stripé les clés `WebKit*` privées du `Info.plist`
-final → le fallback `iceTransportPolicy: 'relay'` (point 3 ci-dessus) doit
-prendre le relais et l'appel doit quand même aboutir.
+### Scénario B — fallback relay déclenché
+
+| # | Étape                                                                  | Attendu                                                        |
+|---|------------------------------------------------------------------------|----------------------------------------------------------------|
+| 1 | Forcer Apple à strip les clés (TestFlight/App Store) **ou** désactiver manuellement les clés WebKit avant build | Compteur **mDNS > 0** apparaît dans l'overlay |
+| 2 | Laisser l'appel négocier 6 s                                           | Event `ice-fallback` émis (`all → relay`), `restartIce()` exécuté |
+| 3 | Overlay → bandeau « fallback: all → relay »                            | Visible, horodaté                                              |
+| 4 | Connexion finale                                                       | `iceConnectionState` → `connected` via candidat TURN uniquement |
+| 5 | Couper Wi-Fi pendant l'appel → bascule LTE                             | `disconnected` → `connected` après ICE restart (toujours relay) |
+| 6 | Bloquer TURN (VPN d'entreprise strict, ports 443/3478 fermés)          | Overlay affiche `fallback` puis `webrtc-error`, toast utilisateur |
+| 7 | « Copier diagnostic »                                                  | Rapport contient `mDNS>0`, `fallback=relay`, telemetry probe   |
+
+### Matrice de couverture
+
+- **iOS** : 16, 17, 18 (au moins une version par majeure).
+- **Appareils** : iPhone SE 2/3, iPhone 12/13/14/15 Pro Max (perfs RTC variables).
+- **Réseaux** : Wi-Fi domestique, LTE Bell/Telus/Rogers, hotspot iPhone, VPN d'entreprise.
+- **Profils** : Development, Ad-Hoc, **TestFlight**, App Store (production).
+
+### Critères Go / No-Go
+
+- ✅ **Go** : Scénario A passe sur Debug + Ad-Hoc, et Scénario B passe sur TestFlight/App Store si mDNS réapparaît.
+- ❌ **No-Go** : appel échoue (`failed` / `ice=new` timeout) sans déclencher le fallback,
+  ou fallback déclenché mais pas de candidat `relay` valide (vérifier creds Metered/TURN).
+
+### Reporting
+
+Joindre à chaque run : capture overlay + sortie « Copier diagnostic » +
+profil de build + version iOS + opérateur réseau. Stocker dans le ticket QA
+correspondant.
+
