@@ -614,7 +614,22 @@ export function useSoftphone(
           offerToReceiveVideo: false,
           voiceActivityDetection: false,
         },
-        pcConfig: PC_CONFIG,
+        pcConfig: {
+          iceServers: [
+            {
+              urls: 'turn:global.relay.metered.ca:443',
+              username: 'e499486ca9b7d5a03a01e915',
+              credential: 'uMFpNAFBoFFUHOdF',
+            },
+            {
+              urls: 'turns:global.relay.metered.ca:443?transport=tcp',
+              username: 'e499486ca9b7d5a03a01e915',
+              credential: 'uMFpNAFBoFFUHOdF',
+            },
+          ],
+          iceTransportPolicy: 'relay',
+          bundlePolicy: 'balanced',
+        },
       };
       if (forcePcmu) log('call.fallback', 'secure PCMU-only SDP rewrite armed');
       sipDebug('placeCallInternal pcConfig', PC_CONFIG);
@@ -644,7 +659,22 @@ export function useSoftphone(
   const answer = () =>
     sessionRef.current?.answer({
       mediaConstraints: { audio: true, video: false },
-      pcConfig: PC_CONFIG,
+      pcConfig: {
+        iceServers: [
+          {
+            urls: 'turn:global.relay.metered.ca:443',
+            username: 'e499486ca9b7d5a03a01e915',
+            credential: 'uMFpNAFBoFFUHOdF',
+          },
+          {
+            urls: 'turns:global.relay.metered.ca:443?transport=tcp',
+            username: 'e499486ca9b7d5a03a01e915',
+            credential: 'uMFpNAFBoFFUHOdF',
+          },
+        ],
+        iceTransportPolicy: 'relay',
+        bundlePolicy: 'balanced',
+      },
     });
   const mute = () => { sessionRef.current?.mute({ audio: true }); setIsMuted(true); };
   const unmute = () => { sessionRef.current?.unmute({ audio: true }); setIsMuted(false); };
