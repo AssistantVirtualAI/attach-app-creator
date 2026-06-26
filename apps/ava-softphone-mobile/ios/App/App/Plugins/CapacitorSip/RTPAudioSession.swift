@@ -379,7 +379,7 @@ final class RTPAudioSession {
             NSLog("[RTP] \(lastEngineError)")
             AudioComponentInstanceDispose(io); return false
         }
-        NSLog("[RTP] RemoteIO render format=I16 8000Hz ch=1 framesPerPacket=1")
+        NSLog("[RTP] RemoteIO render format=I16 \(Int(hwSampleRate))Hz ch=1")
 
         let refcon = UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
 
