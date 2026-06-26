@@ -13,6 +13,8 @@
 		62C0A1112D47000100C0FFEE /* CapacitorSip.m in Sources */ = {isa = PBXBuildFile; fileRef = 62C0A1102D47000100C0FFEE /* CapacitorSip.m */; };
 		62C0A1152D47000100C0FFEE /* CapacitorSip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62C0A1122D47000100C0FFEE /* CapacitorSip.swift */; };
 		62C0A1162D47000100C0FFEE /* AppBridgeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62C0A1172D47000100C0FFEE /* AppBridgeViewController.swift */; };
+		62C0A1182D47000100C0FFEE /* RTPAudioSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62C0A1192D47000100C0FFEE /* RTPAudioSession.swift */; };
+
 		504EC30D1FED79650016851F /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30B1FED79650016851F /* Main.storyboard */; };
 		504EC30F1FED79650016851F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30E1FED79650016851F /* Assets.xcassets */; };
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
@@ -33,6 +35,8 @@
 		62C0A1102D47000100C0FFEE /* CapacitorSip.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CapacitorSip.m; sourceTree = "<group>"; };
 		62C0A1122D47000100C0FFEE /* CapacitorSip.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CapacitorSip.swift; sourceTree = "<group>"; };
 		62C0A1172D47000100C0FFEE /* AppBridgeViewController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppBridgeViewController.swift; sourceTree = "<group>"; };
+		62C0A1192D47000100C0FFEE /* RTPAudioSession.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RTPAudioSession.swift; sourceTree = "<group>"; };
+
 		AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_App.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		AF51FD2D460BCFE21FA515B2 /* Pods-App.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.release.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.release.xcconfig"; sourceTree = "<group>"; };
 		FC68EB0AF532CFC21C3344DD /* Pods-App.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.debug.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.debug.xcconfig"; sourceTree = "<group>"; };
@@ -106,8 +110,10 @@
 			children = (
 				62C0A1102D47000100C0FFEE /* CapacitorSip.m */,
 				62C0A1122D47000100C0FFEE /* CapacitorSip.swift */,
+				62C0A1192D47000100C0FFEE /* RTPAudioSession.swift */,
 			);
 			path = CapacitorSip;
+
 			sourceTree = "<group>";
 		};
 		7F8756D8B27F46E3366F6CEA /* Pods */ = {
@@ -238,7 +244,9 @@
 				62C0A1112D47000100C0FFEE /* CapacitorSip.m in Sources */,
 				62C0A1152D47000100C0FFEE /* CapacitorSip.swift in Sources */,
 				62C0A1162D47000100C0FFEE /* AppBridgeViewController.swift in Sources */,
+				62C0A1182D47000100C0FFEE /* RTPAudioSession.swift in Sources */,
 			);
+
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */

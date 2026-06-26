@@ -58,6 +58,67 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     private var isOnHold: Bool = false
     private var localSdpPort: Int = 40000
 
+    // MARK: - RTP audio
+    private var rtp: RTPAudioSession?
+    private var localRtpIp: String = "0.0.0.0"
+    private var localRtpPort: UInt16 = 0
+    private var remoteRtpIp: String = ""
+    private var remoteRtpPort: UInt16 = 0
+    private var rtpStarted: Bool = false
+
+    private func ensureRtpSocket() {
+        if rtp != nil { return }
+        let session = RTPAudioSession()
+        do {
+            try session.prepareLocalSocket()
+            self.rtp = session
+            self.localRtpIp = session.localIp
+            self.localRtpPort = session.localPort
+            log("RTP socket bound \(localRtpIp):\(localRtpPort)")
+        } catch {
+            log("RTP socket bind failed: \(error.localizedDescription)")
+        }
+    }
+
+    private func startRtpIfReady() {
+        guard !rtpStarted, let rtp = rtp, !remoteRtpIp.isEmpty, remoteRtpPort > 0 else { return }
+        rtpStarted = true
+        rtp.setMuted(isMuted)
+        rtp.start(remoteIp: remoteRtpIp, remotePort: remoteRtpPort)
+        log("RTP started → \(remoteRtpIp):\(remoteRtpPort)")
+    }
+
+    private func stopRtp() {
+        rtpStarted = false
+        rtp?.stop()
+        rtp = nil
+        remoteRtpIp = ""; remoteRtpPort = 0
+        localRtpIp = "0.0.0.0"; localRtpPort = 0
+    }
+
+    /// Parse SDP body, populating remoteRtpIp / remoteRtpPort.
+    private func parseRemoteSdp(_ msg: String) {
+        guard let bodyStart = msg.range(of: "\r\n\r\n") else { return }
+        let body = String(msg[bodyStart.upperBound...])
+        var ip = ""
+        var port: UInt16 = 0
+        for raw in body.split(separator: "\r\n") {
+            let line = String(raw)
+            if line.hasPrefix("c=IN IP4 ") {
+                ip = String(line.dropFirst("c=IN IP4 ".count)).trimmingCharacters(in: .whitespaces)
+            } else if line.hasPrefix("m=audio ") {
+                let parts = line.split(separator: " ")
+                if parts.count >= 2, let p = UInt16(parts[1]) { port = p }
+            }
+        }
+        if !ip.isEmpty && port > 0 {
+            remoteRtpIp = ip
+            remoteRtpPort = port
+            log("remote SDP audio = \(ip):\(port)")
+        }
+    }
+
+
     // MARK: - Logging
     private func log(_ msg: String) {
         NSLog("[CapacitorPjsip] \(msg)")
@@ -174,6 +235,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         callState = "calling"
         isMuted = false
         isOnHold = false
+        ensureRtpSocket()
         emitCallState("ringing", direction: "out", number: number, stage: "before_invite")
         sendInvite(to: number, authHeader: nil)
         emitCallState("ringing", direction: "out", number: number, stage: "invite_sent")
@@ -190,6 +252,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
             sendResponseToInvite(code: 486, reason: "Busy Here")
         }
         let id = callActiveId
+        stopRtp()
         resetCallState()
         emitCallEnded("local_hangup", callId: id)
         call.resolve(["ok": true])
@@ -197,15 +260,21 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
 
     @objc func answer(_ call: CAPPluginCall) {
         if callState != "incoming" { call.reject("no incoming call"); return }
+        ensureRtpSocket()
+        parseRemoteSdp(lastInviteRequest)
         sendResponseToInvite(code: 200, reason: "OK", withSdp: true)
         callState = "active"
+        startRtpIfReady()
         emitCallState("active", direction: "in")
         call.resolve(["ok": true])
     }
 
+
     @objc func setMute(_ call: CAPPluginCall) {
         let muted = call.getBool("muted") ?? !isMuted
         isMuted = muted
+        rtp?.setMuted(muted)
+
         let session = AVAudioSession.sharedInstance()
         do {
             try session.setCategory(.playAndRecord, mode: .voiceChat,
@@ -344,6 +413,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         case "BYE":
             send200OK(to: msg)
             let id = callActiveId
+            stopRtp()
             resetCallState()
             emitCallEnded("remote_bye", callId: id)
         case "CANCEL":
@@ -351,9 +421,11 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
             if callState == "incoming" {
                 sendResponseToInvite(code: 487, reason: "Request Terminated")
                 let id = callActiveId
+                stopRtp()
                 resetCallState()
                 emitCallEnded("remote_cancel", callId: id)
             }
+
         case "INFO", "NOTIFY", "OPTIONS", "MESSAGE":
             send200OK(to: msg)
         default:
@@ -367,6 +439,9 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         callState = "incoming"
         callActiveId = headerValue(msg, "Call-ID") ?? UUID().uuidString
         callLocalTag = String(UUID().uuidString.prefix(8))
+        ensureRtpSocket()
+        parseRemoteSdp(msg)
+
         let fromH = headerValue(msg, "From") ?? ""
         callRemoteUri = extractUri(fromH)
         callRemoteContact = extractUri(headerValue(msg, "Contact") ?? fromH)
@@ -446,23 +521,28 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
                 } else {
                     log("INVITE \(code) missing auth header")
                     let id = callActiveId
+                    stopRtp()
                     resetCallState()
                     emitCallEnded("INVITE \(code) without auth header", callId: id)
                 }
             } else if code == "200" {
                 callRemoteTag = extractTag(headerValue(msg, "To") ?? "")
                 if let contact = headerValue(msg, "Contact") { callRemoteContact = extractUri(contact) }
+                parseRemoteSdp(msg)
                 sendAck(to: msg, withinDialog: true)
                 if callDirection.isEmpty { callDirection = "out" }
                 callState = "active"
+                startRtpIfReady()
                 log("CALL_EVENT|INVITE_200_OK→active|callId=\(callActiveId)")
                 emitCallState("active", direction: "out", stage: "answered", code: code)
             } else if let n = Int(code), n >= 300 {
                 sendAck(to: msg, withinDialog: false)
                 let id = callActiveId
+                stopRtp()
                 resetCallState()
                 emitCallEnded(firstLine, callId: id)
             }
+
         }
         // BYE response — clean up
         if cseqMethod == "BYE" {
@@ -625,7 +705,10 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     }
 
     private func buildSdp(hold: Bool = false) -> String {
-        let ip = "0.0.0.0"
+        let ip = localRtpIp.isEmpty || localRtpIp == "0.0.0.0"
+            ? (RTPAudioSession.primaryLocalIPv4() ?? "0.0.0.0")
+            : localRtpIp
+        let port = localRtpPort > 0 ? Int(localRtpPort) : localSdpPort
         let direction = hold ? "a=sendonly" : "a=sendrecv"
         var sdp = ""
         sdp += "v=0\r\n"
@@ -633,7 +716,8 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         sdp += "s=CapacitorPjsip\r\n"
         sdp += "c=IN IP4 \(ip)\r\n"
         sdp += "t=0 0\r\n"
-        sdp += "m=audio \(localSdpPort) RTP/AVP 0 8 101\r\n"
+        sdp += "m=audio \(port) RTP/AVP 0 8 101\r\n"
+
         sdp += "a=rtpmap:0 PCMU/8000\r\n"
         sdp += "a=rtpmap:8 PCMA/8000\r\n"
         sdp += "a=rtpmap:101 telephone-event/8000\r\n"
