@@ -86,4 +86,28 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication, continue userActivity: NSUserActivity, restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void) -> Bool {
         return ApplicationDelegateProxy.shared.application(application, continue: userActivity, restorationHandler: restorationHandler)
     }
+
+    // Display an opaque error overlay if the storyboard is mis-wired so the
+    // app does not silently sit in "connecting" forever.
+    private func showBootError(message: String) {
+        guard let window = self.window else { return }
+        let overlay = UIViewController()
+        overlay.view.backgroundColor = UIColor(red: 0.10, green: 0.02, blue: 0.05, alpha: 1)
+        let label = UILabel()
+        label.text = "⚠️ Boot error\n\n\(message)"
+        label.numberOfLines = 0
+        label.textColor = .white
+        label.textAlignment = .center
+        label.font = .systemFont(ofSize: 16, weight: .medium)
+        label.translatesAutoresizingMaskIntoConstraints = false
+        overlay.view.addSubview(label)
+        NSLayoutConstraint.activate([
+            label.centerXAnchor.constraint(equalTo: overlay.view.centerXAnchor),
+            label.centerYAnchor.constraint(equalTo: overlay.view.centerYAnchor),
+            label.leadingAnchor.constraint(equalTo: overlay.view.leadingAnchor, constant: 24),
+            label.trailingAnchor.constraint(equalTo: overlay.view.trailingAnchor, constant: -24)
+        ])
+        window.rootViewController?.present(overlay, animated: false)
+    }
 }
+
