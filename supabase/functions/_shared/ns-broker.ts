@@ -81,7 +81,20 @@ export async function obtainBrokerJwt(extension: string) {
   const env = nsEnv();
   const clientId = Deno.env.get("NS_API_CLIENT_ID") ?? "";
   const clientSecret = Deno.env.get("NS_API_CLIENT_SECRET") ?? "";
+  if (!clientId || !clientSecret) {
+    throw new Error(
+      "NS-API client credentials missing: set NS_API_CLIENT_ID and NS_API_CLIENT_SECRET (NetSapiens OAuth2 app — error OA101 = invalid client).",
+    );
+  }
   const username = env.domain ? `${extension}@${env.domain}` : extension;
+
+  const oauthForm = new URLSearchParams({
+    grant_type: "password",
+    username,
+    password: env.password,
+    client_id: clientId,
+    client_secret: clientSecret,
+  }).toString();
 
   const attempts: Array<{ label: string; url: string; init: RequestInit }> = [
     {
@@ -90,13 +103,17 @@ export async function obtainBrokerJwt(extension: string) {
       init: {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
-        body: new URLSearchParams({
-          grant_type: "password",
-          username,
-          password: env.password,
-          ...(clientId ? { client_id: clientId } : {}),
-          ...(clientSecret ? { client_secret: clientSecret } : {}),
-        }).toString(),
+        body: oauthForm,
+      },
+    },
+    {
+      // some NS installs expose oauth2 at root (no /ns-api prefix)
+      label: "oauth2/token(root)",
+      url: `${env.base}/oauth2/token`,
+      init: {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+        body: oauthForm,
       },
     },
     {
@@ -105,7 +122,12 @@ export async function obtainBrokerJwt(extension: string) {
       init: {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ username, password: env.password }),
+        body: JSON.stringify({
+          username,
+          password: env.password,
+          client_id: clientId,
+          client_secret: clientSecret,
+        }),
       },
     },
   ];
