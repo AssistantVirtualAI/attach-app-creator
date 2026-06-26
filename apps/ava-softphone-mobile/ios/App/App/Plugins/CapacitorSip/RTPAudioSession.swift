@@ -563,20 +563,20 @@ final class RTPAudioSession {
         for i in 0..<n { let a = abs(scratch[i]); if a > peak { peak = a } }
         micPeak = Float(peak) / 32767.0
 
-        // Decimate hwSampleRate → 8000Hz using fractional phase accumulator
-        // (zero-order hold). Small/cheap and OK for narrowband PCMU.
-        let step = rtpSampleRate / hwSampleRate
+        // Integer decimation 48000 → 8000 (every 6th sample). txPhase counts
+        // skipped samples across callbacks so we never lose alignment.
         var decimated = [Int16]()
-        decimated.reserveCapacity(n + 1)
-        var phase = txPhase
+        decimated.reserveCapacity(n / decimation + 1)
+        var skip = Int(txPhase)
         for i in 0..<n {
-            phase += step
-            if phase >= 1.0 {
-                phase -= 1.0
+            if skip == 0 {
                 decimated.append(isMuted ? 0 : scratch[i])
+                skip = decimation - 1
+            } else {
+                skip -= 1
             }
         }
-        txPhase = phase
+        txPhase = Double(skip)
 
         var framesToSend: [[Int16]] = []
         audioLock.lock()
