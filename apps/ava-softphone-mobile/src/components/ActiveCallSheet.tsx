@@ -164,6 +164,26 @@ export default function ActiveCallSheet({
         {sp.snap.muted && inCall && (
           <div style={{ fontSize: 11, color: colors.warning, letterSpacing: 1.2, fontWeight: 700, textTransform: 'uppercase' }}>Microphone muted</div>
         )}
+        {sp.snap.recording && inCall && (
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8,
+            padding: '6px 14px', borderRadius: 999,
+            background: 'rgba(220,38,38,0.18)',
+            border: `1px solid ${colors.danger}88`,
+            fontSize: 11, letterSpacing: 1.4, fontWeight: 800,
+            color: '#ffd5d5', textTransform: 'uppercase',
+            boxShadow: `0 0 24px -6px ${colors.danger}`,
+          }}>
+            <span style={{
+              width: 8, height: 8, borderRadius: '50%',
+              background: colors.danger,
+              animation: 'rec-pulse 1.2s ease-in-out infinite',
+              boxShadow: `0 0 10px ${colors.danger}`,
+            }} />
+            Enregistrement en cours
+          </div>
+        )}
+
         {inCall && (
           <div style={{
             display: 'inline-flex', alignItems: 'center', gap: 8,
