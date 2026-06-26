@@ -41,6 +41,21 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     private var registerTimer: Timer?
     private var rxBuffer: String = ""
 
+    // MARK: - Call state
+    private var callActiveId: String = ""
+    private var callLocalTag: String = ""
+    private var callRemoteTag: String = ""
+    private var callRemoteUri: String = ""
+    private var callRemoteContact: String = ""
+    private var callCseq: Int = 1
+    private var callDirection: String = "" // "out" | "in"
+    private var callState: String = "idle"
+    private var lastInviteRequest: String = ""
+    private var lastInviteAuth: String? = nil
+    private var isMuted: Bool = false
+    private var isOnHold: Bool = false
+    private var localSdpPort: Int = 40000
+
     // MARK: - Logging
     private func log(_ msg: String) {
         NSLog("[CapacitorPjsip] \(msg)")
@@ -128,15 +143,87 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func makeCall(_ call: CAPPluginCall) {
-        log("makeCall not yet implemented in native plugin")
-        call.resolve(["ok": false, "reason": "not_implemented"])
+        let number = call.getString("number") ?? call.getString("destination") ?? ""
+        if number.isEmpty { call.reject("number required"); return }
+        if !registered { call.reject("not registered"); return }
+        callDirection = "out"
+        callActiveId = UUID().uuidString
+        callLocalTag = String(UUID().uuidString.prefix(8))
+        callRemoteTag = ""
+        callRemoteUri = "sip:\(number)@\(domain)"
+        callRemoteContact = callRemoteUri
+        callCseq = 1
+        callState = "calling"
+        isMuted = false
+        isOnHold = false
+        sendInvite(to: number, authHeader: nil)
+        notifyListeners("callStateChanged", data: ["state": "ringing", "direction": "out", "number": number, "callId": callActiveId])
+        call.resolve(["ok": true, "callId": callActiveId])
     }
-    @objc func hangup(_ call: CAPPluginCall) { call.resolve(["ok": true]) }
-    @objc func answer(_ call: CAPPluginCall) { call.resolve(["ok": true]) }
-    @objc func setMute(_ call: CAPPluginCall) { call.resolve(["ok": true]) }
-    @objc func setHold(_ call: CAPPluginCall) { call.resolve(["ok": true]) }
-    @objc func sendDTMF(_ call: CAPPluginCall) { call.resolve(["ok": true]) }
-    @objc func setLogLevel(_ call: CAPPluginCall) { call.resolve(["ok": true]) }
+
+    @objc func hangup(_ call: CAPPluginCall) {
+        if callActiveId.isEmpty { call.resolve(["ok": true, "noCall": true]); return }
+        if callState == "calling" || callState == "ringing" {
+            sendCancel()
+        } else if callState == "active" || callState == "hold" {
+            sendBye()
+        } else if callState == "incoming" {
+            sendResponseToInvite(code: 486, reason: "Busy Here")
+        }
+        let id = callActiveId
+        resetCallState()
+        notifyListeners("callEnded", data: ["callId": id, "reason": "local_hangup"])
+        call.resolve(["ok": true])
+    }
+
+    @objc func answer(_ call: CAPPluginCall) {
+        if callState != "incoming" { call.reject("no incoming call"); return }
+        sendResponseToInvite(code: 200, reason: "OK", withSdp: true)
+        callState = "active"
+        notifyListeners("callStateChanged", data: ["state": "active", "direction": "in", "callId": callActiveId])
+        call.resolve(["ok": true])
+    }
+
+    @objc func setMute(_ call: CAPPluginCall) {
+        let muted = call.getBool("muted") ?? !isMuted
+        isMuted = muted
+        let session = AVAudioSession.sharedInstance()
+        do {
+            try session.setCategory(.playAndRecord, mode: .voiceChat,
+                                    options: muted ? [.allowBluetooth, .defaultToSpeaker] : [.allowBluetooth, .allowBluetoothA2DP, .defaultToSpeaker, .duckOthers])
+            try session.setActive(true, options: [])
+        } catch {
+            log("setMute audio session error: \(error.localizedDescription)")
+        }
+        notifyListeners("muteChanged", data: ["muted": muted])
+        call.resolve(["ok": true, "muted": muted])
+    }
+
+    @objc func setHold(_ call: CAPPluginCall) {
+        let hold = call.getBool("held") ?? call.getBool("onHold") ?? !isOnHold
+        if callActiveId.isEmpty || (callState != "active" && callState != "hold") {
+            call.reject("no active call")
+            return
+        }
+        isOnHold = hold
+        callCseq += 1
+        sendReInvite(hold: hold)
+        callState = hold ? "hold" : "active"
+        notifyListeners("holdChanged", data: ["held": hold, "onHold": hold])
+        call.resolve(["ok": true, "held": hold])
+    }
+
+    @objc func sendDTMF(_ call: CAPPluginCall) {
+        let digits = call.getString("digits") ?? call.getString("digit") ?? ""
+        if digits.isEmpty || callActiveId.isEmpty { call.resolve(["ok": false]); return }
+        for ch in digits {
+            sendInfoDtmf(digit: String(ch))
+            callCseq += 1
+        }
+        call.resolve(["ok": true])
+    }
+
+    @objc func setLogLevel(_ call: CAPPluginCall) { call.resolve(["ok": true, "level": call.getInt("level") ?? 3]) }
 
     @objc func unregister(_ call: CAPPluginCall) {
         connection?.cancel()
@@ -227,9 +314,49 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
 
     private func handleRequest(_ msg: String, firstLine: String) {
         let method = firstLine.split(separator: " ").first.map(String.init) ?? ""
-        if method == "NOTIFY" || method == "OPTIONS" || method == "MESSAGE" {
+        switch method {
+        case "INVITE":
+            handleIncomingInvite(msg)
+        case "ACK":
+            // Confirmed answered call (for incoming we answered)
+            if callDirection == "in" && callState == "active" {
+                log("ACK received — call confirmed")
+            }
+        case "BYE":
+            send200OK(to: msg)
+            let id = callActiveId
+            resetCallState()
+            notifyListeners("callEnded", data: ["callId": id, "reason": "remote_bye"])
+        case "CANCEL":
+            send200OK(to: msg)
+            if callState == "incoming" {
+                sendResponseToInvite(code: 487, reason: "Request Terminated")
+                let id = callActiveId
+                resetCallState()
+                notifyListeners("callEnded", data: ["callId": id, "reason": "remote_cancel"])
+            }
+        case "INFO", "NOTIFY", "OPTIONS", "MESSAGE":
+            send200OK(to: msg)
+        default:
             send200OK(to: msg)
         }
+    }
+
+    private func handleIncomingInvite(_ msg: String) {
+        lastInviteRequest = msg
+        callDirection = "in"
+        callState = "incoming"
+        callActiveId = headerValue(msg, "Call-ID") ?? UUID().uuidString
+        callLocalTag = String(UUID().uuidString.prefix(8))
+        let fromH = headerValue(msg, "From") ?? ""
+        callRemoteUri = extractUri(fromH)
+        callRemoteContact = extractUri(headerValue(msg, "Contact") ?? fromH)
+        let fromNumber = extractUser(fromH)
+        // Send 100 Trying then 180 Ringing
+        sendResponseToInvite(code: 100, reason: "Trying")
+        sendResponseToInvite(code: 180, reason: "Ringing")
+        notifyListeners("callReceived", data: ["from": fromNumber, "callId": callActiveId])
+        notifyListeners("callStateChanged", data: ["state": "ringing", "direction": "in", "number": fromNumber, "callId": callActiveId])
     }
 
     private func send200OK(to request: String) {
@@ -300,6 +427,42 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         } else if let n = Int(code), n >= 400, cseqMethod == "REGISTER" {
             notifyListeners("registrationFailed", data: ["reason": firstLine])
         }
+
+        // INVITE responses (outgoing call leg)
+        if cseqMethod == "INVITE" && callDirection == "out" && !callActiveId.isEmpty {
+            if code == "100" {
+                // Trying — noop
+            } else if code == "180" || code == "183" {
+                callState = "ringing"
+                notifyListeners("callStateChanged", data: ["state": "ringing", "direction": "out", "callId": callActiveId])
+            } else if code == "401" || code == "407" {
+                if let wwwLine = msg.split(separator: "\r\n").first(where: {
+                    $0.lowercased().hasPrefix("www-authenticate:") || $0.lowercased().hasPrefix("proxy-authenticate:")
+                }).map(String.init) {
+                    let (realm, nonce) = parseAuth(wwwLine)
+                    callCseq += 1
+                    let target = extractUser(callRemoteUri)
+                    let auth = buildAuthHeader(method: "INVITE", uri: callRemoteUri, realm: realm, nonce: nonce)
+                    sendAck(to: msg, withinDialog: false)
+                    sendInvite(to: target, authHeader: auth)
+                }
+            } else if code == "200" {
+                callRemoteTag = extractTag(headerValue(msg, "To") ?? "")
+                if let contact = headerValue(msg, "Contact") { callRemoteContact = extractUri(contact) }
+                sendAck(to: msg, withinDialog: true)
+                callState = "active"
+                notifyListeners("callStateChanged", data: ["state": "active", "direction": "out", "callId": callActiveId])
+            } else if let n = Int(code), n >= 300 {
+                sendAck(to: msg, withinDialog: false)
+                let id = callActiveId
+                resetCallState()
+                notifyListeners("callEnded", data: ["callId": id, "reason": firstLine])
+            }
+        }
+        // BYE response — clean up
+        if cseqMethod == "BYE" {
+            // already notified locally on hangup
+        }
     }
 
     private func parseAuth(_ header: String) -> (String, String) {
@@ -366,5 +529,212 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         conn.send(content: msg.data(using: .utf8), completion: .contentProcessed { [weak self] error in
             if let error = error { self?.log("sendRaw error: \(error.localizedDescription)") }
         })
+    }
+
+    // MARK: - Call signaling helpers
+    private func resetCallState() {
+        callActiveId = ""; callLocalTag = ""; callRemoteTag = ""
+        callRemoteUri = ""; callRemoteContact = ""
+        callState = "idle"; callDirection = ""
+        isMuted = false; isOnHold = false
+        lastInviteRequest = ""; lastInviteAuth = nil
+    }
+
+    private func headerValue(_ msg: String, _ name: String) -> String? {
+        let prefix = name.lowercased() + ":"
+        for raw in msg.split(separator: "\r\n") {
+            let line = String(raw)
+            if line.lowercased().hasPrefix(prefix) {
+                let v = line.dropFirst(prefix.count).trimmingCharacters(in: .whitespaces)
+                return v
+            }
+        }
+        return nil
+    }
+
+    private func extractUri(_ header: String) -> String {
+        if let lt = header.firstIndex(of: "<"), let gt = header.firstIndex(of: ">"), lt < gt {
+            return String(header[header.index(after: lt)..<gt])
+        }
+        return header.split(separator: ";").first.map { String($0).trimmingCharacters(in: .whitespaces) } ?? header
+    }
+
+    private func extractUser(_ uri: String) -> String {
+        let u = uri.replacingOccurrences(of: "sip:", with: "").replacingOccurrences(of: "sips:", with: "")
+        if let at = u.firstIndex(of: "@") { return String(u[..<at]) }
+        return u
+    }
+
+    private func extractTag(_ header: String) -> String {
+        for part in header.split(separator: ";") {
+            let p = part.trimmingCharacters(in: .whitespaces)
+            if p.lowercased().hasPrefix("tag=") { return String(p.dropFirst(4)) }
+        }
+        return ""
+    }
+
+    private func buildSdp(hold: Bool = false) -> String {
+        let ip = "0.0.0.0"
+        let direction = hold ? "a=sendonly" : "a=sendrecv"
+        var sdp = ""
+        sdp += "v=0\r\n"
+        sdp += "o=- \(Int(Date().timeIntervalSince1970)) 1 IN IP4 \(ip)\r\n"
+        sdp += "s=CapacitorPjsip\r\n"
+        sdp += "c=IN IP4 \(ip)\r\n"
+        sdp += "t=0 0\r\n"
+        sdp += "m=audio \(localSdpPort) RTP/AVP 0 8 101\r\n"
+        sdp += "a=rtpmap:0 PCMU/8000\r\n"
+        sdp += "a=rtpmap:8 PCMA/8000\r\n"
+        sdp += "a=rtpmap:101 telephone-event/8000\r\n"
+        sdp += "a=fmtp:101 0-16\r\n"
+        sdp += direction + "\r\n"
+        return sdp
+    }
+
+    private func sendInvite(to number: String, authHeader: String?) {
+        let br = branch
+        let uri = "sip:\(number)@\(domain)"
+        callRemoteUri = uri
+        let sdp = buildSdp()
+        var msg = ""
+        msg += "INVITE \(uri) SIP/2.0\r\n"
+        msg += "Via: SIP/2.0/TCP 0.0.0.0;branch=\(br);rport\r\n"
+        msg += "Max-Forwards: 70\r\n"
+        msg += "From: \"\(displayName)\" <sip:\(username)@\(domain)>;tag=\(callLocalTag)\r\n"
+        msg += "To: <\(uri)>\r\n"
+        msg += "Call-ID: \(callActiveId)\r\n"
+        msg += "CSeq: \(callCseq) INVITE\r\n"
+        msg += "Contact: <sip:\(username)@0.0.0.0;transport=tcp>\r\n"
+        msg += "User-Agent: CapacitorPjsip/1.0\r\n"
+        msg += "Allow: INVITE, ACK, CANCEL, BYE, INFO, OPTIONS, NOTIFY\r\n"
+        if let auth = authHeader { msg += auth }
+        msg += "Content-Type: application/sdp\r\n"
+        msg += "Content-Length: \(sdp.utf8.count)\r\n\r\n"
+        msg += sdp
+        log(">>> INVITE \(uri) cseq=\(callCseq)\(authHeader != nil ? " (auth)" : "")")
+        sendRaw(msg)
+    }
+
+    private func sendAck(to response: String, withinDialog: Bool) {
+        let toH = headerValue(response, "To") ?? ""
+        let fromH = headerValue(response, "From") ?? ""
+        let callid = headerValue(response, "Call-ID") ?? callActiveId
+        let viaH = headerValue(response, "Via") ?? "SIP/2.0/TCP 0.0.0.0;branch=\(branch)"
+        let target = withinDialog ? callRemoteContact : callRemoteUri
+        var msg = ""
+        msg += "ACK \(target) SIP/2.0\r\n"
+        msg += "Via: \(viaH)\r\n"
+        msg += "Max-Forwards: 70\r\n"
+        msg += "From: \(fromH)\r\n"
+        msg += "To: \(toH)\r\n"
+        msg += "Call-ID: \(callid)\r\n"
+        msg += "CSeq: \(callCseq) ACK\r\n"
+        msg += "Content-Length: 0\r\n\r\n"
+        log(">>> ACK")
+        sendRaw(msg)
+    }
+
+    private func sendBye() {
+        callCseq += 1
+        let br = branch
+        var msg = ""
+        msg += "BYE \(callRemoteContact.isEmpty ? callRemoteUri : callRemoteContact) SIP/2.0\r\n"
+        msg += "Via: SIP/2.0/TCP 0.0.0.0;branch=\(br);rport\r\n"
+        msg += "Max-Forwards: 70\r\n"
+        msg += "From: \"\(displayName)\" <sip:\(username)@\(domain)>;tag=\(callLocalTag)\r\n"
+        msg += "To: <\(callRemoteUri)>" + (callRemoteTag.isEmpty ? "" : ";tag=\(callRemoteTag)") + "\r\n"
+        msg += "Call-ID: \(callActiveId)\r\n"
+        msg += "CSeq: \(callCseq) BYE\r\n"
+        msg += "User-Agent: CapacitorPjsip/1.0\r\n"
+        msg += "Content-Length: 0\r\n\r\n"
+        log(">>> BYE")
+        sendRaw(msg)
+    }
+
+    private func sendCancel() {
+        let br = branch
+        var msg = ""
+        msg += "CANCEL \(callRemoteUri) SIP/2.0\r\n"
+        msg += "Via: SIP/2.0/TCP 0.0.0.0;branch=\(br);rport\r\n"
+        msg += "Max-Forwards: 70\r\n"
+        msg += "From: \"\(displayName)\" <sip:\(username)@\(domain)>;tag=\(callLocalTag)\r\n"
+        msg += "To: <\(callRemoteUri)>\r\n"
+        msg += "Call-ID: \(callActiveId)\r\n"
+        msg += "CSeq: \(callCseq) CANCEL\r\n"
+        msg += "Content-Length: 0\r\n\r\n"
+        log(">>> CANCEL")
+        sendRaw(msg)
+    }
+
+    private func sendReInvite(hold: Bool) {
+        let br = branch
+        let target = callRemoteContact.isEmpty ? callRemoteUri : callRemoteContact
+        let sdp = buildSdp(hold: hold)
+        var msg = ""
+        msg += "INVITE \(target) SIP/2.0\r\n"
+        msg += "Via: SIP/2.0/TCP 0.0.0.0;branch=\(br);rport\r\n"
+        msg += "Max-Forwards: 70\r\n"
+        msg += "From: \"\(displayName)\" <sip:\(username)@\(domain)>;tag=\(callLocalTag)\r\n"
+        msg += "To: <\(callRemoteUri)>" + (callRemoteTag.isEmpty ? "" : ";tag=\(callRemoteTag)") + "\r\n"
+        msg += "Call-ID: \(callActiveId)\r\n"
+        msg += "CSeq: \(callCseq) INVITE\r\n"
+        msg += "Contact: <sip:\(username)@0.0.0.0;transport=tcp>\r\n"
+        msg += "Content-Type: application/sdp\r\n"
+        msg += "Content-Length: \(sdp.utf8.count)\r\n\r\n"
+        msg += sdp
+        log(">>> re-INVITE hold=\(hold)")
+        sendRaw(msg)
+    }
+
+    private func sendInfoDtmf(digit: String) {
+        let body = "Signal=\(digit)\r\nDuration=160\r\n"
+        let br = branch
+        let target = callRemoteContact.isEmpty ? callRemoteUri : callRemoteContact
+        var msg = ""
+        msg += "INFO \(target) SIP/2.0\r\n"
+        msg += "Via: SIP/2.0/TCP 0.0.0.0;branch=\(br);rport\r\n"
+        msg += "Max-Forwards: 70\r\n"
+        msg += "From: \"\(displayName)\" <sip:\(username)@\(domain)>;tag=\(callLocalTag)\r\n"
+        msg += "To: <\(callRemoteUri)>" + (callRemoteTag.isEmpty ? "" : ";tag=\(callRemoteTag)") + "\r\n"
+        msg += "Call-ID: \(callActiveId)\r\n"
+        msg += "CSeq: \(callCseq) INFO\r\n"
+        msg += "Content-Type: application/dtmf-relay\r\n"
+        msg += "Content-Length: \(body.utf8.count)\r\n\r\n"
+        msg += body
+        log(">>> INFO DTMF \(digit)")
+        sendRaw(msg)
+    }
+
+    private func sendResponseToInvite(code: Int, reason: String, withSdp: Bool = false) {
+        guard !lastInviteRequest.isEmpty else { return }
+        let lines = lastInviteRequest.split(separator: "\r\n").map(String.init)
+        var via = "", from = "", toH = "", callid = "", cseqH = ""
+        for l in lines {
+            let lo = l.lowercased()
+            if lo.hasPrefix("via:") && via.isEmpty { via = l }
+            else if lo.hasPrefix("from:") { from = l }
+            else if lo.hasPrefix("to:") { toH = l }
+            else if lo.hasPrefix("call-id:") { callid = l }
+            else if lo.hasPrefix("cseq:") { cseqH = l }
+        }
+        var resp = "SIP/2.0 \(code) \(reason)\r\n"
+        resp += via + "\r\n"
+        resp += from + "\r\n"
+        resp += toH + (toH.contains(";tag=") ? "" : ";tag=\(callLocalTag)") + "\r\n"
+        resp += callid + "\r\n"
+        resp += cseqH + "\r\n"
+        if code == 200 {
+            resp += "Contact: <sip:\(username)@0.0.0.0;transport=tcp>\r\n"
+        }
+        if withSdp && code == 200 {
+            let sdp = buildSdp()
+            resp += "Content-Type: application/sdp\r\n"
+            resp += "Content-Length: \(sdp.utf8.count)\r\n\r\n"
+            resp += sdp
+        } else {
+            resp += "Content-Length: 0\r\n\r\n"
+        }
+        sendRaw(resp)
+        log(">>> \(code) \(reason) (to INVITE)")
     }
 }
