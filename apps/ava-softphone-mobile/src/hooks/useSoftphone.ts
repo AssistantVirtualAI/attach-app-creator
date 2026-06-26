@@ -47,7 +47,7 @@ export interface UseSoftphoneReturn {
   negotiatedCodec: string | null;
 }
 
-export function useSoftphone(
+export function useSoftphoneJsSip(
   config: SIPConfig | null,
   opts: { jsSipTimeoutMs?: number } = {},
 ): UseSoftphoneReturn {
