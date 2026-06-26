@@ -18,13 +18,19 @@ async function checkOnce(reason: string) {
       headers: { "Cache-Control": "no-store", Pragma: "no-cache" },
     });
     if (!res.ok) return;
-    const latest = await res.json();
+    // Skip silently when the server returns HTML (preview origins, 404 fallbacks).
+    const ct = res.headers.get("content-type") || "";
+    if (!ct.includes("json")) return;
+    const text = await res.text();
+    if (!text || text.trim().startsWith("<")) return;
+    let latest: any;
+    try { latest = JSON.parse(text); } catch { return; }
     if (latest?.buildId && latest.buildId !== BUILD_ID) {
       console.warn(`[AVA] new build detected (${reason}): ${latest.buildId} ≠ ${BUILD_ID}`);
       await hardReload(`poller-${reason}`);
     }
-  } catch (e) {
-    console.warn("[AVA] build-version poll failed", e);
+  } catch {
+    // Swallow — never reload because of a transient poll failure.
   }
 }
 
