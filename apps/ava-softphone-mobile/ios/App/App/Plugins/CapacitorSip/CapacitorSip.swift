@@ -154,6 +154,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         let body = String(msg[bodyStart.upperBound...])
         var ip = ""
         var port: UInt16 = 0
+        var direction = "sendrecv" // default per RFC 3264 when no a=* present
         for raw in body.split(separator: "\r\n") {
             let line = String(raw)
             if line.hasPrefix("c=IN IP4 ") {
@@ -161,13 +162,25 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
             } else if line.hasPrefix("m=audio ") {
                 let parts = line.split(separator: " ")
                 if parts.count >= 2, let p = UInt16(parts[1]) { port = p }
+            } else if line == "a=recvonly" || line == "a=sendonly" || line == "a=sendrecv" || line == "a=inactive" {
+                direction = String(line.dropFirst("a=".count))
             }
         }
         if !ip.isEmpty && port > 0 {
             remoteRtpIp = ip
             remoteRtpPort = port
-            log("remote SDP audio = \(ip):\(port)")
+            log("remote SDP audio=\(ip):\(port) direction=\(direction)")
+            // FusionPBX sometimes answers a=recvonly even though our offer was
+            // sendrecv (typically when a media bug / bridge is mid-setup). We
+            // keep transmitting RTP regardless — the remote can drop what it
+            // doesn't want — to avoid one-way audio when the PBX re-negotiates.
+            if direction == "recvonly" || direction == "inactive" {
+                log("remote=\(direction) — continuing to send RTP anyway (FusionPBX compat)")
+            }
         }
+        // Dump full remote SDP for diagnostics (truncated to avoid log spam).
+        let truncated = body.count > 800 ? String(body.prefix(800)) + "…[+\(body.count-800)b]" : body
+        log("REMOTE SDP <<<\n\(truncated)")
     }
 
 
@@ -884,6 +897,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         let uri = "sip:\(number)@\(domain)"
         callRemoteUri = uri
         let sdp = buildSdp()
+        log("LOCAL SDP (INVITE) >>>\n\(sdp)")
         var msg = ""
         msg += "INVITE \(uri) SIP/2.0\r\n"
         msg += "Via: SIP/2.0/TCP \(sigLocalIp());branch=\(br);rport\r\n"
@@ -959,6 +973,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         let br = branch
         let target = callRemoteContact.isEmpty ? callRemoteUri : callRemoteContact
         let sdp = buildSdp(hold: hold)
+        log("LOCAL SDP (re-INVITE hold=\(hold)) >>>\n\(sdp)")
         var msg = ""
         msg += "INVITE \(target) SIP/2.0\r\n"
         msg += "Via: SIP/2.0/TCP \(sigLocalIp());branch=\(br);rport\r\n"
@@ -1017,6 +1032,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         }
         if withSdp && code == 200 {
             let sdp = buildSdp()
+            log("LOCAL SDP (\(code) answer) >>>\n\(sdp)")
             resp += "Content-Type: application/sdp\r\n"
             resp += "Content-Length: \(sdp.utf8.count)\r\n\r\n"
             resp += sdp
