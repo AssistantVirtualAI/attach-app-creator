@@ -24,6 +24,9 @@ export default function IceDiagnosticsOverlay() {
   const [firstRelayMs, setFirstRelayMs] = useState<number | null>(null);
   const [connectedMs, setConnectedMs] = useState<number | null>(null);
   const [candidates, setCandidates] = useState<{ source: string; raw: string; t: number }[]>([]);
+  const [mdnsCount, setMdnsCount] = useState(0);
+  const [errors, setErrors] = useState<{ where: string; message: string; t: number }[]>([]);
+  const [fallback, setFallback] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(true);
   const [copied, setCopied] = useState(false);
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -43,6 +46,11 @@ export default function IceDiagnosticsOverlay() {
       else if (e.kind === 'ice-connected') setConnectedMs(e.latencyMs);
       else if (e.kind === 'candidate') {
         setCandidates((prev) => [{ source: e.source, raw: e.raw, t: Date.now() }, ...prev].slice(0, 5));
+      } else if (e.kind === 'mdns-candidate') setMdnsCount((n) => n + 1);
+      else if (e.kind === 'webrtc-error') {
+        setErrors((prev) => [{ where: e.where, message: e.message, t: Date.now() }, ...prev].slice(0, 5));
+      } else if (e.kind === 'ice-fallback') {
+        setFallback(`${e.from} → ${e.to} (${e.reason})`);
       }
     });
     return () => { off(); if (copyTimerRef.current) clearTimeout(copyTimerRef.current); };
