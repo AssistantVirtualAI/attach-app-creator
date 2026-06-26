@@ -93,8 +93,32 @@ final class RTPAudioSession {
             "converterFormat": converterFormatDesc,
             "converterRebuilds": converterRebuilds,
             "convertErrors": convertErrors,
-            "lastConvertError": lastConvertError
+            "lastConvertError": lastConvertError,
+            "engineRestartAttempts": engineRestartAttempts,
+            "engineRestartTotal": engineRestartTotal,
+            "lastEngineError": lastEngineError,
+            "sessionState": sessionStateDescription()
         ]
+    }
+
+    /// One-line snapshot of the current AVAudioSession configuration. Useful
+    /// when diagnosing conflicts with CapacitorSip (which also touches the
+    /// shared session) and when verifying the .playAndRecord/.voiceChat
+    /// category we expect for full-duplex VoIP.
+    private func sessionStateDescription() -> String {
+        let s = AVAudioSession.sharedInstance()
+        let cat = s.category.rawValue
+        let mode = s.mode.rawValue
+        let opts = s.categoryOptions.rawValue
+        let sr = s.sampleRate
+        let io = s.ioBufferDuration * 1000
+        let inAvail = s.isInputAvailable
+        let other = s.isOtherAudioPlaying
+        return "cat=\(cat) mode=\(mode) opts=0x\(String(opts, radix: 16)) sr=\(Int(sr)) io=\(Int(io))ms input=\(inAvail) other=\(other)"
+    }
+
+    private func logSessionState(_ tag: String) {
+        NSLog("[RTP] session[\(tag)] \(sessionStateDescription()) route=\(currentRouteDescription())")
     }
 
     // MARK: - Lifecycle
