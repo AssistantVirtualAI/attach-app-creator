@@ -414,7 +414,39 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         call.resolve(["outputs": outputs, "availableInputs": inputs])
     }
 
-    // MARK: - TCP / SIP
+    // MARK: - Pre-call audio test
+    @objc func playTestTone(_ call: CAPPluginCall) {
+        let seconds = call.getDouble("seconds") ?? 1.5
+        let freq = call.getDouble("frequency") ?? 440.0
+        let session = AVAudioSession.sharedInstance()
+        do {
+            try session.setCategory(.playAndRecord, mode: .voiceChat,
+                                    options: [.allowBluetooth, .allowBluetoothA2DP,
+                                              .defaultToSpeaker, .duckOthers])
+            try session.setActive(true, options: [])
+        } catch { /* non-fatal */ }
+        let tester = rtp ?? RTPAudioSession()
+        tester.playTestTone(seconds: seconds, frequency: freq)
+        // Sample mic peak for `seconds` then return the max value.
+        let deadline = DispatchTime.now() + .milliseconds(Int(seconds * 1000) + 200)
+        DispatchQueue.global().asyncAfter(deadline: deadline) {
+            let snap = tester.snapshot()
+            call.resolve([
+                "ok": true,
+                "micPeak": snap["micPeak"] ?? 0,
+                "route": snap["route"] ?? ""
+            ])
+        }
+    }
+
+    @objc func getRtpStats(_ call: CAPPluginCall) {
+        if let rtp = rtp {
+            call.resolve(rtp.snapshot())
+        } else {
+            call.resolve(["running": false])
+        }
+    }
+
     private func connectAndRegister() {
         connection?.cancel()
         let host = NWEndpoint.Host(server)
