@@ -58,6 +58,15 @@ export default function ActiveCallSheet({
   const isTransfer = !!sp.snap.transferring;
   const isEnded = sp.snap.callState === 'ended' || sp.snap.callState === 'idle';
 
+  // Native audio-engine status (iOS plugin). When 'starting' or 'retrying' the
+  // RTP pipeline isn't ready yet, so audio-affecting buttons must be disabled.
+  const audioStatus: 'idle' | 'starting' | 'running' | 'retrying' | 'error' =
+    sp.audioStatus ?? sp.snap.audioStatus ?? 'idle';
+  const audioError: string = sp.audioError ?? sp.snap.audioError ?? '';
+  const audioRestartAttempts: number = sp.audioRestartAttempts ?? sp.snap.audioRestartAttempts ?? 0;
+  const audioBusy = audioStatus === 'starting' || audioStatus === 'retrying';
+  const audioFailed = audioStatus === 'error';
+
   // State-aware accent — see lib/callStateAccent.ts (single source of truth, snapshot-tested).
   const visual = getCallStateVisual(sp.snap.callState, { transferring: isTransfer });
   const stateAccent = visual.accent;
