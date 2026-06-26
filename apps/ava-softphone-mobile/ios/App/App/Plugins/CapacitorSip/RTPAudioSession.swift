@@ -4,10 +4,9 @@ import AudioToolbox
 import Darwin
 
 /// PCMU (G.711 μ-law) RTP audio session backed by a single BSD UDP socket
-/// for symmetric send/receive. Capture/playback uses a low-level RemoteIO
-/// AudioUnit (kAudioUnitSubType_RemoteIO) instead of AVAudioEngine to avoid
-/// fighting CapacitorSip for the shared AVAudioSession (two AVAudioEngine
-/// instances can't coexist on iOS; doing so yields error 561017449 / '!cat').
+/// for symmetric send/receive. Capture/playback uses only a low-level RemoteIO
+/// AudioUnit (kAudioUnitSubType_RemoteIO) so the mobile softphone has one
+/// native audio owner and avoids iOS hardware category conflicts.
 final class RTPAudioSession {
     // MARK: - Public state
     private(set) var localPort: UInt16 = 0
