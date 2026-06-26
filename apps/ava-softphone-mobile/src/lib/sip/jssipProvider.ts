@@ -53,6 +53,11 @@ function bundledJsSIP() {
 
 /** Resolves the bundled JsSIP module, falling back to window.JsSIP if present. */
 export function waitForJsSIP(timeoutMs = 8000, intervalMs = 100, requireWebRTC = true): Promise<any> {
+  if (__NATIVE_SIP_ACTIVE) {
+    return Promise.reject(new JsSIPUnavailableError(
+      'JsSIP disabled — native SIP plugin is active (VITE_NATIVE_SIP=true)'
+    ));
+  }
   return new Promise((resolve, reject) => {
     if (typeof window === 'undefined') {
       const bundled = bundledJsSIP();
