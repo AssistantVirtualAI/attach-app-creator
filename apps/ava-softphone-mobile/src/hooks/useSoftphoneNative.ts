@@ -39,7 +39,7 @@ function emitNativeCallSnapshot(patch: Partial<NativeCallSnapshot>) {
 function subscribeNativeCallEvents(subscriber: (snapshot: NativeCallSnapshot) => void) {
   nativeCallSubscribers.add(subscriber);
   subscriber(nativeCallSnapshot);
-  return () => nativeCallSubscribers.delete(subscriber);
+  return () => { nativeCallSubscribers.delete(subscriber); };
 }
 
 function ensureNativeCallEventBridge() {
