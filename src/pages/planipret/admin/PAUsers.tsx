@@ -164,6 +164,16 @@ export default function PAUsers() {
           <span className="px-2 py-1 rounded-full" style={{ fontSize: 11, background: "var(--pp-bg-elevated)", color: "var(--pp-text-secondary)", border: "1px solid var(--pp-bg-border-2)" }}>
             {rows.length} courtier{rows.length > 1 ? "s" : ""}
           </span>
+          {nsDomain && (
+            <span className="px-2 py-1 rounded-full" style={{ fontSize: 11, background: `${SUCCESS}15`, color: SUCCESS, border: `1px solid ${SUCCESS}33` }}>
+              ● NS {nsDomain}
+            </span>
+          )}
+          {nsError && (
+            <span title={nsError} className="px-2 py-1 rounded-full" style={{ fontSize: 11, background: `${DANGER}15`, color: DANGER, border: `1px solid ${DANGER}33` }}>
+              ⚠ NS-API hors ligne
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <div className="relative">
