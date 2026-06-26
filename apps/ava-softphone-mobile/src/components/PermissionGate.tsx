@@ -77,6 +77,7 @@ export default function PermissionGate({ onComplete }: PermissionGateProps) {
     if (step === 'intro' || step === 'done') return;
     setRequesting(true);
     setError(null);
+    let shouldAdvance = true;
     try {
       let next: PermissionStatus = 'denied';
       if (step === 'microphone') {
@@ -84,6 +85,7 @@ export default function PermissionGate({ onComplete }: PermissionGateProps) {
         setPerms((p) => ({ ...p, microphone: next, speaker: next === 'granted' ? 'granted' : p.speaker }));
         if (next !== 'granted') {
           setError('Accès microphone refusé. Activez-le dans Réglages iOS → Lemtel → Microphone pour que les appels et l’audio bidirectionnel fonctionnent.');
+          shouldAdvance = false;
         }
       } else if (step === 'contacts') {
         if (Capacitor.isNativePlatform()) {
@@ -117,7 +119,7 @@ export default function PermissionGate({ onComplete }: PermissionGateProps) {
       }
     } finally {
       setRequesting(false);
-      if (step !== 'microphone' || perms.microphone === 'granted') advance(step);
+      if (shouldAdvance) advance(step);
     }
   };
 
