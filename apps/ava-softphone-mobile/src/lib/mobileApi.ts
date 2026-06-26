@@ -256,8 +256,8 @@ export interface ChatReply { answer: string }
 
 const meMock: MeResponse = {
   user: { id: 'u1', name: 'Alex Morin', email: 'alex@lemtel.tel' },
-  organization: { id: 'org-lemtel', name: 'Lemtel Communications', sipDomain: 'lemtel.lemtel.tel', portalUrl: 'https://avastatistic.ca', wssUrl: 'wss://pbxnode.lemtel.tel:7443' },
-  domain: { organizationId: 'org-lemtel', sipDomain: 'lemtel.lemtel.tel', portalUrl: 'https://avastatistic.ca', wssUrl: 'wss://pbxnode.lemtel.tel:7443' },
+  organization: { id: 'org-lemtel', name: 'Lemtel Communications', sipDomain: 'lemtel.lemtel.tel', portalUrl: 'https://avastatistic.ca', wssUrl: 'sips://pbxnode.lemtel.tel:5061' },
+  domain: { organizationId: 'org-lemtel', sipDomain: 'lemtel.lemtel.tel', portalUrl: 'https://avastatistic.ca', wssUrl: 'sips://pbxnode.lemtel.tel:5061' },
   extension: { number: '1042', displayName: 'Alex M.', sipDomain: 'lemtel.lemtel.tel' },
   role: 'org_admin',
   dataScope: 'domain_admin',
