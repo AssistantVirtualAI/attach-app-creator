@@ -39,9 +39,11 @@ export default function ActiveCallSheet({
   const switchRoute = async (next: AudioRoute) => {
     haptic(ImpactStyle.Light);
     try {
-      await setRoute(next);
-    } catch {
-      setToast(`Impossible de basculer sur ${routeLabel(next)}`);
+      const ok = await setRoute(next);
+      if (!ok) setToast({ text: `Bascule audio impossible vers ${routeLabel(next)}`, tone: 'err' });
+    } catch (e: any) {
+      const msg = e?.message ? `: ${e.message}` : '';
+      setToast({ text: `Impossible de basculer sur ${routeLabel(next)}${msg}`, tone: 'err' });
     }
   };
 
