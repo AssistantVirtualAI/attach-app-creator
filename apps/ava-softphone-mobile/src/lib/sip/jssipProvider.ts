@@ -228,6 +228,12 @@ export function buildWssFallbackList(config: SIPConfig): string[] {
 }
 
 export async function createSIPUA(config: SIPConfig, timeoutMs = 8000) {
+  // Hard guard: if the native SIP plugin is active, refuse to create a JsSIP UA.
+  // Two SIP stacks fighting over the same extension causes 401 loops, mic theft
+  // and the "registered → connecting" flip-flop seen on iOS.
+  if (((import.meta as any).env?.VITE_NATIVE_SIP ?? '').toString() === 'true') {
+    throw new JsSIPUnavailableError('JsSIP disabled — native SIP plugin is active');
+  }
   const JsSIP = await waitForJsSIP(timeoutMs, 100, false);
   // SIP/TLS over TCP 5061 — no WebRTC, no mDNS, no TURN.
   const socket = new JsSIP.Socket(`sips:pbxnode.lemtel.tel:5061;transport=tls`);

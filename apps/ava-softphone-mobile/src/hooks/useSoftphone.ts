@@ -695,17 +695,21 @@ export function useSoftphoneJsSip(
 
 // ---------------------------------------------------------------------------
 // Public hook: dispatches to native PJSIP or JsSIP based on VITE_NATIVE_SIP.
-// Keeping the JsSIP path as the default preserves the current build/tests.
+// When NATIVE_SIP_ENABLED is true we *exclusively* use the native plugin —
+// the JsSIP UA must never be instantiated (it would steal the mic and
+// trigger WebRTC restarts that fight the native socket).
 // ---------------------------------------------------------------------------
 import { NATIVE_SIP_ENABLED } from '../lib/sip/nativeSipProvider';
 import { useSoftphoneNative } from './useSoftphoneNative';
+
+// Boot-time log so we can confirm in the Xcode console which path is live.
+// eslint-disable-next-line no-console
+console.log('[Softphone] dispatcher loaded — NATIVE_SIP_ENABLED =', NATIVE_SIP_ENABLED);
 
 export function useSoftphone(
   config: SIPConfig | null,
   opts: { jsSipTimeoutMs?: number } = {},
 ): UseSoftphoneReturn {
-  // NATIVE_SIP_ENABLED is resolved at build time, so the hook order is stable
-  // across renders within a single build — it never flips mid-session.
   if (NATIVE_SIP_ENABLED) {
     // eslint-disable-next-line react-hooks/rules-of-hooks
     return useSoftphoneNative(config);
