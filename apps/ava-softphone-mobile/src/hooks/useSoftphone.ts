@@ -157,19 +157,9 @@ export function useSoftphoneJsSip(
     }
   }, []);
 
-  // WebRTC capability check on mount — surfaces clear error immediately so
-  // UI doesn't sit on "connecting…" for ever.
-  useEffect(() => {
-    if (typeof window !== 'undefined' && !hasWebRTC()) {
-      setSipStatus('error');
-      setSipError(WEBRTC_UNAVAILABLE_MESSAGE);
-      log('webrtc.unavailable', WEBRTC_UNAVAILABLE_MESSAGE, 'error');
-    }
-  }, [log, setSipError, setSipStatus]);
-
+  // SIP/TLS transport does not require WebRTC, mDNS or TURN.
   useEffect(() => {
     if (!config) return;
-    if (typeof window !== 'undefined' && !hasWebRTC()) return;
     let cancelled = false;
 
     const ctx = { extension: config.extension, domain: config.domain };
