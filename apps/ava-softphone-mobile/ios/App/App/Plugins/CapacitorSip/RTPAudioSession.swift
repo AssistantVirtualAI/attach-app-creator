@@ -21,12 +21,20 @@ final class RTPAudioSession {
 
     // MARK: - RemoteIO AudioUnit
     private var ioUnit: AudioUnit?
-    /// Native VoIP rate. 8kHz keeps PCMU conversion trivial (1 PCM frame = 1 μ-law byte).
-    private let sampleRate: Double = 8000
+    /// Hardware/native sample rate negotiated with AVAudioSession.
+    /// iOS RemoteIO does NOT accept 8000Hz on modern devices — we run RemoteIO
+    /// at the native rate (typically 48000Hz) and resample to/from 8000Hz for RTP.
+    private var hwSampleRate: Double = 48000
+    /// RTP/PCMU codec rate (G.711 μ-law).
+    private let rtpSampleRate: Double = 8000
     private let channels: UInt32 = 1
     /// Scratch buffer used inside the input callback to receive captured PCM.
     private var captureScratch: UnsafeMutablePointer<Int16>?
     private var captureScratchFrames: UInt32 = 0
+    /// Fractional resampling phase accumulators (zero-order hold).
+    private var txPhase: Double = 0
+    private var rxPhase: Double = 0
+    private var rxHoldSample: Int16 = 0
 
     // MARK: - RTP
     private var sequenceNumber: UInt16 = UInt16.random(in: 0...UInt16.max)
@@ -35,12 +43,13 @@ final class RTPAudioSession {
     private let frameSamples: Int = 160 // 20ms @ 8kHz
     private var isMuted = false
     private var running = false
+    private var audioPrepared = false
 
     // MARK: - Audio buffers (lock-protected)
     private let audioLock = NSLock()
-    /// Outgoing PCM samples awaiting RTP framing.
+    /// Outgoing PCM samples (already decimated to 8kHz) awaiting RTP framing.
     private var sendBuffer = [Int16]()
-    /// Incoming PCM jitter buffer drained by the render callback.
+    /// Incoming PCM jitter buffer at 8kHz drained by the render callback.
     private var playQueue = [Int16]()
     private let maxPlayQueueSamples = 8000 // ~1s safety cap
 
