@@ -47,7 +47,7 @@ export interface UseSoftphoneReturn {
   negotiatedCodec: string | null;
 }
 
-export function useSoftphone(
+export function useSoftphoneJsSip(
   config: SIPConfig | null,
   opts: { jsSipTimeoutMs?: number } = {},
 ): UseSoftphoneReturn {
@@ -700,4 +700,25 @@ export function useSoftphone(
     quality, audioProfile, setAudioProfile,
     offeredCodecs, negotiatedCodec,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Public hook: dispatches to native PJSIP or JsSIP based on VITE_NATIVE_SIP.
+// Keeping the JsSIP path as the default preserves the current build/tests.
+// ---------------------------------------------------------------------------
+import { NATIVE_SIP_ENABLED } from '../lib/sip/nativeSipProvider';
+import { useSoftphoneNative } from './useSoftphoneNative';
+
+export function useSoftphone(
+  config: SIPConfig | null,
+  opts: { jsSipTimeoutMs?: number } = {},
+): UseSoftphoneReturn {
+  // NATIVE_SIP_ENABLED is resolved at build time, so the hook order is stable
+  // across renders within a single build — it never flips mid-session.
+  if (NATIVE_SIP_ENABLED) {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    return useSoftphoneNative(config);
+  }
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  return useSoftphoneJsSip(config, opts);
 }
