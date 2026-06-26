@@ -293,7 +293,7 @@ static NSString *ChallengeParam(NSString *header, NSString *key) {
         } else if (code >= 400) {
             NSString *reason = parts.count > 2 ? [[parts subarrayWithRange:NSMakeRange(2, parts.count - 2)] componentsJoinedByString:@" "] : @"REGISTER failed";
             [self emitRegistrationFailed:reason code:code];
-            if (self.pendingRegister) { [self.pendingRegister reject:[NSString stringWithFormat:@"REGISTER failed %ld %@", (long)code, reason]]; self.pendingRegister = nil; }
+            if (self.pendingRegister) { [self.pendingRegister reject:[NSString stringWithFormat:@"REGISTER failed %ld %@", (long)code, reason] :nil :nil :nil]; self.pendingRegister = nil; }
         }
     } else if (isInvite) {
         if (code >= 100 && code < 200) {
@@ -303,7 +303,7 @@ static NSString *ChallengeParam(NSString *header, NSString *key) {
             if (self.pendingInvite) { [self.pendingInvite resolve:@{@"success": @YES}]; self.pendingInvite = nil; }
         } else if (code >= 400) {
             [self emitCallState:@"failed" number:nil];
-            if (self.pendingInvite) { [self.pendingInvite reject:[NSString stringWithFormat:@"INVITE failed %ld", (long)code]]; self.pendingInvite = nil; }
+            if (self.pendingInvite) { [self.pendingInvite reject:[NSString stringWithFormat:@"INVITE failed %ld", (long)code] :nil :nil :nil]; self.pendingInvite = nil; }
         }
     }
 }
@@ -322,7 +322,7 @@ static NSString *ChallengeParam(NSString *header, NSString *key) {
     if (!self.username || !self.password) {
         PJLOG(@"initAccount missing username/password");
         [self emitRegistrationFailed:@"username/password required" code:0];
-        [call reject:@"username/password required"];
+        [call reject:@"username/password required" :nil :nil :nil];
         return;
     }
     self.pendingRegister = call;
@@ -348,7 +348,7 @@ static NSString *ChallengeParam(NSString *header, NSString *key) {
 
 - (void)makeCall:(CAPPluginCall *)call {
     NSString *dest = [call getString:@"destination"] ?: [call getString:@"number"];
-    if (!dest) { [call reject:@"destination/number required"]; return; }
+    if (!dest) { [call reject:@"destination/number required" :nil :nil :nil]; return; }
     PJLOG(@"makeCall %@", dest);
     self.activeCallId = RandTag();
     NSString *branch = [@"z9hG4bK" stringByAppendingString:RandTag()];
