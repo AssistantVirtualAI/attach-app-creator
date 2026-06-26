@@ -56,6 +56,7 @@ const UniversalLoginContent = () => {
       const looksLikeEmail = trimmedLoginId.includes('@');
 
       // If it looks like an email, try admin auth first (avoids unnecessary 401 from client login)
+      let adminAuthError: any = null;
       if (looksLikeEmail) {
         const { data, error: authError } = await supabase.auth.signInWithPassword({
           email: trimmedLoginId,
@@ -67,17 +68,28 @@ const UniversalLoginContent = () => {
           navigate(route);
           return;
         }
+        adminAuthError = authError;
       }
 
       // Client / member universal login
-      const portalSession = await loginUniversal(trimmedLoginId, password);
-      navigate(`/${portalSession.agentSlug}/dashboard`);
+      try {
+        const portalSession = await loginUniversal(trimmedLoginId, password);
+        navigate(`/${portalSession.agentSlug}/dashboard`);
+      } catch (portalErr: any) {
+        // If admin auth was attempted, surface the clearer "invalid credentials" message
+        if (adminAuthError) {
+          setError(t('auth.errors.invalidCredentials'));
+          return;
+        }
+        throw portalErr;
+      }
     } catch (err: any) {
       setError(err?.message || t('auth.errors.invalidCredentials'));
     } finally {
       setIsLoading(false);
     }
   };
+
 
   return (
     <div className="min-h-screen bg-background flex overflow-hidden">
