@@ -102,15 +102,19 @@ export default function ActiveCallSheet({
     const isRec = !!sp.snap.recording;
     const fn = isRec ? sp.stopRecord : sp.startRecord;
     if (typeof fn !== 'function') {
-      setToast("Enregistrement non supporté par cette extension");
+      setToast({ text: "Enregistrement non supporté par cette extension", tone: 'err' });
       return;
     }
+    setRecPending(true);
+    setToast({ text: isRec ? "Arrêt de l'enregistrement…" : "Démarrage de l'enregistrement…", tone: 'info' });
     try {
       await fn();
-      setToast(isRec ? "Enregistrement arrêté" : "● Enregistrement en cours");
+      setToast({ text: isRec ? "Enregistrement arrêté ✓" : "Enregistré ✓ — la conversation est capturée", tone: 'ok' });
     } catch (e: any) {
       const msg = e?.message || 'erreur inconnue';
-      setToast(isRec ? `Impossible d'arrêter l'enregistrement: ${msg}` : `Impossible de démarrer l'enregistrement: ${msg}`);
+      setToast({ text: isRec ? `Erreur — arrêt impossible: ${msg}` : `Erreur — démarrage impossible: ${msg}`, tone: 'err' });
+    } finally {
+      setRecPending(false);
     }
   };
 
