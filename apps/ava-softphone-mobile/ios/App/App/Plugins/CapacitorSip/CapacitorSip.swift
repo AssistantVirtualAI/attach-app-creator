@@ -341,4 +341,11 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
             }
         })
     }
+
+    private func sendRaw(_ msg: String) {
+        guard let conn = connection else { return }
+        conn.send(content: msg.data(using: .utf8), completion: .contentProcessed { [weak self] error in
+            if let error = error { self?.log("sendRaw error: \(error.localizedDescription)") }
+        })
+    }
 }
