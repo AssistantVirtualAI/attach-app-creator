@@ -5,6 +5,7 @@ import { describe, it, expect } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useSoftphone } from '../hooks/useSoftphone';
 import { classifySipFailure } from '../lib/sip/jssipProvider';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 const cfg = {
   extension: '300',
