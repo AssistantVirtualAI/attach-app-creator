@@ -405,5 +405,7 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
     parkCall,
     park: parkCall,
     addCall,
+    endReason,
+    lastEndReason: endReason,
   } as UseSoftphoneReturn;
 }
