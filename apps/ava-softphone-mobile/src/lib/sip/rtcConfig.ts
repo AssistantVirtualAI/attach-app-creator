@@ -57,7 +57,7 @@ export const ICE_SERVERS: RTCIceServer[] = buildIceServers({
 
 export const PC_CONFIG: RTCConfiguration = {
   iceServers: ICE_SERVERS,
-  iceTransportPolicy: 'all',
+  iceTransportPolicy: 'relay',
   bundlePolicy: 'balanced',
 };
 
@@ -339,7 +339,7 @@ export function ensureActivePcConfig(): Promise<RTCConfiguration> {
       const res = await probeTurnEndpoints();
       const servers = res.provider === 'metered' ? ICE_SERVERS : FALLBACK_ICE_SERVERS;
       _activeProvider = res.provider;
-      _activePcConfig = { iceServers: servers, iceTransportPolicy: 'all', bundlePolicy: 'balanced' };
+      _activePcConfig = { iceServers: servers, iceTransportPolicy: 'relay', bundlePolicy: 'balanced' };
       emitDiag({ kind: 'pc-config', provider: res.provider });
     } catch {
       _activeProvider = 'metered';
