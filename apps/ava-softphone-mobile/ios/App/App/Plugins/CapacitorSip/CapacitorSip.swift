@@ -314,9 +314,49 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
 
     private func handleRequest(_ msg: String, firstLine: String) {
         let method = firstLine.split(separator: " ").first.map(String.init) ?? ""
-        if method == "NOTIFY" || method == "OPTIONS" || method == "MESSAGE" {
+        switch method {
+        case "INVITE":
+            handleIncomingInvite(msg)
+        case "ACK":
+            // Confirmed answered call (for incoming we answered)
+            if callDirection == "in" && callState == "active" {
+                log("ACK received — call confirmed")
+            }
+        case "BYE":
+            send200OK(to: msg)
+            let id = callActiveId
+            resetCallState()
+            notifyListeners("callEnded", data: ["callId": id, "reason": "remote_bye"])
+        case "CANCEL":
+            send200OK(to: msg)
+            if callState == "incoming" {
+                sendResponseToInvite(code: 487, reason: "Request Terminated")
+                let id = callActiveId
+                resetCallState()
+                notifyListeners("callEnded", data: ["callId": id, "reason": "remote_cancel"])
+            }
+        case "INFO", "NOTIFY", "OPTIONS", "MESSAGE":
+            send200OK(to: msg)
+        default:
             send200OK(to: msg)
         }
+    }
+
+    private func handleIncomingInvite(_ msg: String) {
+        lastInviteRequest = msg
+        callDirection = "in"
+        callState = "incoming"
+        callActiveId = headerValue(msg, "Call-ID") ?? UUID().uuidString
+        callLocalTag = String(UUID().uuidString.prefix(8))
+        let fromH = headerValue(msg, "From") ?? ""
+        callRemoteUri = extractUri(fromH)
+        callRemoteContact = extractUri(headerValue(msg, "Contact") ?? fromH)
+        let fromNumber = extractUser(fromH)
+        // Send 100 Trying then 180 Ringing
+        sendResponseToInvite(code: 100, reason: "Trying")
+        sendResponseToInvite(code: 180, reason: "Ringing")
+        notifyListeners("callReceived", data: ["from": fromNumber, "callId": callActiveId])
+        notifyListeners("callStateChanged", data: ["state": "ringing", "direction": "in", "number": fromNumber, "callId": callActiveId])
     }
 
     private func send200OK(to request: String) {
