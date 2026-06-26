@@ -34,6 +34,37 @@ final class RTPAudioSession {
     private var isMuted = false
     private var running = false
 
+    // MARK: - Diagnostics
+    private(set) var txPackets: UInt64 = 0
+    private(set) var rxPackets: UInt64 = 0
+    private(set) var txBytes: UInt64 = 0
+    private(set) var rxBytes: UInt64 = 0
+    private(set) var lastRemoteSeq: UInt16 = 0
+    private(set) var lastRemotePort: UInt16 = 0
+    private(set) var micPeak: Float = 0
+    private(set) var rxPeak: Float = 0
+    private(set) var startedAt: Date?
+
+    func snapshot() -> [String: Any] {
+        return [
+            "running": running,
+            "localIp": localIp,
+            "localPort": Int(localPort),
+            "remoteIp": hasRemote ? String(cString: inet_ntoa(remoteAddr.sin_addr)) : "",
+            "remotePort": Int(lastRemotePort),
+            "txPackets": Int(txPackets),
+            "rxPackets": Int(rxPackets),
+            "txBytes": Int(txBytes),
+            "rxBytes": Int(rxBytes),
+            "lastSeq": Int(lastRemoteSeq),
+            "seqOut": Int(sequenceNumber),
+            "micPeak": micPeak,
+            "rxPeak": rxPeak,
+            "uptimeMs": startedAt.map { Int(Date().timeIntervalSince($0) * 1000) } ?? 0,
+            "route": currentRouteDescription()
+        ]
+    }
+
     // MARK: - Lifecycle
     func prepareLocalSocket() throws {
         localIp = RTPAudioSession.primaryLocalIPv4() ?? "0.0.0.0"
