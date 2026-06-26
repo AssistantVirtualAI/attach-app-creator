@@ -45,6 +45,17 @@ export interface UseSoftphoneReturn {
   offeredCodecs: string[];
   /** Codec actually negotiated for the current/last call. */
   negotiatedCodec: string | null;
+  /** Native audio engine status — surfaced by the iOS plugin only. */
+  audioStatus?: 'idle' | 'starting' | 'running' | 'retrying' | 'error';
+  audioError?: string;
+  audioRestartAttempts?: number;
+  // Native-only call-control extras (consumed by ActiveCallSheet).
+  isRecording?: boolean;
+  startRecording?: () => void | Promise<void>;
+  stopRecording?: () => void | Promise<void>;
+  transferCall?: (target: string) => void | Promise<void>;
+  parkCall?: (code?: string) => void | Promise<void>;
+  addCall?: (target: string) => void | Promise<void>;
 }
 
 export function useSoftphoneJsSip(
