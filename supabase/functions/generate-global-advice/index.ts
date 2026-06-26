@@ -6,6 +6,152 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const resolveStartDate = (days: number | 'all' | string): Date | undefined => {
+  if (days === 'all') return undefined;
+  const numericDays = Number(days);
+  if (!Number.isFinite(numericDays) || numericDays <= 0) return undefined;
+
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - numericDays);
+  return startDate;
+};
+
+const buildDefaultGlobalAdvice = (language: string, message?: string) => ({
+  globalSummary: message || (language === 'en'
+    ? 'No organization context is available yet. Select an organization to load AI advice.'
+    : 'Aucun contexte d’organisation n’est disponible pour le moment. Sélectionnez une organisation pour charger les conseils IA.'),
+  overallHealth: 'warning',
+  keyInsights: [],
+  globalStrengths: [],
+  globalWeaknesses: [],
+  priorityActions: [],
+  agentRecommendations: {},
+});
+
+const buildEmptyAdviceResponse = ({
+  days,
+  language,
+  organizationId = null,
+  reason,
+}: {
+  days: number | 'all' | string;
+  language: string;
+  organizationId?: string | null;
+  reason?: string;
+}) => {
+  const startDate = resolveStartDate(days);
+  return new Response(
+    JSON.stringify({
+      success: true,
+      organizationId,
+      fallback: true,
+      reason,
+      period: { days, from: startDate?.toISOString() || null, to: new Date().toISOString() },
+      globalMetrics: {
+        totalConversations: 0,
+        avgSatisfaction: 0,
+        avgDuration: 0,
+        sentiment: { positive: 0, neutral: 0, negative: 0 },
+        agentCount: 0,
+        bestAgent: null,
+        worstAgent: null,
+      },
+      agentMetrics: [],
+      globalAdvice: buildDefaultGlobalAdvice(language),
+    }),
+    { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+  );
+};
+
+async function resolveOrganizationId(supabaseAdmin: any, userId: string, requestedOrganizationId?: string | null) {
+  const requestedOrgId = typeof requestedOrganizationId === 'string' && requestedOrganizationId.trim().length > 0
+    ? requestedOrganizationId.trim()
+    : null;
+
+  const [{ data: isSuper }, { data: isMaster }] = await Promise.all([
+    supabaseAdmin.rpc('is_super_admin', { _user_id: userId }),
+    supabaseAdmin.rpc('is_master_admin', { _user_id: userId }),
+  ]);
+
+  // Prefer the explicit frontend organization context. This prevents /dashboard
+  // from accidentally using the first/default org when the user is switching
+  // between AVA, Planipret, and Lemtel.
+  if (requestedOrgId) {
+    if (isSuper === true || isMaster === true) {
+      return requestedOrgId;
+    }
+
+    const [modernMembership, legacyMembership] = await Promise.all([
+      supabaseAdmin
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', userId)
+        .eq('organization_id', requestedOrgId)
+        .limit(1),
+      supabaseAdmin
+        .from('org_members')
+        .select('org_id')
+        .eq('user_id', userId)
+        .eq('org_id', requestedOrgId)
+        .limit(1),
+    ]);
+
+    if (modernMembership.data?.[0]?.organization_id || legacyMembership.data?.[0]?.org_id) {
+      return requestedOrgId;
+    }
+
+    console.warn(`[global-advice] Ignoring unauthorized requested organization ${requestedOrgId} for user ${userId}`);
+  }
+
+  // Modern membership table first.
+  const modernRes = await supabaseAdmin
+    .from('organization_members')
+    .select('organization_id, created_at')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: true })
+    .limit(1);
+  if (modernRes.error) console.warn('[global-advice] organization_members lookup failed:', modernRes.error.message);
+  if (modernRes.data?.[0]?.organization_id) return modernRes.data[0].organization_id;
+
+  // Legacy org_members table for the newer standalone portals.
+  const legacyRes = await supabaseAdmin
+    .from('org_members')
+    .select('org_id, created_at')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: true })
+    .limit(1);
+  if (legacyRes.error) console.warn('[global-advice] org_members lookup failed:', legacyRes.error.message);
+  if (legacyRes.data?.[0]?.org_id) return legacyRes.data[0].org_id;
+
+  // If available, use the centralized org-access RPC. It includes master/super
+  // admin access and avoids softphone-only org expansion.
+  const accessibleRes = await supabaseAdmin.rpc('get_accessible_org_ids', { _user_id: userId });
+  if (!accessibleRes.error && Array.isArray(accessibleRes.data) && accessibleRes.data.length > 0) {
+    const firstAccessible = accessibleRes.data
+      .map((row: any) => typeof row === 'string' ? row : row?.get_accessible_org_ids || row?.id || row?.org_id)
+      .filter(Boolean)[0];
+    if (firstAccessible) return firstAccessible;
+  } else if (accessibleRes.error) {
+    console.warn('[global-advice] get_accessible_org_ids lookup failed:', accessibleRes.error.message);
+  }
+
+  // Final super/master admin fallback: choose any active organization so the
+  // function can still render a safe empty dashboard instead of crashing.
+  if (isSuper === true || isMaster === true) {
+    const { data: anyOrg, error: anyOrgError } = await supabaseAdmin
+      .from('organizations')
+      .select('id')
+      .eq('is_active', true)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (anyOrgError) console.warn('[global-advice] active organization fallback failed:', anyOrgError.message);
+    return anyOrg?.id ?? null;
+  }
+
+  return null;
+}
+
 // Bilingual prompt templates
 const getSystemPrompt = (language: string) => {
   if (language === 'en') {
@@ -176,7 +322,7 @@ serve(async (req) => {
   }
 
   try {
-    const { days = 7, language = 'en', forceRegenerate = false } = await req.json().catch(() => ({}));
+    const { days = 7, language = 'en', forceRegenerate = false, organizationId: requestedOrganizationId = null } = await req.json().catch(() => ({}));
 
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
@@ -207,45 +353,11 @@ serve(async (req) => {
       });
     }
 
-    // Resolve user organization — check both membership tables (organization_members and org_members)
-    const [omRes, omLegacyRes] = await Promise.all([
-      supabaseAdmin
-        .from('organization_members')
-        .select('organization_id, created_at')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: true })
-        .limit(1),
-      supabaseAdmin
-        .from('org_members')
-        .select('org_id, created_at')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: true })
-        .limit(1),
-    ]);
-
-    let organizationId: string | null =
-      omRes.data?.[0]?.organization_id ?? omLegacyRes.data?.[0]?.org_id ?? null;
-
-    // Super admin fallback: if no membership, use any active org
-    if (!organizationId) {
-      const { data: isSuper } = await supabaseAdmin.rpc('is_super_admin', { _user_id: user.id });
-      if (isSuper) {
-        const { data: anyOrg } = await supabaseAdmin
-          .from('organizations')
-          .select('id')
-          .eq('is_active', true)
-          .order('created_at', { ascending: true })
-          .limit(1)
-          .maybeSingle();
-        organizationId = anyOrg?.id ?? null;
-      }
-    }
+    const organizationId = await resolveOrganizationId(supabaseAdmin, user.id, requestedOrganizationId);
 
     if (!organizationId) {
-      return new Response(JSON.stringify({ error: 'No organization found' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      console.warn(`[global-advice] No organization context found for user ${user.id}; returning safe empty payload`);
+      return buildEmptyAdviceResponse({ days, language, reason: 'no_organization_context' });
     }
 
     const orgMember = { organization_id: organizationId };
@@ -282,11 +394,7 @@ serve(async (req) => {
     }
 
     // Calculate start date (null for "all time")
-    let startDate: Date | undefined;
-    if (days !== 'all' && days > 0) {
-      startDate = new Date();
-      startDate.setDate(startDate.getDate() - days);
-    }
+    const startDate = resolveStartDate(days);
 
     // First try to fetch from local database
     let conversations = await fetchAllOrgConversations(supabaseAdmin, orgMember.organization_id, startDate);
