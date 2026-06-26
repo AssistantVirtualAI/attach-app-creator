@@ -96,7 +96,7 @@ function ensureNativeCallEventBridge() {
       console.log('[NativeSIP] CALL_EVENT|callEnded', d);
       stopRingback();
       const friendly = describeEndReason(d?.reason);
-      emitNativeCallSnapshot({ callState: 'idle', activeCallNumber: '', isMuted: false, isOnHold: false, isRecording: false, direction: null, endReason: friendly });
+      emitNativeCallSnapshot({ callState: 'idle', activeCallNumber: '', isMuted: false, isOnHold: false, isRecording: false, direction: null, endReason: friendly, callPhase: 'ended', lastSipCode: d?.code ?? null });
     });
     const muteHandle = await CapacitorPjsip.addListener('muteChanged', (d: any) => {
       emitNativeCallSnapshot({ isMuted: !!d?.muted });
