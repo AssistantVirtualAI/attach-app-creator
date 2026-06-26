@@ -22,6 +22,25 @@ function json(body: unknown, status = 200) {
   });
 }
 
+function stringifyElError(data: any, fallback: string): string {
+  if (!data) return fallback;
+  if (typeof data === "string") return data;
+  // FastAPI/Pydantic style: detail can be string OR array of {loc,msg,type}
+  const detail = data.detail ?? data.error ?? data.message;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    return detail.map((d: any) => {
+      if (typeof d === "string") return d;
+      const loc = Array.isArray(d?.loc) ? d.loc.join(".") : "";
+      return `${loc ? loc + ": " : ""}${d?.msg ?? JSON.stringify(d)}`;
+    }).join(" | ");
+  }
+  if (detail && typeof detail === "object") {
+    return detail.message || JSON.stringify(detail);
+  }
+  try { return JSON.stringify(data); } catch { return fallback; }
+}
+
 async function elFetch(apiKey: string, path: string, init: RequestInit = {}) {
   const r = await fetch(`${EL_API}${path}`, {
     ...init,
@@ -35,10 +54,12 @@ async function elFetch(apiKey: string, path: string, init: RequestInit = {}) {
   let data: any = null;
   try { data = text ? JSON.parse(text) : null; } catch { data = { raw: text }; }
   if (!r.ok) {
-    return { ok: false, status: r.status, error: data?.detail?.message || data?.message || data?.detail || text || `HTTP ${r.status}`, data };
+    const errStr = stringifyElError(data, text || `HTTP ${r.status}`);
+    return { ok: false, status: r.status, error: errStr, data };
   }
   return { ok: true, status: r.status, data };
 }
+
 
 async function getConfig(admin: any, key: string): Promise<string | null> {
   const { data } = await admin.from("planipret_elevenlabs_config").select("value").eq("key", key).maybeSingle();
