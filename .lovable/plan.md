@@ -1,50 +1,43 @@
-## Diagnostic
+## Objectif
+Empêcher tout utilisateur avec un email `@lemtel.com` d'être membre de l'organisation Planiprêt, et nettoyer les cas existants (Juliano Lemme).
 
-### 1. « Configurer AVA automatiquement » → erreur
+## Étapes
 
-Le bouton appelle `elevenlabs-manage-agent` action `create_agent`. Vérifié :
-- ✅ Tu as bien le rôle `planipret_admin` (pas de 403)
-- ✅ `ELEVENLABS_API_KEY` est configurée
-- ❌ Le payload envoyé à ElevenLabs utilise `llm: "claude-3-5-sonnet"` — **ce nom de modèle n'est plus accepté** par l'API ElevenLabs Convai (déprécié). C'est ce qui fait remonter l'erreur après le clic.
-- ❌ Le payload utilise aussi une **ancienne structure** `conversation_config.agent.prompt.llm` que la nouvelle API ElevenLabs a déplacée vers `agent.prompt.llm_id` (selon version) + `model` au niveau racine.
+### 1. Nettoyage des données existantes
+- Supprimer de `planipret_profiles` toutes les lignes où `lower(email) LIKE '%@lemtel.com'` (Juliano Lemme aujourd'hui).
+- Supprimer les `user_roles` correspondants (`planipret_admin`, `planipret_broker`) pour ces user_ids dans l'org Planiprêt.
+- Logger l'opération dans `planipret_audit_log` (action = `purge_lemtel_domain`).
 
-**Important** : la clé Claude (`ANTHROPIC_API_KEY`) n'est PAS utilisée par ce bouton — ElevenLabs appelle Claude lui-même côté ElevenLabs, donc avoir sauvegardé la clé Claude dans Lovable ne change rien à cette erreur. C'est une confusion à clarifier dans l'UI.
+### 2. Garde-fou côté base de données (trigger)
+Créer un trigger `BEFORE INSERT OR UPDATE` sur `planipret_profiles` :
+- Si `lower(email)` se termine par `@lemtel.com` → `RAISE EXCEPTION 'Les emails @lemtel.com ne peuvent pas être membres de Planiprêt'`.
+- Trigger en `SECURITY DEFINER`, `search_path = public`.
 
-### 2. Système téléphonique → ne fonctionne pas
+Créer un trigger équivalent sur `user_roles` pour les rôles `planipret_admin` / `planipret_broker` : vérifie l'email de `auth.users` du `user_id` et bloque si `@lemtel.com`.
 
-Vérifié dans `planipret_profiles` pour ton compte :
-- `extension` = **NULL**
-- `ns_jwt` = absent
+### 3. Garde-fou côté Edge Functions
+- `pp-admin-user/index.ts` : avant `upsert` dans `planipret_profiles`, rejeter avec 422 si `email` finit par `@lemtel.com` (message clair).
+- `pp-ns-users/index.ts` : dans la fusion NS↔local, **filtrer** les subscribers dont l'email finit par `@lemtel.com` pour qu'ils n'apparaissent pas dans la liste admin.
 
-Conséquence : `ns-auth` retourne `400 "ns_extension manquante"`, donc aucun appel softphone NetSapiens ne peut s'authentifier. ElevenLabs n'a rien à voir — la téléphonie passe par NetSapiens (NS-API), pas par ElevenLabs.
+### 4. UI
+- `PAUsers.tsx` : afficher un badge/info "Les comptes @lemtel.com sont exclus de Planiprêt" en haut de la page, et catcher l'erreur du trigger avec un toast lisible si un admin tente de créer un tel compte.
 
-Les 350+ courtiers existent côté NetSapiens, mais leurs `extension` ne sont pas backfillés dans `planipret_profiles`.
+## Détails techniques
 
----
+```text
+INSERT/UPDATE planipret_profiles
+        │
+        ▼
+ trigger guard_no_lemtel_in_planipret  ──► RAISE si @lemtel.com
+        │
+        ▼
+   ligne acceptée
+```
 
-## Plan de correction
+- Filtre email : `lower(NEW.email) ~ '@lemtel\.com$'`
+- Le trigger sur `user_roles` joint `auth.users` (SECURITY DEFINER requis car `auth` n'est pas accessible côté `authenticated`).
+- L'edge `pp-ns-users` continue de lister les subscribers NetSapiens mais filtre côté merge — la liste NS reste intacte, seule la vue Planiprêt est nettoyée.
 
-### A. Fix « Configurer AVA automatiquement »
-1. Dans `supabase/functions/elevenlabs-manage-agent/index.ts` :
-   - Mettre à jour le payload `create_agent` au format ElevenLabs Convai actuel : `llm: "claude-sonnet-4-5"` (ou modèle dispo, à découvrir via `GET /v1/convai/llms`).
-   - Ajouter une action `list_llms` qui appelle `/v1/convai/llms` pour récupérer dynamiquement les modèles supportés, et utiliser le 1er Claude dispo en fallback.
-   - Améliorer le message d'erreur : si ElevenLabs retourne `model_not_supported`, renvoyer un texte clair.
-2. Dans `ElevenLabsManagementCard.tsx` :
-   - Ajouter une note sous le bouton : « Cette configuration utilise la clé ElevenLabs uniquement. La clé Claude n'est pas requise ici. »
-   - Charger la liste des LLMs via `list_llms` et la proposer dans `LlmEditor` au lieu de la liste codée en dur.
-
-### B. Fix téléphonie (extension manquante)
-1. **Court terme — ton compte** : SQL ponctuel pour assigner ton extension (à confirmer laquelle : `300` apparaît dans les logs de `softphone-credentials`).
-2. **Long terme — backfill** : nouvelle action dans `pp-ns-users` action `sync_extensions` qui, pour chaque `planipret_profiles` sans `extension`, fait un match par `email`/`name` avec la liste NetSapiens et upsert `extension`.
-3. Bouton « Synchroniser les extensions NS » dans `PAUsers.tsx` (admin), qui déclenche cette action et affiche le nombre de profils mis à jour.
-4. Dans `ns-auth`, si `extension` manque, retourner un message plus utile : « Aucune extension NetSapiens liée à ce compte. Demande à un admin de lancer la synchro. »
-
-### C. Vérification
-- Tester `create_agent` via `supabase--curl_edge_functions` après le fix → attendre `success: true` avec `agent_id`.
-- Tester `ns-auth` après backfill de ton extension → attendre `success: true, expires_in: 3600`.
-
-### Détails techniques
-- Source du modèle Claude actuel ElevenLabs : `GET https://api.elevenlabs.io/v1/convai/llms` (auth `xi-api-key`).
-- L'extension `300` vue dans les logs vient de `pbx_softphone_users.portal_user_id` — à confirmer avant de l'assigner à `planipret_profiles.extension`.
-
-Confirme-moi : (1) quelle extension NetSapiens t'appartient (300 ?), (2) OK pour ajouter le bouton de backfill admin ?
+## Hors scope
+- Pas de changement dans Lemtel (ses tables `lemtel_*` et `pbx_*` restent intactes).
+- Pas de modification du flux d'authentification Supabase.

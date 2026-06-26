@@ -142,6 +142,9 @@ export default function PAUsers() {
   const adminCount = rows.length;
   return (
     <div className="space-y-4">
+      <div className="rounded-lg px-3 py-2 text-[11px]" style={{ background: "var(--pp-bg-elevated)", color: "var(--pp-text-secondary)", border: "1px solid var(--pp-bg-border-2)" }}>
+        🔒 Les comptes <code>@lemtel.com</code> sont automatiquement exclus de Planiprêt (réservés à Lemtel).
+      </div>
       {!loading && adminCount <= 1 && (
         <div className="rounded-xl p-4 flex items-start gap-3" style={{ background: `${ACCENT}10`, border: `1px solid ${ACCENT}33` }}>
           <div style={{ color: ACCENT, fontSize: 20, lineHeight: 1 }}>ℹ️</div>
@@ -347,6 +350,9 @@ function UserModal({ mode, user, onClose, onSaved }: { mode: "add" | "edit"; use
   const submit = async () => {
     if (!firstName || !lastName || !email || !extension || (!isEdit && !password)) {
       toast.error("Champs requis manquants"); return;
+    }
+    if (/@lemtel\.com$/i.test(email.trim())) {
+      toast.error("Les emails @lemtel.com appartiennent à Lemtel — utilisez un autre domaine."); return;
     }
     setBusy(true);
     const full_name = `${firstName} ${lastName}`.trim();

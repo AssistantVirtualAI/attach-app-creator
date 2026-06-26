@@ -17,6 +17,9 @@ Deno.serve(async (req) => {
       if (!email || !password || !full_name || !ns_extension) {
         return jsonResponse({ success: false, error: "Champs requis manquants" }, 400);
       }
+      if (/@lemtel\.com$/i.test(String(email).trim())) {
+        return jsonResponse({ success: false, error: "Les emails @lemtel.com appartiennent à Lemtel et ne peuvent pas être ajoutés à Planiprêt." }, 422);
+      }
       // Unique extension check
       const { data: existing } = await admin.from("planipret_profiles").select("id").eq("extension", ns_extension).maybeSingle();
       if (existing) return jsonResponse({ success: false, error: "Extension déjà utilisée" }, 400);

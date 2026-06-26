@@ -60,12 +60,13 @@ Deno.serve(async (req) => {
       const first = u.first_name ?? u.firstName ?? "";
       const last = u.last_name ?? u.lastName ?? "";
       const fullName = local?.full_name || `${first} ${last}`.trim() || u.display_name || u.name || ext;
+      const email = local?.email ?? u.email ?? u.email_address ?? "";
       return {
         user_id: local?.user_id ?? `ns:${domain}:${ext}`,
         ns_only: !local,
         extension: ext,
         full_name: fullName,
-        email: local?.email ?? u.email ?? u.email_address ?? "",
+        email,
         ns_domain: domain,
         mobile_app_enabled: local?.mobile_app_enabled ?? false,
         voice_agent_enabled: local?.voice_agent_enabled ?? false,
@@ -76,7 +77,7 @@ Deno.serve(async (req) => {
         updated_at: local?.updated_at ?? u.last_modified ?? null,
         created_at: local?.created_at ?? u.creation_date ?? null,
       };
-    });
+    }).filter((b: any) => !/@lemtel\.com$/i.test(String(b.email || "").trim()));
 
     return jsonResponse({ ok: true, count: brokers.length, domain, brokers });
   } catch (e) {
