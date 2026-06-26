@@ -20,6 +20,7 @@ type NativeCallSnapshot = {
   activeCallNumber: string;
   isMuted: boolean;
   isOnHold: boolean;
+  isRecording: boolean;
 };
 
 const nativeCallSubscribers = new Set<(snapshot: NativeCallSnapshot) => void>();
@@ -28,6 +29,7 @@ let nativeCallSnapshot: NativeCallSnapshot = {
   activeCallNumber: '',
   isMuted: false,
   isOnHold: false,
+  isRecording: false,
 };
 let nativeCallBridgePromise: Promise<void> | null = null;
 
