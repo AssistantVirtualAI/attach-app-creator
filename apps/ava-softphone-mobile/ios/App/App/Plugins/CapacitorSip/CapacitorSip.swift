@@ -17,6 +17,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "setHold", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "sendDTMF", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setLogLevel", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "requestMicrophonePermission", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "unregister", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setAudioRoute", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getAudioRoute", returnType: CAPPluginReturnPromise),
@@ -108,6 +109,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     private var isMuted: Bool = false
     private var isOnHold: Bool = false
     private var isRecording: Bool = false
+    private var pendingHold: Bool? = nil
     private var localSdpPort: Int = 40000
 
     // MARK: - RTP audio
@@ -136,7 +138,10 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     }
 
     private func startRtpIfReady() {
-        guard !rtpStarted, let rtp = rtp, !remoteRtpIp.isEmpty, remoteRtpPort > 0 else { return }
+        guard !rtpStarted, let rtp = rtp, !remoteRtpIp.isEmpty, remoteRtpPort > 0 else {
+            log("RTP not ready rtpStarted=\(rtpStarted) hasRtp=\(rtp != nil) remote=\(remoteRtpIp):\(remoteRtpPort)")
+            return
+        }
         rtpStarted = true
         rtp.setMuted(isMuted)
         rtp.start(remoteIp: remoteRtpIp, remotePort: remoteRtpPort)
@@ -254,44 +259,87 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         self.cseq = 1
 
         log("initAccount server=\(server):\(port) user=\(username) domain=\(self.domain)")
-        configureAudioSession()
         requestMicPermission { [weak self] granted in
             guard let self = self else { return }
             self.log("mic permission granted=\(granted)")
-            self.notifyListeners("micPermission", data: ["granted": granted, "status": granted ? "granted" : "denied"])
+            let deniedReason = self.microphoneDeniedReason()
+            self.notifyListeners("micPermission", data: [
+                "granted": granted,
+                "status": granted ? "granted" : "denied",
+                "reason": granted ? "" : deniedReason
+            ])
             if !granted {
-                self.notifyListeners("registration", data: ["state": "error", "status": "error", "reason": "microphone permission denied"])
-                self.notifyListeners("registrationFailed", data: ["reason": "Microphone permission denied — enable it in iOS Settings"])
+                self.notifyListeners("registration", data: [
+                    "state": "error",
+                    "status": "error",
+                    "reason": deniedReason
+                ])
+                self.notifyListeners("registrationFailed", data: ["reason": deniedReason])
+                call.reject(deniedReason)
                 return
             }
+            self.configureAudioSession()
             self.connectAndRegister()
+            call.resolve(["ok": true])
         }
-        call.resolve(["ok": true])
     }
 
     // MARK: - Audio
     private func configureAudioSession() {
         let session = AVAudioSession.sharedInstance()
         do {
+            log("AVAudioSession configure begin permission=\(session.recordPermission.rawValue) route=\(audioRouteSummary())")
             try session.setCategory(.playAndRecord,
                                     mode: .voiceChat,
                                     options: [.allowBluetooth, .allowBluetoothA2DP, .defaultToSpeaker, .duckOthers])
-            try session.setPreferredSampleRate(48000)
+            try session.setPreferredSampleRate(8000)
             try session.setPreferredIOBufferDuration(0.02)
             try session.setActive(true, options: [])
-            log("AVAudioSession configured (playAndRecord/voiceChat)")
+            log("AVAudioSession configured cat=\(session.category.rawValue) mode=\(session.mode.rawValue) sr=\(Int(session.sampleRate))Hz io=\(Int(session.ioBufferDuration * 1000))ms route=\(audioRouteSummary())")
         } catch {
             log("AVAudioSession error: \(error.localizedDescription)")
         }
     }
 
+    private func microphoneDeniedReason() -> String {
+        return "Microphone access is required for calls and two-way audio. Enable it in iOS Settings → Lemtel → Microphone, then reopen the app."
+    }
+
+    private func audioRouteSummary() -> String {
+        let session = AVAudioSession.sharedInstance()
+        let outputs = session.currentRoute.outputs.map { "\($0.portType.rawValue):\($0.portName)" }.joined(separator: ",")
+        let inputs = session.currentRoute.inputs.map { "\($0.portType.rawValue):\($0.portName)" }.joined(separator: ",")
+        return "in=[\(inputs)] out=[\(outputs)]"
+    }
+
     private func requestMicPermission(_ cb: @escaping (Bool) -> Void) {
         let session = AVAudioSession.sharedInstance()
         switch session.recordPermission {
-        case .granted: cb(true)
-        case .denied:  cb(false)
-        case .undetermined: session.requestRecordPermission { granted in DispatchQueue.main.async { cb(granted) } }
+        case .granted:
+            log("mic permission state=granted")
+            cb(true)
+        case .denied:
+            log("mic permission state=denied")
+            cb(false)
+        case .undetermined:
+            log("mic permission state=undetermined — requesting")
+            session.requestRecordPermission { granted in DispatchQueue.main.async { cb(granted) } }
         @unknown default: cb(false)
+        }
+    }
+
+    @objc func requestMicrophonePermission(_ call: CAPPluginCall) {
+        log("explicit microphone permission request from JS")
+        requestMicPermission { [weak self] granted in
+            guard let self = self else { return }
+            let reason = granted ? "" : self.microphoneDeniedReason()
+            self.notifyListeners("micPermission", data: [
+                "granted": granted,
+                "status": granted ? "granted" : "denied",
+                "reason": reason
+            ])
+            if granted { self.configureAudioSession() }
+            call.resolve(["ok": true, "granted": granted, "status": granted ? "granted" : "denied", "reason": reason])
         }
     }
 
@@ -348,15 +396,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         let muted = call.getBool("muted") ?? !isMuted
         isMuted = muted
         rtp?.setMuted(muted)
-
-        let session = AVAudioSession.sharedInstance()
-        do {
-            try session.setCategory(.playAndRecord, mode: .voiceChat,
-                                    options: muted ? [.allowBluetooth, .defaultToSpeaker] : [.allowBluetooth, .allowBluetoothA2DP, .defaultToSpeaker, .duckOthers])
-            try session.setActive(true, options: [])
-        } catch {
-            log("setMute audio session error: \(error.localizedDescription)")
-        }
+        log("mute changed muted=\(muted) — RTP samples \(muted ? "zeroed" : "live"), AVAudioSession unchanged")
         notifyListeners("muteChanged", data: ["muted": muted])
         call.resolve(["ok": true, "muted": muted])
     }
@@ -372,12 +412,12 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
             call.resolve(["ok": true, "held": hold, "noop": true])
             return
         }
-        isOnHold = hold
+        pendingHold = hold
         callCseq += 1
         sendReInvite(hold: hold)
-        // NOTE: don't touch callState — the 200 OK to the re-INVITE confirms.
-        notifyListeners("holdChanged", data: ["held": hold, "onHold": hold])
-        call.resolve(["ok": true, "held": hold])
+        // NOTE: don't mark held/resumed until the PBX confirms with 200 OK.
+        notifyListeners("holdPending", data: ["held": hold, "onHold": hold])
+        call.resolve(["ok": true, "held": hold, "pending": true])
     }
 
     @objc func sendDTMF(_ call: CAPPluginCall) {
@@ -693,7 +733,12 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
                 if isReInvite {
                     // Hold / resume confirmation. Do NOT touch callState, do NOT restart RTP.
                     // Just refresh the remote RTP target (PBX may relay through different IP/port).
-                    log("CALL_EVENT|reINVITE_200_OK|held=\(isOnHold)|callId=\(callActiveId)")
+                    if let confirmed = pendingHold {
+                        isOnHold = confirmed
+                        callState = confirmed ? "hold" : "active"
+                        pendingHold = nil
+                    }
+                    log("CALL_EVENT|reINVITE_200_OK|held=\(isOnHold)|callState=\(callState)|callId=\(callActiveId)")
                     notifyListeners("holdChanged", data: ["held": isOnHold, "onHold": isOnHold])
                 } else {
                     if callDirection.isEmpty { callDirection = "out" }
@@ -827,7 +872,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         callRemoteUri = ""; callRemoteContact = ""
         callState = "idle"; callDirection = ""
         callInviteBranch = ""; callInviteCseq = 1
-        isMuted = false; isOnHold = false; isRecording = false
+        isMuted = false; isOnHold = false; pendingHold = nil; isRecording = false
         lastInviteRequest = ""; lastInviteAuth = nil
     }
 

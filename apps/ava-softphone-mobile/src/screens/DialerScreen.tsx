@@ -47,6 +47,7 @@ export default function DialerScreen({ sp, haptic, preferClickToCall: _preferCli
   };
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+      <style>{dialerButtonCss}</style>
       {diagOpen && <WssDiagnostics config={sp.sipConfig || null} onClose={() => setDiagOpen(false)} />}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px 8px', borderBottom: '1px solid var(--border)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -59,8 +60,8 @@ export default function DialerScreen({ sp, haptic, preferClickToCall: _preferCli
         <div style={{ margin: '10px 16px 0', padding: '10px 12px', borderRadius: 12, background: bannerBg, border: `1px solid ${bannerColor}55`, color: bannerColor, fontSize: 12, flexShrink: 0 }}>
           <div style={{ fontWeight: 700 }}>{bannerTitle}</div>
           <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
-            <button onClick={() => { haptic(); sp.reconnect?.(); }} style={{ background: bannerColor, color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Reconnecter</button>
-            <button onClick={() => { haptic(); setDiagOpen(true); }} style={{ background: 'rgba(255,255,255,0.12)', color: '#fff', border: '1px solid rgba(255,255,255,0.18)', padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Diagnostics WSS</button>
+            <button className="dialer-glass-pill" onClick={() => { haptic(); sp.reconnect?.(); }} style={{ ['--accent' as any]: bannerColor }}>Reconnecter</button>
+            <button className="dialer-glass-pill" onClick={() => { haptic(); setDiagOpen(true); }} style={{ ['--accent' as any]: '#23d6ff' }}>Diagnostics WSS</button>
           </div>
         </div>
       )}
@@ -73,11 +74,25 @@ export default function DialerScreen({ sp, haptic, preferClickToCall: _preferCli
         <Dialpad onPress={(d) => { haptic(ImpactStyle.Light); setNum((n) => n + d); }} onLongPressZero={() => setNum((n) => n.slice(0, -1) + '+')} />
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-evenly', padding: '16px 24px 8px' }}>
           <div style={{ width: 64 }} />
-          <button disabled={!num || dialing || !isRegistered} onClick={startCall} style={{ width: 72, height: 72, borderRadius: '50%', background: (!num || dialing || !isRegistered) ? 'rgba(34,197,94,0.3)' : 'linear-gradient(135deg,#22c55e,#15803d)', border: 'none', cursor: (!num || dialing || !isRegistered) ? 'not-allowed' : 'pointer', color: 'white', fontSize: 30, boxShadow: '0 10px 30px rgba(34,197,94,0.4)' }}>{dialing ? '…' : '☏'}</button>
-          <button onClick={() => { haptic(); setNum((n) => n.slice(0, -1)); }} disabled={!num} style={{ width: 64, height: 48, borderRadius: 24, background: 'transparent', border: 'none', color: num ? 'white' : 'transparent', fontSize: 22, cursor: 'pointer' }}>⌫</button>
+          <button className="dialer-call-orb" disabled={!num || dialing || !isRegistered} onClick={startCall}>{dialing ? '…' : '☏'}</button>
+          <button className="dialer-backspace" onClick={() => { haptic(); setNum((n) => n.slice(0, -1)); }} disabled={!num}>⌫</button>
         </div>
         {error && <div style={{ color: 'var(--danger)', textAlign: 'center', fontSize: 12, padding: '0 24px 10px' }}>{error}</div>}
       </div>
     </div>
   );
 }
+
+const dialerButtonCss = `
+.dialer-glass-pill,.dialer-call-orb,.dialer-backspace{position:relative;overflow:hidden;isolation:isolate;-webkit-tap-highlight-color:transparent;backdrop-filter:blur(18px) saturate(180%);-webkit-backdrop-filter:blur(18px) saturate(180%);transition:transform .18s cubic-bezier(.2,.8,.2,1),box-shadow .18s ease,border-color .18s ease,opacity .18s ease;}
+.dialer-glass-pill{border:1px solid color-mix(in srgb,var(--accent) 58%,white);background:radial-gradient(circle at 25% 0%,rgba(255,255,255,.34),rgba(255,255,255,.10) 45%,rgba(255,255,255,.045)),linear-gradient(135deg,color-mix(in srgb,var(--accent) 34%,transparent),rgba(255,255,255,.05));color:#fff;padding:7px 13px;border-radius:999px;font-size:12px;font-weight:800;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.34),0 12px 26px -18px var(--accent);}
+.dialer-call-orb{width:78px;height:78px;border-radius:50%;border:1px solid rgba(255,255,255,.30);background:radial-gradient(circle at 30% 18%,rgba(255,255,255,.48),rgba(34,197,94,.88) 32%,rgba(21,128,61,.96) 100%);color:white;font-size:31px;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.46),inset 0 -22px 34px rgba(0,0,0,.25),0 18px 46px -12px rgba(34,197,94,.86),0 0 30px -14px rgba(34,197,94,.95);}
+.dialer-backspace{width:64px;height:48px;border-radius:24px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:white;font-size:22px;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.18);}
+.dialer-glass-pill::before,.dialer-call-orb::before,.dialer-backspace::before{content:"";position:absolute;inset:-45%;background:linear-gradient(115deg,transparent 35%,rgba(255,255,255,.72) 49%,transparent 63%);transform:translateX(-78%) rotate(8deg);opacity:.55;transition:transform .42s ease;pointer-events:none;}
+.dialer-glass-pill:hover:not(:disabled),.dialer-call-orb:hover:not(:disabled),.dialer-backspace:hover:not(:disabled){transform:translateY(-3px) scale(1.035);}
+.dialer-glass-pill:hover:not(:disabled)::before,.dialer-call-orb:hover:not(:disabled)::before,.dialer-backspace:hover:not(:disabled)::before{transform:translateX(78%) rotate(8deg);}
+.dialer-glass-pill:active:not(:disabled),.dialer-call-orb:active:not(:disabled),.dialer-backspace:active:not(:disabled){transform:translateY(1px) scale(.94);}
+.dialer-call-orb:disabled{opacity:.42;cursor:not-allowed;filter:saturate(.55);box-shadow:inset 0 1px 0 rgba(255,255,255,.18),inset 0 -18px 28px rgba(0,0,0,.25);}
+.dialer-backspace:disabled{opacity:0;color:transparent;cursor:default;}
+@media (prefers-reduced-motion:reduce){.dialer-glass-pill,.dialer-call-orb,.dialer-backspace,.dialer-glass-pill::before,.dialer-call-orb::before,.dialer-backspace::before{transition:none;}}
+`;

@@ -74,7 +74,8 @@ function ensureNativeCallEventBridge() {
     const holdHandle = await CapacitorPjsip.addListener('holdChanged', (d: any) => {
       // Purely reflective — never re-invoke setHold here, that would create
       // an infinite re-INVITE loop.
-      emitNativeCallSnapshot({ isOnHold: !!(d?.held ?? d?.onHold) });
+      const held = !!(d?.held ?? d?.onHold);
+      emitNativeCallSnapshot({ isOnHold: held, callState: held ? 'active' : 'active' });
     });
     const recordingHandle = await CapacitorPjsip.addListener('recordingChanged', (d: any) => {
       emitNativeCallSnapshot({ isRecording: !!d?.recording });
@@ -134,6 +135,7 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
       if (snapshot.callState === 'idle') stopTimer();
     });
     let audioHandle: { remove(): Promise<void> } | null = null;
+    let micHandle: { remove(): Promise<void> } | null = null;
     CapacitorPjsip.addListener('audioStateChanged', (d: any) => {
       const status = (d?.status as typeof audioStatus) || 'idle';
       setAudioStatus(status);
@@ -145,7 +147,16 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
       }
       console.log(`[NativeSIP] AUDIO_STATE|${status}|attempts=${d?.restartAttempts}|err=${d?.lastError || ''}`);
     }).then((h: any) => { audioHandle = h; }).catch(() => {});
-    return () => { unsub(); audioHandle?.remove().catch(() => {}); };
+    CapacitorPjsip.addListener('micPermission', (d: any) => {
+      console.log('[NativeSIP] MIC_PERMISSION', d);
+      if (d?.status === 'denied' || d?.granted === false) {
+        const msg = d?.reason || 'Microphone access is required for two-way audio. Enable it in iOS Settings.';
+        setSipStatus('error');
+        setSipError(msg);
+        setNativeRegStatus('error', msg);
+      }
+    }).then((h: any) => { micHandle = h; }).catch(() => {});
+    return () => { unsub(); audioHandle?.remove().catch(() => {}); micHandle?.remove().catch(() => {}); };
   }, []);
 
   // Register account on config change.
@@ -282,10 +293,12 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
   const sendDTMF = (key: string) => { CapacitorPjsip.sendDTMF({ digit: key }).catch(() => {}); };
 
   const startRecording = useCallback(async () => {
-    try { await CapacitorPjsip.startRecord(); } catch (e) { console.warn('[NativeSIP] startRecord failed', e); }
+    try { await CapacitorPjsip.startRecord(); emitNativeCallSnapshot({ isRecording: true }); setIsRecording(true); }
+    catch (e) { console.warn('[NativeSIP] startRecord failed', e); }
   }, []);
   const stopRecording = useCallback(async () => {
-    try { await CapacitorPjsip.stopRecord(); } catch (e) { console.warn('[NativeSIP] stopRecord failed', e); }
+    try { await CapacitorPjsip.stopRecord(); emitNativeCallSnapshot({ isRecording: false }); setIsRecording(false); }
+    catch (e) { console.warn('[NativeSIP] stopRecord failed', e); }
   }, []);
   const transferCall = useCallback(async (target: string) => {
     try { await CapacitorPjsip.transfer({ target }); } catch (e) { console.warn('[NativeSIP] transfer failed', e); }
@@ -351,8 +364,12 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
     isRecording,
     startRecording,
     stopRecording,
+    startRecord: startRecording,
+    stopRecord: stopRecording,
     transferCall,
+    transfer: transferCall,
     parkCall,
+    park: parkCall,
     addCall,
   } as UseSoftphoneReturn;
 }

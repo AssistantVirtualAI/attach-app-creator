@@ -20,6 +20,7 @@ export interface CapacitorSipPlugin {
   setHold(options: { held?: boolean; onHold?: boolean }): Promise<void>;
   sendDTMF(options: { digits?: string; digit?: string }): Promise<void>;
   setLogLevel(options: { level: CapacitorSipLogLevel }): Promise<{ level: number }>;
+  requestMicrophonePermission(): Promise<{ ok: boolean; granted: boolean; status: 'granted' | 'denied'; reason?: string }>;
   setAudioRoute(options: { route: 'auto' | 'speaker' | 'earpiece' | 'bluetooth' }): Promise<{ ok: boolean; route: string; outputs: string }>;
   getAudioRoute(): Promise<{ outputs: Array<{ portType: string; portName: string }>; availableInputs: Array<{ portType: string; portName: string }> }>;
   playTestTone(options?: { seconds?: number; frequency?: number }): Promise<{ ok: boolean; micPeak: number; route: string }>;
@@ -39,6 +40,18 @@ export interface CapacitorSipPlugin {
     rxPeak?: number;
     uptimeMs?: number;
     route?: string;
+    tapFormat?: string;
+    converterFormat?: string;
+    converterRebuilds?: number;
+    convertErrors?: number;
+    lastConvertError?: string;
+    audioBackend?: string;
+    inputCallbacks?: number;
+    renderCallbacks?: number;
+    inputFrames?: number;
+    renderFrames?: number;
+    sessionState?: string;
+    lastEngineError?: string;
   }>;
   startRecord(): Promise<{ ok: boolean; recording: boolean }>;
   stopRecord(): Promise<{ ok: boolean; recording: boolean }>;

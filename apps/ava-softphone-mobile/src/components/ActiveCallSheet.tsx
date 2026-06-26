@@ -53,8 +53,8 @@ export default function ActiveCallSheet({
   const remote = sp.snap.remoteParty || sp.snap.remoteUri || 'Unknown';
   const isIncoming = sp.snap.callState === 'ringing-in';
   const isOutgoing = sp.snap.callState === 'ringing-out';
-  const inCall = sp.snap.callState === 'active' || sp.snap.callState === 'held';
-  const onHold = sp.snap.callState === 'held';
+  const onHold = !!sp.snap.onHold || sp.snap.callState === 'held';
+  const inCall = sp.snap.callState === 'active' || sp.snap.callState === 'held' || onHold;
   const isTransfer = !!sp.snap.transferring;
   const isEnded = sp.snap.callState === 'ended' || sp.snap.callState === 'idle';
 
@@ -99,6 +99,7 @@ export default function ActiveCallSheet({
 
   return (
     <div style={sheetStyle}>
+      <style>{callButtonCss}</style>
       {/* Top brand strip */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 16px 8px', padding: '10px 12px', borderRadius: radius.lg, background: 'rgba(255,255,255,0.04)', border: `1px solid ${stateAccent}55`, boxShadow: shadow.glass }}>
         <span style={{ fontSize: 10, letterSpacing: 1.6, fontWeight: 800, color: stateAccent, textTransform: 'uppercase' }}>
@@ -314,20 +315,13 @@ function Ctrl({ label, icon, onClick, active, tone = 'default', disabled }: {
 }) {
   const accent = tone === 'danger' ? colors.danger : tone === 'ai' ? colors.avaViolet : colors.blueGlow;
   return (
-    <button onClick={onClick} disabled={disabled} style={{
-      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-      background: 'transparent', border: 'none', cursor: disabled ? 'not-allowed' : 'pointer',
-      color: colors.textIce, opacity: disabled ? 0.45 : 1,
-    }}>
-      <span style={{
-        width: 60, height: 60, borderRadius: '50%',
-        background: active ? `${accent}24` : 'rgba(255,255,255,0.06)',
-        border: `1px solid ${active ? accent : colors.border}`,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 22, color: active ? accent : colors.textIce,
-        boxShadow: active ? `0 12px 28px -18px ${accent}` : shadow.glass,
-        transition: 'all 0.18s cubic-bezier(.4,.0,.2,1)',
-      }}>{icon}</span>
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`call-ctrl ${active ? 'is-active' : ''} ${disabled ? 'is-disabled' : ''}`}
+      style={{ ['--accent' as any]: accent }}
+    >
+      <span className="call-ctrl-orb">{icon}</span>
       <span style={{ fontSize: 10, color: colors.mutedSilver, letterSpacing: 0.6, fontWeight: 600 }}>{label}</span>
     </button>
   );
@@ -335,21 +329,34 @@ function Ctrl({ label, icon, onClick, active, tone = 'default', disabled }: {
 
 function BigButton({ color, onClick, label, icon }: { color: string; onClick: () => void; label: string; icon: string }) {
   return (
-    <button onClick={onClick} style={{
-      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
-      background: 'transparent', border: 'none', cursor: 'pointer', color: colors.textIce,
-    }}>
-      <span style={{
-        width: 72, height: 72, borderRadius: '50%',
-        background: color,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 30, fontWeight: 300,
-        boxShadow: `0 14px 36px ${color}66`,
-      }}>{icon}</span>
+    <button
+      onClick={onClick}
+      className="call-big"
+      style={{ ['--accent' as any]: color }}
+    >
+      <span className="call-big-orb">{icon}</span>
       <span style={{ fontSize: 11, color: colors.mutedSilver, letterSpacing: 0.8, fontWeight: 600 }}>{label}</span>
     </button>
   );
 }
+
+const callButtonCss = `
+.call-ctrl,.call-big{display:flex;flex-direction:column;align-items:center;gap:7px;background:transparent;border:0;color:${colors.textIce};cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;position:relative;isolation:isolate;}
+.call-ctrl{min-width:68px;}
+.call-big{gap:9px;}
+.call-ctrl-orb,.call-big-orb{position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:50%;color:${colors.textIce};border:1px solid rgba(255,255,255,.22);background:radial-gradient(circle at 30% 18%,rgba(255,255,255,.34),rgba(255,255,255,.10) 32%,rgba(255,255,255,.045) 64%),linear-gradient(145deg,rgba(255,255,255,.16),rgba(255,255,255,.045));box-shadow:inset 0 1px 0 rgba(255,255,255,.35),inset 0 -18px 28px rgba(0,0,0,.22),0 14px 30px -18px var(--accent),0 0 0 0 rgba(255,255,255,0);backdrop-filter:blur(18px) saturate(170%);transition:transform .18s cubic-bezier(.2,.8,.2,1),box-shadow .18s ease,border-color .18s ease,background .18s ease,color .18s ease;}
+.call-ctrl-orb{width:62px;height:62px;font-size:22px;}
+.call-big-orb{width:76px;height:76px;font-size:31px;background:radial-gradient(circle at 30% 18%,rgba(255,255,255,.42),rgba(255,255,255,.14) 28%,color-mix(in srgb,var(--accent) 82%,transparent) 100%),linear-gradient(145deg,var(--accent),rgba(255,255,255,.08));box-shadow:inset 0 1px 0 rgba(255,255,255,.42),inset 0 -22px 34px rgba(0,0,0,.28),0 16px 42px -12px var(--accent);}
+.call-ctrl-orb::before,.call-big-orb::before{content:"";position:absolute;inset:-42%;background:linear-gradient(115deg,transparent 35%,rgba(255,255,255,.72) 48%,transparent 62%);transform:translateX(-76%) rotate(8deg);opacity:.55;transition:transform .42s ease;}
+.call-ctrl-orb::after,.call-big-orb::after{content:"";position:absolute;inset:12%;border-radius:50%;border:1px solid rgba(255,255,255,.14);box-shadow:0 0 22px rgba(255,255,255,.08);pointer-events:none;}
+.call-ctrl:hover:not(:disabled) .call-ctrl-orb,.call-big:hover:not(:disabled) .call-big-orb{transform:translateY(-3px) scale(1.035);border-color:color-mix(in srgb,var(--accent) 70%,white);box-shadow:inset 0 1px 0 rgba(255,255,255,.42),inset 0 -18px 28px rgba(0,0,0,.20),0 18px 42px -15px var(--accent),0 0 26px -8px var(--accent);}
+.call-ctrl:hover:not(:disabled) .call-ctrl-orb::before,.call-big:hover:not(:disabled) .call-big-orb::before{transform:translateX(76%) rotate(8deg);}
+.call-ctrl:active:not(:disabled) .call-ctrl-orb,.call-big:active:not(:disabled) .call-big-orb{transform:translateY(1px) scale(.94);box-shadow:inset 0 0 36px color-mix(in srgb,var(--accent) 38%,transparent),inset 0 1px 0 rgba(255,255,255,.5),0 8px 22px -14px var(--accent);}
+.call-ctrl.is-active .call-ctrl-orb{color:var(--accent);background:radial-gradient(circle at 30% 18%,rgba(255,255,255,.38),color-mix(in srgb,var(--accent) 34%,transparent) 38%,rgba(255,255,255,.06) 100%);border-color:color-mix(in srgb,var(--accent) 70%,white);box-shadow:inset 0 1px 0 rgba(255,255,255,.44),inset 0 -18px 28px rgba(0,0,0,.20),0 16px 44px -14px var(--accent),0 0 24px -8px var(--accent);}
+.call-ctrl.is-disabled{cursor:not-allowed;opacity:.48;filter:saturate(.6);}
+.call-ctrl.is-disabled .call-ctrl-orb{box-shadow:inset 0 1px 0 rgba(255,255,255,.16),inset 0 -18px 28px rgba(0,0,0,.28);}
+@media (prefers-reduced-motion:reduce){.call-ctrl-orb,.call-big-orb,.call-ctrl-orb::before,.call-big-orb::before{transition:none;}}
+`;
 
 const sheetStyle: React.CSSProperties = {
   position: 'fixed', inset: 0, zIndex: 100,

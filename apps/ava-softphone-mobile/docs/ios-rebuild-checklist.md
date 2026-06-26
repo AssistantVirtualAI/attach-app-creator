@@ -16,6 +16,17 @@ git log -1 --stat apps/ava-softphone-mobile/ios/App/App/Plugins/CapacitorSip/
 ```
 The latest commit must show the file you expect (e.g. `RTPAudioSession.swift`).
 
+Before opening Xcode, verify the native audio file is really the RemoteIO build:
+```bash
+grep -En "AVAudioEngine|AVAudioPlayerNode|installTap|removeTap" \
+  ios/App/App/Plugins/CapacitorSip/RTPAudioSession.swift && \
+  echo "❌ stale AVAudioEngine code still present" || \
+  echo "✅ RemoteIO-only: no AVAudioEngine/tap references"
+
+grep -n "kAudioUnitSubType_RemoteIO" \
+  ios/App/App/Plugins/CapacitorSip/RTPAudioSession.swift
+```
+
 ## 1. Install JS dependencies (only if `package.json` changed)
 ```bash
 cd apps/ava-softphone-mobile
@@ -83,24 +94,35 @@ Expected log sequence on the first call after a successful audio fix:
 [RTP] session[pre-start] cat=… mode=…
 [RTP] setCategory playAndRecord/voiceChat ok …
 [RTP] sleeping 100ms after setCategory to let session settle
-[RTP] session[post-settle] cat=AVAudioSessionCategoryPlayAndRecord mode=AVAudioSessionModeVoiceChat sr=48000 …
-[RTP] engine reset before prepare
-[RTP] hw input format=F32 48000Hz ch=1 …
-[RTP] converter init #1 F32 48000Hz → I16 8000Hz
-[RTP] tap installed (format=nil, native bus0)
-[RTP] audio engine started, route=…
+[RTP] session[post-settle] cat=AVAudioSessionCategoryPlayAndRecord mode=AVAudioSessionModeVoiceChat sr=…
+[RTP] RemoteIO build begin
+[RTP] RemoteIO component found
+[RTP] RemoteIO instance created
+[RTP] RemoteIO input enabled bus=1
+[RTP] RemoteIO output enabled bus=0
+[RTP] RemoteIO input callback format=I16 8000Hz ch=1 framesPerPacket=1
+[RTP] RemoteIO render format=I16 8000Hz ch=1 framesPerPacket=1
+[RTP] RemoteIO render callback installed bus=0
+[RTP] RemoteIO input callback installed bus=1
+[RTP] AudioUnitInitialize ok
+[RTP] AudioOutputUnitStart begin
+[RTP] RemoteIO started, route=…
+[RTP] input callback #1 frames=… micPeak=… txPackets=…
+[RTP] render callback #1 frames=… playQueue=… rxPackets=…
 ```
 
-If you see `engine start failed: code=561017449` again, the build did **not**
-include the fix — restart at step 5.
+If you see `AVAudioEngine`, `AVAudioPlayerNode`, `installTap`, `removeTap`, or
+`engine start failed: code=561017449` again, the device is running a stale native
+binary — restart at step 5 and delete the app before reinstalling.
 
 ## 8. Verify the fix on device
-- Place an outbound call: you should hear ringback + remote audio, and the
-  remote side should hear you.
-- Toggle **Record** during the call — UI flips to "Stop Rec" and the device logs
-  `recordingChanged recording=true`.
-- Toggle **Hold** → **Resume** — no infinite re-INVITE loop, `holdChanged`
-  events match the UI state.
+- Place an outbound call: you should hear ringback + remote audio, and the remote side should hear you.
+- Place an inbound call and answer: confirm two-way audio again.
+- Watch `[RTP] input callback` logs: `micPeak` should rise when you speak and `txPackets` should increase.
+- Watch `[RTP] rx packet` + `[RTP] render callback` logs: `rxPackets` should increase while the remote talks and `rxPeak` should rise.
+- Toggle **Record** during the call — UI flips to "Stop Rec" and the device logs `recordingChanged recording=true`.
+- Toggle **Hold** → **Resume** — the button returns to **Hold**, no infinite re-INVITE loop, and `holdChanged` events match the UI state.
+- Deny microphone permission on a test install: the app must show a readable microphone-required error and must not start a call.
 
 ## 9. (Optional) Archive for TestFlight
 Only after all the above pass:

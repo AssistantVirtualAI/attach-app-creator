@@ -29,6 +29,7 @@ export default function Dialpad({
 
   return (
     <div style={gridStyle}>
+      <style>{dialpadCss}</style>
       {KEYS.map((k) => (
         <button
           key={k.d}
@@ -51,6 +52,7 @@ export default function Dialpad({
             if (longTimerRef.current) { clearTimeout(longTimerRef.current); longTimerRef.current = null; }
           }}
           onClick={(e) => { e.preventDefault(); /* handled in pointerdown */ }}
+          className="dialpad-glass-key"
           style={keyStyle}
         >
           <span style={{ fontSize: 30, fontWeight: 300 }}>{k.d}</span>
@@ -70,15 +72,30 @@ const gridStyle: React.CSSProperties = {
 };
 
 const keyStyle: React.CSSProperties = {
+  position: 'relative',
+  isolation: 'isolate',
+  overflow: 'hidden',
   height: 72,
   borderRadius: 36,
-  background: 'rgba(255, 255, 255, 0.06)',
-  border: '1px solid var(--border)',
+  background: 'radial-gradient(circle at 28% 18%, rgba(255,255,255,.28), rgba(255,255,255,.08) 36%, rgba(255,255,255,.035) 100%)',
+  border: '1px solid rgba(255,255,255,.20)',
   color: 'var(--text)',
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
   justifyContent: 'center',
   cursor: 'pointer',
-  transition: 'transform 80ms ease, background 120ms ease',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,.32), inset 0 -18px 28px rgba(0,0,0,.18), 0 16px 34px -24px rgba(35,214,255,.75)',
+  WebkitBackdropFilter: 'blur(18px) saturate(180%)',
+  backdropFilter: 'blur(18px) saturate(180%)',
+  transition: 'transform .18s cubic-bezier(.2,.8,.2,1), box-shadow .18s ease, border-color .18s ease, background .18s ease',
 };
+
+const dialpadCss = `
+.dialpad-glass-key::before{content:"";position:absolute;inset:-48%;background:linear-gradient(115deg,transparent 34%,rgba(255,255,255,.68) 48%,transparent 62%);transform:translateX(-78%) rotate(8deg);opacity:.55;transition:transform .42s ease;pointer-events:none;z-index:-1;}
+.dialpad-glass-key::after{content:"";position:absolute;inset:9px;border-radius:999px;border:1px solid rgba(255,255,255,.10);box-shadow:0 0 22px rgba(255,255,255,.07);pointer-events:none;}
+.dialpad-glass-key:hover{transform:translateY(-3px) scale(1.035);border-color:rgba(35,214,255,.62);box-shadow:inset 0 1px 0 rgba(255,255,255,.42),inset 0 -18px 28px rgba(0,0,0,.16),0 20px 46px -20px rgba(35,214,255,.85),0 0 24px -10px rgba(35,214,255,.85);}
+.dialpad-glass-key:hover::before{transform:translateX(78%) rotate(8deg);}
+.dialpad-glass-key:active{transform:translateY(1px) scale(.94);box-shadow:inset 0 0 34px rgba(35,214,255,.26),inset 0 1px 0 rgba(255,255,255,.50),0 10px 24px -18px rgba(35,214,255,.75);}
+@media (prefers-reduced-motion:reduce){.dialpad-glass-key,.dialpad-glass-key::before{transition:none;}}
+`;
