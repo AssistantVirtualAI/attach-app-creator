@@ -1,102 +1,217 @@
-//
-//  CapacitorPjsip.swift
-//  Capacitor plugin exposing PjsipBridge (PJSUA2) to JS.
-//
-
 import Foundation
 import Capacitor
+import AVFoundation
+#if canImport(linphonesw)
+import linphonesw
+#endif
 
+/// Capacitor plugin exposing a native SIP backend via linphone-sdk (SwiftPM).
+/// The JS facade lives in `src/lib/sip/nativeSipProvider.ts` — keep the
+/// method names and event payloads in sync with that file.
+///
+/// Setup: see `ios/App/LINPHONE_SETUP.md` for SwiftPM package URL + version.
 @objc(CapacitorPjsip)
-public class CapacitorPjsip: CAPPlugin, PjsipBridgeDelegate {
+public class CapacitorPjsip: CAPPlugin {
 
-    private var domain: String = ""
+    #if canImport(linphonesw)
+    private var core: Core?
+    private var account: Account?
+    private var currentCall: Call?
+    private var delegateRef: CoreDelegate?
+    #endif
 
-    override public func load() {
-        PjsipBridge.shared().delegate = self
-        var err: NSError?
-        if !PjsipBridge.shared().initEndpoint(&err) {
-            NSLog("[CapacitorPjsip] initEndpoint failed: \(err?.localizedDescription ?? "")")
-        }
-    }
-
-    // MARK: - JS API
+    // MARK: - initAccount
 
     @objc func initAccount(_ call: CAPPluginCall) {
+        #if canImport(linphonesw)
         guard
             let ext = call.getString("extension"),
             let domain = call.getString("domain"),
             let password = call.getString("password"),
             let wssUrl = call.getString("wssUrl")
-        else { call.reject("Missing extension/domain/password/wssUrl"); return }
+        else {
+            call.reject("Missing extension/domain/password/wssUrl")
+            return
+        }
 
-        self.domain = domain
-        var err: NSError?
-        let ok = PjsipBridge.shared().registerAccount(withExtension: ext,
-                                                      domain: domain,
-                                                      password: password,
-                                                      wssUrl: wssUrl,
-                                                      error: &err)
-        if ok { call.resolve(["ok": true]) }
-        else  { call.reject(err?.localizedDescription ?? "registerAccount failed") }
+        do {
+            // Configure audio session for VoIP early.
+            try? AVAudioSession.sharedInstance().setCategory(
+                .playAndRecord,
+                mode: .voiceChat,
+                options: [.allowBluetooth, .defaultToSpeaker]
+            )
+            try? AVAudioSession.sharedInstance().setActive(true)
+
+            let factory = Factory.Instance
+            let core = try factory.createCore(configPath: nil, factoryConfigPath: nil, systemContext: nil)
+
+            // ICE / TURN configuration (Metered.ca relay fallback).
+            if let nat = core.natPolicy ?? (try? core.createNatPolicy()) {
+                nat.stunEnabled = true
+                nat.iceEnabled = true
+                nat.turnEnabled = true
+                nat.stunServer = "stun:stun.l.google.com:19302"
+                core.natPolicy = nat
+            }
+
+            // Build account params with WSS transport.
+            let accountParams = try core.createAccountParams()
+            let identity = try factory.createAddress(addr: "sip:\(ext)@\(domain)")
+            try accountParams.setIdentityaddress(newValue: identity)
+
+            let serverAddr = try factory.createAddress(addr: wssUrl)
+            try serverAddr.setTransport(newValue: .Tls)
+            try accountParams.setServeraddress(newValue: serverAddr)
+            accountParams.registerEnabled = true
+
+            let authInfo = try factory.createAuthInfo(
+                username: ext, userid: ext, passwd: password,
+                ha1: "", realm: "", domain: domain
+            )
+            core.addAuthInfo(info: authInfo)
+
+            let account = try core.createAccount(params: accountParams)
+            try core.addAccount(account: account)
+            core.defaultAccount = account
+
+            // Delegate → JS events.
+            let delegate = CoreDelegateStub(
+                onAccountRegistrationStateChanged: { [weak self] _, _, state, message in
+                    self?.notifyListeners("registration", data: [
+                        "state": String(describing: state),
+                        "message": message
+                    ])
+                },
+                onCallStateChanged: { [weak self] _, call, state, message in
+                    guard let self = self else { return }
+                    let remote = call.remoteAddress?.asStringUriOnly() ?? ""
+                    let stateStr = String(describing: state)
+
+                    switch state {
+                    case .IncomingReceived:
+                        self.currentCall = call
+                        self.notifyListeners("callReceived", data: [
+                            "from": remote, "callId": call.callLog?.callId ?? ""
+                        ])
+                    case .End, .Released, .Error:
+                        self.notifyListeners("callEnded", data: [
+                            "reason": message, "state": stateStr
+                        ])
+                        if self.currentCall === call { self.currentCall = nil }
+                    default:
+                        self.currentCall = call
+                    }
+
+                    self.notifyListeners("callStateChanged", data: [
+                        "state": stateStr, "remote": remote, "message": message
+                    ])
+                }
+            )
+            core.addDelegate(delegate: delegate)
+            self.delegateRef = delegate
+
+            try core.start()
+
+            self.core = core
+            self.account = account
+            call.resolve(["ok": true])
+        } catch {
+            call.reject("Linphone init failed: \(error.localizedDescription)")
+        }
+        #else
+        call.reject("linphone-sdk not linked. See ios/App/LINPHONE_SETUP.md")
+        #endif
     }
 
+    // MARK: - makeCall
+
     @objc func makeCall(_ call: CAPPluginCall) {
+        #if canImport(linphonesw)
+        guard let core = core else { call.reject("Core not initialized"); return }
         guard let number = call.getString("number") else { call.reject("Missing number"); return }
-        var err: NSError?
-        let ok = PjsipBridge.shared().makeCall(to: number, domain: self.domain, error: &err)
-        if ok { call.resolve(["ok": true]) } else { call.reject(err?.localizedDescription ?? "makeCall failed") }
+        let domain = call.getString("domain")
+            ?? account?.params?.identityAddress?.domain
+            ?? ""
+        let uri = number.hasPrefix("sip:") ? number : "sip:\(number)@\(domain)"
+
+        if let outgoing = core.invite(url: uri) {
+            currentCall = outgoing
+            call.resolve(["ok": true, "callId": outgoing.callLog?.callId ?? ""])
+        } else {
+            call.reject("Failed to place call to \(uri)")
+        }
+        #else
+        call.reject("linphone-sdk not linked")
+        #endif
+    }
+
+    // MARK: - hangup / answer / mute / hold / DTMF
+
+    @objc func hangup(_ call: CAPPluginCall) {
+        #if canImport(linphonesw)
+        guard let active = currentCall ?? core?.currentCall else {
+            call.resolve(["ok": true]); return
+        }
+        do { try active.terminate(); call.resolve(["ok": true]) }
+        catch { call.reject("hangup failed: \(error.localizedDescription)") }
+        #else
+        call.reject("linphone-sdk not linked")
+        #endif
     }
 
     @objc func answer(_ call: CAPPluginCall) {
-        var err: NSError?
-        let ok = PjsipBridge.shared().answerCurrentCall(&err)
-        if ok { call.resolve(["ok": true]) } else { call.reject(err?.localizedDescription ?? "answer failed") }
-    }
-
-    @objc func hangup(_ call: CAPPluginCall) {
-        var err: NSError?
-        let ok = PjsipBridge.shared().hangupCurrentCall(&err)
-        if ok { call.resolve(["ok": true]) } else { call.reject(err?.localizedDescription ?? "hangup failed") }
+        #if canImport(linphonesw)
+        guard let incoming = currentCall ?? core?.currentCall else {
+            call.reject("No incoming call"); return
+        }
+        do { try incoming.accept(); call.resolve(["ok": true]) }
+        catch { call.reject("answer failed: \(error.localizedDescription)") }
+        #else
+        call.reject("linphone-sdk not linked")
+        #endif
     }
 
     @objc func setMute(_ call: CAPPluginCall) {
+        #if canImport(linphonesw)
+        guard let core = core else { call.reject("Core not initialized"); return }
         let muted = call.getBool("muted") ?? false
-        var err: NSError?
-        let ok = PjsipBridge.shared().setMuted(muted, error: &err)
-        if ok { call.resolve(["ok": true, "muted": muted]) } else { call.reject(err?.localizedDescription ?? "setMute failed") }
+        core.micEnabled = !muted
+        call.resolve(["ok": true, "muted": muted])
+        #else
+        call.reject("linphone-sdk not linked")
+        #endif
     }
 
     @objc func setHold(_ call: CAPPluginCall) {
-        let onHold = call.getBool("onHold") ?? false
-        var err: NSError?
-        let ok = PjsipBridge.shared().setHold(onHold, error: &err)
-        if ok { call.resolve(["ok": true, "onHold": onHold]) } else { call.reject(err?.localizedDescription ?? "setHold failed") }
+        #if canImport(linphonesw)
+        guard let active = currentCall ?? core?.currentCall else {
+            call.reject("No active call"); return
+        }
+        let hold = call.getBool("hold") ?? false
+        do {
+            if hold { try active.pause() } else { try active.resume() }
+            call.resolve(["ok": true, "hold": hold])
+        } catch {
+            call.reject("setHold failed: \(error.localizedDescription)")
+        }
+        #else
+        call.reject("linphone-sdk not linked")
+        #endif
     }
 
     @objc func sendDTMF(_ call: CAPPluginCall) {
-        guard let digit = call.getString("digit") else { call.reject("Missing digit"); return }
-        var err: NSError?
-        let ok = PjsipBridge.shared().sendDtmf(digit, error: &err)
-        if ok { call.resolve(["ok": true, "digit": digit]) } else { call.reject(err?.localizedDescription ?? "sendDtmf failed") }
-    }
-
-    // MARK: - PjsipBridgeDelegate → notifyListeners
-
-    public func pjsipRegStateChanged(_ registered: Bool, code: Int32, reason: String) {
-        if registered {
-            notifyListeners("registered", data: ["code": code, "reason": reason])
-        } else {
-            notifyListeners("registrationFailed", data: ["code": code, "reason": reason])
+        #if canImport(linphonesw)
+        guard let active = currentCall ?? core?.currentCall else {
+            call.reject("No active call"); return
         }
-    }
-    public func pjsipIncomingCall(from: String) {
-        notifyListeners("callReceived", data: ["from": from])
-        notifyListeners("callStateChanged", data: ["state": "ringing", "number": from])
-    }
-    public func pjsipCallStateChanged(_ state: String) {
-        notifyListeners("callStateChanged", data: ["state": state])
-    }
-    public func pjsipCallEnded(_ reason: String) {
-        notifyListeners("callEnded", data: ["reason": reason])
+        guard let digit = call.getString("digit"), let ch = digit.first else {
+            call.reject("Missing digit"); return
+        }
+        do { try active.sendDtmf(dtmf: ch); call.resolve(["ok": true]) }
+        catch { call.reject("DTMF failed: \(error.localizedDescription)") }
+        #else
+        call.reject("linphone-sdk not linked")
+        #endif
     }
 }
