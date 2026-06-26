@@ -1,5 +1,27 @@
-// Shared definition of the 35 AVA tools pushed to the ElevenLabs agent.
+// Shared definition of the 29 AVA tools pushed to the ElevenLabs agent.
 // Used by elevenlabs-manage-agent (sync_all_tools) and the admin UI status table.
+//
+// Two output shapes are exposed:
+//  - buildAvaToolsArray(): legacy inline webhook tools (kept for back-compat
+//    with older agent payloads that accepted `prompt.tools`).
+//  - buildAvaToolConfigs(): registry-shaped `tool_config` payloads compatible
+//    with the current ElevenLabs Convai Tools API
+//    (POST/PATCH /v1/convai/tools → reference by `tool_ids` on the agent).
+
+type ToolSpec = {
+  name: string;
+  description: string;
+  properties: Record<string, any>;
+  required: string[];
+};
+
+function specs(): ToolSpec[] {
+  const list: ToolSpec[] = [];
+  const add = (name: string, description: string, properties: Record<string, any> = {}, required: string[] = []) =>
+    list.push({ name, description, properties, required });
+  buildSpecs(add);
+  return list;
+}
 
 export function buildAvaToolsArray(supabaseUrl: string, anonKey: string) {
   const SUPABASE_TOOL_URL = `${supabaseUrl}/functions/v1/ava-tool-executor`;
@@ -26,6 +48,47 @@ export function buildAvaToolsArray(supabaseUrl: string, anonKey: string) {
       },
     },
   });
+
+  const arr: any[] = [];
+  buildSpecs((name, description, properties = {}, required = []) => arr.push(mk(name, description, properties, required)));
+  return arr;
+}
+
+/** Registry-shaped tool configs (ElevenLabs Convai Tools API). */
+export function buildAvaToolConfigs(supabaseUrl: string, anonKey: string) {
+  const url = `${supabaseUrl}/functions/v1/ava-tool-executor`;
+  return specs().map((s) => ({
+    tool_config: {
+      type: "webhook",
+      name: s.name,
+      description: s.description,
+      response_timeout_secs: 20,
+      api_schema: {
+        url,
+        method: "POST",
+        request_headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${anonKey}`,
+        },
+        request_body_schema: {
+          type: "object",
+          properties: {
+            tool_name: { type: "string", description: "Tool identifier", constant_value: s.name },
+            parameters: {
+              type: "object",
+              properties: s.properties,
+              ...(s.required.length ? { required: s.required } : {}),
+            },
+          },
+          required: ["tool_name", "parameters"],
+        },
+      },
+    },
+  }));
+}
+
+function buildSpecs(mk: (name: string, description: string, properties?: Record<string, any>, required?: string[]) => any) {
+
 
   return [
     // Telephony
