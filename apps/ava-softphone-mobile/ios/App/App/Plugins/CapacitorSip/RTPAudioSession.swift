@@ -228,6 +228,7 @@ final class RTPAudioSession {
 
     // MARK: - Audio engine
     private func startAudio() {
+        emitAudio("starting")
         logSessionState("pre-start")
         installAudioObservers()
         configureSessionCategory()
@@ -239,9 +240,11 @@ final class RTPAudioSession {
         attachAndPrepareEngine()
         if startEngineWithRetry() {
             engineRestartAttempts = 0
+            emitAudio("running")
         } else {
             // Engine refused to start synchronously — schedule a backoff retry
             // so the call doesn't permanently lose audio.
+            emitAudio("retrying")
             scheduleEngineRestart()
         }
     }
