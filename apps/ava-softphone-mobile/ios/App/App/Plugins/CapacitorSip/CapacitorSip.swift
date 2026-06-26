@@ -174,11 +174,13 @@ public class CapacitorSip: CAPPlugin, CXProviderDelegate {
 
     private func startRegisterTimer() {
         registerTimer?.cancel()
+        log(3, "register", "Starting REGISTER refresh timer every \(registerIntervalSec)s")
         let timer = DispatchSource.makeTimerSource(queue: .global())
         timer.schedule(deadline: .now() + .seconds(registerIntervalSec), repeating: .seconds(registerIntervalSec))
         timer.setEventHandler { [weak self] in
             guard let self = self else { return }
             self.cseq += 1
+            self.log(3, "register", "Refresh REGISTER cseq=\(self.cseq)")
             self.sendRegister(cseq: self.cseq, authHeader: self.lastAuthHeader)
         }
         timer.resume()
@@ -186,12 +188,13 @@ public class CapacitorSip: CAPPlugin, CXProviderDelegate {
     }
 
     @objc func disconnect(_ call: CAPPluginCall) {
+        log(3, "register", "disconnect() — sending UNREGISTER (Expires: 0)")
         shouldReconnect = false
         registerTimer?.cancel()
         registerTimer = nil
-        // Send UNREGISTER (Expires: 0) before closing
         sendRegister(cseq: cseq + 1, authHeader: lastAuthHeader, expires: 0)
         DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.log(3, "tls", "Closing NWConnection after UNREGISTER")
             self?.connection?.cancel()
             self?.connection = nil
             self?.isRegistered = false
@@ -220,17 +223,25 @@ public class CapacitorSip: CAPPlugin, CXProviderDelegate {
         }
         headers += "Content-Length: 0\r\n\r\n"
 
+        log(4, "sip-out", "REGISTER cseq=\(cseq) expires=\(expires) auth=\(authHeader != nil ? "yes" : "no")")
+        log(5, "sip-out", "\n\(redactSip(headers))")
+
         let data = headers.data(using: .utf8)!
-        connection?.send(content: data, completion: .contentProcessed { _ in })
+        connection?.send(content: data, completion: .contentProcessed { [weak self] err in
+            if let err = err { self?.log(1, "sip-out", "send REGISTER failed: \(err)") }
+        })
     }
 
     private func startReceiving() {
         connection?.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, _, error in
             guard let self = self else { return }
             if let data = data, let response = String(data: data, encoding: .utf8) {
+                self.log(5, "sip-in", "\n\(self.redactSip(response))")
                 self.handleSipResponse(response)
             }
-            if error == nil {
+            if let error = error {
+                self.log(1, "sip-in", "receive error: \(error)")
+            } else {
                 self.startReceiving()
             }
         }
@@ -240,6 +251,7 @@ public class CapacitorSip: CAPPlugin, CXProviderDelegate {
         if response.contains("SIP/2.0 401") || response.contains("SIP/2.0 407") {
             let realm = self.extractValue(from: response, key: "realm")
             let nonce = self.extractValue(from: response, key: "nonce")
+            log(3, "register", "Auth challenge received — realm=\(realm) nonce.len=\(nonce.count)")
             let ha1 = self.md5("\(sipExtension):\(realm):\(sipPassword)")
             let ha2 = self.md5("REGISTER:sip:\(sipDomain)")
             let digestResp = self.md5("\(ha1):\(nonce):\(ha2)")
@@ -248,6 +260,7 @@ public class CapacitorSip: CAPPlugin, CXProviderDelegate {
             self.cseq += 1
             self.sendRegister(cseq: self.cseq, authHeader: authHeader)
         } else if response.hasPrefix("SIP/2.0 200") && response.contains("REGISTER") {
+            log(3, "register", "200 OK REGISTER — registered as \(sipExtension)@\(sipDomain)")
             DispatchQueue.main.async {
                 self.isRegistered = true
                 self.notifyListeners("registration", data: [
@@ -257,7 +270,9 @@ public class CapacitorSip: CAPPlugin, CXProviderDelegate {
             }
             self.startRegisterTimer()
         } else if response.hasPrefix("SIP/2.0 180") {
+            log(3, "call", "180 Ringing")
             DispatchQueue.main.async {
+
                 self.notifyListeners("callStateChanged", data: ["state": "ringing"])
             }
         } else if response.hasPrefix("SIP/2.0 200") && response.contains("INVITE") {
