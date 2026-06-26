@@ -705,7 +705,10 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     }
 
     private func buildSdp(hold: Bool = false) -> String {
-        let ip = "0.0.0.0"
+        let ip = localRtpIp.isEmpty || localRtpIp == "0.0.0.0"
+            ? (RTPAudioSession.primaryLocalIPv4() ?? "0.0.0.0")
+            : localRtpIp
+        let port = localRtpPort > 0 ? Int(localRtpPort) : localSdpPort
         let direction = hold ? "a=sendonly" : "a=sendrecv"
         var sdp = ""
         sdp += "v=0\r\n"
@@ -713,7 +716,8 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         sdp += "s=CapacitorPjsip\r\n"
         sdp += "c=IN IP4 \(ip)\r\n"
         sdp += "t=0 0\r\n"
-        sdp += "m=audio \(localSdpPort) RTP/AVP 0 8 101\r\n"
+        sdp += "m=audio \(port) RTP/AVP 0 8 101\r\n"
+
         sdp += "a=rtpmap:0 PCMU/8000\r\n"
         sdp += "a=rtpmap:8 PCMA/8000\r\n"
         sdp += "a=rtpmap:101 telephone-event/8000\r\n"
