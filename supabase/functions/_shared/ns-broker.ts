@@ -79,34 +79,75 @@ export async function requirePlanipretAdmin(req: Request) {
 
 export async function obtainBrokerJwt(extension: string) {
   const env = nsEnv();
-  const res = await fetch(`${env.base}/jwt`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      username: `${extension}@${env.domain}`,
-      password: env.password,
-    }),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.message ?? `NS-API auth failed (${res.status})`);
-  const token = data.token ?? data.access_token ?? data.jwt;
-  const refresh = data.refresh_token ?? data.refresh ?? null;
-  const expiresIn = Number(data.expires_in ?? 3600);
-  if (!token) throw new Error("NS-API: no token returned");
-  return { token, refresh, expiresIn };
+  const clientId = Deno.env.get("NS_API_CLIENT_ID") ?? "";
+  const clientSecret = Deno.env.get("NS_API_CLIENT_SECRET") ?? "";
+  const username = env.domain ? `${extension}@${env.domain}` : extension;
+
+  const attempts: Array<{ label: string; url: string; init: RequestInit }> = [
+    {
+      label: "oauth2/token",
+      url: `${env.base}/ns-api/oauth2/token`,
+      init: {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+        body: new URLSearchParams({
+          grant_type: "password",
+          username,
+          password: env.password,
+          ...(clientId ? { client_id: clientId } : {}),
+          ...(clientSecret ? { client_secret: clientSecret } : {}),
+        }).toString(),
+      },
+    },
+    {
+      label: "v2/jwt",
+      url: `${env.base}/ns-api/v2/jwt`,
+      init: {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ username, password: env.password }),
+      },
+    },
+  ];
+
+  const errors: string[] = [];
+  for (const a of attempts) {
+    const res = await fetch(a.url, a.init);
+    const text = await res.text();
+    let data: any = {};
+    try { data = JSON.parse(text); } catch { /* keep text */ }
+    if (res.ok) {
+      const token = data.access_token ?? data.token ?? data.jwt;
+      if (!token) { errors.push(`${a.label}: no token`); continue; }
+      return {
+        token,
+        refresh: data.refresh_token ?? data.refresh ?? null,
+        expiresIn: Number(data.expires_in ?? 3600),
+      };
+    }
+    errors.push(`${a.label}: ${res.status} ${text.slice(0, 200)}`);
+  }
+  throw new Error(`NS-API auth failed: ${errors.join(" | ")}`);
 }
 
 export async function refreshBrokerJwt(refreshToken: string) {
   const env = nsEnv();
-  const res = await fetch(`${env.base}/jwt`, {
+  const clientId = Deno.env.get("NS_API_CLIENT_ID") ?? "";
+  const clientSecret = Deno.env.get("NS_API_CLIENT_SECRET") ?? "";
+  const res = await fetch(`${env.base}/ns-api/oauth2/token`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refresh_token: refreshToken }),
+    headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+    body: new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token: refreshToken,
+      ...(clientId ? { client_id: clientId } : {}),
+      ...(clientSecret ? { client_secret: clientSecret } : {}),
+    }).toString(),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.message ?? `NS-API refresh failed (${res.status})`);
   return {
-    token: data.token ?? data.access_token ?? data.jwt,
+    token: data.access_token ?? data.token ?? data.jwt,
     refresh: data.refresh_token ?? refreshToken,
     expiresIn: Number(data.expires_in ?? 3600),
   };
