@@ -40,17 +40,26 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
     if (!config) return;
     let cancelled = false;
     const cleanups: Array<() => void> = [];
+    let watchdog: ReturnType<typeof setTimeout> | null = null;
 
     setSipStatus('connecting');
     setSipError('');
+    console.log('[NativeSIP] initAccount → ext=%s domain=%s', config.extension, config.domain);
 
     (async () => {
       try {
         cleanups.push(await onNativeSipEvent('registered', () => {
-          if (!cancelled) { setSipStatus('registered'); setSipError(''); }
+          if (cancelled) return;
+          if (watchdog) { clearTimeout(watchdog); watchdog = null; }
+          console.log('[NativeSIP] registered ✓');
+          setSipStatus('registered'); setSipError('');
         }));
         cleanups.push(await onNativeSipEvent('registrationFailed', (d) => {
-          if (!cancelled) { setSipStatus('error'); setSipError(d?.reason || 'Registration failed'); }
+          if (cancelled) return;
+          if (watchdog) { clearTimeout(watchdog); watchdog = null; }
+          console.warn('[NativeSIP] registrationFailed', d);
+          setSipStatus('error');
+          setSipError(d?.reason || `Registration failed${d?.code ? ` (${d.code})` : ''}`);
         }));
         cleanups.push(await onNativeSipEvent('callReceived', (d) => {
           if (cancelled) return;
@@ -70,6 +79,20 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
           setIsOnHold(false);
           stopTimer();
         }));
+        cleanups.push(await onNativeSipEvent('log', (e: any) => {
+          // Bubble native logs to JS console for on-device debugging.
+          console.log('[CapacitorPjsip][native]', e?.message ?? e);
+        }));
+
+        // Watchdog: if the native plugin never answers in 15s we surface a
+        // clear error instead of leaving the UI on "connecting" forever
+        // (typical when the JS plugin name didn't match the native one).
+        watchdog = setTimeout(() => {
+          if (cancelled) return;
+          console.error('[NativeSIP] watchdog timeout — no registration event in 15s');
+          setSipStatus('error');
+          setSipError('Native SIP timeout — plugin did not respond');
+        }, 15000);
 
         await CapacitorPjsip.initAccount({
           extension: config.extension,
@@ -78,15 +101,17 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
           wssUrl: config.wssUrl,
         });
       } catch (e: any) {
-        if (!cancelled) {
-          setSipStatus('error');
-          setSipError(e?.message || 'Native SIP init failed');
-        }
+        if (cancelled) return;
+        if (watchdog) { clearTimeout(watchdog); watchdog = null; }
+        console.error('[NativeSIP] initAccount threw', e);
+        setSipStatus('error');
+        setSipError(e?.message || 'Native SIP init failed');
       }
     })();
 
     return () => {
       cancelled = true;
+      if (watchdog) { clearTimeout(watchdog); watchdog = null; }
       cleanups.forEach((c) => { try { c(); } catch {} });
       CapacitorPjsip.removeAllListeners().catch(() => {});
       stopTimer();

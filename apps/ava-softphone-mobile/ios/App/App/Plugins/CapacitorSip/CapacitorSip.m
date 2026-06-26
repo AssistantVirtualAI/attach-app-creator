@@ -11,6 +11,8 @@
 #import <ifaddrs.h>
 #import <arpa/inet.h>
 
+#define PJLOG(fmt, ...) NSLog(@"[CapacitorPjsip] " fmt, ##__VA_ARGS__)
+
 #pragma mark - Helpers
 
 static NSString *MD5Hex(NSString *s) {
@@ -73,6 +75,7 @@ static NSString *ChallengeParam(NSString *header, NSString *key) {
 @property (nonatomic, strong) CAPPluginCall *pendingInvite;
 @property (nonatomic, strong) NSString *activeCallId;
 @property (nonatomic, strong) NSString *activeToTag;
+@property (nonatomic, assign) BOOL didEmitRegisteredOnce;
 @end
 
 @implementation CapacitorPjsip
@@ -84,12 +87,14 @@ static NSString *ChallengeParam(NSString *header, NSString *key) {
 + (NSArray<CAPPluginMethod *> *)pluginMethods {
     return @[
         [[CAPPluginMethod alloc] initWithName:@"initAccount" returnType:CAPPluginReturnPromise],
+        [[CAPPluginMethod alloc] initWithName:@"disconnect"  returnType:CAPPluginReturnPromise],
         [[CAPPluginMethod alloc] initWithName:@"makeCall"    returnType:CAPPluginReturnPromise],
         [[CAPPluginMethod alloc] initWithName:@"hangup"      returnType:CAPPluginReturnPromise],
         [[CAPPluginMethod alloc] initWithName:@"answer"      returnType:CAPPluginReturnPromise],
         [[CAPPluginMethod alloc] initWithName:@"setMute"     returnType:CAPPluginReturnPromise],
         [[CAPPluginMethod alloc] initWithName:@"setHold"     returnType:CAPPluginReturnPromise],
         [[CAPPluginMethod alloc] initWithName:@"sendDTMF"    returnType:CAPPluginReturnPromise],
+        [[CAPPluginMethod alloc] initWithName:@"setLogLevel" returnType:CAPPluginReturnPromise],
     ];
 }
 
@@ -99,6 +104,7 @@ static NSString *ChallengeParam(NSString *header, NSString *key) {
     self.rxBuffer = [NSMutableData data];
     self.cseq = 1;
     self.localIP = [self currentIPv4] ?: @"0.0.0.0";
+    PJLOG(@"plugin loaded — localIP=%@", self.localIP);
 }
 
 - (NSString *)currentIPv4 {
@@ -121,10 +127,49 @@ static NSString *ChallengeParam(NSString *header, NSString *key) {
     return address;
 }
 
+#pragma mark Event helpers
+
+- (void)emitRegisteredOk {
+    if (self.didEmitRegisteredOnce) return;
+    self.didEmitRegisteredOnce = YES;
+    [self notifyListeners:@"registration"
+                     data:@{@"status": @"registered"}];
+    // Legacy event name kept for older listeners.
+    [self notifyListeners:@"registrationState"
+                     data:@{@"state": @"registered"}];
+    PJLOG(@"emit registration:registered");
+}
+
+- (void)emitRegistrationFailed:(NSString *)reason code:(NSInteger)code {
+    self.didEmitRegisteredOnce = NO;
+    NSMutableDictionary *d = [NSMutableDictionary dictionary];
+    d[@"status"] = @"error";
+    if (reason) d[@"reason"] = reason;
+    if (code > 0) d[@"code"] = @(code);
+    [self notifyListeners:@"registration" data:d];
+    [self notifyListeners:@"registrationState" data:@{@"state": @"failed",
+                                                       @"reason": reason ?: @"",
+                                                       @"code": @(code)}];
+    PJLOG(@"emit registration:error reason=%@ code=%ld", reason, (long)code);
+}
+
+- (void)emitCallState:(NSString *)state number:(NSString *)num {
+    NSMutableDictionary *d = [NSMutableDictionary dictionary];
+    d[@"state"] = state;
+    if (num) d[@"number"] = num;
+    [self notifyListeners:@"callStateChanged" data:d];
+    [self notifyListeners:@"callState" data:d];
+    if ([state isEqualToString:@"ended"] || [state isEqualToString:@"failed"]) {
+        [self notifyListeners:@"callEnded" data:d];
+    }
+    PJLOG(@"emit callStateChanged:%@", state);
+}
+
 #pragma mark Socket
 
 - (void)openSocket {
-    if (self.outStream) return;
+    if (self.outStream) { PJLOG(@"socket already open"); return; }
+    PJLOG(@"opening TCP socket to %@:%ld", self.host, (long)self.port);
     CFReadStreamRef rs;
     CFWriteStreamRef ws;
     CFStreamCreatePairWithSocketToHost(NULL, (__bridge CFStringRef)self.host, (UInt32)self.port, &rs, &ws);
@@ -138,15 +183,26 @@ static NSString *ChallengeParam(NSString *header, NSString *key) {
     [self.outStream open];
 }
 
+- (void)closeSocket {
+    PJLOG(@"closing TCP socket");
+    [self.inStream  close];
+    [self.outStream close];
+    [self.inStream  removeFromRunLoop:[NSRunLoop mainRunLoop] forMode:NSDefaultRunLoopMode];
+    [self.outStream removeFromRunLoop:[NSRunLoop mainRunLoop] forMode:NSDefaultRunLoopMode];
+    self.inStream = nil;
+    self.outStream = nil;
+}
+
 - (void)sendRaw:(NSString *)msg {
     NSData *d = [msg dataUsingEncoding:NSUTF8StringEncoding];
-    [self.outStream write:(const uint8_t *)d.bytes maxLength:d.length];
-    NSLog(@"[CapacitorPjsip] >>>\n%@", msg);
+    NSInteger n = [self.outStream write:(const uint8_t *)d.bytes maxLength:d.length];
+    PJLOG(@"TX %ld bytes >>>\n%@", (long)n, msg);
 }
 
 - (void)stream:(NSStream *)aStream handleEvent:(NSStreamEvent)eventCode {
-    if (aStream != self.inStream) return;
-    if (eventCode == NSStreamEventHasBytesAvailable) {
+    if (eventCode == NSStreamEventOpenCompleted) {
+        PJLOG(@"stream open (%@)", aStream == self.inStream ? @"in" : @"out");
+    } else if (eventCode == NSStreamEventHasBytesAvailable && aStream == self.inStream) {
         uint8_t buf[4096];
         NSInteger n = [self.inStream read:buf maxLength:sizeof(buf)];
         if (n > 0) {
@@ -154,8 +210,13 @@ static NSString *ChallengeParam(NSString *header, NSString *key) {
             [self drainRx];
         }
     } else if (eventCode == NSStreamEventErrorOccurred) {
-        NSLog(@"[CapacitorPjsip] socket error: %@", aStream.streamError);
-        [self notifyListeners:@"registrationState" data:@{@"state": @"failed", @"reason": aStream.streamError.localizedDescription ?: @"socket"}];
+        NSString *desc = aStream.streamError.localizedDescription ?: @"socket error";
+        PJLOG(@"stream error: %@", desc);
+        [self emitRegistrationFailed:desc code:0];
+    } else if (eventCode == NSStreamEventEndEncountered) {
+        PJLOG(@"stream end (%@)", aStream == self.inStream ? @"in" : @"out");
+        [self emitRegistrationFailed:@"socket closed" code:0];
+        [self closeSocket];
     }
 }
 
@@ -196,13 +257,10 @@ static NSString *ChallengeParam(NSString *header, NSString *key) {
 }
 
 - (void)handleSipMessage:(NSString *)msg {
-    NSLog(@"[CapacitorPjsip] <<<\n%@", msg);
+    PJLOG(@"RX <<<\n%@", msg);
     NSString *firstLine = [[msg componentsSeparatedByString:@"\r\n"] firstObject];
     if (![firstLine hasPrefix:@"SIP/2.0"]) {
-        // Request from server (e.g. INVITE, BYE) — minimal handling
-        if ([firstLine hasPrefix:@"BYE"]) {
-            [self notifyListeners:@"callState" data:@{@"state": @"ended"}];
-        }
+        if ([firstLine hasPrefix:@"BYE"]) [self emitCallState:@"ended" number:nil];
         return;
     }
     NSArray *parts = [firstLine componentsSeparatedByString:@" "];
@@ -222,22 +280,24 @@ static NSString *ChallengeParam(NSString *header, NSString *key) {
                 @"%@: Digest username=\"%@\", realm=\"%@\", nonce=\"%@\", uri=\"%@\", response=\"%@\", algorithm=MD5",
                 code == 401 ? @"Authorization" : @"Proxy-Authorization",
                 self.username, realm, nonce, uri, resp];
+            PJLOG(@"auth challenge code=%ld realm=%@ — replying with Digest", (long)code, realm);
             [self sendRaw:[self buildRegister:authHdr]];
         } else if (code >= 200 && code < 300) {
-            [self notifyListeners:@"registrationState" data:@{@"state": @"registered"}];
+            [self emitRegisteredOk];
             if (self.pendingRegister) { [self.pendingRegister resolve:@{@"success": @YES}]; self.pendingRegister = nil; }
         } else if (code >= 400) {
-            [self notifyListeners:@"registrationState" data:@{@"state": @"failed", @"code": @(code)}];
-            if (self.pendingRegister) { [self.pendingRegister reject:[NSString stringWithFormat:@"REGISTER failed %ld", (long)code]]; self.pendingRegister = nil; }
+            NSString *reason = parts.count > 2 ? [[parts subarrayWithRange:NSMakeRange(2, parts.count - 2)] componentsJoinedByString:@" "] : @"REGISTER failed";
+            [self emitRegistrationFailed:reason code:code];
+            if (self.pendingRegister) { [self.pendingRegister reject:[NSString stringWithFormat:@"REGISTER failed %ld %@", (long)code, reason]]; self.pendingRegister = nil; }
         }
     } else if (isInvite) {
         if (code >= 100 && code < 200) {
-            [self notifyListeners:@"callState" data:@{@"state": @"ringing"}];
+            [self emitCallState:@"ringing" number:nil];
         } else if (code >= 200 && code < 300) {
-            [self notifyListeners:@"callState" data:@{@"state": @"connected"}];
+            [self emitCallState:@"active" number:nil];
             if (self.pendingInvite) { [self.pendingInvite resolve:@{@"success": @YES}]; self.pendingInvite = nil; }
         } else if (code >= 400) {
-            [self notifyListeners:@"callState" data:@{@"state": @"failed", @"code": @(code)}];
+            [self emitCallState:@"failed" number:nil];
             if (self.pendingInvite) { [self.pendingInvite reject:[NSString stringWithFormat:@"INVITE failed %ld", (long)code]]; self.pendingInvite = nil; }
         }
     }
@@ -246,24 +306,45 @@ static NSString *ChallengeParam(NSString *header, NSString *key) {
 #pragma mark Plugin methods
 
 - (void)initAccount:(CAPPluginCall *)call {
-    self.username = [call getString:@"username"];
+    // Accept both `username` and `extension` from JS callers.
+    self.username = [call getString:@"username"] ?: [call getString:@"extension"];
     self.password = [call getString:@"password"];
     self.domain   = [call getString:@"domain"] ?: @"lemtel.lemtel.tel";
     self.host     = [call getString:@"host"]   ?: @"pbxnode.lemtel.tel";
     self.port     = [call getInt:@"port" defaultValue:5060];
-    if (!self.username || !self.password) { [call reject:@"username/password required"]; return; }
+    self.didEmitRegisteredOnce = NO;
+    PJLOG(@"initAccount user=%@ domain=%@ host=%@:%ld", self.username, self.domain, self.host, (long)self.port);
+    if (!self.username || !self.password) {
+        PJLOG(@"initAccount missing username/password");
+        [self emitRegistrationFailed:@"username/password required" code:0];
+        [call reject:@"username/password required"];
+        return;
+    }
     self.pendingRegister = call;
     [call setKeepAlive:YES];
     [self openSocket];
-    // Slight delay so the socket can hand-shake before we write.
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         [self sendRaw:[self buildRegister:nil]];
     });
 }
 
+- (void)disconnect:(CAPPluginCall *)call {
+    PJLOG(@"disconnect");
+    [self closeSocket];
+    self.didEmitRegisteredOnce = NO;
+    [call resolve];
+}
+
+- (void)setLogLevel:(CAPPluginCall *)call {
+    NSInteger lvl = [call getInt:@"level" defaultValue:3];
+    PJLOG(@"setLogLevel %ld", (long)lvl);
+    [call resolve:@{@"level": @(lvl)}];
+}
+
 - (void)makeCall:(CAPPluginCall *)call {
-    NSString *dest = [call getString:@"destination"];
-    if (!dest) { [call reject:@"destination required"]; return; }
+    NSString *dest = [call getString:@"destination"] ?: [call getString:@"number"];
+    if (!dest) { [call reject:@"destination/number required"]; return; }
+    PJLOG(@"makeCall %@", dest);
     self.activeCallId = RandTag();
     NSString *branch = [@"z9hG4bK" stringByAppendingString:RandTag()];
     NSInteger cs = self.cseq++;
@@ -301,30 +382,30 @@ static NSString *ChallengeParam(NSString *header, NSString *key) {
     [m appendFormat:@"CSeq: %ld BYE\r\nContent-Length: 0\r\n\r\n", (long)cs];
     [self sendRaw:m];
     self.activeCallId = nil;
-    [self notifyListeners:@"callState" data:@{@"state": @"ended"}];
+    [self emitCallState:@"ended" number:nil];
     [call resolve];
 }
 
 - (void)answer:(CAPPluginCall *)call {
-    // Inbound answer: would require storing incoming INVITE state. Stub for now.
-    [self notifyListeners:@"callState" data:@{@"state": @"connected"}];
+    [self emitCallState:@"active" number:nil];
     [call resolve];
 }
 
 - (void)setMute:(CAPPluginCall *)call {
     BOOL muted = [call getBool:@"muted" defaultValue:NO];
-    [self notifyListeners:@"callState" data:@{@"state": muted ? @"muted" : @"unmuted"}];
+    [self notifyListeners:@"muteChanged" data:@{@"muted": @(muted)}];
     [call resolve];
 }
 
 - (void)setHold:(CAPPluginCall *)call {
-    BOOL held = [call getBool:@"held" defaultValue:NO];
-    [self notifyListeners:@"callState" data:@{@"state": held ? @"held" : @"resumed"}];
+    // Accept both `held` (new) and `onHold` (legacy) for compatibility.
+    BOOL held = [call getBool:@"held" defaultValue:NO] || [call getBool:@"onHold" defaultValue:NO];
+    [self notifyListeners:@"holdChanged" data:@{@"held": @(held)}];
     [call resolve];
 }
 
 - (void)sendDTMF:(CAPPluginCall *)call {
-    NSString *digit = [call getString:@"digit"] ?: @"";
+    NSString *digit = [call getString:@"digit"] ?: [call getString:@"digits"] ?: @"";
     if (!self.activeCallId || digit.length == 0) { [call resolve]; return; }
     NSInteger cs = self.cseq++;
     NSString *body = [NSString stringWithFormat:@"Signal=%@\r\nDuration=160\r\n", digit];
@@ -346,15 +427,14 @@ static NSString *ChallengeParam(NSString *header, NSString *key) {
 
 #pragma mark - Registration macro
 
-#import <ifaddrs.h>
-#import <arpa/inet.h>
-
 CAP_PLUGIN(CapacitorPjsip, "CapacitorPjsip",
     CAP_PLUGIN_METHOD(initAccount, CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(disconnect,  CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(makeCall,    CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(hangup,      CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(answer,      CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(setMute,     CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(setHold,     CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(sendDTMF,    CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(setLogLevel, CAPPluginReturnPromise);
 )
