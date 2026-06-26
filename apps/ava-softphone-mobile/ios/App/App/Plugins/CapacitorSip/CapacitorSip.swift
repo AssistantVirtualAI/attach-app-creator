@@ -58,6 +58,67 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     private var isOnHold: Bool = false
     private var localSdpPort: Int = 40000
 
+    // MARK: - RTP audio
+    private var rtp: RTPAudioSession?
+    private var localRtpIp: String = "0.0.0.0"
+    private var localRtpPort: UInt16 = 0
+    private var remoteRtpIp: String = ""
+    private var remoteRtpPort: UInt16 = 0
+    private var rtpStarted: Bool = false
+
+    private func ensureRtpSocket() {
+        if rtp != nil { return }
+        let session = RTPAudioSession()
+        do {
+            try session.prepareLocalSocket()
+            self.rtp = session
+            self.localRtpIp = session.localIp
+            self.localRtpPort = session.localPort
+            log("RTP socket bound \(localRtpIp):\(localRtpPort)")
+        } catch {
+            log("RTP socket bind failed: \(error.localizedDescription)")
+        }
+    }
+
+    private func startRtpIfReady() {
+        guard !rtpStarted, let rtp = rtp, !remoteRtpIp.isEmpty, remoteRtpPort > 0 else { return }
+        rtpStarted = true
+        rtp.setMuted(isMuted)
+        rtp.start(remoteIp: remoteRtpIp, remotePort: remoteRtpPort)
+        log("RTP started → \(remoteRtpIp):\(remoteRtpPort)")
+    }
+
+    private func stopRtp() {
+        rtpStarted = false
+        rtp?.stop()
+        rtp = nil
+        remoteRtpIp = ""; remoteRtpPort = 0
+        localRtpIp = "0.0.0.0"; localRtpPort = 0
+    }
+
+    /// Parse SDP body, populating remoteRtpIp / remoteRtpPort.
+    private func parseRemoteSdp(_ msg: String) {
+        guard let bodyStart = msg.range(of: "\r\n\r\n") else { return }
+        let body = String(msg[bodyStart.upperBound...])
+        var ip = ""
+        var port: UInt16 = 0
+        for raw in body.split(separator: "\r\n") {
+            let line = String(raw)
+            if line.hasPrefix("c=IN IP4 ") {
+                ip = String(line.dropFirst("c=IN IP4 ".count)).trimmingCharacters(in: .whitespaces)
+            } else if line.hasPrefix("m=audio ") {
+                let parts = line.split(separator: " ")
+                if parts.count >= 2, let p = UInt16(parts[1]) { port = p }
+            }
+        }
+        if !ip.isEmpty && port > 0 {
+            remoteRtpIp = ip
+            remoteRtpPort = port
+            log("remote SDP audio = \(ip):\(port)")
+        }
+    }
+
+
     // MARK: - Logging
     private func log(_ msg: String) {
         NSLog("[CapacitorPjsip] \(msg)")
