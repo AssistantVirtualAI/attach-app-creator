@@ -132,6 +132,9 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
             self.localRtpIp = session.localIp
             self.localRtpPort = session.localPort
             log("RTP socket bound \(localRtpIp):\(localRtpPort)")
+            // Prewarm RemoteIO AudioUnit BEFORE any INVITE so AudioUnitInitialize
+            // happens once on a stable AVAudioSession (avoids 561017449 mid-call).
+            session.prewarmAudio()
         } catch {
             log("RTP socket bind failed: \(error.localizedDescription)")
         }
@@ -292,7 +295,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
             try session.setCategory(.playAndRecord,
                                     mode: .voiceChat,
                                     options: [.allowBluetooth, .allowBluetoothA2DP, .defaultToSpeaker, .duckOthers])
-            try session.setPreferredSampleRate(8000)
+            try session.setPreferredSampleRate(48000)
             try session.setPreferredIOBufferDuration(0.02)
             try session.setActive(true, options: [])
             log("AVAudioSession configured cat=\(session.category.rawValue) mode=\(session.mode.rawValue) sr=\(Int(session.sampleRate))Hz io=\(Int(session.ioBufferDuration * 1000))ms route=\(audioRouteSummary())")

@@ -21,12 +21,20 @@ final class RTPAudioSession {
 
     // MARK: - RemoteIO AudioUnit
     private var ioUnit: AudioUnit?
-    /// Native VoIP rate. 8kHz keeps PCMU conversion trivial (1 PCM frame = 1 μ-law byte).
-    private let sampleRate: Double = 8000
+    /// Hardware/native sample rate negotiated with AVAudioSession.
+    /// iOS RemoteIO does NOT accept 8000Hz on modern devices — we run RemoteIO
+    /// at the native rate (typically 48000Hz) and resample to/from 8000Hz for RTP.
+    private var hwSampleRate: Double = 48000
+    /// RTP/PCMU codec rate (G.711 μ-law).
+    private let rtpSampleRate: Double = 8000
     private let channels: UInt32 = 1
     /// Scratch buffer used inside the input callback to receive captured PCM.
     private var captureScratch: UnsafeMutablePointer<Int16>?
     private var captureScratchFrames: UInt32 = 0
+    /// Fractional resampling phase accumulators (zero-order hold).
+    private var txPhase: Double = 0
+    private var rxPhase: Double = 0
+    private var rxHoldSample: Int16 = 0
 
     // MARK: - RTP
     private var sequenceNumber: UInt16 = UInt16.random(in: 0...UInt16.max)
@@ -35,12 +43,13 @@ final class RTPAudioSession {
     private let frameSamples: Int = 160 // 20ms @ 8kHz
     private var isMuted = false
     private var running = false
+    private var audioPrepared = false
 
     // MARK: - Audio buffers (lock-protected)
     private let audioLock = NSLock()
-    /// Outgoing PCM samples awaiting RTP framing.
+    /// Outgoing PCM samples (already decimated to 8kHz) awaiting RTP framing.
     private var sendBuffer = [Int16]()
-    /// Incoming PCM jitter buffer drained by the render callback.
+    /// Incoming PCM jitter buffer at 8kHz drained by the render callback.
     private var playQueue = [Int16]()
     private let maxPlayQueueSamples = 8000 // ~1s safety cap
 
@@ -181,6 +190,20 @@ final class RTPAudioSession {
         self.startedAt = Date()
         NSLog("[RTP] start remote=\(remoteIp):\(remotePort) local=\(localIp):\(localPort)")
         startReceiveLoop()
+        if ioUnit == nil {
+            startAudio()
+        } else {
+            NSLog("[RTP] start: RemoteIO already prewarmed — reusing existing AudioUnit")
+            emitAudio("running")
+        }
+    }
+
+    /// Public: build + start RemoteIO eagerly (called right after socket bind).
+    /// Doing this BEFORE the SIP INVITE avoids AudioUnitInitialize 561017449
+    /// caused by AVAudioSession being mid-config when the call answers.
+    func prewarmAudio() {
+        if audioPrepared && ioUnit != nil { return }
+        audioPrepared = true
         startAudio()
     }
 
@@ -191,11 +214,13 @@ final class RTPAudioSession {
             configureSessionCategory()
             _ = buildAndStartIOUnit()
         }
-        let total = Int(sampleRate * seconds)
+        // Tone is generated at the RTP/playQueue rate (8kHz); render callback
+        // upsamples to the hardware rate.
+        let total = Int(rtpSampleRate * seconds)
         var samples = [Int16](repeating: 0, count: total)
         let twoPi = 2.0 * Double.pi
         for i in 0..<total {
-            let v = sin(twoPi * frequency * Double(i) / sampleRate) * 8000
+            let v = sin(twoPi * frequency * Double(i) / rtpSampleRate) * 8000
             samples[i] = Int16(v)
         }
         audioLock.lock()
@@ -207,8 +232,9 @@ final class RTPAudioSession {
     }
 
     func stop() {
-        guard running else { return }
+        let wasRunning = running
         running = false
+        audioPrepared = false
         NSLog("[RTP] stop")
         engineRestartTimer?.cancel(); engineRestartTimer = nil
         engineRestartAttempts = 0
@@ -220,7 +246,7 @@ final class RTPAudioSession {
         playQueue.removeAll()
         audioLock.unlock()
         hasRemote = false
-        emitAudio("idle")
+        if wasRunning { emitAudio("idle") }
     }
 
     func setMuted(_ muted: Bool) { isMuted = muted }
@@ -234,6 +260,12 @@ final class RTPAudioSession {
         // Let the session settle before reading/forcing hardware format.
         NSLog("[RTP] sleeping 100ms after setCategory to let session settle")
         Thread.sleep(forTimeInterval: 0.1)
+        // Read the actual hardware rate iOS negotiated. RemoteIO MUST use this
+        // rate — passing 8000Hz here is what triggers kAudioUnitErr_FormatNotSupported.
+        let actual = AVAudioSession.sharedInstance().sampleRate
+        if actual >= 8000 { hwSampleRate = actual }
+        tapFormatDesc = "RemoteIO I16 \(Int(hwSampleRate))Hz ch=1 → RTP 8000Hz"
+        NSLog("[RTP] negotiated hwSampleRate=\(Int(hwSampleRate))Hz (RTP rate=\(Int(rtpSampleRate))Hz)")
         logSessionState("post-settle")
         if buildAndStartIOUnit() {
             engineRestartAttempts = 0
@@ -259,7 +291,7 @@ final class RTPAudioSession {
             NSLog("[RTP] setCategory failed: \(error.localizedDescription)")
         }
         // Hint preferred I/O parameters; iOS may pick its own hardware rate.
-        try? session.setPreferredSampleRate(sampleRate)
+        try? session.setPreferredSampleRate(hwSampleRate)
         try? session.setPreferredIOBufferDuration(0.02)
         logSessionState("post-category")
     }
@@ -267,8 +299,10 @@ final class RTPAudioSession {
     // MARK: - RemoteIO build / teardown
     @discardableResult
     private func buildAndStartIOUnit() -> Bool {
-        NSLog("[RTP] RemoteIO build begin")
-        teardownIOUnit()
+        if ioUnit != nil { NSLog("[RTP] RemoteIO already built — reusing"); return true }
+        NSLog("[RTP] RemoteIO build begin (hwSampleRate=\(Int(hwSampleRate))Hz)")
+        // Reset resampler phase for a clean start.
+        txPhase = 0; rxPhase = 0; rxHoldSample = 0
 
         var desc = AudioComponentDescription(
             componentType: kAudioUnitType_Output,
@@ -315,7 +349,7 @@ final class RTPAudioSession {
 
         // Stream format: 8kHz mono Int16 packed.
         var asbd = AudioStreamBasicDescription(
-            mSampleRate: sampleRate,
+            mSampleRate: hwSampleRate,
             mFormatID: kAudioFormatLinearPCM,
             mFormatFlags: kAudioFormatFlagIsSignedInteger | kAudioFormatFlagIsPacked,
             mBytesPerPacket: 2,
@@ -335,7 +369,7 @@ final class RTPAudioSession {
             NSLog("[RTP] \(lastEngineError)")
             AudioComponentInstanceDispose(io); return false
         }
-        NSLog("[RTP] RemoteIO input callback format=I16 8000Hz ch=1 framesPerPacket=1")
+        NSLog("[RTP] RemoteIO input callback format=I16 \(Int(hwSampleRate))Hz ch=1")
         // Format we feed to speaker (element 0, input scope).
         status = AudioUnitSetProperty(io, kAudioUnitProperty_StreamFormat,
                                       kAudioUnitScope_Input, 0,
@@ -345,7 +379,7 @@ final class RTPAudioSession {
             NSLog("[RTP] \(lastEngineError)")
             AudioComponentInstanceDispose(io); return false
         }
-        NSLog("[RTP] RemoteIO render format=I16 8000Hz ch=1 framesPerPacket=1")
+        NSLog("[RTP] RemoteIO render format=I16 \(Int(hwSampleRate))Hz ch=1")
 
         let refcon = UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
 
@@ -524,23 +558,35 @@ final class RTPAudioSession {
         for i in 0..<n { let a = abs(scratch[i]); if a > peak { peak = a } }
         micPeak = Float(peak) / 32767.0
 
+        // Decimate hwSampleRate → 8000Hz using fractional phase accumulator
+        // (zero-order hold). Small/cheap and OK for narrowband PCMU.
+        let step = rtpSampleRate / hwSampleRate
+        var decimated = [Int16]()
+        decimated.reserveCapacity(n + 1)
+        var phase = txPhase
+        for i in 0..<n {
+            phase += step
+            if phase >= 1.0 {
+                phase -= 1.0
+                decimated.append(isMuted ? 0 : scratch[i])
+            }
+        }
+        txPhase = phase
+
         var framesToSend: [[Int16]] = []
         audioLock.lock()
-        if isMuted {
-            sendBuffer.append(contentsOf: repeatElement(0, count: n))
-        } else {
-            sendBuffer.append(contentsOf: UnsafeBufferPointer(start: scratch, count: n))
-        }
+        sendBuffer.append(contentsOf: decimated)
         while sendBuffer.count >= frameSamples {
             let frame = Array(sendBuffer.prefix(frameSamples))
             sendBuffer.removeFirst(frameSamples)
             framesToSend.append(frame)
         }
+        let queued = sendBuffer.count
         audioLock.unlock()
 
         for f in framesToSend { sendRTPFrame(f) }
         if inputCallbackCount == 1 || inputCallbackCount % 50 == 0 {
-            NSLog("[RTP] input callback #\(inputCallbackCount) frames=\(inNumberFrames) micPeak=\(String(format: "%.3f", micPeak)) queuedTxFrames=\(sendBuffer.count) txPackets=\(txPackets)")
+            NSLog("[RTP] input cb #\(inputCallbackCount) hwFrames=\(n) decim=\(decimated.count) micPeak=\(String(format: "%.3f", micPeak)) queued=\(queued) txPackets=\(txPackets)")
         }
         return noErr
     }
@@ -556,13 +602,32 @@ final class RTPAudioSession {
         let abl = UnsafeMutableAudioBufferListPointer(ioData)
         let needed = Int(inNumberFrames)
 
+        // Upsample 8000Hz playQueue → hwSampleRate using fractional phase
+        // (zero-order hold / sample repeat). Pulls one 8kHz sample whenever
+        // the phase rolls past 1.0; otherwise reuses the previous sample.
+        let step = rtpSampleRate / hwSampleRate
         var out = [Int16](repeating: 0, count: needed)
+        var phase = rxPhase
+        var hold = rxHoldSample
+        var drained = 0
         audioLock.lock()
-        let avail = min(needed, playQueue.count)
-        if avail > 0 {
-            for i in 0..<avail { out[i] = playQueue[i] }
-            playQueue.removeFirst(avail)
+        let available = playQueue.count
+        for i in 0..<needed {
+            phase += step
+            if phase >= 1.0 {
+                phase -= 1.0
+                if !playQueue.isEmpty {
+                    hold = playQueue.removeFirst()
+                    drained += 1
+                } else {
+                    hold = 0
+                }
+            }
+            out[i] = hold
         }
+        rxPhase = phase
+        rxHoldSample = hold
+        let remaining = playQueue.count
         audioLock.unlock()
 
         for buffer in abl {
@@ -573,7 +638,7 @@ final class RTPAudioSession {
             }
         }
         if renderCallbackCount == 1 || renderCallbackCount % 50 == 0 {
-            NSLog("[RTP] render callback #\(renderCallbackCount) frames=\(inNumberFrames) drained=\(avail) playQueue=\(playQueue.count) rxPackets=\(rxPackets) rxPeak=\(String(format: "%.3f", rxPeak))")
+            NSLog("[RTP] render cb #\(renderCallbackCount) hwFrames=\(needed) drained8k=\(drained) avail8k=\(available)→\(remaining) rxPackets=\(rxPackets) rxPeak=\(String(format: "%.3f", rxPeak))")
         }
         return noErr
     }
