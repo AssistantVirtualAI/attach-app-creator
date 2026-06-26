@@ -181,13 +181,20 @@ final class RTPAudioSession {
     // MARK: - Audio engine
     private func startAudio() {
         let session = AVAudioSession.sharedInstance()
+        // NOTE: The AVAudioSession is already activated by CapacitorSip when the
+        // call is set up. Do NOT call setActive(true) here — doing so races with
+        // the SIP plugin and yields "Session activation failed".
+        // We only (re)assert the category/mode so AVAudioEngine can attach to a
+        // compatible .playAndRecord / .voiceChat route. 561017449 ('!cat') means
+        // the active category is incompatible with input+output.
+        let sessionOptions: AVAudioSession.CategoryOptions = [
+            .allowBluetooth, .allowBluetoothA2DP, .defaultToSpeaker, .duckOthers
+        ]
         do {
-            try session.setCategory(.playAndRecord, mode: .voiceChat,
-                                    options: [.allowBluetooth, .allowBluetoothA2DP,
-                                              .defaultToSpeaker, .duckOthers])
-            try session.setActive(true, options: [])
+            try session.setCategory(.playAndRecord, mode: .voiceChat, options: sessionOptions)
+            NSLog("[RTP] audio session category=playAndRecord/voiceChat (already active, skip setActive)")
         } catch {
-            NSLog("[RTP] audio session activate failed: \(error.localizedDescription)")
+            NSLog("[RTP] setCategory failed: \(error.localizedDescription) — continuing with current category")
         }
 
         engine.attach(playerNode)
@@ -229,8 +236,19 @@ final class RTPAudioSession {
             try engine.start()
             playerNode.play()
             NSLog("[RTP] audio engine started, route=\(currentRouteDescription())")
-        } catch {
-            NSLog("[RTP] engine start failed: \(error.localizedDescription)")
+        } catch let nsErr as NSError {
+            NSLog("[RTP] engine start failed: code=\(nsErr.code) domain=\(nsErr.domain) desc=\(nsErr.localizedDescription)")
+            // 561017449 = kAudioSessionIncompatibleCategory ('!cat'). Retry once
+            // after forcing the category, in case the SIP plugin had set
+            // .playback or another incompatible category.
+            do {
+                try session.setCategory(.playAndRecord, mode: .voiceChat, options: sessionOptions)
+                try engine.start()
+                playerNode.play()
+                NSLog("[RTP] audio engine started on retry, route=\(currentRouteDescription())")
+            } catch {
+                NSLog("[RTP] engine start retry failed: \(error.localizedDescription)")
+            }
         }
     }
 
