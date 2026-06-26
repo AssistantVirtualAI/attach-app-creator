@@ -124,14 +124,22 @@ export default function PlanipretIntegrations() {
 
   const safeInvoke = async (name: string, body?: any) => {
     try {
-      const { data, error } = await supabase.functions.invoke(name, body ? { body } : undefined);
-      if (error) {
-        // Try to parse FunctionsHttpError body for the real message
-        let parsed: any = null;
-        try { parsed = await (error as any).context?.json?.(); } catch { /* ignore */ }
-        return { data: parsed ?? null, error: parsed?.error ?? error.message };
-      }
-      return { data, error: null as string | null };
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess?.session?.access_token;
+      const r = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${name}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(body ?? {}),
+      });
+      const text = await r.text();
+      let parsed: any = null;
+      try { parsed = text ? JSON.parse(text) : null; } catch { /* non-json */ }
+      if (!r.ok) return { data: parsed, error: parsed?.error ?? `HTTP ${r.status}` };
+      return { data: parsed, error: null as string | null };
     } catch (e: any) {
       return { data: null, error: e?.message ?? "Erreur réseau" };
     }
