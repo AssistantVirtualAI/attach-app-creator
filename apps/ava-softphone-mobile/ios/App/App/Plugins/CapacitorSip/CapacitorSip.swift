@@ -21,7 +21,12 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "setAudioRoute", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getAudioRoute", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "playTestTone", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "getRtpStats", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "getRtpStats", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "startRecord", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "stopRecord", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "transfer", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "park", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "addCall", returnType: CAPPluginReturnPromise)
     ]
 
     public override func load() {
@@ -102,6 +107,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     private var lastInviteAuth: String? = nil
     private var isMuted: Bool = false
     private var isOnHold: Bool = false
+    private var isRecording: Bool = false
     private var localSdpPort: Int = 40000
 
     // MARK: - RTP audio
@@ -169,6 +175,12 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     private func log(_ msg: String) {
         NSLog("[CapacitorPjsip] \(msg)")
         self.notifyListeners("log", data: ["message": msg])
+    }
+
+    /// Best-effort local IPv4 to advertise in SIP signaling headers (Via, Contact).
+    /// Avoids 0.0.0.0 which some PBX (NetSapiens) reject when NAT keepalive is off.
+    private func sigLocalIp() -> String {
+        return RTPAudioSession.primaryLocalIPv4() ?? "0.0.0.0"
     }
 
     private func emitCallState(_ state: String, direction: String? = nil, number: String? = nil, stage: String? = nil, code: String? = nil) {
@@ -339,10 +351,15 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
             call.reject("no active call")
             return
         }
+        if hold == isOnHold {
+            // No-op: already in the requested state, don't spam re-INVITEs.
+            call.resolve(["ok": true, "held": hold, "noop": true])
+            return
+        }
         isOnHold = hold
         callCseq += 1
         sendReInvite(hold: hold)
-        callState = hold ? "hold" : "active"
+        // NOTE: don't touch callState — the 200 OK to the re-INVITE confirms.
         notifyListeners("holdChanged", data: ["held": hold, "onHold": hold])
         call.resolve(["ok": true, "held": hold])
     }
@@ -651,15 +668,24 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
                     resetCallState()
                 }
             } else if code == "200" {
+                // Detect re-INVITE (within an established dialog) vs initial INVITE 200 OK.
+                let isReInvite = !callRemoteTag.isEmpty && (callState == "active" || callState == "hold")
                 callRemoteTag = extractTag(headerValue(msg, "To") ?? "")
                 if let contact = headerValue(msg, "Contact") { callRemoteContact = extractUri(contact) }
                 parseRemoteSdp(msg)
                 sendAck(to: msg, withinDialog: true)
-                if callDirection.isEmpty { callDirection = "out" }
-                callState = "active"
-                startRtpIfReady()
-                log("CALL_EVENT|INVITE_200_OK→active|callId=\(callActiveId)")
-                emitCallState("active", direction: "out", stage: "answered", code: code)
+                if isReInvite {
+                    // Hold / resume confirmation. Do NOT touch callState, do NOT restart RTP.
+                    // Just refresh the remote RTP target (PBX may relay through different IP/port).
+                    log("CALL_EVENT|reINVITE_200_OK|held=\(isOnHold)|callId=\(callActiveId)")
+                    notifyListeners("holdChanged", data: ["held": isOnHold, "onHold": isOnHold])
+                } else {
+                    if callDirection.isEmpty { callDirection = "out" }
+                    callState = "active"
+                    startRtpIfReady()
+                    log("CALL_EVENT|INVITE_200_OK→active|callId=\(callActiveId)")
+                    emitCallState("active", direction: "out", stage: "answered", code: code)
+                }
             } else if let n = Int(code), n >= 300 {
                 sendAck(to: msg, withinDialog: false)
                 let id = callActiveId
@@ -742,7 +768,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     }
 
     private func sendRegister(authHeader: String?) {
-        let localIp = "0.0.0.0"
+        let localIp = sigLocalIp()
         let transport = "TCP"
         let br = branch
         var msg = ""
@@ -785,7 +811,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         callRemoteUri = ""; callRemoteContact = ""
         callState = "idle"; callDirection = ""
         callInviteBranch = ""; callInviteCseq = 1
-        isMuted = false; isOnHold = false
+        isMuted = false; isOnHold = false; isRecording = false
         lastInviteRequest = ""; lastInviteAuth = nil
     }
 
@@ -860,13 +886,13 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         let sdp = buildSdp()
         var msg = ""
         msg += "INVITE \(uri) SIP/2.0\r\n"
-        msg += "Via: SIP/2.0/TCP 0.0.0.0;branch=\(br);rport\r\n"
+        msg += "Via: SIP/2.0/TCP \(sigLocalIp());branch=\(br);rport\r\n"
         msg += "Max-Forwards: 70\r\n"
         msg += "From: \"\(displayName)\" <sip:\(username)@\(domain)>;tag=\(callLocalTag)\r\n"
         msg += "To: <\(uri)>\r\n"
         msg += "Call-ID: \(callActiveId)\r\n"
         msg += "CSeq: \(callCseq) INVITE\r\n"
-        msg += "Contact: <sip:\(username)@0.0.0.0;transport=tcp>\r\n"
+        msg += "Contact: <sip:\(username)@\(sigLocalIp());transport=tcp>\r\n"
         msg += "User-Agent: CapacitorPjsip/1.0\r\n"
         msg += "Allow: INVITE, ACK, CANCEL, BYE, INFO, OPTIONS, NOTIFY\r\n"
         if let auth = authHeader { msg += auth }
@@ -881,7 +907,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         let toH = headerValue(response, "To") ?? ""
         let fromH = headerValue(response, "From") ?? ""
         let callid = headerValue(response, "Call-ID") ?? callActiveId
-        let viaH = headerValue(response, "Via") ?? "SIP/2.0/TCP 0.0.0.0;branch=\(branch)"
+        let viaH = headerValue(response, "Via") ?? "SIP/2.0/TCP \(sigLocalIp());branch=\(branch)"
         let target = withinDialog ? callRemoteContact : callRemoteUri
         var msg = ""
         msg += "ACK \(target) SIP/2.0\r\n"
@@ -901,7 +927,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         let br = branch
         var msg = ""
         msg += "BYE \(callRemoteContact.isEmpty ? callRemoteUri : callRemoteContact) SIP/2.0\r\n"
-        msg += "Via: SIP/2.0/TCP 0.0.0.0;branch=\(br);rport\r\n"
+        msg += "Via: SIP/2.0/TCP \(sigLocalIp());branch=\(br);rport\r\n"
         msg += "Max-Forwards: 70\r\n"
         msg += "From: \"\(displayName)\" <sip:\(username)@\(domain)>;tag=\(callLocalTag)\r\n"
         msg += "To: <\(callRemoteUri)>" + (callRemoteTag.isEmpty ? "" : ";tag=\(callRemoteTag)") + "\r\n"
@@ -918,7 +944,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         let cancelCseq = callInviteCseq
         var msg = ""
         msg += "CANCEL \(callRemoteUri) SIP/2.0\r\n"
-        msg += "Via: SIP/2.0/TCP 0.0.0.0;branch=\(br);rport\r\n"
+        msg += "Via: SIP/2.0/TCP \(sigLocalIp());branch=\(br);rport\r\n"
         msg += "Max-Forwards: 70\r\n"
         msg += "From: \"\(displayName)\" <sip:\(username)@\(domain)>;tag=\(callLocalTag)\r\n"
         msg += "To: <\(callRemoteUri)>\r\n"
@@ -935,13 +961,13 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         let sdp = buildSdp(hold: hold)
         var msg = ""
         msg += "INVITE \(target) SIP/2.0\r\n"
-        msg += "Via: SIP/2.0/TCP 0.0.0.0;branch=\(br);rport\r\n"
+        msg += "Via: SIP/2.0/TCP \(sigLocalIp());branch=\(br);rport\r\n"
         msg += "Max-Forwards: 70\r\n"
         msg += "From: \"\(displayName)\" <sip:\(username)@\(domain)>;tag=\(callLocalTag)\r\n"
         msg += "To: <\(callRemoteUri)>" + (callRemoteTag.isEmpty ? "" : ";tag=\(callRemoteTag)") + "\r\n"
         msg += "Call-ID: \(callActiveId)\r\n"
         msg += "CSeq: \(callCseq) INVITE\r\n"
-        msg += "Contact: <sip:\(username)@0.0.0.0;transport=tcp>\r\n"
+        msg += "Contact: <sip:\(username)@\(sigLocalIp());transport=tcp>\r\n"
         msg += "Content-Type: application/sdp\r\n"
         msg += "Content-Length: \(sdp.utf8.count)\r\n\r\n"
         msg += sdp
@@ -955,7 +981,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         let target = callRemoteContact.isEmpty ? callRemoteUri : callRemoteContact
         var msg = ""
         msg += "INFO \(target) SIP/2.0\r\n"
-        msg += "Via: SIP/2.0/TCP 0.0.0.0;branch=\(br);rport\r\n"
+        msg += "Via: SIP/2.0/TCP \(sigLocalIp());branch=\(br);rport\r\n"
         msg += "Max-Forwards: 70\r\n"
         msg += "From: \"\(displayName)\" <sip:\(username)@\(domain)>;tag=\(callLocalTag)\r\n"
         msg += "To: <\(callRemoteUri)>" + (callRemoteTag.isEmpty ? "" : ";tag=\(callRemoteTag)") + "\r\n"
@@ -987,7 +1013,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         resp += callid + "\r\n"
         resp += cseqH + "\r\n"
         if code == 200 {
-            resp += "Contact: <sip:\(username)@0.0.0.0;transport=tcp>\r\n"
+            resp += "Contact: <sip:\(username)@\(sigLocalIp());transport=tcp>\r\n"
         }
         if withSdp && code == 200 {
             let sdp = buildSdp()
@@ -999,5 +1025,114 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         }
         sendRaw(resp)
         log(">>> \(code) \(reason) (to INVITE)")
+    }
+
+    // MARK: - Record / Transfer / Park / AddCall
+
+    /// Server-side recording toggle via SIP INFO `Record: on|off` (NetSapiens / FusionPBX standard).
+    /// Falls back to DTMF feature code `*1` for PBX that don't support the INFO method.
+    @objc func startRecord(_ call: CAPPluginCall) {
+        if callActiveId.isEmpty || callState != "active" {
+            call.reject("no active call")
+            return
+        }
+        isRecording = true
+        callCseq += 1
+        sendInfoRecord(on: true)
+        notifyListeners("recordingChanged", data: ["recording": true])
+        call.resolve(["ok": true, "recording": true])
+    }
+
+    @objc func stopRecord(_ call: CAPPluginCall) {
+        if callActiveId.isEmpty {
+            call.resolve(["ok": true, "recording": false])
+            return
+        }
+        isRecording = false
+        callCseq += 1
+        sendInfoRecord(on: false)
+        notifyListeners("recordingChanged", data: ["recording": false])
+        call.resolve(["ok": true, "recording": false])
+    }
+
+    @objc func transfer(_ call: CAPPluginCall) {
+        let target = call.getString("target") ?? call.getString("number") ?? ""
+        if target.isEmpty { call.reject("target required"); return }
+        if callActiveId.isEmpty || (callState != "active" && callState != "hold") {
+            call.reject("no active call")
+            return
+        }
+        callCseq += 1
+        sendRefer(to: target)
+        call.resolve(["ok": true, "target": target])
+    }
+
+    @objc func park(_ call: CAPPluginCall) {
+        let code = call.getString("code") ?? "*5"
+        if callActiveId.isEmpty || (callState != "active" && callState != "hold") {
+            call.reject("no active call")
+            return
+        }
+        callCseq += 1
+        sendRefer(to: code)
+        call.resolve(["ok": true, "code": code])
+    }
+
+    @objc func addCall(_ call: CAPPluginCall) {
+        let target = call.getString("target") ?? call.getString("number") ?? ""
+        if target.isEmpty { call.reject("target required"); return }
+        // Hold current call first (re-INVITE sendonly) so the user can place a new outbound leg.
+        // Full multi-leg merging is the caller's responsibility (or the PBX with *3).
+        if !callActiveId.isEmpty && callState == "active" && !isOnHold {
+            isOnHold = true
+            callCseq += 1
+            sendReInvite(hold: true)
+            notifyListeners("holdChanged", data: ["held": true, "onHold": true])
+        }
+        // Notify JS so it can fire a fresh makeCall() once the hold is acknowledged.
+        notifyListeners("addCallRequested", data: ["target": target])
+        call.resolve(["ok": true, "target": target, "note": "follow up with makeCall on JS side"])
+    }
+
+    // MARK: - Helpers for new methods
+
+    private func sendInfoRecord(on: Bool) {
+        let body = "Record: \(on ? "on" : "off")\r\n"
+        let br = branch
+        let target = callRemoteContact.isEmpty ? callRemoteUri : callRemoteContact
+        var msg = ""
+        msg += "INFO \(target) SIP/2.0\r\n"
+        msg += "Via: SIP/2.0/TCP \(sigLocalIp());branch=\(br);rport\r\n"
+        msg += "Max-Forwards: 70\r\n"
+        msg += "From: \"\(displayName)\" <sip:\(username)@\(domain)>;tag=\(callLocalTag)\r\n"
+        msg += "To: <\(callRemoteUri)>" + (callRemoteTag.isEmpty ? "" : ";tag=\(callRemoteTag)") + "\r\n"
+        msg += "Call-ID: \(callActiveId)\r\n"
+        msg += "CSeq: \(callCseq) INFO\r\n"
+        msg += "Content-Type: application/x-record-control\r\n"
+        msg += "Content-Length: \(body.utf8.count)\r\n\r\n"
+        msg += body
+        log(">>> SIP INFO Record: \(on ? "on" : "off")")
+        sendRaw(msg)
+    }
+
+    private func sendRefer(to target: String) {
+        let br = branch
+        let dialogTarget = callRemoteContact.isEmpty ? callRemoteUri : callRemoteContact
+        // Normalize target: if it already looks like a SIP URI, keep it; otherwise build one.
+        let referTo = target.lowercased().hasPrefix("sip:") ? target : "sip:\(target)@\(domain)"
+        var msg = ""
+        msg += "REFER \(dialogTarget) SIP/2.0\r\n"
+        msg += "Via: SIP/2.0/TCP \(sigLocalIp());branch=\(br);rport\r\n"
+        msg += "Max-Forwards: 70\r\n"
+        msg += "From: \"\(displayName)\" <sip:\(username)@\(domain)>;tag=\(callLocalTag)\r\n"
+        msg += "To: <\(callRemoteUri)>" + (callRemoteTag.isEmpty ? "" : ";tag=\(callRemoteTag)") + "\r\n"
+        msg += "Call-ID: \(callActiveId)\r\n"
+        msg += "CSeq: \(callCseq) REFER\r\n"
+        msg += "Refer-To: <\(referTo)>\r\n"
+        msg += "Referred-By: <sip:\(username)@\(domain)>\r\n"
+        msg += "Contact: <sip:\(username)@\(sigLocalIp());transport=tcp>\r\n"
+        msg += "Content-Length: 0\r\n\r\n"
+        log(">>> REFER → \(referTo)")
+        sendRaw(msg)
     }
 }

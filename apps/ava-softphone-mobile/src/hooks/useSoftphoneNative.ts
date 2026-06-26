@@ -20,6 +20,7 @@ type NativeCallSnapshot = {
   activeCallNumber: string;
   isMuted: boolean;
   isOnHold: boolean;
+  isRecording: boolean;
 };
 
 const nativeCallSubscribers = new Set<(snapshot: NativeCallSnapshot) => void>();
@@ -28,6 +29,7 @@ let nativeCallSnapshot: NativeCallSnapshot = {
   activeCallNumber: '',
   isMuted: false,
   isOnHold: false,
+  isRecording: false,
 };
 let nativeCallBridgePromise: Promise<void> | null = null;
 
@@ -55,6 +57,7 @@ function ensureNativeCallEventBridge() {
     const callStateHandle = await CapacitorPjsip.addListener('callStateChanged', (d: any) => {
       console.log(`[NativeSIP] CALL_EVENT|callStateChanged|state=${d?.state || ''}|stage=${d?.stage || ''}`, d);
       if (d?.state === 'active') {
+        // Don't reset isOnHold here — hold/resume is driven by `holdChanged` only.
         emitNativeCallSnapshot({ callState: 'active', activeCallNumber: d?.number || nativeCallSnapshot.activeCallNumber });
       }
       if (d?.state === 'ringing' || d?.state === 'calling') {
@@ -63,24 +66,28 @@ function ensureNativeCallEventBridge() {
     });
     const callEndedHandle = await CapacitorPjsip.addListener('callEnded', (d: any) => {
       console.log('[NativeSIP] CALL_EVENT|callEnded', d);
-      emitNativeCallSnapshot({ callState: 'idle', activeCallNumber: '', isMuted: false, isOnHold: false });
+      emitNativeCallSnapshot({ callState: 'idle', activeCallNumber: '', isMuted: false, isOnHold: false, isRecording: false });
     });
     const muteHandle = await CapacitorPjsip.addListener('muteChanged', (d: any) => {
       emitNativeCallSnapshot({ isMuted: !!d?.muted });
     });
     const holdHandle = await CapacitorPjsip.addListener('holdChanged', (d: any) => {
+      // Purely reflective — never re-invoke setHold here, that would create
+      // an infinite re-INVITE loop.
       emitNativeCallSnapshot({ isOnHold: !!(d?.held ?? d?.onHold) });
+    });
+    const recordingHandle = await CapacitorPjsip.addListener('recordingChanged', (d: any) => {
+      emitNativeCallSnapshot({ isRecording: !!d?.recording });
     });
 
     // Intentionally keep these native listeners for the lifetime of the JS app.
-    // React remounts/StrictMode cleanups were removing call listeners before
-    // 407/180/200 INVITE events arrived, leaving the UI stuck in idle/connecting.
     (globalThis as any).__lemtelNativeCallHandles = [
       callReceivedHandle,
       callStateHandle,
       callEndedHandle,
       muteHandle,
       holdHandle,
+      recordingHandle,
     ];
   })();
   return nativeCallBridgePromise;
@@ -93,6 +100,7 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
   const [callTimer, setCallTimer] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [isOnHold, setIsOnHold] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
   const [activeCallNumber, setActiveCallNumber] = useState('');
   const [audioProfile, setAudioProfileState] = useState<AudioProfile>(() => loadAudioProfile());
   const [quality] = useState<CallQuality>(EMPTY_QUALITY);
@@ -117,6 +125,7 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
       setActiveCallNumber(snapshot.activeCallNumber);
       setIsMuted(snapshot.isMuted);
       setIsOnHold(snapshot.isOnHold);
+      setIsRecording(snapshot.isRecording);
       setCallState(snapshot.callState);
       if (snapshot.callState === 'active') startTimer();
       if (snapshot.callState === 'idle') stopTimer();
@@ -250,9 +259,27 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
   const answer = () => { CapacitorPjsip.answer().catch(() => {}); };
   const mute   = () => { CapacitorPjsip.setMute({ muted: true }).catch(() => {});  setIsMuted(true); };
   const unmute = () => { CapacitorPjsip.setMute({ muted: false }).catch(() => {}); setIsMuted(false); };
-  const hold   = () => { CapacitorPjsip.setHold({ onHold: true }).catch(() => {});  setIsOnHold(true); };
-  const unhold = () => { CapacitorPjsip.setHold({ onHold: false }).catch(() => {}); setIsOnHold(false); };
+  // hold/unhold no longer optimistically toggle isOnHold — we wait for the
+  // `holdChanged` event so the UI and PBX state can't desync into a re-INVITE loop.
+  const hold   = () => { CapacitorPjsip.setHold({ onHold: true  }).catch(() => {}); };
+  const unhold = () => { CapacitorPjsip.setHold({ onHold: false }).catch(() => {}); };
   const sendDTMF = (key: string) => { CapacitorPjsip.sendDTMF({ digit: key }).catch(() => {}); };
+
+  const startRecording = useCallback(async () => {
+    try { await CapacitorPjsip.startRecord(); } catch (e) { console.warn('[NativeSIP] startRecord failed', e); }
+  }, []);
+  const stopRecording = useCallback(async () => {
+    try { await CapacitorPjsip.stopRecord(); } catch (e) { console.warn('[NativeSIP] stopRecord failed', e); }
+  }, []);
+  const transferCall = useCallback(async (target: string) => {
+    try { await CapacitorPjsip.transfer({ target }); } catch (e) { console.warn('[NativeSIP] transfer failed', e); }
+  }, []);
+  const parkCall = useCallback(async (code?: string) => {
+    try { await CapacitorPjsip.park({ code }); } catch (e) { console.warn('[NativeSIP] park failed', e); }
+  }, []);
+  const addCall = useCallback(async (target: string) => {
+    try { await CapacitorPjsip.addCall({ target }); } catch (e) { console.warn('[NativeSIP] addCall failed', e); }
+  }, []);
 
   const setAudioProfile = useCallback((p: AudioProfile) => {
     setAudioProfileState(p);
@@ -301,5 +328,12 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
     setAudioProfile,
     offeredCodecs: [],
     negotiatedCodec: null,
-  };
+    // Native call-control extras (consumed by ActiveCallSheet)
+    isRecording,
+    startRecording,
+    stopRecording,
+    transferCall,
+    parkCall,
+    addCall,
+  } as UseSoftphoneReturn;
 }
