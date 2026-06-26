@@ -148,6 +148,7 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
       setIsOnHold(snapshot.isOnHold);
       setIsRecording(snapshot.isRecording);
       setCallState(snapshot.callState);
+      setEndReason(snapshot.endReason);
       if (snapshot.callState === 'active') startTimer();
       if (snapshot.callState === 'idle') stopTimer();
     });
