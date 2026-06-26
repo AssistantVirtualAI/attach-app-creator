@@ -10,6 +10,26 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
 
+        // ---- Boot guard: ensure storyboard wires the custom bridge VC, not raw CAPBridgeViewController ----
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            guard let root = self.window?.rootViewController else {
+                NSLog("[BootGuard] ❌ No rootViewController after launch")
+                return
+            }
+            let cls = type(of: root)
+            let name = String(describing: cls)
+            NSLog("[BootGuard] rootViewController class = \(name)")
+            if root is AppBridgeViewController {
+                NSLog("[BootGuard] ✅ AppBridgeViewController loaded — plugin registration path active")
+            } else if name == "CAPBridgeViewController" {
+                NSLog("[BootGuard] ❌ FATAL: Storyboard is using raw CAPBridgeViewController. Local plugins (CapacitorPjsip) will NOT be registered. Update Main.storyboard customClass to AppBridgeViewController (customModule=\"App\").")
+                self.showBootError(message: "Configuration error: Main.storyboard must reference AppBridgeViewController, not CAPBridgeViewController. Plugin CapacitorPjsip cannot load.")
+            } else {
+                NSLog("[BootGuard] ⚠️ Unexpected rootViewController: \(name)")
+            }
+        }
+
+
         // Configure audio session for VoIP (full-duplex, BT + speaker route).
         let audioSession = AVAudioSession.sharedInstance()
         try? audioSession.setCategory(
