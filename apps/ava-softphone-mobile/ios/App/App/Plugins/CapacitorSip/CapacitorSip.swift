@@ -897,6 +897,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         let uri = "sip:\(number)@\(domain)"
         callRemoteUri = uri
         let sdp = buildSdp()
+        log("LOCAL SDP (INVITE) >>>\n\(sdp)")
         var msg = ""
         msg += "INVITE \(uri) SIP/2.0\r\n"
         msg += "Via: SIP/2.0/TCP \(sigLocalIp());branch=\(br);rport\r\n"
