@@ -191,7 +191,10 @@ final class RTPAudioSession {
         }
         self.converter = conv
 
-        input.installTap(onBus: 0, bufferSize: 1024, format: hwFormat) { [weak self] buf, _ in
+        // Pass nil so CoreAudio uses the node's actual native format (avoids
+        // "Failed to create tap due to format mismatch" when hw is 48k Float32
+        // and our cached hwFormat is stale or different).
+        input.installTap(onBus: 0, bufferSize: 1024, format: nil) { [weak self] buf, _ in
             self?.handleCapturedBuffer(buf)
         }
 
