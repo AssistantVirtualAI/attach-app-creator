@@ -259,9 +259,27 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
   const answer = () => { CapacitorPjsip.answer().catch(() => {}); };
   const mute   = () => { CapacitorPjsip.setMute({ muted: true }).catch(() => {});  setIsMuted(true); };
   const unmute = () => { CapacitorPjsip.setMute({ muted: false }).catch(() => {}); setIsMuted(false); };
-  const hold   = () => { CapacitorPjsip.setHold({ onHold: true }).catch(() => {});  setIsOnHold(true); };
-  const unhold = () => { CapacitorPjsip.setHold({ onHold: false }).catch(() => {}); setIsOnHold(false); };
+  // hold/unhold no longer optimistically toggle isOnHold — we wait for the
+  // `holdChanged` event so the UI and PBX state can't desync into a re-INVITE loop.
+  const hold   = () => { CapacitorPjsip.setHold({ onHold: true  }).catch(() => {}); };
+  const unhold = () => { CapacitorPjsip.setHold({ onHold: false }).catch(() => {}); };
   const sendDTMF = (key: string) => { CapacitorPjsip.sendDTMF({ digit: key }).catch(() => {}); };
+
+  const startRecording = useCallback(async () => {
+    try { await CapacitorPjsip.startRecord(); } catch (e) { console.warn('[NativeSIP] startRecord failed', e); }
+  }, []);
+  const stopRecording = useCallback(async () => {
+    try { await CapacitorPjsip.stopRecord(); } catch (e) { console.warn('[NativeSIP] stopRecord failed', e); }
+  }, []);
+  const transferCall = useCallback(async (target: string) => {
+    try { await CapacitorPjsip.transfer({ target }); } catch (e) { console.warn('[NativeSIP] transfer failed', e); }
+  }, []);
+  const parkCall = useCallback(async (code?: string) => {
+    try { await CapacitorPjsip.park({ code }); } catch (e) { console.warn('[NativeSIP] park failed', e); }
+  }, []);
+  const addCall = useCallback(async (target: string) => {
+    try { await CapacitorPjsip.addCall({ target }); } catch (e) { console.warn('[NativeSIP] addCall failed', e); }
+  }, []);
 
   const setAudioProfile = useCallback((p: AudioProfile) => {
     setAudioProfileState(p);
