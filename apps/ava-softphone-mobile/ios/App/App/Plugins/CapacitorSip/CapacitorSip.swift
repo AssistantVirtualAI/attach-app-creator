@@ -521,23 +521,28 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
                 } else {
                     log("INVITE \(code) missing auth header")
                     let id = callActiveId
+                    stopRtp()
                     resetCallState()
                     emitCallEnded("INVITE \(code) without auth header", callId: id)
                 }
             } else if code == "200" {
                 callRemoteTag = extractTag(headerValue(msg, "To") ?? "")
                 if let contact = headerValue(msg, "Contact") { callRemoteContact = extractUri(contact) }
+                parseRemoteSdp(msg)
                 sendAck(to: msg, withinDialog: true)
                 if callDirection.isEmpty { callDirection = "out" }
                 callState = "active"
+                startRtpIfReady()
                 log("CALL_EVENT|INVITE_200_OK→active|callId=\(callActiveId)")
                 emitCallState("active", direction: "out", stage: "answered", code: code)
             } else if let n = Int(code), n >= 300 {
                 sendAck(to: msg, withinDialog: false)
                 let id = callActiveId
+                stopRtp()
                 resetCallState()
                 emitCallEnded(firstLine, callId: id)
             }
+
         }
         // BYE response — clean up
         if cseqMethod == "BYE" {
