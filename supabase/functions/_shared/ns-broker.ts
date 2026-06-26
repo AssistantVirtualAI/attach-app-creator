@@ -20,8 +20,10 @@ export function nsEnv() {
   if (!NS_API_BASE_URL || !NS_API_USER || !NS_API_PASSWORD) {
     throw new Error("NS-API secrets not configured");
   }
+  // Tolerate base URL with or without trailing /ns-api/v2 or /ns-api
+  const base = NS_API_BASE_URL.replace(/\/$/, "").replace(/\/ns-api(\/v2)?$/, "");
   return {
-    base: NS_API_BASE_URL.replace(/\/$/, ""),
+    base,
     user: NS_API_USER,
     password: NS_API_PASSWORD,
     domain: NS_DEFAULT_DOMAIN,
