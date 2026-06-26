@@ -291,7 +291,7 @@ final class RTPAudioSession {
             NSLog("[RTP] setCategory failed: \(error.localizedDescription)")
         }
         // Hint preferred I/O parameters; iOS may pick its own hardware rate.
-        try? session.setPreferredSampleRate(sampleRate)
+        try? session.setPreferredSampleRate(hwSampleRate)
         try? session.setPreferredIOBufferDuration(0.02)
         logSessionState("post-category")
     }
