@@ -1,44 +1,29 @@
-## Fix : 29 outils ElevenLabs créés correctement + statut tableau de bord
+## Plan
 
-### 1. `supabase/functions/_shared/ava-tools.ts`
-Réécrire `buildAvaToolConfigs()` :
-- Paramètres AVA **à plat** dans `request_body_schema.properties` (plus de nested `parameters`, plus de `tool_name` ni `constant_value`).
-- Schema final par outil :
-  ```
-  { tool_config: {
-      type: "webhook", name, description, response_timeout_secs: 20,
-      api_schema: {
-        url, method: "POST",
-        request_headers: {
-          "Content-Type": "application/json",
-          Authorization: "Bearer <anon>",
-          "X-Ava-Tool-Name": "<name>"   // routage côté executor
-        },
-        request_body_schema: {
-          type: "object",
-          properties: <flat AVA params>,
-          required: <required[]>
-        }
-      }
-  }}
-  ```
-- Outils sans paramètres : envoyer `request_body_schema` minimal `{ type: "object", properties: {} }` (sans `required`).
+1. Fix the native plugin registration mismatch
+   - Make JS register the same plugin name exported by iOS: `CapacitorPjsip`.
+   - Keep a compatibility alias only if needed, but avoid registering `CapacitorSip` when iOS exports `CapacitorPjsip`.
 
-### 2. `supabase/functions/ava-tool-executor/index.ts`
-- Lire `tool_name` depuis le header `X-Ava-Tool-Name` en priorité, fallback `body.tool_name` (rétro-compat).
-- `parameters` = soit `body.parameters` (legacy), soit le body brut (nouveau format à plat, en excluant `tool_name`/`session_id`/`parameters`).
+2. Fix the native init payload mismatch
+   - JS currently sends `extension`, but ObjC reads `username`; update the native plugin to accept both.
+   - JS currently calls `makeCall({ number })`, but ObjC reads `destination`; update ObjC to accept both.
+   - JS calls `setHold({ onHold })`, but ObjC reads `held`; update ObjC to accept both.
 
-### 3. `supabase/functions/elevenlabs-manage-agent/index.ts`
-- Dans `elFetch` et `sync_all_tools` : sérialiser proprement les erreurs ElevenLabs (`JSON.stringify` si objet/array — notamment les détails de validation `detail: [{loc, msg, type}]`) au lieu de `[object Object]`.
-- Ajouter `console.log` détaillé par outil : nom, status HTTP, body d'erreur brut.
-- Dédupliquer les `tool_ids` avant le PATCH agent.
-- Renvoyer dans la réponse JSON un tableau `errors_detailed: [{ tool, status, message }]`.
+3. Fix event-name mismatch causing endless “connecting”
+   - ObjC currently emits `registrationState` / `callState`.
+   - JS listens for `registration`, `callStateChanged`, and `callEnded`.
+   - Update ObjC to emit the JS-expected events with `status: registered/error` and call states mapped to `active/ringing/ended`.
 
-### 4. Déploiement + test
-- `deploy_edge_functions(["ava-tool-executor", "elevenlabs-manage-agent"])`
-- `curl_edge_functions` → `POST /elevenlabs-manage-agent` `{action: "sync_all_tools"}` avec l'auth de session.
-- Lire `edge_function_logs("elevenlabs-manage-agent")` pour confirmer `29/29`.
-- Si encore des erreurs, lire le détail JSON renvoyé pour ajuster le schema.
+4. Add native diagnostic logs visible with Xcode filter `CapacitorPjsip`
+   - Log plugin load, `initAccount`, socket open, stream open/error/end, REGISTER send/receive, and auth challenge handling.
+   - Add `setLogLevel` and `disconnect` methods because JS declares them.
 
-### 5. UI
-Aucun changement nécessaire — `ElevenLabsManagementCard` consomme déjà `tools_synced / total_expected / errors`. L'affichage `29/29 outils synchronisés` apparaîtra automatiquement.
+5. Add a registration watchdog in `useSoftphoneNative`
+   - If native registration never emits success/error, fail with a clear error instead of staying on connecting forever.
+   - Log native events to the console for easier on-device debugging.
+
+6. Update the validation script
+   - Check that the JS registered plugin name matches `CapacitorPjsip`.
+   - Check ObjC accepts `extension`, emits `registration`, and includes required methods.
+
+After implementation you’ll need to pull the code, then run from `apps/ava-softphone-mobile`: `npm run build && npx cap sync ios`, then clean build in Xcode.
