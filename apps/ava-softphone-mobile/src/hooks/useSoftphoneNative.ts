@@ -57,13 +57,16 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
           if (watchdog) { clearTimeout(watchdog); watchdog = null; }
           console.log('[NativeSIP] registered ✓');
           setSipStatus('registered'); setSipError('');
+          setNativeRegStatus('registered', null);
         }));
         cleanups.push(await onNativeSipEvent('registrationFailed', (d) => {
           if (cancelled) return;
           if (watchdog) { clearTimeout(watchdog); watchdog = null; }
+          const msg = d?.reason || `Registration failed${d?.code ? ` (${d.code})` : ''}`;
           console.warn('[NativeSIP] registrationFailed', d);
           setSipStatus('error');
-          setSipError(d?.reason || `Registration failed${d?.code ? ` (${d.code})` : ''}`);
+          setSipError(msg);
+          setNativeRegStatus('error', msg);
         }));
         cleanups.push(await onNativeSipEvent('callReceived', (d) => {
           if (cancelled) return;
