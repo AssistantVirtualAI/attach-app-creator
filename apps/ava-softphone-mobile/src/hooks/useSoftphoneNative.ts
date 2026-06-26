@@ -104,6 +104,9 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
   const [activeCallNumber, setActiveCallNumber] = useState('');
   const [audioProfile, setAudioProfileState] = useState<AudioProfile>(() => loadAudioProfile());
   const [quality] = useState<CallQuality>(EMPTY_QUALITY);
+  const [audioStatus, setAudioStatus] = useState<'idle' | 'starting' | 'running' | 'retrying' | 'error'>('idle');
+  const [audioError, setAudioError] = useState('');
+  const [audioRestartAttempts, setAudioRestartAttempts] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const initInFlightRef = useRef<boolean>(false);
   const regHandleRef = useRef<{ remove(): Promise<void> } | null>(null);
