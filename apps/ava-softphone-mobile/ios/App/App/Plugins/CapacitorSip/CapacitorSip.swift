@@ -49,12 +49,16 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
 
     // MARK: - Plugin methods
     @objc func initAccount(_ call: CAPPluginCall) {
-        guard let server = call.getString("server"),
-              let username = call.getString("username"),
-              let password = call.getString("password") else {
-            call.reject("server, username, password required")
+        // Accept both legacy (server/username) and JS-side (domain/extension) param names.
+        let domainParam = call.getString("domain")
+        let server = call.getString("server") ?? domainParam ?? ""
+        let username = call.getString("username") ?? call.getString("extension") ?? ""
+        let password = call.getString("password") ?? ""
+        if server.isEmpty || username.isEmpty || password.isEmpty {
+            call.reject("server/domain, username/extension, password required")
             return
         }
+
         // Re-entrancy guard: if already registered or a connection is already
         // up, just re-emit registered and skip opening a new TCP socket. React
         // StrictMode / parent re-renders otherwise spam initAccount.
@@ -75,7 +79,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         self.username = username
         self.authUser = call.getString("authUser") ?? username
         self.password = password
-        self.domain = call.getString("domain") ?? server
+        self.domain = domainParam ?? server
         self.displayName = call.getString("displayName") ?? username
         self.localTag = String(UUID().uuidString.prefix(8))
         self.callId = UUID().uuidString
