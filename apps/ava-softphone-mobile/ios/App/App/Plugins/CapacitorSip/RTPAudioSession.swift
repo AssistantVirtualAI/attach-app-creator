@@ -109,9 +109,36 @@ final class RTPAudioSession {
         addr.sin_addr.s_addr = inet_addr(remoteIp)
         self.remoteAddr = addr
         self.hasRemote = true
-        NSLog("[RTP] start remote=\(remoteIp):\(remotePort)")
+        self.lastRemotePort = remotePort
+        self.startedAt = Date()
+        NSLog("[RTP] start remote=\(remoteIp):\(remotePort) local=\(localIp):\(localPort)")
         startReceiveLoop()
         startAudio()
+    }
+
+    /// Play a local 440Hz tone for `seconds` seconds through the speaker path
+    /// (no RTP transmission). Used by the pre-call audio test screen.
+    func playTestTone(seconds: Double = 1.5, frequency: Double = 440) {
+        let session = AVAudioSession.sharedInstance()
+        try? session.setCategory(.playAndRecord, mode: .voiceChat,
+                                 options: [.allowBluetooth, .allowBluetoothA2DP,
+                                           .defaultToSpeaker, .duckOthers])
+        try? session.setActive(true, options: [])
+        if !engine.isAttached(playerNode) { engine.attach(playerNode) }
+        engine.connect(playerNode, to: engine.mainMixerNode, format: playFormat)
+        if !engine.isRunning { try? engine.start() }
+        let frames = AVAudioFrameCount(playFormat.sampleRate * seconds)
+        guard let buf = AVAudioPCMBuffer(pcmFormat: playFormat, frameCapacity: frames) else { return }
+        buf.frameLength = frames
+        if let ch = buf.int16ChannelData?[0] {
+            let twoPi = 2.0 * Double.pi
+            for i in 0..<Int(frames) {
+                let s = sin(twoPi * frequency * Double(i) / playFormat.sampleRate) * 8000
+                ch[i] = Int16(s)
+            }
+        }
+        playerNode.scheduleBuffer(buf, completionHandler: nil)
+        playerNode.play()
     }
 
     func stop() {
