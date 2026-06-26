@@ -276,23 +276,27 @@ public class CapacitorSip: CAPPlugin, CXProviderDelegate {
                 self.notifyListeners("callStateChanged", data: ["state": "ringing"])
             }
         } else if response.hasPrefix("SIP/2.0 200") && response.contains("INVITE") {
+            log(3, "call", "200 OK INVITE — sending ACK, call active")
             self.sendAck(response: response)
             DispatchQueue.main.async {
                 self.notifyListeners("callStateChanged", data: ["state": "active"])
             }
         } else if response.hasPrefix("BYE") {
+            log(3, "call", "BYE received — ending call")
             DispatchQueue.main.async {
                 self.endActiveCallKitCall()
                 self.notifyListeners("callEnded", data: [:])
             }
         } else if response.hasPrefix("INVITE") {
             let callerNumber = self.extractCallerNumber(from: response)
+            log(3, "call", "Incoming INVITE from \(callerNumber)")
             self.reportIncomingCallKit(number: callerNumber)
             DispatchQueue.main.async {
                 self.notifyListeners("callReceived", data: ["number": callerNumber])
             }
         }
     }
+
 
     private func sendAck(response: String) {
         let ack = """
