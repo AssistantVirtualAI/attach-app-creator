@@ -143,15 +143,87 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func makeCall(_ call: CAPPluginCall) {
-        log("makeCall not yet implemented in native plugin")
-        call.resolve(["ok": false, "reason": "not_implemented"])
+        let number = call.getString("number") ?? call.getString("destination") ?? ""
+        if number.isEmpty { call.reject("number required"); return }
+        if !registered { call.reject("not registered"); return }
+        callDirection = "out"
+        callActiveId = UUID().uuidString
+        callLocalTag = String(UUID().uuidString.prefix(8))
+        callRemoteTag = ""
+        callRemoteUri = "sip:\(number)@\(domain)"
+        callRemoteContact = callRemoteUri
+        callCseq = 1
+        callState = "calling"
+        isMuted = false
+        isOnHold = false
+        sendInvite(to: number, authHeader: nil)
+        notifyListeners("callStateChanged", data: ["state": "ringing", "direction": "out", "number": number, "callId": callActiveId])
+        call.resolve(["ok": true, "callId": callActiveId])
     }
-    @objc func hangup(_ call: CAPPluginCall) { call.resolve(["ok": true]) }
-    @objc func answer(_ call: CAPPluginCall) { call.resolve(["ok": true]) }
-    @objc func setMute(_ call: CAPPluginCall) { call.resolve(["ok": true]) }
-    @objc func setHold(_ call: CAPPluginCall) { call.resolve(["ok": true]) }
-    @objc func sendDTMF(_ call: CAPPluginCall) { call.resolve(["ok": true]) }
-    @objc func setLogLevel(_ call: CAPPluginCall) { call.resolve(["ok": true]) }
+
+    @objc func hangup(_ call: CAPPluginCall) {
+        if callActiveId.isEmpty { call.resolve(["ok": true, "noCall": true]); return }
+        if callState == "calling" || callState == "ringing" {
+            sendCancel()
+        } else if callState == "active" || callState == "hold" {
+            sendBye()
+        } else if callState == "incoming" {
+            sendResponseToInvite(code: 486, reason: "Busy Here")
+        }
+        let id = callActiveId
+        resetCallState()
+        notifyListeners("callEnded", data: ["callId": id, "reason": "local_hangup"])
+        call.resolve(["ok": true])
+    }
+
+    @objc func answer(_ call: CAPPluginCall) {
+        if callState != "incoming" { call.reject("no incoming call"); return }
+        sendResponseToInvite(code: 200, reason: "OK", withSdp: true)
+        callState = "active"
+        notifyListeners("callStateChanged", data: ["state": "active", "direction": "in", "callId": callActiveId])
+        call.resolve(["ok": true])
+    }
+
+    @objc func setMute(_ call: CAPPluginCall) {
+        let muted = call.getBool("muted") ?? !isMuted
+        isMuted = muted
+        let session = AVAudioSession.sharedInstance()
+        do {
+            try session.setCategory(.playAndRecord, mode: .voiceChat,
+                                    options: muted ? [.allowBluetooth, .defaultToSpeaker] : [.allowBluetooth, .allowBluetoothA2DP, .defaultToSpeaker, .duckOthers])
+            try session.setActive(true, options: [])
+        } catch {
+            log("setMute audio session error: \(error.localizedDescription)")
+        }
+        notifyListeners("muteChanged", data: ["muted": muted])
+        call.resolve(["ok": true, "muted": muted])
+    }
+
+    @objc func setHold(_ call: CAPPluginCall) {
+        let hold = call.getBool("held") ?? call.getBool("onHold") ?? !isOnHold
+        if callActiveId.isEmpty || (callState != "active" && callState != "hold") {
+            call.reject("no active call")
+            return
+        }
+        isOnHold = hold
+        callCseq += 1
+        sendReInvite(hold: hold)
+        callState = hold ? "hold" : "active"
+        notifyListeners("holdChanged", data: ["held": hold, "onHold": hold])
+        call.resolve(["ok": true, "held": hold])
+    }
+
+    @objc func sendDTMF(_ call: CAPPluginCall) {
+        let digits = call.getString("digits") ?? call.getString("digit") ?? ""
+        if digits.isEmpty || callActiveId.isEmpty { call.resolve(["ok": false]); return }
+        for ch in digits {
+            sendInfoDtmf(digit: String(ch))
+            callCseq += 1
+        }
+        call.resolve(["ok": true])
+    }
+
+    @objc func setLogLevel(_ call: CAPPluginCall) { call.resolve(["ok": true, "level": call.getInt("level") ?? 3]) }
 
     @objc func unregister(_ call: CAPPluginCall) {
         connection?.cancel()
