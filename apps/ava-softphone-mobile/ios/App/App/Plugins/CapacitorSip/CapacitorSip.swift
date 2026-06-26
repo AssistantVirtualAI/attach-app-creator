@@ -2,6 +2,7 @@ import Foundation
 import Capacitor
 import Network
 import CommonCrypto
+import AVFoundation
 
 @objc(CapacitorPjsip)
 public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
@@ -66,8 +67,42 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         self.cseq = 1
 
         log("initAccount server=\(server):\(port) user=\(username) domain=\(self.domain)")
-        connectAndRegister()
+        configureAudioSession()
+        requestMicPermission { [weak self] granted in
+            guard let self = self else { return }
+            self.log("mic permission granted=\(granted)")
+            if !granted {
+                self.notifyListeners("registrationFailed", data: ["reason": "microphone permission denied"])
+            }
+            self.connectAndRegister()
+        }
         call.resolve(["ok": true])
+    }
+
+    // MARK: - Audio
+    private func configureAudioSession() {
+        let session = AVAudioSession.sharedInstance()
+        do {
+            try session.setCategory(.playAndRecord,
+                                    mode: .voiceChat,
+                                    options: [.allowBluetooth, .allowBluetoothA2DP, .defaultToSpeaker, .duckOthers])
+            try session.setPreferredSampleRate(48000)
+            try session.setPreferredIOBufferDuration(0.02)
+            try session.setActive(true, options: [])
+            log("AVAudioSession configured (playAndRecord/voiceChat)")
+        } catch {
+            log("AVAudioSession error: \(error.localizedDescription)")
+        }
+    }
+
+    private func requestMicPermission(_ cb: @escaping (Bool) -> Void) {
+        let session = AVAudioSession.sharedInstance()
+        switch session.recordPermission {
+        case .granted: cb(true)
+        case .denied:  cb(false)
+        case .undetermined: session.requestRecordPermission { granted in DispatchQueue.main.async { cb(granted) } }
+        @unknown default: cb(false)
+        }
     }
 
     @objc func makeCall(_ call: CAPPluginCall) {
