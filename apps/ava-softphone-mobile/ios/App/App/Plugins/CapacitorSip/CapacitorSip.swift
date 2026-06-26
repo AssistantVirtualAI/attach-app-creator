@@ -19,8 +19,52 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "setLogLevel", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "unregister", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setAudioRoute", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "getAudioRoute", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "getAudioRoute", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "playTestTone", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getRtpStats", returnType: CAPPluginReturnPromise)
     ]
+
+    public override func load() {
+        // Auto-detect Bluetooth / route changes and force audio route without restarting the call.
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(handleRouteChange(_:)),
+            name: AVAudioSession.routeChangeNotification, object: nil)
+    }
+
+    @objc private func handleRouteChange(_ note: Notification) {
+        guard let userInfo = note.userInfo,
+              let reasonRaw = userInfo[AVAudioSessionRouteChangeReasonKey] as? UInt,
+              let reason = AVAudioSession.RouteChangeReason(rawValue: reasonRaw) else { return }
+        let session = AVAudioSession.sharedInstance()
+        let outputs = session.currentRoute.outputs.map { $0.portType.rawValue }
+        let hasBT = outputs.contains { ["BluetoothHFP","BluetoothA2DPOutput","BluetoothLE"].contains($0) }
+        log("route change reason=\(reasonRaw) outputs=\(outputs) bt=\(hasBT)")
+
+        // Auto policy: BT connected → BT; BT disconnected → speaker (if call in progress).
+        if !callActiveId.isEmpty {
+            do {
+                switch reason {
+                case .newDeviceAvailable:
+                    if hasBT {
+                        if let bt = session.availableInputs?.first(where: { [.bluetoothHFP, .bluetoothLE].contains($0.portType) }) {
+                            try session.setPreferredInput(bt)
+                        }
+                        try session.overrideOutputAudioPort(.none)
+                    }
+                case .oldDeviceUnavailable:
+                    try session.overrideOutputAudioPort(.speaker)
+                default: break
+                }
+            } catch {
+                log("route auto-switch error: \(error.localizedDescription)")
+            }
+        }
+        notifyListeners("audioRouteChanged", data: [
+            "reason": reasonRaw,
+            "outputs": outputs,
+            "bluetooth": hasBT
+        ])
+    }
 
     // MARK: - Config / State
     private var server: String = ""
@@ -370,7 +414,39 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         call.resolve(["outputs": outputs, "availableInputs": inputs])
     }
 
-    // MARK: - TCP / SIP
+    // MARK: - Pre-call audio test
+    @objc func playTestTone(_ call: CAPPluginCall) {
+        let seconds = call.getDouble("seconds") ?? 1.5
+        let freq = call.getDouble("frequency") ?? 440.0
+        let session = AVAudioSession.sharedInstance()
+        do {
+            try session.setCategory(.playAndRecord, mode: .voiceChat,
+                                    options: [.allowBluetooth, .allowBluetoothA2DP,
+                                              .defaultToSpeaker, .duckOthers])
+            try session.setActive(true, options: [])
+        } catch { /* non-fatal */ }
+        let tester = rtp ?? RTPAudioSession()
+        tester.playTestTone(seconds: seconds, frequency: freq)
+        // Sample mic peak for `seconds` then return the max value.
+        let deadline = DispatchTime.now() + .milliseconds(Int(seconds * 1000) + 200)
+        DispatchQueue.global().asyncAfter(deadline: deadline) {
+            let snap = tester.snapshot()
+            call.resolve([
+                "ok": true,
+                "micPeak": snap["micPeak"] ?? 0,
+                "route": snap["route"] ?? ""
+            ])
+        }
+    }
+
+    @objc func getRtpStats(_ call: CAPPluginCall) {
+        if let rtp = rtp {
+            call.resolve(rtp.snapshot())
+        } else {
+            call.resolve(["running": false])
+        }
+    }
+
     private func connectAndRegister() {
         connection?.cancel()
         let host = NWEndpoint.Host(server)

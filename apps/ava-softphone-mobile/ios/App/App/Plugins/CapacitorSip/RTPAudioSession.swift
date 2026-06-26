@@ -34,6 +34,37 @@ final class RTPAudioSession {
     private var isMuted = false
     private var running = false
 
+    // MARK: - Diagnostics
+    private(set) var txPackets: UInt64 = 0
+    private(set) var rxPackets: UInt64 = 0
+    private(set) var txBytes: UInt64 = 0
+    private(set) var rxBytes: UInt64 = 0
+    private(set) var lastRemoteSeq: UInt16 = 0
+    private(set) var lastRemotePort: UInt16 = 0
+    private(set) var micPeak: Float = 0
+    private(set) var rxPeak: Float = 0
+    private(set) var startedAt: Date?
+
+    func snapshot() -> [String: Any] {
+        return [
+            "running": running,
+            "localIp": localIp,
+            "localPort": Int(localPort),
+            "remoteIp": hasRemote ? String(cString: inet_ntoa(remoteAddr.sin_addr)) : "",
+            "remotePort": Int(lastRemotePort),
+            "txPackets": Int(txPackets),
+            "rxPackets": Int(rxPackets),
+            "txBytes": Int(txBytes),
+            "rxBytes": Int(rxBytes),
+            "lastSeq": Int(lastRemoteSeq),
+            "seqOut": Int(sequenceNumber),
+            "micPeak": micPeak,
+            "rxPeak": rxPeak,
+            "uptimeMs": startedAt.map { Int(Date().timeIntervalSince($0) * 1000) } ?? 0,
+            "route": currentRouteDescription()
+        ]
+    }
+
     // MARK: - Lifecycle
     func prepareLocalSocket() throws {
         localIp = RTPAudioSession.primaryLocalIPv4() ?? "0.0.0.0"
@@ -78,9 +109,36 @@ final class RTPAudioSession {
         addr.sin_addr.s_addr = inet_addr(remoteIp)
         self.remoteAddr = addr
         self.hasRemote = true
-        NSLog("[RTP] start remote=\(remoteIp):\(remotePort)")
+        self.lastRemotePort = remotePort
+        self.startedAt = Date()
+        NSLog("[RTP] start remote=\(remoteIp):\(remotePort) local=\(localIp):\(localPort)")
         startReceiveLoop()
         startAudio()
+    }
+
+    /// Play a local 440Hz tone for `seconds` seconds through the speaker path
+    /// (no RTP transmission). Used by the pre-call audio test screen.
+    func playTestTone(seconds: Double = 1.5, frequency: Double = 440) {
+        let session = AVAudioSession.sharedInstance()
+        try? session.setCategory(.playAndRecord, mode: .voiceChat,
+                                 options: [.allowBluetooth, .allowBluetoothA2DP,
+                                           .defaultToSpeaker, .duckOthers])
+        try? session.setActive(true, options: [])
+        if playerNode.engine == nil { engine.attach(playerNode) }
+        engine.connect(playerNode, to: engine.mainMixerNode, format: playFormat)
+        if !engine.isRunning { try? engine.start() }
+        let frames = AVAudioFrameCount(playFormat.sampleRate * seconds)
+        guard let buf = AVAudioPCMBuffer(pcmFormat: playFormat, frameCapacity: frames) else { return }
+        buf.frameLength = frames
+        if let ch = buf.int16ChannelData?[0] {
+            let twoPi = 2.0 * Double.pi
+            for i in 0..<Int(frames) {
+                let s = sin(twoPi * frequency * Double(i) / playFormat.sampleRate) * 8000
+                ch[i] = Int16(s)
+            }
+        }
+        playerNode.scheduleBuffer(buf, completionHandler: nil)
+        playerNode.play()
     }
 
     func stop() {
@@ -166,6 +224,10 @@ final class RTPAudioSession {
         }
         guard let ptr = outBuf.int16ChannelData?[0] else { return }
         let n = Int(outBuf.frameLength)
+        // Mic peak (linear 0..1) for diagnostics
+        var peak: Int16 = 0
+        for i in 0..<n { let a = abs(ptr[i]); if a > peak { peak = a } }
+        micPeak = Float(peak) / 32767.0
         if isMuted {
             sendBuffer.append(contentsOf: repeatElement(0, count: n))
         } else {
@@ -201,16 +263,19 @@ final class RTPAudioSession {
 
         let fd = sockfd
         var addr = remoteAddr
+        let pktLen = packet.count
         txQueue.async {
             packet.withUnsafeBytes { raw in
                 _ = withUnsafePointer(to: &addr) { ptr in
                     ptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sa in
-                        Darwin.sendto(fd, raw.baseAddress, packet.count, 0, sa,
+                        Darwin.sendto(fd, raw.baseAddress, pktLen, 0, sa,
                                       socklen_t(MemoryLayout<sockaddr_in>.size))
                     }
                 }
             }
         }
+        txPackets &+= 1
+        txBytes &+= UInt64(pktLen)
     }
 
     // MARK: - RTP receive
@@ -232,13 +297,22 @@ final class RTPAudioSession {
                 // Symmetric RTP latch: if PBX answered from a different port, follow it.
                 if from.sin_port != self.remoteAddr.sin_port {
                     self.remoteAddr.sin_port = from.sin_port
-                    NSLog("[RTP] latched remote port=\(UInt16(bigEndian: from.sin_port))")
+                    self.lastRemotePort = UInt16(bigEndian: from.sin_port)
+                    NSLog("[RTP] latched remote port=\(self.lastRemotePort)")
                 }
+                self.rxPackets &+= 1
+                self.rxBytes &+= UInt64(n)
+                self.lastRemoteSeq = (UInt16(buf[2]) << 8) | UInt16(buf[3])
                 let payloadCount = n - 12
                 var samples = [Int16](); samples.reserveCapacity(payloadCount)
+                var peak: Int16 = 0
                 for i in 0..<payloadCount {
-                    samples.append(RTPAudioSession.ulawToLinear(buf[12 + i]))
+                    let s = RTPAudioSession.ulawToLinear(buf[12 + i])
+                    let a = s < 0 ? -s : s
+                    if a > peak { peak = a }
+                    samples.append(s)
                 }
+                self.rxPeak = Float(peak) / 32767.0
                 self.enqueuePlayback(samples)
             }
             NSLog("[RTP] receive loop exited")

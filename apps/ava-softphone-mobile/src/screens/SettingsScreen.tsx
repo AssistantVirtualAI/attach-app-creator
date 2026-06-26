@@ -142,6 +142,7 @@ export default function SettingsScreen({
         <SettingsRow label={t('settings.role')} icon="◎" value={me?.role || creds.role || 'agent'} />
         <SettingsRow label={t('settings.devices')} icon="📱" value={lang === 'fr' ? 'Cet appareil · WebRTC' : 'This device · WebRTC'} onPress={() => onNavigate?.('permissions' as Tab)} />
         <SettingsRow label={t('settings.notifications')} icon="🔔" value={t('settings.pushEnabled')} onPress={() => openAppSettings()} />
+        <SettingsRow label={lang === 'fr' ? 'Diagnostic audio / RTP' : 'Audio / RTP diagnostics'} icon="🩺" value={lang === 'fr' ? 'Test ton, route, stats' : 'Tone test, route, stats'} onPress={() => onNavigate?.('audiodiag' as Tab)} />
       </Card>
 
       {/* Admin */}

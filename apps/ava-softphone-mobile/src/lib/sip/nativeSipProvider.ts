@@ -22,6 +22,24 @@ export interface CapacitorSipPlugin {
   setLogLevel(options: { level: CapacitorSipLogLevel }): Promise<{ level: number }>;
   setAudioRoute(options: { route: 'auto' | 'speaker' | 'earpiece' | 'bluetooth' }): Promise<{ ok: boolean; route: string; outputs: string }>;
   getAudioRoute(): Promise<{ outputs: Array<{ portType: string; portName: string }>; availableInputs: Array<{ portType: string; portName: string }> }>;
+  playTestTone(options?: { seconds?: number; frequency?: number }): Promise<{ ok: boolean; micPeak: number; route: string }>;
+  getRtpStats(): Promise<{
+    running: boolean;
+    localIp?: string;
+    localPort?: number;
+    remoteIp?: string;
+    remotePort?: number;
+    txPackets?: number;
+    rxPackets?: number;
+    txBytes?: number;
+    rxBytes?: number;
+    lastSeq?: number;
+    seqOut?: number;
+    micPeak?: number;
+    rxPeak?: number;
+    uptimeMs?: number;
+    route?: string;
+  }>;
   addListener(event: string, callback: (data: any) => void): Promise<{ remove: () => Promise<void> }>;
   removeAllListeners(): Promise<void>;
 }

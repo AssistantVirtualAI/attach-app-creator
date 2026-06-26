@@ -18,6 +18,7 @@ const QueuesScreen       = lazy(() => import('./screens/QueuesScreen'));
 const SettingsScreen     = lazy(() => import('./screens/SettingsScreen'));
 const DialerScreen       = lazy(() => import('./screens/DialerScreen'));
 const SpeedDialScreen    = lazy(() => import('./screens/SpeedDialScreen'));
+const AudioDiagnosticsScreen = lazy(() => import('./screens/AudioDiagnosticsScreen'));
 import BottomTabs, { Tab } from './components/BottomTabs';
 import NotificationsSheet from './components/NotificationsSheet';
 import { useTheme } from './lib/ThemeContext';
@@ -443,6 +444,7 @@ function AuthenticatedShell({
           {tab === 'voicemail'  && <VoicemailScreen haptic={haptic} />}
           {tab === 'sms'        && <MessagesScreen haptic={haptic} />}
           {tab === 'queues'     && <QueuesScreen />}
+          {tab === 'audiodiag'  && <AudioDiagnosticsScreen />}
         </Suspense>
       </div>
 
