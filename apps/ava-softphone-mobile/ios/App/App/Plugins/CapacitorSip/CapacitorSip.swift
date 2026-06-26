@@ -651,15 +651,24 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
                     resetCallState()
                 }
             } else if code == "200" {
+                // Detect re-INVITE (within an established dialog) vs initial INVITE 200 OK.
+                let isReInvite = !callRemoteTag.isEmpty && (callState == "active" || callState == "hold")
                 callRemoteTag = extractTag(headerValue(msg, "To") ?? "")
                 if let contact = headerValue(msg, "Contact") { callRemoteContact = extractUri(contact) }
                 parseRemoteSdp(msg)
                 sendAck(to: msg, withinDialog: true)
-                if callDirection.isEmpty { callDirection = "out" }
-                callState = "active"
-                startRtpIfReady()
-                log("CALL_EVENT|INVITE_200_OK→active|callId=\(callActiveId)")
-                emitCallState("active", direction: "out", stage: "answered", code: code)
+                if isReInvite {
+                    // Hold / resume confirmation. Do NOT touch callState, do NOT restart RTP.
+                    // Just refresh the remote RTP target (PBX may relay through different IP/port).
+                    log("CALL_EVENT|reINVITE_200_OK|held=\(isOnHold)|callId=\(callActiveId)")
+                    notifyListeners("holdChanged", data: ["held": isOnHold, "onHold": isOnHold])
+                } else {
+                    if callDirection.isEmpty { callDirection = "out" }
+                    callState = "active"
+                    startRtpIfReady()
+                    log("CALL_EVENT|INVITE_200_OK→active|callId=\(callActiveId)")
+                    emitCallState("active", direction: "out", stage: "answered", code: code)
+                }
             } else if let n = Int(code), n >= 300 {
                 sendAck(to: msg, withinDialog: false)
                 let id = callActiveId
