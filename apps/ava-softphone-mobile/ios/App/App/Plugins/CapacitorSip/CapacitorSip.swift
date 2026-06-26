@@ -811,7 +811,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         callRemoteUri = ""; callRemoteContact = ""
         callState = "idle"; callDirection = ""
         callInviteBranch = ""; callInviteCseq = 1
-        isMuted = false; isOnHold = false
+        isMuted = false; isOnHold = false; isRecording = false
         lastInviteRequest = ""; lastInviteAuth = nil
     }
 
