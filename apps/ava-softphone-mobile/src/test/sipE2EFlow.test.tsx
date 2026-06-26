@@ -1,11 +1,11 @@
 /**
- * End-to-end-style flow test for the mobile JsSIP softphone.
+ * End-to-end-style flow test for the mobile JsSIP softphone using SIP/TLS.
  *
  * Verifies:
- *   1. The JsSIP UA registers against the configured WSS endpoint.
+ *   1. The JsSIP UA registers against the configured SIP/TLS endpoint.
  *   2. `sp.call()` places an outbound INVITE *directly via JsSIP* — i.e. it
- *      goes through the WebSocket transport and never asks the backend to
- *      perform a FusionPBX `originate-click-to-call`.
+ *      goes through the TLS transport and never asks the backend to perform a
+ *      FusionPBX `originate-click-to-call`.
  *   3. Dialling never calls the backend `mobile-calls-start` fallback.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -26,11 +26,9 @@ function installFakeJsSIP() {
     __sockets: sockets,
   };
   (window as any).JsSIP = {
-    WebSocketInterface: vi.fn().mockImplementation((url: string) => { sockets.push(url); return { url }; }),
+    Socket: vi.fn().mockImplementation((url: string) => { sockets.push(url); return { url }; }),
     UA: vi.fn().mockImplementation(() => ua),
   };
-  // RTCPeerConnection must exist so the WebRTC capability check passes.
-  if (!(window as any).RTCPeerConnection) (window as any).RTCPeerConnection = vi.fn();
   return ua;
 }
 
@@ -38,7 +36,7 @@ const cfg = {
   extension: '300',
   password: 'VirtualAI2026!',
   domain: 'lemtel.lemtel.tel',
-  wssUrl: 'wss://node.lemtelcloud.net:7443',
+  wssUrl: 'sips://pbxnode.lemtel.tel:5061',
   displayName: 'Mobile 300',
 };
 
