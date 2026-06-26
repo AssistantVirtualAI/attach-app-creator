@@ -471,6 +471,41 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     }
 
     private func handleRegisterResponse(code: String, msg: String) {
+        if code == "401" || code == "407" {
+            if let wwwLine = msg.split(separator: "\r\n").first(where: {
+                $0.lowercased().hasPrefix("www-authenticate:") || $0.lowercased().hasPrefix("proxy-authenticate:")
+            }).map(String.init) {
+                let (realm, nonce) = parseAuth(wwwLine)
+                self.lastRealm = realm
+                self.lastNonce = nonce
+                cseq += 1
+                let isProxyAuth = wwwLine.lowercased().hasPrefix("proxy-authenticate:") || code == "407"
+                sendRegister(authHeader: buildAuthHeader(method: "REGISTER", uri: "sip:\(domain)", realm: realm, nonce: nonce, proxy: isProxyAuth))
+            } else {
+                notifyListeners("registrationFailed", data: ["reason": "401 without auth header"])
+            }
+        } else if code == "200" {
+            if !registered {
+                registered = true
+                log("REGISTERED ✓ — notifying JS")
+                notifyListeners("registration", data: ["state": "registered", "status": "registered", "extension": username])
+                DispatchQueue.main.async {
+                    self.registerTimer?.invalidate()
+                    self.registerTimer = Timer.scheduledTimer(withTimeInterval: 50, repeats: true) { _ in
+                        self.cseq += 1
+                        if let realm = self.lastRealm, let nonce = self.lastNonce {
+                            self.sendRegister(authHeader: self.buildAuthHeader(method: "REGISTER", uri: "sip:\(self.domain)", realm: realm, nonce: nonce))
+                        } else {
+                            self.sendRegister(authHeader: nil)
+                        }
+                    }
+                }
+            }
+        } else if let n = Int(code), n >= 400 {
+            notifyListeners("registrationFailed", data: ["reason": "REGISTER \(code)"])
+        }
+    }
+
 
     private func parseAuth(_ header: String) -> (String, String) {
         func extract(_ key: String) -> String {
