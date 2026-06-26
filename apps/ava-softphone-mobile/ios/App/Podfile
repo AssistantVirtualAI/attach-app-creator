@@ -29,8 +29,6 @@ target 'App' do
   # Add your Pods here
 
   # Native SIP backend (used when VITE_NATIVE_SIP=true) is provided by
-  # linphone-sdk added via Swift Package Manager in Xcode.
-  # See ios/App/LINPHONE_SETUP.md for setup instructions.
 end
 
 post_install do |installer|
