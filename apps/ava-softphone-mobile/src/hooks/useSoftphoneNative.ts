@@ -55,24 +55,34 @@ function ensureNativeCallEventBridge() {
   nativeCallBridgePromise = (async () => {
     const callReceivedHandle = await CapacitorPjsip.addListener('callReceived', (d: any) => {
       console.log('[NativeSIP] CALL_EVENT|callReceived', d);
+      stopRingback();
       emitNativeCallSnapshot({
         callState: 'ringing',
         activeCallNumber: d?.from || d?.number || 'Unknown',
+        direction: 'in',
+        endReason: null,
       });
     });
     const callStateHandle = await CapacitorPjsip.addListener('callStateChanged', (d: any) => {
       console.log(`[NativeSIP] CALL_EVENT|callStateChanged|state=${d?.state || ''}|stage=${d?.stage || ''}`, d);
+      const dir: NativeCallDirection = d?.direction === 'in' ? 'in' : d?.direction === 'out' ? 'out' : nativeCallSnapshot.direction;
       if (d?.state === 'active') {
-        // Don't reset isOnHold here — hold/resume is driven by `holdChanged` only.
-        emitNativeCallSnapshot({ callState: 'active', activeCallNumber: d?.number || nativeCallSnapshot.activeCallNumber });
+        stopRingback();
+        emitNativeCallSnapshot({ callState: 'active', activeCallNumber: d?.number || nativeCallSnapshot.activeCallNumber, direction: dir, endReason: null });
       }
       if (d?.state === 'ringing' || d?.state === 'calling') {
-        emitNativeCallSnapshot({ callState: 'ringing', activeCallNumber: d?.number || nativeCallSnapshot.activeCallNumber });
+        // Outgoing local ringback when no early media (stage != 'early_media').
+        const hasEarlyMedia = d?.stage === 'early_media';
+        if (dir === 'out' && !hasEarlyMedia) startRingback();
+        else stopRingback();
+        emitNativeCallSnapshot({ callState: 'ringing', activeCallNumber: d?.number || nativeCallSnapshot.activeCallNumber, direction: dir, endReason: null });
       }
     });
     const callEndedHandle = await CapacitorPjsip.addListener('callEnded', (d: any) => {
       console.log('[NativeSIP] CALL_EVENT|callEnded', d);
-      emitNativeCallSnapshot({ callState: 'idle', activeCallNumber: '', isMuted: false, isOnHold: false, isRecording: false });
+      stopRingback();
+      const friendly = describeEndReason(d?.reason);
+      emitNativeCallSnapshot({ callState: 'idle', activeCallNumber: '', isMuted: false, isOnHold: false, isRecording: false, direction: null, endReason: friendly });
     });
     const muteHandle = await CapacitorPjsip.addListener('muteChanged', (d: any) => {
       emitNativeCallSnapshot({ isMuted: !!d?.muted });
