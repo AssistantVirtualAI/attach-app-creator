@@ -89,7 +89,22 @@ export default function ActiveCallSheet({
     const target = window.prompt('Add call to:');
     if (target) safeCall('addCall', () => sp.addCall?.(target) ?? sp.call?.(target));
   };
-  const record = () => safeCall('record', () => sp.snap.recording ? sp.stopRecord?.() : sp.startRecord?.());
+  const record = async () => {
+    const isRec = !!sp.snap.recording;
+    const fn = isRec ? sp.stopRecord : sp.startRecord;
+    if (typeof fn !== 'function') {
+      setToast("Enregistrement non supporté par cette extension");
+      return;
+    }
+    try {
+      await fn();
+      setToast(isRec ? "Enregistrement arrêté" : "● Enregistrement en cours");
+    } catch (e: any) {
+      const msg = e?.message || 'erreur inconnue';
+      setToast(isRec ? `Impossible d'arrêter l'enregistrement: ${msg}` : `Impossible de démarrer l'enregistrement: ${msg}`);
+    }
+  };
+
 
   const avatarGradient =
     isTransfer ? `linear-gradient(135deg, ${colors.avaViolet} 0%, ${colors.avaCyan} 100%)` :
