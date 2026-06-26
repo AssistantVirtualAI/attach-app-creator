@@ -23,9 +23,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { RefreshCw, Plus, Settings, Zap, ArrowRight, Sparkles, Brain, Bot, FileText } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/context/OrganizationContext';
+import { PLANIPRET_ORG_ID, LEMTEL_ORG_ID } from '@/lib/avaOwner';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import { subDays } from 'date-fns';
@@ -33,6 +34,19 @@ import { subDays } from 'date-fns';
 const Dashboard = () => {
   const { t } = useTranslation();
   const { selectedOrgId } = useOrganization();
+  const navigate = useNavigate();
+
+  // Org-scoped routing: switching to Planipret or Lemtel sends the user
+  // into that org's dedicated portal. AVA org stays on this dashboard
+  // (the super-admin / platform overview).
+  useEffect(() => {
+    if (!selectedOrgId) return;
+    if (selectedOrgId === PLANIPRET_ORG_ID) {
+      navigate('/planipret/admin/overview', { replace: true });
+    } else if (selectedOrgId === LEMTEL_ORG_ID) {
+      navigate('/lemtel/dashboard', { replace: true });
+    }
+  }, [selectedOrgId, navigate]);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [dateRange, setDateRange] = useState<{ start: Date; end: Date }>({
