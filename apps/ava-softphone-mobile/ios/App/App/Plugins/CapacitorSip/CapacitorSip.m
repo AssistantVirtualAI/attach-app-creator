@@ -3,6 +3,7 @@
 
 CAP_PLUGIN(CapacitorSip, "CapacitorSip",
     CAP_PLUGIN_METHOD(initAccount, CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(disconnect, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(makeCall, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(hangup, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(answer, CAPPluginReturnPromise);
