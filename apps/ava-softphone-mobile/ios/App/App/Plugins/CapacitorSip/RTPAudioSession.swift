@@ -1,9 +1,13 @@
 import Foundation
 import AVFoundation
+import AudioToolbox
 import Darwin
 
 /// PCMU (G.711 μ-law) RTP audio session backed by a single BSD UDP socket
-/// for symmetric send/receive. AVAudioEngine drives capture and playback.
+/// for symmetric send/receive. Capture/playback uses a low-level RemoteIO
+/// AudioUnit (kAudioUnitSubType_RemoteIO) instead of AVAudioEngine to avoid
+/// fighting CapacitorSip for the shared AVAudioSession (two AVAudioEngine
+/// instances can't coexist on iOS; doing so yields error 561017449 / '!cat').
 final class RTPAudioSession {
     // MARK: - Public state
     private(set) var localPort: UInt16 = 0
@@ -16,25 +20,32 @@ final class RTPAudioSession {
     private let rxQueue = DispatchQueue(label: "rtp.audio.rx", qos: .userInteractive)
     private let txQueue = DispatchQueue(label: "rtp.audio.tx", qos: .userInteractive)
 
-    // MARK: - Audio
-    private let engine = AVAudioEngine()
-    private let playerNode = AVAudioPlayerNode()
-    private let playFormat = AVAudioFormat(commonFormat: .pcmFormatInt16,
-                                           sampleRate: 8000,
-                                           channels: 1,
-                                           interleaved: true)!
-    private var converter: AVAudioConverter?
+    // MARK: - RemoteIO AudioUnit
+    private var ioUnit: AudioUnit?
+    /// Native VoIP rate. 8kHz keeps PCMU conversion trivial (1 PCM frame = 1 μ-law byte).
+    private let sampleRate: Double = 8000
+    private let channels: UInt32 = 1
+    /// Scratch buffer used inside the input callback to receive captured PCM.
+    private var captureScratch: UnsafeMutablePointer<Int16>?
+    private var captureScratchFrames: UInt32 = 0
 
     // MARK: - RTP
     private var sequenceNumber: UInt16 = UInt16.random(in: 0...UInt16.max)
     private var timestamp: UInt32 = UInt32.random(in: 0...UInt32.max)
     private let ssrc: UInt32 = UInt32.random(in: 0...UInt32.max)
-    private var sendBuffer = [Int16]()
-    private let frameSamples = 160 // 20ms @ 8kHz
+    private let frameSamples: Int = 160 // 20ms @ 8kHz
     private var isMuted = false
     private var running = false
 
-    // MARK: - Engine recovery (auto-reconnect with backoff)
+    // MARK: - Audio buffers (lock-protected)
+    private let audioLock = NSLock()
+    /// Outgoing PCM samples awaiting RTP framing.
+    private var sendBuffer = [Int16]()
+    /// Incoming PCM jitter buffer drained by the render callback.
+    private var playQueue = [Int16]()
+    private let maxPlayQueueSamples = 8000 // ~1s safety cap
+
+    // MARK: - Engine recovery
     private var engineRestartAttempts: Int = 0
     private var engineRestartTimer: DispatchSourceTimer?
     private var routeChangeObserver: NSObjectProtocol?
@@ -44,7 +55,7 @@ final class RTPAudioSession {
     private(set) var engineRestartTotal: Int = 0
 
     /// Wired by CapacitorSip to surface audio engine state to JS.
-    /// Status values: "starting" | "running" | "retrying" | "error".
+    /// Status values: "starting" | "running" | "retrying" | "error" | "idle".
     var onAudioStateChanged: ((String, [String: Any]) -> Void)?
     private func emitAudio(_ status: String, _ extra: [String: Any] = [:]) {
         var data: [String: Any] = ["status": status,
@@ -65,24 +76,11 @@ final class RTPAudioSession {
     private(set) var micPeak: Float = 0
     private(set) var rxPeak: Float = 0
     private(set) var startedAt: Date?
-    private(set) var tapFormatDesc: String = ""
-    private(set) var converterFormatDesc: String = ""
+    private(set) var tapFormatDesc: String = "RemoteIO I16 8000Hz ch=1"
+    private(set) var converterFormatDesc: String = "n/a (RemoteIO native 8kHz)"
     private(set) var converterRebuilds: Int = 0
     private(set) var convertErrors: Int = 0
     private(set) var lastConvertError: String = ""
-
-    private func describeFormat(_ f: AVAudioFormat) -> String {
-        let cf: String
-        switch f.commonFormat {
-        case .pcmFormatFloat32: cf = "F32"
-        case .pcmFormatFloat64: cf = "F64"
-        case .pcmFormatInt16: cf = "I16"
-        case .pcmFormatInt32: cf = "I32"
-        case .otherFormat: cf = "other"
-        @unknown default: cf = "?"
-        }
-        return "\(cf) \(Int(f.sampleRate))Hz ch=\(f.channelCount) il=\(f.isInterleaved)"
-    }
 
     func snapshot() -> [String: Any] {
         return [
@@ -109,14 +107,11 @@ final class RTPAudioSession {
             "engineRestartAttempts": engineRestartAttempts,
             "engineRestartTotal": engineRestartTotal,
             "lastEngineError": lastEngineError,
-            "sessionState": sessionStateDescription()
+            "sessionState": sessionStateDescription(),
+            "audioBackend": "RemoteIO"
         ]
     }
 
-    /// One-line snapshot of the current AVAudioSession configuration. Useful
-    /// when diagnosing conflicts with CapacitorSip (which also touches the
-    /// shared session) and when verifying the .playAndRecord/.voiceChat
-    /// category we expect for full-duplex VoIP.
     private func sessionStateDescription() -> String {
         let s = AVAudioSession.sharedInstance()
         let cat = s.category.rawValue
@@ -124,9 +119,7 @@ final class RTPAudioSession {
         let opts = s.categoryOptions.rawValue
         let sr = s.sampleRate
         let io = s.ioBufferDuration * 1000
-        let inAvail = s.isInputAvailable
-        let other = s.isOtherAudioPlaying
-        return "cat=\(cat) mode=\(mode) opts=0x\(String(opts, radix: 16)) sr=\(Int(sr)) io=\(Int(io))ms input=\(inAvail) other=\(other)"
+        return "cat=\(cat) mode=\(mode) opts=0x\(String(opts, radix: 16)) sr=\(Int(sr)) io=\(Int(io))ms"
     }
 
     private func logSessionState(_ tag: String) {
@@ -184,29 +177,26 @@ final class RTPAudioSession {
         startAudio()
     }
 
-    /// Play a local 440Hz tone for `seconds` seconds through the speaker path
-    /// (no RTP transmission). Used by the pre-call audio test screen.
+    /// Play a local 440Hz tone for ~seconds seconds through the speaker path
+    /// by feeding sine samples into the RemoteIO playback queue.
     func playTestTone(seconds: Double = 1.5, frequency: Double = 440) {
-        let session = AVAudioSession.sharedInstance()
-        try? session.setCategory(.playAndRecord, mode: .voiceChat,
-                                 options: [.allowBluetooth, .allowBluetoothA2DP,
-                                           .defaultToSpeaker, .duckOthers])
-        try? session.setActive(true, options: [])
-        if playerNode.engine == nil { engine.attach(playerNode) }
-        engine.connect(playerNode, to: engine.mainMixerNode, format: playFormat)
-        if !engine.isRunning { try? engine.start() }
-        let frames = AVAudioFrameCount(playFormat.sampleRate * seconds)
-        guard let buf = AVAudioPCMBuffer(pcmFormat: playFormat, frameCapacity: frames) else { return }
-        buf.frameLength = frames
-        if let ch = buf.int16ChannelData?[0] {
-            let twoPi = 2.0 * Double.pi
-            for i in 0..<Int(frames) {
-                let s = sin(twoPi * frequency * Double(i) / playFormat.sampleRate) * 8000
-                ch[i] = Int16(s)
-            }
+        if ioUnit == nil {
+            configureSessionCategory()
+            _ = buildAndStartIOUnit()
         }
-        playerNode.scheduleBuffer(buf, completionHandler: nil)
-        playerNode.play()
+        let total = Int(sampleRate * seconds)
+        var samples = [Int16](repeating: 0, count: total)
+        let twoPi = 2.0 * Double.pi
+        for i in 0..<total {
+            let v = sin(twoPi * frequency * Double(i) / sampleRate) * 8000
+            samples[i] = Int16(v)
+        }
+        audioLock.lock()
+        playQueue.append(contentsOf: samples)
+        if playQueue.count > maxPlayQueueSamples * 2 {
+            playQueue.removeFirst(playQueue.count - maxPlayQueueSamples * 2)
+        }
+        audioLock.unlock()
     }
 
     func stop() {
@@ -216,35 +206,32 @@ final class RTPAudioSession {
         engineRestartTimer?.cancel(); engineRestartTimer = nil
         engineRestartAttempts = 0
         removeAudioObservers()
-        engine.inputNode.removeTap(onBus: 0)
-        if engine.isRunning { engine.stop() }
-        playerNode.stop()
+        teardownIOUnit()
         if sockfd >= 0 { close(sockfd); sockfd = -1 }
+        audioLock.lock()
         sendBuffer.removeAll()
+        playQueue.removeAll()
+        audioLock.unlock()
         hasRemote = false
         emitAudio("idle")
     }
 
     func setMuted(_ muted: Bool) { isMuted = muted }
 
-    // MARK: - Audio engine
+    // MARK: - Audio start
     private func startAudio() {
         emitAudio("starting")
         logSessionState("pre-start")
         installAudioObservers()
         configureSessionCategory()
-        // 100ms delay lets AVAudioSession fully apply the new category before we
-        // read inputNode.inputFormat — otherwise sampleRate can come back as 0Hz.
+        // Let the session settle before reading/forcing hardware format.
         NSLog("[RTP] sleeping 100ms after setCategory to let session settle")
         Thread.sleep(forTimeInterval: 0.1)
         logSessionState("post-settle")
-        attachAndPrepareEngine()
-        if startEngineWithRetry() {
+        if buildAndStartIOUnit() {
             engineRestartAttempts = 0
             emitAudio("running")
         } else {
-            // Engine refused to start synchronously — schedule a backoff retry
-            // so the call doesn't permanently lose audio.
             emitAudio("retrying")
             scheduleEngineRestart()
         }
@@ -256,114 +243,167 @@ final class RTPAudioSession {
 
     private func configureSessionCategory() {
         let session = AVAudioSession.sharedInstance()
-        // NOTE: The AVAudioSession is already activated by CapacitorSip when the
-        // call is set up. Do NOT call setActive(true) here — doing so races with
-        // the SIP plugin and yields "Session activation failed".
-        // 561017449 ('!cat') means the active category is incompatible with
-        // simultaneous input+output, so we (re)assert .playAndRecord/.voiceChat.
+        // CapacitorSip owns setActive(true). We only (re)assert category.
         do {
             try session.setCategory(.playAndRecord, mode: .voiceChat,
                                     options: RTPAudioSession.voipSessionOptions)
             NSLog("[RTP] setCategory playAndRecord/voiceChat ok (skip setActive — owned by SIP)")
         } catch {
-            NSLog("[RTP] setCategory failed: \(error.localizedDescription) — keeping current category")
+            NSLog("[RTP] setCategory failed: \(error.localizedDescription)")
         }
+        // Hint preferred I/O parameters; iOS may pick its own hardware rate.
+        try? session.setPreferredSampleRate(sampleRate)
+        try? session.setPreferredIOBufferDuration(0.02)
         logSessionState("post-category")
     }
 
-    private func attachAndPrepareEngine() {
-        // Always remove any prior tap and reset the engine BEFORE reconfiguring —
-        // installTap twice without removeTap is invalid and triggers 561017449.
-        engine.inputNode.removeTap(onBus: 0)
-        if engine.isRunning { engine.stop() }
-        engine.reset()
-        NSLog("[RTP] engine reset before prepare")
-        if playerNode.engine == nil { engine.attach(playerNode) }
-        engine.connect(playerNode, to: engine.mainMixerNode, format: playFormat)
-        engine.prepare()
-
-        let input = engine.inputNode
-        var hwFormat = input.outputFormat(forBus: 0)
-        NSLog("[RTP] hw input format=\(describeFormat(hwFormat))")
-        if hwFormat.sampleRate <= 0 || hwFormat.channelCount == 0 {
-            let sr = AVAudioSession.sharedInstance().sampleRate > 0
-                ? AVAudioSession.sharedInstance().sampleRate : 48000
-            if let fb = AVAudioFormat(standardFormatWithSampleRate: sr, channels: 1) {
-                hwFormat = fb
-                NSLog("[RTP] fallback hw format=\(describeFormat(fb))")
-            } else {
-                NSLog("[RTP] cannot derive hw format — aborting prepare")
-                return
-            }
-        }
-
-        if let conv = AVAudioConverter(from: hwFormat, to: playFormat) {
-            self.converter = conv
-            self.converterFormatDesc = "\(describeFormat(hwFormat)) → \(describeFormat(playFormat))"
-            self.converterRebuilds += 1
-            NSLog("[RTP] converter init #\(converterRebuilds) \(converterFormatDesc)")
-        } else {
-            NSLog("[RTP] cannot create initial converter \(describeFormat(hwFormat)) → \(describeFormat(playFormat)) — will rebuild from first tap buffer")
-        }
-
-        // format: nil → CoreAudio uses the node's actual native format,
-        // sidestepping "Failed to create tap due to format mismatch".
-        input.removeTap(onBus: 0)
-        input.installTap(onBus: 0, bufferSize: 1024, format: nil) { [weak self] buf, _ in
-            self?.handleCapturedBuffer(buf)
-        }
-        NSLog("[RTP] tap installed (format=nil, native bus0)")
-    }
-
+    // MARK: - RemoteIO build / teardown
     @discardableResult
-    private func startEngineWithRetry() -> Bool {
-        do {
-            try engine.start()
-            playerNode.play()
-            lastEngineError = ""
-            logSessionState("engine-running")
-            NSLog("[RTP] audio engine started, route=\(currentRouteDescription())")
-            return true
-        } catch let nsErr as NSError {
-            lastEngineError = "code=\(nsErr.code) \(nsErr.localizedDescription)"
-            NSLog("[RTP] engine start failed: code=\(nsErr.code) domain=\(nsErr.domain) desc=\(nsErr.localizedDescription)")
-            logSessionState("engine-failed")
-            // One synchronous retry after re-forcing category — covers the
-            // common case where CapacitorSip just bumped category to .playback.
-            // Always removeTap + reset before retry: installTap twice is invalid.
-            do {
-                engine.inputNode.removeTap(onBus: 0)
-                if engine.isRunning { engine.stop() }
-                engine.reset()
-                try AVAudioSession.sharedInstance().setCategory(.playAndRecord, mode: .voiceChat,
-                                                                options: RTPAudioSession.voipSessionOptions)
-                Thread.sleep(forTimeInterval: 0.1)
-                attachAndPrepareEngine()
-                try engine.start()
-                playerNode.play()
-                lastEngineError = ""
-                NSLog("[RTP] audio engine started on retry, route=\(currentRouteDescription())")
-                return true
-            } catch {
-                lastEngineError = "retry: \(error.localizedDescription)"
-                NSLog("[RTP] engine start retry failed: \(error.localizedDescription)")
-                return false
-            }
+    private func buildAndStartIOUnit() -> Bool {
+        teardownIOUnit()
+
+        var desc = AudioComponentDescription(
+            componentType: kAudioUnitType_Output,
+            componentSubType: kAudioUnitSubType_RemoteIO,
+            componentManufacturer: kAudioUnitManufacturer_Apple,
+            componentFlags: 0, componentFlagsMask: 0
+        )
+        guard let comp = AudioComponentFindNext(nil, &desc) else {
+            lastEngineError = "AudioComponentFindNext returned nil"
+            NSLog("[RTP] \(lastEngineError)")
+            return false
+        }
+        var unit: AudioUnit?
+        var status = AudioComponentInstanceNew(comp, &unit)
+        if status != noErr || unit == nil {
+            lastEngineError = "AudioComponentInstanceNew failed: \(status)"
+            NSLog("[RTP] \(lastEngineError)")
+            return false
+        }
+        let io = unit!
+
+        // Enable input on element 1 (mic).
+        var enable: UInt32 = 1
+        status = AudioUnitSetProperty(io, kAudioOutputUnitProperty_EnableIO,
+                                      kAudioUnitScope_Input, 1,
+                                      &enable, UInt32(MemoryLayout<UInt32>.size))
+        if status != noErr {
+            lastEngineError = "enableIO(input) failed: \(status)"
+            NSLog("[RTP] \(lastEngineError)")
+            AudioComponentInstanceDispose(io); return false
+        }
+        // Output on element 0 is enabled by default but assert it.
+        status = AudioUnitSetProperty(io, kAudioOutputUnitProperty_EnableIO,
+                                      kAudioUnitScope_Output, 0,
+                                      &enable, UInt32(MemoryLayout<UInt32>.size))
+        if status != noErr {
+            NSLog("[RTP] enableIO(output) status=\(status) (continuing)")
+        }
+
+        // Stream format: 8kHz mono Int16 packed.
+        var asbd = AudioStreamBasicDescription(
+            mSampleRate: sampleRate,
+            mFormatID: kAudioFormatLinearPCM,
+            mFormatFlags: kAudioFormatFlagIsSignedInteger | kAudioFormatFlagIsPacked,
+            mBytesPerPacket: 2,
+            mFramesPerPacket: 1,
+            mBytesPerFrame: 2,
+            mChannelsPerFrame: channels,
+            mBitsPerChannel: 16,
+            mReserved: 0
+        )
+
+        // Format the AU delivers to us when we render input (element 1, output scope).
+        status = AudioUnitSetProperty(io, kAudioUnitProperty_StreamFormat,
+                                      kAudioUnitScope_Output, 1,
+                                      &asbd, UInt32(MemoryLayout<AudioStreamBasicDescription>.size))
+        if status != noErr {
+            lastEngineError = "setStreamFormat(input bus) failed: \(status)"
+            NSLog("[RTP] \(lastEngineError)")
+            AudioComponentInstanceDispose(io); return false
+        }
+        // Format we feed to speaker (element 0, input scope).
+        status = AudioUnitSetProperty(io, kAudioUnitProperty_StreamFormat,
+                                      kAudioUnitScope_Input, 0,
+                                      &asbd, UInt32(MemoryLayout<AudioStreamBasicDescription>.size))
+        if status != noErr {
+            lastEngineError = "setStreamFormat(output bus) failed: \(status)"
+            NSLog("[RTP] \(lastEngineError)")
+            AudioComponentInstanceDispose(io); return false
+        }
+        NSLog("[RTP] RemoteIO stream format set: 8000Hz mono Int16 packed")
+
+        let refcon = UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
+
+        // Render callback on output (element 0, input scope) — pulls playback PCM.
+        var renderCb = AURenderCallbackStruct(inputProc: rtp_render_cb, inputProcRefCon: refcon)
+        status = AudioUnitSetProperty(io, kAudioUnitProperty_SetRenderCallback,
+                                      kAudioUnitScope_Input, 0,
+                                      &renderCb, UInt32(MemoryLayout<AURenderCallbackStruct>.size))
+        if status != noErr {
+            lastEngineError = "setRenderCallback failed: \(status)"
+            NSLog("[RTP] \(lastEngineError)")
+            AudioComponentInstanceDispose(io); return false
+        }
+        // Input callback on element 1 (global scope) — fires when mic samples ready.
+        var inputCb = AURenderCallbackStruct(inputProc: rtp_input_cb, inputProcRefCon: refcon)
+        status = AudioUnitSetProperty(io, kAudioOutputUnitProperty_SetInputCallback,
+                                      kAudioUnitScope_Global, 1,
+                                      &inputCb, UInt32(MemoryLayout<AURenderCallbackStruct>.size))
+        if status != noErr {
+            lastEngineError = "setInputCallback failed: \(status)"
+            NSLog("[RTP] \(lastEngineError)")
+            AudioComponentInstanceDispose(io); return false
+        }
+
+        status = AudioUnitInitialize(io)
+        if status != noErr {
+            lastEngineError = "AudioUnitInitialize failed: \(status)"
+            NSLog("[RTP] \(lastEngineError)")
+            AudioComponentInstanceDispose(io); return false
+        }
+        status = AudioOutputUnitStart(io)
+        if status != noErr {
+            lastEngineError = "AudioOutputUnitStart failed: \(status)"
+            NSLog("[RTP] \(lastEngineError)")
+            AudioUnitUninitialize(io)
+            AudioComponentInstanceDispose(io)
+            return false
+        }
+        self.ioUnit = io
+        self.lastEngineError = ""
+        NSLog("[RTP] RemoteIO started, route=\(currentRouteDescription())")
+        logSessionState("audiounit-running")
+        return true
+    }
+
+    private func teardownIOUnit() {
+        if let io = ioUnit {
+            AudioOutputUnitStop(io)
+            AudioUnitUninitialize(io)
+            AudioComponentInstanceDispose(io)
+            ioUnit = nil
+            NSLog("[RTP] RemoteIO disposed")
+        }
+        if let p = captureScratch {
+            p.deallocate()
+            captureScratch = nil
+            captureScratchFrames = 0
         }
     }
 
-    /// Exponential backoff (0.5s, 1s, 2s, 4s, 8s, capped at 10s, 8 attempts).
+    /// Exponential backoff (0.5s … 10s, 8 attempts).
     private func scheduleEngineRestart() {
         guard running else { return }
         engineRestartAttempts += 1
         if engineRestartAttempts > 8 {
-            NSLog("[RTP] engine restart abandoned after \(engineRestartAttempts) attempts")
-            emitAudio("error", ["reason": "engine restart abandoned after \(engineRestartAttempts) attempts: \(lastEngineError)"])
+            NSLog("[RTP] RemoteIO restart abandoned after \(engineRestartAttempts) attempts")
+            emitAudio("error", ["reason": "RemoteIO restart abandoned: \(lastEngineError)"])
             return
         }
         emitAudio("retrying", ["attempt": engineRestartAttempts])
         let delay = min(10.0, 0.5 * pow(2.0, Double(engineRestartAttempts - 1)))
-        NSLog("[RTP] scheduling engine restart #\(engineRestartAttempts) in \(delay)s")
+        NSLog("[RTP] scheduling RemoteIO restart #\(engineRestartAttempts) in \(delay)s")
         engineRestartTimer?.cancel()
         let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.global(qos: .userInitiated))
         timer.schedule(deadline: .now() + delay)
@@ -375,16 +415,10 @@ final class RTPAudioSession {
     private func performEngineRestart() {
         guard running else { return }
         engineRestartTotal += 1
-        NSLog("[RTP] restarting engine (attempt #\(engineRestartAttempts), total=\(engineRestartTotal))")
-        engine.inputNode.removeTap(onBus: 0)
-        if engine.isRunning { engine.stop() }
-        playerNode.stop()
-        engine.reset()
-        NSLog("[RTP] engine.reset() before reconfigure")
+        NSLog("[RTP] restarting RemoteIO (attempt #\(engineRestartAttempts), total=\(engineRestartTotal))")
         configureSessionCategory()
         Thread.sleep(forTimeInterval: 0.1)
-        attachAndPrepareEngine()
-        if startEngineWithRetry() {
+        if buildAndStartIOUnit() {
             engineRestartAttempts = 0
             emitAudio("running")
         } else {
@@ -408,16 +442,15 @@ final class RTPAudioSession {
             let typeRaw = (note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt) ?? 0
             let type = AVAudioSession.InterruptionType(rawValue: typeRaw)
             NSLog("[RTP] interruption type=\(typeRaw)")
-            if type == .ended, self.running, !self.engine.isRunning {
+            if type == .ended, self.running {
                 self.scheduleEngineRestart()
             }
         }
         mediaServicesResetObserver = nc.addObserver(forName: AVAudioSession.mediaServicesWereResetNotification,
                                                     object: nil, queue: .main) { [weak self] _ in
             guard let self = self, self.running else { return }
-            NSLog("[RTP] mediaServicesWereReset — full engine rebuild")
-            self.engine.inputNode.removeTap(onBus: 0)
-            if self.engine.isRunning { self.engine.stop() }
+            NSLog("[RTP] mediaServicesWereReset — full RemoteIO rebuild")
+            self.teardownIOUnit()
             self.scheduleEngineRestart()
         }
     }
@@ -429,62 +462,81 @@ final class RTPAudioSession {
         if let o = mediaServicesResetObserver { nc.removeObserver(o); mediaServicesResetObserver = nil }
     }
 
-    private func handleCapturedBuffer(_ buf: AVAudioPCMBuffer) {
-        let bufDesc = describeFormat(buf.format)
-        if tapFormatDesc != bufDesc {
-            tapFormatDesc = bufDesc
-            NSLog("[RTP] tap buffer format=\(bufDesc) frames=\(buf.frameLength)")
-        }
-        // Rebuild converter if tap delivered a different format than expected.
-        if converter == nil || converter?.inputFormat != buf.format {
-            if let c = AVAudioConverter(from: buf.format, to: playFormat) {
-                converter = c
-                converterFormatDesc = "\(bufDesc) → \(describeFormat(playFormat))"
-                converterRebuilds += 1
-                NSLog("[RTP] converter rebuilt #\(converterRebuilds) \(converterFormatDesc)")
-            } else {
-                convertErrors += 1
-                lastConvertError = "build failed for \(bufDesc)"
-                NSLog("[RTP] cannot build converter for \(bufDesc)")
-                return
-            }
-        }
-        guard let conv = converter else { return }
-        let ratio = playFormat.sampleRate / buf.format.sampleRate
-        let outCapacity = AVAudioFrameCount(Double(buf.frameLength) * ratio + 16)
-        guard let outBuf = AVAudioPCMBuffer(pcmFormat: playFormat, frameCapacity: outCapacity) else { return }
+    // MARK: - Callback implementations (called from real-time audio thread)
+    fileprivate func handleInputCallback(ioActionFlags: UnsafeMutablePointer<AudioUnitRenderActionFlags>,
+                                         inTimeStamp: UnsafePointer<AudioTimeStamp>,
+                                         inBusNumber: UInt32,
+                                         inNumberFrames: UInt32) -> OSStatus {
+        guard let io = ioUnit else { return noErr }
 
-        var supplied = false
-        var convErr: NSError?
-        let status = conv.convert(to: outBuf, error: &convErr) { _, outStatus in
-            if supplied { outStatus.pointee = .noDataNow; return nil }
-            supplied = true
-            outStatus.pointee = .haveData
-            return buf
+        // (Re)allocate scratch buffer to hold inNumberFrames Int16 mono samples.
+        if captureScratch == nil || captureScratchFrames < inNumberFrames {
+            if let p = captureScratch { p.deallocate() }
+            captureScratch = UnsafeMutablePointer<Int16>.allocate(capacity: Int(inNumberFrames))
+            captureScratchFrames = inNumberFrames
         }
-        if status == .error || convErr != nil {
-            convertErrors += 1
-            lastConvertError = convErr?.localizedDescription ?? "unknown"
-            NSLog("[RTP] convert error: \(lastConvertError) — resetting converter")
-            converter = nil
-            return
-        }
-        guard let ptr = outBuf.int16ChannelData?[0] else { return }
-        let n = Int(outBuf.frameLength)
-        // Mic peak (linear 0..1) for diagnostics
+        let scratch = captureScratch!
+
+        var abl = AudioBufferList(
+            mNumberBuffers: 1,
+            mBuffers: AudioBuffer(
+                mNumberChannels: channels,
+                mDataByteSize: inNumberFrames * 2,
+                mData: UnsafeMutableRawPointer(scratch)
+            )
+        )
+        let status = AudioUnitRender(io, ioActionFlags, inTimeStamp, inBusNumber, inNumberFrames, &abl)
+        if status != noErr { return status }
+
+        let n = Int(inNumberFrames)
         var peak: Int16 = 0
-        for i in 0..<n { let a = abs(ptr[i]); if a > peak { peak = a } }
+        for i in 0..<n { let a = abs(scratch[i]); if a > peak { peak = a } }
         micPeak = Float(peak) / 32767.0
+
+        var framesToSend: [[Int16]] = []
+        audioLock.lock()
         if isMuted {
             sendBuffer.append(contentsOf: repeatElement(0, count: n))
         } else {
-            sendBuffer.append(contentsOf: UnsafeBufferPointer(start: ptr, count: n))
+            sendBuffer.append(contentsOf: UnsafeBufferPointer(start: scratch, count: n))
         }
         while sendBuffer.count >= frameSamples {
             let frame = Array(sendBuffer.prefix(frameSamples))
             sendBuffer.removeFirst(frameSamples)
-            sendRTPFrame(frame)
+            framesToSend.append(frame)
         }
+        audioLock.unlock()
+
+        for f in framesToSend { sendRTPFrame(f) }
+        return noErr
+    }
+
+    fileprivate func handleRenderCallback(ioActionFlags: UnsafeMutablePointer<AudioUnitRenderActionFlags>,
+                                          inTimeStamp: UnsafePointer<AudioTimeStamp>,
+                                          inBusNumber: UInt32,
+                                          inNumberFrames: UInt32,
+                                          ioData: UnsafeMutablePointer<AudioBufferList>?) -> OSStatus {
+        guard let ioData = ioData else { return noErr }
+        let abl = UnsafeMutableAudioBufferListPointer(ioData)
+        let needed = Int(inNumberFrames)
+
+        var out = [Int16](repeating: 0, count: needed)
+        audioLock.lock()
+        let avail = min(needed, playQueue.count)
+        if avail > 0 {
+            for i in 0..<avail { out[i] = playQueue[i] }
+            playQueue.removeFirst(avail)
+        }
+        audioLock.unlock()
+
+        for buffer in abl {
+            guard let data = buffer.mData else { continue }
+            let dst = data.assumingMemoryBound(to: Int16.self)
+            out.withUnsafeBufferPointer { src in
+                dst.update(from: src.baseAddress!, count: needed)
+            }
+        }
+        return noErr
     }
 
     // MARK: - RTP send
@@ -541,7 +593,6 @@ final class RTPAudioSession {
                     }
                 }
                 if n <= 12 { continue }
-                // Symmetric RTP latch: if PBX answered from a different port, follow it.
                 if from.sin_port != self.remoteAddr.sin_port {
                     self.remoteAddr.sin_port = from.sin_port
                     self.lastRemotePort = UInt16(bigEndian: from.sin_port)
@@ -560,22 +611,16 @@ final class RTPAudioSession {
                     samples.append(s)
                 }
                 self.rxPeak = Float(peak) / 32767.0
-                self.enqueuePlayback(samples)
+                self.audioLock.lock()
+                self.playQueue.append(contentsOf: samples)
+                if self.playQueue.count > self.maxPlayQueueSamples {
+                    let drop = self.playQueue.count - self.maxPlayQueueSamples
+                    self.playQueue.removeFirst(drop)
+                }
+                self.audioLock.unlock()
             }
             NSLog("[RTP] receive loop exited")
         }
-    }
-
-    private func enqueuePlayback(_ samples: [Int16]) {
-        guard let pcm = AVAudioPCMBuffer(pcmFormat: playFormat,
-                                         frameCapacity: AVAudioFrameCount(samples.count)) else { return }
-        pcm.frameLength = AVAudioFrameCount(samples.count)
-        if let dst = pcm.int16ChannelData?[0] {
-            samples.withUnsafeBufferPointer { src in
-                dst.update(from: src.baseAddress!, count: samples.count)
-            }
-        }
-        playerNode.scheduleBuffer(pcm, completionHandler: nil)
     }
 
     // MARK: - μ-law
@@ -641,4 +686,32 @@ final class RTPAudioSession {
         }
         return address
     }
+}
+
+// MARK: - C trampolines (must be free @convention(c) functions)
+private func rtp_input_cb(inRefCon: UnsafeMutableRawPointer,
+                          ioActionFlags: UnsafeMutablePointer<AudioUnitRenderActionFlags>,
+                          inTimeStamp: UnsafePointer<AudioTimeStamp>,
+                          inBusNumber: UInt32,
+                          inNumberFrames: UInt32,
+                          ioData: UnsafeMutablePointer<AudioBufferList>?) -> OSStatus {
+    let session = Unmanaged<RTPAudioSession>.fromOpaque(inRefCon).takeUnretainedValue()
+    return session.handleInputCallback(ioActionFlags: ioActionFlags,
+                                       inTimeStamp: inTimeStamp,
+                                       inBusNumber: inBusNumber,
+                                       inNumberFrames: inNumberFrames)
+}
+
+private func rtp_render_cb(inRefCon: UnsafeMutableRawPointer,
+                           ioActionFlags: UnsafeMutablePointer<AudioUnitRenderActionFlags>,
+                           inTimeStamp: UnsafePointer<AudioTimeStamp>,
+                           inBusNumber: UInt32,
+                           inNumberFrames: UInt32,
+                           ioData: UnsafeMutablePointer<AudioBufferList>?) -> OSStatus {
+    let session = Unmanaged<RTPAudioSession>.fromOpaque(inRefCon).takeUnretainedValue()
+    return session.handleRenderCallback(ioActionFlags: ioActionFlags,
+                                        inTimeStamp: inTimeStamp,
+                                        inBusNumber: inBusNumber,
+                                        inNumberFrames: inNumberFrames,
+                                        ioData: ioData)
 }
