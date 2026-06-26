@@ -54,38 +54,38 @@ export function buildAvaToolsArray(supabaseUrl: string, anonKey: string) {
   return arr;
 }
 
-/** Registry-shaped tool configs (ElevenLabs Convai Tools API). */
+/** Registry-shaped tool configs (ElevenLabs Convai Tools API).
+ *  Params are flat in `request_body_schema.properties`; tool routing is
+ *  done via the `X-Ava-Tool-Name` request header (no `constant_value`). */
 export function buildAvaToolConfigs(supabaseUrl: string, anonKey: string) {
   const url = `${supabaseUrl}/functions/v1/ava-tool-executor`;
-  return specs().map((s) => ({
-    tool_config: {
-      type: "webhook",
-      name: s.name,
-      description: s.description,
-      response_timeout_secs: 20,
-      api_schema: {
-        url,
-        method: "POST",
-        request_headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${anonKey}`,
-        },
-        request_body_schema: {
-          type: "object",
-          properties: {
-            tool_name: { type: "string", description: "Tool identifier", constant_value: s.name },
-            parameters: {
-              type: "object",
-              properties: s.properties,
-              ...(s.required.length ? { required: s.required } : {}),
-            },
+  return specs().map((s) => {
+    const request_body_schema: Record<string, any> = {
+      type: "object",
+      properties: s.properties ?? {},
+    };
+    if (s.required && s.required.length) request_body_schema.required = s.required;
+    return {
+      tool_config: {
+        type: "webhook",
+        name: s.name,
+        description: s.description,
+        response_timeout_secs: 20,
+        api_schema: {
+          url,
+          method: "POST",
+          request_headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${anonKey}`,
+            "X-Ava-Tool-Name": s.name,
           },
-          required: ["tool_name", "parameters"],
+          request_body_schema,
         },
       },
-    },
-  }));
+    };
+  });
 }
+
 
 function buildSpecs(mk: (name: string, description: string, properties?: Record<string, any>, required?: string[]) => any) {
 
