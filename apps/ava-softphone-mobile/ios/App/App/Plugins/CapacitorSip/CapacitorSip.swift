@@ -339,10 +339,15 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
             call.reject("no active call")
             return
         }
+        if hold == isOnHold {
+            // No-op: already in the requested state, don't spam re-INVITEs.
+            call.resolve(["ok": true, "held": hold, "noop": true])
+            return
+        }
         isOnHold = hold
         callCseq += 1
         sendReInvite(hold: hold)
-        callState = hold ? "hold" : "active"
+        // NOTE: don't touch callState — the 200 OK to the re-INVITE confirms.
         notifyListeners("holdChanged", data: ["held": hold, "onHold": hold])
         call.resolve(["ok": true, "held": hold])
     }
