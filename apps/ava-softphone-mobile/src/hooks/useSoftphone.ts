@@ -45,12 +45,6 @@ export interface UseSoftphoneReturn {
   offeredCodecs: string[];
   /** Codec actually negotiated for the current/last call. */
   negotiatedCodec: string | null;
-  isRecording?: boolean;
-  startRecording?: () => void | Promise<void>;
-  stopRecording?: () => void | Promise<void>;
-  transferCall?: (target: string) => void | Promise<void>;
-  parkCall?: (code?: string) => void | Promise<void>;
-  addCall?: (target: string) => void | Promise<void>;
 }
 
 export function useSoftphoneJsSip(

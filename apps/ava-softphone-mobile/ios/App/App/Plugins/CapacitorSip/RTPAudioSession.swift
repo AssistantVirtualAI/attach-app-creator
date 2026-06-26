@@ -219,7 +219,19 @@ final class RTPAudioSession {
         logSessionState("pre-start")
         installAudioObservers()
         configureSessionCategory()
-        startEngineAfterSessionSettles(reason: "initial-start")
+        // 100ms delay lets AVAudioSession fully apply the new category before we
+        // read inputNode.inputFormat — otherwise sampleRate can come back as 0Hz.
+        NSLog("[RTP] sleeping 100ms after setCategory to let session settle")
+        Thread.sleep(forTimeInterval: 0.1)
+        logSessionState("post-settle")
+        attachAndPrepareEngine()
+        if startEngineWithRetry() {
+            engineRestartAttempts = 0
+        } else {
+            // Engine refused to start synchronously — schedule a backoff retry
+            // so the call doesn't permanently lose audio.
+            scheduleEngineRestart()
+        }
     }
 
     private static let voipSessionOptions: AVAudioSession.CategoryOptions = [
@@ -243,40 +255,18 @@ final class RTPAudioSession {
         logSessionState("post-category")
     }
 
-    /// iOS can briefly report inputNode formats like F32 0Hz immediately after
-    /// setCategory. Wait 100ms before reading inputFormat/installing taps.
-    private func startEngineAfterSessionSettles(reason: String) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.10) { [weak self] in
-            guard let self = self, self.running else { return }
-            NSLog("[RTP] audio start after session settle reason=\(reason)")
-            self.attachAndPrepareEngine()
-            if self.startEngineWithRetry() {
-                self.engineRestartAttempts = 0
-            } else {
-                // Engine refused to start synchronously — schedule a backoff retry
-                // so the call doesn't permanently lose audio.
-                self.scheduleEngineRestart()
-            }
-        }
-    }
-
-    private func cleanupEngineBeforeRetry(_ reason: String) {
-        NSLog("[RTP] cleanup engine before retry reason=\(reason)")
-        engine.inputNode.removeTap(onBus: 0)
-        engine.stop()
-        playerNode.stop()
-        engine.reset()
-    }
-
     private func attachAndPrepareEngine() {
-        let input = engine.inputNode
-        input.removeTap(onBus: 0)
+        // Always remove any prior tap and reset the engine BEFORE reconfiguring —
+        // installTap twice without removeTap is invalid and triggers 561017449.
+        engine.inputNode.removeTap(onBus: 0)
+        if engine.isRunning { engine.stop() }
         engine.reset()
+        NSLog("[RTP] engine reset before prepare")
         if playerNode.engine == nil { engine.attach(playerNode) }
         engine.connect(playerNode, to: engine.mainMixerNode, format: playFormat)
-        engine.reset()
         engine.prepare()
 
+        let input = engine.inputNode
         var hwFormat = input.outputFormat(forBus: 0)
         NSLog("[RTP] hw input format=\(describeFormat(hwFormat))")
         if hwFormat.sampleRate <= 0 || hwFormat.channelCount == 0 {
@@ -312,7 +302,6 @@ final class RTPAudioSession {
     @discardableResult
     private func startEngineWithRetry() -> Bool {
         do {
-            engine.reset()
             try engine.start()
             playerNode.play()
             lastEngineError = ""
@@ -325,10 +314,15 @@ final class RTPAudioSession {
             logSessionState("engine-failed")
             // One synchronous retry after re-forcing category — covers the
             // common case where CapacitorSip just bumped category to .playback.
+            // Always removeTap + reset before retry: installTap twice is invalid.
             do {
+                engine.inputNode.removeTap(onBus: 0)
+                if engine.isRunning { engine.stop() }
+                engine.reset()
                 try AVAudioSession.sharedInstance().setCategory(.playAndRecord, mode: .voiceChat,
                                                                 options: RTPAudioSession.voipSessionOptions)
-                engine.reset()
+                Thread.sleep(forTimeInterval: 0.1)
+                attachAndPrepareEngine()
                 try engine.start()
                 playerNode.play()
                 lastEngineError = ""
@@ -345,7 +339,6 @@ final class RTPAudioSession {
     /// Exponential backoff (0.5s, 1s, 2s, 4s, 8s, capped at 10s, 8 attempts).
     private func scheduleEngineRestart() {
         guard running else { return }
-        cleanupEngineBeforeRetry("scheduleEngineRestart")
         engineRestartAttempts += 1
         if engineRestartAttempts > 8 {
             NSLog("[RTP] engine restart abandoned after \(engineRestartAttempts) attempts")
@@ -365,9 +358,19 @@ final class RTPAudioSession {
         guard running else { return }
         engineRestartTotal += 1
         NSLog("[RTP] restarting engine (attempt #\(engineRestartAttempts), total=\(engineRestartTotal))")
-        cleanupEngineBeforeRetry("performEngineRestart")
+        engine.inputNode.removeTap(onBus: 0)
+        if engine.isRunning { engine.stop() }
+        playerNode.stop()
+        engine.reset()
+        NSLog("[RTP] engine.reset() before reconfigure")
         configureSessionCategory()
-        startEngineAfterSessionSettles(reason: "retry-\(engineRestartAttempts)")
+        Thread.sleep(forTimeInterval: 0.1)
+        attachAndPrepareEngine()
+        if startEngineWithRetry() {
+            engineRestartAttempts = 0
+        } else {
+            scheduleEngineRestart()
+        }
     }
 
     // MARK: - Audio system observers

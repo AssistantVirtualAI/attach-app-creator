@@ -71,7 +71,7 @@ export default function AudioDiagnosticsScreen() {
         <p style={{ color: '#94a3b8', fontSize: 12 }}>
           Joue un ton 440 Hz pendant 2 s sur la sortie active et mesure le pic micro.
         </p>
-        <button className="ava-glass-button ava-glass-button-primary" onClick={runToneTest} disabled={tone.running}
+        <button onClick={runToneTest} disabled={tone.running}
           style={{ padding: '10px 16px', borderRadius: 8, background: '#2563eb', color: '#fff', border: 0 }}>
           {tone.running ? 'Test en cours…' : '▶ Lancer le test'}
         </button>
@@ -85,7 +85,7 @@ export default function AudioDiagnosticsScreen() {
         <h3 style={{ marginTop: 0, fontSize: 15 }}>Forcer la route</h3>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {(['auto','speaker','earpiece','bluetooth'] as const).map(r => (
-            <button className="ava-glass-button" key={r} onClick={() => setRouteTo(r)}
+            <button key={r} onClick={() => setRouteTo(r)}
               style={{ padding: '8px 12px', borderRadius: 8, background: '#1e293b', color: '#e2e8f0', border: '1px solid #334155' }}>
               {r}
             </button>

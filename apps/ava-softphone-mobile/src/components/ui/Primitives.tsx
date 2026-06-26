@@ -124,7 +124,6 @@ export function PrimaryButton({
 }: { children: React.ReactNode; onClick?: () => void; disabled?: boolean; style?: React.CSSProperties }) {
   return (
     <button
-      className="ava-glass-button ava-glass-button-primary"
       onClick={onClick}
       disabled={disabled}
       onMouseDown={(e) => !disabled && ((e.currentTarget as HTMLButtonElement).style.transform = 'scale(0.97)')}
@@ -181,7 +180,6 @@ export function GhostButton({
   const c = tone === 'cyan' ? colors.avaCyan : tone === 'violet' ? colors.avaViolet : tone === 'gold' ? colors.signalGold : colors.lemtelBlue;
   return (
     <button
-      className="ava-glass-button"
       onClick={onClick}
       onMouseDown={(e) => ((e.currentTarget as HTMLButtonElement).style.transform = 'scale(0.97)')}
       onMouseUp={(e) => ((e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)')}
@@ -238,7 +236,7 @@ export function SettingsRow({
   label, value, icon, onPress, right,
 }: { label: string; value?: string; icon?: React.ReactNode; onPress?: () => void; right?: React.ReactNode }) {
   return (
-    <button className="ava-glass-button" onClick={onPress} style={{
+    <button onClick={onPress} style={{
       display: 'flex', alignItems: 'center', gap: 12,
       width: '100%', minHeight: 54, padding: '14px 14px',
       background: 'transparent', border: 'none',

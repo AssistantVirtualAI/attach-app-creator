@@ -249,7 +249,7 @@ function AuthenticatedShell({
   }, [creds.accessToken, creds.email, creds.extension, creds.userId, setCreds, softphone.sipError]);
 
   const sp = useMemo(() => {
-    const richCallState = softphone.isOnHold ? 'held' : softphone.callState === 'ringing' ? 'ringing-out' : softphone.callState;
+    const richCallState = softphone.callState === 'ringing' ? 'ringing-out' : softphone.callState;
     return {
       snap: {
         status: softphone.sipStatus,
@@ -259,14 +259,14 @@ function AuthenticatedShell({
         remoteParty: softphone.activeCallNumber,
         remoteUri: softphone.activeCallNumber,
         muted: softphone.isMuted,
-        recording: !!softphone.isRecording,
+        recording: false,
         contacts: [],
         recents: [],
         quality: softphone.quality,
       },
       sipConfig,
       call: softphone.call,
-      addCall: (target: string) => softphone.addCall?.(target) ?? softphone.call(target),
+      addCall: softphone.call,
       hangup: softphone.hangup,
       answer: softphone.answer,
       mute: softphone.mute,
@@ -288,10 +288,10 @@ function AuthenticatedShell({
       audioProfile: softphone.audioProfile,
       setAudioProfile: softphone.setAudioProfile,
       setAudioEl: (_el: HTMLAudioElement | null) => {},
-      transfer: (target?: string) => { if (target) softphone.transferCall?.(target); },
-      park: () => { softphone.parkCall?.(); },
-      startRecord: () => { softphone.startRecording?.(); },
-      stopRecord: () => { softphone.stopRecording?.(); },
+      transfer: (_target?: string) => {},
+      park: () => {},
+      startRecord: () => {},
+      stopRecord: () => {},
     };
   }, [softphone, sipConfig]);
 

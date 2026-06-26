@@ -200,7 +200,7 @@ export default function ActiveCallSheet({
           <Ctrl label="Transfer" icon="↗" onClick={() => { haptic(ImpactStyle.Medium); transfer(); }} />
           <Ctrl label="Add" icon="＋" onClick={() => { haptic(ImpactStyle.Medium); addCall(); }} />
           <Ctrl label="Park" icon="🅿" onClick={() => { haptic(ImpactStyle.Medium); park(); }} />
-          <Ctrl label={sp.snap.recording ? 'Stop Rec' : 'Record'} icon="●" tone={sp.snap.recording ? 'danger' : 'default'} active={sp.snap.recording}
+          <Ctrl label={sp.snap.recording ? 'Stop Rec' : 'Record'} icon="●" tone={sp.snap.recording ? 'danger' : 'default'}
             onClick={() => { haptic(ImpactStyle.Medium); record(); }} />
           <Ctrl label="AVA" icon="✦" tone="ai" active={aiOpen}
             onClick={() => { haptic(); setAiOpen((v) => !v); }} />
@@ -229,7 +229,7 @@ export default function ActiveCallSheet({
         }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
             {['1','2','3','4','5','6','7','8','9','*','0','#'].map((d) => (
-              <button key={d} className="ava-glass-button ava-dtmf-button" onClick={() => { haptic(); sp.sendDtmf?.(d) ?? sp.sendDTMF?.(d); }} style={{
+              <button key={d} onClick={() => { haptic(); sp.sendDtmf?.(d) ?? sp.sendDTMF?.(d); }} style={{
                 padding: '14px 0', borderRadius: radius.md, background: colors.graphite2,
                 border: `1px solid ${colors.border}`, color: colors.textIce,
                 fontSize: 20, fontWeight: 500, cursor: 'pointer',
@@ -269,13 +269,12 @@ function Ctrl({ label, icon, onClick, active, tone = 'default', disabled }: {
 }) {
   const accent = tone === 'danger' ? colors.danger : tone === 'ai' ? colors.avaViolet : colors.blueGlow;
   return (
-    <button className="ava-control-button" onClick={onClick} disabled={disabled} style={{
+    <button onClick={onClick} disabled={disabled} style={{
       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
       background: 'transparent', border: 'none', cursor: disabled ? 'not-allowed' : 'pointer',
       color: colors.textIce, opacity: disabled ? 0.45 : 1,
-      '--btn-accent': accent,
-    } as React.CSSProperties}>
-      <span className="ava-control-orb" style={{
+    }}>
+      <span style={{
         width: 60, height: 60, borderRadius: '50%',
         background: active ? `${accent}24` : 'rgba(255,255,255,0.06)',
         border: `1px solid ${active ? accent : colors.border}`,
@@ -291,12 +290,11 @@ function Ctrl({ label, icon, onClick, active, tone = 'default', disabled }: {
 
 function BigButton({ color, onClick, label, icon }: { color: string; onClick: () => void; label: string; icon: string }) {
   return (
-    <button className="ava-big-call-button" onClick={onClick} style={{
+    <button onClick={onClick} style={{
       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
       background: 'transparent', border: 'none', cursor: 'pointer', color: colors.textIce,
-      '--btn-accent': color,
-    } as React.CSSProperties}>
-      <span className="ava-big-call-orb" style={{
+    }}>
+      <span style={{
         width: 72, height: 72, borderRadius: '50%',
         background: color,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
