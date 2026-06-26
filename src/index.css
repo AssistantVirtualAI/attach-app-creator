@@ -1137,26 +1137,54 @@ All colors MUST be HSL.
    - Subtle inner highlight + outer glow tuned per variant
    ========================================================================= */
 @layer components {
+  /* Theme-adaptive tokens (light defaults) */
+  .btn-futuristic {
+    --btn-highlight: 0 0% 100%;       /* top inner highlight */
+    --btn-shadow-rim: 0 0% 0%;        /* bottom inner rim */
+    --btn-highlight-a: 0.55;
+    --btn-rim-a: 0.18;
+    --btn-shine-a: 0.55;              /* shine sweep alpha */
+    --btn-flash-a: 0.65;              /* click flash alpha */
+    --btn-glow: var(--primary);       /* outer glow color */
+    --btn-glow-a: 0.45;
+    --btn-glow-a-hover: 0.65;
+    --btn-drop-a: 0.18;
+    --btn-text-shadow-a: 0.35;
+  }
+  .dark .btn-futuristic {
+    --btn-highlight-a: 0.22;
+    --btn-rim-a: 0.45;
+    --btn-shine-a: 0.32;
+    --btn-flash-a: 0.30;
+    --btn-glow-a: 0.55;
+    --btn-glow-a-hover: 0.85;
+    --btn-drop-a: 0.45;
+    --btn-text-shadow-a: 0.55;
+  }
+
   .btn-futuristic {
     position: relative;
     overflow: hidden;
     isolation: isolate;
-    backdrop-filter: blur(10px) saturate(140%);
-    -webkit-backdrop-filter: blur(10px) saturate(140%);
+    backdrop-filter: blur(14px) saturate(160%);
+    -webkit-backdrop-filter: blur(14px) saturate(160%);
+    border: 1px solid hsl(var(--btn-highlight) / calc(var(--btn-highlight-a) * 0.35));
     box-shadow:
-      0 1px 0 0 hsl(0 0% 100% / 0.18) inset,
-      0 -1px 0 0 hsl(0 0% 0% / 0.18) inset,
-      0 6px 18px -8px hsl(var(--primary) / 0.45),
-      0 2px 6px -2px hsl(0 0% 0% / 0.25);
+      0 1px 0 0 hsl(var(--btn-highlight) / var(--btn-highlight-a)) inset,
+      0 -1px 0 0 hsl(var(--btn-shadow-rim) / var(--btn-rim-a)) inset,
+      0 0 0 1px hsl(var(--btn-glow) / 0.10),
+      0 8px 24px -10px hsl(var(--btn-glow) / var(--btn-glow-a)),
+      0 2px 6px -2px hsl(var(--btn-shadow-rim) / var(--btn-drop-a));
     transition:
-      transform 180ms cubic-bezier(.2,.7,.2,1),
-      box-shadow 220ms ease,
-      background-color 200ms ease,
-      filter 200ms ease;
+      transform 220ms cubic-bezier(.2,.7,.2,1),
+      box-shadow 260ms ease,
+      background-color 220ms ease,
+      filter 220ms ease,
+      border-color 220ms ease;
     will-change: transform, box-shadow;
   }
 
-  /* Shine sweep */
+  /* Shine sweep — also triggered when hovering any descendant (icon/spinner) */
   .btn-futuristic::before {
     content: "";
     position: absolute;
@@ -1164,16 +1192,20 @@ All colors MUST be HSL.
     background: linear-gradient(
       115deg,
       transparent 30%,
-      hsl(0 0% 100% / 0.35) 50%,
+      hsl(var(--btn-highlight) / var(--btn-shine-a)) 50%,
       transparent 70%
     );
     transform: translateX(-120%);
-    transition: transform 700ms cubic-bezier(.2,.7,.2,1);
+    transition: transform 800ms cubic-bezier(.2,.7,.2,1);
     pointer-events: none;
     z-index: 1;
     mix-blend-mode: overlay;
+    border-radius: inherit;
   }
-  .btn-futuristic:hover::before { transform: translateX(120%); }
+  .btn-futuristic:hover::before,
+  .btn-futuristic:focus-visible::before,
+  .btn-futuristic:has(:hover)::before,
+  .btn-futuristic:has(svg:hover)::before { transform: translateX(120%); }
 
   /* Glassy click flash */
   .btn-futuristic::after {
@@ -1182,8 +1214,8 @@ All colors MUST be HSL.
     inset: 0;
     background: radial-gradient(
       circle at center,
-      hsl(0 0% 100% / 0.55) 0%,
-      hsl(0 0% 100% / 0.15) 40%,
+      hsl(var(--btn-highlight) / var(--btn-flash-a)) 0%,
+      hsl(var(--btn-highlight) / calc(var(--btn-flash-a) * 0.3)) 40%,
       transparent 70%
     );
     opacity: 0;
@@ -1201,67 +1233,84 @@ All colors MUST be HSL.
 
   .btn-futuristic:hover {
     transform: translateY(-1px);
-    filter: brightness(1.06);
+    filter: brightness(1.05) saturate(1.05);
+    border-color: hsl(var(--btn-glow) / 0.45);
     box-shadow:
-      0 1px 0 0 hsl(0 0% 100% / 0.25) inset,
-      0 -1px 0 0 hsl(0 0% 0% / 0.20) inset,
-      0 10px 28px -8px hsl(var(--primary) / 0.6),
-      0 4px 12px -2px hsl(0 0% 0% / 0.3);
+      0 1px 0 0 hsl(var(--btn-highlight) / calc(var(--btn-highlight-a) + 0.08)) inset,
+      0 -1px 0 0 hsl(var(--btn-shadow-rim) / var(--btn-rim-a)) inset,
+      0 0 0 1px hsl(var(--btn-glow) / 0.25),
+      0 14px 34px -10px hsl(var(--btn-glow) / var(--btn-glow-a-hover)),
+      0 6px 14px -4px hsl(var(--btn-shadow-rim) / var(--btn-drop-a));
   }
   .btn-futuristic:active {
     transform: translateY(0) scale(0.97);
     box-shadow:
-      0 1px 0 0 hsl(0 0% 100% / 0.15) inset,
-      0 0 0 1px hsl(0 0% 100% / 0.18) inset,
-      0 4px 12px -6px hsl(var(--primary) / 0.5);
+      0 1px 0 0 hsl(var(--btn-highlight) / var(--btn-highlight-a)) inset,
+      0 0 0 1px hsl(var(--btn-glow) / 0.35) inset,
+      0 6px 16px -6px hsl(var(--btn-glow) / var(--btn-glow-a));
   }
 
   /* Keep label/icon above the sheen layers */
   .btn-futuristic > * { position: relative; z-index: 2; }
 
-  /* Variant tints */
+  /* Variant tints — auto-adapt via tokens */
   .btn-futuristic-primary {
+    --btn-glow: var(--primary);
     background-image: linear-gradient(
       135deg,
       hsl(var(--primary)) 0%,
       hsl(var(--primary-glow, var(--primary))) 100%
     );
+    color: hsl(var(--primary-foreground));
+    text-shadow: 0 1px 0 hsl(var(--btn-shadow-rim) / var(--btn-text-shadow-a));
   }
   .btn-futuristic-destructive {
+    --btn-glow: var(--destructive);
     background-image: linear-gradient(
       135deg,
       hsl(var(--destructive)) 0%,
-      hsl(var(--destructive) / 0.75) 100%
+      hsl(var(--destructive) / 0.78) 100%
     );
-    box-shadow:
-      0 1px 0 0 hsl(0 0% 100% / 0.18) inset,
-      0 -1px 0 0 hsl(0 0% 0% / 0.18) inset,
-      0 6px 18px -8px hsl(var(--destructive) / 0.55),
-      0 2px 6px -2px hsl(0 0% 0% / 0.25);
   }
   .btn-futuristic-secondary {
+    --btn-glow: var(--secondary);
     background-image: linear-gradient(
       135deg,
       hsl(var(--secondary)) 0%,
       hsl(var(--secondary) / 0.78) 100%
     );
+    color: hsl(var(--secondary-foreground));
   }
   .btn-futuristic-glass {
     background-color: hsl(var(--background) / 0.55);
-    border: 1px solid hsl(var(--border) / 0.7);
-    box-shadow:
-      0 1px 0 0 hsl(0 0% 100% / 0.35) inset,
-      0 -1px 0 0 hsl(0 0% 0% / 0.10) inset,
-      0 8px 24px -10px hsl(var(--primary) / 0.25);
+    border-color: hsl(var(--border) / 0.7);
+    color: hsl(var(--foreground));
+  }
+  .dark .btn-futuristic-glass {
+    background-color: hsl(var(--background) / 0.45);
   }
   .btn-futuristic-ghost {
     background-color: transparent;
+    border-color: transparent;
     box-shadow: none;
   }
   .btn-futuristic-ghost:hover {
-    background-color: hsl(var(--accent) / 0.6);
+    background-color: hsl(var(--accent) / 0.55);
+    border-color: hsl(var(--border) / 0.5);
     box-shadow:
-      0 6px 18px -10px hsl(var(--primary) / 0.35);
+      0 0 0 1px hsl(var(--btn-glow) / 0.18),
+      0 8px 22px -10px hsl(var(--btn-glow) / var(--btn-glow-a));
+  }
+
+  /* Icon/spinner buttons: ensure children never block hover-triggered sheen */
+  .btn-futuristic svg,
+  .btn-futuristic [role="status"],
+  .btn-futuristic .animate-spin { pointer-events: none; }
+
+  /* Disabled: dim but keep readable in both themes */
+  .btn-futuristic:disabled,
+  .btn-futuristic[aria-disabled="true"] {
+    filter: saturate(0.7) brightness(0.95);
   }
 
   @media (prefers-reduced-motion: reduce) {
