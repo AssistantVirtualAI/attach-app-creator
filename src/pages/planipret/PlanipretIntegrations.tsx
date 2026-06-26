@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { AVA_OWNER_USER_ID } from "@/lib/avaOwner";
+import { safeEdgeFunction } from "@/lib/safeEdgeFunction";
 import ElevenLabsManagementCard from "@/components/planipret/admin/integrations/ElevenLabsManagementCard";
 import { Phone, Mic, Sparkles, Database, Cloud, ArrowLeft, CheckCircle2, AlertCircle, Loader2, ExternalLink, X, Bell } from "lucide-react";
 
@@ -122,35 +123,12 @@ export default function PlanipretIntegrations() {
     else { setMsg(`✓ ${provider} sauvegardé`); setForms((f) => ({ ...f, [provider]: {} })); await reload(); testOne(provider); }
   };
 
-  const safeInvoke = async (name: string, body?: any) => {
-    try {
-      const { data: sess } = await supabase.auth.getSession();
-      const token = sess?.session?.access_token;
-      const r = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${name}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify(body ?? {}),
-      });
-      const text = await r.text();
-      let parsed: any = null;
-      try { parsed = text ? JSON.parse(text) : null; } catch { /* non-json */ }
-      if (!r.ok) return { data: parsed, error: parsed?.error ?? `HTTP ${r.status}` };
-      return { data: parsed, error: null as string | null };
-    } catch (e: any) {
-      return { data: null, error: e?.message ?? "Erreur réseau" };
-    }
-  };
-
   const testOne = async (provider: Provider) => {
     setTesting(provider);
     try {
       let result: { ok: boolean; msg: string };
       if (provider === "nsapi") {
-        const { data, error } = await safeInvoke("ns-auth");
+        const { data, error } = await safeEdgeFunction("ns-auth", { body: {} });
         result = { ok: !!(data as any)?.success, msg: (data as any)?.success ? "Connecté" : (error ?? (data as any)?.error ?? "Erreur") };
       } else if (provider === "elevenlabs") {
         const cfg = items.elevenlabs?.config_masked;
@@ -166,12 +144,12 @@ export default function PlanipretIntegrations() {
           }
         }
       } else if (provider === "anthropic") {
-        const { data, error } = await safeInvoke("ai-analyze-call", { call_id: "test", transcript: "test" });
+        const { data, error } = await safeEdgeFunction("ai-analyze-call", { body: { call_id: "test", transcript: "test" } });
         const errStr = error ?? (data as any)?.error ?? "";
         const ok = (data as any)?.success === true || /Appel introuvable/i.test(errStr);
         result = { ok, msg: ok ? "Claude API opérationnelle" : (errStr || "Erreur") };
       } else if (provider === "maestro") {
-        const { data, error } = await safeInvoke("maestro-actions", { action: "test" });
+        const { data, error } = await safeEdgeFunction("maestro-actions", { body: { action: "test" } });
         result = { ok: !!(data as any)?.success, msg: (data as any)?.success ? "Maestro CRM connecté" : (error ?? (data as any)?.error ?? "Non configuré") };
       } else {
         result = { ok: isConfigured(provider), msg: isConfigured(provider) ? "Configuré" : "Non configuré" };
