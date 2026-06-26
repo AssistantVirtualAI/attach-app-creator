@@ -208,6 +208,16 @@ final class RTPAudioSession {
     }
 
     private func handleCapturedBuffer(_ buf: AVAudioPCMBuffer) {
+        // Rebuild converter if tap delivered a different format than expected.
+        if converter == nil || converter?.inputFormat != buf.format {
+            if let c = AVAudioConverter(from: buf.format, to: playFormat) {
+                converter = c
+                NSLog("[RTP] converter rebuilt \(buf.format) → \(playFormat)")
+            } else {
+                NSLog("[RTP] cannot build converter for \(buf.format)")
+                return
+            }
+        }
         guard let conv = converter else { return }
         let ratio = playFormat.sampleRate / buf.format.sampleRate
         let outCapacity = AVAudioFrameCount(Double(buf.frameLength) * ratio + 16)
