@@ -27,10 +27,16 @@ export function getEnv() {
   return { NS_API_BASE_URL, NS_API_USER, NS_API_PASSWORD, NS_DEFAULT_DOMAIN };
 }
 
+function nsBase() {
+  // Tolerate either form: with or without trailing /ns-api/v2
+  const raw = getEnv().NS_API_BASE_URL.replace(/\/$/, "");
+  return raw.replace(/\/ns-api\/v2$/, "");
+}
+
 export async function getNsJwt(): Promise<string> {
   if (cachedToken && cachedToken.exp > Date.now() + 60_000) return cachedToken.token;
   const env = getEnv();
-  const res = await fetch(`${env.NS_API_BASE_URL.replace(/\/$/, "")}/ns-api/v2/jwt`, {
+  const res = await fetch(`${nsBase()}/ns-api/v2/jwt`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ username: env.NS_API_USER, password: env.NS_API_PASSWORD }),
@@ -42,15 +48,13 @@ export async function getNsJwt(): Promise<string> {
   const data = await res.json();
   const token = data.token ?? data.access_token ?? data.jwt;
   if (!token) throw new Error("NS-API auth: no token in response");
-  // tokens typically last ~1h; default to 50 min if exp not provided
   cachedToken = { token, exp: Date.now() + 50 * 60 * 1000 };
   return token;
 }
 
 export async function nsFetch(path: string, init: RequestInit = {}) {
-  const env = getEnv();
   const token = await getNsJwt();
-  const url = `${env.NS_API_BASE_URL.replace(/\/$/, "")}/ns-api/v2${path}`;
+  const url = `${nsBase()}/ns-api/v2${path}`;
   let res = await fetch(url, {
     ...init,
     headers: {
