@@ -87,7 +87,7 @@ function ensureNativeCallEventBridge() {
         else if (stage === 'early_media') phase = 'early-media';
         else if (dir === 'in') phase = 'ringing';
         // Local ringback: only when outgoing AND no early media from PBX.
-        if (dir === 'out' && phase !== 'early-media' && phase !== 'active') startRingback();
+        if (dir === 'out' && phase !== 'early-media') startRingback();
         else stopRingback();
         emitNativeCallSnapshot({ callState: 'ringing', activeCallNumber: d?.number || nativeCallSnapshot.activeCallNumber, direction: dir, endReason: null, callPhase: phase, lastSipCode: code });
       }
