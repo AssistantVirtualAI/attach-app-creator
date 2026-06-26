@@ -23,6 +23,13 @@ test -f ios/App/App/Plugins/CapacitorSip/CapacitorSip.m     || { red "Missing Ca
 test -f src/lib/sip/nativeSipProvider.ts                    || { red "Missing nativeSipProvider.ts"; exit 1; }
 green "OK — plugin files present."
 
+echo "==> 1b. Verify iOS plugin is linked + bridge-registered"
+PBX="ios/App/App.xcodeproj/project.pbxproj"
+STORYBOARD="ios/App/App/Base.lproj/Main.storyboard"
+grep -q "CapacitorSip.m in Sources" "$PBX" && green "  ✓ CapacitorSip.m is in Xcode Sources" || { red "  ✗ CapacitorSip.m is NOT in Xcode Sources — plugin will never load"; exit 1; }
+grep -q "AppBridgeViewController" "$STORYBOARD" && green "  ✓ Main.storyboard uses AppBridgeViewController" || { red "  ✗ Main.storyboard still uses CAPBridgeViewController"; exit 1; }
+grep -q "registerPluginInstance" ios/App/App/Plugins/CapacitorSip/CapacitorSip.m && green "  ✓ Local plugin registered in capacitorDidLoad" || { red "  ✗ Missing registerPluginInstance"; exit 1; }
+
 echo "==> 2. Verify Info.plist keys"
 PLIST="ios/App/App/Info.plist"
 if [ -f "$PLIST" ]; then
