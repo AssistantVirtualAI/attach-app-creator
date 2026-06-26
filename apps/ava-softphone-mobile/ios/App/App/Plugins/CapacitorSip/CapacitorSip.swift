@@ -132,6 +132,9 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
             self.localRtpIp = session.localIp
             self.localRtpPort = session.localPort
             log("RTP socket bound \(localRtpIp):\(localRtpPort)")
+            // Prewarm RemoteIO AudioUnit BEFORE any INVITE so AudioUnitInitialize
+            // happens once on a stable AVAudioSession (avoids 561017449 mid-call).
+            session.prewarmAudio()
         } catch {
             log("RTP socket bind failed: \(error.localizedDescription)")
         }
