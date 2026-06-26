@@ -80,6 +80,10 @@ final class RTPAudioSession {
     private(set) var converterRebuilds: Int = 0
     private(set) var convertErrors: Int = 0
     private(set) var lastConvertError: String = ""
+    private var inputCallbackCount: UInt64 = 0
+    private var renderCallbackCount: UInt64 = 0
+    private var inputFramesTotal: UInt64 = 0
+    private var renderFramesTotal: UInt64 = 0
 
     func snapshot() -> [String: Any] {
         return [
@@ -107,7 +111,11 @@ final class RTPAudioSession {
             "engineRestartTotal": engineRestartTotal,
             "lastEngineError": lastEngineError,
             "sessionState": sessionStateDescription(),
-            "audioBackend": "RemoteIO"
+            "audioBackend": "RemoteIO",
+            "inputCallbacks": Int(inputCallbackCount),
+            "renderCallbacks": Int(renderCallbackCount),
+            "inputFrames": Int(inputFramesTotal),
+            "renderFrames": Int(renderFramesTotal)
         ]
     }
 
@@ -259,6 +267,7 @@ final class RTPAudioSession {
     // MARK: - RemoteIO build / teardown
     @discardableResult
     private func buildAndStartIOUnit() -> Bool {
+        NSLog("[RTP] RemoteIO build begin")
         teardownIOUnit()
 
         var desc = AudioComponentDescription(
@@ -272,14 +281,16 @@ final class RTPAudioSession {
             NSLog("[RTP] \(lastEngineError)")
             return false
         }
+        NSLog("[RTP] RemoteIO component found")
         var unit: AudioUnit?
         var status = AudioComponentInstanceNew(comp, &unit)
         if status != noErr || unit == nil {
-            lastEngineError = "AudioComponentInstanceNew failed: \(status)"
+            lastEngineError = "AudioComponentInstanceNew failed: \(describeOSStatus(status))"
             NSLog("[RTP] \(lastEngineError)")
             return false
         }
         let io = unit!
+        NSLog("[RTP] RemoteIO instance created")
 
         // Enable input on element 1 (mic).
         var enable: UInt32 = 1
@@ -287,16 +298,19 @@ final class RTPAudioSession {
                                       kAudioUnitScope_Input, 1,
                                       &enable, UInt32(MemoryLayout<UInt32>.size))
         if status != noErr {
-            lastEngineError = "enableIO(input) failed: \(status)"
+            lastEngineError = "enableIO(input) failed: \(describeOSStatus(status))"
             NSLog("[RTP] \(lastEngineError)")
             AudioComponentInstanceDispose(io); return false
         }
+        NSLog("[RTP] RemoteIO input enabled bus=1")
         // Output on element 0 is enabled by default but assert it.
         status = AudioUnitSetProperty(io, kAudioOutputUnitProperty_EnableIO,
                                       kAudioUnitScope_Output, 0,
                                       &enable, UInt32(MemoryLayout<UInt32>.size))
         if status != noErr {
-            NSLog("[RTP] enableIO(output) status=\(status) (continuing)")
+            NSLog("[RTP] enableIO(output) status=\(describeOSStatus(status)) (continuing)")
+        } else {
+            NSLog("[RTP] RemoteIO output enabled bus=0")
         }
 
         // Stream format: 8kHz mono Int16 packed.
@@ -317,20 +331,21 @@ final class RTPAudioSession {
                                       kAudioUnitScope_Output, 1,
                                       &asbd, UInt32(MemoryLayout<AudioStreamBasicDescription>.size))
         if status != noErr {
-            lastEngineError = "setStreamFormat(input bus) failed: \(status)"
+            lastEngineError = "setStreamFormat(input bus) failed: \(describeOSStatus(status))"
             NSLog("[RTP] \(lastEngineError)")
             AudioComponentInstanceDispose(io); return false
         }
+        NSLog("[RTP] RemoteIO input callback format=I16 8000Hz ch=1 framesPerPacket=1")
         // Format we feed to speaker (element 0, input scope).
         status = AudioUnitSetProperty(io, kAudioUnitProperty_StreamFormat,
                                       kAudioUnitScope_Input, 0,
                                       &asbd, UInt32(MemoryLayout<AudioStreamBasicDescription>.size))
         if status != noErr {
-            lastEngineError = "setStreamFormat(output bus) failed: \(status)"
+            lastEngineError = "setStreamFormat(output bus) failed: \(describeOSStatus(status))"
             NSLog("[RTP] \(lastEngineError)")
             AudioComponentInstanceDispose(io); return false
         }
-        NSLog("[RTP] RemoteIO stream format set: 8000Hz mono Int16 packed")
+        NSLog("[RTP] RemoteIO render format=I16 8000Hz ch=1 framesPerPacket=1")
 
         let refcon = UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
 
@@ -340,30 +355,35 @@ final class RTPAudioSession {
                                       kAudioUnitScope_Input, 0,
                                       &renderCb, UInt32(MemoryLayout<AURenderCallbackStruct>.size))
         if status != noErr {
-            lastEngineError = "setRenderCallback failed: \(status)"
+            lastEngineError = "setRenderCallback failed: \(describeOSStatus(status))"
             NSLog("[RTP] \(lastEngineError)")
             AudioComponentInstanceDispose(io); return false
         }
+        NSLog("[RTP] RemoteIO render callback installed bus=0")
         // Input callback on element 1 (global scope) — fires when mic samples ready.
         var inputCb = AURenderCallbackStruct(inputProc: rtp_input_cb, inputProcRefCon: refcon)
         status = AudioUnitSetProperty(io, kAudioOutputUnitProperty_SetInputCallback,
                                       kAudioUnitScope_Global, 1,
                                       &inputCb, UInt32(MemoryLayout<AURenderCallbackStruct>.size))
         if status != noErr {
-            lastEngineError = "setInputCallback failed: \(status)"
+            lastEngineError = "setInputCallback failed: \(describeOSStatus(status))"
             NSLog("[RTP] \(lastEngineError)")
             AudioComponentInstanceDispose(io); return false
         }
+        NSLog("[RTP] RemoteIO input callback installed bus=1")
 
+        NSLog("[RTP] AudioUnitInitialize begin")
         status = AudioUnitInitialize(io)
         if status != noErr {
-            lastEngineError = "AudioUnitInitialize failed: \(status)"
+            lastEngineError = "AudioUnitInitialize failed: \(describeOSStatus(status))"
             NSLog("[RTP] \(lastEngineError)")
             AudioComponentInstanceDispose(io); return false
         }
+        NSLog("[RTP] AudioUnitInitialize ok")
+        NSLog("[RTP] AudioOutputUnitStart begin")
         status = AudioOutputUnitStart(io)
         if status != noErr {
-            lastEngineError = "AudioOutputUnitStart failed: \(status)"
+            lastEngineError = "AudioOutputUnitStart failed: \(describeOSStatus(status))"
             NSLog("[RTP] \(lastEngineError)")
             AudioUnitUninitialize(io)
             AudioComponentInstanceDispose(io)
@@ -378,9 +398,13 @@ final class RTPAudioSession {
 
     private func teardownIOUnit() {
         if let io = ioUnit {
-            AudioOutputUnitStop(io)
-            AudioUnitUninitialize(io)
-            AudioComponentInstanceDispose(io)
+            NSLog("[RTP] RemoteIO stopping")
+            let stopStatus = AudioOutputUnitStop(io)
+            if stopStatus != noErr { NSLog("[RTP] AudioOutputUnitStop status=\(describeOSStatus(stopStatus))") }
+            let uninitStatus = AudioUnitUninitialize(io)
+            if uninitStatus != noErr { NSLog("[RTP] AudioUnitUninitialize status=\(describeOSStatus(uninitStatus))") }
+            let disposeStatus = AudioComponentInstanceDispose(io)
+            if disposeStatus != noErr { NSLog("[RTP] AudioComponentInstanceDispose status=\(describeOSStatus(disposeStatus))") }
             ioUnit = nil
             NSLog("[RTP] RemoteIO disposed")
         }
@@ -467,12 +491,15 @@ final class RTPAudioSession {
                                          inBusNumber: UInt32,
                                          inNumberFrames: UInt32) -> OSStatus {
         guard let io = ioUnit else { return noErr }
+        inputCallbackCount &+= 1
+        inputFramesTotal &+= UInt64(inNumberFrames)
 
         // (Re)allocate scratch buffer to hold inNumberFrames Int16 mono samples.
         if captureScratch == nil || captureScratchFrames < inNumberFrames {
             if let p = captureScratch { p.deallocate() }
             captureScratch = UnsafeMutablePointer<Int16>.allocate(capacity: Int(inNumberFrames))
             captureScratchFrames = inNumberFrames
+            NSLog("[RTP] input scratch allocated frames=\(inNumberFrames)")
         }
         let scratch = captureScratch!
 
@@ -485,7 +512,12 @@ final class RTPAudioSession {
             )
         )
         let status = AudioUnitRender(io, ioActionFlags, inTimeStamp, inBusNumber, inNumberFrames, &abl)
-        if status != noErr { return status }
+        if status != noErr {
+            if inputCallbackCount <= 5 || inputCallbackCount % 50 == 0 {
+                NSLog("[RTP] input callback AudioUnitRender failed status=\(describeOSStatus(status)) bus=\(inBusNumber) frames=\(inNumberFrames)")
+            }
+            return status
+        }
 
         let n = Int(inNumberFrames)
         var peak: Int16 = 0
@@ -507,6 +539,9 @@ final class RTPAudioSession {
         audioLock.unlock()
 
         for f in framesToSend { sendRTPFrame(f) }
+        if inputCallbackCount == 1 || inputCallbackCount % 50 == 0 {
+            NSLog("[RTP] input callback #\(inputCallbackCount) frames=\(inNumberFrames) micPeak=\(String(format: "%.3f", micPeak)) queuedTxFrames=\(sendBuffer.count) txPackets=\(txPackets)")
+        }
         return noErr
     }
 
@@ -516,6 +551,8 @@ final class RTPAudioSession {
                                           inNumberFrames: UInt32,
                                           ioData: UnsafeMutablePointer<AudioBufferList>?) -> OSStatus {
         guard let ioData = ioData else { return noErr }
+        renderCallbackCount &+= 1
+        renderFramesTotal &+= UInt64(inNumberFrames)
         let abl = UnsafeMutableAudioBufferListPointer(ioData)
         let needed = Int(inNumberFrames)
 
@@ -534,6 +571,9 @@ final class RTPAudioSession {
             out.withUnsafeBufferPointer { src in
                 dst.update(from: src.baseAddress!, count: needed)
             }
+        }
+        if renderCallbackCount == 1 || renderCallbackCount % 50 == 0 {
+            NSLog("[RTP] render callback #\(renderCallbackCount) frames=\(inNumberFrames) drained=\(avail) playQueue=\(playQueue.count) rxPackets=\(rxPackets) rxPeak=\(String(format: "%.3f", rxPeak))")
         }
         return noErr
     }
@@ -617,6 +657,9 @@ final class RTPAudioSession {
                     self.playQueue.removeFirst(drop)
                 }
                 self.audioLock.unlock()
+                if self.rxPackets == 1 || self.rxPackets % 50 == 0 {
+                    NSLog("[RTP] rx packet #\(self.rxPackets) bytes=\(n) payload=\(payloadCount) seq=\(self.lastRemoteSeq) rxPeak=\(String(format: "%.3f", self.rxPeak)) playQueue=\(self.playQueue.count)")
+                }
             }
             NSLog("[RTP] receive loop exited")
         }
@@ -652,6 +695,20 @@ final class RTPAudioSession {
     // MARK: - Helpers
     private func err(_ m: String) -> NSError {
         NSError(domain: "RTPAudioSession", code: 1, userInfo: [NSLocalizedDescriptionKey: m])
+    }
+
+    private func describeOSStatus(_ status: OSStatus) -> String {
+        if status == noErr { return "0/noErr" }
+        let unsigned = UInt32(bitPattern: status)
+        let bytes: [UInt8] = [
+            UInt8((unsigned >> 24) & 0xff),
+            UInt8((unsigned >> 16) & 0xff),
+            UInt8((unsigned >> 8) & 0xff),
+            UInt8(unsigned & 0xff)
+        ]
+        let printable = bytes.allSatisfy { $0 >= 32 && $0 <= 126 }
+        let fourCC = printable ? String(bytes: bytes, encoding: .macOSRoman) ?? "" : ""
+        return fourCC.isEmpty ? "\(status)" : "\(status) ('\(fourCC)')"
     }
 
     private func currentRouteDescription() -> String {
