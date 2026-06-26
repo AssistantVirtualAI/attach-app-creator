@@ -304,7 +304,7 @@ const AvaPlatformOrgOnly = ({ children }: { children: React.ReactNode }) => {
     setSelectedOrgId(AVA_STANDALONE_ORG_ID);
     return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Switching to AVA…</div>;
   }
-  return <Navigate to="/portal" replace />;
+  return <Navigate to="/login" replace />;
 };
 
 /**
