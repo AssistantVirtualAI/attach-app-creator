@@ -239,7 +239,10 @@ export type IceDiagnosticEvent =
   | { kind: 'probe-result'; provider: 'metered' | 'fallback'; relayFound: boolean; durationMs: number }
   | { kind: 'pc-config'; provider: 'metered' | 'fallback' }
   | { kind: 'first-relay-candidate'; latencyMs: number }
-  | { kind: 'ice-connected'; latencyMs: number };
+  | { kind: 'ice-connected'; latencyMs: number }
+  | { kind: 'mdns-candidate'; raw: string }
+  | { kind: 'webrtc-error'; message: string; where: string }
+  | { kind: 'ice-fallback'; from: RTCIceTransportPolicy; to: RTCIceTransportPolicy; reason: string };
 
 const _diagListeners = new Set<(e: IceDiagnosticEvent) => void>();
 export function onIceDiagnostic(fn: (e: IceDiagnosticEvent) => void): () => void {
