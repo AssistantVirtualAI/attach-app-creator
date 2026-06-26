@@ -16,12 +16,15 @@ import { attachNativeAutoReconnect } from '../lib/sip/nativeAutoReconnect';
 import { startRingback, stopRingback, describeEndReason } from '../lib/sip/ringback';
 import type { UseSoftphoneReturn, SIPStatus, CallState } from './useSoftphone';
 
+type NativeCallDirection = 'in' | 'out' | null;
 type NativeCallSnapshot = {
   callState: CallState;
   activeCallNumber: string;
   isMuted: boolean;
   isOnHold: boolean;
   isRecording: boolean;
+  direction: NativeCallDirection;
+  endReason: string | null;
 };
 
 const nativeCallSubscribers = new Set<(snapshot: NativeCallSnapshot) => void>();
@@ -31,6 +34,8 @@ let nativeCallSnapshot: NativeCallSnapshot = {
   isMuted: false,
   isOnHold: false,
   isRecording: false,
+  direction: null,
+  endReason: null,
 };
 let nativeCallBridgePromise: Promise<void> | null = null;
 
