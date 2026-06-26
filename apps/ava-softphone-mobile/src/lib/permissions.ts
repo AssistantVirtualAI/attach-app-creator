@@ -5,6 +5,7 @@
  * camera, and notification permissions. Safe to call on web (no-ops).
  */
 import { Capacitor } from '@capacitor/core';
+import { CapacitorPjsip } from './sip/nativeSipProvider';
 
 export type PermissionStatus = 'granted' | 'denied' | 'prompt' | 'unsupported';
 
@@ -19,6 +20,10 @@ export interface AllPermissions {
 /** Microphone + speaker output (WebRTC). Triggers OS prompt on native. */
 export async function requestMicrophone(): Promise<PermissionStatus> {
   try {
+    if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios') {
+      const res = await CapacitorPjsip.requestMicrophonePermission();
+      return res?.granted ? 'granted' : 'denied';
+    }
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) return 'unsupported';
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     // Immediately stop so we don't keep the mic open before a call.

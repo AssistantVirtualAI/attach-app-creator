@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { colors, gradients, radius, font } from '../lib/theme';
 import { LemtelMark } from './Brand';
+import { requestMicrophone } from '../lib/permissions';
 import type { AllPermissions, PermissionStatus } from '../lib/permissions';
 
 interface PermissionGateProps {
@@ -60,6 +61,7 @@ export default function PermissionGate({ onComplete }: PermissionGateProps) {
     camera: 'prompt',
   });
   const [requesting, setRequesting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const advance = (from: StepId) => {
     const order: StepId[] = ['microphone', 'contacts', 'notifications'];
@@ -74,15 +76,15 @@ export default function PermissionGate({ onComplete }: PermissionGateProps) {
   const requestCurrent = async () => {
     if (step === 'intro' || step === 'done') return;
     setRequesting(true);
+    setError(null);
     try {
       let next: PermissionStatus = 'denied';
       if (step === 'microphone') {
-        try {
-          const s = await navigator.mediaDevices.getUserMedia({ audio: true });
-          s.getTracks().forEach((t) => t.stop());
-          next = 'granted';
-        } catch { next = 'denied'; }
+        next = await requestMicrophone();
         setPerms((p) => ({ ...p, microphone: next, speaker: next === 'granted' ? 'granted' : p.speaker }));
+        if (next !== 'granted') {
+          setError('Accès microphone refusé. Activez-le dans Réglages iOS → Lemtel → Microphone pour que les appels et l’audio bidirectionnel fonctionnent.');
+        }
       } else if (step === 'contacts') {
         if (Capacitor.isNativePlatform()) {
           try {
@@ -115,7 +117,7 @@ export default function PermissionGate({ onComplete }: PermissionGateProps) {
       }
     } finally {
       setRequesting(false);
-      advance(step);
+      if (step !== 'microphone' || perms.microphone === 'granted') advance(step);
     }
   };
 
@@ -215,7 +217,12 @@ export default function PermissionGate({ onComplete }: PermissionGateProps) {
       )}
       {status === 'denied' && (
         <div style={{ color: colors.danger, fontSize: font.xs, marginBottom: 16, textAlign: 'center', maxWidth: 320 }}>
-          Permission denied. You can enable it later in Settings → Privacy → {current.title}.
+          Accès refusé. Activez-le dans Réglages iOS → Lemtel → Microphone, puis relancez l’application.
+        </div>
+      )}
+      {error && (
+        <div style={{ color: colors.danger, fontSize: font.xs, marginBottom: 16, textAlign: 'center', maxWidth: 330, lineHeight: 1.45 }}>
+          {error}
         </div>
       )}
 
