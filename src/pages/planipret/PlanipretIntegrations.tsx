@@ -122,19 +122,33 @@ export default function PlanipretIntegrations() {
     else { setMsg(`✓ ${provider} sauvegardé`); setForms((f) => ({ ...f, [provider]: {} })); await reload(); testOne(provider); }
   };
 
+  const safeInvoke = async (name: string, body?: any) => {
+    try {
+      const { data, error } = await supabase.functions.invoke(name, body ? { body } : undefined);
+      if (error) {
+        // Try to parse FunctionsHttpError body for the real message
+        let parsed: any = null;
+        try { parsed = await (error as any).context?.json?.(); } catch { /* ignore */ }
+        return { data: parsed ?? null, error: parsed?.error ?? error.message };
+      }
+      return { data, error: null as string | null };
+    } catch (e: any) {
+      return { data: null, error: e?.message ?? "Erreur réseau" };
+    }
+  };
+
   const testOne = async (provider: Provider) => {
     setTesting(provider);
     try {
       let result: { ok: boolean; msg: string };
       if (provider === "nsapi") {
-        const { data } = await supabase.functions.invoke("ns-auth");
-        result = { ok: !!(data as any)?.success, msg: (data as any)?.success ? "Connecté" : (data as any)?.error ?? "Erreur" };
+        const { data, error } = await safeInvoke("ns-auth");
+        result = { ok: !!(data as any)?.success, msg: (data as any)?.success ? "Connecté" : (error ?? (data as any)?.error ?? "Erreur") };
       } else if (provider === "elevenlabs") {
         const cfg = items.elevenlabs?.config_masked;
         const apiKey = forms.elevenlabs?.api_key;
         if (!apiKey && !cfg?.api_key) result = { ok: false, msg: "Saisir la clé d'abord" };
         else {
-          // Use a proxy via pp-integration-secrets test action — simpler: hit elevenlabs directly with provided key
           if (apiKey) {
             const r = await fetch("https://api.elevenlabs.io/v1/user", { headers: { "xi-api-key": apiKey } });
             const d = await r.json().catch(() => ({}));
@@ -144,16 +158,19 @@ export default function PlanipretIntegrations() {
           }
         }
       } else if (provider === "anthropic") {
-        const { data } = await supabase.functions.invoke("ai-analyze-call", { body: { call_id: "test", transcript: "test" } });
-        const ok = (data as any)?.success === false && /Appel introuvable/i.test((data as any)?.error ?? "");
-        result = { ok: ok || (data as any)?.success === true, msg: ok ? "Claude API opérationnelle" : (data as any)?.error ?? "Erreur" };
+        const { data, error } = await safeInvoke("ai-analyze-call", { call_id: "test", transcript: "test" });
+        const errStr = error ?? (data as any)?.error ?? "";
+        const ok = (data as any)?.success === true || /Appel introuvable/i.test(errStr);
+        result = { ok, msg: ok ? "Claude API opérationnelle" : (errStr || "Erreur") };
       } else if (provider === "maestro") {
-        const { data } = await supabase.functions.invoke("maestro-actions", { body: { action: "test" } });
-        result = { ok: !!(data as any)?.success, msg: (data as any)?.success ? "Maestro CRM connecté" : (data as any)?.error ?? "Erreur" };
+        const { data, error } = await safeInvoke("maestro-actions", { action: "test" });
+        result = { ok: !!(data as any)?.success, msg: (data as any)?.success ? "Maestro CRM connecté" : (error ?? (data as any)?.error ?? "Non configuré") };
       } else {
         result = { ok: isConfigured(provider), msg: isConfigured(provider) ? "Configuré" : "Non configuré" };
       }
       setTestResults((p) => ({ ...p, [provider]: result }));
+    } catch (e: any) {
+      setTestResults((p) => ({ ...p, [provider]: { ok: false, msg: e?.message ?? "Erreur" } }));
     } finally {
       setTesting(null);
     }
