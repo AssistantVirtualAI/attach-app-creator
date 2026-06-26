@@ -303,7 +303,7 @@ static NSString *ChallengeParam(NSString *header, NSString *key) {
             if (self.pendingInvite) { [self.pendingInvite resolve:@{@"success": @YES}]; self.pendingInvite = nil; }
         } else if (code >= 400) {
             [self emitCallState:@"failed" number:nil];
-            if (self.pendingInvite) { [self.pendingInvite reject:[NSString stringWithFormat:@"INVITE failed %ld", (long)code]]; self.pendingInvite = nil; }
+            if (self.pendingInvite) { [self.pendingInvite reject:[NSString stringWithFormat:@"INVITE failed %ld", (long)code] :nil :nil :nil]; self.pendingInvite = nil; }
         }
     }
 }
