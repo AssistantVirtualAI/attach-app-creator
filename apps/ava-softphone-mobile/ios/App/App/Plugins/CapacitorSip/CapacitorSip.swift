@@ -17,7 +17,9 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "setHold", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "sendDTMF", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setLogLevel", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "unregister", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "unregister", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setAudioRoute", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getAudioRoute", returnType: CAPPluginReturnPromise)
     ]
 
     // MARK: - Config / State
@@ -319,6 +321,53 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         registered = false
         notifyListeners("registration", data: ["state": "unregistered"])
         call.resolve(["ok": true])
+    }
+
+    // MARK: - Audio route control (speaker / earpiece / bluetooth)
+    @objc func setAudioRoute(_ call: CAPPluginCall) {
+        let route = (call.getString("route") ?? "auto").lowercased()
+        let session = AVAudioSession.sharedInstance()
+        do {
+            // Always (re)assert playAndRecord/voiceChat with BT allowed.
+            try session.setCategory(.playAndRecord, mode: .voiceChat,
+                                    options: [.allowBluetooth, .allowBluetoothA2DP,
+                                              .defaultToSpeaker, .duckOthers])
+            try session.setActive(true, options: [])
+
+            switch route {
+            case "speaker":
+                try session.overrideOutputAudioPort(.speaker)
+            case "earpiece", "receiver", "none":
+                try session.overrideOutputAudioPort(.none)
+            case "bluetooth":
+                // Pick first Bluetooth input as preferred — iOS then routes audio there.
+                if let bt = session.availableInputs?.first(where: { input in
+                    [.bluetoothHFP, .bluetoothLE].contains(input.portType)
+                }) {
+                    try session.setPreferredInput(bt)
+                }
+                try session.overrideOutputAudioPort(.none)
+            default:
+                break
+            }
+            let outputs = session.currentRoute.outputs.map { "\($0.portType.rawValue)" }.joined(separator: ",")
+            log("audio route set → \(route) actual=\(outputs)")
+            call.resolve(["ok": true, "route": route, "outputs": outputs])
+        } catch {
+            log("setAudioRoute error: \(error.localizedDescription)")
+            call.reject(error.localizedDescription)
+        }
+    }
+
+    @objc func getAudioRoute(_ call: CAPPluginCall) {
+        let session = AVAudioSession.sharedInstance()
+        let outputs = session.currentRoute.outputs.map {
+            ["portType": $0.portType.rawValue, "portName": $0.portName]
+        }
+        let inputs = session.availableInputs?.map {
+            ["portType": $0.portType.rawValue, "portName": $0.portName]
+        } ?? []
+        call.resolve(["outputs": outputs, "availableInputs": inputs])
     }
 
     // MARK: - TCP / SIP
