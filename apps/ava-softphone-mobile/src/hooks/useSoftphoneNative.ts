@@ -28,6 +28,7 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const initInFlightRef = useRef<boolean>(false);
   const regHandleRef = useRef<{ remove(): Promise<void> } | null>(null);
+  const callHandlesRef = useRef<Array<{ remove(): Promise<void> }>>([]);
   const activeInitKeyRef = useRef<string | null>(null);
 
   const startTimer = () => {
@@ -47,8 +48,13 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
 
     // Keep the registration listener alive across React StrictMode re-renders.
     // Only detach it when the credentials actually change.
+    const removeCallListeners = () => {
+      callHandlesRef.current.forEach((h) => h.remove().catch(() => {}));
+      callHandlesRef.current = [];
+    };
+
     if (activeInitKeyRef.current === initKey && regHandleRef.current) {
-      console.log('[NativeSIP] registration listener already active for %s, skip initAccount', initKey);
+      console.log('[NativeSIP] native listeners already active for %s, skip initAccount', initKey);
       return;
     }
     if (initInFlightRef.current && activeInitKeyRef.current === initKey) {
@@ -59,6 +65,7 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
       console.log('[NativeSIP] removing old registration listener for %s', activeInitKeyRef.current);
       regHandleRef.current.remove().catch(() => {});
       regHandleRef.current = null;
+      removeCallListeners();
     }
     activeInitKeyRef.current = initKey;
     initInFlightRef.current = true;
@@ -100,24 +107,34 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
         });
         regHandleRef.current = regHandle;
 
-        cleanups.push(await onNativeSipEvent('callReceived', (d) => {
+        const callReceivedHandle = await CapacitorPjsip.addListener('callReceived', (d: any) => {
+          if (activeInitKeyRef.current !== initKey) return;
           if (cancelled) return;
+          console.log('[NativeSIP] callReceived event', d);
           setActiveCallNumber(d?.from || 'Unknown');
           setCallState('ringing');
-        }));
-        cleanups.push(await onNativeSipEvent('callStateChanged', (d) => {
+        });
+        const callStateHandle = await CapacitorPjsip.addListener('callStateChanged', (d: any) => {
+          if (activeInitKeyRef.current !== initKey) return;
           if (cancelled) return;
-          if (d?.state === 'active')  { setCallState('active'); startTimer(); }
-          if (d?.state === 'ringing') { setCallState('ringing'); if (d?.number) setActiveCallNumber(d.number); }
-        }));
-        cleanups.push(await onNativeSipEvent('callEnded', () => {
+          console.log('[NativeSIP] callStateChanged event', d);
+          if (d?.state === 'active') { setCallState('active'); startTimer(); }
+          if (d?.state === 'ringing' || d?.state === 'calling') {
+            setCallState('ringing');
+            if (d?.number) setActiveCallNumber(d.number);
+          }
+        });
+        const callEndedHandle = await CapacitorPjsip.addListener('callEnded', (d: any) => {
+          if (activeInitKeyRef.current !== initKey) return;
           if (cancelled) return;
+          console.log('[NativeSIP] callEnded event', d);
           setCallState('idle');
           setActiveCallNumber('');
           setIsMuted(false);
           setIsOnHold(false);
           stopTimer();
-        }));
+        });
+        callHandlesRef.current = [callReceivedHandle, callStateHandle, callEndedHandle];
         cleanups.push(await onNativeSipEvent('log', (e: any) => {
           // Bubble native logs to JS console for on-device debugging.
           console.log('[CapacitorPjsip][native]', e?.message ?? e);
@@ -153,8 +170,8 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
       cancelled = true;
       if (watchdog) { clearTimeout(watchdog); watchdog = null; }
       cleanups.forEach((c) => { try { c(); } catch {} });
-      // The registration listener is intentionally kept alive across React
-      // StrictMode re-renders. It is removed only on credential change or unmount.
+      // Registration + call listeners are intentionally kept alive across React
+      // StrictMode re-renders. They are removed only on credential change/unmount.
       stopTimer();
     };
   }, [config]);
@@ -165,6 +182,8 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
     return () => {
       regHandleRef.current?.remove().catch(() => {});
       regHandleRef.current = null;
+      callHandlesRef.current.forEach((h) => h.remove().catch(() => {}));
+      callHandlesRef.current = [];
     };
   }, []);
 
