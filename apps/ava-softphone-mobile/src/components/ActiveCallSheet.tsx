@@ -20,14 +20,21 @@ export default function ActiveCallSheet({
   const [showKeypad, setShowKeypad] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const [audio, setAudio] = useState<AudioState>(getAudioState());
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ text: string; tone: 'ok' | 'err' | 'info' } | null>(null);
+  const [recPending, setRecPending] = useState(false);
 
   useEffect(() => onAudioStateChange(setAudio), []);
   useEffect(() => {
     if (!toast) return;
-    const id = setTimeout(() => setToast(null), 2400);
+    const id = setTimeout(() => setToast(null), 2800);
     return () => clearTimeout(id);
   }, [toast]);
+
+  // Surface remote end reason (busy, declined, unavailable…) when call ends.
+  const endReasonText: string | null = sp.endReason ?? sp.lastEndReason ?? null;
+  useEffect(() => {
+    if (endReasonText) setToast({ text: endReasonText, tone: 'err' });
+  }, [endReasonText]);
 
   const switchRoute = async (next: AudioRoute) => {
     haptic(ImpactStyle.Light);
