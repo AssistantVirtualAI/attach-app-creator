@@ -89,7 +89,22 @@ export default function ActiveCallSheet({
     const target = window.prompt('Add call to:');
     if (target) safeCall('addCall', () => sp.addCall?.(target) ?? sp.call?.(target));
   };
-  const record = () => safeCall('record', () => sp.snap.recording ? sp.stopRecord?.() : sp.startRecord?.());
+  const record = async () => {
+    const isRec = !!sp.snap.recording;
+    const fn = isRec ? sp.stopRecord : sp.startRecord;
+    if (typeof fn !== 'function') {
+      setToast("Enregistrement non supporté par cette extension");
+      return;
+    }
+    try {
+      await fn();
+      setToast(isRec ? "Enregistrement arrêté" : "● Enregistrement en cours");
+    } catch (e: any) {
+      const msg = e?.message || 'erreur inconnue';
+      setToast(isRec ? `Impossible d'arrêter l'enregistrement: ${msg}` : `Impossible de démarrer l'enregistrement: ${msg}`);
+    }
+  };
+
 
   const avatarGradient =
     isTransfer ? `linear-gradient(135deg, ${colors.avaViolet} 0%, ${colors.avaCyan} 100%)` :
@@ -149,6 +164,26 @@ export default function ActiveCallSheet({
         {sp.snap.muted && inCall && (
           <div style={{ fontSize: 11, color: colors.warning, letterSpacing: 1.2, fontWeight: 700, textTransform: 'uppercase' }}>Microphone muted</div>
         )}
+        {sp.snap.recording && inCall && (
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8,
+            padding: '6px 14px', borderRadius: 999,
+            background: 'rgba(220,38,38,0.18)',
+            border: `1px solid ${colors.danger}88`,
+            fontSize: 11, letterSpacing: 1.4, fontWeight: 800,
+            color: '#ffd5d5', textTransform: 'uppercase',
+            boxShadow: `0 0 24px -6px ${colors.danger}`,
+          }}>
+            <span style={{
+              width: 8, height: 8, borderRadius: '50%',
+              background: colors.danger,
+              animation: 'rec-pulse 1.2s ease-in-out infinite',
+              boxShadow: `0 0 10px ${colors.danger}`,
+            }} />
+            Enregistrement en cours
+          </div>
+        )}
+
         {inCall && (
           <div style={{
             display: 'inline-flex', alignItems: 'center', gap: 8,
@@ -285,18 +320,24 @@ export default function ActiveCallSheet({
         </div>
       )}
 
-      {toast && (
-        <div style={{
-          position: 'absolute', left: 16, right: 16, bottom: 'calc(220px + var(--safe-bottom))',
-          padding: '12px 16px', borderRadius: radius.md,
-          background: 'rgba(220,38,38,0.92)', color: '#fff',
-          fontSize: 13, fontWeight: 600, textAlign: 'center',
-          boxShadow: '0 18px 40px -12px rgba(220,38,38,0.55)',
-          backdropFilter: 'blur(12px)',
-        }}>
-          {toast}
-        </div>
-      )}
+      {toast && (() => {
+        const ok = /enregistrement en cours|arrêté/i.test(toast);
+        const bg = ok ? 'rgba(34,197,94,0.92)' : 'rgba(220,38,38,0.92)';
+        const glow = ok ? 'rgba(34,197,94,0.55)' : 'rgba(220,38,38,0.55)';
+        return (
+          <div style={{
+            position: 'absolute', left: 16, right: 16, bottom: 'calc(220px + var(--safe-bottom))',
+            padding: '12px 16px', borderRadius: radius.md,
+            background: bg, color: '#fff',
+            fontSize: 13, fontWeight: 600, textAlign: 'center',
+            boxShadow: `0 18px 40px -12px ${glow}`,
+            backdropFilter: 'blur(12px)',
+          }}>
+            {toast}
+          </div>
+        );
+      })()}
+
     </div>
   );
 }
@@ -356,7 +397,9 @@ const callButtonCss = `
 .call-ctrl.is-disabled{cursor:not-allowed;opacity:.48;filter:saturate(.6);}
 .call-ctrl.is-disabled .call-ctrl-orb{box-shadow:inset 0 1px 0 rgba(255,255,255,.16),inset 0 -18px 28px rgba(0,0,0,.28);}
 @media (prefers-reduced-motion:reduce){.call-ctrl-orb,.call-big-orb,.call-ctrl-orb::before,.call-big-orb::before{transition:none;}}
+@keyframes rec-pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.45;transform:scale(1.35);}}
 `;
+
 
 const sheetStyle: React.CSSProperties = {
   position: 'fixed', inset: 0, zIndex: 100,

@@ -147,9 +147,19 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
         organization_id: (data as any)?.organization_id,
       });
       if (t?.stub || t?.error) {
-        const detail = [t.error || t.reason || 'transcription unavailable', ...(t.fetchErrors || [])].filter(Boolean).join(' · ');
-        throw new Error(detail);
+        const reason = t.reason || t.error || '';
+        const fetchTxt = (t.fetchErrors || []).join(' ');
+        let friendly = '';
+        if (reason === 'recording-not-synced' || reason === 'no-recording' || /RECORDING_NOT_FOUND/i.test(fetchTxt)) {
+          friendly = "Enregistrement non disponible — l'appel n'a pas été enregistré, ou la synchro PBX n'est pas encore terminée. Réessayez dans ~30 s.";
+        } else if (reason === 'missing-ai-key') {
+          friendly = "Clé IA manquante côté serveur. Contactez l'administrateur.";
+        } else {
+          friendly = `Transcription indisponible: ${reason || 'erreur inconnue'}`;
+        }
+        throw new Error(friendly);
       }
+
       setAiStage('analyzing');
       await mobileApi.analyzeCall(id);
       // Poll once for the freshly written transcript/insights

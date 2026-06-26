@@ -293,13 +293,26 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
   const sendDTMF = (key: string) => { CapacitorPjsip.sendDTMF({ digit: key }).catch(() => {}); };
 
   const startRecording = useCallback(async () => {
-    try { await CapacitorPjsip.startRecord(); emitNativeCallSnapshot({ isRecording: true }); setIsRecording(true); }
-    catch (e) { console.warn('[NativeSIP] startRecord failed', e); }
+    try {
+      await CapacitorPjsip.startRecord();
+      emitNativeCallSnapshot({ isRecording: true });
+      setIsRecording(true);
+    } catch (e: any) {
+      console.warn('[NativeSIP] startRecord failed', e);
+      throw new Error(e?.message || 'startRecord failed');
+    }
   }, []);
   const stopRecording = useCallback(async () => {
-    try { await CapacitorPjsip.stopRecord(); emitNativeCallSnapshot({ isRecording: false }); setIsRecording(false); }
-    catch (e) { console.warn('[NativeSIP] stopRecord failed', e); }
+    try {
+      await CapacitorPjsip.stopRecord();
+      emitNativeCallSnapshot({ isRecording: false });
+      setIsRecording(false);
+    } catch (e: any) {
+      console.warn('[NativeSIP] stopRecord failed', e);
+      throw new Error(e?.message || 'stopRecord failed');
+    }
   }, []);
+
   const transferCall = useCallback(async (target: string) => {
     try { await CapacitorPjsip.transfer({ target }); } catch (e) { console.warn('[NativeSIP] transfer failed', e); }
   }, []);

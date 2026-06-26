@@ -1,55 +1,69 @@
-## Plan
+## Scope
+Fix three remaining mobile-app issues in the Planipret softphone. Frontend + iOS native plugin only — no backend schema, no Lemtel changes.
 
-1. **Verify RemoteIO-only audio path**
-   - Confirm `RTPAudioSession.swift` has no `AVAudioEngine`, `AVAudioPlayerNode`, `installTap`, or `removeTap` references.
-   - Add a static validation script/check so future commits fail clearly if those symbols return.
-   - Note: I can validate source/static compile assumptions here, but a true iOS device compile/run must be done in Xcode on Mac.
+---
 
-2. **Add detailed native RTP/AudioUnit logs**
-   - Add structured `[RTP]` logs for:
-     - RemoteIO state transitions: create, enable input/output, set stream formats, initialize, start, stop, dispose.
-     - AudioUnit OSStatus failures with readable 4-char-code formatting where possible.
-     - First input callback and periodic input counters: frames, mic peak, RTP tx packets.
-     - First render callback and periodic render counters: frames, queued samples, RTP rx packets.
-     - retry/reconnect attempt number, backoff delay, route/session state.
-   - Keep logs diagnostic but throttled so callbacks do not spam the device console every audio frame.
+### 1. Record button — no visible indication that the call is being recorded
 
-3. **Harden iOS microphone permission UX**
-   - Keep explicit native mic permission request before registration/call audio.
-   - Add a JS listener for native `micPermission`/registration errors.
-   - Show a clear user-facing message when mic access is denied: “Microphone access is required for two-way audio. Enable it in iOS Settings.”
-   - Prevent calls from starting if permission is denied.
+**Root cause**
+- `ActiveCallSheet` only shows the label `Record / Stop Rec` on a small icon; users don't notice the toggle.
+- `CapacitorSip.swift::startRecord` calls `call.reject("no active call")` when `callState != "active"`, but the JS layer (`useSoftphoneNative.startRecording`) just `console.warn`s the rejection — no toast, no state change. So if the toggle silently fails, the UI looks identical.
+- After a successful `startRecord`, the only signal is the small icon label change; no banner/pulse.
 
-4. **Fix broken Record button wiring**
-   - Current issue found: `MobileApp.tsx` maps `recording: false`, `startRecord: () => {}`, `stopRecord: () => {}` even though `useSoftphoneNative.ts` exposes `isRecording`, `startRecording`, `stopRecording`.
-   - Wire `sp.snap.recording` to `softphone.isRecording`.
-   - Wire `startRecord`/`stopRecord` to `softphone.startRecording`/`softphone.stopRecording`.
-   - Keep native `recordingChanged` as the source of truth.
+**Fix (frontend only)**
+- In `ActiveCallSheet.tsx`:
+  - Add a prominent "● REC" pill (red, pulsing) near the status strip whenever `sp.snap.recording === true`. Show it next to the call timer, similar to the existing audio-engine banner.
+  - Surface record errors through the existing `toast` state when `sp.startRecord/stopRecord` rejects.
+- In `useSoftphoneNative.ts`:
+  - Make `startRecording` / `stopRecording` re-throw the native rejection so the caller can show a toast (instead of swallowing with `console.warn`).
+  - Only flip `isRecording` after the native promise resolves (remove the optimistic `setIsRecording(true)` before await).
+- In `ActiveCallSheet.tsx::record`, wrap the call in try/catch and call `setToast("Impossible de démarrer l'enregistrement: …")` on failure.
 
-5. **Fix Hold/Resume UI state wiring**
-   - Current likely issue found: `MobileApp.tsx` does not pass `softphone.isOnHold` into the `snap`; `ActiveCallSheet` only checks `callState === 'held'`, but native emits `isOnHold` separately.
-   - Add `snap.onHold`/held mapping from `softphone.isOnHold`.
-   - Update `ActiveCallSheet` so the Hold button label/action uses native hold state, not only callState.
-   - Keep no optimistic re-toggle loops; state remains driven by native `holdChanged`.
+---
 
-6. **Improve visible mobile call buttons**
-   - Replace the flat circular controls in `ActiveCallSheet.tsx` with visible glass/futuristic button styles directly in the component:
-     - glossy radial/linear background,
-     - active/disabled/loading states,
-     - press/hover shine styling,
-     - clearer Record/Hold active states.
-   - Keep scope limited to mobile call controls.
+### 2. Speaker / Bluetooth toggle throws an error
 
-7. **Add iOS real-device RTP test steps**
-   - Update the iOS rebuild checklist with the exact verification commands/checks:
-     - grep validation for no AVAudioEngine symbols,
-     - clean build/reinstall steps,
-     - required Xcode console filters,
-     - expected RemoteIO logs,
-     - real call test matrix: outbound audio both ways, inbound audio both ways, Hold/Resume, Record toggle, reconnect/retry.
+**Root cause**
+`src/lib/sip/audioOutput.ts::setRoute` only tries `HTMLMediaElement.setSinkId(...)`, which on iOS WKWebView is either missing or rejects — the catch then throws and `ActiveCallSheet` shows "Impossible de basculer sur Haut-parleur". The real iOS routing is implemented in `CapacitorSip.swift::setAudioRoute` (already exposed in `nativeSipProvider.ts`) but never called.
 
-8. **Validation after implementation**
-   - Run source checks for removed AVAudioEngine symbols.
-   - Run the existing iOS sync static validation script in check mode if safe.
-   - Run TypeScript/tests only if available without changing native state.
-   - Report clearly that real capture/playback confirmation must be run on the physical iOS device after `git pull`, `npm run build`, `npx cap sync ios`, clean build, reinstall.
+**Fix (frontend only)**
+- In `audioOutput.ts::setRoute`, when running on Capacitor native (`Capacitor.isNativePlatform()` or `VITE_NATIVE_SIP` flag), call `CapacitorPjsip.setAudioRoute({ route })` first; only fall back to `setSinkId` on web.
+- Treat `setSinkId` `NotSupportedError` / missing as a silent skip (don't throw) — the native side did the routing.
+- Update `route` from the native response (`outputs` string) so the UI pill reflects the actual port (e.g. detect `BluetoothHFP` → `bluetooth`, `Speaker` → `speaker`, else `earpiece`).
+- Keep the existing `busy` guard and event emission.
+
+---
+
+### 3. Call transcription always fails
+
+**Diagnosis (already confirmed via Edge logs)**
+`ai-transcribe-call` returns `RECORDING_NOT_FOUND` on both `fusion-signed` and `fusion` proxies for `call_record_id=b1e19218-…`:
+```
+fetchErrors: ["fusion-signed:RECORDING_NOT_FOUND","fusion:RECORDING_NOT_FOUND"]
+```
+The function correctly maps that to `reason: "recording-not-synced"` with a retry hint, but `useCallAi` surfaces it as a generic "Transcription failed".
+
+Two contributing factors:
+1. The call was never actually recorded on the PBX (SIP INFO `Record: on` may not be honored on this Fusion install — or recording wasn't toggled before hangup), so there's no file to fetch.
+2. Even when a recording exists, the `xml_cdr` row often isn't synced into Supabase yet at the moment the user taps "Transcribe", so `recording_path/name` are empty.
+
+**Fix (frontend only — no backend change in this plan)**
+- In `useCallAi.ts`:
+  - When `t?.reason === 'recording-not-synced'` or `t?.reason === 'no-recording'`, surface a clear French message: "Enregistrement non disponible (l'appel n'a pas été enregistré ou la synchro PBX n'est pas encore terminée). Réessayez dans ~30 s."
+  - Honor `t.retry_after_ms` by exposing a `retryAt` value so the UI can show a countdown / disable the button.
+- In `CallDetailScreen.tsx` (or wherever the "Transcribe" button lives), show the retry hint instead of the raw "stub" error.
+
+**Open question for the user** (asked separately below): do you want us to also force-enable per-extension recording on the PBX side so every call is recorded automatically? That's a backend change (`pbx_extensions.record_all_calls = true` + Fusion sync) and is out of scope unless confirmed.
+
+---
+
+## Files touched
+- `apps/ava-softphone-mobile/src/components/ActiveCallSheet.tsx`
+- `apps/ava-softphone-mobile/src/hooks/useSoftphoneNative.ts`
+- `apps/ava-softphone-mobile/src/lib/sip/audioOutput.ts`
+- `apps/ava-softphone-mobile/src/hooks/useCallAi.ts`
+- `apps/ava-softphone-mobile/src/screens/CallDetailScreen.tsx`
+
+No native Swift changes required for these three fixes — the existing `setAudioRoute`, `startRecord`, `stopRecord`, and `recordingChanged` bridge are already in place.
+
+After approval the user will need to `git pull` + `npx cap sync ios` + rebuild to ship.
