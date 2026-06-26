@@ -314,9 +314,15 @@ final class RTPAudioSession {
             logSessionState("engine-failed")
             // One synchronous retry after re-forcing category — covers the
             // common case where CapacitorSip just bumped category to .playback.
+            // Always removeTap + reset before retry: installTap twice is invalid.
             do {
+                engine.inputNode.removeTap(onBus: 0)
+                if engine.isRunning { engine.stop() }
+                engine.reset()
                 try AVAudioSession.sharedInstance().setCategory(.playAndRecord, mode: .voiceChat,
                                                                 options: RTPAudioSession.voipSessionOptions)
+                Thread.sleep(forTimeInterval: 0.1)
+                attachAndPrepareEngine()
                 try engine.start()
                 playerNode.play()
                 lastEngineError = ""
