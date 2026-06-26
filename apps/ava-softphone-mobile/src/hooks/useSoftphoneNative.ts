@@ -109,15 +109,15 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
           console.log('[CapacitorPjsip][native]', e?.message ?? e);
         }));
 
-        // Watchdog: if the native plugin never answers in 15s we surface a
-        // clear error instead of leaving the UI on "connecting" forever
-        // (typical when the JS plugin name didn't match the native one).
+        // Watchdog: if the native plugin never answers in 30s we surface a
+        // clear error instead of leaving the UI on "connecting" forever.
         watchdog = setTimeout(() => {
           if (cancelled) return;
-          console.error('[NativeSIP] watchdog timeout — no registration event in 15s');
+          initInFlightRef.current = false;
+          console.error('[NativeSIP] watchdog timeout — no registration event in 30s');
           setSipStatus('error');
           setSipError('Native SIP timeout — plugin did not respond');
-        }, 15000);
+        }, 30000);
 
         await CapacitorPjsip.initAccount({
           extension: config.extension,
@@ -128,6 +128,7 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
       } catch (e: any) {
         if (cancelled) return;
         if (watchdog) { clearTimeout(watchdog); watchdog = null; }
+        initInFlightRef.current = false;
         console.error('[NativeSIP] initAccount threw', e);
         setSipStatus('error');
         setSipError(e?.message || 'Native SIP init failed');
@@ -138,7 +139,10 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
       cancelled = true;
       if (watchdog) { clearTimeout(watchdog); watchdog = null; }
       cleanups.forEach((c) => { try { c(); } catch {} });
-      CapacitorPjsip.removeAllListeners().catch(() => {});
+      // Do NOT removeAllListeners or reset initInFlightRef here: in React
+      // StrictMode the effect is torn down and re-run synchronously, which
+      // would kill the listeners right before the native registration event
+      // arrives. The next effect run will overwrite listeners as needed.
       stopTimer();
     };
   }, [config]);
