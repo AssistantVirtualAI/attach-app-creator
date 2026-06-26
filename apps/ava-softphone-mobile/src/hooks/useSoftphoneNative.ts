@@ -109,15 +109,15 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
           console.log('[CapacitorPjsip][native]', e?.message ?? e);
         }));
 
-        // Watchdog: if the native plugin never answers in 30s we surface a
+        // Watchdog: if the native plugin never answers in 45s we surface a
         // clear error instead of leaving the UI on "connecting" forever.
         watchdog = setTimeout(() => {
           if (cancelled) return;
           initInFlightRef.current = false;
-          console.error('[NativeSIP] watchdog timeout — no registration event in 30s');
+          console.error('[NativeSIP] watchdog timeout — no registration event in 45s');
           setSipStatus('error');
           setSipError('Native SIP timeout — plugin did not respond');
-        }, 30000);
+        }, 45000);
 
         await CapacitorPjsip.initAccount({
           extension: config.extension,
