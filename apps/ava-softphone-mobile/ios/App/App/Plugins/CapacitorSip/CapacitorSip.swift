@@ -171,6 +171,12 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         self.notifyListeners("log", data: ["message": msg])
     }
 
+    /// Best-effort local IPv4 to advertise in SIP signaling headers (Via, Contact).
+    /// Avoids 0.0.0.0 which some PBX (NetSapiens) reject when NAT keepalive is off.
+    private func sigLocalIp() -> String {
+        return RTPAudioSession.primaryLocalIPv4() ?? "0.0.0.0"
+    }
+
     private func emitCallState(_ state: String, direction: String? = nil, number: String? = nil, stage: String? = nil, code: String? = nil) {
         var data: [String: Any] = ["state": state, "callId": callActiveId]
         if let direction = direction ?? (callDirection.isEmpty ? nil : callDirection) { data["direction"] = direction }
