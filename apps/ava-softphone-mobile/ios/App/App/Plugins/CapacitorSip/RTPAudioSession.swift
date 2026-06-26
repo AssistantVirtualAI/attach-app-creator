@@ -361,7 +361,10 @@ final class RTPAudioSession {
         engine.inputNode.removeTap(onBus: 0)
         if engine.isRunning { engine.stop() }
         playerNode.stop()
+        engine.reset()
+        NSLog("[RTP] engine.reset() before reconfigure")
         configureSessionCategory()
+        Thread.sleep(forTimeInterval: 0.1)
         attachAndPrepareEngine()
         if startEngineWithRetry() {
             engineRestartAttempts = 0
