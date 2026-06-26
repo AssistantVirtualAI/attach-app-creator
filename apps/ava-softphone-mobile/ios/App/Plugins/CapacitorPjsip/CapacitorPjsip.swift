@@ -34,14 +34,33 @@ public class CapacitorPjsip: CAPPlugin {
             return
         }
 
+        // Request microphone permission first; reject init if denied.
+        let session = AVAudioSession.sharedInstance()
+        session.requestRecordPermission { [weak self] granted in
+            guard granted else {
+                call.reject("Microphone permission denied")
+                return
+            }
+            DispatchQueue.main.async {
+                self?.startCore(call: call, ext: ext, domain: domain, password: password, wssUrl: wssUrl)
+            }
+        }
+        #else
+        call.reject("linphone-sdk not linked. See ios/App/LINPHONE_SETUP.md")
+        #endif
+    }
+
+    #if canImport(linphonesw)
+    private func startCore(call: CAPPluginCall, ext: String, domain: String, password: String, wssUrl: String) {
         do {
-            // Configure audio session for VoIP early.
-            try? AVAudioSession.sharedInstance().setCategory(
+            // Configure audio session for VoIP.
+            let session = AVAudioSession.sharedInstance()
+            try? session.setCategory(
                 .playAndRecord,
                 mode: .voiceChat,
-                options: [.allowBluetooth, .defaultToSpeaker]
+                options: [.allowBluetooth, .allowBluetoothA2DP, .defaultToSpeaker]
             )
-            try? AVAudioSession.sharedInstance().setActive(true)
+            try? session.setActive(true, options: [])
 
             let factory = Factory.Instance
             let core = try factory.createCore(configPath: nil, factoryConfigPath: nil, systemContext: nil)
