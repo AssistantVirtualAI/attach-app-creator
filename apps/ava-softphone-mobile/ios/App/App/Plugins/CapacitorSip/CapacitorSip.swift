@@ -107,6 +107,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     private var lastInviteAuth: String? = nil
     private var isMuted: Bool = false
     private var isOnHold: Bool = false
+    private var isRecording: Bool = false
     private var localSdpPort: Int = 40000
 
     // MARK: - RTP audio
