@@ -247,7 +247,10 @@ export default function PlanipretAdminLayout() {
                 {realtimeOk ? "En direct" : "Reconnexion…"}
               </span>
             </div>
-            <NotificationsBell />
+            <div className="flex flex-col items-end gap-1">
+              <WorkspaceHeaderExtras />
+              <NotificationsBell />
+            </div>
             <span className="capitalize" style={{ fontSize: 10, color: "var(--pp-text-muted)" }}>{dateLabel}</span>
           </div>
         </header>
