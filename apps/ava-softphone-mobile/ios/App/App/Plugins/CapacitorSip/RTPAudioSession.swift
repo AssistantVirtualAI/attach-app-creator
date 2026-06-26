@@ -558,23 +558,35 @@ final class RTPAudioSession {
         for i in 0..<n { let a = abs(scratch[i]); if a > peak { peak = a } }
         micPeak = Float(peak) / 32767.0
 
+        // Decimate hwSampleRate → 8000Hz using fractional phase accumulator
+        // (zero-order hold). Small/cheap and OK for narrowband PCMU.
+        let step = rtpSampleRate / hwSampleRate
+        var decimated = [Int16]()
+        decimated.reserveCapacity(n + 1)
+        var phase = txPhase
+        for i in 0..<n {
+            phase += step
+            if phase >= 1.0 {
+                phase -= 1.0
+                decimated.append(isMuted ? 0 : scratch[i])
+            }
+        }
+        txPhase = phase
+
         var framesToSend: [[Int16]] = []
         audioLock.lock()
-        if isMuted {
-            sendBuffer.append(contentsOf: repeatElement(0, count: n))
-        } else {
-            sendBuffer.append(contentsOf: UnsafeBufferPointer(start: scratch, count: n))
-        }
+        sendBuffer.append(contentsOf: decimated)
         while sendBuffer.count >= frameSamples {
             let frame = Array(sendBuffer.prefix(frameSamples))
             sendBuffer.removeFirst(frameSamples)
             framesToSend.append(frame)
         }
+        let queued = sendBuffer.count
         audioLock.unlock()
 
         for f in framesToSend { sendRTPFrame(f) }
         if inputCallbackCount == 1 || inputCallbackCount % 50 == 0 {
-            NSLog("[RTP] input callback #\(inputCallbackCount) frames=\(inNumberFrames) micPeak=\(String(format: "%.3f", micPeak)) queuedTxFrames=\(sendBuffer.count) txPackets=\(txPackets)")
+            NSLog("[RTP] input cb #\(inputCallbackCount) hwFrames=\(n) decim=\(decimated.count) micPeak=\(String(format: "%.3f", micPeak)) queued=\(queued) txPackets=\(txPackets)")
         }
         return noErr
     }
