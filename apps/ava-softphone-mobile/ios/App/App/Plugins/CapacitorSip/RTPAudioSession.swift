@@ -357,8 +357,10 @@ final class RTPAudioSession {
         engineRestartAttempts += 1
         if engineRestartAttempts > 8 {
             NSLog("[RTP] engine restart abandoned after \(engineRestartAttempts) attempts")
+            emitAudio("error", ["reason": "engine restart abandoned after \(engineRestartAttempts) attempts: \(lastEngineError)"])
             return
         }
+        emitAudio("retrying", ["attempt": engineRestartAttempts])
         let delay = min(10.0, 0.5 * pow(2.0, Double(engineRestartAttempts - 1)))
         NSLog("[RTP] scheduling engine restart #\(engineRestartAttempts) in \(delay)s")
         engineRestartTimer?.cancel()
@@ -383,6 +385,7 @@ final class RTPAudioSession {
         attachAndPrepareEngine()
         if startEngineWithRetry() {
             engineRestartAttempts = 0
+            emitAudio("running")
         } else {
             scheduleEngineRestart()
         }
