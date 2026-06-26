@@ -46,6 +46,8 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
 
     setSipStatus('connecting');
     setSipError('');
+    setNativeRegStatus('connecting');
+    startNativeSipTracking();
     console.log('[NativeSIP] initAccount → ext=%s domain=%s', config.extension, config.domain);
 
     (async () => {
