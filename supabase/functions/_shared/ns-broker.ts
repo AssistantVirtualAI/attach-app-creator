@@ -184,7 +184,7 @@ export async function nsBrokerFetch(
   init: RequestInit = {},
 ): Promise<Response> {
   const env = nsEnv();
-  const url = `${env.base}${path}`;
+  const url = path.startsWith("http") ? path : `${env.base}/ns-api/v2${path.startsWith("/") ? path : `/${path}`}`;
   let token = await ensureBrokerJwt(admin, profile);
   const doFetch = (t: string) =>
     fetch(url, {
