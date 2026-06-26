@@ -74,7 +74,8 @@ function ensureNativeCallEventBridge() {
     const holdHandle = await CapacitorPjsip.addListener('holdChanged', (d: any) => {
       // Purely reflective — never re-invoke setHold here, that would create
       // an infinite re-INVITE loop.
-      emitNativeCallSnapshot({ isOnHold: !!(d?.held ?? d?.onHold) });
+      const held = !!(d?.held ?? d?.onHold);
+      emitNativeCallSnapshot({ isOnHold: held, callState: held ? 'active' : 'active' });
     });
     const recordingHandle = await CapacitorPjsip.addListener('recordingChanged', (d: any) => {
       emitNativeCallSnapshot({ isRecording: !!d?.recording });
@@ -292,10 +293,12 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
   const sendDTMF = (key: string) => { CapacitorPjsip.sendDTMF({ digit: key }).catch(() => {}); };
 
   const startRecording = useCallback(async () => {
-    try { await CapacitorPjsip.startRecord(); } catch (e) { console.warn('[NativeSIP] startRecord failed', e); }
+    try { await CapacitorPjsip.startRecord(); emitNativeCallSnapshot({ isRecording: true }); setIsRecording(true); }
+    catch (e) { console.warn('[NativeSIP] startRecord failed', e); }
   }, []);
   const stopRecording = useCallback(async () => {
-    try { await CapacitorPjsip.stopRecord(); } catch (e) { console.warn('[NativeSIP] stopRecord failed', e); }
+    try { await CapacitorPjsip.stopRecord(); emitNativeCallSnapshot({ isRecording: false }); setIsRecording(false); }
+    catch (e) { console.warn('[NativeSIP] stopRecord failed', e); }
   }, []);
   const transferCall = useCallback(async (target: string) => {
     try { await CapacitorPjsip.transfer({ target }); } catch (e) { console.warn('[NativeSIP] transfer failed', e); }

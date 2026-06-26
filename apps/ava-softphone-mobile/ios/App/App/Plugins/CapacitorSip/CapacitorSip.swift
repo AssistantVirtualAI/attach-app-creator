@@ -109,6 +109,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     private var isMuted: Bool = false
     private var isOnHold: Bool = false
     private var isRecording: Bool = false
+    private var pendingHold: Bool? = nil
     private var localSdpPort: Int = 40000
 
     // MARK: - RTP audio
@@ -137,7 +138,10 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     }
 
     private func startRtpIfReady() {
-        guard !rtpStarted, let rtp = rtp, !remoteRtpIp.isEmpty, remoteRtpPort > 0 else { return }
+        guard !rtpStarted, let rtp = rtp, !remoteRtpIp.isEmpty, remoteRtpPort > 0 else {
+            log("RTP not ready rtpStarted=\(rtpStarted) hasRtp=\(rtp != nil) remote=\(remoteRtpIp):\(remoteRtpPort)")
+            return
+        }
         rtpStarted = true
         rtp.setMuted(isMuted)
         rtp.start(remoteIp: remoteRtpIp, remotePort: remoteRtpPort)
@@ -408,12 +412,12 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
             call.resolve(["ok": true, "held": hold, "noop": true])
             return
         }
-        isOnHold = hold
+        pendingHold = hold
         callCseq += 1
         sendReInvite(hold: hold)
-        // NOTE: don't touch callState — the 200 OK to the re-INVITE confirms.
-        notifyListeners("holdChanged", data: ["held": hold, "onHold": hold])
-        call.resolve(["ok": true, "held": hold])
+        // NOTE: don't mark held/resumed until the PBX confirms with 200 OK.
+        notifyListeners("holdPending", data: ["held": hold, "onHold": hold])
+        call.resolve(["ok": true, "held": hold, "pending": true])
     }
 
     @objc func sendDTMF(_ call: CAPPluginCall) {
@@ -729,7 +733,12 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
                 if isReInvite {
                     // Hold / resume confirmation. Do NOT touch callState, do NOT restart RTP.
                     // Just refresh the remote RTP target (PBX may relay through different IP/port).
-                    log("CALL_EVENT|reINVITE_200_OK|held=\(isOnHold)|callId=\(callActiveId)")
+                    if let confirmed = pendingHold {
+                        isOnHold = confirmed
+                        callState = confirmed ? "hold" : "active"
+                        pendingHold = nil
+                    }
+                    log("CALL_EVENT|reINVITE_200_OK|held=\(isOnHold)|callState=\(callState)|callId=\(callActiveId)")
                     notifyListeners("holdChanged", data: ["held": isOnHold, "onHold": isOnHold])
                 } else {
                     if callDirection.isEmpty { callDirection = "out" }
@@ -863,7 +872,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         callRemoteUri = ""; callRemoteContact = ""
         callState = "idle"; callDirection = ""
         callInviteBranch = ""; callInviteCseq = 1
-        isMuted = false; isOnHold = false; isRecording = false
+        isMuted = false; isOnHold = false; pendingHold = nil; isRecording = false
         lastInviteRequest = ""; lastInviteAuth = nil
     }
 

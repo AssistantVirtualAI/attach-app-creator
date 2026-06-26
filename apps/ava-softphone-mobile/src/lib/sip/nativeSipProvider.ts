@@ -40,6 +40,18 @@ export interface CapacitorSipPlugin {
     rxPeak?: number;
     uptimeMs?: number;
     route?: string;
+    tapFormat?: string;
+    converterFormat?: string;
+    converterRebuilds?: number;
+    convertErrors?: number;
+    lastConvertError?: string;
+    audioBackend?: string;
+    inputCallbacks?: number;
+    renderCallbacks?: number;
+    inputFrames?: number;
+    renderFrames?: number;
+    sessionState?: string;
+    lastEngineError?: string;
   }>;
   startRecord(): Promise<{ ok: boolean; recording: boolean }>;
   stopRecord(): Promise<{ ok: boolean; recording: boolean }>;

@@ -69,7 +69,7 @@ export default function AudioDiagnosticsScreen() {
       <section style={{ background: '#0f172a', padding: 12, borderRadius: 12, marginBottom: 16 }}>
         <h3 style={{ marginTop: 0, fontSize: 15 }}>Test pré-appel</h3>
         <p style={{ color: '#94a3b8', fontSize: 12 }}>
-          Joue un ton 440 Hz pendant 2 s sur la sortie active et mesure le pic micro.
+          Joue un ton 440 Hz pendant 2 s sur la sortie active et démarre RemoteIO pour mesurer le pic micro.
         </p>
         <button onClick={runToneTest} disabled={tone.running}
           style={{ padding: '10px 16px', borderRadius: 8, background: '#2563eb', color: '#fff', border: 0 }}>
@@ -110,11 +110,15 @@ export default function AudioDiagnosticsScreen() {
             {row('Pic RX', `${((stats.rxPeak ?? 0) * 100).toFixed(1)}%`)}
             {row('Uptime', `${(((stats.uptimeMs ?? 0) / 1000) | 0)} s`)}
             {row('Route', stats.route)}
-            {row('Tap format', (stats as any).tapFormat || '—')}
-            {row('Converter', (stats as any).converterFormat || '—')}
-            {row('Reconstructions', (stats as any).converterRebuilds ?? 0)}
-            {row('Erreurs conv.', (stats as any).convertErrors ?? 0)}
-            {((stats as any).lastConvertError) && row('Dernière erreur', (stats as any).lastConvertError)}
+            {row('Backend', stats.audioBackend || '—')}
+            {row('Input callbacks', stats.inputCallbacks ?? 0)}
+            {row('Render callbacks', stats.renderCallbacks ?? 0)}
+            {row('Input frames', stats.inputFrames ?? 0)}
+            {row('Render frames', stats.renderFrames ?? 0)}
+            {row('Format capture', stats.tapFormat || '—')}
+            {row('Converter', stats.converterFormat || '—')}
+            {row('Session', stats.sessionState || '—')}
+            {row('RemoteIO erreur', stats.lastEngineError || '—')}
           </div>
         ) : (
           <p style={{ color: '#94a3b8', fontSize: 12 }}>Aucun appel actif. Les stats apparaîtront pendant l'appel.</p>
