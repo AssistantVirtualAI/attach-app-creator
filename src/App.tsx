@@ -372,6 +372,7 @@ const App = () => (
                 
                 {/* Universal login - redirects based on user type */}
                 <Route path="/login" element={<UniversalLogin />} />
+                <Route path="/portal" element={<Navigate to="/login" replace />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
 
                 <Route path="/portals" element={<PortalChooser />} />
