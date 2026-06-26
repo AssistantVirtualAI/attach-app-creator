@@ -11,6 +11,8 @@ import type { SIPConfig } from '../lib/sip/jssipProvider';
 import { CapacitorPjsip, onNativeSipEvent } from '../lib/sip/nativeSipProvider';
 import { EMPTY_QUALITY, type CallQuality } from '../lib/sip/callQuality';
 import { loadAudioProfile, saveAudioProfile, type AudioProfile } from '../lib/sip/audioProfile';
+import { startNativeSipTracking, setNativeRegStatus } from '../lib/sip/nativeSipState';
+import { attachNativeAutoReconnect } from '../lib/sip/nativeAutoReconnect';
 import type { UseSoftphoneReturn, SIPStatus, CallState } from './useSoftphone';
 
 export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn {
@@ -44,6 +46,8 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
 
     setSipStatus('connecting');
     setSipError('');
+    setNativeRegStatus('connecting');
+    startNativeSipTracking();
     console.log('[NativeSIP] initAccount → ext=%s domain=%s', config.extension, config.domain);
 
     (async () => {
@@ -53,13 +57,16 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
           if (watchdog) { clearTimeout(watchdog); watchdog = null; }
           console.log('[NativeSIP] registered ✓');
           setSipStatus('registered'); setSipError('');
+          setNativeRegStatus('registered', null);
         }));
         cleanups.push(await onNativeSipEvent('registrationFailed', (d) => {
           if (cancelled) return;
           if (watchdog) { clearTimeout(watchdog); watchdog = null; }
+          const msg = d?.reason || `Registration failed${d?.code ? ` (${d.code})` : ''}`;
           console.warn('[NativeSIP] registrationFailed', d);
           setSipStatus('error');
-          setSipError(d?.reason || `Registration failed${d?.code ? ` (${d.code})` : ''}`);
+          setSipError(msg);
+          setNativeRegStatus('error', msg);
         }));
         cleanups.push(await onNativeSipEvent('callReceived', (d) => {
           if (cancelled) return;
@@ -143,15 +150,28 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
   const reconnect = useCallback(() => {
     setSipError('');
     setSipStatus('connecting');
+    setNativeRegStatus('connecting');
     if (config) {
       CapacitorPjsip.initAccount({
         extension: config.extension,
         domain: config.domain,
         password: config.password,
         wssUrl: config.wssUrl,
-      }).catch((e) => { setSipStatus('error'); setSipError(e?.message || 'reconnect failed'); });
+      }).catch((e) => {
+        const msg = e?.message || 'reconnect failed';
+        setSipStatus('error'); setSipError(msg); setNativeRegStatus('error', msg);
+      });
     }
   }, [config]);
+
+  // Auto-reconnect when the app returns to foreground or the network recovers.
+  useEffect(() => {
+    let cleanup: (() => void) | null = null;
+    attachNativeAutoReconnect(() => {
+      if (sipStatus !== 'registered') reconnect();
+    }).then((c) => { cleanup = c; });
+    return () => { if (cleanup) cleanup(); };
+  }, [reconnect, sipStatus]);
 
   return {
     sipStatus, sipError, callState, callTimer, isMuted, isOnHold, activeCallNumber,

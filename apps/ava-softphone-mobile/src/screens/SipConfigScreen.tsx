@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import type { Creds } from '../lib/creds';
 import { Store } from '../lib/creds';
 import { colors } from '../lib/theme';
+import NativeStatePanel from '../components/sip/NativeStatePanel';
 
 export default function SipConfigScreen({
   initial,
@@ -89,6 +90,8 @@ export default function SipConfigScreen({
             <button type="button" onClick={onCancel} style={ghostBtn}>Annuler</button>
           )}
         </form>
+
+        <NativeStatePanel />
       </div>
     </div>
   );
