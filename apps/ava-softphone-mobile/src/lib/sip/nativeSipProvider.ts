@@ -24,9 +24,11 @@ export interface CapacitorSipPlugin {
   removeAllListeners(): Promise<void>;
 }
 
-export const CapacitorSipNative = registerPlugin<CapacitorSipPlugin>('CapacitorSip');
-
-// Legacy alias kept for existing hook imports.
+// IMPORTANT: the iOS bridge exports the plugin under the name `CapacitorPjsip`
+// (see CAP_PLUGIN(CapacitorPjsip, "CapacitorPjsip", ...) in CapacitorSip.m).
+// Registering a different JS name made every method call resolve to the
+// web-fallback no-op and left the UI stuck on "connecting" forever.
+export const CapacitorSipNative = registerPlugin<CapacitorSipPlugin>('CapacitorPjsip');
 export const CapacitorPjsip = CapacitorSipNative;
 
 export const NATIVE_SIP_ENABLED =
