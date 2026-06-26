@@ -40,6 +40,11 @@ export interface CapacitorSipPlugin {
     uptimeMs?: number;
     route?: string;
   }>;
+  startRecord(): Promise<{ ok: boolean; recording: boolean }>;
+  stopRecord(): Promise<{ ok: boolean; recording: boolean }>;
+  transfer(options: { target: string }): Promise<{ ok: boolean; target: string }>;
+  park(options?: { code?: string }): Promise<{ ok: boolean; code: string }>;
+  addCall(options: { target: string }): Promise<{ ok: boolean; target: string }>;
   addListener(event: string, callback: (data: any) => void): Promise<{ remove: () => Promise<void> }>;
   removeAllListeners(): Promise<void>;
 }
