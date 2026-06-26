@@ -43,6 +43,18 @@ final class RTPAudioSession {
     private(set) var lastEngineError: String = ""
     private(set) var engineRestartTotal: Int = 0
 
+    /// Wired by CapacitorSip to surface audio engine state to JS.
+    /// Status values: "starting" | "running" | "retrying" | "error".
+    var onAudioStateChanged: ((String, [String: Any]) -> Void)?
+    private func emitAudio(_ status: String, _ extra: [String: Any] = [:]) {
+        var data: [String: Any] = ["status": status,
+                                   "restartAttempts": engineRestartAttempts,
+                                   "restartTotal": engineRestartTotal,
+                                   "lastError": lastEngineError]
+        for (k, v) in extra { data[k] = v }
+        onAudioStateChanged?(status, data)
+    }
+
     // MARK: - Diagnostics
     private(set) var txPackets: UInt64 = 0
     private(set) var rxPackets: UInt64 = 0
