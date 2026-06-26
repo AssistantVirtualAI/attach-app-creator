@@ -5,11 +5,11 @@
 // Wire transport: raw NSStream TCP socket to the SIP server (port 5060).
 // No third-party SIP stack required. No Swift code involved.
 
-#import <Foundation/Foundation.h>
-#import <Capacitor/Capacitor.h>
-#import <CommonCrypto/CommonDigest.h>
-#import <ifaddrs.h>
-#import <arpa/inet.h>
+@import Capacitor;
+#if __has_feature(modules)
+#else
+  #import <Capacitor/Capacitor.h>
+#endif
 
 #define PJLOG(fmt, ...) NSLog(@"[CapacitorPjsip] " fmt, ##__VA_ARGS__)
 
