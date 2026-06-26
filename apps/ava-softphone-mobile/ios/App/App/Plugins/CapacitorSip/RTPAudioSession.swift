@@ -299,8 +299,10 @@ final class RTPAudioSession {
     // MARK: - RemoteIO build / teardown
     @discardableResult
     private func buildAndStartIOUnit() -> Bool {
-        NSLog("[RTP] RemoteIO build begin")
-        teardownIOUnit()
+        if ioUnit != nil { NSLog("[RTP] RemoteIO already built — reusing"); return true }
+        NSLog("[RTP] RemoteIO build begin (hwSampleRate=\(Int(hwSampleRate))Hz)")
+        // Reset resampler phase for a clean start.
+        txPhase = 0; rxPhase = 0; rxHoldSample = 0
 
         var desc = AudioComponentDescription(
             componentType: kAudioUnitType_Output,
