@@ -124,7 +124,7 @@ final class RTPAudioSession {
                                  options: [.allowBluetooth, .allowBluetoothA2DP,
                                            .defaultToSpeaker, .duckOthers])
         try? session.setActive(true, options: [])
-        if !engine.isAttached(playerNode) { engine.attach(playerNode) }
+        if playerNode.engine == nil { engine.attach(playerNode) }
         engine.connect(playerNode, to: engine.mainMixerNode, format: playFormat)
         if !engine.isRunning { try? engine.start() }
         let frames = AVAudioFrameCount(playFormat.sampleRate * seconds)
