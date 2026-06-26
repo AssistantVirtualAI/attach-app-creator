@@ -119,7 +119,8 @@ export default function ElevenLabsManagementCard({ userId }: { userId: string | 
         {!loading && !agentId && (
           <div className="rounded-2xl p-6 border" style={{ background: "linear-gradient(135deg, rgba(108,60,225,0.15), rgba(46,155,220,0.15))", borderColor: "rgba(108,60,225,0.4)" }}>
             <h4 className="text-lg font-bold text-slate-800">⚡ Configuration rapide ElevenLabs</h4>
-            <p className="text-sm text-slate-600 mt-1 mb-4">Configurez AVA en 1 clic — création de l'agent + 29 outils + voix + connexion Supabase.</p>
+            <p className="text-sm text-slate-600 mt-1 mb-1">Configurez AVA en 1 clic — création de l'agent + 29 outils + voix + connexion Supabase.</p>
+            <p className="text-[11px] text-slate-500 mb-4">ℹ️ Utilise uniquement la clé <code>ELEVENLABS_API_KEY</code>. La clé Claude (<code>ANTHROPIC_API_KEY</code>) n'est pas requise ici — ElevenLabs choisit le modèle LLM côté serveur.</p>
             <button onClick={oneClickSetup} disabled={busy === "setup"} className="w-full px-4 py-3 rounded-xl text-white font-semibold disabled:opacity-60" style={{ background: "linear-gradient(135deg,#6C3CE1,#2E9BDC)" }}>
               {busy === "setup" ? <span className="flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Configuration en cours…</span> : <span className="flex items-center justify-center gap-2"><Rocket className="w-4 h-4" /> Configurer AVA automatiquement</span>}
             </button>
