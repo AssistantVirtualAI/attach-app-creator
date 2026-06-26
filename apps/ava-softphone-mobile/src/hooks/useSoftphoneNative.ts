@@ -1,17 +1,17 @@
 /**
- * useSoftphoneNative — Native PJSIP-backed implementation of UseSoftphoneReturn.
+ * useSoftphoneNative — native SIP/TLS-backed implementation of UseSoftphoneReturn.
  *
- * Activated when VITE_NATIVE_SIP=true. Provides the same surface as the
- * JsSIP-based `useSoftphone` hook so the rest of the app is unchanged.
- * Many advanced fields (sipLog, retries, quality sampler) are stubbed for now
- * and will be enriched once the Swift/Kotlin plugin emits richer events.
+ * Activated when VITE_NATIVE_SIP=true. Uses the `CapacitorSip` plugin which
+ * speaks raw SIP over TLS:5061 via Apple's Network.framework (no WebRTC).
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { SIPConfig } from '../lib/sip/jssipProvider';
-import { CapacitorPjsip, onNativeSipEvent } from '../lib/sip/nativeSipProvider';
+import { CapacitorSipNative, onNativeSipEvent } from '../lib/sip/nativeSipProvider';
 import { EMPTY_QUALITY, type CallQuality } from '../lib/sip/callQuality';
 import { loadAudioProfile, saveAudioProfile, type AudioProfile } from '../lib/sip/audioProfile';
 import type { UseSoftphoneReturn, SIPStatus, CallState } from './useSoftphone';
+
+const SIP_HOST = 'pbxnode.lemtel.tel';
 
 export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn {
   const [sipStatus, setSipStatus] = useState<SIPStatus>('idle');
@@ -35,7 +35,6 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
     timerRef.current = null;
   };
 
-  // Register account on config change.
   useEffect(() => {
     if (!config) return;
     let cancelled = false;
@@ -46,11 +45,10 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
 
     (async () => {
       try {
-        cleanups.push(await onNativeSipEvent('registered', () => {
-          if (!cancelled) { setSipStatus('registered'); setSipError(''); }
-        }));
-        cleanups.push(await onNativeSipEvent('registrationFailed', (d) => {
-          if (!cancelled) { setSipStatus('error'); setSipError(d?.reason || 'Registration failed'); }
+        cleanups.push(await onNativeSipEvent('registration', (d) => {
+          if (cancelled) return;
+          if (d?.status === 'registered') { setSipStatus('registered'); setSipError(''); }
+          else if (d?.status === 'error') { setSipStatus('error'); setSipError(d?.reason || 'Registration failed'); }
         }));
         cleanups.push(await onNativeSipEvent('callReceived', (d) => {
           if (cancelled) return;
@@ -71,11 +69,11 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
           stopTimer();
         }));
 
-        await CapacitorPjsip.initAccount({
+        await CapacitorSipNative.initAccount({
+          host: SIP_HOST,
           extension: config.extension,
           domain: config.domain,
           password: config.password,
-          wssUrl: config.wssUrl,
         });
       } catch (e: any) {
         if (!cancelled) {
@@ -88,7 +86,7 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
     return () => {
       cancelled = true;
       cleanups.forEach((c) => { try { c(); } catch {} });
-      CapacitorPjsip.removeAllListeners().catch(() => {});
+      CapacitorSipNative.removeAllListeners().catch(() => {});
       stopTimer();
     };
   }, [config]);
@@ -97,19 +95,19 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
     if (sipStatus !== 'registered') return false;
     setActiveCallNumber(number);
     setCallState('ringing');
-    CapacitorPjsip.makeCall({ number }).catch((e) => {
+    CapacitorSipNative.makeCall({ number }).catch((e) => {
       setCallState('idle');
       setSipError(e?.message || 'makeCall failed');
     });
     return true;
   };
-  const hangup = () => { CapacitorPjsip.hangup().catch(() => {}); };
-  const answer = () => { CapacitorPjsip.answer().catch(() => {}); };
-  const mute   = () => { CapacitorPjsip.setMute({ muted: true }).catch(() => {});  setIsMuted(true); };
-  const unmute = () => { CapacitorPjsip.setMute({ muted: false }).catch(() => {}); setIsMuted(false); };
-  const hold   = () => { CapacitorPjsip.setHold({ onHold: true }).catch(() => {});  setIsOnHold(true); };
-  const unhold = () => { CapacitorPjsip.setHold({ onHold: false }).catch(() => {}); setIsOnHold(false); };
-  const sendDTMF = (key: string) => { CapacitorPjsip.sendDTMF({ digit: key }).catch(() => {}); };
+  const hangup = () => { CapacitorSipNative.hangup().catch(() => {}); };
+  const answer = () => { CapacitorSipNative.answer().catch(() => {}); };
+  const mute   = () => { CapacitorSipNative.setMute({ muted: true }).catch(() => {});  setIsMuted(true); };
+  const unmute = () => { CapacitorSipNative.setMute({ muted: false }).catch(() => {}); setIsMuted(false); };
+  const hold   = () => { CapacitorSipNative.setHold({ held: true }).catch(() => {});  setIsOnHold(true); };
+  const unhold = () => { CapacitorSipNative.setHold({ held: false }).catch(() => {}); setIsOnHold(false); };
+  const sendDTMF = (key: string) => { CapacitorSipNative.sendDTMF({ digits: key }).catch(() => {}); };
 
   const setAudioProfile = useCallback((p: AudioProfile) => {
     setAudioProfileState(p);
@@ -119,11 +117,11 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
     setSipError('');
     setSipStatus('connecting');
     if (config) {
-      CapacitorPjsip.initAccount({
+      CapacitorSipNative.initAccount({
+        host: SIP_HOST,
         extension: config.extension,
         domain: config.domain,
         password: config.password,
-        wssUrl: config.wssUrl,
       }).catch((e) => { setSipStatus('error'); setSipError(e?.message || 'reconnect failed'); });
     }
   }, [config]);
