@@ -25,6 +25,44 @@ public class CapacitorSip: CAPPlugin, CXProviderDelegate {
     private let registerIntervalSec: Int = 240 // refresh well before 300s Expires
     private var shouldReconnect = true
 
+    // MARK: - Logging
+    // 0=off, 1=error, 2=warn, 3=info, 4=debug, 5=verbose (full SIP frames)
+    private var logLevel: Int = 3
+    private let logLevelNames = ["OFF", "ERROR", "WARN", "INFO", "DEBUG", "VERBOSE"]
+
+    @objc func setLogLevel(_ call: CAPPluginCall) {
+        let lvl = call.getInt("level") ?? 3
+        logLevel = max(0, min(5, lvl))
+        log(3, "log", "Log level set to \(logLevelNames[logLevel]) (\(logLevel))")
+        call.resolve(["level": logLevel])
+    }
+
+    private func log(_ level: Int, _ category: String, _ message: String) {
+        guard level <= logLevel else { return }
+        let tag = logLevelNames[level]
+        let line = "[CapacitorSip][\(tag)][\(category)] \(message)"
+        NSLog("%@", line)
+        DispatchQueue.main.async {
+            self.notifyListeners("log", data: [
+                "level": level,
+                "tag": tag,
+                "category": category,
+                "message": message,
+                "ts": Date().timeIntervalSince1970
+            ])
+        }
+    }
+
+    private func redactSip(_ frame: String) -> String {
+        // Avoid leaking password / Digest response in verbose dumps
+        var out = frame
+        out = out.replacingOccurrences(of: sipPassword, with: "***")
+        if let re = try? NSRegularExpression(pattern: "response=\"[^\"]*\"") {
+            out = re.stringByReplacingMatches(in: out, range: NSRange(out.startIndex..., in: out), withTemplate: "response=\"***\"")
+        }
+        return out
+    }
+
     // MARK: - CallKit
     private lazy var callProvider: CXProvider = {
         let config = CXProviderConfiguration(localizedName: "AVA Softphone")
