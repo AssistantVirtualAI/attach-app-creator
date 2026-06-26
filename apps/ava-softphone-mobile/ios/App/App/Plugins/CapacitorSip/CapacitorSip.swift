@@ -1,535 +1,248 @@
 import Foundation
 import Capacitor
-import Network
 import AVFoundation
-import CallKit
-import CommonCrypto
+#if canImport(linphonesw)
+import linphonesw
+#endif
 
-@objc(CapacitorSip)
-public class CapacitorSip: CAPPlugin, CXProviderDelegate {
+/// Capacitor plugin exposing a native SIP backend via linphone-sdk (SwiftPM).
+/// The JS facade lives in `src/lib/sip/nativeSipProvider.ts` — keep the
+/// method names and event payloads in sync with that file.
+///
+/// Setup: see `ios/App/LINPHONE_SETUP.md` for SwiftPM package URL + version.
+@objc(CapacitorPjsip)
+public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
+    public let identifier = "CapacitorPjsip"
+    public let jsName = "CapacitorPjsip"
+    public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "initAccount", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "makeCall", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "hangup", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "answer", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setMute", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setHold", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "sendDTMF", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "addListener", returnType: CAPPluginReturnCallback),
+        CAPPluginMethod(name: "removeAllListeners", returnType: CAPPluginReturnPromise),
+    ]
 
-    // MARK: - SIP state
-    private var connection: NWConnection?
-    private var sipDomain = ""
-    private var sipExtension = ""
-    private var sipPassword = ""
-    private var sipHost = ""
-    private let sipPort: UInt16 = 5061
-    private var callId = ""
-    private var fromTag = ""
-    private var cseq = 1
-    private var isRegistered = false
-    private var currentCallId = ""
-    private var lastAuthHeader: String? = nil
-    private var registerTimer: DispatchSourceTimer?
-    private let registerIntervalSec: Int = 240 // refresh well before 300s Expires
-    private var shouldReconnect = true
+    #if canImport(linphonesw)
+    private var core: Core?
+    private var account: Account?
+    private var currentCall: Call?
+    private var delegateRef: CoreDelegate?
+    #endif
 
-    // MARK: - Logging
-    // 0=off, 1=error, 2=warn, 3=info, 4=debug, 5=verbose (full SIP frames)
-    private var logLevel: Int = 3
-    private let logLevelNames = ["OFF", "ERROR", "WARN", "INFO", "DEBUG", "VERBOSE"]
+    // MARK: - initAccount
 
-    @objc func setLogLevel(_ call: CAPPluginCall) {
-        let lvl = call.getInt("level") ?? 3
-        logLevel = max(0, min(5, lvl))
-        log(3, "log", "Log level set to \(logLevelNames[logLevel]) (\(logLevel))")
-        call.resolve(["level": logLevel])
-    }
-
-    private func log(_ level: Int, _ category: String, _ message: String) {
-        guard level <= logLevel else { return }
-        let tag = logLevelNames[level]
-        let line = "[CapacitorSip][\(tag)][\(category)] \(message)"
-        NSLog("%@", line)
-        DispatchQueue.main.async {
-            self.notifyListeners("log", data: [
-                "level": level,
-                "tag": tag,
-                "category": category,
-                "message": message,
-                "ts": Date().timeIntervalSince1970
-            ])
-        }
-    }
-
-    private func redactSip(_ frame: String) -> String {
-        // Avoid leaking password / Digest response in verbose dumps
-        var out = frame
-        out = out.replacingOccurrences(of: sipPassword, with: "***")
-        if let re = try? NSRegularExpression(pattern: "response=\"[^\"]*\"") {
-            out = re.stringByReplacingMatches(in: out, range: NSRange(out.startIndex..., in: out), withTemplate: "response=\"***\"")
-        }
-        return out
-    }
-
-    // MARK: - CallKit
-    private lazy var callProvider: CXProvider = {
-        let config = CXProviderConfiguration(localizedName: "AVA Softphone")
-        config.supportsVideo = false
-        config.maximumCallGroups = 1
-        config.maximumCallsPerCallGroup = 1
-        config.supportedHandleTypes = [.phoneNumber, .generic]
-        let provider = CXProvider(configuration: config)
-        provider.setDelegate(self, queue: nil)
-        return provider
-    }()
-    private let callController = CXCallController()
-    private var activeCallUUID: UUID?
-
-    // MARK: - Init / Register
     @objc func initAccount(_ call: CAPPluginCall) {
-        sipExtension = call.getString("extension") ?? ""
-        sipDomain = call.getString("domain") ?? ""
-        sipPassword = call.getString("password") ?? ""
-        sipHost = call.getString("host") ?? "pbxnode.lemtel.tel"
-        if let lvl = call.getInt("logLevel") { logLevel = max(0, min(5, lvl)) }
-        fromTag = String(UUID().uuidString.prefix(8))
-        callId = UUID().uuidString
-        shouldReconnect = true
-
-        log(3, "init", "initAccount ext=\(sipExtension) domain=\(sipDomain) host=\(sipHost):\(sipPort) logLevel=\(logLevelNames[logLevel])")
-
-        AVAudioSession.sharedInstance().requestRecordPermission { granted in
-            guard granted else {
-                self.log(1, "audio", "Microphone permission denied")
-                DispatchQueue.main.async { call.reject("Microphone permission denied") }
-                return
-            }
-            self.log(3, "audio", "Microphone permission granted; configuring AVAudioSession (playAndRecord/voiceChat, BT+speaker)")
-
-            try? AVAudioSession.sharedInstance().setCategory(
-                .playAndRecord,
-                mode: .voiceChat,
-                options: [.allowBluetooth, .defaultToSpeaker]
-            )
-            try? AVAudioSession.sharedInstance().setActive(true)
-
-            self.startTlsConnection()
-            DispatchQueue.main.async { call.resolve() }
-        }
-    }
-
-    private func startTlsConnection() {
-        log(3, "tls", "Opening TLS connection to \(sipHost):\(sipPort) SNI=\(sipHost) minTLS=1.2")
-        let tlsOptions = NWProtocolTLS.Options()
-        let secOptions = tlsOptions.securityProtocolOptions
-        sec_protocol_options_set_tls_server_name(secOptions, sipHost)
-        sec_protocol_options_set_min_tls_protocol_version(secOptions, .TLSv12)
-
-        let tcpOptions = NWProtocolTCP.Options()
-        tcpOptions.enableKeepalive = true
-        tcpOptions.keepaliveIdle = 30
-        tcpOptions.connectionTimeout = 10
-
-        let params = NWParameters(tls: tlsOptions, tcp: tcpOptions)
-        params.serviceClass = .signaling
-
-        let endpoint = NWEndpoint.hostPort(
-            host: NWEndpoint.Host(sipHost),
-            port: NWEndpoint.Port(rawValue: sipPort)!
-        )
-
-        self.connection = NWConnection(to: endpoint, using: params)
-        self.connection?.stateUpdateHandler = { [weak self] state in
-            guard let self = self else { return }
-            switch state {
-            case .preparing:
-                self.log(4, "tls", "NWConnection preparing")
-            case .waiting(let err):
-                self.log(2, "tls", "NWConnection waiting: \(err.localizedDescription)")
-            case .ready:
-                self.log(3, "tls", "NWConnection ready (TLS handshake OK) — sending initial REGISTER")
-                self.cseq = 1
-                self.lastAuthHeader = nil
-                self.sendRegister(cseq: self.cseq, authHeader: nil)
-                self.startReceiving()
-            case .failed(let error):
-                self.log(1, "tls", "NWConnection failed: \(error.localizedDescription)")
-                DispatchQueue.main.async {
-                    self.notifyListeners("registration", data: [
-                        "status": "error",
-                        "reason": error.localizedDescription
-                    ])
-                }
-                self.scheduleReconnect()
-            case .cancelled:
-                self.log(3, "tls", "NWConnection cancelled")
-                self.isRegistered = false
-            default:
-                break
-            }
-        }
-        self.connection?.start(queue: .global(qos: .userInitiated))
-    }
-
-
-    private func scheduleReconnect() {
-        guard shouldReconnect else { return }
-        DispatchQueue.global().asyncAfter(deadline: .now() + 5) { [weak self] in
-            guard let self = self, self.shouldReconnect else { return }
-            self.startTlsConnection()
-        }
-    }
-
-    private func startRegisterTimer() {
-        registerTimer?.cancel()
-        log(3, "register", "Starting REGISTER refresh timer every \(registerIntervalSec)s")
-        let timer = DispatchSource.makeTimerSource(queue: .global())
-        timer.schedule(deadline: .now() + .seconds(registerIntervalSec), repeating: .seconds(registerIntervalSec))
-        timer.setEventHandler { [weak self] in
-            guard let self = self else { return }
-            self.cseq += 1
-            self.log(3, "register", "Refresh REGISTER cseq=\(self.cseq)")
-            self.sendRegister(cseq: self.cseq, authHeader: self.lastAuthHeader)
-        }
-        timer.resume()
-        registerTimer = timer
-    }
-
-    @objc func disconnect(_ call: CAPPluginCall) {
-        log(3, "register", "disconnect() — sending UNREGISTER (Expires: 0)")
-        shouldReconnect = false
-        registerTimer?.cancel()
-        registerTimer = nil
-        sendRegister(cseq: cseq + 1, authHeader: lastAuthHeader, expires: 0)
-        DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) { [weak self] in
-            self?.log(3, "tls", "Closing NWConnection after UNREGISTER")
-            self?.connection?.cancel()
-            self?.connection = nil
-            self?.isRegistered = false
-            DispatchQueue.main.async {
-                self?.notifyListeners("registration", data: ["status": "unregistered"])
-                call.resolve()
-            }
-        }
-    }
-
-    private func sendRegister(cseq: Int, authHeader: String?, expires: Int = 300) {
-        var headers = """
-        REGISTER sip:\(sipDomain) SIP/2.0\r\n\
-        Via: SIP/2.0/TLS \(sipHost):\(sipPort);branch=z9hG4bK\(UUID().uuidString.replacingOccurrences(of: "-", with: ""))\r\n\
-        From: <sip:\(sipExtension)@\(sipDomain)>;tag=\(fromTag)\r\n\
-        To: <sip:\(sipExtension)@\(sipDomain)>\r\n\
-        Call-ID: \(callId)\r\n\
-        CSeq: \(cseq) REGISTER\r\n\
-        Contact: <sip:\(sipExtension)@\(sipHost):\(sipPort);transport=tls>\r\n\
-        Expires: \(expires)\r\n\
-        Max-Forwards: 70\r\n\
-        User-Agent: AVA Softphone 1.0\r\n
-        """
-        if let auth = authHeader {
-            headers += "Authorization: \(auth)\r\n"
-        }
-        headers += "Content-Length: 0\r\n\r\n"
-
-        log(4, "sip-out", "REGISTER cseq=\(cseq) expires=\(expires) auth=\(authHeader != nil ? "yes" : "no")")
-        log(5, "sip-out", "\n\(redactSip(headers))")
-
-        let data = headers.data(using: .utf8)!
-        connection?.send(content: data, completion: .contentProcessed { [weak self] err in
-            if let err = err { self?.log(1, "sip-out", "send REGISTER failed: \(err)") }
-        })
-    }
-
-    private func startReceiving() {
-        connection?.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, _, error in
-            guard let self = self else { return }
-            if let data = data, let response = String(data: data, encoding: .utf8) {
-                self.log(5, "sip-in", "\n\(self.redactSip(response))")
-                self.handleSipResponse(response)
-            }
-            if let error = error {
-                self.log(1, "sip-in", "receive error: \(error)")
-            } else {
-                self.startReceiving()
-            }
-        }
-    }
-
-    private func handleSipResponse(_ response: String) {
-        if response.contains("SIP/2.0 401") || response.contains("SIP/2.0 407") {
-            let realm = self.extractValue(from: response, key: "realm")
-            let nonce = self.extractValue(from: response, key: "nonce")
-            log(3, "register", "Auth challenge received — realm=\(realm) nonce.len=\(nonce.count)")
-            let ha1 = self.md5("\(sipExtension):\(realm):\(sipPassword)")
-            let ha2 = self.md5("REGISTER:sip:\(sipDomain)")
-            let digestResp = self.md5("\(ha1):\(nonce):\(ha2)")
-            let authHeader = "Digest username=\"\(sipExtension)\", realm=\"\(realm)\", nonce=\"\(nonce)\", uri=\"sip:\(sipDomain)\", response=\"\(digestResp)\""
-            self.lastAuthHeader = authHeader
-            self.cseq += 1
-            self.sendRegister(cseq: self.cseq, authHeader: authHeader)
-        } else if response.hasPrefix("SIP/2.0 200") && response.contains("REGISTER") {
-            log(3, "register", "200 OK REGISTER — registered as \(sipExtension)@\(sipDomain)")
-            DispatchQueue.main.async {
-                self.isRegistered = true
-                self.notifyListeners("registration", data: [
-                    "status": "registered",
-                    "extension": self.sipExtension
-                ])
-            }
-            self.startRegisterTimer()
-        } else if response.hasPrefix("SIP/2.0 180") {
-            log(3, "call", "180 Ringing")
-            DispatchQueue.main.async {
-
-                self.notifyListeners("callStateChanged", data: ["state": "ringing"])
-            }
-        } else if response.hasPrefix("SIP/2.0 200") && response.contains("INVITE") {
-            log(3, "call", "200 OK INVITE — sending ACK, call active")
-            self.sendAck(response: response)
-            DispatchQueue.main.async {
-                self.notifyListeners("callStateChanged", data: ["state": "active"])
-            }
-        } else if response.hasPrefix("BYE") {
-            log(3, "call", "BYE received — ending call")
-            DispatchQueue.main.async {
-                self.endActiveCallKitCall()
-                self.notifyListeners("callEnded", data: [:])
-            }
-        } else if response.hasPrefix("INVITE") {
-            let callerNumber = self.extractCallerNumber(from: response)
-            log(3, "call", "Incoming INVITE from \(callerNumber)")
-            self.reportIncomingCallKit(number: callerNumber)
-            DispatchQueue.main.async {
-                self.notifyListeners("callReceived", data: ["number": callerNumber])
-            }
-        }
-    }
-
-
-    private func sendAck(response: String) {
-        let ack = """
-        ACK sip:\(sipDomain) SIP/2.0\r\n\
-        Via: SIP/2.0/TLS \(sipHost):\(sipPort);branch=z9hG4bK\(UUID().uuidString.replacingOccurrences(of: "-", with: ""))\r\n\
-        From: <sip:\(sipExtension)@\(sipDomain)>;tag=\(fromTag)\r\n\
-        To: <sip:\(sipDomain)>\r\n\
-        Call-ID: \(currentCallId)\r\n\
-        CSeq: 1 ACK\r\n\
-        Max-Forwards: 70\r\n\
-        Content-Length: 0\r\n\r\n
-        """
-        let data = ack.data(using: .utf8)!
-        connection?.send(content: data, completion: .contentProcessed { _ in })
-    }
-
-    @objc func makeCall(_ call: CAPPluginCall) {
-        guard let number = call.getString("number") else {
-            call.reject("Missing number")
+        #if canImport(linphonesw)
+        guard
+            let ext = call.getString("extension"),
+            let domain = call.getString("domain"),
+            let password = call.getString("password"),
+            let wssUrl = call.getString("wssUrl")
+        else {
+            call.reject("Missing extension/domain/password/wssUrl")
             return
         }
-        log(3, "call", "makeCall to \(number)")
-        currentCallId = UUID().uuidString
-        startOutgoingCallKit(number: number)
 
-        let sdp = """
-        v=0\r\n\
-        o=\(sipExtension) 0 0 IN IP4 \(sipHost)\r\n\
-        s=AVA Softphone\r\n\
-        c=IN IP4 \(sipHost)\r\n\
-        t=0 0\r\n\
-        m=audio 8000 RTP/AVP 0 8 101\r\n\
-        a=rtpmap:0 PCMU/8000\r\n\
-        a=rtpmap:8 PCMA/8000\r\n\
-        a=rtpmap:101 telephone-event/8000\r\n\
-        a=fmtp:101 0-16\r\n\
-        a=sendrecv\r\n
-        """
-
-        let invite = """
-        INVITE sip:\(number)@\(sipDomain) SIP/2.0\r\n\
-        Via: SIP/2.0/TLS \(sipHost):\(sipPort);branch=z9hG4bK\(UUID().uuidString.replacingOccurrences(of: "-", with: ""))\r\n\
-        From: <sip:\(sipExtension)@\(sipDomain)>;tag=\(fromTag)\r\n\
-        To: <sip:\(number)@\(sipDomain)>\r\n\
-        Call-ID: \(currentCallId)\r\n\
-        CSeq: 1 INVITE\r\n\
-        Contact: <sip:\(sipExtension)@\(sipHost):\(sipPort);transport=tls>\r\n\
-        Content-Type: application/sdp\r\n\
-        Max-Forwards: 70\r\n\
-        User-Agent: AVA Softphone 1.0\r\n\
-        Content-Length: \(sdp.utf8.count)\r\n\r\n\(sdp)
-        """
-
-        log(5, "sip-out", "\n\(invite)")
-        let data = invite.data(using: .utf8)!
-        connection?.send(content: data, completion: .contentProcessed { [weak self] err in
-            if let err = err { self?.log(1, "sip-out", "send INVITE failed: \(err)") }
-        })
-        notifyListeners("callStateChanged", data: ["state": "ringing"])
-        call.resolve()
+        // Request microphone permission first; reject init if denied.
+        let session = AVAudioSession.sharedInstance()
+        session.requestRecordPermission { [weak self] granted in
+            guard granted else {
+                call.reject("Microphone permission denied")
+                return
+            }
+            DispatchQueue.main.async {
+                self?.startCore(call: call, ext: ext, domain: domain, password: password, wssUrl: wssUrl)
+            }
+        }
+        #else
+        call.reject("linphone-sdk not linked. See ios/App/LINPHONE_SETUP.md")
+        #endif
     }
 
+    #if canImport(linphonesw)
+    private func startCore(call: CAPPluginCall, ext: String, domain: String, password: String, wssUrl: String) {
+        do {
+            // Configure audio session for VoIP.
+            let session = AVAudioSession.sharedInstance()
+            try? session.setCategory(
+                .playAndRecord,
+                mode: .voiceChat,
+                options: [.allowBluetooth, .allowBluetoothA2DP, .defaultToSpeaker]
+            )
+            try? session.setActive(true, options: [])
+
+            let factory = Factory.Instance
+            let core = try factory.createCore(configPath: nil, factoryConfigPath: nil, systemContext: nil)
+
+            // ICE / TURN configuration (Metered.ca relay fallback).
+            if let nat = core.natPolicy ?? (try? core.createNatPolicy()) {
+                nat.stunEnabled = true
+                nat.iceEnabled = true
+                nat.turnEnabled = true
+                nat.stunServer = "stun:stun.l.google.com:19302"
+                core.natPolicy = nat
+            }
+
+            // Build account params with WSS transport.
+            let accountParams = try core.createAccountParams()
+            let identity = try factory.createAddress(addr: "sip:\(ext)@\(domain)")
+            try accountParams.setIdentityaddress(newValue: identity)
+
+            let serverAddr = try factory.createAddress(addr: wssUrl)
+            try serverAddr.setTransport(newValue: .Tls)
+            try accountParams.setServeraddress(newValue: serverAddr)
+            accountParams.registerEnabled = true
+
+            let authInfo = try factory.createAuthInfo(
+                username: ext, userid: ext, passwd: password,
+                ha1: "", realm: "", domain: domain
+            )
+            core.addAuthInfo(info: authInfo)
+
+            let account = try core.createAccount(params: accountParams)
+            try core.addAccount(account: account)
+            core.defaultAccount = account
+
+            // Delegate → JS events.
+            let delegate = CoreDelegateStub(
+                onAccountRegistrationStateChanged: { [weak self] _, _, state, message in
+                    self?.notifyListeners("registration", data: [
+                        "state": String(describing: state),
+                        "message": message
+                    ])
+                },
+                onCallStateChanged: { [weak self] _, call, state, message in
+                    guard let self = self else { return }
+                    let remote = call.remoteAddress?.asStringUriOnly() ?? ""
+                    let stateStr = String(describing: state)
+
+                    switch state {
+                    case .IncomingReceived:
+                        self.currentCall = call
+                        self.notifyListeners("callReceived", data: [
+                            "from": remote, "callId": call.callLog?.callId ?? ""
+                        ])
+                    case .End, .Released, .Error:
+                        self.notifyListeners("callEnded", data: [
+                            "reason": message, "state": stateStr
+                        ])
+                        if self.currentCall === call { self.currentCall = nil }
+                    default:
+                        self.currentCall = call
+                    }
+
+                    self.notifyListeners("callStateChanged", data: [
+                        "state": stateStr, "remote": remote, "message": message
+                    ])
+                }
+            )
+            core.addDelegate(delegate: delegate)
+            self.delegateRef = delegate
+
+            try core.start()
+
+            self.core = core
+            self.account = account
+            call.resolve(["ok": true])
+        } catch {
+            call.reject("Linphone init failed: \(error.localizedDescription)")
+        }
+    }
+    #endif
+
+
+    // MARK: - makeCall
+
+    @objc func makeCall(_ call: CAPPluginCall) {
+        #if canImport(linphonesw)
+        guard let core = core else { call.reject("Core not initialized"); return }
+        guard let number = call.getString("number") else { call.reject("Missing number"); return }
+        let domain = call.getString("domain")
+            ?? account?.params?.identityAddress?.domain
+            ?? ""
+        let uri = number.hasPrefix("sip:") ? number : "sip:\(number)@\(domain)"
+
+        if let outgoing = core.invite(url: uri) {
+            currentCall = outgoing
+            call.resolve(["ok": true, "callId": outgoing.callLog?.callId ?? ""])
+        } else {
+            call.reject("Failed to place call to \(uri)")
+        }
+        #else
+        call.reject("linphone-sdk not linked")
+        #endif
+    }
+
+    // MARK: - hangup / answer / mute / hold / DTMF
+
     @objc func hangup(_ call: CAPPluginCall) {
-        log(3, "call", "hangup() — sending BYE")
-        let bye = """
-        BYE sip:\(sipDomain) SIP/2.0\r\n\
-        Via: SIP/2.0/TLS \(sipHost):\(sipPort);branch=z9hG4bK\(UUID().uuidString.replacingOccurrences(of: "-", with: ""))\r\n\
-        From: <sip:\(sipExtension)@\(sipDomain)>;tag=\(fromTag)\r\n\
-        To: <sip:\(sipDomain)>\r\n\
-        Call-ID: \(currentCallId)\r\n\
-        CSeq: 2 BYE\r\n\
-        Content-Length: 0\r\n\r\n
-        """
-        let data = bye.data(using: .utf8)!
-        connection?.send(content: data, completion: .contentProcessed { _ in })
-        endActiveCallKitCall()
-        notifyListeners("callEnded", data: [:])
-        call.resolve()
+        #if canImport(linphonesw)
+        guard let active = currentCall ?? core?.currentCall else {
+            call.resolve(["ok": true]); return
+        }
+        do { try active.terminate(); call.resolve(["ok": true]) }
+        catch { call.reject("hangup failed: \(error.localizedDescription)") }
+        #else
+        call.reject("linphone-sdk not linked")
+        #endif
     }
 
     @objc func answer(_ call: CAPPluginCall) {
-        log(3, "call", "answer() invoked")
-        call.resolve()
+        #if canImport(linphonesw)
+        guard let incoming = currentCall ?? core?.currentCall else {
+            call.reject("No incoming call"); return
+        }
+        do { try incoming.accept(); call.resolve(["ok": true]) }
+        catch { call.reject("answer failed: \(error.localizedDescription)") }
+        #else
+        call.reject("linphone-sdk not linked")
+        #endif
     }
 
-
     @objc func setMute(_ call: CAPPluginCall) {
+        #if canImport(linphonesw)
+        guard let core = core else { call.reject("Core not initialized"); return }
         let muted = call.getBool("muted") ?? false
-        log(3, "call", "setMute(\(muted))")
-        if let uuid = activeCallUUID {
-            let action = CXSetMutedCallAction(call: uuid, muted: muted)
-            callController.request(CXTransaction(action: action)) { [weak self] err in
-                if let err = err { self?.log(1, "callkit", "setMute tx error: \(err)") }
-            }
-        } else {
-            let session = AVAudioSession.sharedInstance()
-            try? session.setActive(!muted)
-        }
-        call.resolve()
+        core.micEnabled = !muted
+        call.resolve(["ok": true, "muted": muted])
+        #else
+        call.reject("linphone-sdk not linked")
+        #endif
     }
 
     @objc func setHold(_ call: CAPPluginCall) {
-        let held = call.getBool("held") ?? false
-        log(3, "call", "setHold(\(held))")
-        if let uuid = activeCallUUID {
-            let action = CXSetHeldCallAction(call: uuid, onHold: held)
-            callController.request(CXTransaction(action: action)) { [weak self] err in
-                if let err = err { self?.log(1, "callkit", "setHold tx error: \(err)") }
-            }
+        #if canImport(linphonesw)
+        guard let active = currentCall ?? core?.currentCall else {
+            call.reject("No active call"); return
         }
-        call.resolve()
+        let hold = call.getBool("hold") ?? false
+        do {
+            if hold { try active.pause() } else { try active.resume() }
+            call.resolve(["ok": true, "hold": hold])
+        } catch {
+            call.reject("setHold failed: \(error.localizedDescription)")
+        }
+        #else
+        call.reject("linphone-sdk not linked")
+        #endif
     }
 
     @objc func sendDTMF(_ call: CAPPluginCall) {
-        let digits = call.getString("digits") ?? ""
-        log(3, "call", "sendDTMF \(digits)")
-        let body = "Signal=\(digits)\r\nDuration=250\r\n"
-        let info = """
-        INFO sip:\(sipDomain) SIP/2.0\r\n\
-        Via: SIP/2.0/TLS \(sipHost):\(sipPort);branch=z9hG4bK\(UUID().uuidString.replacingOccurrences(of: "-", with: ""))\r\n\
-        From: <sip:\(sipExtension)@\(sipDomain)>;tag=\(fromTag)\r\n\
-        To: <sip:\(sipDomain)>\r\n\
-        Call-ID: \(currentCallId)\r\n\
-        CSeq: 3 INFO\r\n\
-        Content-Type: application/dtmf-relay\r\n\
-        Content-Length: \(body.utf8.count)\r\n\r\n\(body)
-        """
-        let data = info.data(using: .utf8)!
-        connection?.send(content: data, completion: .contentProcessed { _ in })
-        call.resolve()
-    }
-
-    // MARK: - CallKit helpers
-    private func reportIncomingCallKit(number: String) {
-        let uuid = UUID()
-        activeCallUUID = uuid
-        log(3, "callkit", "reportNewIncomingCall uuid=\(uuid) number=\(number)")
-        let update = CXCallUpdate()
-        update.remoteHandle = CXHandle(type: .phoneNumber, value: number)
-        update.hasVideo = false
-        callProvider.reportNewIncomingCall(with: uuid, update: update) { [weak self] err in
-            if let err = err { self?.log(1, "callkit", "reportNewIncomingCall error: \(err)") }
-            else { self?.log(4, "callkit", "Incoming call reported to system") }
+        #if canImport(linphonesw)
+        guard let active = currentCall ?? core?.currentCall else {
+            call.reject("No active call"); return
         }
-    }
-
-    private func startOutgoingCallKit(number: String) {
-        let uuid = UUID()
-        activeCallUUID = uuid
-        log(3, "callkit", "CXStartCallAction uuid=\(uuid) handle=\(number)")
-        let handle = CXHandle(type: .phoneNumber, value: number)
-        let action = CXStartCallAction(call: uuid, handle: handle)
-        callController.request(CXTransaction(action: action)) { [weak self] err in
-            if let err = err { self?.log(1, "callkit", "CXStartCallAction error: \(err)") }
+        guard let digit = call.getString("digit"), let ch = digit.first else {
+            call.reject("Missing digit"); return
         }
-    }
-
-    private func endActiveCallKitCall() {
-        guard let uuid = activeCallUUID else { return }
-        log(3, "callkit", "CXEndCallAction uuid=\(uuid)")
-        let action = CXEndCallAction(call: uuid)
-        callController.request(CXTransaction(action: action)) { [weak self] err in
-            if let err = err { self?.log(1, "callkit", "CXEndCallAction error: \(err)") }
-        }
-        activeCallUUID = nil
-    }
-
-    // MARK: - CXProviderDelegate
-    public func providerDidReset(_ provider: CXProvider) {
-        log(2, "callkit", "providerDidReset — clearing active call")
-        activeCallUUID = nil
-    }
-    public func provider(_ provider: CXProvider, perform action: CXAnswerCallAction) {
-        log(3, "callkit", "CXAnswerCallAction fulfilled")
-        notifyListeners("callStateChanged", data: ["state": "active"])
-        action.fulfill()
-    }
-    public func provider(_ provider: CXProvider, perform action: CXEndCallAction) {
-        log(3, "callkit", "CXEndCallAction fulfilled")
-        notifyListeners("callEnded", data: [:])
-        action.fulfill()
-    }
-    public func provider(_ provider: CXProvider, perform action: CXStartCallAction) {
-        log(3, "callkit", "CXStartCallAction fulfilled")
-        action.fulfill()
-    }
-    public func provider(_ provider: CXProvider, perform action: CXSetMutedCallAction) {
-        log(3, "callkit", "CXSetMutedCallAction muted=\(action.isMuted)")
-        notifyListeners("muteChanged", data: ["muted": action.isMuted])
-        action.fulfill()
-    }
-    public func provider(_ provider: CXProvider, perform action: CXSetHeldCallAction) {
-        log(3, "callkit", "CXSetHeldCallAction onHold=\(action.isOnHold)")
-        notifyListeners("holdChanged", data: ["held": action.isOnHold])
-        action.fulfill()
-    }
-    public func provider(_ provider: CXProvider, didActivate audioSession: AVAudioSession) {
-        log(4, "callkit", "didActivate audio session")
-    }
-    public func provider(_ provider: CXProvider, didDeactivate audioSession: AVAudioSession) {
-        log(4, "callkit", "didDeactivate audio session")
-    }
-
-
-    // MARK: - Parsing helpers
-    private func extractCallerNumber(from message: String) -> String {
-        let pattern = "From:.*?sip:([^@>]+)@"
-        if let range = message.range(of: pattern, options: .regularExpression) {
-            let match = String(message[range])
-            let parts = match.components(separatedBy: "sip:")
-            if parts.count > 1 {
-                return parts[1].components(separatedBy: "@")[0]
-            }
-        }
-        return "Unknown"
-    }
-
-    private func extractValue(from text: String, key: String) -> String {
-        let pattern = "\(key)=\"([^\"]+)\""
-        if let range = text.range(of: pattern, options: .regularExpression) {
-            let match = String(text[range])
-            let parts = match.components(separatedBy: "\"")
-            if parts.count > 1 { return parts[1] }
-        }
-        return ""
-    }
-
-    private func md5(_ string: String) -> String {
-        let data = Data(string.utf8)
-        var digest = [UInt8](repeating: 0, count: Int(CC_MD5_DIGEST_LENGTH))
-        data.withUnsafeBytes { ptr in
-            _ = CC_MD5(ptr.baseAddress, CC_LONG(data.count), &digest)
-        }
-        return digest.map { String(format: "%02x", $0) }.joined()
+        do { try active.sendDtmf(dtmf: ch); call.resolve(["ok": true]) }
+        catch { call.reject("DTMF failed: \(error.localizedDescription)") }
+        #else
+        call.reject("linphone-sdk not linked")
+        #endif
     }
 }
