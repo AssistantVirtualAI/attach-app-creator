@@ -414,16 +414,16 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
             send200OK(to: msg)
             let id = callActiveId
             stopRtp()
-            resetCallState()
             emitCallEnded("remote_bye", callId: id)
+            resetCallState()
         case "CANCEL":
             send200OK(to: msg)
             if callState == "incoming" {
                 sendResponseToInvite(code: 487, reason: "Request Terminated")
                 let id = callActiveId
                 stopRtp()
-                resetCallState()
                 emitCallEnded("remote_cancel", callId: id)
+                resetCallState()
             }
 
         case "INFO", "NOTIFY", "OPTIONS", "MESSAGE":
