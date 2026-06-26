@@ -13,6 +13,11 @@
 
 #define PJLOG(fmt, ...) NSLog(@"[CapacitorPjsip] " fmt, ##__VA_ARGS__)
 
+__attribute__((constructor))
+static void CapacitorPjsipBinaryLinked(void) {
+    PJLOG(@"binary linked — Objective-C plugin object file is inside the app target");
+}
+
 #pragma mark - Helpers
 
 static NSString *MD5Hex(NSString *s) {
@@ -421,6 +426,21 @@ static NSString *ChallengeParam(NSString *header, NSString *key) {
     [m appendFormat:@"Content-Length: %lu\r\n\r\n%@", (unsigned long)body.length, body];
     [self sendRaw:m];
     [call resolve];
+}
+
+@end
+
+#pragma mark - Capacitor 6 local plugin bridge registration
+
+@interface AppBridgeViewController : CAPBridgeViewController
+@end
+
+@implementation AppBridgeViewController
+
+- (void)capacitorDidLoad {
+    [super capacitorDidLoad];
+    PJLOG(@"bridge did load — registering local plugin instance");
+    [self.bridge registerPluginInstance:[[CapacitorPjsip alloc] init]];
 }
 
 @end
