@@ -339,19 +339,20 @@ export default function ActiveCallSheet({
       )}
 
       {toast && (() => {
-        const ok = /enregistrement en cours|arrêté/i.test(toast);
-        const bg = ok ? 'rgba(34,197,94,0.92)' : 'rgba(220,38,38,0.92)';
-        const glow = ok ? 'rgba(34,197,94,0.55)' : 'rgba(220,38,38,0.55)';
+        const palette =
+          toast.tone === 'ok'   ? { bg: 'rgba(34,197,94,0.94)',  glow: 'rgba(34,197,94,0.55)' } :
+          toast.tone === 'info' ? { bg: 'rgba(35,214,255,0.92)', glow: 'rgba(35,214,255,0.55)' } :
+                                  { bg: 'rgba(220,38,38,0.94)',  glow: 'rgba(220,38,38,0.55)' };
         return (
-          <div style={{
+          <div role="status" aria-live="polite" style={{
             position: 'absolute', left: 16, right: 16, bottom: 'calc(220px + var(--safe-bottom))',
             padding: '12px 16px', borderRadius: radius.md,
-            background: bg, color: '#fff',
+            background: palette.bg, color: '#fff',
             fontSize: 13, fontWeight: 600, textAlign: 'center',
-            boxShadow: `0 18px 40px -12px ${glow}`,
+            boxShadow: `0 18px 40px -12px ${palette.glow}`,
             backdropFilter: 'blur(12px)',
           }}>
-            {toast}
+            {toast.text}
           </div>
         );
       })()}
