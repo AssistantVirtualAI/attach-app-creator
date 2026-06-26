@@ -322,7 +322,7 @@ static NSString *ChallengeParam(NSString *header, NSString *key) {
     if (!self.username || !self.password) {
         PJLOG(@"initAccount missing username/password");
         [self emitRegistrationFailed:@"username/password required" code:0];
-        [call reject:@"username/password required"];
+        [call reject:@"username/password required" :nil :nil :nil];
         return;
     }
     self.pendingRegister = call;
@@ -348,7 +348,7 @@ static NSString *ChallengeParam(NSString *header, NSString *key) {
 
 - (void)makeCall:(CAPPluginCall *)call {
     NSString *dest = [call getString:@"destination"] ?: [call getString:@"number"];
-    if (!dest) { [call reject:@"destination/number required"]; return; }
+    if (!dest) { [call reject:@"destination/number required" :nil :nil :nil]; return; }
     PJLOG(@"makeCall %@", dest);
     self.activeCallId = RandTag();
     NSString *branch = [@"z9hG4bK" stringByAppendingString:RandTag()];
