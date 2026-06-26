@@ -8,6 +8,8 @@
 #import <Foundation/Foundation.h>
 #import <Capacitor/Capacitor.h>
 #import <CommonCrypto/CommonDigest.h>
+#import <ifaddrs.h>
+#import <arpa/inet.h>
 
 #pragma mark - Helpers
 
