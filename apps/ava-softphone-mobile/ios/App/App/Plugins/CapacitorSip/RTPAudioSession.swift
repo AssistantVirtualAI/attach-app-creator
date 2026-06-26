@@ -602,13 +602,32 @@ final class RTPAudioSession {
         let abl = UnsafeMutableAudioBufferListPointer(ioData)
         let needed = Int(inNumberFrames)
 
+        // Upsample 8000Hz playQueue → hwSampleRate using fractional phase
+        // (zero-order hold / sample repeat). Pulls one 8kHz sample whenever
+        // the phase rolls past 1.0; otherwise reuses the previous sample.
+        let step = rtpSampleRate / hwSampleRate
         var out = [Int16](repeating: 0, count: needed)
+        var phase = rxPhase
+        var hold = rxHoldSample
+        var drained = 0
         audioLock.lock()
-        let avail = min(needed, playQueue.count)
-        if avail > 0 {
-            for i in 0..<avail { out[i] = playQueue[i] }
-            playQueue.removeFirst(avail)
+        let available = playQueue.count
+        for i in 0..<needed {
+            phase += step
+            if phase >= 1.0 {
+                phase -= 1.0
+                if !playQueue.isEmpty {
+                    hold = playQueue.removeFirst()
+                    drained += 1
+                } else {
+                    hold = 0
+                }
+            }
+            out[i] = hold
         }
+        rxPhase = phase
+        rxHoldSample = hold
+        let remaining = playQueue.count
         audioLock.unlock()
 
         for buffer in abl {
@@ -619,7 +638,7 @@ final class RTPAudioSession {
             }
         }
         if renderCallbackCount == 1 || renderCallbackCount % 50 == 0 {
-            NSLog("[RTP] render callback #\(renderCallbackCount) frames=\(inNumberFrames) drained=\(avail) playQueue=\(playQueue.count) rxPackets=\(rxPackets) rxPeak=\(String(format: "%.3f", rxPeak))")
+            NSLog("[RTP] render cb #\(renderCallbackCount) hwFrames=\(needed) drained8k=\(drained) avail8k=\(available)→\(remaining) rxPackets=\(rxPackets) rxPeak=\(String(format: "%.3f", rxPeak))")
         }
         return noErr
     }
