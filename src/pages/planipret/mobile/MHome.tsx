@@ -14,6 +14,7 @@ import PWAInstallBanner from "@/components/planipret/PWAInstallBanner";
 import { TEMP_EMOJI } from "@/components/planipret/leadHelpers";
 import { useMaestroPipelineToasts } from "@/hooks/useMaestroPipelineToasts";
 import heroStats from "@/assets/planipret-hero-stats.jpg.asset.json";
+import { safeEdgeFunction } from "@/lib/safeEdgeFunction";
 
 function Shimmer({ className = "" }: { className?: string }) {
   return (
@@ -121,8 +122,17 @@ export default function MHome() {
 
   const reconnect = async () => {
     toast.loading("Reconnexion SIP…", { id: "sip-reconnect" });
-    await supabase.functions.invoke("ns-auth");
+    const { data, error, status } = await safeEdgeFunction("ns-auth", { body: {} });
     toast.dismiss("sip-reconnect");
+    if (error || (data as any)?.success === false) {
+      const msg = status === 403
+        ? "Accès téléphonie non autorisé pour ce compte Planiprêt."
+        : ((data as any)?.error ?? error ?? "Connexion téléphonique impossible");
+      toast.error(msg);
+      return;
+    }
+    toast.success("Connexion téléphonique établie ✅");
+    await reloadProfile();
     loadStats();
   };
 
