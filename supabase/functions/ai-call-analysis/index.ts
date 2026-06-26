@@ -32,7 +32,7 @@ Deno.serve(async (req) => {
       method: "POST",
       headers: { "x-api-key": anthropicKey, "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-5-20250929",
         max_tokens: 1024,
         system: "You are a call analysis expert. Analyze this call transcript and return ONLY valid JSON with these exact fields: { sentiment: 'positive'|'neutral'|'negative', topics: string[], action_items: string[], summary: string (2 sentences max), satisfaction_score: number (1-5), escalation_needed: boolean, key_phrases: string[] }",
         messages: [{ role: "user", content: transcript }],
