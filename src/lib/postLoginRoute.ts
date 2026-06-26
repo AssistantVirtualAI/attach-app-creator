@@ -53,11 +53,11 @@ export async function getPostLoginRoute(userId: string): Promise<string> {
 
     const inAvaStandalone = orgRows.some((r: any) => r.organization_id === AVA_STANDALONE_ORG_ID);
 
-    // AVA super admin platform
+    // AVA super admin → main dashboard with org switcher (Planipret / Lemtel / AVA)
     if (isSuper || appRoles.includes('super_admin')) {
-      if (inAvaStandalone) return '/platform';
       return '/dashboard';
     }
+
 
     // Planipret org (admins and members both land on the Planipret admin portal)
     if (isPlanipretAdmin || isPlanipretMember) {
