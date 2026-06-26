@@ -22,6 +22,25 @@ function json(body: unknown, status = 200) {
   });
 }
 
+function stringifyElError(data: any, fallback: string): string {
+  if (!data) return fallback;
+  if (typeof data === "string") return data;
+  // FastAPI/Pydantic style: detail can be string OR array of {loc,msg,type}
+  const detail = data.detail ?? data.error ?? data.message;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    return detail.map((d: any) => {
+      if (typeof d === "string") return d;
+      const loc = Array.isArray(d?.loc) ? d.loc.join(".") : "";
+      return `${loc ? loc + ": " : ""}${d?.msg ?? JSON.stringify(d)}`;
+    }).join(" | ");
+  }
+  if (detail && typeof detail === "object") {
+    return detail.message || JSON.stringify(detail);
+  }
+  try { return JSON.stringify(data); } catch { return fallback; }
+}
+
 async function elFetch(apiKey: string, path: string, init: RequestInit = {}) {
   const r = await fetch(`${EL_API}${path}`, {
     ...init,
@@ -35,10 +54,12 @@ async function elFetch(apiKey: string, path: string, init: RequestInit = {}) {
   let data: any = null;
   try { data = text ? JSON.parse(text) : null; } catch { data = { raw: text }; }
   if (!r.ok) {
-    return { ok: false, status: r.status, error: data?.detail?.message || data?.message || data?.detail || text || `HTTP ${r.status}`, data };
+    const errStr = stringifyElError(data, text || `HTTP ${r.status}`);
+    return { ok: false, status: r.status, error: errStr, data };
   }
   return { ok: true, status: r.status, data };
 }
+
 
 async function getConfig(admin: any, key: string): Promise<string | null> {
   const { data } = await admin.from("planipret_elevenlabs_config").select("value").eq("key", key).maybeSingle();
@@ -225,6 +246,7 @@ Deno.serve(async (req) => {
         const desired = buildAvaToolConfigs(SUPABASE_URL, SUPABASE_ANON_KEY);
         const ids: string[] = [];
         const errors: string[] = [];
+        const errors_detailed: Array<{ tool: string; status: number; message: string; data?: any }> = [];
 
         for (let i = 0; i < desired.length; i++) {
           const cfg = desired[i];
@@ -239,26 +261,37 @@ Deno.serve(async (req) => {
             toolId = upRes.data?.id ?? upRes.data?.tool_id;
           }
           if (!upRes.ok || !toolId) {
-            errors.push(`${name}: ${upRes.error ?? "no id"}`);
-            await broadcastSetup(admin, user.id, { type: "setup_error", step: name, error: upRes.error ?? "no id" });
+            const msg = typeof upRes.error === "string" ? upRes.error : JSON.stringify(upRes.error ?? "no id");
+            console.log(`[sync_all_tools] ${name} FAILED status=${upRes.status} error=${msg} body=${JSON.stringify(upRes.data ?? null)}`);
+            errors.push(`${name}: ${msg}`);
+            errors_detailed.push({ tool: name, status: upRes.status, message: msg, data: upRes.data });
+            await broadcastSetup(admin, user.id, { type: "setup_error", step: name, error: msg });
             continue;
           }
+          console.log(`[sync_all_tools] ${name} OK id=${toolId}`);
           ids.push(toolId);
           await broadcastSetup(admin, user.id, { type: "tool_added", tool_name: name, count: i + 1, total: desired.length });
         }
 
-        if (ids.length === 0) {
-          return json({ success: false, error: `Aucun outil créé. Erreurs: ${errors.join(" | ")}` });
+        const uniqIds = Array.from(new Set(ids));
+
+        if (uniqIds.length === 0) {
+          return json({
+            success: false,
+            error: `Aucun outil créé. Premières erreurs: ${errors.slice(0, 3).join(" | ")}`,
+            errors_detailed,
+          });
         }
 
         // 3. Attach tool_ids on the agent.
         const patchRes = await elFetch(apiKey, `/convai/agents/${agentId}`, {
           method: "PATCH",
-          body: JSON.stringify({ conversation_config: { agent: { prompt: { tool_ids: ids } } } }),
+          body: JSON.stringify({ conversation_config: { agent: { prompt: { tool_ids: uniqIds } } } }),
         });
 
         // 4. Legacy fallback: some installs still accept inline `tools`.
         if (!patchRes.ok) {
+          console.log(`[sync_all_tools] tool_ids attach failed: ${patchRes.error} — trying legacy inline tools`);
           const legacyTools = buildAvaToolsArray(SUPABASE_URL, SUPABASE_ANON_KEY);
           const legacyRes = await elFetch(apiKey, `/convai/agents/${agentId}`, {
             method: "PATCH",
@@ -266,22 +299,24 @@ Deno.serve(async (req) => {
           });
           if (!legacyRes.ok) {
             await broadcastSetup(admin, user.id, { type: "setup_error", step: "attach_tools", error: patchRes.error });
-            return json({ success: false, error: `Attache outils impossible: ${patchRes.error}`, status: patchRes.status });
+            return json({ success: false, error: `Attache outils impossible: ${patchRes.error}`, status: patchRes.status, errors_detailed });
           }
         }
 
-        await setConfig(admin, "tools_count", String(ids.length), user.id);
+        await setConfig(admin, "tools_count", String(uniqIds.length), user.id);
         await setConfig(admin, "tools_synced_at", new Date().toISOString(), user.id);
-        await broadcastSetup(admin, user.id, { type: "setup_complete", agent_id: agentId, tools_count: ids.length });
+        await broadcastSetup(admin, user.id, { type: "setup_complete", agent_id: agentId, tools_count: uniqIds.length });
         return json({
           success: true,
-          tools_synced: ids.length,
+          tools_synced: uniqIds.length,
           total_expected: desired.length,
           errors: errors.length ? errors : undefined,
+          errors_detailed: errors_detailed.length ? errors_detailed : undefined,
           agent_id: agentId,
-          message: `${ids.length}/${desired.length} outils synchronisés${errors.length ? ` (${errors.length} erreur(s))` : ""}`,
+          message: `${uniqIds.length}/${desired.length} outils synchronisés${errors.length ? ` (${errors.length} erreur(s))` : ""}`,
         });
       }
+
 
       case "update_voice": {
         if (!agentId) return json({ success: false, error: "no_agent_configured" });

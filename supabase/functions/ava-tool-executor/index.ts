@@ -482,7 +482,17 @@ Deno.serve(async (req) => {
   }
 
   const body = await req.json().catch(() => ({}));
-  const { tool_name, parameters, session_id } = body ?? {};
+  // New shape: tool_name comes via header X-Ava-Tool-Name and params are flat in body.
+  // Legacy shape: { tool_name, parameters, session_id }
+  const headerToolName = req.headers.get("x-ava-tool-name") ?? req.headers.get("X-Ava-Tool-Name");
+  const tool_name: string | undefined = headerToolName || body?.tool_name;
+  const session_id: string | undefined = body?.session_id;
+  const parameters = body?.parameters && typeof body.parameters === "object"
+    ? body.parameters
+    : (() => {
+        const { tool_name: _t, session_id: _s, parameters: _p, ...rest } = body ?? {};
+        return rest;
+      })();
   if (!tool_name || typeof tool_name !== "string") {
     return jsonResponse({ success: false, error: "tool_name_required" }, 400);
   }
@@ -494,6 +504,7 @@ Deno.serve(async (req) => {
     const result = await fn(ctx, parameters ?? {});
     await logTool(ctx, session_id ?? "no-session", tool_name, parameters, result);
     return jsonResponse(result);
+
   } catch (e) {
     const err = { success: false, error: e instanceof Error ? e.message : String(e) };
     await logTool(ctx, session_id ?? "no-session", tool_name, parameters, err);
