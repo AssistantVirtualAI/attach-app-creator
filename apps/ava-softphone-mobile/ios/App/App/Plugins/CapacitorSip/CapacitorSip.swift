@@ -48,6 +48,8 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     private var callRemoteUri: String = ""
     private var callRemoteContact: String = ""
     private var callCseq: Int = 1
+    private var callInviteBranch: String = ""
+    private var callInviteCseq: Int = 1
     private var callDirection: String = "" // "out" | "in"
     private var callState: String = "idle"
     private var lastInviteRequest: String = ""
@@ -157,7 +159,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         isMuted = false
         isOnHold = false
         sendInvite(to: number, authHeader: nil)
-        notifyListeners("callStateChanged", data: ["state": "ringing", "direction": "out", "number": number, "callId": callActiveId])
+        notifyListeners("callStateChanged", data: ["state": "ringing", "direction": "out", "number": number, "callId": callActiveId, "stage": "invite_sent"])
         call.resolve(["ok": true, "callId": callActiveId])
     }
 
@@ -392,7 +394,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
                 break
             }
         }
-        log("response code=\(code) cseqMethod=\(cseqMethod)")
+        log("response code=\(code) cseqMethod=\(cseqMethod) callDirection=\(callDirection) callState=\(callState) callId=\(callActiveId)")
         // REGISTER responses
         if cseqMethod == "REGISTER" {
             if code == "401" || code == "407" {
@@ -403,7 +405,8 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
                     self.lastRealm = realm
                     self.lastNonce = nonce
                     cseq += 1
-                    sendRegister(authHeader: buildAuthHeader(method: "REGISTER", uri: "sip:\(domain)", realm: realm, nonce: nonce))
+                    let isProxyAuth = wwwLine.lowercased().hasPrefix("proxy-authenticate:") || code == "407"
+                    sendRegister(authHeader: buildAuthHeader(method: "REGISTER", uri: "sip:\(domain)", realm: realm, nonce: nonce, proxy: isProxyAuth))
                 } else {
                     notifyListeners("registrationFailed", data: ["reason": "401 without auth header"])
                 }
@@ -411,7 +414,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
                 if !registered {
                     registered = true
                     log("REGISTERED ✓ — notifying JS")
-                    notifyListeners("registration", data: ["state": "registered"])
+                    notifyListeners("registration", data: ["state": "registered", "status": "registered", "extension": username])
                     DispatchQueue.main.async {
                         self.registerTimer?.invalidate()
                         self.registerTimer = Timer.scheduledTimer(withTimeInterval: 50, repeats: true) { _ in
@@ -437,15 +440,24 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
                 callState = "ringing"
                 notifyListeners("callStateChanged", data: ["state": "ringing", "direction": "out", "callId": callActiveId])
             } else if code == "401" || code == "407" {
+                log("INVITE auth challenge \(code) — keeping call ringing and retrying with digest auth")
+                callState = "ringing"
+                notifyListeners("callStateChanged", data: ["state": "ringing", "direction": "out", "callId": callActiveId, "stage": "auth_challenge", "code": code])
                 if let wwwLine = msg.split(separator: "\r\n").first(where: {
                     $0.lowercased().hasPrefix("www-authenticate:") || $0.lowercased().hasPrefix("proxy-authenticate:")
                 }).map(String.init) {
                     let (realm, nonce) = parseAuth(wwwLine)
-                    callCseq += 1
                     let target = extractUser(callRemoteUri)
-                    let auth = buildAuthHeader(method: "INVITE", uri: callRemoteUri, realm: realm, nonce: nonce)
+                    let isProxyAuth = wwwLine.lowercased().hasPrefix("proxy-authenticate:") || code == "407"
+                    let auth = buildAuthHeader(method: "INVITE", uri: callRemoteUri, realm: realm, nonce: nonce, proxy: isProxyAuth)
                     sendAck(to: msg, withinDialog: false)
+                    callCseq += 1
                     sendInvite(to: target, authHeader: auth)
+                } else {
+                    log("INVITE \(code) missing auth header")
+                    let id = callActiveId
+                    resetCallState()
+                    notifyListeners("callEnded", data: ["callId": id, "reason": "INVITE \(code) without auth header"])
                 }
             } else if code == "200" {
                 callRemoteTag = extractTag(headerValue(msg, "To") ?? "")
@@ -487,11 +499,12 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         return digest.map { String(format: "%02x", $0) }.joined()
     }
 
-    private func buildAuthHeader(method: String, uri: String, realm: String, nonce: String) -> String {
+    private func buildAuthHeader(method: String, uri: String, realm: String, nonce: String, proxy: Bool = false) -> String {
         let ha1 = md5("\(authUser):\(realm):\(password)")
         let ha2 = md5("\(method):\(uri)")
         let response = md5("\(ha1):\(nonce):\(ha2)")
-        return "Authorization: Digest username=\"\(authUser)\", realm=\"\(realm)\", nonce=\"\(nonce)\", uri=\"\(uri)\", response=\"\(response)\", algorithm=MD5\r\n"
+        let headerName = proxy ? "Proxy-Authorization" : "Authorization"
+        return "\(headerName): Digest username=\"\(authUser)\", realm=\"\(realm)\", nonce=\"\(nonce)\", uri=\"\(uri)\", response=\"\(response)\", algorithm=MD5\r\n"
     }
 
     private func sendRegister(authHeader: String?) {
@@ -537,6 +550,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         callActiveId = ""; callLocalTag = ""; callRemoteTag = ""
         callRemoteUri = ""; callRemoteContact = ""
         callState = "idle"; callDirection = ""
+        callInviteBranch = ""; callInviteCseq = 1
         isMuted = false; isOnHold = false
         lastInviteRequest = ""; lastInviteAuth = nil
     }
@@ -574,6 +588,13 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         return ""
     }
 
+    private func cseqNumber(_ msg: String) -> Int {
+        guard let cseqH = headerValue(msg, "CSeq") else { return callCseq }
+        let comps = cseqH.split(separator: " ")
+        if let first = comps.first, let n = Int(first) { return n }
+        return callCseq
+    }
+
     private func buildSdp(hold: Bool = false) -> String {
         let ip = "0.0.0.0"
         let direction = hold ? "a=sendonly" : "a=sendrecv"
@@ -594,6 +615,8 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
 
     private func sendInvite(to number: String, authHeader: String?) {
         let br = branch
+        callInviteBranch = br
+        callInviteCseq = callCseq
         let uri = "sip:\(number)@\(domain)"
         callRemoteUri = uri
         let sdp = buildSdp()
@@ -629,7 +652,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         msg += "From: \(fromH)\r\n"
         msg += "To: \(toH)\r\n"
         msg += "Call-ID: \(callid)\r\n"
-        msg += "CSeq: \(callCseq) ACK\r\n"
+        msg += "CSeq: \(cseqNumber(response)) ACK\r\n"
         msg += "Content-Length: 0\r\n\r\n"
         log(">>> ACK")
         sendRaw(msg)
@@ -653,7 +676,8 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     }
 
     private func sendCancel() {
-        let br = branch
+        let br = callInviteBranch.isEmpty ? branch : callInviteBranch
+        let cancelCseq = callInviteCseq
         var msg = ""
         msg += "CANCEL \(callRemoteUri) SIP/2.0\r\n"
         msg += "Via: SIP/2.0/TCP 0.0.0.0;branch=\(br);rport\r\n"
@@ -661,7 +685,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         msg += "From: \"\(displayName)\" <sip:\(username)@\(domain)>;tag=\(callLocalTag)\r\n"
         msg += "To: <\(callRemoteUri)>\r\n"
         msg += "Call-ID: \(callActiveId)\r\n"
-        msg += "CSeq: \(callCseq) CANCEL\r\n"
+        msg += "CSeq: \(cancelCseq) CANCEL\r\n"
         msg += "Content-Length: 0\r\n\r\n"
         log(">>> CANCEL")
         sendRaw(msg)
