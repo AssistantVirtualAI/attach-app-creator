@@ -121,6 +121,9 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     private func ensureRtpSocket() {
         if rtp != nil { return }
         let session = RTPAudioSession()
+        session.onAudioStateChanged = { [weak self] status, data in
+            self?.notifyListeners("audioStateChanged", data: data)
+        }
         do {
             try session.prepareLocalSocket()
             self.rtp = session

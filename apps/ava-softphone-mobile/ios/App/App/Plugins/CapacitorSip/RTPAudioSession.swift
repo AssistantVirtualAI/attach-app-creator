@@ -43,6 +43,18 @@ final class RTPAudioSession {
     private(set) var lastEngineError: String = ""
     private(set) var engineRestartTotal: Int = 0
 
+    /// Wired by CapacitorSip to surface audio engine state to JS.
+    /// Status values: "starting" | "running" | "retrying" | "error".
+    var onAudioStateChanged: ((String, [String: Any]) -> Void)?
+    private func emitAudio(_ status: String, _ extra: [String: Any] = [:]) {
+        var data: [String: Any] = ["status": status,
+                                   "restartAttempts": engineRestartAttempts,
+                                   "restartTotal": engineRestartTotal,
+                                   "lastError": lastEngineError]
+        for (k, v) in extra { data[k] = v }
+        onAudioStateChanged?(status, data)
+    }
+
     // MARK: - Diagnostics
     private(set) var txPackets: UInt64 = 0
     private(set) var rxPackets: UInt64 = 0
@@ -210,12 +222,14 @@ final class RTPAudioSession {
         if sockfd >= 0 { close(sockfd); sockfd = -1 }
         sendBuffer.removeAll()
         hasRemote = false
+        emitAudio("idle")
     }
 
     func setMuted(_ muted: Bool) { isMuted = muted }
 
     // MARK: - Audio engine
     private func startAudio() {
+        emitAudio("starting")
         logSessionState("pre-start")
         installAudioObservers()
         configureSessionCategory()
@@ -227,9 +241,11 @@ final class RTPAudioSession {
         attachAndPrepareEngine()
         if startEngineWithRetry() {
             engineRestartAttempts = 0
+            emitAudio("running")
         } else {
             // Engine refused to start synchronously — schedule a backoff retry
             // so the call doesn't permanently lose audio.
+            emitAudio("retrying")
             scheduleEngineRestart()
         }
     }
@@ -342,8 +358,10 @@ final class RTPAudioSession {
         engineRestartAttempts += 1
         if engineRestartAttempts > 8 {
             NSLog("[RTP] engine restart abandoned after \(engineRestartAttempts) attempts")
+            emitAudio("error", ["reason": "engine restart abandoned after \(engineRestartAttempts) attempts: \(lastEngineError)"])
             return
         }
+        emitAudio("retrying", ["attempt": engineRestartAttempts])
         let delay = min(10.0, 0.5 * pow(2.0, Double(engineRestartAttempts - 1)))
         NSLog("[RTP] scheduling engine restart #\(engineRestartAttempts) in \(delay)s")
         engineRestartTimer?.cancel()
@@ -368,6 +386,7 @@ final class RTPAudioSession {
         attachAndPrepareEngine()
         if startEngineWithRetry() {
             engineRestartAttempts = 0
+            emitAudio("running")
         } else {
             scheduleEngineRestart()
         }
