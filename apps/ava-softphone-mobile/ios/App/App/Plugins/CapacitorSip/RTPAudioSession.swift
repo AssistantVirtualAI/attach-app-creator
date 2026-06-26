@@ -263,16 +263,19 @@ final class RTPAudioSession {
 
         let fd = sockfd
         var addr = remoteAddr
+        let pktLen = packet.count
         txQueue.async {
             packet.withUnsafeBytes { raw in
                 _ = withUnsafePointer(to: &addr) { ptr in
                     ptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sa in
-                        Darwin.sendto(fd, raw.baseAddress, packet.count, 0, sa,
+                        Darwin.sendto(fd, raw.baseAddress, pktLen, 0, sa,
                                       socklen_t(MemoryLayout<sockaddr_in>.size))
                     }
                 }
             }
         }
+        txPackets &+= 1
+        txBytes &+= UInt64(pktLen)
     }
 
     // MARK: - RTP receive
