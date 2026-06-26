@@ -57,6 +57,7 @@ function ensureNativeCallEventBridge() {
     const callStateHandle = await CapacitorPjsip.addListener('callStateChanged', (d: any) => {
       console.log(`[NativeSIP] CALL_EVENT|callStateChanged|state=${d?.state || ''}|stage=${d?.stage || ''}`, d);
       if (d?.state === 'active') {
+        // Don't reset isOnHold here — hold/resume is driven by `holdChanged` only.
         emitNativeCallSnapshot({ callState: 'active', activeCallNumber: d?.number || nativeCallSnapshot.activeCallNumber });
       }
       if (d?.state === 'ringing' || d?.state === 'calling') {
@@ -65,24 +66,28 @@ function ensureNativeCallEventBridge() {
     });
     const callEndedHandle = await CapacitorPjsip.addListener('callEnded', (d: any) => {
       console.log('[NativeSIP] CALL_EVENT|callEnded', d);
-      emitNativeCallSnapshot({ callState: 'idle', activeCallNumber: '', isMuted: false, isOnHold: false });
+      emitNativeCallSnapshot({ callState: 'idle', activeCallNumber: '', isMuted: false, isOnHold: false, isRecording: false });
     });
     const muteHandle = await CapacitorPjsip.addListener('muteChanged', (d: any) => {
       emitNativeCallSnapshot({ isMuted: !!d?.muted });
     });
     const holdHandle = await CapacitorPjsip.addListener('holdChanged', (d: any) => {
+      // Purely reflective — never re-invoke setHold here, that would create
+      // an infinite re-INVITE loop.
       emitNativeCallSnapshot({ isOnHold: !!(d?.held ?? d?.onHold) });
+    });
+    const recordingHandle = await CapacitorPjsip.addListener('recordingChanged', (d: any) => {
+      emitNativeCallSnapshot({ isRecording: !!d?.recording });
     });
 
     // Intentionally keep these native listeners for the lifetime of the JS app.
-    // React remounts/StrictMode cleanups were removing call listeners before
-    // 407/180/200 INVITE events arrived, leaving the UI stuck in idle/connecting.
     (globalThis as any).__lemtelNativeCallHandles = [
       callReceivedHandle,
       callStateHandle,
       callEndedHandle,
       muteHandle,
       holdHandle,
+      recordingHandle,
     ];
   })();
   return nativeCallBridgePromise;
