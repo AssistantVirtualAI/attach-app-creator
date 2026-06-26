@@ -235,6 +235,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         callState = "calling"
         isMuted = false
         isOnHold = false
+        ensureRtpSocket()
         emitCallState("ringing", direction: "out", number: number, stage: "before_invite")
         sendInvite(to: number, authHeader: nil)
         emitCallState("ringing", direction: "out", number: number, stage: "invite_sent")
@@ -251,6 +252,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
             sendResponseToInvite(code: 486, reason: "Busy Here")
         }
         let id = callActiveId
+        stopRtp()
         resetCallState()
         emitCallEnded("local_hangup", callId: id)
         call.resolve(["ok": true])
@@ -258,11 +260,15 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
 
     @objc func answer(_ call: CAPPluginCall) {
         if callState != "incoming" { call.reject("no incoming call"); return }
+        ensureRtpSocket()
+        parseRemoteSdp(lastInviteRequest)
         sendResponseToInvite(code: 200, reason: "OK", withSdp: true)
         callState = "active"
+        startRtpIfReady()
         emitCallState("active", direction: "in")
         call.resolve(["ok": true])
     }
+
 
     @objc func setMute(_ call: CAPPluginCall) {
         let muted = call.getBool("muted") ?? !isMuted
