@@ -186,14 +186,16 @@ export default function ActiveCallSheet({
           padding: '6px 20px 14px',
         }}>
           <Ctrl label={sp.snap.muted ? 'Unmute' : 'Mute'} icon="🎙" active={sp.snap.muted}
+            disabled={audioBusy}
             onClick={() => { haptic(); sp.snap.muted ? sp.unmute() : sp.mute(); }} />
           <Ctrl label={onHold ? 'Resume' : 'Hold'} icon="⏸" active={onHold}
+            disabled={audioBusy}
             onClick={() => { haptic(); onHold ? sp.unhold() : sp.hold(); }} />
           <Ctrl
             label={audio.route === 'speaker' ? 'Speaker' : 'Speaker'}
             icon={audio.busy && audio.route !== 'speaker' ? '…' : '🔊'}
             active={audio.route === 'speaker'}
-            disabled={audio.busy}
+            disabled={audio.busy || audioBusy}
             onClick={() => switchRoute(audio.route === 'speaker' ? 'earpiece' : 'speaker')}
           />
           <Ctrl
@@ -201,18 +203,52 @@ export default function ActiveCallSheet({
             icon={audio.busy && audio.route !== 'bluetooth' ? '…' : '🎧'}
             active={audio.route === 'bluetooth'}
             tone={audio.bluetoothAvailable ? 'default' : 'default'}
-            disabled={audio.busy || !audio.bluetoothAvailable}
+            disabled={audio.busy || audioBusy || !audio.bluetoothAvailable}
             onClick={() => switchRoute(audio.route === 'bluetooth' ? 'earpiece' : 'bluetooth')}
           />
           <Ctrl label="Keypad" icon="⌨" active={showKeypad}
             onClick={() => { haptic(); setShowKeypad((v) => !v); }} />
-          <Ctrl label="Transfer" icon="↗" onClick={() => { haptic(ImpactStyle.Medium); transfer(); }} />
-          <Ctrl label="Add" icon="＋" onClick={() => { haptic(ImpactStyle.Medium); addCall(); }} />
-          <Ctrl label="Park" icon="🅿" onClick={() => { haptic(ImpactStyle.Medium); park(); }} />
-          <Ctrl label={sp.snap.recording ? 'Stop Rec' : 'Record'} icon="●" tone={sp.snap.recording ? 'danger' : 'default'}
-            onClick={() => { haptic(ImpactStyle.Medium); record(); }} />
+          <Ctrl label="Transfer" icon="↗" disabled={audioBusy}
+            onClick={() => { haptic(ImpactStyle.Medium); transfer(); }} />
+          <Ctrl label="Add" icon="＋" disabled={audioBusy}
+            onClick={() => { haptic(ImpactStyle.Medium); addCall(); }} />
+          <Ctrl label="Park" icon="🅿" disabled={audioBusy}
+            onClick={() => { haptic(ImpactStyle.Medium); park(); }} />
+          <Ctrl
+            label={audioBusy ? (audioStatus === 'retrying' ? `Retry ${audioRestartAttempts}` : 'Audio…') : sp.snap.recording ? 'Stop Rec' : 'Record'}
+            icon={audioBusy ? '…' : '●'}
+            tone={audioFailed ? 'danger' : sp.snap.recording ? 'danger' : 'default'}
+            disabled={audioBusy || audioFailed}
+            onClick={() => { haptic(ImpactStyle.Medium); record(); }}
+          />
           <Ctrl label="AVA" icon="✦" tone="ai" active={aiOpen}
             onClick={() => { haptic(); setAiOpen((v) => !v); }} />
+        </div>
+      )}
+
+      {(audioBusy || audioFailed) && inCall && (
+        <div style={{
+          margin: '0 16px 10px', padding: '10px 14px', borderRadius: radius.md,
+          background: audioFailed ? 'rgba(220,38,38,0.18)' : 'rgba(35,214,255,0.12)',
+          border: `1px solid ${audioFailed ? colors.danger : colors.avaCyan}55`,
+          color: audioFailed ? '#ffd5d5' : colors.textIce,
+          fontSize: 12, lineHeight: 1.45, display: 'flex', alignItems: 'center', gap: 10,
+        }}>
+          <span style={{ fontSize: 16 }}>{audioFailed ? '⚠️' : '⏳'}</span>
+          <span style={{ flex: 1 }}>
+            {audioFailed
+              ? `Audio engine error — ${audioError || 'unable to start RTP audio'}. Try reconnecting.`
+              : audioStatus === 'retrying'
+                ? `Reconnecting audio engine… attempt ${audioRestartAttempts}/8`
+                : 'Starting audio engine…'}
+          </span>
+          {audioFailed && (
+            <button onClick={() => sp.reconnect?.()} style={{
+              border: `1px solid ${colors.danger}`, background: 'transparent',
+              color: '#fff', borderRadius: radius.sm, padding: '4px 10px',
+              fontSize: 11, fontWeight: 700, cursor: 'pointer',
+            }}>Retry</button>
+          )}
         </div>
       )}
 
