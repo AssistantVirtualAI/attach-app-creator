@@ -1,20 +1,6 @@
-//
-//  CapacitorPjsip.m
-//  Objective-C bridge declaring the plugin and methods so Capacitor can find
-//  them at runtime. Keep method names in sync with CapacitorPjsip.swift.
-//
-
-#import <Foundation/Foundation.h>
-#import <Capacitor/Capacitor.h>
-
-CAP_PLUGIN(CapacitorPjsip, "CapacitorPjsip",
-    CAP_PLUGIN_METHOD(initAccount, CAPPluginReturnPromise);
-    CAP_PLUGIN_METHOD(makeCall, CAPPluginReturnPromise);
-    CAP_PLUGIN_METHOD(hangup, CAPPluginReturnPromise);
-    CAP_PLUGIN_METHOD(answer, CAPPluginReturnPromise);
-    CAP_PLUGIN_METHOD(setMute, CAPPluginReturnPromise);
-    CAP_PLUGIN_METHOD(setHold, CAPPluginReturnPromise);
-    CAP_PLUGIN_METHOD(sendDTMF, CAPPluginReturnPromise);
-    CAP_PLUGIN_METHOD(addListener, CAPPluginReturnCallback);
-    CAP_PLUGIN_METHOD(removeAllListeners, CAPPluginReturnPromise);
-)
+// Intentionally empty.
+// The active local plugin is registered from
+// App/App/Plugins/CapacitorSip/CapacitorSip.swift via CAPBridgedPlugin and
+// AppBridgeViewController.registerPluginInstance(_:). This stale root-level
+// bridge used to expose an incomplete method list (no startRecord/park/etc.)
+// and could make native fixes look missing after a sync.

@@ -23,6 +23,20 @@ test -f ios/App/App/Plugins/CapacitorSip/CapacitorSip.m     || { red "Missing Ca
 test -f src/lib/sip/nativeSipProvider.ts                    || { red "Missing nativeSipProvider.ts"; exit 1; }
 green "OK — plugin files present."
 
+echo "==> 1a. Verify no stale duplicate CapacitorPjsip plugin remains"
+if [ -d ios/App/App/Plugins/CapacitorPjsip ]; then
+  if find ios/App/App/Plugins/CapacitorPjsip -type f | grep -q .; then
+    red "  ✗ Stale duplicate plugin files found under ios/App/App/Plugins/CapacitorPjsip"
+    find ios/App/App/Plugins/CapacitorPjsip -type f -maxdepth 1 -print
+    exit 1
+  fi
+fi
+if grep -R "CAP_PLUGIN(CapacitorPjsip" -n ios/App --exclude-dir=Pods --exclude-dir=build | grep -v "Plugins/CapacitorSip"; then
+  red "  ✗ Duplicate/incomplete CAP_PLUGIN(CapacitorPjsip) declaration found"
+  exit 1
+fi
+green "  ✓ No stale duplicate plugin declarations"
+
 echo "==> 1b. Verify iOS plugin is linked + bridge-registered"
 PBX="ios/App/App.xcodeproj/project.pbxproj"
 STORYBOARD="ios/App/App/Base.lproj/Main.storyboard"
@@ -38,6 +52,13 @@ if grep -Eq "AVAudioEngine|AVAudioPlayerNode|installTap|removeTap" "$RTP"; then
   exit 1
 fi
 grep -q "kAudioUnitSubType_RemoteIO" "$RTP" && green "  ✓ RTPAudioSession uses RemoteIO AudioUnit" || { red "  ✗ RemoteIO AudioUnit not found in RTPAudioSession.swift"; exit 1; }
+
+echo "==> 1d. Verify native call-control methods are exposed"
+for method in startRecord stopRecord transfer park addCall requestMicrophonePermission getRtpStats playTestTone; do
+  grep -q "CAPPluginMethod(name: \"$method\"" ios/App/App/Plugins/CapacitorSip/CapacitorSip.swift \
+    && green "  ✓ $method" \
+    || { red "  ✗ $method missing from CapacitorSip.swift pluginMethods"; exit 1; }
+done
 
 echo "==> 2. Verify Info.plist keys"
 PLIST="ios/App/App/Info.plist"
