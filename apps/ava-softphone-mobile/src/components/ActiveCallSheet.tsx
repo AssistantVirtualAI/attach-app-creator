@@ -20,21 +20,30 @@ export default function ActiveCallSheet({
   const [showKeypad, setShowKeypad] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const [audio, setAudio] = useState<AudioState>(getAudioState());
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ text: string; tone: 'ok' | 'err' | 'info' } | null>(null);
+  const [recPending, setRecPending] = useState(false);
 
   useEffect(() => onAudioStateChange(setAudio), []);
   useEffect(() => {
     if (!toast) return;
-    const id = setTimeout(() => setToast(null), 2400);
+    const id = setTimeout(() => setToast(null), 2800);
     return () => clearTimeout(id);
   }, [toast]);
+
+  // Surface remote end reason (busy, declined, unavailable…) when call ends.
+  const endReasonText: string | null = sp.endReason ?? sp.lastEndReason ?? null;
+  useEffect(() => {
+    if (endReasonText) setToast({ text: endReasonText, tone: 'err' });
+  }, [endReasonText]);
 
   const switchRoute = async (next: AudioRoute) => {
     haptic(ImpactStyle.Light);
     try {
-      await setRoute(next);
-    } catch {
-      setToast(`Impossible de basculer sur ${routeLabel(next)}`);
+      const ok = await setRoute(next);
+      if (!ok) setToast({ text: `Bascule audio impossible vers ${routeLabel(next)}`, tone: 'err' });
+    } catch (e: any) {
+      const msg = e?.message ? `: ${e.message}` : '';
+      setToast({ text: `Impossible de basculer sur ${routeLabel(next)}${msg}`, tone: 'err' });
     }
   };
 
@@ -93,15 +102,19 @@ export default function ActiveCallSheet({
     const isRec = !!sp.snap.recording;
     const fn = isRec ? sp.stopRecord : sp.startRecord;
     if (typeof fn !== 'function') {
-      setToast("Enregistrement non supporté par cette extension");
+      setToast({ text: "Enregistrement non supporté par cette extension", tone: 'err' });
       return;
     }
+    setRecPending(true);
+    setToast({ text: isRec ? "Arrêt de l'enregistrement…" : "Démarrage de l'enregistrement…", tone: 'info' });
     try {
       await fn();
-      setToast(isRec ? "Enregistrement arrêté" : "● Enregistrement en cours");
+      setToast({ text: isRec ? "Enregistrement arrêté ✓" : "Enregistré ✓ — la conversation est capturée", tone: 'ok' });
     } catch (e: any) {
       const msg = e?.message || 'erreur inconnue';
-      setToast(isRec ? `Impossible d'arrêter l'enregistrement: ${msg}` : `Impossible de démarrer l'enregistrement: ${msg}`);
+      setToast({ text: isRec ? `Erreur — arrêt impossible: ${msg}` : `Erreur — démarrage impossible: ${msg}`, tone: 'err' });
+    } finally {
+      setRecPending(false);
     }
   };
 
@@ -251,10 +264,15 @@ export default function ActiveCallSheet({
           <Ctrl label="Park" icon="🅿" disabled={audioBusy}
             onClick={() => { haptic(ImpactStyle.Medium); park(); }} />
           <Ctrl
-            label={audioBusy ? (audioStatus === 'retrying' ? `Retry ${audioRestartAttempts}` : 'Audio…') : sp.snap.recording ? 'Stop Rec' : 'Record'}
-            icon={audioBusy ? '…' : '●'}
+            label={
+              audioBusy ? (audioStatus === 'retrying' ? `Retry ${audioRestartAttempts}` : 'Audio…')
+              : recPending ? (sp.snap.recording ? 'Arrêt…' : 'Démarrage…')
+              : sp.snap.recording ? 'Stop Rec' : 'Record'
+            }
+            icon={audioBusy || recPending ? '…' : sp.snap.recording ? '■' : '●'}
             tone={audioFailed ? 'danger' : sp.snap.recording ? 'danger' : 'default'}
-            disabled={audioBusy || audioFailed}
+            active={!!sp.snap.recording}
+            disabled={audioBusy || audioFailed || recPending}
             onClick={() => { haptic(ImpactStyle.Medium); record(); }}
           />
           <Ctrl label="AVA" icon="✦" tone="ai" active={aiOpen}
@@ -321,19 +339,20 @@ export default function ActiveCallSheet({
       )}
 
       {toast && (() => {
-        const ok = /enregistrement en cours|arrêté/i.test(toast);
-        const bg = ok ? 'rgba(34,197,94,0.92)' : 'rgba(220,38,38,0.92)';
-        const glow = ok ? 'rgba(34,197,94,0.55)' : 'rgba(220,38,38,0.55)';
+        const palette =
+          toast.tone === 'ok'   ? { bg: 'rgba(34,197,94,0.94)',  glow: 'rgba(34,197,94,0.55)' } :
+          toast.tone === 'info' ? { bg: 'rgba(35,214,255,0.92)', glow: 'rgba(35,214,255,0.55)' } :
+                                  { bg: 'rgba(220,38,38,0.94)',  glow: 'rgba(220,38,38,0.55)' };
         return (
-          <div style={{
+          <div role="status" aria-live="polite" style={{
             position: 'absolute', left: 16, right: 16, bottom: 'calc(220px + var(--safe-bottom))',
             padding: '12px 16px', borderRadius: radius.md,
-            background: bg, color: '#fff',
+            background: palette.bg, color: '#fff',
             fontSize: 13, fontWeight: 600, textAlign: 'center',
-            boxShadow: `0 18px 40px -12px ${glow}`,
+            boxShadow: `0 18px 40px -12px ${palette.glow}`,
             backdropFilter: 'blur(12px)',
           }}>
-            {toast}
+            {toast.text}
           </div>
         );
       })()}
