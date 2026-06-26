@@ -27,6 +27,10 @@ end
 target 'App' do
   capacitor_pods
   # Add your Pods here
+
+  # Native PJSIP backend (used when VITE_NATIVE_SIP=true).
+  # See apps/ava-softphone-mobile/ios/App/Plugins/CapacitorPjsip/.
+  pod 'pjsip', '~> 2.13'
 end
 
 post_install do |installer|
