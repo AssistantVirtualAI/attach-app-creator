@@ -1081,20 +1081,17 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     @objc func addCall(_ call: CAPPluginCall) {
         let target = call.getString("target") ?? call.getString("number") ?? ""
         if target.isEmpty { call.reject("target required"); return }
-        // Hold current call first (re-INVITE sendonly), then place a new INVITE.
-        if !callActiveId.isEmpty && callState == "active" {
+        // Hold current call first (re-INVITE sendonly) so the user can place a new outbound leg.
+        // Full multi-leg merging is the caller's responsibility (or the PBX with *3).
+        if !callActiveId.isEmpty && callState == "active" && !isOnHold {
             isOnHold = true
             callCseq += 1
             sendReInvite(hold: true)
             notifyListeners("holdChanged", data: ["held": true, "onHold": true])
         }
-        // NOTE: full multi-call leg management isn't implemented; this fires a
-        // best-effort blind dial. The PBX or the caller has to manage merging.
-        let proxy = bridge?.viewController as? UIViewController
-        _ = proxy
-        let stub = CAPPluginCall(callbackId: "addCall", options: ["number": target], success: { _, _ in }, error: { _ in })
-        if let stub = stub { self.makeCall(stub) }
-        call.resolve(["ok": true, "target": target])
+        // Notify JS so it can fire a fresh makeCall() once the hold is acknowledged.
+        notifyListeners("addCallRequested", data: ["target": target])
+        call.resolve(["ok": true, "target": target, "note": "follow up with makeCall on JS side"])
     }
 
     // MARK: - Helpers for new methods
