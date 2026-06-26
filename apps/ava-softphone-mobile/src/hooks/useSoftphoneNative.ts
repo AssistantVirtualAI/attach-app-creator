@@ -328,5 +328,12 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
     setAudioProfile,
     offeredCodecs: [],
     negotiatedCodec: null,
-  };
+    // Native call-control extras (consumed by ActiveCallSheet)
+    isRecording,
+    startRecording,
+    stopRecording,
+    transferCall,
+    parkCall,
+    addCall,
+  } as UseSoftphoneReturn;
 }
