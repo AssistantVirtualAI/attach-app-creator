@@ -55,19 +55,31 @@ export async function toggleSpeaker(): Promise<boolean> {
 // New API --------------------------------------------------------------------
 export async function setRoute(next: AudioRoute): Promise<boolean> {
   if (busy) return false;
-  if (next === 'bluetooth' && !bluetoothAvailable) {
-    // allow attempt anyway — native side may still route
-  }
   busy = true; emit();
+  let nativeOk = false;
   try {
-    if (audioEl) await applySink(audioEl, next);
-    route = next;
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const res = await CapacitorSipNative.setAudioRoute({ route: next });
+        nativeOk = !!res?.ok;
+        const outs = (res?.outputs || '').toLowerCase();
+        if (outs.includes('speaker')) route = 'speaker';
+        else if (outs.includes('bluetooth')) route = 'bluetooth';
+        else route = 'earpiece';
+      } catch (e) {
+        console.warn('[audioOutput] native setAudioRoute failed', e);
+        throw e;
+      }
+    } else {
+      route = next;
+    }
+    if (audioEl) {
+      try { await applySink(audioEl, route); } catch (e) {
+        if (!nativeOk) console.warn('[audioOutput] setSinkId failed', e);
+      }
+    }
     emit();
     return true;
-  } catch (e) {
-    console.warn('[audioOutput] setRoute failed', next, e);
-    emit();
-    throw e;
   } finally {
     busy = false;
     emit();
@@ -77,15 +89,14 @@ export async function setRoute(next: AudioRoute): Promise<boolean> {
 async function applySink(el: HTMLAudioElement, target: AudioRoute) {
   const anyEl = el as any;
   el.volume = 1.0;
-  if (typeof anyEl.setSinkId !== 'function') return; // iOS WKWebView path
-  // Map to the limited sink ids the browser exposes. The native layer does
-  // the real routing; this only nudges devices that support setSinkId.
+  if (typeof anyEl.setSinkId !== 'function') return; // unsupported → silent skip
   const sinkId =
     target === 'speaker' ? 'communications' :
     target === 'bluetooth' ? 'communications' :
     'default';
-  await anyEl.setSinkId(sinkId);
+  try { await anyEl.setSinkId(sinkId); } catch { /* native already routed */ }
 }
+
 
 async function probeBluetooth() {
   try {
