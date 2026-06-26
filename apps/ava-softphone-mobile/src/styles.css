@@ -67,13 +67,15 @@ button::before {
   content: "";
   position: absolute;
   inset: -1px;
-  z-index: -1;
+  z-index: 1;
   pointer-events: none;
   background: linear-gradient(118deg, transparent 20%, rgba(255,255,255,0.08) 36%, var(--ava-btn-shine) 50%, rgba(35,214,255,0.18) 58%, transparent 76%);
   transform: translateX(-150%) skewX(-18deg);
   opacity: 0;
   transition: transform .58s cubic-bezier(.2,.8,.2,1), opacity .2s ease;
 }
+
+button > * { position: relative; z-index: 2; }
 
 button:hover::before,
 button:focus-visible::before,
@@ -115,14 +117,15 @@ button:active { transform: scale(.965); filter: saturate(1.18) brightness(1.05);
   border-color: color-mix(in srgb, var(--btn-accent, #23d6ff) 62%, var(--ava-btn-border)) !important;
   box-shadow: 0 18px 44px -20px var(--btn-accent, #23d6ff), inset 0 1px 0 rgba(255,255,255,0.35), inset 0 -8px 18px rgba(0,0,0,0.18) !important;
 }
-.ava-control-orb::after,
-.ava-big-call-orb::after {
+.ava-control-orb::before,
+.ava-big-call-orb::before {
   content: "";
   position: absolute;
   inset: 0;
+  z-index: 0;
   pointer-events: none;
   background: linear-gradient(135deg, rgba(255,255,255,0.42), transparent 34%, rgba(255,255,255,0.08) 68%, rgba(255,255,255,0.24));
-  opacity: .72;
+  opacity: .58;
 }
 .ava-control-button:hover .ava-control-orb,
 .ava-big-call-button:hover .ava-big-call-orb {
