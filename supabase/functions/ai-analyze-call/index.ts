@@ -38,7 +38,11 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    const { call_id, transcript } = await req.json();
+    const body = await req.json().catch(() => ({}));
+    const { call_id, transcript, action } = body ?? {};
+    if (action === "test" || call_id === "test") {
+      return new Response(JSON.stringify({ success: true, test: true }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     if (!call_id || !transcript) {
       return new Response(JSON.stringify({ success: false, error: "missing call_id or transcript" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
