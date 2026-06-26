@@ -191,7 +191,10 @@ final class RTPAudioSession {
         }
         self.converter = conv
 
-        input.installTap(onBus: 0, bufferSize: 1024, format: hwFormat) { [weak self] buf, _ in
+        // Pass nil so CoreAudio uses the node's actual native format (avoids
+        // "Failed to create tap due to format mismatch" when hw is 48k Float32
+        // and our cached hwFormat is stale or different).
+        input.installTap(onBus: 0, bufferSize: 1024, format: nil) { [weak self] buf, _ in
             self?.handleCapturedBuffer(buf)
         }
 
@@ -205,6 +208,16 @@ final class RTPAudioSession {
     }
 
     private func handleCapturedBuffer(_ buf: AVAudioPCMBuffer) {
+        // Rebuild converter if tap delivered a different format than expected.
+        if converter == nil || converter?.inputFormat != buf.format {
+            if let c = AVAudioConverter(from: buf.format, to: playFormat) {
+                converter = c
+                NSLog("[RTP] converter rebuilt \(buf.format) → \(playFormat)")
+            } else {
+                NSLog("[RTP] cannot build converter for \(buf.format)")
+                return
+            }
+        }
         guard let conv = converter else { return }
         let ratio = playFormat.sampleRate / buf.format.sampleRate
         let outCapacity = AVAudioFrameCount(Double(buf.frameLength) * ratio + 16)
