@@ -26,6 +26,8 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
   const [audioProfile, setAudioProfileState] = useState<AudioProfile>(() => loadAudioProfile());
   const [quality] = useState<CallQuality>(EMPTY_QUALITY);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastInitKeyRef = useRef<string | null>(null);
+  const initInFlightRef = useRef<boolean>(false);
 
   const startTimer = () => {
     if (timerRef.current) clearInterval(timerRef.current);
