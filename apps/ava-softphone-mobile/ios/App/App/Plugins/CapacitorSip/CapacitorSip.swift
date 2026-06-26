@@ -253,8 +253,8 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         }
         let id = callActiveId
         stopRtp()
-        resetCallState()
         emitCallEnded("local_hangup", callId: id)
+        resetCallState()
         call.resolve(["ok": true])
     }
 
