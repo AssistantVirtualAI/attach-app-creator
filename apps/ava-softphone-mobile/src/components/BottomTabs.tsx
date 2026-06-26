@@ -9,7 +9,8 @@ import { useT } from '../lib/i18n';
 export type Tab =
   | 'contacts' | 'chats' | 'calls' | 'keypad' | 'speeddial'
   // legacy routes still reachable via deep-link / query param:
-  | 'home' | 'ava' | 'messages' | 'settings' | 'more' | 'voicemail' | 'sms' | 'queues';
+  | 'home' | 'ava' | 'messages' | 'settings' | 'more' | 'voicemail' | 'sms' | 'queues'
+  | 'audiodiag' | 'permissions';
 
 type LabelKey =
   | 'tabs.contacts' | 'tabs.chats' | 'tabs.calls' | 'tabs.keypad' | 'tabs.speeddial';
