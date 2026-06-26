@@ -75,7 +75,7 @@ function ensureNativeCallEventBridge() {
     // Intentionally keep these native listeners for the lifetime of the JS app.
     // React remounts/StrictMode cleanups were removing call listeners before
     // 407/180/200 INVITE events arrived, leaving the UI stuck in idle/connecting.
-    (window as any).__lemtelNativeCallHandles = [
+    (globalThis as any).__lemtelNativeCallHandles = [
       callReceivedHandle,
       callStateHandle,
       callEndedHandle,
