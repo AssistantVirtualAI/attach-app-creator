@@ -124,7 +124,7 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
 
   useEffect(() => {
     ensureNativeCallEventBridge().catch((e) => console.warn('[NativeSIP] call event bridge failed', e));
-    return subscribeNativeCallEvents((snapshot) => {
+    const unsub = subscribeNativeCallEvents((snapshot) => {
       setActiveCallNumber(snapshot.activeCallNumber);
       setIsMuted(snapshot.isMuted);
       setIsOnHold(snapshot.isOnHold);
@@ -133,6 +133,19 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
       if (snapshot.callState === 'active') startTimer();
       if (snapshot.callState === 'idle') stopTimer();
     });
+    let audioHandle: { remove(): Promise<void> } | null = null;
+    CapacitorPjsip.addListener('audioStateChanged', (d: any) => {
+      const status = (d?.status as typeof audioStatus) || 'idle';
+      setAudioStatus(status);
+      setAudioRestartAttempts(Number(d?.restartAttempts ?? 0));
+      if (status === 'error') {
+        setAudioError(String(d?.reason || d?.lastError || 'Audio engine failed'));
+      } else if (status === 'running') {
+        setAudioError('');
+      }
+      console.log(`[NativeSIP] AUDIO_STATE|${status}|attempts=${d?.restartAttempts}|err=${d?.lastError || ''}`);
+    }).then((h: any) => { audioHandle = h; }).catch(() => {});
+    return () => { unsub(); audioHandle?.remove().catch(() => {}); };
   }, []);
 
   // Register account on config change.
