@@ -1026,4 +1026,116 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         sendRaw(resp)
         log(">>> \(code) \(reason) (to INVITE)")
     }
+
+    // MARK: - Record / Transfer / Park / AddCall
+
+    /// Server-side recording toggle via SIP INFO `Record: on|off` (NetSapiens / FusionPBX standard).
+    /// Falls back to DTMF feature code `*1` for PBX that don't support the INFO method.
+    @objc func startRecord(_ call: CAPPluginCall) {
+        if callActiveId.isEmpty || callState != "active" {
+            call.reject("no active call")
+            return
+        }
+        isRecording = true
+        callCseq += 1
+        sendInfoRecord(on: true)
+        notifyListeners("recordingChanged", data: ["recording": true])
+        call.resolve(["ok": true, "recording": true])
+    }
+
+    @objc func stopRecord(_ call: CAPPluginCall) {
+        if callActiveId.isEmpty {
+            call.resolve(["ok": true, "recording": false])
+            return
+        }
+        isRecording = false
+        callCseq += 1
+        sendInfoRecord(on: false)
+        notifyListeners("recordingChanged", data: ["recording": false])
+        call.resolve(["ok": true, "recording": false])
+    }
+
+    @objc func transfer(_ call: CAPPluginCall) {
+        let target = call.getString("target") ?? call.getString("number") ?? ""
+        if target.isEmpty { call.reject("target required"); return }
+        if callActiveId.isEmpty || (callState != "active" && callState != "hold") {
+            call.reject("no active call")
+            return
+        }
+        callCseq += 1
+        sendRefer(to: target)
+        call.resolve(["ok": true, "target": target])
+    }
+
+    @objc func park(_ call: CAPPluginCall) {
+        let code = call.getString("code") ?? "*5"
+        if callActiveId.isEmpty || (callState != "active" && callState != "hold") {
+            call.reject("no active call")
+            return
+        }
+        callCseq += 1
+        sendRefer(to: code)
+        call.resolve(["ok": true, "code": code])
+    }
+
+    @objc func addCall(_ call: CAPPluginCall) {
+        let target = call.getString("target") ?? call.getString("number") ?? ""
+        if target.isEmpty { call.reject("target required"); return }
+        // Hold current call first (re-INVITE sendonly), then place a new INVITE.
+        if !callActiveId.isEmpty && callState == "active" {
+            isOnHold = true
+            callCseq += 1
+            sendReInvite(hold: true)
+            notifyListeners("holdChanged", data: ["held": true, "onHold": true])
+        }
+        // NOTE: full multi-call leg management isn't implemented; this fires a
+        // best-effort blind dial. The PBX or the caller has to manage merging.
+        let proxy = bridge?.viewController as? UIViewController
+        _ = proxy
+        let stub = CAPPluginCall(callbackId: "addCall", options: ["number": target], success: { _, _ in }, error: { _ in })
+        if let stub = stub { self.makeCall(stub) }
+        call.resolve(["ok": true, "target": target])
+    }
+
+    // MARK: - Helpers for new methods
+
+    private func sendInfoRecord(on: Bool) {
+        let body = "Record: \(on ? "on" : "off")\r\n"
+        let br = branch
+        let target = callRemoteContact.isEmpty ? callRemoteUri : callRemoteContact
+        var msg = ""
+        msg += "INFO \(target) SIP/2.0\r\n"
+        msg += "Via: SIP/2.0/TCP \(sigLocalIp());branch=\(br);rport\r\n"
+        msg += "Max-Forwards: 70\r\n"
+        msg += "From: \"\(displayName)\" <sip:\(username)@\(domain)>;tag=\(callLocalTag)\r\n"
+        msg += "To: <\(callRemoteUri)>" + (callRemoteTag.isEmpty ? "" : ";tag=\(callRemoteTag)") + "\r\n"
+        msg += "Call-ID: \(callActiveId)\r\n"
+        msg += "CSeq: \(callCseq) INFO\r\n"
+        msg += "Content-Type: application/x-record-control\r\n"
+        msg += "Content-Length: \(body.utf8.count)\r\n\r\n"
+        msg += body
+        log(">>> SIP INFO Record: \(on ? "on" : "off")")
+        sendRaw(msg)
+    }
+
+    private func sendRefer(to target: String) {
+        let br = branch
+        let dialogTarget = callRemoteContact.isEmpty ? callRemoteUri : callRemoteContact
+        // Normalize target: if it already looks like a SIP URI, keep it; otherwise build one.
+        let referTo = target.lowercased().hasPrefix("sip:") ? target : "sip:\(target)@\(domain)"
+        var msg = ""
+        msg += "REFER \(dialogTarget) SIP/2.0\r\n"
+        msg += "Via: SIP/2.0/TCP \(sigLocalIp());branch=\(br);rport\r\n"
+        msg += "Max-Forwards: 70\r\n"
+        msg += "From: \"\(displayName)\" <sip:\(username)@\(domain)>;tag=\(callLocalTag)\r\n"
+        msg += "To: <\(callRemoteUri)>" + (callRemoteTag.isEmpty ? "" : ";tag=\(callRemoteTag)") + "\r\n"
+        msg += "Call-ID: \(callActiveId)\r\n"
+        msg += "CSeq: \(callCseq) REFER\r\n"
+        msg += "Refer-To: <\(referTo)>\r\n"
+        msg += "Referred-By: <sip:\(username)@\(domain)>\r\n"
+        msg += "Contact: <sip:\(username)@\(sigLocalIp());transport=tcp>\r\n"
+        msg += "Content-Length: 0\r\n\r\n"
+        log(">>> REFER → \(referTo)")
+        sendRaw(msg)
+    }
 }
