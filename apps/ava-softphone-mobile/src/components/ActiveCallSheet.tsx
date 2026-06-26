@@ -264,10 +264,15 @@ export default function ActiveCallSheet({
           <Ctrl label="Park" icon="🅿" disabled={audioBusy}
             onClick={() => { haptic(ImpactStyle.Medium); park(); }} />
           <Ctrl
-            label={audioBusy ? (audioStatus === 'retrying' ? `Retry ${audioRestartAttempts}` : 'Audio…') : sp.snap.recording ? 'Stop Rec' : 'Record'}
-            icon={audioBusy ? '…' : '●'}
+            label={
+              audioBusy ? (audioStatus === 'retrying' ? `Retry ${audioRestartAttempts}` : 'Audio…')
+              : recPending ? (sp.snap.recording ? 'Arrêt…' : 'Démarrage…')
+              : sp.snap.recording ? 'Stop Rec' : 'Record'
+            }
+            icon={audioBusy || recPending ? '…' : sp.snap.recording ? '■' : '●'}
             tone={audioFailed ? 'danger' : sp.snap.recording ? 'danger' : 'default'}
-            disabled={audioBusy || audioFailed}
+            active={!!sp.snap.recording}
+            disabled={audioBusy || audioFailed || recPending}
             onClick={() => { haptic(ImpactStyle.Medium); record(); }}
           />
           <Ctrl label="AVA" icon="✦" tone="ai" active={aiOpen}
