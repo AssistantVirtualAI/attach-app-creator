@@ -297,13 +297,22 @@ final class RTPAudioSession {
                 // Symmetric RTP latch: if PBX answered from a different port, follow it.
                 if from.sin_port != self.remoteAddr.sin_port {
                     self.remoteAddr.sin_port = from.sin_port
-                    NSLog("[RTP] latched remote port=\(UInt16(bigEndian: from.sin_port))")
+                    self.lastRemotePort = UInt16(bigEndian: from.sin_port)
+                    NSLog("[RTP] latched remote port=\(self.lastRemotePort)")
                 }
+                self.rxPackets &+= 1
+                self.rxBytes &+= UInt64(n)
+                self.lastRemoteSeq = (UInt16(buf[2]) << 8) | UInt16(buf[3])
                 let payloadCount = n - 12
                 var samples = [Int16](); samples.reserveCapacity(payloadCount)
+                var peak: Int16 = 0
                 for i in 0..<payloadCount {
-                    samples.append(RTPAudioSession.ulawToLinear(buf[12 + i]))
+                    let s = RTPAudioSession.ulawToLinear(buf[12 + i])
+                    let a = s < 0 ? -s : s
+                    if a > peak { peak = a }
+                    samples.append(s)
                 }
+                self.rxPeak = Float(peak) / 32767.0
                 self.enqueuePlayback(samples)
             }
             NSLog("[RTP] receive loop exited")
