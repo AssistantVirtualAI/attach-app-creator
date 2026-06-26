@@ -55,6 +55,21 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
             call.reject("server, username, password required")
             return
         }
+        // Re-entrancy guard: if already registered or a connection is already
+        // up, just re-emit registered and skip opening a new TCP socket. React
+        // StrictMode / parent re-renders otherwise spam initAccount.
+        let sameAccount = (self.server == server && self.username == username && self.password == password)
+        if sameAccount && registered {
+            log("initAccount skipped — already registered for \(username)@\(server)")
+            notifyListeners("registration", data: ["state": "registered", "status": "registered"])
+            call.resolve(["ok": true, "alreadyRegistered": true])
+            return
+        }
+        if sameAccount, let conn = connection, conn.state == .ready || conn.state == .preparing {
+            log("initAccount skipped — connection already \(conn.state) for \(username)@\(server)")
+            call.resolve(["ok": true, "inFlight": true])
+            return
+        }
         self.server = server
         self.port = UInt16(call.getInt("port") ?? 5060)
         self.username = username
