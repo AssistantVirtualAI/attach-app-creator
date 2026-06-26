@@ -53,8 +53,12 @@ export interface UseSoftphoneReturn {
   isRecording?: boolean;
   startRecording?: () => void | Promise<void>;
   stopRecording?: () => void | Promise<void>;
+  startRecord?: () => void | Promise<void>;
+  stopRecord?: () => void | Promise<void>;
   transferCall?: (target: string) => void | Promise<void>;
+  transfer?: (target: string) => void | Promise<void>;
   parkCall?: (code?: string) => void | Promise<void>;
+  park?: (code?: string) => void | Promise<void>;
   addCall?: (target: string) => void | Promise<void>;
 }
 
