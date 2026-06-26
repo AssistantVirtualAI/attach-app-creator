@@ -190,6 +190,20 @@ final class RTPAudioSession {
         self.startedAt = Date()
         NSLog("[RTP] start remote=\(remoteIp):\(remotePort) local=\(localIp):\(localPort)")
         startReceiveLoop()
+        if ioUnit == nil {
+            startAudio()
+        } else {
+            NSLog("[RTP] start: RemoteIO already prewarmed — reusing existing AudioUnit")
+            emitAudio("running")
+        }
+    }
+
+    /// Public: build + start RemoteIO eagerly (called right after socket bind).
+    /// Doing this BEFORE the SIP INVITE avoids AudioUnitInitialize 561017449
+    /// caused by AVAudioSession being mid-config when the call answers.
+    func prewarmAudio() {
+        if audioPrepared && ioUnit != nil { return }
+        audioPrepared = true
         startAudio()
     }
 
@@ -200,11 +214,13 @@ final class RTPAudioSession {
             configureSessionCategory()
             _ = buildAndStartIOUnit()
         }
-        let total = Int(sampleRate * seconds)
+        // Tone is generated at the RTP/playQueue rate (8kHz); render callback
+        // upsamples to the hardware rate.
+        let total = Int(rtpSampleRate * seconds)
         var samples = [Int16](repeating: 0, count: total)
         let twoPi = 2.0 * Double.pi
         for i in 0..<total {
-            let v = sin(twoPi * frequency * Double(i) / sampleRate) * 8000
+            let v = sin(twoPi * frequency * Double(i) / rtpSampleRate) * 8000
             samples[i] = Int16(v)
         }
         audioLock.lock()
@@ -216,8 +232,9 @@ final class RTPAudioSession {
     }
 
     func stop() {
-        guard running else { return }
+        let wasRunning = running
         running = false
+        audioPrepared = false
         NSLog("[RTP] stop")
         engineRestartTimer?.cancel(); engineRestartTimer = nil
         engineRestartAttempts = 0
@@ -229,7 +246,7 @@ final class RTPAudioSession {
         playQueue.removeAll()
         audioLock.unlock()
         hasRemote = false
-        emitAudio("idle")
+        if wasRunning { emitAudio("idle") }
     }
 
     func setMuted(_ muted: Bool) { isMuted = muted }
@@ -243,6 +260,12 @@ final class RTPAudioSession {
         // Let the session settle before reading/forcing hardware format.
         NSLog("[RTP] sleeping 100ms after setCategory to let session settle")
         Thread.sleep(forTimeInterval: 0.1)
+        // Read the actual hardware rate iOS negotiated. RemoteIO MUST use this
+        // rate — passing 8000Hz here is what triggers kAudioUnitErr_FormatNotSupported.
+        let actual = AVAudioSession.sharedInstance().sampleRate
+        if actual >= 8000 { hwSampleRate = actual }
+        tapFormatDesc = "RemoteIO I16 \(Int(hwSampleRate))Hz ch=1 → RTP 8000Hz"
+        NSLog("[RTP] negotiated hwSampleRate=\(Int(hwSampleRate))Hz (RTP rate=\(Int(rtpSampleRate))Hz)")
         logSessionState("post-settle")
         if buildAndStartIOUnit() {
             engineRestartAttempts = 0
