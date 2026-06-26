@@ -17,7 +17,9 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "setHold", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "sendDTMF", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setLogLevel", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "unregister", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "unregister", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setAudioRoute", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getAudioRoute", returnType: CAPPluginReturnPromise)
     ]
 
     // MARK: - Config / State
