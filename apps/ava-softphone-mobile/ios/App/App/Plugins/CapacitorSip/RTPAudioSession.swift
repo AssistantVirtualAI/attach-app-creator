@@ -1,85 +1,85 @@
 import Foundation
-import Network
 import AVFoundation
 import Darwin
 
-/// Minimal PCMU (G.711 μ-law) RTP audio session.
-/// - UDP socket bound to a random port in [20000, 30000].
-/// - Captures mic with AVAudioEngine, downsamples to 8 kHz mono Int16,
-///   encodes μ-law, sends RTP every 20 ms (160 samples per packet).
-/// - Receives RTP, decodes μ-law, plays via an AVAudioPlayerNode at 8 kHz.
+/// PCMU (G.711 μ-law) RTP audio session backed by a single BSD UDP socket
+/// for symmetric send/receive. AVAudioEngine drives capture and playback.
 final class RTPAudioSession {
     // MARK: - Public state
     private(set) var localPort: UInt16 = 0
     private(set) var localIp: String = "0.0.0.0"
 
-    // MARK: - Private state
-    private var listener: NWListener?
-    private var sendConnection: NWConnection?
-    private let netQueue = DispatchQueue(label: "rtp.audio.net")
-    private var remoteHost: NWEndpoint.Host?
-    private var remotePort: NWEndpoint.Port?
+    // MARK: - Socket
+    private var sockfd: Int32 = -1
+    private var remoteAddr: sockaddr_in = sockaddr_in()
+    private var hasRemote = false
+    private let rxQueue = DispatchQueue(label: "rtp.audio.rx", qos: .userInteractive)
+    private let txQueue = DispatchQueue(label: "rtp.audio.tx", qos: .userInteractive)
 
+    // MARK: - Audio
     private let engine = AVAudioEngine()
-    private var playerNode = AVAudioPlayerNode()
+    private let playerNode = AVAudioPlayerNode()
     private let playFormat = AVAudioFormat(commonFormat: .pcmFormatInt16,
                                            sampleRate: 8000,
                                            channels: 1,
                                            interleaved: true)!
     private var converter: AVAudioConverter?
 
+    // MARK: - RTP
     private var sequenceNumber: UInt16 = UInt16.random(in: 0...UInt16.max)
     private var timestamp: UInt32 = UInt32.random(in: 0...UInt32.max)
     private let ssrc: UInt32 = UInt32.random(in: 0...UInt32.max)
-
     private var sendBuffer = [Int16]()
-    private let frameSamples = 160 // 20ms at 8kHz
+    private let frameSamples = 160 // 20ms @ 8kHz
     private var isMuted = false
     private var running = false
 
     // MARK: - Lifecycle
-    /// Bind the UDP socket and discover local IP. Call before generating SDP.
     func prepareLocalSocket() throws {
         localIp = RTPAudioSession.primaryLocalIPv4() ?? "0.0.0.0"
-        for _ in 0..<20 {
-            let candidate = UInt16.random(in: 20000...30000) & 0xFFFE // even port
-            if let p = NWEndpoint.Port(rawValue: candidate),
-               let l = try? NWListener(using: .udp, on: p) {
-                self.listener = l
-                self.localPort = candidate
-                l.newConnectionHandler = { [weak self] conn in self?.acceptIncoming(conn) }
-                l.stateUpdateHandler = { state in NSLog("[RTP] listener state=\(state)") }
-                l.start(queue: netQueue)
-                NSLog("[RTP] bound UDP port=\(candidate) ip=\(localIp)")
-                return
+        let fd = Darwin.socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
+        if fd < 0 { throw err("socket() failed: \(String(cString: strerror(errno)))") }
+        var yes: Int32 = 1
+        setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &yes, socklen_t(MemoryLayout<Int32>.size))
+        setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &yes, socklen_t(MemoryLayout<Int32>.size))
+
+        var bound: UInt16 = 0
+        for _ in 0..<25 {
+            let candidate = UInt16.random(in: 20000...30000) & 0xFFFE
+            var addr = sockaddr_in()
+            addr.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+            addr.sin_family = sa_family_t(AF_INET)
+            addr.sin_port = in_port_t(candidate.bigEndian)
+            addr.sin_addr = in_addr(s_addr: INADDR_ANY)
+            let res = withUnsafePointer(to: &addr) { ptr -> Int32 in
+                ptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sa in
+                    Darwin.bind(fd, sa, socklen_t(MemoryLayout<sockaddr_in>.size))
+                }
             }
+            if res == 0 { bound = candidate; break }
         }
-        throw NSError(domain: "RTPAudioSession", code: 1,
-                      userInfo: [NSLocalizedDescriptionKey: "Failed to bind UDP socket"])
+        if bound == 0 {
+            close(fd)
+            throw err("Failed to bind UDP socket in [20000,30000]")
+        }
+        self.sockfd = fd
+        self.localPort = bound
+        NSLog("[RTP] bound UDP fd=\(fd) port=\(bound) ip=\(localIp)")
     }
 
-    /// Set the remote RTP endpoint then start capture + playback.
     func start(remoteIp: String, remotePort: UInt16) {
         guard !running else { return }
+        guard sockfd >= 0 else { NSLog("[RTP] start without socket"); return }
         running = true
-        self.remoteHost = NWEndpoint.Host(remoteIp)
-        self.remotePort = NWEndpoint.Port(rawValue: remotePort)
+        var addr = sockaddr_in()
+        addr.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+        addr.sin_family = sa_family_t(AF_INET)
+        addr.sin_port = in_port_t(remotePort.bigEndian)
+        addr.sin_addr.s_addr = inet_addr(remoteIp)
+        self.remoteAddr = addr
+        self.hasRemote = true
         NSLog("[RTP] start remote=\(remoteIp):\(remotePort)")
-
-        // Outbound connection (we already listen on the same local port for inbound).
-        if let host = remoteHost, let rp = remotePort {
-            let params = NWParameters.udp
-            // Reuse local port so symmetric RTP works.
-            if let lp = NWEndpoint.Port(rawValue: localPort) {
-                params.requiredLocalEndpoint = NWEndpoint.hostPort(host: .ipv4(.any), port: lp)
-            }
-            let conn = NWConnection(host: host, port: rp, using: params)
-            conn.stateUpdateHandler = { s in NSLog("[RTP] send conn state=\(s)") }
-            conn.start(queue: netQueue)
-            self.sendConnection = conn
-            _ = rp
-        }
-
+        startReceiveLoop()
         startAudio()
     }
 
@@ -90,52 +90,48 @@ final class RTPAudioSession {
         engine.inputNode.removeTap(onBus: 0)
         if engine.isRunning { engine.stop() }
         playerNode.stop()
-        sendConnection?.cancel(); sendConnection = nil
-        listener?.cancel(); listener = nil
+        if sockfd >= 0 { close(sockfd); sockfd = -1 }
         sendBuffer.removeAll()
+        hasRemote = false
     }
 
     func setMuted(_ muted: Bool) { isMuted = muted }
 
-    // MARK: - Audio
+    // MARK: - Audio engine
     private func startAudio() {
-        // Make absolutely sure the audio session is active in playAndRecord
-        // before reading inputNode.outputFormat — otherwise sr/ch can be 0
-        // and AVAudioConverter init triggers the
-        // "IsFormatSampleRateAndChannelCountValid(format)" assert.
         let session = AVAudioSession.sharedInstance()
         do {
             try session.setCategory(.playAndRecord, mode: .voiceChat,
-                                    options: [.allowBluetooth, .allowBluetoothA2DP, .defaultToSpeaker, .duckOthers])
+                                    options: [.allowBluetooth, .allowBluetoothA2DP,
+                                              .defaultToSpeaker, .duckOthers])
             try session.setActive(true, options: [])
         } catch {
             NSLog("[RTP] audio session activate failed: \(error.localizedDescription)")
         }
 
+        engine.attach(playerNode)
+        engine.connect(playerNode, to: engine.mainMixerNode, format: playFormat)
+        engine.prepare()
+
         let input = engine.inputNode
         var hwFormat = input.outputFormat(forBus: 0)
-        NSLog("[RTP] hw input format sr=\(hwFormat.sampleRate) ch=\(hwFormat.channelCount)")
-
-        // Fallback if the engine hasn't latched a sane format yet.
+        NSLog("[RTP] hw input sr=\(hwFormat.sampleRate) ch=\(hwFormat.channelCount)")
         if hwFormat.sampleRate <= 0 || hwFormat.channelCount == 0 {
             let sr = session.sampleRate > 0 ? session.sampleRate : 48000
             if let fb = AVAudioFormat(standardFormatWithSampleRate: sr, channels: 1) {
-                NSLog("[RTP] fallback hw format sr=\(sr) ch=1")
                 hwFormat = fb
+                NSLog("[RTP] fallback hw sr=\(sr) ch=1")
             } else {
-                NSLog("[RTP] cannot derive valid hw format — aborting audio start")
+                NSLog("[RTP] cannot derive hw format — aborting")
                 return
             }
         }
 
         guard let conv = AVAudioConverter(from: hwFormat, to: playFormat) else {
-            NSLog("[RTP] cannot create converter from \(hwFormat) to \(playFormat)")
+            NSLog("[RTP] cannot create converter \(hwFormat) → \(playFormat)")
             return
         }
         self.converter = conv
-
-        engine.attach(playerNode)
-        engine.connect(playerNode, to: engine.mainMixerNode, format: playFormat)
 
         input.installTap(onBus: 0, bufferSize: 1024, format: hwFormat) { [weak self] buf, _ in
             self?.handleCapturedBuffer(buf)
@@ -144,7 +140,7 @@ final class RTPAudioSession {
         do {
             try engine.start()
             playerNode.play()
-            NSLog("[RTP] audio engine started")
+            NSLog("[RTP] audio engine started, route=\(currentRouteDescription())")
         } catch {
             NSLog("[RTP] engine start failed: \(error.localizedDescription)")
         }
@@ -175,7 +171,6 @@ final class RTPAudioSession {
         } else {
             sendBuffer.append(contentsOf: UnsafeBufferPointer(start: ptr, count: n))
         }
-
         while sendBuffer.count >= frameSamples {
             let frame = Array(sendBuffer.prefix(frameSamples))
             sendBuffer.removeFirst(frameSamples)
@@ -183,13 +178,12 @@ final class RTPAudioSession {
         }
     }
 
-    // MARK: - RTP packetization
+    // MARK: - RTP send
     private func sendRTPFrame(_ samples: [Int16]) {
-        guard let conn = sendConnection else { return }
+        guard hasRemote, sockfd >= 0 else { return }
         var packet = Data(capacity: 12 + samples.count)
-        // RTP header
-        packet.append(0x80) // V=2
-        packet.append(0x00) // PT=0 (PCMU)
+        packet.append(0x80)
+        packet.append(0x00) // PT=0 PCMU
         packet.append(UInt8((sequenceNumber >> 8) & 0xFF))
         packet.append(UInt8(sequenceNumber & 0xFF))
         let ts = timestamp
@@ -202,38 +196,58 @@ final class RTPAudioSession {
         packet.append(UInt8((ssrc >> 8) & 0xFF))
         packet.append(UInt8(ssrc & 0xFF))
         for s in samples { packet.append(RTPAudioSession.linearToUlaw(s)) }
-
         sequenceNumber = sequenceNumber &+ 1
         timestamp = timestamp &+ UInt32(samples.count)
 
-        conn.send(content: packet, completion: .contentProcessed { err in
-            if let err = err { NSLog("[RTP] send err: \(err.localizedDescription)") }
-        })
-    }
-
-    // MARK: - Inbound RTP
-    private func acceptIncoming(_ conn: NWConnection) {
-        conn.start(queue: netQueue)
-        receiveLoop(conn)
-    }
-
-    private func receiveLoop(_ conn: NWConnection) {
-        conn.receiveMessage { [weak self] data, _, _, error in
-            guard let self = self else { return }
-            if let data = data, data.count > 12 {
-                self.handleIncomingRTP(data)
+        let fd = sockfd
+        var addr = remoteAddr
+        txQueue.async {
+            packet.withUnsafeBytes { raw in
+                _ = withUnsafePointer(to: &addr) { ptr in
+                    ptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sa in
+                        Darwin.sendto(fd, raw.baseAddress, packet.count, 0, sa,
+                                      socklen_t(MemoryLayout<sockaddr_in>.size))
+                    }
+                }
             }
-            if error == nil, self.running { self.receiveLoop(conn) }
         }
     }
 
-    private func handleIncomingRTP(_ data: Data) {
-        // Skip 12-byte header (no CSRC/extension handling for the common case).
-        let payload = data.subdata(in: 12..<data.count)
-        var samples = [Int16](); samples.reserveCapacity(payload.count)
-        for b in payload { samples.append(RTPAudioSession.ulawToLinear(b)) }
+    // MARK: - RTP receive
+    private func startReceiveLoop() {
+        let fd = sockfd
+        rxQueue.async { [weak self] in
+            var buf = [UInt8](repeating: 0, count: 2048)
+            var from = sockaddr_in()
+            var fromLen = socklen_t(MemoryLayout<sockaddr_in>.size)
+            while let self = self, self.running, fd >= 0 {
+                let n = buf.withUnsafeMutableBufferPointer { mb -> Int in
+                    withUnsafeMutablePointer(to: &from) { fp in
+                        fp.withMemoryRebound(to: sockaddr.self, capacity: 1) { sa in
+                            Darwin.recvfrom(fd, mb.baseAddress, mb.count, 0, sa, &fromLen)
+                        }
+                    }
+                }
+                if n <= 12 { continue }
+                // Symmetric RTP latch: if PBX answered from a different port, follow it.
+                if from.sin_port != self.remoteAddr.sin_port {
+                    self.remoteAddr.sin_port = from.sin_port
+                    NSLog("[RTP] latched remote port=\(UInt16(bigEndian: from.sin_port))")
+                }
+                let payloadCount = n - 12
+                var samples = [Int16](); samples.reserveCapacity(payloadCount)
+                for i in 0..<payloadCount {
+                    samples.append(RTPAudioSession.ulawToLinear(buf[12 + i]))
+                }
+                self.enqueuePlayback(samples)
+            }
+            NSLog("[RTP] receive loop exited")
+        }
+    }
 
-        guard let pcm = AVAudioPCMBuffer(pcmFormat: playFormat, frameCapacity: AVAudioFrameCount(samples.count)) else { return }
+    private func enqueuePlayback(_ samples: [Int16]) {
+        guard let pcm = AVAudioPCMBuffer(pcmFormat: playFormat,
+                                         frameCapacity: AVAudioFrameCount(samples.count)) else { return }
         pcm.frameLength = AVAudioFrameCount(samples.count)
         if let dst = pcm.int16ChannelData?[0] {
             samples.withUnsafeBufferPointer { src in
@@ -243,7 +257,7 @@ final class RTPAudioSession {
         playerNode.scheduleBuffer(pcm, completionHandler: nil)
     }
 
-    // MARK: - G.711 μ-law
+    // MARK: - μ-law
     static func linearToUlaw(_ pcm: Int16) -> UInt8 {
         let BIAS: Int32 = 0x84
         let CLIP: Int32 = 32635
@@ -270,7 +284,16 @@ final class RTPAudioSession {
         return Int16(sign != 0 ? -sample : sample)
     }
 
-    // MARK: - Local IP helper
+    // MARK: - Helpers
+    private func err(_ m: String) -> NSError {
+        NSError(domain: "RTPAudioSession", code: 1, userInfo: [NSLocalizedDescriptionKey: m])
+    }
+
+    private func currentRouteDescription() -> String {
+        let out = AVAudioSession.sharedInstance().currentRoute.outputs.map { "\($0.portType.rawValue):\($0.portName)" }
+        return out.joined(separator: ",")
+    }
+
     static func primaryLocalIPv4() -> String? {
         var address: String?
         var ifaddr: UnsafeMutablePointer<ifaddrs>?
@@ -289,7 +312,7 @@ final class RTPAudioSession {
                     if getnameinfo(p.pointee.ifa_addr, socklen_t(p.pointee.ifa_addr.pointee.sa_len),
                                    &host, socklen_t(host.count), nil, 0, NI_NUMERICHOST) == 0 {
                         address = String(cString: host)
-                        if name == "en0" { return address } // prefer Wi-Fi
+                        if name == "en0" { return address }
                     }
                 }
             }
