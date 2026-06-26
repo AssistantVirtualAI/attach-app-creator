@@ -320,18 +320,24 @@ export default function ActiveCallSheet({
         </div>
       )}
 
-      {toast && (
-        <div style={{
-          position: 'absolute', left: 16, right: 16, bottom: 'calc(220px + var(--safe-bottom))',
-          padding: '12px 16px', borderRadius: radius.md,
-          background: 'rgba(220,38,38,0.92)', color: '#fff',
-          fontSize: 13, fontWeight: 600, textAlign: 'center',
-          boxShadow: '0 18px 40px -12px rgba(220,38,38,0.55)',
-          backdropFilter: 'blur(12px)',
-        }}>
-          {toast}
-        </div>
-      )}
+      {toast && (() => {
+        const ok = /enregistrement en cours|arrêté/i.test(toast);
+        const bg = ok ? 'rgba(34,197,94,0.92)' : 'rgba(220,38,38,0.92)';
+        const glow = ok ? 'rgba(34,197,94,0.55)' : 'rgba(220,38,38,0.55)';
+        return (
+          <div style={{
+            position: 'absolute', left: 16, right: 16, bottom: 'calc(220px + var(--safe-bottom))',
+            padding: '12px 16px', borderRadius: radius.md,
+            background: bg, color: '#fff',
+            fontSize: 13, fontWeight: 600, textAlign: 'center',
+            boxShadow: `0 18px 40px -12px ${glow}`,
+            backdropFilter: 'blur(12px)',
+          }}>
+            {toast}
+          </div>
+        );
+      })()}
+
     </div>
   );
 }
