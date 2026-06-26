@@ -6,6 +6,7 @@ import SessionTimeoutModal from "@/components/planipret/SessionTimeoutModal";
 import { useAdminRealtime } from "@/hooks/useAdminRealtime";
 import NotificationsBell from "@/components/planipret/admin/NotificationsBell";
 import CommandPalette from "@/components/planipret/admin/CommandPalette";
+import { WorkspaceHeaderExtras } from "@/components/portals/WorkspaceHeaderExtras";
 
 const SSO_URL = "https://avastatistic.ca/login?redirect=planipret";
 
