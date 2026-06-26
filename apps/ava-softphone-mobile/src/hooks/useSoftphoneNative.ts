@@ -165,6 +165,8 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
       setIsRecording(snapshot.isRecording);
       setCallState(snapshot.callState);
       setEndReason(snapshot.endReason);
+      setCallPhase(snapshot.callPhase);
+      setLastSipCode(snapshot.lastSipCode);
       if (snapshot.callState === 'active') startTimer();
       if (snapshot.callState === 'idle') stopTimer();
     });
