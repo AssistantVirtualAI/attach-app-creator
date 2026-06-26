@@ -406,60 +406,32 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         var cseqMethod = ""
         for l in msg.split(separator: "\r\n") {
             if l.lowercased().hasPrefix("cseq:") {
-                let comps = l.split(separator: " ")
-                if comps.count >= 3 { cseqMethod = String(comps[2]) }
+                let comps = l.split(whereSeparator: { $0 == " " || $0 == "\t" }).map(String.init)
+                if comps.count >= 3 {
+                    cseqMethod = comps[2].trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+                }
                 break
             }
         }
         log("response code=\(code) cseqMethod=\(cseqMethod) callDirection=\(callDirection) callState=\(callState) callId=\(callActiveId)")
-        // REGISTER responses
+
         if cseqMethod == "REGISTER" {
-            if code == "401" || code == "407" {
-                if let wwwLine = msg.split(separator: "\r\n").first(where: {
-                    $0.lowercased().hasPrefix("www-authenticate:") || $0.lowercased().hasPrefix("proxy-authenticate:")
-                }).map(String.init) {
-                    let (realm, nonce) = parseAuth(wwwLine)
-                    self.lastRealm = realm
-                    self.lastNonce = nonce
-                    cseq += 1
-                    let isProxyAuth = wwwLine.lowercased().hasPrefix("proxy-authenticate:") || code == "407"
-                    sendRegister(authHeader: buildAuthHeader(method: "REGISTER", uri: "sip:\(domain)", realm: realm, nonce: nonce, proxy: isProxyAuth))
-                } else {
-                    notifyListeners("registrationFailed", data: ["reason": "401 without auth header"])
-                }
-            } else if code == "200" {
-                if !registered {
-                    registered = true
-                    log("REGISTERED ✓ — notifying JS")
-                    notifyListeners("registration", data: ["state": "registered", "status": "registered", "extension": username])
-                    DispatchQueue.main.async {
-                        self.registerTimer?.invalidate()
-                        self.registerTimer = Timer.scheduledTimer(withTimeInterval: 50, repeats: true) { _ in
-                            self.cseq += 1
-                            if let realm = self.lastRealm, let nonce = self.lastNonce {
-                                self.sendRegister(authHeader: self.buildAuthHeader(method: "REGISTER", uri: "sip:\(self.domain)", realm: realm, nonce: nonce))
-                            } else {
-                                self.sendRegister(authHeader: nil)
-                            }
-                        }
-                    }
-                }
-            } else if let n = Int(code), n >= 400 {
-                notifyListeners("registrationFailed", data: ["reason": firstLine])
-            }
+            handleRegisterResponse(code: code, msg: msg)
+            return
         }
 
-        // INVITE responses (outgoing call leg)
-        if cseqMethod == "INVITE" && callDirection == "out" && !callActiveId.isEmpty {
+        // INVITE responses (outgoing call leg). We accept the response even if
+        // callDirection/callActiveId got cleared by a stray cleanup — as long as
+        // we recently sent an INVITE, the 200 OK must transition the UI.
+        if cseqMethod == "INVITE" {
             if code == "100" {
                 // Trying — noop
             } else if code == "180" || code == "183" {
                 callState = "ringing"
                 emitCallState("ringing", direction: "out", stage: code == "180" ? "remote_ringing" : "early_media", code: code)
             } else if code == "401" || code == "407" {
-                log("INVITE auth challenge \(code) — keeping call ringing and retrying with digest auth")
+                log("INVITE auth challenge \(code) — retrying with digest")
                 callState = "ringing"
-                log("INVITE|\(code)|callState=\(callState)|callId=\(callActiveId)")
                 emitCallState("ringing", direction: "out", stage: "auth_challenge", code: code)
                 if let wwwLine = msg.split(separator: "\r\n").first(where: {
                     $0.lowercased().hasPrefix("www-authenticate:") || $0.lowercased().hasPrefix("proxy-authenticate:")
@@ -481,7 +453,9 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
                 callRemoteTag = extractTag(headerValue(msg, "To") ?? "")
                 if let contact = headerValue(msg, "Contact") { callRemoteContact = extractUri(contact) }
                 sendAck(to: msg, withinDialog: true)
+                if callDirection.isEmpty { callDirection = "out" }
                 callState = "active"
+                log("CALL_EVENT|INVITE_200_OK→active|callId=\(callActiveId)")
                 emitCallState("active", direction: "out", stage: "answered", code: code)
             } else if let n = Int(code), n >= 300 {
                 sendAck(to: msg, withinDialog: false)
@@ -495,6 +469,43 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
             // already notified locally on hangup
         }
     }
+
+    private func handleRegisterResponse(code: String, msg: String) {
+        if code == "401" || code == "407" {
+            if let wwwLine = msg.split(separator: "\r\n").first(where: {
+                $0.lowercased().hasPrefix("www-authenticate:") || $0.lowercased().hasPrefix("proxy-authenticate:")
+            }).map(String.init) {
+                let (realm, nonce) = parseAuth(wwwLine)
+                self.lastRealm = realm
+                self.lastNonce = nonce
+                cseq += 1
+                let isProxyAuth = wwwLine.lowercased().hasPrefix("proxy-authenticate:") || code == "407"
+                sendRegister(authHeader: buildAuthHeader(method: "REGISTER", uri: "sip:\(domain)", realm: realm, nonce: nonce, proxy: isProxyAuth))
+            } else {
+                notifyListeners("registrationFailed", data: ["reason": "401 without auth header"])
+            }
+        } else if code == "200" {
+            if !registered {
+                registered = true
+                log("REGISTERED ✓ — notifying JS")
+                notifyListeners("registration", data: ["state": "registered", "status": "registered", "extension": username])
+                DispatchQueue.main.async {
+                    self.registerTimer?.invalidate()
+                    self.registerTimer = Timer.scheduledTimer(withTimeInterval: 50, repeats: true) { _ in
+                        self.cseq += 1
+                        if let realm = self.lastRealm, let nonce = self.lastNonce {
+                            self.sendRegister(authHeader: self.buildAuthHeader(method: "REGISTER", uri: "sip:\(self.domain)", realm: realm, nonce: nonce))
+                        } else {
+                            self.sendRegister(authHeader: nil)
+                        }
+                    }
+                }
+            }
+        } else if let n = Int(code), n >= 400 {
+            notifyListeners("registrationFailed", data: ["reason": "REGISTER \(code)"])
+        }
+    }
+
 
     private func parseAuth(_ header: String) -> (String, String) {
         func extract(_ key: String) -> String {
