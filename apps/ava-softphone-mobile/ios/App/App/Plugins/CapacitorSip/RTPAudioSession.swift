@@ -21,12 +21,15 @@ final class RTPAudioSession {
 
     // MARK: - RemoteIO AudioUnit
     private var ioUnit: AudioUnit?
-    /// Hardware/native sample rate negotiated with AVAudioSession.
-    /// iOS RemoteIO does NOT accept 8000Hz on modern devices — we run RemoteIO
-    /// at the native rate (typically 48000Hz) and resample to/from 8000Hz for RTP.
-    private var hwSampleRate: Double = 48000
+    /// Hardware sample rate. PINNED to 48000Hz — iOS RemoteIO rejects 8000Hz
+    /// (kAudioUnitErr_FormatNotSupported / 561017449) and reading the session
+    /// rate mid-setup can return 0Hz. We hard-pin to 48000 and request it via
+    /// setPreferredSampleRate; resample to/from 8000Hz for RTP PCMU.
+    private let hwSampleRate: Double = 48000
     /// RTP/PCMU codec rate (G.711 μ-law).
     private let rtpSampleRate: Double = 8000
+    /// Integer decimation factor 48000 → 8000.
+    private let decimation: Int = 6
     private let channels: UInt32 = 1
     /// Scratch buffer used inside the input callback to receive captured PCM.
     private var captureScratch: UnsafeMutablePointer<Int16>?
@@ -260,12 +263,14 @@ final class RTPAudioSession {
         // Let the session settle before reading/forcing hardware format.
         NSLog("[RTP] sleeping 100ms after setCategory to let session settle")
         Thread.sleep(forTimeInterval: 0.1)
-        // Read the actual hardware rate iOS negotiated. RemoteIO MUST use this
-        // rate — passing 8000Hz here is what triggers kAudioUnitErr_FormatNotSupported.
+        // hwSampleRate is PINNED to 48000Hz. Do NOT read from AVAudioSession
+        // here — it may return 0 mid-setup. We requested 48000 via
+        // setPreferredSampleRate; if iOS gave us something else the resampler
+        // still works (fractional phase accumulator), but RemoteIO is now
+        // configured for 48000 which is universally supported.
         let actual = AVAudioSession.sharedInstance().sampleRate
-        if actual >= 8000 { hwSampleRate = actual }
-        tapFormatDesc = "RemoteIO I16 \(Int(hwSampleRate))Hz ch=1 → RTP 8000Hz"
-        NSLog("[RTP] negotiated hwSampleRate=\(Int(hwSampleRate))Hz (RTP rate=\(Int(rtpSampleRate))Hz)")
+        tapFormatDesc = "RemoteIO I16 \(Int(hwSampleRate))Hz ch=1 → RTP 8000Hz (session=\(Int(actual))Hz)"
+        NSLog("[RTP] hwSampleRate=\(Int(hwSampleRate))Hz pinned (session reports \(Int(actual))Hz, RTP=\(Int(rtpSampleRate))Hz)")
         logSessionState("post-settle")
         if buildAndStartIOUnit() {
             engineRestartAttempts = 0
@@ -558,20 +563,20 @@ final class RTPAudioSession {
         for i in 0..<n { let a = abs(scratch[i]); if a > peak { peak = a } }
         micPeak = Float(peak) / 32767.0
 
-        // Decimate hwSampleRate → 8000Hz using fractional phase accumulator
-        // (zero-order hold). Small/cheap and OK for narrowband PCMU.
-        let step = rtpSampleRate / hwSampleRate
+        // Integer decimation 48000 → 8000 (every 6th sample). txPhase counts
+        // skipped samples across callbacks so we never lose alignment.
         var decimated = [Int16]()
-        decimated.reserveCapacity(n + 1)
-        var phase = txPhase
+        decimated.reserveCapacity(n / decimation + 1)
+        var skip = Int(txPhase)
         for i in 0..<n {
-            phase += step
-            if phase >= 1.0 {
-                phase -= 1.0
+            if skip == 0 {
                 decimated.append(isMuted ? 0 : scratch[i])
+                skip = decimation - 1
+            } else {
+                skip -= 1
             }
         }
-        txPhase = phase
+        txPhase = Double(skip)
 
         var framesToSend: [[Int16]] = []
         audioLock.lock()
@@ -602,30 +607,29 @@ final class RTPAudioSession {
         let abl = UnsafeMutableAudioBufferListPointer(ioData)
         let needed = Int(inNumberFrames)
 
-        // Upsample 8000Hz playQueue → hwSampleRate using fractional phase
-        // (zero-order hold / sample repeat). Pulls one 8kHz sample whenever
-        // the phase rolls past 1.0; otherwise reuses the previous sample.
-        let step = rtpSampleRate / hwSampleRate
+        // Integer upsample 8000 → 48000 (sample-and-hold, repeat each x6).
+        // rxPhase carries the remaining repeat count for the held sample
+        // across callbacks so hwFrames boundaries don't cause clicks.
         var out = [Int16](repeating: 0, count: needed)
-        var phase = rxPhase
         var hold = rxHoldSample
+        var repeatsLeft = Int(rxPhase)
         var drained = 0
         audioLock.lock()
         let available = playQueue.count
         for i in 0..<needed {
-            phase += step
-            if phase >= 1.0 {
-                phase -= 1.0
+            if repeatsLeft == 0 {
                 if !playQueue.isEmpty {
                     hold = playQueue.removeFirst()
                     drained += 1
                 } else {
                     hold = 0
                 }
+                repeatsLeft = decimation
             }
             out[i] = hold
+            repeatsLeft -= 1
         }
-        rxPhase = phase
+        rxPhase = Double(repeatsLeft)
         rxHoldSample = hold
         let remaining = playQueue.count
         audioLock.unlock()
