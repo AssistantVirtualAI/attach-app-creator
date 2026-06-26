@@ -6,10 +6,11 @@
 // No third-party SIP stack required. No Swift code involved.
 
 @import Capacitor;
-#if __has_feature(modules)
-#else
-  #import <Capacitor/Capacitor.h>
-#endif
+
+#import <Foundation/Foundation.h>
+#import <CommonCrypto/CommonDigest.h>
+#import <ifaddrs.h>
+#import <arpa/inet.h>
 
 #define PJLOG(fmt, ...) NSLog(@"[CapacitorPjsip] " fmt, ##__VA_ARGS__)
 
