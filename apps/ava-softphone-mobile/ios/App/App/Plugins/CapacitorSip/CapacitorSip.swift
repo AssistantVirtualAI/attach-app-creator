@@ -385,17 +385,34 @@ public class CapacitorSip: CAPPlugin, CXProviderDelegate {
 
     @objc func setMute(_ call: CAPPluginCall) {
         let muted = call.getBool("muted") ?? false
-        let session = AVAudioSession.sharedInstance()
-        try? session.setActive(!muted)
+        log(3, "call", "setMute(\(muted))")
+        if let uuid = activeCallUUID {
+            let action = CXSetMutedCallAction(call: uuid, muted: muted)
+            callController.request(CXTransaction(action: action)) { [weak self] err in
+                if let err = err { self?.log(1, "callkit", "setMute tx error: \(err)") }
+            }
+        } else {
+            let session = AVAudioSession.sharedInstance()
+            try? session.setActive(!muted)
+        }
         call.resolve()
     }
 
     @objc func setHold(_ call: CAPPluginCall) {
+        let held = call.getBool("held") ?? false
+        log(3, "call", "setHold(\(held))")
+        if let uuid = activeCallUUID {
+            let action = CXSetHeldCallAction(call: uuid, onHold: held)
+            callController.request(CXTransaction(action: action)) { [weak self] err in
+                if let err = err { self?.log(1, "callkit", "setHold tx error: \(err)") }
+            }
+        }
         call.resolve()
     }
 
     @objc func sendDTMF(_ call: CAPPluginCall) {
         let digits = call.getString("digits") ?? ""
+        log(3, "call", "sendDTMF \(digits)")
         let body = "Signal=\(digits)\r\nDuration=250\r\n"
         let info = """
         INFO sip:\(sipDomain) SIP/2.0\r\n\
@@ -416,47 +433,73 @@ public class CapacitorSip: CAPPlugin, CXProviderDelegate {
     private func reportIncomingCallKit(number: String) {
         let uuid = UUID()
         activeCallUUID = uuid
+        log(3, "callkit", "reportNewIncomingCall uuid=\(uuid) number=\(number)")
         let update = CXCallUpdate()
         update.remoteHandle = CXHandle(type: .phoneNumber, value: number)
         update.hasVideo = false
-        callProvider.reportNewIncomingCall(with: uuid, update: update) { _ in }
+        callProvider.reportNewIncomingCall(with: uuid, update: update) { [weak self] err in
+            if let err = err { self?.log(1, "callkit", "reportNewIncomingCall error: \(err)") }
+            else { self?.log(4, "callkit", "Incoming call reported to system") }
+        }
     }
 
     private func startOutgoingCallKit(number: String) {
         let uuid = UUID()
         activeCallUUID = uuid
+        log(3, "callkit", "CXStartCallAction uuid=\(uuid) handle=\(number)")
         let handle = CXHandle(type: .phoneNumber, value: number)
         let action = CXStartCallAction(call: uuid, handle: handle)
-        callController.request(CXTransaction(action: action)) { _ in }
+        callController.request(CXTransaction(action: action)) { [weak self] err in
+            if let err = err { self?.log(1, "callkit", "CXStartCallAction error: \(err)") }
+        }
     }
 
     private func endActiveCallKitCall() {
         guard let uuid = activeCallUUID else { return }
+        log(3, "callkit", "CXEndCallAction uuid=\(uuid)")
         let action = CXEndCallAction(call: uuid)
-        callController.request(CXTransaction(action: action)) { _ in }
+        callController.request(CXTransaction(action: action)) { [weak self] err in
+            if let err = err { self?.log(1, "callkit", "CXEndCallAction error: \(err)") }
+        }
         activeCallUUID = nil
     }
 
     // MARK: - CXProviderDelegate
     public func providerDidReset(_ provider: CXProvider) {
+        log(2, "callkit", "providerDidReset — clearing active call")
         activeCallUUID = nil
     }
     public func provider(_ provider: CXProvider, perform action: CXAnswerCallAction) {
+        log(3, "callkit", "CXAnswerCallAction fulfilled")
         notifyListeners("callStateChanged", data: ["state": "active"])
         action.fulfill()
     }
     public func provider(_ provider: CXProvider, perform action: CXEndCallAction) {
+        log(3, "callkit", "CXEndCallAction fulfilled")
         notifyListeners("callEnded", data: [:])
         action.fulfill()
     }
     public func provider(_ provider: CXProvider, perform action: CXStartCallAction) {
+        log(3, "callkit", "CXStartCallAction fulfilled")
         action.fulfill()
     }
     public func provider(_ provider: CXProvider, perform action: CXSetMutedCallAction) {
-        let session = AVAudioSession.sharedInstance()
-        try? session.setActive(!action.isMuted)
+        log(3, "callkit", "CXSetMutedCallAction muted=\(action.isMuted)")
+        notifyListeners("muteChanged", data: ["muted": action.isMuted])
         action.fulfill()
     }
+    public func provider(_ provider: CXProvider, perform action: CXSetHeldCallAction) {
+        log(3, "callkit", "CXSetHeldCallAction onHold=\(action.isOnHold)")
+        notifyListeners("holdChanged", data: ["held": action.isOnHold])
+        action.fulfill()
+    }
+    public func provider(_ provider: CXProvider, didActivate audioSession: AVAudioSession) {
+        log(4, "callkit", "didActivate audio session")
+    }
+    public func provider(_ provider: CXProvider, didDeactivate audioSession: AVAudioSession) {
+        log(4, "callkit", "didDeactivate audio session")
+    }
+
 
     // MARK: - Parsing helpers
     private func extractCallerNumber(from message: String) -> String {
