@@ -39,12 +39,18 @@ Deno.serve(async (req) => {
 
       await admin.from("planipret_profiles").insert({
         user_id: created.user.id,
+        organization_id: profile.organization_id,
         email,
         full_name: [first_name, last_name].filter(Boolean).join(" "),
         extension: ns_extension,
         ns_domain: DOMAIN,
         role: "broker",
       });
+      await admin.from("user_roles").upsert({
+        user_id: created.user.id,
+        organization_id: profile.organization_id,
+        role: "planipret_broker",
+      }, { onConflict: "user_id,organization_id" });
       return jsonResponse({ success: true, user_id: created.user.id });
     }
 
