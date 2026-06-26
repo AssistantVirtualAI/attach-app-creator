@@ -6,6 +6,7 @@ import CallQualityGauge from './CallQualityGauge';
 import type { AudioProfile } from '../lib/sip/audioProfile';
 import { EMPTY_QUALITY } from '../lib/sip/callQuality';
 import { getAudioState, onAudioStateChange, setRoute, type AudioRoute, type AudioState } from '../lib/sip/audioOutput';
+import CallTimeline, { type CallPhase } from './CallTimeline';
 
 const PROFILE_CYCLE: AudioProfile[] = ['auto', 'hd', 'low-bandwidth'];
 
