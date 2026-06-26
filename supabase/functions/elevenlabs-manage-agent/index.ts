@@ -2,7 +2,7 @@
 // Planiprêt admin "Intégrations" page to create, configure, and sync
 // the AVA conversational agent without touching the ElevenLabs dashboard.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
-import { buildAvaToolsArray } from "../_shared/ava-tools.ts";
+import { buildAvaToolsArray, buildAvaToolConfigs } from "../_shared/ava-tools.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
