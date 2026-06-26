@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { createSIPUA, JsSIPUnavailableError, SIPConfig, classifySipFailure, hasWebRTC, rewriteSdpForFusionPBX, WEBRTC_UNAVAILABLE_MESSAGE } from '../lib/sip/jssipProvider';
+import { createSIPUA, JsSIPUnavailableError, SIPConfig, classifySipFailure, rewriteSdpForFusionPBX } from '../lib/sip/jssipProvider';
 import {
   appendSipLog, clearSipLog as clearPersistedLog, clearPersistedStatus, loadPersistedError, loadPersistedStatus,
   loadSipLog, MAX_AUTO_RETRIES, PersistedSipError, probeWss, RETRY_BACKOFF_MS, savePersistedError, savePersistedStatus,
