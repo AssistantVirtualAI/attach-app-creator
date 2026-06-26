@@ -42,6 +42,20 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
   // Register account on config change.
   useEffect(() => {
     if (!config) return;
+    // Guard: avoid re-initialising the native account if the same credentials
+    // are already in flight or have just been registered. React StrictMode and
+    // parent re-renders otherwise spam initAccount and starve the watchdog.
+    const initKey = `${config.extension}@${config.domain}|${config.password}|${config.wssUrl ?? ''}`;
+    if (initInFlightRef.current && lastInitKeyRef.current === initKey) {
+      console.log('[NativeSIP] initAccount skipped — already in flight for same config');
+      return;
+    }
+    if (lastInitKeyRef.current === initKey && (sipStatus === 'registered' || sipStatus === 'connecting')) {
+      console.log('[NativeSIP] initAccount skipped — same config, status=%s', sipStatus);
+      return;
+    }
+    lastInitKeyRef.current = initKey;
+    initInFlightRef.current = true;
     let cancelled = false;
     const cleanups: Array<() => void> = [];
     let watchdog: ReturnType<typeof setTimeout> | null = null;
