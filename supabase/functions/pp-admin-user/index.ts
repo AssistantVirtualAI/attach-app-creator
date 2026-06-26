@@ -42,6 +42,11 @@ Deno.serve(async (req) => {
         await admin.auth.admin.deleteUser(created.user.id);
         return jsonResponse({ success: false, error: pErr.message }, 200);
       }
+      await admin.from("user_roles").upsert({
+        user_id: created.user.id,
+        organization_id: profile.organization_id,
+        role: "planipret_broker",
+      }, { onConflict: "user_id,organization_id" });
       await logAudit(admin, req, {
         admin_id: profile.id, action: "USER_CREATE",
         resource_type: "user", resource_id: created.user.id,
