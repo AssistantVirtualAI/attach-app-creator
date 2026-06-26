@@ -444,6 +444,7 @@ function AuthenticatedShell({
           {tab === 'voicemail'  && <VoicemailScreen haptic={haptic} />}
           {tab === 'sms'        && <MessagesScreen haptic={haptic} />}
           {tab === 'queues'     && <QueuesScreen />}
+          {tab === 'audiodiag'  && <AudioDiagnosticsScreen />}
         </Suspense>
       </div>
 
