@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
       method: "POST",
       headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-5-20250929",
         max_tokens: 2000,
         system: SYSTEM_PROMPT,
         messages: [{ role: "user", content: transcript }],
@@ -99,7 +99,7 @@ Deno.serve(async (req) => {
       suggested_actions: insights.tasks ?? [],
       coaching_notes: insights.coaching,
       raw_response: insights,
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-5-20250929",
     });
 
     // Trigger Maestro actions

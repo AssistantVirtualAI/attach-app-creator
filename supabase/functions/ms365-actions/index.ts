@@ -104,7 +104,7 @@ Deno.serve(async (req) => {
             method: "POST",
             headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
             body: JSON.stringify({
-              model: "claude-sonnet-4-20250514",
+              model: "claude-sonnet-4-5-20250929",
               max_tokens: 600,
               system: "Tu es un assistant pour courtier hypothécaire. Génère un briefing matinal court et professionnel en français.",
               messages: [{ role: "user", content: `Courtier: ${profile.full_name}\nDate: ${today.toLocaleDateString("fr-CA")}\nCourriels non lus: ${JSON.stringify(emails)}\nRendez-vous: ${JSON.stringify(events)}\n\nGénère un briefing oral de 3-4 phrases.` }],

@@ -31,7 +31,7 @@ Deno.serve(async (req) => {
       method: "POST",
       headers: { "x-api-key": cfg.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514", max_tokens: 600,
+        model: "claude-sonnet-4-5-20250929", max_tokens: 600,
         messages: [{
           role: "user",
           content: `You are an IVR script writer. Write a professional phone greeting for: ${business_description}. Business hours: ${hours}. Menu options: ${(menu_options || []).join(", ")}. Language: ${language}. Return ONLY the spoken script, no instructions or quotes.`,
