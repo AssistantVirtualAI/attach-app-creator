@@ -170,20 +170,85 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     }
 
     private func processBuffer() {
-        // SIP messages are separated by \r\n\r\n (header end). Naive split per response.
-        while let range = rxBuffer.range(of: "\r\n\r\n") {
-            let head = String(rxBuffer[..<range.upperBound])
-            // We do not handle body length carefully here for REGISTER responses (usually no body).
-            rxBuffer = String(rxBuffer[range.upperBound...])
-            handleResponse(head)
+        // Parse SIP messages respecting Content-Length.
+        while let headerEnd = rxBuffer.range(of: "\r\n\r\n") {
+            let headerPart = String(rxBuffer[..<headerEnd.lowerBound])
+            var contentLength = 0
+            for line in headerPart.split(separator: "\r\n") {
+                let l = line.lowercased()
+                if l.hasPrefix("content-length:") || l.hasPrefix("l:") {
+                    let v = line.split(separator: ":", maxSplits: 1).last.map { String($0).trimmingCharacters(in: .whitespaces) } ?? "0"
+                    contentLength = Int(v) ?? 0
+                }
+            }
+            let afterHeaders = rxBuffer[headerEnd.upperBound...]
+            let bodyBytes = afterHeaders.utf8.count
+            if bodyBytes < contentLength { return } // wait for full body
+            var consumed = headerEnd.upperBound
+            if contentLength > 0 {
+                let bodyData = Array(afterHeaders.utf8.prefix(contentLength))
+                let body = String(bytes: bodyData, encoding: .utf8) ?? ""
+                consumed = rxBuffer.index(headerEnd.upperBound, offsetBy: body.count)
+            }
+            let fullMsg = String(rxBuffer[..<consumed])
+            rxBuffer = String(rxBuffer[consumed...])
+            handleMessage(fullMsg)
         }
     }
 
-    private func handleResponse(_ msg: String) {
+    private func handleMessage(_ msg: String) {
         log("<<< \n\(msg)")
         let firstLine = msg.split(separator: "\r\n").first.map(String.init) ?? ""
-        if firstLine.contains(" 401 ") || firstLine.contains(" 407 ") {
-            // parse WWW-Authenticate
+        if firstLine.hasPrefix("SIP/2.0 ") {
+            handleResponse(msg, firstLine: firstLine)
+        } else {
+            handleRequest(msg, firstLine: firstLine)
+        }
+    }
+
+    private func handleRequest(_ msg: String, firstLine: String) {
+        let method = firstLine.split(separator: " ").first.map(String.init) ?? ""
+        if method == "NOTIFY" || method == "OPTIONS" || method == "MESSAGE" {
+            send200OK(to: msg)
+        }
+    }
+
+    private func send200OK(to request: String) {
+        let lines = request.split(separator: "\r\n").map(String.init)
+        var via = "", from = "", toH = "", callid = "", cseqH = ""
+        for l in lines {
+            let lo = l.lowercased()
+            if lo.hasPrefix("via:") { via = l }
+            else if lo.hasPrefix("from:") { from = l }
+            else if lo.hasPrefix("to:") { toH = l }
+            else if lo.hasPrefix("call-id:") { callid = l }
+            else if lo.hasPrefix("cseq:") { cseqH = l }
+        }
+        var resp = "SIP/2.0 200 OK\r\n"
+        resp += via + "\r\n"
+        resp += from + "\r\n"
+        resp += toH + (toH.contains(";tag=") ? "" : ";tag=\(localTag)") + "\r\n"
+        resp += callid + "\r\n"
+        resp += cseqH + "\r\n"
+        resp += "Content-Length: 0\r\n\r\n"
+        sendRaw(resp)
+        log(">>> 200 OK (in-dialog)")
+    }
+
+    private func handleResponse(_ msg: String, firstLine: String) {
+        let parts = firstLine.split(separator: " ", maxSplits: 2).map(String.init)
+        let code = parts.count > 1 ? parts[1] : ""
+        var cseqMethod = ""
+        for l in msg.split(separator: "\r\n") {
+            if l.lowercased().hasPrefix("cseq:") {
+                let comps = l.split(separator: " ")
+                if comps.count >= 3 { cseqMethod = String(comps[2]) }
+                break
+            }
+        }
+        log("response code=\(code) cseqMethod=\(cseqMethod)")
+        if code == "401" || code == "407" {
+            guard cseqMethod == "REGISTER" else { return }
             if let wwwLine = msg.split(separator: "\r\n").first(where: {
                 $0.lowercased().hasPrefix("www-authenticate:") || $0.lowercased().hasPrefix("proxy-authenticate:")
             }).map(String.init) {
@@ -195,11 +260,12 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
             } else {
                 notifyListeners("registrationFailed", data: ["reason": "401 without auth header"])
             }
-        } else if firstLine.contains(" 200 ") {
+        } else if code == "200" {
+            guard cseqMethod == "REGISTER" else { return }
             if !registered {
                 registered = true
+                log("REGISTERED ✓ — notifying JS")
                 notifyListeners("registration", data: ["state": "registered"])
-                // refresh every 50s
                 DispatchQueue.main.async {
                     self.registerTimer?.invalidate()
                     self.registerTimer = Timer.scheduledTimer(withTimeInterval: 50, repeats: true) { _ in
@@ -212,7 +278,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
                     }
                 }
             }
-        } else if firstLine.range(of: " [4-6]\\d\\d ", options: .regularExpression) != nil {
+        } else if let n = Int(code), n >= 400, cseqMethod == "REGISTER" {
             notifyListeners("registrationFailed", data: ["reason": firstLine])
         }
     }
@@ -273,6 +339,13 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
                 self?.log("send error: \(error.localizedDescription)")
                 self?.notifyListeners("registrationFailed", data: ["reason": error.localizedDescription])
             }
+        })
+    }
+
+    private func sendRaw(_ msg: String) {
+        guard let conn = connection else { return }
+        conn.send(content: msg.data(using: .utf8), completion: .contentProcessed { [weak self] error in
+            if let error = error { self?.log("sendRaw error: \(error.localizedDescription)") }
         })
     }
 }
