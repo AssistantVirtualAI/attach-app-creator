@@ -90,6 +90,8 @@ export default function SipConfigScreen({
             <button type="button" onClick={onCancel} style={ghostBtn}>Annuler</button>
           )}
         </form>
+
+        <NativeStatePanel />
       </div>
     </div>
   );
