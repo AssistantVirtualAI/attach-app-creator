@@ -973,6 +973,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         let br = branch
         let target = callRemoteContact.isEmpty ? callRemoteUri : callRemoteContact
         let sdp = buildSdp(hold: hold)
+        log("LOCAL SDP (re-INVITE hold=\(hold)) >>>\n\(sdp)")
         var msg = ""
         msg += "INVITE \(target) SIP/2.0\r\n"
         msg += "Via: SIP/2.0/TCP \(sigLocalIp());branch=\(br);rport\r\n"
