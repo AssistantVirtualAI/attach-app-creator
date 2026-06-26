@@ -62,7 +62,7 @@ static NSString *ChallengeParam(NSString *header, NSString *key) {
 
 #pragma mark - Plugin
 
-@interface CapacitorPjsip : CAPPlugin <NSStreamDelegate>
+@interface CapacitorPjsip : CAPPlugin <CAPBridgedPlugin, NSStreamDelegate>
 @property (nonatomic, strong) NSInputStream *inStream;
 @property (nonatomic, strong) NSOutputStream *outStream;
 @property (nonatomic, strong) NSMutableData *rxBuffer;
