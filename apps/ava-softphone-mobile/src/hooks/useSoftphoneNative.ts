@@ -68,24 +68,29 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
 
     (async () => {
       try {
-        cleanups.push(await onNativeSipEvent('registered', () => {
+        // Direct listener on the unified `registration` event so we don't
+        // miss it if React re-renders. Accept both `status` and `state`.
+        const regHandle = await CapacitorPjsip.addListener('registration', (d: any) => {
           if (cancelled) return;
-          if (watchdog) { clearTimeout(watchdog); watchdog = null; }
-          initInFlightRef.current = false;
-          console.log('[NativeSIP] registered ✓');
-          setSipStatus('registered'); setSipError('');
-          setNativeRegStatus('registered', null);
-        }));
-        cleanups.push(await onNativeSipEvent('registrationFailed', (d) => {
-          if (cancelled) return;
-          if (watchdog) { clearTimeout(watchdog); watchdog = null; }
-          initInFlightRef.current = false;
-          const msg = d?.reason || `Registration failed${d?.code ? ` (${d.code})` : ''}`;
-          console.warn('[NativeSIP] registrationFailed', d);
-          setSipStatus('error');
-          setSipError(msg);
-          setNativeRegStatus('error', msg);
-        }));
+          console.log('[NativeSIP] registration event', d);
+          const s = d?.status ?? d?.state;
+          if (s === 'registered') {
+            if (watchdog) { clearTimeout(watchdog); watchdog = null; }
+            initInFlightRef.current = false;
+            console.log('[NativeSIP] registered ✓');
+            setSipStatus('registered'); setSipError('');
+            setNativeRegStatus('registered', null);
+          } else if (s === 'error' || s === 'failed') {
+            if (watchdog) { clearTimeout(watchdog); watchdog = null; }
+            initInFlightRef.current = false;
+            const msg = d?.reason || `Registration failed${d?.code ? ` (${d.code})` : ''}`;
+            console.warn('[NativeSIP] registrationFailed', d);
+            setSipStatus('error');
+            setSipError(msg);
+            setNativeRegStatus('error', msg);
+          }
+        });
+        cleanups.push(() => { regHandle.remove().catch(() => {}); });
         cleanups.push(await onNativeSipEvent('callReceived', (d) => {
           if (cancelled) return;
           setActiveCallNumber(d?.from || 'Unknown');
