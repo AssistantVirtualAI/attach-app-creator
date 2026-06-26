@@ -92,6 +92,13 @@ export function sipDebug(...args: any[]) {
 
 export type IceLogger = (event: string, detail?: string, level?: 'info' | 'warn' | 'error') => void;
 
+/** Returns true when the candidate address is an iOS WKWebView mDNS .local hostname. */
+export function isMdnsCandidate(candidate: RTCIceCandidate | null | undefined): boolean {
+  if (!candidate?.candidate) return false;
+  // candidate string format: "candidate:... <address> <port> typ host ..."
+  return /\s[0-9a-f-]{8,}\.local\s/i.test(candidate.candidate);
+}
+
 /** Classify an ICE candidate by transport type for log readability. */
 export function classifyIceCandidate(candidate: RTCIceCandidate | null | undefined): string {
   if (!candidate || !candidate.candidate) return 'end-of-candidates';
@@ -101,7 +108,7 @@ export function classifyIceCandidate(candidate: RTCIceCandidate | null | undefin
   const source =
     type === 'relay' ? 'TURN'
     : type === 'srflx' ? 'STUN'
-    : type === 'host' ? 'LOCAL'
+    : type === 'host' ? (isMdnsCandidate(candidate) ? 'LOCAL-mDNS' : 'LOCAL')
     : type === 'prflx' ? 'PEER'
     : type.toUpperCase();
   return `${source}/${proto}`;
