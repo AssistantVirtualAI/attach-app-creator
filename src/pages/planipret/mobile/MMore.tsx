@@ -10,6 +10,7 @@ import type { PlanipretMobileContext } from "../PlanipretMobile";
 import { usePlanipretPush } from "@/hooks/usePlanipretPush";
 import { CalendarSyncCard } from "@/components/planipret/CalendarSyncCard";
 import { SiriShortcutsCard } from "@/components/planipret/SiriShortcutsCard";
+import { safeEdgeFunction } from "@/lib/safeEdgeFunction";
 
 const initials = (name?: string) =>
   (name ?? "").split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase()).join("") || "?";
@@ -65,9 +66,12 @@ export default function MMore() {
 
   const reconnectNs = async () => {
     setReconnecting(true);
-    const { data, error } = await supabase.functions.invoke("ns-auth", { body: { action: "refresh" } });
+    const { data, error, status } = await safeEdgeFunction("ns-auth", { body: { action: "refresh" } });
     setReconnecting(false);
-    if (error || (data as any)?.success === false) { toast.error("Échec de connexion."); return; }
+    if (error || (data as any)?.success === false) {
+      toast.error(status === 403 ? "Accès téléphonie non autorisé pour ce compte Planiprêt." : ((data as any)?.error ?? error ?? "Échec de connexion."));
+      return;
+    }
     toast.success("Connexion téléphonique établie ✅");
     await reloadProfile();
   };
