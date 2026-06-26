@@ -134,6 +134,7 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
       if (snapshot.callState === 'idle') stopTimer();
     });
     let audioHandle: { remove(): Promise<void> } | null = null;
+    let micHandle: { remove(): Promise<void> } | null = null;
     CapacitorPjsip.addListener('audioStateChanged', (d: any) => {
       const status = (d?.status as typeof audioStatus) || 'idle';
       setAudioStatus(status);
@@ -145,7 +146,16 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
       }
       console.log(`[NativeSIP] AUDIO_STATE|${status}|attempts=${d?.restartAttempts}|err=${d?.lastError || ''}`);
     }).then((h: any) => { audioHandle = h; }).catch(() => {});
-    return () => { unsub(); audioHandle?.remove().catch(() => {}); };
+    CapacitorPjsip.addListener('micPermission', (d: any) => {
+      console.log('[NativeSIP] MIC_PERMISSION', d);
+      if (d?.status === 'denied' || d?.granted === false) {
+        const msg = d?.reason || 'Microphone access is required for two-way audio. Enable it in iOS Settings.';
+        setSipStatus('error');
+        setSipError(msg);
+        setNativeRegStatus('error', msg);
+      }
+    }).then((h: any) => { micHandle = h; }).catch(() => {});
+    return () => { unsub(); audioHandle?.remove().catch(() => {}); micHandle?.remove().catch(() => {}); };
   }, []);
 
   // Register account on config change.
@@ -351,8 +361,12 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
     isRecording,
     startRecording,
     stopRecording,
+    startRecord: startRecording,
+    stopRecord: stopRecording,
     transferCall,
+    transfer: transferCall,
     parkCall,
+    park: parkCall,
     addCall,
   } as UseSoftphoneReturn;
 }
