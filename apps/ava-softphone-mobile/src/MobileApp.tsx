@@ -249,7 +249,7 @@ function AuthenticatedShell({
   }, [creds.accessToken, creds.email, creds.extension, creds.userId, setCreds, softphone.sipError]);
 
   const sp = useMemo(() => {
-    const richCallState = softphone.callState === 'ringing' ? 'ringing-out' : softphone.callState;
+    const richCallState = softphone.isOnHold ? 'held' : softphone.callState === 'ringing' ? 'ringing-out' : softphone.callState;
     return {
       snap: {
         status: softphone.sipStatus,
@@ -259,14 +259,18 @@ function AuthenticatedShell({
         remoteParty: softphone.activeCallNumber,
         remoteUri: softphone.activeCallNumber,
         muted: softphone.isMuted,
-        recording: false,
+        onHold: softphone.isOnHold,
+        recording: !!softphone.isRecording,
         contacts: [],
         recents: [],
         quality: softphone.quality,
+        audioStatus: softphone.audioStatus,
+        audioError: softphone.audioError,
+        audioRestartAttempts: softphone.audioRestartAttempts,
       },
       sipConfig,
       call: softphone.call,
-      addCall: softphone.call,
+      addCall: softphone.addCall || softphone.call,
       hangup: softphone.hangup,
       answer: softphone.answer,
       mute: softphone.mute,
@@ -288,10 +292,13 @@ function AuthenticatedShell({
       audioProfile: softphone.audioProfile,
       setAudioProfile: softphone.setAudioProfile,
       setAudioEl: (_el: HTMLAudioElement | null) => {},
-      transfer: (_target?: string) => {},
-      park: () => {},
-      startRecord: () => {},
-      stopRecord: () => {},
+      audioStatus: softphone.audioStatus,
+      audioError: softphone.audioError,
+      audioRestartAttempts: softphone.audioRestartAttempts,
+      transfer: softphone.transfer || softphone.transferCall || ((_target?: string) => {}),
+      park: softphone.park || softphone.parkCall || (() => {}),
+      startRecord: softphone.startRecord || softphone.startRecording || (() => {}),
+      stopRecord: softphone.stopRecord || softphone.stopRecording || (() => {}),
     };
   }, [softphone, sipConfig]);
 
