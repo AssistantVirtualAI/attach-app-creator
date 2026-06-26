@@ -19,8 +19,52 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "setLogLevel", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "unregister", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setAudioRoute", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "getAudioRoute", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "getAudioRoute", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "playTestTone", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getRtpStats", returnType: CAPPluginReturnPromise)
     ]
+
+    public override func load() {
+        // Auto-detect Bluetooth / route changes and force audio route without restarting the call.
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(handleRouteChange(_:)),
+            name: AVAudioSession.routeChangeNotification, object: nil)
+    }
+
+    @objc private func handleRouteChange(_ note: Notification) {
+        guard let userInfo = note.userInfo,
+              let reasonRaw = userInfo[AVAudioSessionRouteChangeReasonKey] as? UInt,
+              let reason = AVAudioSession.RouteChangeReason(rawValue: reasonRaw) else { return }
+        let session = AVAudioSession.sharedInstance()
+        let outputs = session.currentRoute.outputs.map { $0.portType.rawValue }
+        let hasBT = outputs.contains { ["BluetoothHFP","BluetoothA2DPOutput","BluetoothLE"].contains($0) }
+        log("route change reason=\(reasonRaw) outputs=\(outputs) bt=\(hasBT)")
+
+        // Auto policy: BT connected → BT; BT disconnected → speaker (if call in progress).
+        if !callActiveId.isEmpty {
+            do {
+                switch reason {
+                case .newDeviceAvailable:
+                    if hasBT {
+                        if let bt = session.availableInputs?.first(where: { [.bluetoothHFP, .bluetoothLE].contains($0.portType) }) {
+                            try session.setPreferredInput(bt)
+                        }
+                        try session.overrideOutputAudioPort(.none)
+                    }
+                case .oldDeviceUnavailable:
+                    try session.overrideOutputAudioPort(.speaker)
+                default: break
+                }
+            } catch {
+                log("route auto-switch error: \(error.localizedDescription)")
+            }
+        }
+        notifyListeners("audioRouteChanged", data: [
+            "reason": reasonRaw,
+            "outputs": outputs,
+            "bluetooth": hasBT
+        ])
+    }
 
     // MARK: - Config / State
     private var server: String = ""
