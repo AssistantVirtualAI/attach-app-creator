@@ -425,5 +425,7 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
     addCall,
     endReason,
     lastEndReason: endReason,
+    callPhase,
+    lastSipCode,
   } as UseSoftphoneReturn;
 }
