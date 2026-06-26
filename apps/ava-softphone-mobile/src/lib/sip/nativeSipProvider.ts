@@ -1,5 +1,8 @@
 import { registerPlugin } from '@capacitor/core';
 
+export type CapacitorSipLogLevel = 0 | 1 | 2 | 3 | 4 | 5;
+// 0=off 1=error 2=warn 3=info 4=debug 5=verbose (full SIP frames)
+
 export interface CapacitorSipPlugin {
   initAccount(options: {
     extension: string;
@@ -7,6 +10,7 @@ export interface CapacitorSipPlugin {
     password: string;
     host?: string;
     wssUrl?: string; // legacy, ignored by native TLS plugin
+    logLevel?: CapacitorSipLogLevel;
   }): Promise<void>;
   disconnect(): Promise<void>;
   makeCall(options: { number: string }): Promise<void>;
@@ -15,6 +19,7 @@ export interface CapacitorSipPlugin {
   setMute(options: { muted: boolean }): Promise<void>;
   setHold(options: { held?: boolean; onHold?: boolean }): Promise<void>;
   sendDTMF(options: { digits?: string; digit?: string }): Promise<void>;
+  setLogLevel(options: { level: CapacitorSipLogLevel }): Promise<{ level: number }>;
   addListener(event: string, callback: (data: any) => void): Promise<{ remove: () => Promise<void> }>;
   removeAllListeners(): Promise<void>;
 }
