@@ -522,8 +522,8 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
                     log("INVITE \(code) missing auth header")
                     let id = callActiveId
                     stopRtp()
-                    resetCallState()
                     emitCallEnded("INVITE \(code) without auth header", callId: id)
+                    resetCallState()
                 }
             } else if code == "200" {
                 callRemoteTag = extractTag(headerValue(msg, "To") ?? "")
@@ -539,8 +539,8 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
                 sendAck(to: msg, withinDialog: false)
                 let id = callActiveId
                 stopRtp()
-                resetCallState()
                 emitCallEnded(firstLine, callId: id)
+                resetCallState()
             }
 
         }
