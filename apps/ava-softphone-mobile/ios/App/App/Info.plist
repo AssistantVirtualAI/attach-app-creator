@@ -61,7 +61,7 @@
 		<string>node.lemtelcloud.net</string>
 	</array>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Required for SIP/WebRTC calls on local network</string>
+	<string>AVA Softphone a besoin d'accéder au réseau local pour établir vos appels téléphoniques.</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_sip._tcp</string>
