@@ -1032,6 +1032,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         }
         if withSdp && code == 200 {
             let sdp = buildSdp()
+            log("LOCAL SDP (\(code) answer) >>>\n\(sdp)")
             resp += "Content-Type: application/sdp\r\n"
             resp += "Content-Length: \(sdp.utf8.count)\r\n\r\n"
             resp += sdp
