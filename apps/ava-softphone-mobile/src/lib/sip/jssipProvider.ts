@@ -1,5 +1,15 @@
 import * as JsSIPModule from 'jssip';
 
+// Module-level barrier: if the native SIP plugin is active, refuse to expose
+// any JsSIP entry point. This guarantees no UA can ever be constructed even
+// if a forgotten code path imports from this file.
+const __NATIVE_SIP_ACTIVE =
+  ((import.meta as any).env?.VITE_NATIVE_SIP ?? '').toString() === 'true';
+if (__NATIVE_SIP_ACTIVE) {
+  // eslint-disable-next-line no-console
+  console.log('[jssipProvider] native SIP active — JsSIP entry points disabled');
+}
+
 declare global {
   interface Window {
     JsSIP: any;
@@ -43,6 +53,11 @@ function bundledJsSIP() {
 
 /** Resolves the bundled JsSIP module, falling back to window.JsSIP if present. */
 export function waitForJsSIP(timeoutMs = 8000, intervalMs = 100, requireWebRTC = true): Promise<any> {
+  if (__NATIVE_SIP_ACTIVE) {
+    return Promise.reject(new JsSIPUnavailableError(
+      'JsSIP disabled — native SIP plugin is active (VITE_NATIVE_SIP=true)'
+    ));
+  }
   return new Promise((resolve, reject) => {
     if (typeof window === 'undefined') {
       const bundled = bundledJsSIP();
