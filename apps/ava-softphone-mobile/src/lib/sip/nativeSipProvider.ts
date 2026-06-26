@@ -20,6 +20,8 @@ export interface CapacitorSipPlugin {
   setHold(options: { held?: boolean; onHold?: boolean }): Promise<void>;
   sendDTMF(options: { digits?: string; digit?: string }): Promise<void>;
   setLogLevel(options: { level: CapacitorSipLogLevel }): Promise<{ level: number }>;
+  setAudioRoute(options: { route: 'auto' | 'speaker' | 'earpiece' | 'bluetooth' }): Promise<{ ok: boolean; route: string; outputs: string }>;
+  getAudioRoute(): Promise<{ outputs: Array<{ portType: string; portName: string }>; availableInputs: Array<{ portType: string; portName: string }> }>;
   addListener(event: string, callback: (data: any) => void): Promise<{ remove: () => Promise<void> }>;
   removeAllListeners(): Promise<void>;
 }
