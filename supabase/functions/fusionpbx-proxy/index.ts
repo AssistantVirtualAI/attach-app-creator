@@ -2006,10 +2006,13 @@ Deno.serve(async (req) => {
       );
       const sessionLoggedIn = FUSION_SESSIONS.size > 0;
       console.log("[get-recording] RECORDING_NOT_FOUND", JSON.stringify({
-        xml_cdr_uuid, record_name, session_logged_in: sessionLoggedIn,
+        xml_cdr_uuid, record_name, record_path, domain_name, recorded_at,
+        session_logged_in: sessionLoggedIn,
         file_missing_signal: fileMissing,
-        session_attempts: attemptsSession.slice(0, 8),
-        legacy_attempts: attempts.slice(0, 4),
+        session_attempts_count: attemptsSession.length,
+        legacy_attempts_count: attempts.length,
+        session_attempts: attemptsSession.slice(0, 30),
+        legacy_attempts: attempts.slice(0, 20),
       }));
       return json({
         ok: false,
