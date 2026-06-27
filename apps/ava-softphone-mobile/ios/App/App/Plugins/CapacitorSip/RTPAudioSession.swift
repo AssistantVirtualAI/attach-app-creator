@@ -309,9 +309,12 @@ final class RTPAudioSession {
         // Reset resampler phase for a clean start.
         txPhase = 0; rxPhase = 0; rxHoldSample = 0
 
+        // Phase 4: use VoiceProcessingIO instead of plain RemoteIO to get
+        // built-in AEC (echo cancellation), NS (noise suppression) and AGC
+        // (auto gain) handled by the OS Voice Processing unit.
         var desc = AudioComponentDescription(
             componentType: kAudioUnitType_Output,
-            componentSubType: kAudioUnitSubType_RemoteIO,
+            componentSubType: kAudioUnitSubType_VoiceProcessingIO,
             componentManufacturer: kAudioUnitManufacturer_Apple,
             componentFlags: 0, componentFlagsMask: 0
         )
