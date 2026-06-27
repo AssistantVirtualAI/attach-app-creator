@@ -119,7 +119,7 @@ export default function ActiveCallSheet({
     // Fallback: ask the PBX directly via fusionpbx-proxy.
     try {
       const callUuid = (sp.snap as any).callId || (sp.snap as any).callUuid || '';
-      const { supabase } = await import('../lib/supabase');
+      const { supabase } = await import('../lib/mobileSupabase');
       const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
         body: { action: 'record-call', uuid: callUuid, start: !isRec, domain_name: (sp.snap as any).domain },
       });
