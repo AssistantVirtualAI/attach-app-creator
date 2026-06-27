@@ -28,7 +28,8 @@ test.describe("/mplanipret routing isolation", () => {
 
     const url = new URL(page.url());
     expect(url.pathname, "must never enter the admin portal").not.toContain("/planipret/admin");
-    expect(["/mplanipret", "/mplanipret/home", "/login"]).toContain(url.pathname);
+    expect(["/mplanipret", "/mplanipret/home"]).toContain(url.pathname);
+    await expect(page.getByText("Connexion mobile Planiprêt")).toBeVisible();
   });
 
   test("debug overlay reports the current route", async ({ page }) => {
