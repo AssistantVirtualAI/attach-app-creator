@@ -439,7 +439,7 @@ export const mobileApi = {
     '/ai-analyze-call', { method: 'POST', body: JSON.stringify({ call_record_id: callId }) },
     { jobId: 'job-' + Date.now() },
   ),
-  transcribeCall: (callId: string, meta?: { recording_path?: string | null; recording_name?: string | null; domain_uuid?: string | null; xml_cdr_uuid?: string | null; organization_id?: string | null; force?: boolean }) => call<{ transcript_text?: string; stub?: boolean; reason?: string; error?: string; details?: string; fetchErrors?: string[]; provider?: string; attempts?: any[] }>(
+  transcribeCall: (callId: string, meta?: { recording_path?: string | null; recording_name?: string | null; domain_uuid?: string | null; xml_cdr_uuid?: string | null; organization_id?: string | null; force?: boolean; disableClaude?: boolean }) => call<{ transcript_text?: string; stub?: boolean; reason?: string; error?: string; details?: string; fetchErrors?: string[]; provider?: string; attempts?: any[] }>(
     '/ai-transcribe-call', { method: 'POST', body: JSON.stringify({
       call_record_id: callId,
       xml_cdr_uuid: meta?.xml_cdr_uuid || callId,
@@ -450,6 +450,7 @@ export const mobileApi = {
       domain_uuid: meta?.domain_uuid || undefined,
       organization_id: meta?.organization_id || undefined,
       force: meta?.force || undefined,
+      disable_claude: meta?.disableClaude || undefined,
     }) },
     { transcript_text: 'Mock transcript', stub: false },
   ),

@@ -24,6 +24,8 @@ export default function SettingsScreen({
   const [haptics, setHaptics] = useState<boolean>(() => localStorage.getItem('ava.haptics') !== 'off');
   const [autoAnswer, setAutoAnswer] = useState<boolean>(() => localStorage.getItem('ava.autoAnswer') === 'on');
   const [announceRec, setAnnounceRec] = useState<boolean>(() => getAnnounceConsent());
+  const [claudeFallback, setClaudeFallback] = useState<boolean>(() => localStorage.getItem('ava.claudeFallback') !== 'off');
+  const [lastTranscriber, setLastTranscriber] = useState<string>(() => localStorage.getItem('ava.lastTranscriber') || '—');
   
   const [ringtone, setRingtone] = useState<string>(() => localStorage.getItem('ava.ringtone') || 'AVA Default');
   const [audioOut, setAudioOut] = useState<string>(() => localStorage.getItem('ava.audioOut') || 'System default');
@@ -206,6 +208,25 @@ export default function SettingsScreen({
         />
         <SettingsRow label={t('settings.clearCache')} icon="🧹" onPress={clearCache} />
         <SettingsRow label={t('settings.deleteAccount')} icon="⚠" onPress={() => openPortal('/account/delete')} />
+      </Card>
+
+      {/* Transcription */}
+      <SectionTitle eyebrow="AI" title={lang === 'fr' ? 'Transcription' : 'Transcription'} />
+      <Card padded={false}>
+        <SettingsRow
+          label={lang === 'fr' ? 'Fournisseur actif (dernier appel)' : 'Active provider (last call)'}
+          icon="🧠"
+          value={lastTranscriber}
+          onPress={() => setLastTranscriber(localStorage.getItem('ava.lastTranscriber') || '—')}
+        />
+        <SettingsRow
+          label={lang === 'fr' ? 'Repli Claude (Anthropic)' : 'Claude fallback (Anthropic)'}
+          icon="🛟"
+          value={claudeFallback
+            ? (lang === 'fr' ? 'Activé — utilisé si Gemini & GPT échouent' : 'On — used if Gemini & GPT fail')
+            : (lang === 'fr' ? 'Désactivé' : 'Off')}
+          onPress={() => { const next = !claudeFallback; setClaudeFallback(next); localStorage.setItem('ava.claudeFallback', next ? 'on' : 'off'); }}
+        />
       </Card>
 
       {/* Support & about */}
