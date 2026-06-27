@@ -356,7 +356,10 @@ export default function PlanipretMobile() {
         </div>
         <SessionTimeoutModal />
         {profile && <PrivacyConsentGate profile={profile} onAccepted={loadProfile} />}
-        {profile && profile.consent_accepted_at && !profile.onboarding_completed && (
+        {profile && profile.consent_accepted_at && !isPermOnboardingDone() && (
+          <MobilePermissionsOnboarding onDone={() => loadProfile()} />
+        )}
+        {profile && profile.consent_accepted_at && isPermOnboardingDone() && !profile.onboarding_completed && (
           <OnboardingTutorial profile={profile} onDone={loadProfile} />
         )}
 
