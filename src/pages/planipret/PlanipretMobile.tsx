@@ -427,13 +427,9 @@ export default function PlanipretMobile() {
 
 
         {/* Tab bar (5 tabs + center FAB placeholder = 5 grid columns) */}
-        <nav className="absolute bottom-[22px] inset-x-0 grid grid-cols-5 z-10"
-          style={{
-            height: 70,
-            background: "rgba(4,11,22,0.97)",
-            backdropFilter: "blur(20px)",
-            borderTop: "1px solid var(--pp-bg-border-2)",
-          }}>
+        <nav className="absolute bottom-[22px] inset-x-0 grid grid-cols-5 z-10 pp-mobile-tabbar"
+          style={{ height: 70 }}>
+
           {TABS.map((t) => {
             if (t.to === "_fab") return <div key="fab-slot" />;
             const badge = t.to.endsWith("/messages") ? unreadMsg : 0;
