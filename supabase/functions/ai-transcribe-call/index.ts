@@ -424,11 +424,22 @@ Deno.serve(async (req) => {
       return json({ transcript_text: fallbackTranscript, stub: true, reason: "all-providers-failed", attempts }, 200);
     }
 
-    const providerLabel = `${final.provider}/${final.model}`;
-    console.log("ai-transcribe-call ai result", { provider: providerLabel, length: final.text.length, audioSource, attempts });
-    await writeTranscript(final.text, providerLabel);
-    await audit("ok", { provider: final.provider, model: final.model, metadata: { audioSource, length: final.text.length, attempts } });
-    return json({ transcript_text: final.text, audioSource, provider: providerLabel, attempts });
+    let finalText = final.text;
+    let providerLabel = `${final.provider}/${final.model}`;
+    let cleanupInfo: any = { used: false };
+    if (!disableClaude) {
+      const cleanup = await claudePostProcess(final.text);
+      cleanupInfo = cleanup;
+      if (cleanup.used && cleanup.text) {
+        finalText = cleanup.text;
+        providerLabel = `${final.provider}/${final.model}+claude-3-5-sonnet-cleanup`;
+      }
+    }
+    console.log("ai-transcribe-call ai result", { provider: providerLabel, length: finalText.length, audioSource, attempts, cleanup: cleanupInfo });
+    await writeTranscript(finalText, providerLabel);
+    await audit("ok", { provider: final.provider, model: final.model, metadata: { audioSource, length: finalText.length, attempts, claude_cleanup: cleanupInfo } });
+    return json({ transcript_text: finalText, audioSource, provider: providerLabel, attempts, claude_cleanup: cleanupInfo });
+
   } catch (e: any) {
     console.error("ai-transcribe-call error", e);
     await audit("error", { error_code: "exception", message: String(e?.message || e).slice(0, 400) });
