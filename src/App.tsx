@@ -455,7 +455,7 @@ const App = () => (
                 />
 
                 {/* Legacy AVA admin portal is now strictly hosted inside the Planipret organization. */}
-                <Route element={<ProtectedRoute><PlanipretOrgOnly><Outlet /></PlanipretOrgOnly></ProtectedRoute>}>
+                <Route element={<ProtectedRoute><Outlet /></ProtectedRoute>}>
 
 
                 <Route
