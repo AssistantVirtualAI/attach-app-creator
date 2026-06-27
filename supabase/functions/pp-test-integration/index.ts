@@ -51,6 +51,9 @@ Deno.serve(async (req) => {
         case "elevenlabs": result = await testElevenLabs(cfg); break;
         case "ms365":      result = await testMs365(cfg); break;
         case "maestro":    result = await testMaestro(cfg); break;
+        case "webhooks":   result = await testWebhooks(cfg); break;
+        case "mobile_app": result = await testMobileApp(admin); break;
+        case "compliance": result = await testCompliance(admin, cfg); break;
         default:           result = { success: false, message: `Tests not implemented for ${integration_key}` };
       }
     } catch (e) {
