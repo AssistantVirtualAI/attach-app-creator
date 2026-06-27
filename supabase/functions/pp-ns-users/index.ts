@@ -35,15 +35,22 @@ Deno.serve(async (req) => {
     const domain = new URL(req.url).searchParams.get("domain") ?? env.NS_DEFAULT_DOMAIN;
     if (!domain) return jsonResponse({ error: "NS domain not configured" }, 412);
 
-    // Fetch all users from NS-API for this domain
-    const res = await nsFetch(`/domains/${encodeURIComponent(domain)}/users?limit=2000`, {
-      method: "GET",
-    });
-    if (!res.ok) {
-      const txt = await res.text();
-      return jsonResponse({ error: "NS-API users fetch failed", status: res.status, body: txt.slice(0, 500) }, 502);
+    // Fetch all users from NS-API for this domain — degrade gracefully on auth/network failure
+    let raw: any = null;
+    let nsWarning: string | null = null;
+    try {
+      const res = await nsFetch(`/domains/${encodeURIComponent(domain)}/users?limit=2000`, {
+        method: "GET",
+      });
+      if (!res.ok) {
+        const txt = await res.text();
+        nsWarning = `NS-API users fetch failed: ${res.status} ${txt.slice(0, 200)}`;
+      } else {
+        raw = await res.json();
+      }
+    } catch (e) {
+      nsWarning = `NS-API unreachable: ${(e as Error).message}`;
     }
-    const raw = await res.json();
     const list: any[] = Array.isArray(raw) ? raw : (raw?.users ?? raw?.data ?? raw?.items ?? []);
 
     // Merge with local planipret_profiles for app/agent flags
