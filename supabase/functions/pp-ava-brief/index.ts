@@ -63,9 +63,8 @@ Deno.serve(async (req) => {
       .eq("user_id", u.user.id).maybeSingle();
     if (!profile) return json({ error: "no_profile" }, 404);
 
-    // (cache skipped — planipret_ai_insights schema does not have a generic key/value column;
-    // client-side React Query handles short-lived caching)
-    void cacheKey: var _ck = `home_brief_${period}_${force}`;
+    // Caching is handled by React Query on the client; force flag is accepted for future use.
+    void force;
 
     const { since, until } = periodRange(period);
     const sinceIso = since.toISOString();
