@@ -134,6 +134,13 @@ export default function RecordingsScreen({
     return Array.from(set).sort();
   }, [items, domainExtensions, myExtension]);
 
+  const recMeta = (rec: RecordingEntry) => ({
+    recording_path: rec.record_path, recording_name: rec.record_name,
+    xml_cdr_uuid: rec.xml_cdr_uuid || rec.id, domain_uuid: rec.domain_uuid,
+    domain_name: rec.domain_name, organization_id: rec.organization_id,
+    start_at: rec.startedAt,
+  });
+
   const play = async (rec: RecordingEntry) => {
     if (playingId === rec.id) {
       audioRef.current?.pause();
@@ -142,32 +149,48 @@ export default function RecordingsScreen({
     }
     setLoadingId(rec.id);
     try {
-      const url = await loadPbxRecordingAudioMobile(
-        {
-          id: rec.id,
-          xml_cdr_uuid: rec.xml_cdr_uuid,
-          recording_path: rec.record_path,
-          recording_name: rec.record_name,
-          domain_uuid: rec.domain_uuid,
-          domain_name: rec.domain_name,
-          organization_id: rec.organization_id,
-          start_at: rec.startedAt,
-        },
-        creds?.accessToken || null,
-        creds?.organizationId || null,
-        creds?.domainUuid || creds?.fusionpbxDomainUuid || fallbackDomainUuid || null,
-      );
+      // Phase 5: serve from local cache first; if missing, download (and cache) on the fly.
+      let url = await getCachedRecordingUrl(rec.id);
+      if (!url) {
+        url = await downloadRecording(
+          rec.id, recMeta(rec),
+          creds?.accessToken || null,
+          creds?.organizationId || null,
+          creds?.domainUuid || creds?.fusionpbxDomainUuid || fallbackDomainUuid || null,
+        );
+        setCachedIds((prev) => new Set(prev).add(rec.id));
+      }
       if (audioRef.current) {
         audioRef.current.src = url;
         audioRef.current.play().catch(() => {});
       }
       setPlayingId(rec.id);
     } catch (e: any) {
-      showMobileToast(e?.message || 'Unable to load recording', 'error');
+      showMobileToast(e?.message || (fr ? 'Impossible de charger l\'enregistrement' : 'Unable to load recording'), 'error');
     } finally {
       setLoadingId(null);
     }
   };
+
+  const download = async (rec: RecordingEntry) => {
+    setDownloadingId(rec.id);
+    try {
+      await downloadRecording(
+        rec.id, recMeta(rec),
+        creds?.accessToken || null,
+        creds?.organizationId || null,
+        creds?.domainUuid || creds?.fusionpbxDomainUuid || fallbackDomainUuid || null,
+        { force: true },
+      );
+      setCachedIds((prev) => new Set(prev).add(rec.id));
+      showMobileToast(fr ? 'Enregistrement téléchargé pour écoute hors-ligne' : 'Recording downloaded for offline playback', 'success');
+    } catch (e: any) {
+      showMobileToast(e?.message || (fr ? 'Téléchargement échoué' : 'Download failed'), 'error');
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
 
   const toggleExpand = (id: string) => {
     setExpandedId((prev) => (prev === id ? null : id));
