@@ -267,7 +267,7 @@ export default function PlanipretMobile() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center" style={{ background: "#030810", color: "var(--pp-text-muted, #4A7FA5)" }}>Chargement…</div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center" style={{ background: "#F7F9FC", color: "#5A6B85", fontFamily: "Urbanist,sans-serif" }}>Chargement…</div>;
 
   if (accessError) {
     return (
@@ -344,8 +344,8 @@ export default function PlanipretMobile() {
     <Frame>
       <div className="h-full flex flex-col relative overflow-hidden" style={{ background: "var(--pp-bg-base)" }}>
         {/* Top brand header — AVA (left) · Planiprêt (center) · Settings (right) */}
-        <header className="relative flex items-center px-4 pt-3 pb-2"
-          style={{ background: "linear-gradient(180deg, #0A1628 0%, #060D1A 100%)", borderBottom: "1px solid var(--pp-bg-border)" }}>
+        <header className="relative flex items-center px-4 pt-3 pb-2 pp-mobile-header">
+
           {/* AVA icon — left */}
           <div className="flex items-center gap-1.5">
             <img src={avaLogo.url} alt="AVA" className="w-7 h-7 rounded-lg object-cover"
@@ -427,13 +427,9 @@ export default function PlanipretMobile() {
 
 
         {/* Tab bar (5 tabs + center FAB placeholder = 5 grid columns) */}
-        <nav className="absolute bottom-[22px] inset-x-0 grid grid-cols-5 z-10"
-          style={{
-            height: 70,
-            background: "rgba(4,11,22,0.97)",
-            backdropFilter: "blur(20px)",
-            borderTop: "1px solid var(--pp-bg-border-2)",
-          }}>
+        <nav className="absolute bottom-[22px] inset-x-0 grid grid-cols-5 z-10 pp-mobile-tabbar"
+          style={{ height: 70 }}>
+
           {TABS.map((t) => {
             if (t.to === "_fab") return <div key="fab-slot" />;
             const badge = t.to.endsWith("/messages") ? unreadMsg : 0;
@@ -465,13 +461,13 @@ export default function PlanipretMobile() {
 
 
         {/* Powered by AVA footer */}
-        <div className="absolute bottom-0 inset-x-0 h-[24px] flex items-center justify-center gap-2 z-10"
-          style={{ background: "var(--pp-bg-deep)", borderTop: "1px solid var(--pp-bg-border)" }}>
-          <span style={{ fontSize: 9, color: "var(--pp-text-faint)", letterSpacing: "0.12em", fontWeight: 600 }}>POWERED BY</span>
-          <img src={avaLogo.url} alt="AVA" className="w-3.5 h-3.5 rounded object-cover" style={{ boxShadow: "0 0 6px rgba(155,127,232,0.4)" }} />
-          <span style={{ fontSize: 9, color: "rgba(255,255,255,0.7)", letterSpacing: "0.08em", fontWeight: 700 }}>AVA</span>
+        <div className="absolute bottom-0 inset-x-0 h-[24px] flex items-center justify-center gap-2 z-10 pp-mobile-footer">
+          <span style={{ fontFamily: "Urbanist,sans-serif", fontSize: 9, color: "var(--pp-text-muted)", letterSpacing: "0.14em", fontWeight: 600 }}>POWERED BY</span>
+          <img src={avaLogo.url} alt="AVA" className="w-3.5 h-3.5 rounded object-cover" />
+          <span style={{ fontFamily: "Urbanist,sans-serif", fontSize: 9, color: "var(--pp-brand-accent-2)", letterSpacing: "0.10em", fontWeight: 700 }}>AVA</span>
           <span style={{ fontSize: 8.5, color: "var(--pp-text-faint)", letterSpacing: "0.1em" }}>· DEVELOPED BY AVA</span>
         </div>
+
 
         <Dialer open={dialerOpen} onClose={() => setDialerOpen(false)} initial={dialerInit} />
         <InboundCallOverlay call={inbound} onClose={() => setInbound(null)} />
@@ -488,12 +484,13 @@ export default function PlanipretMobile() {
 
 function Frame({ children }: { children: React.ReactNode }) {
   return (
-    <div className="planipret-scope min-h-screen w-full flex items-center justify-center md:p-6" style={{ background: "#020610" }}>
+    <div className="planipret-scope planipret-mobile-scope min-h-screen w-full flex items-center justify-center md:p-6"
+      style={{ background: "linear-gradient(160deg, #EEF2F8 0%, #DCE3EC 100%)" }}>
       <div className="overflow-hidden w-full md:w-[390px] md:h-[844px] h-screen md:rounded-[44px] relative"
         style={{
-          background: "#060D1A",
-          border: "2px solid #1A3A5A",
-          boxShadow: "0 0 0 8px #040B16, 0 40px 120px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.05)",
+          background: "#F7F9FC",
+          border: "1px solid #DCE3EC",
+          boxShadow: "0 0 0 6px #FFFFFF, 0 40px 120px rgba(15,27,61,0.18), inset 0 1px 0 rgba(255,255,255,0.6)",
         }}>
         {children}
       </div>
