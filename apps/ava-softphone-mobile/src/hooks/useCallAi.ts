@@ -68,7 +68,7 @@ export function useCallAi(callId: string | null, meta: CallAiMeta | undefined, o
     if (autoLoad && callId) { load(); }
   }, [autoLoad, callId, load]);
 
-  const run = useCallback(async () => {
+  const run = useCallback(async (opts?: { force?: boolean }) => {
     if (!callId || running) return;
     const seq = runSeqRef.current + 1;
     runSeqRef.current = seq;
@@ -82,6 +82,7 @@ export function useCallAi(callId: string | null, meta: CallAiMeta | undefined, o
         domain_uuid: meta?.domain_uuid,
         xml_cdr_uuid: meta?.xml_cdr_uuid || callId,
         organization_id: meta?.organization_id,
+        force: opts?.force,
       });
       if (t?.stub || t?.error) {
         const reason = t.reason || t.error || '';
