@@ -18,6 +18,7 @@ import AgencyHome from "./pages/AgencyHome";
 import PostLoginRedirect from "./pages/PostLoginRedirect";
 // PlanipretLogin removed — auth handled via avastatistic.ca SSO
 import PlanipretMobile from "./pages/planipret/PlanipretMobile";
+import StorePreflightPreview from "./pages/planipret/StorePreflightPreview";
 import { AppSeparationGuard } from "./components/auth/AppSeparationGuard";
 import { MplanipretGuard } from "./components/auth/MplanipretGuard";
 import RouteDebugOverlay from "./components/debug/RouteDebugOverlay";
@@ -408,6 +409,8 @@ const App = () => (
                 <Route path="/planipret/integrations" element={<Navigate to="/planipret/admin/integrations" replace />} />
                 <Route path="/auth/ms365/callback" element={<Ms365Callback />} />
                 <Route path="/planipret/audit" element={<AppSeparationGuard app="planipret"><PlanipretAudit /></AppSeparationGuard>} />
+                <Route path="/planipret/store-preflight" element={<AppSeparationGuard app="planipret"><StorePreflightPreview /></AppSeparationGuard>} />
+
 
                 {/* Planipret Admin sub-routes (layout with sidebar) — lazy-loaded */}
                 <Route
