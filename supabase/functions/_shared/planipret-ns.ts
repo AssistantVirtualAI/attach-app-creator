@@ -93,7 +93,17 @@ export async function getNsJwt(): Promise<string> {
 }
 
 export async function nsFetch(path: string, init: RequestInit = {}) {
-  const token = await getNsJwt();
+  let token: string;
+  try {
+    token = await getNsJwt();
+  } catch (e) {
+    // Degrade gracefully: return a synthetic 503 instead of throwing so callers
+    // can fall back to local data and avoid blank-screen 500s on the admin UI.
+    return new Response(
+      JSON.stringify({ error: (e as Error).message, degraded: true }),
+      { status: 503, headers: { "Content-Type": "application/json" } },
+    );
+  }
   const url = `${nsBase()}/ns-api/v2${path}`;
   let res = await fetch(url, {
     ...init,
@@ -106,16 +116,23 @@ export async function nsFetch(path: string, init: RequestInit = {}) {
   });
   if (res.status === 401) {
     cachedToken = null;
-    const fresh = await getNsJwt();
-    res = await fetch(url, {
-      ...init,
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        Authorization: `Bearer ${fresh}`,
-        ...(init.headers ?? {}),
-      },
-    });
+    try {
+      const fresh = await getNsJwt();
+      res = await fetch(url, {
+        ...init,
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          Authorization: `Bearer ${fresh}`,
+          ...(init.headers ?? {}),
+        },
+      });
+    } catch (e) {
+      return new Response(
+        JSON.stringify({ error: (e as Error).message, degraded: true }),
+        { status: 503, headers: { "Content-Type": "application/json" } },
+      );
+    }
   }
   return res;
 }
