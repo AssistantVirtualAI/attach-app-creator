@@ -1,0 +1,115 @@
+import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { Link2, CheckCircle2, AlertCircle, Phone, Mail } from "lucide-react";
+
+type Profile = {
+  ms365_email?: string | null;
+  ms365_display_name?: string | null;
+  ms365_access_token?: string | null;
+  ns_extension?: string | null;
+  extension?: string | null;
+  ns_domain?: string | null;
+  ns_linked?: boolean | null;
+};
+
+export default function IdentityCard({ profile, onLinked }: { profile: Profile | null; onLinked: () => Promise<void> | void }) {
+  const [linking, setLinking] = useState(false);
+  const [manual, setManual] = useState("");
+  const [showManual, setShowManual] = useState(false);
+
+  if (!profile) return null;
+
+  const msConnected = !!profile.ms365_access_token;
+  const nsLinked = !!profile.ns_linked && !!(profile.ns_extension || profile.extension);
+  const ext = profile.ns_extension || profile.extension;
+
+  const autoLink = async () => {
+    setLinking(true);
+    const { data, error } = await supabase.functions.invoke("ms365-ns-identity-link", { body: {} });
+    setLinking(false);
+    if (error) { toast.error(error.message); return; }
+    const d = data as any;
+    if (d?.linked) { toast.success(`Lié à l'extension ${d.extension}`); await onLinked(); }
+    else if (d?.need_manual) { setShowManual(true); toast.message("Saisissez votre extension manuellement"); }
+    else toast.error(d?.error ?? "Lien impossible");
+  };
+
+  const manualLink = async () => {
+    if (!/^\d{3,6}$/.test(manual.trim())) { toast.error("Extension invalide"); return; }
+    setLinking(true);
+    const { data, error } = await supabase.functions.invoke("ms365-ns-identity-link", { body: { extension: manual.trim() } });
+    setLinking(false);
+    if (error) { toast.error(error.message); return; }
+    const d = data as any;
+    if (d?.linked) { toast.success(`Lié à l'extension ${d.extension}`); setShowManual(false); await onLinked(); }
+    else toast.error(d?.error ?? "Extension introuvable");
+  };
+
+  return (
+    <div className="pp-card p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="pp-eyebrow">Identité</p>
+        <span className="pp-pill" style={{
+          background: nsLinked ? "rgba(13,122,95,0.10)" : "rgba(178,58,72,0.10)",
+          color: nsLinked ? "var(--pp-success)" : "var(--pp-danger)",
+          border: `1px solid ${nsLinked ? "rgba(13,122,95,0.30)" : "rgba(178,58,72,0.30)"}`,
+        }}>
+          {nsLinked ? <><CheckCircle2 className="w-3 h-3" /> Liée</> : <><AlertCircle className="w-3 h-3" /> Non liée</>}
+        </span>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <div className="w-11 h-11 rounded-full flex items-center justify-center font-bold text-white"
+             style={{ background: "linear-gradient(135deg,#0078D4,#005A9E)" }}>
+          {(profile.ms365_display_name || profile.ms365_email || "?").slice(0, 1).toUpperCase()}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold truncate" style={{ color: "var(--pp-text-primary)" }}>
+            {profile.ms365_display_name || profile.ms365_email || "—"}
+          </p>
+          {msConnected && profile.ms365_email && (
+            <p className="text-xs flex items-center gap-1" style={{ color: "var(--pp-text-secondary)" }}>
+              <Mail className="w-3 h-3" /> {profile.ms365_email} <span style={{ opacity: 0.6 }}>· Microsoft</span>
+            </p>
+          )}
+          {ext && (
+            <p className="text-xs flex items-center gap-1" style={{ color: "var(--pp-text-secondary)" }}>
+              <Phone className="w-3 h-3" /> Ext. {ext}{profile.ns_domain ? ` · ${profile.ns_domain}` : ""} <span style={{ opacity: 0.6 }}>· NS-API</span>
+            </p>
+          )}
+        </div>
+      </div>
+
+      {msConnected && !nsLinked && !showManual && (
+        <button onClick={autoLink} disabled={linking} className="pp-btn-primary w-full">
+          <Link2 className="w-4 h-4" /> {linking ? "Liaison…" : "Lier mon extension"}
+        </button>
+      )}
+
+      {showManual && (
+        <div className="space-y-2">
+          <input
+            value={manual}
+            onChange={(e) => setManual(e.target.value.replace(/\D/g, ""))}
+            placeholder="Extension (ex. 1136)"
+            inputMode="numeric"
+            className="pp-input w-full"
+          />
+          <div className="flex gap-2">
+            <button onClick={() => setShowManual(false)} className="pp-btn-secondary flex-1">Annuler</button>
+            <button onClick={manualLink} disabled={linking} className="pp-btn-primary flex-1">
+              {linking ? "Validation…" : "Confirmer"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!msConnected && (
+        <p className="text-xs" style={{ color: "var(--pp-text-secondary)" }}>
+          Connectez Microsoft 365 dans Paramètres pour lier automatiquement votre identité.
+        </p>
+      )}
+    </div>
+  );
+}
