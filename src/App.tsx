@@ -391,6 +391,9 @@ const App = () => (
                 {/* Planiprêt — auth via avastatistic.ca SSO */}
                 <Route path="/planipret" element={<Navigate to="/planipret/admin/overview" replace />} />
                 <Route path="/planipret/login" element={<Navigate to={loginWithRedirect(ROUTES.MPLANIPRET)} replace />} />
+                {/* Legacy alias — old links/bookmarks land here, forward to the canonical mobile app */}
+                <Route path="/planipret/mobile" element={<Navigate to={ROUTES.MPLANIPRET} replace />} />
+                <Route path="/planipret/mobile/*" element={<Navigate to={ROUTES.MPLANIPRET} replace />} />
                 <Route path="/lemtel/setup/:token" element={<SoftphoneSetup />} />
                 <Route path="/lemtel/redeem/:token" element={<SoftphoneSetup />} />
                 <Route path={ROUTES.MPLANIPRET} element={<MplanipretGuard><PlanipretMobile /></MplanipretGuard>}>
