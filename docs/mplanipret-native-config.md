@@ -123,3 +123,25 @@ Content: (1) Home KPIs + AVA brief · (2) Active call + coaching · (3) Call det
 - Shared: Microsoft (SSO), NetSapiens (telephony)
 - Encrypted in transit: yes
 - Deletion: `support@avastatistic.ca`
+
+## Phase 4 — Bluetooth audio (added)
+
+### iOS — `Info.plist`
+```xml
+<key>NSBluetoothAlwaysUsageDescription</key>
+<string>Planiprêt utilise le Bluetooth pour acheminer vos appels vers votre casque ou votre voiture.</string>
+<key>NSBluetoothPeripheralUsageDescription</key>
+<string>Planiprêt détecte les casques Bluetooth pour vos appels professionnels.</string>
+```
+
+### Android — `AndroidManifest.xml` (API 31+)
+```xml
+<uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+<uses-permission android:name="android.permission.BLUETOOTH_SCAN"
+    android:usesPermissionFlags="neverForLocation" />
+<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+<uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
+```
+
+After editing native projects run `npx cap sync` so the new Bluetooth + Network
+plugins (`@capacitor-community/bluetooth-le`, `@capacitor/network`) register.

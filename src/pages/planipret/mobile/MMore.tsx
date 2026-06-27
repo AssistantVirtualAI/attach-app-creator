@@ -11,6 +11,7 @@ import { usePlanipretPush } from "@/hooks/usePlanipretPush";
 import { CalendarSyncCard } from "@/components/planipret/CalendarSyncCard";
 import { SiriShortcutsCard } from "@/components/planipret/SiriShortcutsCard";
 import { safeEdgeFunction } from "@/lib/safeEdgeFunction";
+import MNetworkSection from "@/components/planipret/mobile/MNetworkSection";
 
 const initials = (name?: string) =>
   (name ?? "").split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase()).join("") || "?";
@@ -242,6 +243,8 @@ export default function MMore() {
         <Row icon={<Bell className="w-4 h-4" />} label="Notifications" right={<Toggle on={notifEnabled} onChange={toggleNotif} />} />
         <Row icon={<Moon className="w-4 h-4" />} label="Mode sombre" right={<Toggle on={darkMode} onChange={setDarkMode} />} />
       </Section>
+
+      <MNetworkSection />
 
       <NotificationsSection profile={profile} reloadProfile={reloadProfile} />
 
