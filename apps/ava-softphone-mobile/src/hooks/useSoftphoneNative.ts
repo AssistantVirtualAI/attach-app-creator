@@ -339,6 +339,11 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
 
   const startRecording = useCallback(async () => {
     try {
+      // Apple App Review + jurisdictional consent: play audible notice before recording.
+      try {
+        const { playRecordingConsent } = await import('@/lib/recordingConsent');
+        await playRecordingConsent('fr');
+      } catch {}
       await CapacitorPjsip.startRecord();
       emitNativeCallSnapshot({ isRecording: true });
       setIsRecording(true);
