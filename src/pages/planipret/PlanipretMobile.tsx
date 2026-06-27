@@ -372,10 +372,12 @@ export default function PlanipretMobile() {
 
 
         {/* Powered by AVA footer */}
-        <div className="absolute bottom-0 inset-x-0 h-[22px] flex items-center justify-center gap-1.5 z-10"
+        <div className="absolute bottom-0 inset-x-0 h-[24px] flex items-center justify-center gap-2 z-10"
           style={{ background: "var(--pp-bg-deep)", borderTop: "1px solid var(--pp-bg-border)" }}>
-          <span style={{ fontSize: 9, color: "var(--pp-text-faint)", letterSpacing: "0.1em" }}>Powered by</span>
-          <img src={avaWordmark} alt="AVA" className="h-2.5 opacity-60" />
+          <span style={{ fontSize: 9, color: "var(--pp-text-faint)", letterSpacing: "0.12em", fontWeight: 600 }}>POWERED BY</span>
+          <img src={avaLogo.url} alt="AVA" className="w-3.5 h-3.5 rounded object-cover" style={{ boxShadow: "0 0 6px rgba(155,127,232,0.4)" }} />
+          <span style={{ fontSize: 9, color: "rgba(255,255,255,0.7)", letterSpacing: "0.08em", fontWeight: 700 }}>AVA</span>
+          <span style={{ fontSize: 8.5, color: "var(--pp-text-faint)", letterSpacing: "0.1em" }}>· DEVELOPED BY AVA</span>
         </div>
 
         <Dialer open={dialerOpen} onClose={() => setDialerOpen(false)} initial={dialerInit} />
