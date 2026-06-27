@@ -354,6 +354,7 @@ const App = () => (
           <BrowserRouter>
 
             <OrganizationProvider>
+              <RouteDebugOverlay />
               <Suspense fallback={<div>Loading...</div>}>
               <Routes>
                 {/* Landing page on root */}

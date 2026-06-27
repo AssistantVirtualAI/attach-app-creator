@@ -18,6 +18,8 @@ import { OnboardingTutorial } from "@/components/planipret/OnboardingTutorial";
 import { useAvaNavigation } from "@/hooks/useAvaNavigation";
 import AvaVoiceAgent from "@/components/planipret/mobile/AvaVoiceAgent";
 import AvaChatSheet from "@/components/planipret/mobile/AvaChatSheet";
+import { ROUTES, loginWithRedirect } from "@/lib/routes";
+import { recordRedirect } from "@/lib/debug/navDebug";
 
 const ACCENT = "#2E9BDC";
 
@@ -215,16 +217,26 @@ export default function PlanipretMobile() {
 
   const loadProfile = async () => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { navigate("/login?redirect=/mplanipret", { replace: true }); return; }
+    if (!user) {
+      const to = loginWithRedirect(ROUTES.MPLANIPRET);
+      recordRedirect(location.pathname, to, "PlanipretMobile.loadProfile", "no auth session");
+      navigate(to, { replace: true });
+      return;
+    }
     const { data } = await supabase.from("planipret_profiles").select("*").eq("user_id", user.id).maybeSingle();
-    if (!data) { navigate("/login?redirect=/mplanipret", { replace: true }); return; }
+    if (!data) {
+      const to = loginWithRedirect(ROUTES.MPLANIPRET);
+      recordRedirect(location.pathname, to, "PlanipretMobile.loadProfile", "missing planipret_profiles row");
+      navigate(to, { replace: true });
+      return;
+    }
     setProfile(data);
     setLoading(false);
   };
 
   useEffect(() => {
     loadProfile();
-    if (location.pathname === "/mplanipret") navigate("/mplanipret/home", { replace: true });
+    if (location.pathname === ROUTES.MPLANIPRET) navigate(ROUTES.MPLANIPRET_HOME, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
