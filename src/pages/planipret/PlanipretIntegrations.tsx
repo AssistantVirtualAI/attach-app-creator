@@ -667,20 +667,3 @@ function HealthPill({ color, bg, border, label }: { color: string; bg: string; b
   );
 }
 
-function ComingSoon({ emoji, name, description, fullWidth }: { emoji: string; name: string; description: string; fullWidth?: boolean }) {
-  return (
-    <div className={fullWidth ? "md:col-span-2" : ""}
-      style={{ background: "#0A1628", border: "1px dashed #0E2A45", borderRadius: 16, padding: 16, opacity: 0.75 }}>
-      <div className="flex items-center gap-3">
-        <div className="text-2xl w-10 h-10 rounded-lg flex items-center justify-center"
-          style={{ background: "#0D1F35", border: "1px solid #0E2A45" }}>{emoji}</div>
-        <div className="flex-1">
-          <div style={{ fontFamily: "Inter, sans-serif", fontWeight: 700, fontSize: 15, color: "#E8EDF5" }}>{name}</div>
-          <div style={{ fontSize: 12, color: "#4A7FA5", marginTop: 2 }}>{description}</div>
-        </div>
-        <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold"
-          style={{ background: "#0D1F35", border: "1px solid #0E2A45", color: "#4A7FA5" }}>Bientôt</span>
-      </div>
-    </div>
-  );
-}
