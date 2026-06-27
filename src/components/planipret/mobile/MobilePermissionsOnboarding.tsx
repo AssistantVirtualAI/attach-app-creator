@@ -26,30 +26,26 @@ type Screen = {
   action?: () => Promise<void>;
 };
 
+// Native Capacitor plugins (Microphone, PushNotifications, Contacts) attach to
+// `window.Capacitor.Plugins` when the wrapper is present. In web preview we use
+// browser APIs as fallbacks.
+function capPlugin(name: string): any {
+  return (window as any)?.Capacitor?.Plugins?.[name];
+}
 async function reqMic() {
-  try {
-    // @ts-ignore optional native plugin
-    const { Microphone } = await import(/* @vite-ignore */ "@capacitor-community/microphone").catch(() => ({}));
-    if (Microphone?.requestPermissions) { await Microphone.requestPermissions(); return; }
-  } catch {}
+  const p = capPlugin("Microphone");
+  if (p?.requestPermissions) { await p.requestPermissions(); return; }
   try { await navigator.mediaDevices.getUserMedia({ audio: true }).then(s => s.getTracks().forEach(t => t.stop())); }
   catch (e: any) { throw new Error(e?.message ?? "Microphone denied"); }
 }
 async function reqPush() {
-  try {
-    // @ts-ignore
-    const { PushNotifications } = await import(/* @vite-ignore */ "@capacitor/push-notifications").catch(() => ({}));
-    if (PushNotifications?.requestPermissions) { await PushNotifications.requestPermissions(); return; }
-  } catch {}
+  const p = capPlugin("PushNotifications");
+  if (p?.requestPermissions) { await p.requestPermissions(); return; }
   if ("Notification" in window) await Notification.requestPermission();
 }
 async function reqContacts() {
-  try {
-    // @ts-ignore
-    const { Contacts } = await import(/* @vite-ignore */ "@capacitor-community/contacts").catch(() => ({}));
-    if (Contacts?.requestPermissions) { await Contacts.requestPermissions(); return; }
-  } catch {}
-  // Web has no contacts API in most browsers — silently no-op.
+  const p = capPlugin("Contacts");
+  if (p?.requestPermissions) { await p.requestPermissions(); return; }
 }
 async function reqBluetooth() {
   try {
