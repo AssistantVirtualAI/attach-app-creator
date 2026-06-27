@@ -309,7 +309,10 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
   const call = (number: string) => {
     if (sipStatus !== 'registered') return false;
     emitNativeCallSnapshot({ callState: 'ringing', activeCallNumber: number, isMuted: false, isOnHold: false, direction: 'out', endReason: null, callPhase: 'dialing', lastSipCode: null });
-    // Do not start local ringback until 180 arrives — avoids overlap with PBX early media.
+    // iOS WebAudio requires a user-gesture to unlock the AudioContext. Start
+    // the ringback here (synchronous to the tap) and let it run until 180/183
+    // arrives. It is stopped on 'active', 'early-media' or 'ended'.
+    try { startRingback(); } catch (e) { console.warn('[NativeSIP] startRingback failed', e); }
     CapacitorPjsip.makeCall({ number }).catch((e) => {
       stopRingback();
       emitNativeCallSnapshot({ callState: 'idle', activeCallNumber: '', isMuted: false, isOnHold: false, direction: null, endReason: 'Échec de l’appel', callPhase: 'ended', lastSipCode: null });
