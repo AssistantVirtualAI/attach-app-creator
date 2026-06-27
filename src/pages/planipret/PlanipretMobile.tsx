@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { FormEvent, useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate, NavLink, Outlet, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,7 +18,7 @@ import { OnboardingTutorial } from "@/components/planipret/OnboardingTutorial";
 import { useAvaNavigation } from "@/hooks/useAvaNavigation";
 import AvaVoiceAgent from "@/components/planipret/mobile/AvaVoiceAgent";
 import AvaChatSheet from "@/components/planipret/mobile/AvaChatSheet";
-import { ROUTES, loginWithRedirect } from "@/lib/routes";
+import { ROUTES } from "@/lib/routes";
 import { recordRedirect } from "@/lib/debug/navDebug";
 
 const ACCENT = "#2E9BDC";
@@ -142,7 +142,10 @@ export default function PlanipretMobile() {
   const location = useLocation();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [accessError, setAccessError] = useState<"missing_profile" | "load_failed" | null>(null);
+  const [accessError, setAccessError] = useState<"unauthenticated" | "missing_profile" | "load_failed" | null>(null);
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginLoading, setLoginLoading] = useState(false);
   const [dialerOpen, setDialerOpen] = useState(false);
   const [dialerInit, setDialerInit] = useState<string | undefined>(undefined);
   const [unreadMsg, setUnreadMsg] = useState(0);
@@ -219,9 +222,10 @@ export default function PlanipretMobile() {
   const loadProfile = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      const to = loginWithRedirect(ROUTES.MPLANIPRET);
-      recordRedirect(location.pathname, to, "PlanipretMobile.loadProfile", "no auth session");
-      navigate(to, { replace: true });
+      recordRedirect(location.pathname, ROUTES.MPLANIPRET, "PlanipretMobile.loadProfile", "no auth session — stay inside mobile app");
+      setProfile(null);
+      setAccessError("unauthenticated");
+      setLoading(false);
       return;
     }
     const { data, error } = await supabase.from("planipret_profiles").select("*").eq("user_id", user.id).maybeSingle();
@@ -242,6 +246,21 @@ export default function PlanipretMobile() {
     setLoading(false);
   };
 
+  const submitMobileLogin = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!loginEmail || !loginPassword) return;
+    setLoginLoading(true);
+    const { error } = await supabase.auth.signInWithPassword({ email: loginEmail.trim(), password: loginPassword });
+    setLoginLoading(false);
+    if (error) {
+      toast.error(error.message || "Connexion impossible");
+      return;
+    }
+    toast.success("Connexion réussie");
+    setLoading(true);
+    await loadProfile();
+  };
+
   useEffect(() => {
     loadProfile();
     if (location.pathname === ROUTES.MPLANIPRET) navigate(ROUTES.MPLANIPRET_HOME, { replace: true });
@@ -259,14 +278,45 @@ export default function PlanipretMobile() {
               <Lock className="w-7 h-7" />
             </div>
             <h2 style={{ fontFamily: "Inter,sans-serif", fontWeight: 700, fontSize: 18, color: "var(--pp-text-primary)", marginBottom: 8 }}>
-              Accès mobile Planiprêt
+              {accessError === "unauthenticated" ? "Connexion mobile Planiprêt" : "Accès mobile Planiprêt"}
             </h2>
-            <p style={{ fontSize: 13, color: "var(--pp-text-secondary)", marginBottom: 16 }}>
-              {accessError === "missing_profile"
-                ? "Votre compte est connecté, mais aucun profil mobile Planiprêt n'est lié à cet utilisateur."
-                : "Impossible de charger votre profil mobile Planiprêt pour le moment."}
-            </p>
-            <button onClick={loadProfile} className="pp-btn-primary inline-block">Réessayer</button>
+            {accessError === "unauthenticated" ? (
+              <form onSubmit={submitMobileLogin} className="space-y-3 text-left">
+                <p style={{ fontSize: 13, color: "var(--pp-text-secondary)", marginBottom: 12 }}>
+                  Connectez-vous directement dans l'application mobile. Cette page reste séparée du portail admin Planiprêt.
+                </p>
+                <input
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  type="email"
+                  autoComplete="email"
+                  placeholder="Courriel"
+                  className="w-full rounded-xl px-4 py-3 outline-none"
+                  style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }}
+                />
+                <input
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  type="password"
+                  autoComplete="current-password"
+                  placeholder="Mot de passe"
+                  className="w-full rounded-xl px-4 py-3 outline-none"
+                  style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }}
+                />
+                <button type="submit" disabled={loginLoading} className="pp-btn-primary w-full inline-block disabled:opacity-60">
+                  {loginLoading ? "Connexion…" : "Se connecter"}
+                </button>
+              </form>
+            ) : (
+              <>
+                <p style={{ fontSize: 13, color: "var(--pp-text-secondary)", marginBottom: 16 }}>
+                  {accessError === "missing_profile"
+                    ? "Votre compte est connecté, mais aucun profil mobile Planiprêt n'est lié à cet utilisateur."
+                    : "Impossible de charger votre profil mobile Planiprêt pour le moment."}
+                </p>
+                <button onClick={loadProfile} className="pp-btn-primary inline-block">Réessayer</button>
+              </>
+            )}
           </div>
         </div>
       </Frame>
