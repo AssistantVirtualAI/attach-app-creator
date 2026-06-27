@@ -345,7 +345,7 @@ function RecordingAiPanel({ rec }: { rec: RecordingEntry }) {
         <>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
             <div style={{ fontSize: 10, color: colors.avaViolet, letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 800 }}>{statusText}</div>
-            <button onClick={run} disabled={running} style={{
+            <button onClick={() => run()} disabled={running} style={{
               padding: '6px 10px', borderRadius: 999, border: 'none',
               background: running ? 'rgba(255,255,255,0.06)' : `linear-gradient(135deg, ${colors.avaViolet}, ${colors.avaCyan})`,
               color: '#fff', fontSize: 11, fontWeight: 800, cursor: running ? 'wait' : 'pointer',
@@ -365,7 +365,7 @@ function RecordingAiPanel({ rec }: { rec: RecordingEntry }) {
             <div style={{ marginBottom: 8, padding: 10, borderRadius: radius.md, border: `1px solid ${colors.danger}55`, background: `${colors.danger}10` }}>
               <div style={{ color: colors.danger, fontSize: 11, fontWeight: 800, marginBottom: 4 }}>⚠ {fr ? 'Échec de la transcription' : 'Transcription failed'}</div>
               <div style={{ color: colors.mutedSilver, fontSize: 11, marginBottom: 8, wordBreak: 'break-word' }}>{error}</div>
-              <button onClick={run} disabled={running} style={{
+              <button onClick={() => run()} disabled={running} style={{
                 padding: '5px 10px', borderRadius: 8, border: `1px solid ${colors.danger}80`,
                 background: 'transparent', color: colors.danger, fontSize: 10.5, fontWeight: 800, cursor: 'pointer',
               }}>↻ {fr ? 'Relancer l\'IA' : 'Retry AI run'}</button>
