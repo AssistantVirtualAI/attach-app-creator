@@ -414,6 +414,22 @@ final class RTPAudioSession {
         }
         NSLog("[RTP] RemoteIO input callback installed bus=1")
 
+        // Phase 4: configure VoiceProcessingIO — enable AEC (not bypassed),
+        // automatic gain control and ducking. Apple NS is always on with VPIO.
+        var bypass: UInt32 = 0
+        _ = AudioUnitSetProperty(io, kAUVoiceIOProperty_BypassVoiceProcessing,
+                                 kAudioUnitScope_Global, 0,
+                                 &bypass, UInt32(MemoryLayout<UInt32>.size))
+        var agc: UInt32 = 1
+        _ = AudioUnitSetProperty(io, kAUVoiceIOProperty_VoiceProcessingEnableAGC,
+                                 kAudioUnitScope_Global, 0,
+                                 &agc, UInt32(MemoryLayout<UInt32>.size))
+        var muteOut: UInt32 = 0
+        _ = AudioUnitSetProperty(io, kAUVoiceIOProperty_MuteOutput,
+                                 kAudioUnitScope_Global, 0,
+                                 &muteOut, UInt32(MemoryLayout<UInt32>.size))
+        NSLog("[RTP] VoiceProcessingIO configured: AEC=on NS=on AGC=on")
+
         NSLog("[RTP] AudioUnitInitialize begin")
         status = AudioUnitInitialize(io)
         if status != noErr {
