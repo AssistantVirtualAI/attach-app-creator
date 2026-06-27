@@ -29,7 +29,7 @@ type Screen = {
 async function reqMic() {
   try {
     // @ts-ignore optional native plugin
-    const { Microphone } = await import("@capacitor-community/microphone").catch(() => ({}));
+    const { Microphone } = await import(/* @vite-ignore */ "@capacitor-community/microphone").catch(() => ({}));
     if (Microphone?.requestPermissions) { await Microphone.requestPermissions(); return; }
   } catch {}
   try { await navigator.mediaDevices.getUserMedia({ audio: true }).then(s => s.getTracks().forEach(t => t.stop())); }
@@ -38,7 +38,7 @@ async function reqMic() {
 async function reqPush() {
   try {
     // @ts-ignore
-    const { PushNotifications } = await import("@capacitor/push-notifications").catch(() => ({}));
+    const { PushNotifications } = await import(/* @vite-ignore */ "@capacitor/push-notifications").catch(() => ({}));
     if (PushNotifications?.requestPermissions) { await PushNotifications.requestPermissions(); return; }
   } catch {}
   if ("Notification" in window) await Notification.requestPermission();
@@ -46,7 +46,7 @@ async function reqPush() {
 async function reqContacts() {
   try {
     // @ts-ignore
-    const { Contacts } = await import("@capacitor-community/contacts").catch(() => ({}));
+    const { Contacts } = await import(/* @vite-ignore */ "@capacitor-community/contacts").catch(() => ({}));
     if (Contacts?.requestPermissions) { await Contacts.requestPermissions(); return; }
   } catch {}
   // Web has no contacts API in most browsers — silently no-op.
