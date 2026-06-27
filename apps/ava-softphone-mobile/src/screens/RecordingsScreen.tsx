@@ -31,6 +31,8 @@ export default function RecordingsScreen({
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [cachedIds, setCachedIds] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
   const { lang } = useT();
   const fr = lang === 'fr';
