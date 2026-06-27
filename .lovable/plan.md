@@ -1,124 +1,120 @@
-# Plan — Refonte mobile Planiprêt (Navy Trust + Accueil pro courtier)
-
 ## Objectif
-Aligner `/mplanipret` sur l'élégance du portail admin (palette Navy Trust claire, typo Urbanist + Epilogue) et transformer la page d'accueil en véritable cockpit courtier : stats réelles, filtres temporels, résumé IA quotidien/hebdo/mensuel.
+
+1. Refaire la page d'auth de `/mplanipret` :
+   - Logos **AVA Statistic** + **Planiprêt** côte à côte en haut.
+   - Mention **"POWERED BY AVA · DEVELOPED BY AVA"** en bas.
+   - 100 % bilingue **FR / EN** (titres, labels, placeholders, messages d'erreur, consentements légaux, footer).
+   - Contenu et métadonnées prêts pour soumission **App Store + Google Play**.
+
+2. Ajouter dans l'en-tête de l'app mobile (visible après login) trois contrôles, comme dans `/m` Lemtel :
+   - Switch **langue FR/EN** (en haut à droite).
+   - Switch **thème dark / light**.
+   - Bouton **profil + statut** (Disponible / Occupé / Pause / Hors-ligne + changement de mot de passe), identique à `ProfileSheet` de Lemtel mobile.
+
+Aucune logique backend, Supabase ou Edge Function n'est modifiée. Pas de touche à `/planipret/admin` ni à Lemtel.
 
 ---
 
-## 1. Système visuel "Navy Trust Mobile"
+## Périmètre des fichiers
 
-Créer `src/styles/planipret-mobile-theme.css` scopé sous `.mplanipret-scope` (isolé du dark theme actuel et du scope admin) :
+### Nouveau
+- `src/lib/i18n/mplanipret.ts` — petit dictionnaire FR/EN dédié à l'app mobile Planiprêt (clés `auth.*`, `header.*`, `profile.*`, `status.*`, `legal.*`).
+- `src/hooks/useMplanipretLang.ts` — hook qui lit/écrit `mplanipret-lang` dans `localStorage` (défaut = navigateur, fallback FR) et expose `t(key)`.
+- `src/hooks/useMplanipretTheme.ts` — hook qui pose `data-pp-theme="light|dark"` sur `.planipret-mobile-scope` et persiste dans `localStorage`.
+- `src/components/planipret/mobile/MobileAuthScreen.tsx` — écran d'auth complet (logos, formulaire, langues, liens légaux, footer AVA).
+- `src/components/planipret/mobile/MobileHeaderControls.tsx` — barre droite : `LangToggle` + `ThemeToggle` + bouton profil (ouvre `MobileProfileSheet`).
+- `src/components/planipret/mobile/MobileProfileSheet.tsx` — drawer : avatar, nom, extension, sélecteur de statut (Disponible / Occupé / Pause / Hors-ligne), changement mot de passe, langue, thème, déconnexion. S'appuie uniquement sur `supabase.auth.updateUser` et `planipret_profiles.status` (colonnes déjà existantes).
 
-- Fond app : `#F7F9FC`, surfaces : `#FFFFFF` avec ombre douce `0 4px 24px rgba(30,58,95,0.06)`
-- Navy `#1E3A5F` (titres/CTA), accent `#3B6FA0`, succès `#10B981`, alerte `#F59E0B`, danger `#EF4444`
-- Typo : Urbanist (KPI, titres, FAB), Epilogue (corps, listes)
-- Composants : `pp-mobile-card`, `pp-mobile-kpi`, `pp-mobile-pill`, `pp-mobile-tab`, `pp-mobile-sheet` — même langage que `pp-card / pp-pill` admin
-- Header sticky vitrifié (blur léger sur `rgba(247,249,252,0.85)`), logo Planiprêt centré, badge AVA gauche, cloche notif droite
-- FAB AVA conservé (logo coloré) mais re-stylé bordure navy + halo doux
-- Footer "POWERED BY AVA" conservé, recoloré navy/accent
+### Modifiés (UI uniquement)
+- `src/pages/planipret/PlanipretMobile.tsx`
+  - Remplace le bloc `accessError === "unauthenticated"` par `<MobileAuthScreen onLoggedIn={loadProfile} />`.
+  - Insère `<MobileHeaderControls />` dans le `<header>` à droite, à la place du bouton ⚙️ seul (l'icône paramètres devient un item du `MobileProfileSheet`).
+  - Wrappe tous les libellés FR en dur (`"Accueil"`, `"Appels"`, footer, etc.) via `t()` du hook.
+- `src/index.css` (scope `.planipret-mobile-scope`) — ajoute tokens `--pp-*` pour le mode **light** sous `[data-pp-theme="light"]`. Aucun changement aux tokens existants (dark reste défaut).
 
-Mise à jour des écrans existants pour utiliser le nouveau scope sans toucher la logique :
-- `PlanipretMobile.tsx` (frame + login intégré)
-- `pages/mplanipret/Home.tsx`, `Calls.tsx`, `Messages.tsx`, `Calendar.tsx`, `Contacts.tsx`, `Settings.tsx`
-- `AvaChatSheet.tsx`, `AvaVoiceAgent` wrapper
-
-Aucune modification des Edge Functions ni des hooks de données.
-
----
-
-## 2. Accueil enrichi — Cockpit courtier
-
-### 2.1 En-tête personnalisé
-- Salutation dynamique ("Bonjour Marc — mercredi 14h22")
-- Statut SIP + DND + transfert (déjà dispo via `mobile-dashboard`)
-- Sélecteur de période global : **Aujourd'hui · Cette semaine · Ce mois · Mon quart** (persisté `localStorage`)
-
-### 2.2 Bandeau KPI (6 cartes, données réelles)
-Source : `mobile-dashboard` + nouveaux agrégats Planiprêt (déjà tables existantes, pas de migration) :
-1. **Appels** (répondus / manqués) — `planipret_phone_calls`
-2. **SMS non lus** — `planipret_phone_messages`
-3. **Courriels** non lus — `planipret_profiles` (compte Gmail/Outlook déjà sync via `calendar_integrations` / future colonne mail si présente, sinon section vide gracieuse)
-4. **Meetings cette semaine** — `appointments` filtré par `user_id`
-5. **Leads chauds** — `planipret_phone_calls.lead_score >= 7` + `leads.status`
-6. **Tâches à faire** — `planipret_reminders` non complétées
-
-Cartes `pp-mobile-kpi` avec micro-sparkline (Recharts léger déjà présent).
-
-### 2.3 Sections détaillées (collapsibles, ordre courtier)
-- **🔥 Leads chauds** (top 5) — nom, score, dernière interaction, CTA Appeler/SMS
-- **📅 Rendez-vous à venir** (semaine) — heure, client, type, lien visio si dispo
-- **✅ Tâches du jour** — checkbox inline (update `planipret_reminders`)
-- **📞 Appels manqués prioritaires** — avec badge "rappel suggéré"
-- **💬 Conversations non lues** — SMS + chat équipe
-- **📧 Courriels en attente** (si intégration présente)
-
-Chaque section respecte le filtre de période. Pull-to-refresh global (hook existant `usePullToRefresh`).
-
-### 2.4 Résumé IA AVA — "Brief du jour"
-Nouvelle carte en haut, sous le KPI, **fixe et magnifique** :
-- 3 modes via segmented control : **Jour / Semaine / Mois**
-- Génération via nouvelle Edge Function **`pp-ava-brief`** (calque sur `pp-ava-chat` existant, même provider Lovable AI Gateway, `google/gemini-3-flash-preview`)
-  - Input : profil courtier + agrégats (appels, leads, RDV, tâches, SMS) sur la période
-  - Output structuré Zod : `{ headline, priorities[3], risks[], suggestions[3] }`
-  - Cache 30 min en `planipret_ai_insights` (table existante) pour éviter coûts
-- UI : headline gras navy, 3 priorités numérotées, chips suggestion cliquables (call/sms/reminder via payload — réutilise `SuggestionSchema` de `pp-ava-chat`)
-- Bouton "Régénérer" + "Écouter" (TTS optionnel via AVA voice si activé)
-
-### 2.5 États vides & erreurs
-- Skeletons Navy doux
-- Message clair si intégration manquante (ex. calendrier non connecté → CTA "Connecter")
-- Mode dégradé respecté (déjà géré pour `pp-ns-users`)
+### Métadonnées store (préparation soumission)
+- `apps/ava-softphone-mobile/store-metadata/planipret/metadata.txt` (EN) et `metadata-fr.txt` (FR) — titre, sous-titre, description longue, mots-clés, URL support, URL politique de confidentialité, catégorie (Business / Finance), classification d'âge 4+.
+- `public/planipret-manifest.json` — vérifier `name`, `short_name`, `description` (déjà en place, juste mettre à jour le `description` bilingue minimal côté FR).
+- README court `apps/ava-softphone-mobile/docs/planipret-store-submission.md` listant les checklists App Store / Play Store (screenshots requis, Info.plist déjà OK pour micro/contacts, Privacy Nutrition Labels, Data Safety form Google).
 
 ---
 
-## 3. Détails techniques
+## Détails fonctionnels
 
-- **Aucune migration DB** (tables `planipret_phone_calls`, `appointments`, `planipret_reminders`, `planipret_ai_insights`, `planipret_phone_messages` déjà présentes)
-- **Nouvelle Edge Function** : `supabase/functions/pp-ava-brief/index.ts` (verify_jwt off, JWT validé en code, CORS standard, gateway helper partagé)
-- **Nouveau hook** : `src/hooks/usePlanipretBrief.ts` (React Query, key `[brief, period, userId]`, TTL 30 min)
-- **Nouveau hook** : `src/hooks/usePlanipretHomeStats.ts` agrégateur unique appelant `mobile-dashboard` + queries Supabase scopées RLS (utilisateur connecté)
-- **Composants nouveaux** sous `src/components/mplanipret/home/` : `PeriodFilter.tsx`, `KpiGrid.tsx`, `BriefCard.tsx`, `HotLeadsList.tsx`, `MeetingsList.tsx`, `TasksList.tsx`, `MissedCallsList.tsx`, `UnreadThreadsList.tsx`, `EmailsList.tsx`
-- **Theme CSS** scopé : aucune fuite vers admin ou autres apps
-- **Backend Lemtel intact** : aucune touche à `useSoftphone*`, `CapacitorSip`, RTP, etc.
+### Écran d'auth (`MobileAuthScreen`)
 
----
-
-## 4. Livrables & validation
-
-1. Thème Navy Trust mobile appliqué à toutes les pages `/mplanipret/*`
-2. Accueil refondu avec 6 KPI + 6 sections + Brief IA
-3. Filtre période fonctionnel et persistant
-4. Edge Function `pp-ava-brief` déployée et testée
-5. Test Playwright : `/mplanipret/home` charge, affiche KPI, brief IA visible, filtre change les données
-6. Aucun impact sur `/planipret/admin/*` ni Lemtel
+Structure verticale dans le « téléphone » (390 × 844) :
 
 ```text
-┌──────────────────────────────┐
-│  AVA  ·  Planiprêt  ·  🔔    │  header glass navy
-├──────────────────────────────┤
-│  Bonjour Marc — mer 14:22    │
-│  [Jour][Semaine][Mois][Quart]│  filtre
-│                              │
-│  ┌───────── BRIEF AVA ─────┐ │
-│  │ "3 leads chauds à rappe-│ │
-│  │  ler avant 17h..."      │ │
-│  │  1. Appeler Dupuis      │ │
-│  │  2. Confirmer RDV Roy   │ │
-│  │  3. Relancer Tremblay   │ │
-│  │  [Régénérer] [Écouter]  │ │
-│  └─────────────────────────┘ │
-│                              │
-│  [Appels][SMS][Mails]        │
-│  [RDV  ][Hot ][Tâches]       │  KPI
-│                              │
-│  🔥 Leads chauds   >         │
-│  📅 RDV semaine    >         │
-│  ✅ Tâches du jour >         │
-│  📞 Manqués        >         │
-│  💬 Non lus        >         │
-│  📧 Courriels      >         │
-│                              │
-│       (•) FAB AVA            │
-│  POWERED BY AVA · DEV BY AVA │
-└──────────────────────────────┘
+┌────────────────────────────┐
+│   [AVA logo]   [PP logo]   │   ← deux logos côte à côte, 56×56
+│   Planiprêt × AVA          │
+│                            │
+│   {auth.welcomeTitle}      │
+│   {auth.welcomeSubtitle}   │
+│                            │
+│   [Courriel / Email]       │
+│   [Mot de passe / Password]│
+│   [ Se connecter / Sign in]│
+│   {auth.forgotPassword}    │
+│                            │
+│   {legal.tos} · {privacy}  │
+│                            │
+│   POWERED BY [AVA] · DEV…  │
+└────────────────────────────┘
 ```
+
+- Switch FR/EN en haut-droite de l'écran d'auth (mêmes contrôles que dans le header, pour qu'on puisse changer avant login).
+- Switch thème en haut-droite aussi.
+- Validation : email + password obligatoires, messages d'erreur bilingues.
+- Appelle exactement la même requête qu'aujourd'hui : `supabase.auth.signInWithPassword(...)` puis `loadProfile()`.
+- Liens légaux pointent vers `/legal/terms` et `/legal/privacy` (déjà existants côté Planiprêt) — ouverts dans un drawer in-app pour respecter les guidelines App Store.
+
+### En-tête mobile (`MobileHeaderControls`)
+
+À droite du header, dans cet ordre (44×44 cible tactile) :
+1. `LangToggle` — pilule `FR | EN`, identique visuellement à `LanguageSwitcher` du desktop Lemtel.
+2. `ThemeToggle` — icône `Sun`/`Moon`, bascule `data-pp-theme`.
+3. Bouton **avatar/initiales** avec pastille de statut colorée (vert/orange/rouge/gris) — ouvre `MobileProfileSheet`.
+
+### Profil + statut (`MobileProfileSheet`)
+
+Drawer bottom-sheet (réutilise le pattern `Dialer`) avec :
+- Bandeau identité (avatar, nom complet, extension SIP, courriel).
+- **Statut** : 4 boutons radio — `available`, `busy`, `break`, `offline`. UPDATE `planipret_profiles` (colonne `status` déjà présente) + toast.
+- **Changer mot de passe** : 2 inputs (nouveau / confirmation), `supabase.auth.updateUser({ password })`.
+- **Langue** + **Thème** dupliqués ici pour découverte.
+- **Notifications** : raccourci vers réglages OS (placeholder).
+- **Se déconnecter** : `supabase.auth.signOut()` puis retour à l'écran d'auth.
+
+### Bilinguisation
+
+Toutes les chaînes FR en dur dans `PlanipretMobile.tsx` (titres, placeholders, "Chargement…", "Application non activée", "Contacter le support", labels d'onglets, "POWERED BY / DEVELOPED BY") passent par `t()` du nouveau hook.
+Les écrans enfants (`MHome`, `MCalls`, etc.) ne sont **pas** touchés dans ce plan — leur bilinguisation est un travail séparé.
+
+### Préparation App Store / Play Store
+
+Documenté dans `planipret-store-submission.md` :
+
+- **iOS** : `Info.plist` déjà à jour (micro, contacts, notifications, réseau local). Ajouter `CFBundleLocalizations = [fr, en]` et `CFBundleDevelopmentRegion = fr_CA`. Privacy Manifest (`PrivacyInfo.xcprivacy`) déjà présent.
+- **Android** : `strings.xml` + `strings-fr/strings.xml` (libellé app FR). `AndroidManifest.xml` `android:supportsRtl="false"`. Data Safety form : auth (email), audio (micro), contacts.
+- Screenshots requis listés (6.7" iPhone, 5.5" iPhone, tablette 12.9", Pixel, tablette 10"), 3 mockups : auth bilingue, accueil, appel actif.
+- Politique de confidentialité et CGU : URLs publiques `/legal/privacy` et `/legal/terms`.
+- Classification : Business (iOS), Finance (Play). Âge 4+ / Everyone.
+
+---
+
+## Tests / validation
+
+- Build typecheck via le pipeline existant.
+- Vérification manuelle : `/mplanipret` non-connecté → nouvel écran d'auth, switch FR↔EN met à jour tout le texte, switch thème inverse les couleurs, login fonctionne.
+- Vérification manuelle : connecté → en-tête montre les 3 contrôles, drawer profil change le statut (vérifier en DB via `planipret_profiles.status`), changement de mot de passe fonctionne, déconnexion ramène à l'écran d'auth.
+- `tests/mplanipret-routing.spec.ts` reste vert (aucune route modifiée).
+
+---
+
+## Hors périmètre
+
+- Pas de modification de `MHome`, `MCalls`, `MMessages`, `MContacts`, `MMore` (sauf si tu confirmes vouloir aussi les bilinguiser maintenant).
+- Pas de changement des Edge Functions, RLS, ou schéma DB.
+- Pas de toucher au portail admin `/planipret/admin` ni à Lemtel `/m`.
