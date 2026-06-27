@@ -297,7 +297,7 @@ export default function ProfileSheet({
         </button>
       </div>
     </div>
-  );
+  ), document.body);
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
