@@ -1,78 +1,117 @@
-# Plan — Softphone timeline, ringback early-media, Planipret header & freeze fix
+# Plan — Améliorations softphone mobile Lemtel
 
-## 1. Call state timeline (mobile softphone)
+Périmètre : `apps/ava-softphone-mobile/**` + Edge Functions `ai-transcribe-call` / `ai-analyze-call`. Aucun changement Lemtel desktop ni autres portails. Après chaque phase, étape de test explicite à valider avant de passer à la suivante.
 
-Add a compact visual timeline at the top of `ActiveCallSheet.tsx` (and outgoing pre-answer view) showing the SIP progression with live status dots:
+---
 
-```
-● Composition → ● Sonnerie → ● Connecté
-                ↘ Occupé / Refusé / Indisponible / Échec
-```
+## Phase 1 — Ringback sortant (rapide, fondation audio)
 
-- New component `apps/ava-softphone-mobile/src/components/CallTimeline.tsx`
-  - Steps: `dialing` → `ringing` → `early-media` → `active` → `ended(reason)`
-  - Glass pills with pulse animation on the active step, red glow on failure
-  - French labels + sub-text (e.g. "Sonnerie chez le destinataire", "Ligne occupée")
-- Wire from `useSoftphoneNative.ts` exposing a new `callPhase` + `callEndReason` already captured from native `callEnded`
-- Map SIP/native reason codes → phase:
-  - 100 Trying → `dialing`
-  - 180 Ringing (no SDP) → `ringing`
-  - 183 Session Progress (SDP) → `early-media`
-  - 200 OK → `active`
-  - 486/600 → `busy`, 603 → `declined`, 480/408 → `unavailable`, 487 → `cancelled`
+**Problème 6** : aucun son de sonnerie côté appelant.
 
-## 2. Early-media ringback handling
+Actions :
+- Vérifier `apps/ava-softphone-mobile/src/lib/sip/ringback.ts` (oscillateurs 440+480 Hz, cadence NA 2s on / 4s off).
+- Dans `useSoftphoneNative.ts` : démarrer ringback dès `callPhase === 'ringing'` SANS early-media ; stopper sur `early-media`, `active`, `ended`, `idle`.
+- Dans `CapacitorSip.swift` : confirmer émission de `provisional { code:180, hasSdp:false }` vs `183 hasSdp:true`.
+- Gérer route audio : ringback doit sortir sur earpiece par défaut, pas écraser la session RTP.
 
-In `CapacitorSip.swift`:
-- Distinguish 180 without SDP (play local ringback) vs 183 with SDP (start RTP, stop local ringback)
-- Emit new native events: `provisional` with `{ code, hasSdp }`
-- On 183: call `prewarmAudio` + open RTP session immediately so PBX tones (announcements/queues) are audible
-- Stop local ringback as soon as RTP packets arrive OR on 200 OK
+**Test livré** : passer un appel vers une extension qui sonne sans répondre → entendre la tonalité de sonnerie locale ; décrocher → tonalité s'arrête net.
 
-In `useSoftphoneNative.ts` + `src/lib/sip/ringback.ts`:
-- Start local ringback only when phase = `ringing` AND no early-media
-- Stop on `early-media`, `active`, or `ended`
-- Guarantee single instance (existing `ringback.ts` already uses Web Audio)
+---
 
-## 3. Planipret portal — top-right profile menu + bell
+## Phase 2 — Speaker iOS
 
-Target: `/planipret` desktop (PlanipretDashboard layout).
+**Problème 1** : bouton speaker inopérant.
 
-- Mount `WorkspaceHeaderExtras` (reused) in the Planipret top bar, positioned **above** the existing bell button (right column, stacked: profile menu on top, bell below)
-- Enhance bell (`NotificationsSheet` or current bell trigger):
-  - Realtime subscription to `planipret_phone_calls` (missed), `planipret_phone_messages` (inbound SMS), `planipret_voicemails`
-  - Unread badge count, sound ping on new event, list with deep-links to MCalls/MMessages/MVoicemail
-  - RLS already exists; use `supabase.channel` subscriptions in `useEffect` with cleanup
+Actions :
+- `CapacitorSip.swift` : `setAudioRoute(route:)` doit appeler `AVAudioSession.overrideOutputAudioPort(.speaker | .none)` APRÈS `setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetoothHFP, .allowBluetooth, .defaultToSpeaker])`, puis renvoyer `outputs` réels via `currentRoute.outputs`.
+- Ne PAS toucher catégorie pendant un appel actif (cause connue de mute) ; uniquement `overrideOutputAudioPort`.
+- `audioOutput.ts` : déjà câblé sur le natif, vérifier que `applySink` HTML ne court-circuite pas le résultat natif.
+- Ajouter logs natifs `[AudioRoute] applied=speaker outputs=Speaker`.
 
-## 4. Auto page-switch freeze (desktop /planipret)
+**Test livré** : en appel actif, toggler speaker → audio bascule haut-parleur ; re-toggle → earpiece ; bouton reflète l'état réel.
 
-Symptom: portal flips between login ↔ dashboard by itself. Root cause investigation:
-- `[AVA] build-version poll failed` in console + `vite server connection lost` suggests `buildVersionPoller.ts` triggers a reload loop
-- Likely culprits to inspect & fix:
-  - `src/lib/buildVersionPoller.ts` — JSON parse SyntaxError causes silent reload trigger
-  - `PlanipretDashboard.tsx` / `PostLoginRedirect.tsx` auth guard re-evaluating on token refresh and bouncing user
-  - `usePresencePing` / realtime subscription resubscribing on each render causing remount
+---
 
-Fix:
-- Harden `buildVersionPoller`: try/catch JSON, ignore non-JSON responses, back-off on failure, never reload in preview origin
-- Stabilize Planipret auth guard: wait for `loading === false` before redirecting; memoize redirect decision; guard against repeated `navigate()` on same path
-- Audit `useEffect` deps in Planipret layout for missing cleanup causing re-subscribe loops
+## Phase 3 — Keypad standard
 
-## Technical notes
+**Problème 3** : retirer le style « glass » récent du keypad.
 
-- All native changes require `npx cap sync ios` + Xcode rebuild after `git pull`
-- No backend schema changes; only new realtime subscriptions on existing tables
-- No edits to Lemtel components or edge functions
+Actions :
+- `apps/ava-softphone-mobile/src/components/Dialpad.tsx` : revenir à des boutons ronds standards (shadcn `Button variant="outline"`, taille 64px, typo system, ripple natif, halo discret au tap, pas de gradient radial, pas de `::before` shine).
+- Conserver le DTMF natif et l'haptique légère.
 
-## Files touched
+**Test livré** : ouvrir le dialer → keypad sobre, lisibilité chiffres OK, tap clair, plus d'effet futuriste.
 
-- `apps/ava-softphone-mobile/src/components/CallTimeline.tsx` *(new)*
-- `apps/ava-softphone-mobile/src/components/ActiveCallSheet.tsx`
-- `apps/ava-softphone-mobile/src/hooks/useSoftphoneNative.ts`
-- `apps/ava-softphone-mobile/src/lib/sip/ringback.ts`
-- `apps/ava-softphone-mobile/ios/App/App/CapacitorSip.swift`
-- `src/pages/planipret/PlanipretDashboard.tsx` (header slot)
-- `src/pages/planipret/mobile/MHome.tsx` (bell wiring if shared)
-- New `src/components/planipret/PlanipretBell.tsx` with realtime hooks
-- `src/lib/buildVersionPoller.ts` (harden)
-- Planipret auth guard file (TBD after inspection)
+---
+
+## Phase 4 — Qualité audio + noise cancellation + focus voix
+
+**Problème 4** : son médiocre, pas de NS/AEC/AGC.
+
+Actions :
+- `RTPAudioSession.swift` (RemoteIO) : activer `voiceProcessingIO` (`kAudioUnitSubType_VoiceProcessingIO`) au lieu de `RemoteIO` pur → AEC + NS + AGC iOS natifs gratuits.
+  - Propriétés : `kAUVoiceIOProperty_BypassVoiceProcessing = 0`, `kAUVoiceIOProperty_VoiceProcessingEnableAGC = 1`, iOS 13+ `setAGCEnabled`, `setBypassVoiceProcessing(false)`.
+- `AVAudioSession` : mode `.voiceChat` (déjà), ajouter `setPreferredIOBufferDuration(0.02)` et `setPreferredSampleRate(48000)`.
+- Codec SDP : déjà PCMU/PCMA (G.711). Ajouter négo Opus 16 kHz si le PBX le supporte (offer `a=rtpmap:111 opus/48000/2` + `a=fmtp:111 useinbandfec=1; usedtx=1`). Fallback transparent à G.711.
+- Jitter buffer : implémenter buffer adaptatif 20–60 ms côté réception RTP (dejitter avant push vers RemoteIO) pour réduire les craquements.
+- Logs : `[Audio] codec=opus/48k AEC=on NS=on AGC=on bufferMs=20`.
+
+**Test livré** : appel test, parler dans un café (bruit ambiant) → l'interlocuteur n'entend que la voix ; tester écho en speaker → aucun retour ; mesurer MOS subjectif > G.711 baseline.
+
+---
+
+## Phase 5 — Enregistrement + accès temps réel + pré-téléchargement
+
+**Problème 2** : record déclenché mais introuvable, accès temps réel + cache local manquants.
+
+Actions :
+- Diagnostic : vérifier que `CapacitorSip.startRecord()` invoque bien le PBX (`recording_action=start` sur FusionPBX via API ou DTMF `*1`) ET que le CDR remonte avec `record_path`.
+- Edge Function `pp-recordings-list` (ou existante) : exposer `recording_path`, `recording_status` (`pending|ready`) et URL signée 1h.
+- `RecordingsScreen.tsx` : 
+  - Subscription realtime sur `pbx_xml_cdr` (filter `record_path IS NOT NULL`) → injecte nouvelles entrées en haut.
+  - Badge « En traitement » tant que `record_status != ready`.
+- Pré-téléchargement : nouveau service `apps/ava-softphone-mobile/src/lib/recordings/prefetch.ts` qui, au montage de l'écran et sur événement realtime, télécharge silencieusement les 20 dernières en cache Capacitor `Filesystem` (Documents/recordings/<uuid>.wav). Lecture offline si présent.
+- UI : pastille « ⬇ Téléchargé » vs « ☁ Streaming ».
+
+**Test livré** : démarrer un appel → toggle Record (REC banner) → raccrocher → dans les 30 s la ligne apparaît dans Recordings sans refresh, statut passe `pending → ready`, fichier auto-téléchargé, lecture instantanée hors-ligne (mode avion).
+
+---
+
+## Phase 6 — Transcription forcée + fallback Claude
+
+**Problème 5** : transcription échoue, besoin de fallback.
+
+Actions :
+- Forcer la transcription : à la fin de chaque appel enregistré, `useSoftphoneNative` déclenche `ai-transcribe-call` automatiquement (debounce 30 s pour laisser le PBX synchroniser le WAV). Plus de bouton manuel obligatoire ; bouton reste pour re-run.
+- Edge Function `ai-transcribe-call` : 
+  - Tentative 1 — Lovable AI `openai/gpt-4o-mini-transcribe` (déjà en place).
+  - Si erreur (`stub`, `recording-not-synced` après 3 retries espacés, `missing-ai-key`, réponse vide < 5 chars) → **fallback Claude** via `ANTHROPIC_API_KEY` (déjà en secrets) : utiliser `claude-3-5-sonnet` avec audio attaché en base64 (ou Claude Haiku audio si dispo) ; sinon convertir WAV en chunks et utiliser `messages` avec `input_audio`.
+  - Marquer `transcription_provider` dans `ai_call_insights` (`lovable|claude`).
+- `useCallAi.ts` : afficher provenance + bouton « Réessayer avec Claude » si fallback non auto-déclenché.
+- `ai-analyze-call` : inchangé, consomme le texte fourni.
+
+**Test livré** : appel test 30 s, raccrocher → 30 s plus tard, transcription apparaît automatiquement dans le détail de l'appel ; simuler échec Lovable (clé vide en dev) → fallback Claude s'enclenche, badge « via Claude » visible.
+
+---
+
+## Détails techniques (référence dev)
+
+Fichiers principaux touchés :
+- `apps/ava-softphone-mobile/ios/App/App/CapacitorSip.swift` (P1, P2, P4, P5)
+- `apps/ava-softphone-mobile/ios/App/App/RTPAudioSession.swift` (P4 — VoiceProcessingIO)
+- `apps/ava-softphone-mobile/src/hooks/useSoftphoneNative.ts` (P1, P5, P6)
+- `apps/ava-softphone-mobile/src/lib/sip/ringback.ts` (P1)
+- `apps/ava-softphone-mobile/src/lib/sip/audioOutput.ts` (P2)
+- `apps/ava-softphone-mobile/src/components/Dialpad.tsx` (P3)
+- `apps/ava-softphone-mobile/src/screens/RecordingsScreen.tsx` (P5)
+- `apps/ava-softphone-mobile/src/lib/recordings/prefetch.ts` *(nouveau, P5)*
+- `apps/ava-softphone-mobile/src/hooks/useCallAi.ts` (P6)
+- `supabase/functions/ai-transcribe-call/index.ts` (P6 — fallback Claude)
+
+Après chaque phase touchant le natif iOS : `git pull` + `npx cap sync ios` + rebuild Xcode requis côté utilisateur.
+
+Aucun changement Lemtel desktop, aucun edit Landing, aucune migration de schéma (réutilisation tables existantes).
+
+---
+
+Confirme et je commence par la **Phase 1 (ringback)**, ou indique une autre phase prioritaire.
