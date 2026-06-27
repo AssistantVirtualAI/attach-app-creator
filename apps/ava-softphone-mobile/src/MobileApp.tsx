@@ -30,6 +30,7 @@ import PermissionGate from './components/PermissionGate';
 import SyncIndicator from './components/SyncIndicator';
 import ProfileSheet from './components/ProfileSheet';
 import { useRealtimeCDR } from './hooks/useRealtimeCDR';
+import { useDeviceNotifications } from './hooks/useDeviceNotifications';
 import { initBackgroundSync } from './lib/backgroundSync';
 import { useNotificationCounts } from './hooks/useNotificationCounts';
 import { useStoredCreds, Creds, ensureStoredOrganizationId, hydrateSoftphoneCredentials } from './lib/creds';
@@ -146,6 +147,7 @@ function AuthenticatedShell({
 
   const [permsGateDone, setPermsGateDone] = useState<boolean | null>(isPreviewMode ? true : null);
   const [profileOpen, setProfileOpen] = useState(false);
+  useDeviceNotifications(creds);
   const [freshCredentialToken, setFreshCredentialToken] = useState('');
   const [authExpired, setAuthExpired] = useState(false);
   const passwordHealRef = useRef('');
@@ -427,7 +429,10 @@ function AuthenticatedShell({
         tab={tab}
         onNavigate={(t) => { haptic(ImpactStyle.Light); setTab(t); }}
         haptic={haptic}
+        creds={creds}
+        onOpenProfile={() => setProfileOpen(true)}
       />
+
 
 
 
@@ -488,12 +493,45 @@ function AuthenticatedShell({
 
 /* ─── Top header with hamburger dropdown + actions ─────────────────────── */
 function TopHeader({
-  tab, onNavigate, haptic,
-}: { tab: Tab; onNavigate: (t: Tab) => void; haptic: (s?: ImpactStyle) => Promise<void> }) {
+  tab, onNavigate, haptic, creds, onOpenProfile,
+}: { tab: Tab; onNavigate: (t: Tab) => void; haptic: (s?: ImpactStyle) => Promise<void>; creds: Creds; onOpenProfile: () => void }) {
   const [open, setOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const { mode, toggle: toggleTheme } = useTheme();
   const { lang, toggle: toggleLang, t: tr } = useT();
+  const [presence, setPresence] = useState<{ status: string; color: string }>({ status: 'available', color: '#22c55e' });
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!creds?.accessToken || !creds?.userId) return;
+    let cancelled = false;
+    const STATUS_COLORS: Record<string, string> = {
+      available: '#22c55e', busy: '#f59e0b', on_call: '#3b82f6', meeting: '#8b5cf6',
+      lunch: '#f97316', break: '#14b8a6', dnd: '#ef4444', away: '#94a3b8',
+      out_of_office: '#6366f1', offline: '#64748b',
+    };
+    (async () => {
+      try {
+        const [{ data: pres }, { data: prof }] = await Promise.all([
+          supabase.from('user_presence').select('status').eq('user_id', creds.userId!).maybeSingle(),
+          supabase.from('profiles').select('avatar_url').eq('id', creds.userId!).maybeSingle(),
+        ]);
+        if (cancelled) return;
+        const s = (pres?.status as string) || 'available';
+        setPresence({ status: s, color: STATUS_COLORS[s] || '#22c55e' });
+        if (prof?.avatar_url) setAvatarUrl(prof.avatar_url);
+      } catch {}
+    })();
+    const ch = supabase.channel(`presence-self-${creds.userId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_presence', filter: `user_id=eq.${creds.userId}` }, (payload: any) => {
+        const s = payload?.new?.status || 'available';
+        setPresence({ status: s, color: STATUS_COLORS[s] || '#22c55e' });
+      })
+      .subscribe();
+    return () => { cancelled = true; try { supabase.removeChannel(ch); } catch {} };
+  }, [creds?.accessToken, creds?.userId]);
+
+  const initials = (creds?.email || creds?.extension || 'U').slice(0, 2).toUpperCase();
   const titles: Partial<Record<Tab, string>> = {
     contacts: tr('tabs.contacts' as any),
     chats: tr('tabs.chats' as any),
@@ -570,6 +608,29 @@ function TopHeader({
           {titles[tab] || ''}
         </span>
 
+        <button
+          onClick={() => { haptic(ImpactStyle.Light); onOpenProfile(); }}
+          aria-label="Profile and status"
+          title={`Profile · ${presence.status.replace('_', ' ')}`}
+          style={{
+            position: 'relative', width: 36, height: 36, borderRadius: '50%',
+            background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)',
+            display: 'grid', placeItems: 'center', cursor: 'pointer',
+            color: colors.textIce, WebkitTapHighlightColor: 'transparent', padding: 0,
+            overflow: 'hidden',
+          }}
+        >
+          {avatarUrl ? (
+            <img src={avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+          ) : (
+            <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0.4 }}>{initials}</span>
+          )}
+          <span style={{
+            position: 'absolute', right: -1, bottom: -1, width: 11, height: 11,
+            borderRadius: '50%', background: presence.color,
+            boxShadow: '0 0 0 2px rgba(8,12,30,0.92)',
+          }} />
+        </button>
         <button
           onClick={() => { haptic(ImpactStyle.Light); toggleLang(); }}
           aria-label="Switch language"
