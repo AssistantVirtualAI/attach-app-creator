@@ -532,8 +532,6 @@ function TopHeader({
   }, [creds?.accessToken, creds?.userId]);
 
   const initials = (creds?.email || creds?.extension || 'U').slice(0, 2).toUpperCase();
-  const { mode, toggle: toggleTheme } = useTheme();
-  const { lang, toggle: toggleLang, t: tr } = useT();
   const titles: Partial<Record<Tab, string>> = {
     contacts: tr('tabs.contacts' as any),
     chats: tr('tabs.chats' as any),
