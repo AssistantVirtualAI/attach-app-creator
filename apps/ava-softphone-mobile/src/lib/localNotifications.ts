@@ -13,7 +13,7 @@ export async function ensureNotificationPermission(): Promise<boolean> {
   if (!Capacitor.isNativePlatform()) return false;
   if (permissionGranted !== null) return permissionGranted;
   try {
-    const { LocalNotifications } = await import('@capacitor/local-notifications');
+    const { LocalNotifications } = await import(/* @vite-ignore */ '@capacitor/local-notifications');
     const cur = await LocalNotifications.checkPermissions();
     if (cur.display === 'granted') { permissionGranted = true; return true; }
     const req = await LocalNotifications.requestPermissions();
@@ -50,7 +50,7 @@ export async function showLocalNotification(opts: {
   const ok = await ensureNotificationPermission();
   if (!ok) return;
   try {
-    const { LocalNotifications } = await import('@capacitor/local-notifications');
+    const { LocalNotifications } = await import(/* @vite-ignore */ '@capacitor/local-notifications');
     await LocalNotifications.schedule({
       notifications: [{
         id: opts.id ?? Math.floor(Math.random() * 1_000_000_000),
@@ -69,7 +69,7 @@ export async function showLocalNotification(opts: {
 export async function initNotificationChannels(): Promise<void> {
   if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'android') return;
   try {
-    const { LocalNotifications } = await import('@capacitor/local-notifications');
+    const { LocalNotifications } = await import(/* @vite-ignore */ '@capacitor/local-notifications');
     await Promise.all([
       LocalNotifications.createChannel({ id: 'missed_calls', name: 'Missed calls', importance: 5, visibility: 1 }),
       LocalNotifications.createChannel({ id: 'voicemail',    name: 'Voicemail',    importance: 5, visibility: 1 }),
