@@ -148,12 +148,6 @@ Génère un brief court, professionnel, en français du Québec.
       };
     }
 
-    // Cache
-    await admin.from("planipret_ai_insights").insert({
-      user_id: profile.id,
-      insight_type: cacheKey,
-      data: { ...result, stats },
-    }).then(() => {}, () => {});
 
     return json({ ...result, stats, cached: false });
   } catch (e) {
