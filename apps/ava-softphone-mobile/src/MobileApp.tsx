@@ -147,6 +147,7 @@ function AuthenticatedShell({
 
   const [permsGateDone, setPermsGateDone] = useState<boolean | null>(isPreviewMode ? true : null);
   const [profileOpen, setProfileOpen] = useState(false);
+  useDeviceNotifications(creds);
   const [freshCredentialToken, setFreshCredentialToken] = useState('');
   const [authExpired, setAuthExpired] = useState(false);
   const passwordHealRef = useRef('');
