@@ -26,7 +26,7 @@ export type PlanipretMobileContext = { profile: any; reloadProfile: () => Promis
 const TABS = [
   { to: "/mplanipret/home", label: "Accueil", Icon: Home },
   { to: "/mplanipret/calls", label: "Appels", Icon: Phone },
-  { to: "_fab", label: "", Icon: Bot },
+  { to: "_fab", label: "", Icon: Home },
   { to: "/mplanipret/messages", label: "Messages", Icon: MessageSquare },
   { to: "/mplanipret/contacts", label: "Contacts", Icon: Users },
 ];
