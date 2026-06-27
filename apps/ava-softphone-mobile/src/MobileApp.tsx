@@ -611,6 +611,29 @@ function TopHeader({
         </span>
 
         <button
+          onClick={() => { haptic(ImpactStyle.Light); onOpenProfile(); }}
+          aria-label="Profile and status"
+          title={`Profile · ${presence.status.replace('_', ' ')}`}
+          style={{
+            position: 'relative', width: 36, height: 36, borderRadius: '50%',
+            background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)',
+            display: 'grid', placeItems: 'center', cursor: 'pointer',
+            color: colors.textIce, WebkitTapHighlightColor: 'transparent', padding: 0,
+            overflow: 'hidden',
+          }}
+        >
+          {avatarUrl ? (
+            <img src={avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+          ) : (
+            <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0.4 }}>{initials}</span>
+          )}
+          <span style={{
+            position: 'absolute', right: -1, bottom: -1, width: 11, height: 11,
+            borderRadius: '50%', background: presence.color,
+            boxShadow: '0 0 0 2px rgba(8,12,30,0.92)',
+          }} />
+        </button>
+        <button
           onClick={() => { haptic(ImpactStyle.Light); toggleLang(); }}
           aria-label="Switch language"
           title="Switch language"
