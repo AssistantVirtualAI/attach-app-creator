@@ -23,6 +23,8 @@ export interface NavGroup {
   lemtelOnly?: boolean;
   lemtelCustomerOnly?: boolean;
   hideForLemtel?: boolean;
+  /** Show only when selectedOrgId matches Planipret */
+  planipretOnly?: boolean;
   /** scope controls where this group appears */
   scope?: 'org' | 'my' | 'legacy' | 'platform' | 'customer';
 }
