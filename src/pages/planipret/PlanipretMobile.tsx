@@ -6,6 +6,7 @@ import { Home, Phone, MessageSquare, Users, Phone as PhoneIcon, X, Delete, Plus,
 import { toast } from "sonner";
 import planipretLogo from "@/assets/planipret-logo.png.asset.json";
 import avaWordmark from "@/assets/ava-wordmark.svg";
+import avaLogo from "@/assets/ava-statistics-logo.png.asset.json";
 import { usePullToRefresh, PullIndicator } from "@/hooks/usePullToRefresh";
 import { useRealtimeManager } from "@/hooks/useRealtimeManager";
 import InboundCallOverlay, { type InboundCall } from "@/components/InboundCallOverlay";
@@ -16,6 +17,7 @@ import UniversalSearchBar from "@/components/planipret/UniversalSearchBar";
 import { OnboardingTutorial } from "@/components/planipret/OnboardingTutorial";
 import { useAvaNavigation } from "@/hooks/useAvaNavigation";
 import AvaVoiceAgent from "@/components/planipret/mobile/AvaVoiceAgent";
+import AvaChatSheet from "@/components/planipret/mobile/AvaChatSheet";
 
 const ACCENT = "#2E9BDC";
 
