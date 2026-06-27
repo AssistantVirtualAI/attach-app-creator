@@ -17,6 +17,14 @@ export async function bootNative(): Promise<void> {
     await StatusBar.setStyle({ style: Style.Dark });
     await StatusBar.setBackgroundColor({ color: '#001a3d' });
   } catch {}
+
+  // Delta contact sync — fires at most once per 24h, non-blocking.
+  try {
+    const { maybeRunDeltaSync } = await import('./contactsSync');
+    void maybeRunDeltaSync().then((r) => {
+      if (r) console.log('[nativeBoot] contacts delta sync', r);
+    });
+  } catch {}
 }
 
 export async function onAppStateChange(handler: (active: boolean) => void): Promise<() => void> {
