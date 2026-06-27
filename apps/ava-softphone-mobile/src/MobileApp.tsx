@@ -30,6 +30,7 @@ import PermissionGate from './components/PermissionGate';
 import SyncIndicator from './components/SyncIndicator';
 import ProfileSheet from './components/ProfileSheet';
 import { useRealtimeCDR } from './hooks/useRealtimeCDR';
+import { useDeviceNotifications } from './hooks/useDeviceNotifications';
 import { initBackgroundSync } from './lib/backgroundSync';
 import { useNotificationCounts } from './hooks/useNotificationCounts';
 import { useStoredCreds, Creds, ensureStoredOrganizationId, hydrateSoftphoneCredentials } from './lib/creds';
