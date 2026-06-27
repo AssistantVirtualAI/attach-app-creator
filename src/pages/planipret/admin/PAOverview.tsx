@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Phone, Users, MessageSquare, Bot, ArrowUpRight, ArrowDownLeft, X, Sparkles, Flame, Clock, TrendingUp, TrendingDown } from "lucide-react";
+import { Phone, Users, MessageSquare, Bot, ArrowUpRight, ArrowDownLeft, X, Sparkles, Flame, Clock, TrendingUp, TrendingDown, RefreshCw, DollarSign } from "lucide-react";
 import { TEMP_COLORS, TEMP_EMOJI } from "@/components/planipret/leadHelpers";
+import { computeServiceFinance, computeTotals, fmtMoney, type ServiceFinance } from "@/lib/planipret/pricing";
+import { FinancialKpiCard } from "@/components/planipret/admin/FinancialKpiCard";
+import { RevenueBreakdown } from "@/components/planipret/admin/RevenueBreakdown";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
   PieChart, Pie, Cell, BarChart, Bar, Legend,
@@ -20,30 +23,45 @@ const initials = (n?: string) =>
 function KpiCard({ icon, title, value, subtitle, trend, color }: { icon: any; title: string; value: number | string; subtitle: string; trend?: number; color: string }) {
   const trendUp = (trend ?? 0) >= 0;
   return (
-    <div className="pp-card" style={{ padding: 20 }}>
-      <div className="flex items-start justify-between mb-3">
-        <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: `${color}1A`, color, border: `1px solid ${color}33` }}>
-          {icon}
+    <div className="pp-card relative overflow-hidden group" style={{ padding: 20 }}>
+      <div
+        aria-hidden
+        className="absolute top-0 left-0 right-0 h-[2px]"
+        style={{ background: `linear-gradient(90deg, ${color}, transparent)` }}
+      />
+      <div
+        aria-hidden
+        className="absolute -top-10 -right-10 w-32 h-32 rounded-full opacity-10 group-hover:opacity-20 transition-opacity"
+        style={{ background: `radial-gradient(circle, ${color}, transparent 70%)` }}
+      />
+      <div className="relative">
+        <div className="flex items-start justify-between mb-3">
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: `${color}1A`, color, border: `1px solid ${color}33` }}>
+            {icon}
+          </div>
+          {trend !== undefined && (
+            <span className="flex items-center gap-0.5 text-[11px] font-semibold tabular-nums" style={{ color: trendUp ? SUCCESS : DANGER }}>
+              {trendUp ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+              {trendUp ? "+" : ""}{trend}%
+            </span>
+          )}
         </div>
-        {trend !== undefined && (
-          <span className="flex items-center gap-0.5 text-[11px] font-semibold tabular-nums" style={{ color: trendUp ? SUCCESS : DANGER }}>
-            {trendUp ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-            {trendUp ? "+" : ""}{trend}%
-          </span>
-        )}
+        <div style={{ fontSize: 32, fontWeight: 700, lineHeight: 1, color: "var(--pp-text-primary)" }} className="tabular-nums">{value}</div>
+        <p style={{ fontSize: 12, color: "var(--pp-text-secondary)", marginTop: 8 }}>{title}</p>
+        <p style={{ fontSize: 11, color: "var(--pp-text-faint)", marginTop: 2 }}>{subtitle}</p>
       </div>
-      <div style={{ fontSize: 32, fontWeight: 700, lineHeight: 1, color: "var(--pp-text-primary)" }}>{value}</div>
-      <p style={{ fontSize: 12, color: "var(--pp-text-secondary)", marginTop: 8 }}>{title}</p>
-      <p style={{ fontSize: 11, color: "var(--pp-text-faint)", marginTop: 2 }}>{subtitle}</p>
     </div>
   );
 }
 
-function ChartCard({ title, children, action }: { title: string; children: any; action?: any }) {
+function ChartCard({ title, subtitle, children, action }: { title: string; subtitle?: string; children: any; action?: any }) {
   return (
     <div className="pp-card" style={{ padding: 20 }}>
       <div className="flex items-center justify-between mb-4">
-        <h2 style={{ fontFamily: "Inter,sans-serif", fontWeight: 600, fontSize: 14, color: "var(--pp-text-primary)" }}>{title}</h2>
+        <div>
+          <h2 style={{ fontFamily: "Inter,sans-serif", fontWeight: 600, fontSize: 14, color: "var(--pp-text-primary)" }}>{title}</h2>
+          {subtitle && <p style={{ fontSize: 11, color: "var(--pp-text-faint)" }} className="mt-0.5">{subtitle}</p>}
+        </div>
         {action}
       </div>
       {children}
@@ -66,25 +84,31 @@ const TooltipDark = ({ active, payload, label }: any) => {
   );
 };
 
+type Period = 7 | 30 | 90;
+
 export default function PAOverview() {
+  const [period, setPeriod] = useState<Period>(7);
+  const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState({ calls: 0, callsYest: 0, brokers: 0, brokersTotal: 0, sms: 0, ava: 0, smsYest: 0, voicemailsUnread: 0 });
   const [recent, setRecent] = useState<any[]>([]);
   const [brokers, setBrokers] = useState<any[]>([]);
   const [hotLeads, setHotLeads] = useState<any[]>([]);
   const [pendingByBroker, setPendingByBroker] = useState<Array<{ name: string; total: number; overdue: number }>>([]);
-  const [series7d, setSeries7d] = useState<Array<{ day: string; appels: number; sms: number }>>([]);
+  const [seriesData, setSeriesData] = useState<Array<{ day: string; appels: number; sms: number }>>([]);
   const [directionDist, setDirectionDist] = useState<Array<{ name: string; value: number; color: string }>>([]);
   const [topBrokers, setTopBrokers] = useState<Array<{ name: string; calls: number }>>([]);
+  const [serviceCounts, setServiceCounts] = useState({ mobile: 0, widget: 0, ai: 0 });
 
   const load = async () => {
+    setRefreshing(true);
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const yest = new Date(today); yest.setDate(yest.getDate() - 1);
-    const sevenDaysAgo = new Date(today); sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+    const periodAgo = new Date(today); periodAgo.setDate(periodAgo.getDate() - (period - 1));
     const todayIso = today.toISOString();
     const yestIso = yest.toISOString();
-    const sevenIso = sevenDaysAgo.toISOString();
+    const periodIso = periodAgo.toISOString();
 
-    const [c1, c2, bAct, bAll, sms, smsY, ava, vm, rec, bList, calls7d, sms7d, callsByDir, topCalls] = await Promise.all([
+    const [c1, c2, bAct, bAll, sms, smsY, ava, vm, rec, bList, callsP, smsP, callsByDir, topCalls, svcMobile, svcWidget, svcAi] = await Promise.all([
       supabase.from("planipret_phone_calls").select("id", { count: "exact", head: true }).gte("started_at", todayIso),
       supabase.from("planipret_phone_calls").select("id", { count: "exact", head: true }).gte("started_at", yestIso).lt("started_at", todayIso),
       supabase.from("planipret_profiles").select("id", { count: "exact", head: true }).eq("mobile_app_enabled", true),
@@ -95,10 +119,13 @@ export default function PAOverview() {
       supabase.from("planipret_voicemails").select("id", { count: "exact", head: true }).eq("is_read", false),
       supabase.from("planipret_phone_calls").select("id, user_id, direction, from_number, to_number, duration_seconds, started_at, ai_summary, planipret_profiles!inner(full_name)").order("started_at", { ascending: false }).limit(20),
       supabase.from("planipret_profiles").select("user_id, full_name, mobile_app_enabled, updated_at").order("updated_at", { ascending: false }),
-      supabase.from("planipret_phone_calls").select("started_at").gte("started_at", sevenIso),
-      supabase.from("planipret_phone_messages").select("created_at").gte("created_at", sevenIso),
-      supabase.from("planipret_phone_calls").select("direction").gte("started_at", sevenIso),
-      supabase.from("planipret_phone_calls").select("user_id, planipret_profiles!inner(full_name)").gte("started_at", sevenIso),
+      supabase.from("planipret_phone_calls").select("started_at").gte("started_at", periodIso),
+      supabase.from("planipret_phone_messages").select("created_at").gte("created_at", periodIso),
+      supabase.from("planipret_phone_calls").select("direction").gte("started_at", periodIso),
+      supabase.from("planipret_phone_calls").select("user_id, planipret_profiles!inner(full_name)").gte("started_at", periodIso),
+      supabase.from("planipret_profiles").select("id", { count: "exact", head: true }).eq("mobile_app_enabled", true),
+      supabase.from("planipret_profiles").select("id", { count: "exact", head: true }).eq("widget_enabled", true),
+      supabase.from("planipret_profiles").select("id", { count: "exact", head: true }).eq("voice_agent_enabled", true),
     ]);
 
     setStats({
@@ -107,19 +134,28 @@ export default function PAOverview() {
       sms: sms.count ?? 0, smsYest: smsY.count ?? 0,
       ava: ava.count ?? 0, voicemailsUnread: vm.count ?? 0,
     });
+    setServiceCounts({
+      mobile: svcMobile.count ?? 0,
+      widget: svcWidget.count ?? 0,
+      ai: svcAi.count ?? 0,
+    });
     setRecent(rec.data ?? []);
     setBrokers((bList.data ?? []).slice(0, 10));
 
-    // 7d series
+    // period series
     const days: Array<{ day: string; appels: number; sms: number }> = [];
-    for (let i = 6; i >= 0; i--) {
+    const step = period <= 7 ? 1 : period <= 30 ? 1 : 3;
+    for (let i = period - 1; i >= 0; i -= step) {
       const d = new Date(today); d.setDate(d.getDate() - i);
       const key = d.toISOString().slice(0, 10);
-      days.push({ day: d.toLocaleDateString("fr-CA", { weekday: "short" }), appels: 0, sms: 0 });
-      (calls7d.data ?? []).forEach((c: any) => { if (c.started_at?.slice(0, 10) === key) days[days.length - 1].appels++; });
-      (sms7d.data ?? []).forEach((m: any) => { if (m.created_at?.slice(0, 10) === key) days[days.length - 1].sms++; });
+      days.push({
+        day: period <= 7 ? d.toLocaleDateString("fr-CA", { weekday: "short" }) : d.toLocaleDateString("fr-CA", { day: "2-digit", month: "2-digit" }),
+        appels: 0, sms: 0,
+      });
+      (callsP.data ?? []).forEach((c: any) => { if (c.started_at?.slice(0, 10) === key) days[days.length - 1].appels++; });
+      (smsP.data ?? []).forEach((m: any) => { if (m.created_at?.slice(0, 10) === key) days[days.length - 1].sms++; });
     }
-    setSeries7d(days);
+    setSeriesData(days);
 
     // Direction distribution
     const distMap: Record<string, number> = { inbound: 0, outbound: 0, missed: 0 };
@@ -130,7 +166,7 @@ export default function PAOverview() {
       { name: "Manqués", value: distMap.missed, color: DANGER },
     ]);
 
-    // Top 5 brokers by call volume 7d
+    // Top 5 brokers
     const topMap: Record<string, { name: string; calls: number }> = {};
     (topCalls.data ?? []).forEach((c: any) => {
       const name = c.planipret_profiles?.full_name ?? "—";
@@ -165,6 +201,7 @@ export default function PAOverview() {
       if (r.scheduled_at < nowIso) agg[key].overdue += 1;
     });
     setPendingByBroker(Object.values(agg).sort((a, b) => b.overdue - a.overdue || b.total - a.total).slice(0, 8));
+    setRefreshing(false);
   };
 
   useEffect(() => {
@@ -176,28 +213,97 @@ export default function PAOverview() {
       .subscribe();
     const t = window.setInterval(load, 30000);
     return () => { supabase.removeChannel(ch); window.clearInterval(t); };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [period]);
 
   const callsTrend = stats.callsYest > 0 ? Math.round(((stats.calls - stats.callsYest) / stats.callsYest) * 100) : undefined;
   const smsTrend = stats.smsYest > 0 ? Math.round(((stats.sms - stats.smsYest) / stats.smsYest) * 100) : undefined;
 
+  // Financial rows
+  const finance = useMemo<ServiceFinance[]>(() => [
+    computeServiceFinance("mobile", serviceCounts.mobile),
+    computeServiceFinance("widget", serviceCounts.widget),
+    computeServiceFinance("ai", serviceCounts.ai),
+  ], [serviceCounts]);
+  const totals = useMemo(() => computeTotals(finance), [finance]);
+
+  // Engagement metrics
+  const avgCallsPerBroker = stats.brokers > 0 ? (seriesData.reduce((s, d) => s + d.appels, 0) / stats.brokers).toFixed(1) : "0";
+  const adoptionPct = stats.brokersTotal > 0 ? Math.round((stats.brokers / stats.brokersTotal) * 100) : 0;
+
   return (
     <div className="space-y-5">
-      {/* KPI Cards */}
+      {/* Header with period selector */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 style={{ fontFamily: "Inter,sans-serif", fontWeight: 700, fontSize: 22, color: "var(--pp-text-primary)" }}>Vue d'ensemble</h1>
+          <p style={{ fontSize: 12, color: "var(--pp-text-faint)" }} className="mt-0.5">Cockpit Planiprêt · {totals.users} utilisateurs facturables · {fmtMoney(totals.profit)} profit / mois</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center rounded-lg overflow-hidden" style={{ background: "var(--pp-bg-deep)", border: "1px solid var(--pp-bg-border-2)" }}>
+            {[7, 30, 90].map((p) => (
+              <button
+                key={p}
+                onClick={() => setPeriod(p as Period)}
+                className="px-3 py-1.5 transition-colors"
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: period === p ? "#fff" : "var(--pp-text-muted)",
+                  background: period === p ? ACCENT : "transparent",
+                }}
+              >
+                {p}j
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={load}
+            className="px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all hover:bg-white/5"
+            style={{ background: "var(--pp-bg-deep)", border: "1px solid var(--pp-bg-border-2)", fontSize: 11, color: "var(--pp-text-muted)" }}
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
+            Actualiser
+          </button>
+        </div>
+      </div>
+
+      {/* KPI Hero Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard icon={<Phone className="w-5 h-5" />} title="Appels aujourd'hui" value={stats.calls} subtitle="vs hier" trend={callsTrend} color={ACCENT} />
-        <KpiCard icon={<Users className="w-5 h-5" />} title="Courtiers actifs" value={stats.brokers} subtitle={`sur ${stats.brokersTotal} courtiers`} color={SUCCESS} />
+        <KpiCard icon={<Users className="w-5 h-5" />} title="Courtiers actifs" value={stats.brokers} subtitle={`${adoptionPct}% adoption · ${stats.brokersTotal} total`} color={SUCCESS} />
         <KpiCard icon={<MessageSquare className="w-5 h-5" />} title="SMS aujourd'hui" value={stats.sms} subtitle="envoyés + reçus" trend={smsTrend} color={WARNING} />
         <KpiCard icon={<Bot className="w-5 h-5" />} title="Sessions AVA aujourd'hui" value={stats.ava} subtitle={`${stats.voicemailsUnread} voicemails non lus`} color={AGENT} />
       </div>
 
-      {/* Charts row */}
+      {/* ===== FINANCIAL SECTION ===== */}
+      <div className="flex items-center gap-2 pt-2">
+        <DollarSign className="w-4 h-4" style={{ color: SUCCESS }} />
+        <h2 style={{ fontFamily: "Inter,sans-serif", fontWeight: 700, fontSize: 16, color: "var(--pp-text-primary)" }}>Performance financière</h2>
+        <span style={{ fontSize: 10, color: "var(--pp-text-faint)" }} className="ml-2 px-2 py-0.5 rounded-full" >Live</span>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {finance.map((f) => <FinancialKpiCard key={f.service} data={f} />)}
+      </div>
+
+      <RevenueBreakdown rows={finance} />
+
+      {/* Engagement strip */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <MiniStat label="Adoption mobile" value={`${adoptionPct}%`} sub={`${stats.brokers}/${stats.brokersTotal} courtiers`} color={ACCENT} />
+        <MiniStat label={`Appels / courtier (${period}j)`} value={avgCallsPerBroker} sub="moyenne" color={SUCCESS} />
+        <MiniStat label="Leads chauds" value={hotLeads.length} sub="≥ 8/10 aujourd'hui" color={DANGER} />
+        <MiniStat label="Voicemails" value={stats.voicemailsUnread} sub="non lus" color={WARNING} />
+      </div>
+
+      {/* Activity charts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2">
-          <ChartCard title="Activité 7 derniers jours">
+          <ChartCard title={`Activité ${period} derniers jours`} subtitle="Appels et messages cumulés">
             <div style={{ width: "100%", height: 240 }}>
               <ResponsiveContainer>
-                <AreaChart data={series7d} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <AreaChart data={seriesData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="gradCalls" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor={ACCENT} stopOpacity={0.5} />
@@ -221,7 +327,7 @@ export default function PAOverview() {
           </ChartCard>
         </div>
 
-        <ChartCard title="Distribution des appels (7j)">
+        <ChartCard title="Distribution des appels" subtitle={`Période ${period}j`}>
           <div style={{ width: "100%", height: 240 }}>
             <ResponsiveContainer>
               <PieChart>
@@ -238,7 +344,7 @@ export default function PAOverview() {
 
       {/* Top brokers + Hot leads */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <ChartCard title="Top 5 courtiers (7j)">
+        <ChartCard title={`Top 5 courtiers (${period}j)`}>
           <div style={{ width: "100%", height: 240 }}>
             {topBrokers.length === 0 ? (
               <p style={{ fontSize: 12, color: "var(--pp-text-faint)" }} className="text-center py-8">Aucune donnée</p>
@@ -364,6 +470,19 @@ export default function PAOverview() {
           </ul>
         </div>
       )}
+    </div>
+  );
+}
+
+function MiniStat({ label, value, sub, color }: { label: string; value: string | number; sub: string; color: string }) {
+  return (
+    <div className="pp-card" style={{ padding: 16 }}>
+      <div className="flex items-center justify-between mb-1">
+        <span style={{ fontSize: 10, color: "var(--pp-text-faint)", textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</span>
+        <span style={{ width: 6, height: 6, borderRadius: "50%", background: color, boxShadow: `0 0 6px ${color}` }} />
+      </div>
+      <div style={{ fontSize: 22, fontWeight: 700, color }} className="tabular-nums">{value}</div>
+      <p style={{ fontSize: 10, color: "var(--pp-text-faint)", marginTop: 2 }}>{sub}</p>
     </div>
   );
 }
