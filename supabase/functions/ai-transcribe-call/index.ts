@@ -332,42 +332,34 @@ Deno.serve(async (req) => {
       return json({ transcript_text: fallbackTranscript, stub: true, reason: "audio-too-large", size: audioBytes.length });
     }
 
-    // Provider chain: Gemini (Lovable) → OpenAI gpt-4o-mini (Lovable) → Anthropic Claude.
-    const b64 = bufToBase64(audioBytes);
+    // STT: Lovable Gateway gpt-4o-mini-transcribe ONLY (no audio fallback).
+    // Claude 3.5 Sonnet runs after for TEXT cleanup / speaker labels.
     const audioFormat = audioMime.split("/")[1] || "wav";
-    const sttPrompt = "Transcribe this phone call verbatim in the original language spoken (French or English). Label speakers as Agent: and Caller: on separate lines. Include filler words. Return ONLY the transcript text, no preamble, no commentary, no markdown.";
+    const sttPrompt = "Transcribe verbatim. Preserve French or English. Include filler words.";
 
-    type ProviderResult = { text?: string; provider: string; model: string; finishReason?: string; error?: string; status?: number };
+    type ProviderResult = { text?: string; provider: string; model: string; error?: string; status?: number };
 
-    const tryLovable = async (model: string): Promise<ProviderResult> => {
-      const r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const tryGatewayTranscribe = async (model: string): Promise<ProviderResult> => {
+      const ext = ({ mpeg: "mp3", mp3: "mp3", wav: "wav", webm: "webm", ogg: "ogg", mp4: "m4a" } as Record<string, string>)[audioFormat] || "wav";
+      const fd = new FormData();
+      fd.append("model", model);
+      fd.append("file", new Blob([audioBytes!], { type: audioMime }), `recording.${ext}`);
+      fd.append("prompt", sttPrompt);
+      const r = await fetch("https://ai.gateway.lovable.dev/v1/audio/transcriptions", {
         method: "POST",
-        headers: { "Lovable-API-Key": lovableKey, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model,
-          max_tokens: 8000,
-          messages: [{
-            role: "user",
-            content: [
-              { type: "text", text: sttPrompt },
-              { type: "input_audio", input_audio: { data: b64, format: audioFormat } },
-            ],
-          }],
-        }),
+        headers: { "Lovable-API-Key": lovableKey, "X-Lovable-AIG-SDK": "edge-function" },
+        body: fd,
       });
       if (!r.ok) {
         const errTxt = await r.text();
-        console.error(`lovable ${model} error`, r.status, errTxt.slice(0, 300));
+        console.error(`gateway STT ${model} error`, r.status, errTxt.slice(0, 300));
         return { error: errTxt.slice(0, 400), status: r.status, provider: "lovable-ai", model };
       }
       const d = await r.json();
-      return { text: String(d?.choices?.[0]?.message?.content || "").trim(), provider: "lovable-ai", model, finishReason: d?.choices?.[0]?.finish_reason };
+      return { text: String(d?.text || "").trim(), provider: "lovable-ai", model };
     };
 
-    // Claude post-processing: Anthropic's Messages API does NOT accept audio.
-    // We use it for TEXT cleanup only — after a real STT model returns a
-    // transcript, send the text to Claude to clean up disfluencies and label
-    // speakers consistently as "Agent:" / "Caller:".
+    // Claude post-processing: TEXT cleanup only (Anthropic Messages API has no audio input).
     const claudePostProcess = async (raw: string): Promise<{ text: string; used: boolean; error?: string; status?: number }> => {
       const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
       if (!anthropicKey) return { text: raw, used: false, error: "no-anthropic-key" };
@@ -401,21 +393,17 @@ Deno.serve(async (req) => {
 
     const disableClaude = body?.disable_claude === true;
     const attempts: Array<{ provider: string; model: string; status?: number; error?: string }> = [];
-    let final: ProviderResult | null = null;
-    const steps: Array<() => Promise<ProviderResult>> = [
-      () => tryLovable("google/gemini-2.5-pro"),
-      () => tryLovable("google/gemini-2.5-flash"),
-      () => tryLovable("openai/gpt-4o-mini"),
-    ];
-    for (const step of steps) {
-      const res = await step();
-      if (res.text) { final = res; break; }
-      attempts.push({ provider: res.provider, model: res.model, status: res.status, error: (res.error || "empty").slice(0, 200) });
-      if (res.status === 402) {
-        await audit("ai-error", { error_code: "credits-exhausted", http_status: 402, message: res.error, provider: res.provider, model: res.model });
-        return json({ error: "credits-exhausted", details: res.error, attempts }, 402);
+    const sttResult = await tryGatewayTranscribe("openai/gpt-4o-mini-transcribe");
+    const final: ProviderResult | null = sttResult.text ? sttResult : null;
+    if (!sttResult.text) {
+      attempts.push({ provider: sttResult.provider, model: sttResult.model, status: sttResult.status, error: (sttResult.error || "empty").slice(0, 200) });
+      if (sttResult.status === 402) {
+        await audit("ai-error", { error_code: "credits-exhausted", http_status: 402, message: sttResult.error, provider: sttResult.provider, model: sttResult.model });
+        return json({ error: "credits-exhausted", details: sttResult.error, attempts }, 402);
       }
     }
+
+
 
 
     if (!final?.text) {
