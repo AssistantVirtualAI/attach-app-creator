@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, LogOut, KeyRound, Camera, Check } from 'lucide-react';
 import { colors, font, radius, gradients } from '../lib/theme';
 import type { Creds } from '../lib/creds';
@@ -167,11 +168,11 @@ export default function ProfileSheet({
   const initials = (creds.displayName || creds.email || 'U').split(/[\s@]/)[0].slice(0, 2).toUpperCase();
   const currentStatusColor = STATUS_OPTIONS.find((s) => s.id === status)?.color || '#94a3b8';
 
-  return (
+  return createPortal((
     <div
       onClick={onClose}
       style={{
-        position: 'fixed', inset: 0, zIndex: 1000,
+        position: 'fixed', inset: 0, zIndex: 99999,
         background: 'rgba(7,15,38,0.55)', backdropFilter: 'blur(8px)',
         display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
       }}
