@@ -15,6 +15,7 @@ import SessionTimeoutModal from "@/components/planipret/SessionTimeoutModal";
 import PrivacyConsentGate from "@/components/planipret/PrivacyConsentGate";
 import UniversalSearchBar from "@/components/planipret/UniversalSearchBar";
 import { OnboardingTutorial } from "@/components/planipret/OnboardingTutorial";
+import MobilePermissionsOnboarding, { isPermOnboardingDone } from "@/components/planipret/mobile/MobilePermissionsOnboarding";
 import { useAvaNavigation } from "@/hooks/useAvaNavigation";
 import AvaVoiceAgent from "@/components/planipret/mobile/AvaVoiceAgent";
 import AvaChatSheet from "@/components/planipret/mobile/AvaChatSheet";
