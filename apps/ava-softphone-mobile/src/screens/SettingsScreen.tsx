@@ -5,6 +5,7 @@ import { mobileApi, MeResponse } from '../lib/mobileApi';
 import { Card, Chip, SectionTitle, SettingsRow, StatusDot, AIPanel } from '../components/ui/Primitives';
 import { LemtelMark, AvaBadge } from '../components/Brand';
 import { checkAllPermissions, openAppSettings, type AllPermissions, type PermissionStatus } from '../lib/permissions';
+import { getAnnounceConsent, setAnnounceConsent } from '../lib/recordingConsent';
 import { useTheme } from '../lib/ThemeContext';
 import { useT } from '../lib/i18n';
 import type { Tab } from '../components/BottomTabs';
@@ -22,6 +23,7 @@ export default function SettingsScreen({
   const [perms, setPerms] = useState<AllPermissions | null>(null);
   const [haptics, setHaptics] = useState<boolean>(() => localStorage.getItem('ava.haptics') !== 'off');
   const [autoAnswer, setAutoAnswer] = useState<boolean>(() => localStorage.getItem('ava.autoAnswer') === 'on');
+  const [announceRec, setAnnounceRec] = useState<boolean>(() => getAnnounceConsent());
   
   const [ringtone, setRingtone] = useState<string>(() => localStorage.getItem('ava.ringtone') || 'AVA Default');
   const [audioOut, setAudioOut] = useState<string>(() => localStorage.getItem('ava.audioOut') || 'System default');
