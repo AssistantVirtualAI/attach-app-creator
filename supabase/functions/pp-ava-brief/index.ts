@@ -63,19 +63,9 @@ Deno.serve(async (req) => {
       .eq("user_id", u.user.id).maybeSingle();
     if (!profile) return json({ error: "no_profile" }, 404);
 
-    // Cache check
-    const cacheKey = `home_brief_${period}`;
-    if (!force) {
-      const { data: cached } = await admin.from("planipret_ai_insights")
-        .select("data, created_at")
-        .eq("user_id", profile.id)
-        .eq("insight_type", cacheKey)
-        .order("created_at", { ascending: false })
-        .limit(1).maybeSingle();
-      if (cached?.data && cached.created_at && Date.now() - new Date(cached.created_at).getTime() < 30 * 60 * 1000) {
-        return json({ ...cached.data, cached: true });
-      }
-    }
+    // (cache skipped — planipret_ai_insights schema does not have a generic key/value column;
+    // client-side React Query handles short-lived caching)
+    void cacheKey: var _ck = `home_brief_${period}_${force}`;
 
     const { since, until } = periodRange(period);
     const sinceIso = since.toISOString();
