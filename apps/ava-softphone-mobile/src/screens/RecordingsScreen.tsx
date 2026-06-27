@@ -274,6 +274,18 @@ export default function RecordingsScreen({
               <div style={{ display: 'flex', gap: 4 }}>
                 <Chip tone="gold" size="xs">{Math.max(1, Math.round(r.durationSec / 60))}m</Chip>
                 {r.hasTranscript && <Chip tone="violet" size="xs">AI</Chip>}
+                {cachedIds.has(r.id) && <Chip tone="success" size="xs">{fr ? 'Hors-ligne' : 'Offline'}</Chip>}
+                <button
+                  onClick={() => download(r)}
+                  disabled={downloadingId === r.id}
+                  title={fr ? 'Télécharger pour écoute hors-ligne' : 'Download for offline playback'}
+                  style={{
+                    background: 'transparent', border: `1px solid ${colors.border}`, color: colors.signalGold,
+                    borderRadius: 8, padding: '2px 6px', fontSize: 10, fontWeight: 800,
+                    cursor: downloadingId === r.id ? 'wait' : 'pointer',
+                  }}>
+                  {downloadingId === r.id ? '…' : cachedIds.has(r.id) ? '↻' : '⬇'}
+                </button>
                 <button onClick={() => toggleExpand(r.id)} style={{
                   background: 'transparent', border: `1px solid ${colors.borderAI}`, color: colors.avaViolet,
                   borderRadius: 8, padding: '2px 6px', fontSize: 10, fontWeight: 800, cursor: 'pointer',
