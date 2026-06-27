@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { usePortal, PortalProvider } from '@/hooks/usePortalAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { getPostLoginRoute } from '@/lib/postLoginRoute';
+import { getSafeRedirect } from '@/lib/routes';
+import { recordRedirect } from '@/lib/debug/navDebug';
 import { Loader2, AlertTriangle, Globe, Home } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { AvaStatisticsLogo as AvaLogo } from '@/components/shared/AvaStatisticsLogo';
@@ -24,6 +26,7 @@ const UniversalLoginContent = () => {
   const [rememberMe, setRememberMe] = useState(false);
   const { loginUniversal } = usePortal();
   const navigate = useNavigate();
+  const location = useLocation();
   const { t } = useTranslation();
   const { language, toggleLanguage } = useLanguage();
 
@@ -34,11 +37,17 @@ const UniversalLoginContent = () => {
       const { data } = await supabase.auth.getSession();
       const uid = data.session?.user?.id;
       if (!uid || cancelled) return;
+      const redirect = getSafeRedirect(location.search);
+      if (redirect) {
+        recordRedirect(`${location.pathname}${location.search}`, redirect, 'UniversalLogin.existingSession', 'safe redirect param');
+        if (!cancelled) navigate(redirect, { replace: true });
+        return;
+      }
       const route = await getPostLoginRoute(uid);
       if (!cancelled) navigate(route, { replace: true });
     })();
     return () => { cancelled = true; };
-  }, [navigate]);
+  }, [navigate, location.pathname, location.search]);
 
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -64,7 +73,8 @@ const UniversalLoginContent = () => {
         });
 
         if (!authError && data.user) {
-          const route = await getPostLoginRoute(data.user.id);
+          const route = getSafeRedirect(location.search) ?? await getPostLoginRoute(data.user.id);
+          recordRedirect(`${location.pathname}${location.search}`, route, 'UniversalLogin.submit', getSafeRedirect(location.search) ? 'safe redirect param' : 'post-login route');
           navigate(route);
           return;
         }

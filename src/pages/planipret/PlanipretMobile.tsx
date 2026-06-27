@@ -142,6 +142,7 @@ export default function PlanipretMobile() {
   const location = useLocation();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [accessError, setAccessError] = useState<"missing_profile" | "load_failed" | null>(null);
   const [dialerOpen, setDialerOpen] = useState(false);
   const [dialerInit, setDialerInit] = useState<string | undefined>(undefined);
   const [unreadMsg, setUnreadMsg] = useState(0);
@@ -223,13 +224,20 @@ export default function PlanipretMobile() {
       navigate(to, { replace: true });
       return;
     }
-    const { data } = await supabase.from("planipret_profiles").select("*").eq("user_id", user.id).maybeSingle();
-    if (!data) {
-      const to = loginWithRedirect(ROUTES.MPLANIPRET);
-      recordRedirect(location.pathname, to, "PlanipretMobile.loadProfile", "missing planipret_profiles row");
-      navigate(to, { replace: true });
+    const { data, error } = await supabase.from("planipret_profiles").select("*").eq("user_id", user.id).maybeSingle();
+    if (error) {
+      recordRedirect(location.pathname, ROUTES.MPLANIPRET, "PlanipretMobile.loadProfile", "profile load failed");
+      setAccessError("load_failed");
+      setLoading(false);
       return;
     }
+    if (!data) {
+      recordRedirect(location.pathname, ROUTES.MPLANIPRET, "PlanipretMobile.loadProfile", "missing planipret_profiles row");
+      setAccessError("missing_profile");
+      setLoading(false);
+      return;
+    }
+    setAccessError(null);
     setProfile(data);
     setLoading(false);
   };
@@ -241,6 +249,29 @@ export default function PlanipretMobile() {
   }, []);
 
   if (loading) return <div className="min-h-screen flex items-center justify-center" style={{ background: "#030810", color: "var(--pp-text-muted, #4A7FA5)" }}>Chargement…</div>;
+
+  if (accessError) {
+    return (
+      <Frame>
+        <div className="h-full flex items-center justify-center p-6" style={{ background: "var(--pp-bg-base)" }}>
+          <div className="pp-card p-6 text-center max-w-xs" style={{ padding: 24 }}>
+            <div className="w-14 h-14 mx-auto rounded-full flex items-center justify-center mb-4" style={{ background: "rgba(46,155,220,0.12)", color: "var(--pp-brand-accent)" }}>
+              <Lock className="w-7 h-7" />
+            </div>
+            <h2 style={{ fontFamily: "Inter,sans-serif", fontWeight: 700, fontSize: 18, color: "var(--pp-text-primary)", marginBottom: 8 }}>
+              Accès mobile Planiprêt
+            </h2>
+            <p style={{ fontSize: 13, color: "var(--pp-text-secondary)", marginBottom: 16 }}>
+              {accessError === "missing_profile"
+                ? "Votre compte est connecté, mais aucun profil mobile Planiprêt n'est lié à cet utilisateur."
+                : "Impossible de charger votre profil mobile Planiprêt pour le moment."}
+            </p>
+            <button onClick={loadProfile} className="pp-btn-primary inline-block">Réessayer</button>
+          </div>
+        </div>
+      </Frame>
+    );
+  }
 
   if (profile && profile.mobile_app_enabled === false) {
     return (
