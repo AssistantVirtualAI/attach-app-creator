@@ -286,7 +286,7 @@ function PermissionPrompt({ device, perm, lang, onAllow, onDeny, isLast }: {
 const iosBtn: React.CSSProperties = { background: "transparent", border: 0, color: "#0A84FF", padding: "12px 0", fontSize: 15, cursor: "pointer" };
 const androidBtn: React.CSSProperties = { background: "transparent", border: 0, color: "#BFC4CA", padding: "8px 14px", borderRadius: 6, fontSize: 14, fontWeight: 600, cursor: "pointer" };
 
-function AuthPreview({ dict }: { dict: typeof MP_DICT["fr"] }) {
+function AuthPreview({ dict }: { dict: any }) {
   return (
     <div style={{ position: "absolute", inset: 0, background: "#030810", color: "#E8EDF5", padding: "60px 24px 24px", display: "flex", flexDirection: "column" }}>
       <div style={{ display: "flex", gap: 16, justifyContent: "center", marginBottom: 18 }}>
