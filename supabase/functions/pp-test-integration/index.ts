@@ -166,7 +166,7 @@ async function testMobileApp(admin: ReturnType<typeof createClient>): Promise<Te
   const { count: total } = await admin.from("planipret_profiles").select("user_id", { count: "exact", head: true });
   const { count: active } = await admin.from("planipret_profiles")
     .select("user_id", { count: "exact", head: true })
-    .gte("last_seen_at", since);
+    .gte("updated_at", since);
   return {
     success: true,
     message: `Mobile App · ${active ?? 0}/${total ?? 0} courtiers actifs (7j)`,
