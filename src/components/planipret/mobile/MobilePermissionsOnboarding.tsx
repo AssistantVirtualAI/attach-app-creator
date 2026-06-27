@@ -54,9 +54,9 @@ async function reqContacts() {
 async function reqBluetooth() {
   try {
     // Web Bluetooth (Chrome/Edge); iOS Safari has no equivalent.
-    // @ts-ignore
-    if (navigator.bluetooth?.requestDevice) {
-      await navigator.bluetooth.requestDevice({ acceptAllDevices: true }).catch(() => {});
+    const bt = (navigator as any).bluetooth;
+    if (bt?.requestDevice) {
+      await bt.requestDevice({ acceptAllDevices: true }).catch(() => {});
     }
   } catch {}
 }
