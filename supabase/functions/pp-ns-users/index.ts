@@ -61,7 +61,17 @@ Deno.serve(async (req) => {
     const byExt = new Map<string, any>();
     (profiles ?? []).forEach((p: any) => { if (p.extension) byExt.set(String(p.extension), p); });
 
-    const brokers = list.map((u: any) => {
+    // If NS-API is down, fall back to local profiles only so the admin page still renders.
+    const sourceList: any[] = list.length > 0
+      ? list
+      : (profiles ?? []).map((p: any) => ({
+          user: p.extension,
+          email: p.email,
+          first_name: (p.full_name || "").split(" ")[0] ?? "",
+          last_name: (p.full_name || "").split(" ").slice(1).join(" "),
+        }));
+
+    const brokers = sourceList.map((u: any) => {
       const ext = String(u.user ?? u.extension ?? u.subscriber_login ?? u.user_id ?? "");
       const local = byExt.get(ext);
       const first = u.first_name ?? u.firstName ?? "";
@@ -86,7 +96,7 @@ Deno.serve(async (req) => {
       };
     }).filter((b: any) => !/@lemtel\.com$/i.test(String(b.email || "").trim()));
 
-    return jsonResponse({ ok: true, count: brokers.length, domain, brokers });
+    return jsonResponse({ ok: true, count: brokers.length, domain, brokers, ns_warning: nsWarning, degraded: !!nsWarning });
   } catch (e) {
     return jsonResponse({ error: (e as Error).message }, 500);
   }
