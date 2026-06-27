@@ -198,6 +198,12 @@ export default function SettingsScreen({
         <SettingsRow label={t('settings.dataSafety')} icon="🛡" onPress={() => openPortal('/data-safety')} />
         <SettingsRow label={t('settings.privacyPolicy')} icon="📄" onPress={() => openPortal('/privacy')} />
         <SettingsRow label={t('settings.termsOfService')} icon="📜" onPress={() => openPortal('/terms')} />
+        <SettingsRow
+          label={lang === 'fr' ? "Annoncer l'enregistrement d'appel" : 'Announce call recording'}
+          icon="🔔"
+          value={announceRec ? (lang === 'fr' ? 'Activé (recommandé)' : 'On (recommended)') : (lang === 'fr' ? 'Désactivé' : 'Off')}
+          onPress={() => { const next = !announceRec; setAnnounceRec(next); setAnnounceConsent(next); }}
+        />
         <SettingsRow label={t('settings.clearCache')} icon="🧹" onPress={clearCache} />
         <SettingsRow label={t('settings.deleteAccount')} icon="⚠" onPress={() => openPortal('/account/delete')} />
       </Card>
