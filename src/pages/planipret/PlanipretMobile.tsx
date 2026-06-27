@@ -488,12 +488,13 @@ export default function PlanipretMobile() {
 
 function Frame({ children }: { children: React.ReactNode }) {
   return (
-    <div className="planipret-scope min-h-screen w-full flex items-center justify-center md:p-6" style={{ background: "#020610" }}>
+    <div className="planipret-scope planipret-mobile-scope min-h-screen w-full flex items-center justify-center md:p-6"
+      style={{ background: "linear-gradient(160deg, #EEF2F8 0%, #DCE3EC 100%)" }}>
       <div className="overflow-hidden w-full md:w-[390px] md:h-[844px] h-screen md:rounded-[44px] relative"
         style={{
-          background: "#060D1A",
-          border: "2px solid #1A3A5A",
-          boxShadow: "0 0 0 8px #040B16, 0 40px 120px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.05)",
+          background: "#F7F9FC",
+          border: "1px solid #DCE3EC",
+          boxShadow: "0 0 0 6px #FFFFFF, 0 40px 120px rgba(15,27,61,0.18), inset 0 1px 0 rgba(255,255,255,0.6)",
         }}>
         {children}
       </div>
