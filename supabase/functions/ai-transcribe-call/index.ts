@@ -364,34 +364,41 @@ Deno.serve(async (req) => {
       return { text: String(d?.choices?.[0]?.message?.content || "").trim(), provider: "lovable-ai", model, finishReason: d?.choices?.[0]?.finish_reason };
     };
 
-    // OpenAI Whisper fallback — Anthropic Messages API does NOT accept audio
-    // input blocks, so the previous "Claude STT" path always returned 400 and
-    // never produced a transcript. We replace it with Whisper-1 (real STT)
-    // keyed by OPENAI_API_KEY. If the key is absent we skip silently.
-    const tryWhisper = async (): Promise<ProviderResult> => {
-      const openaiKey = Deno.env.get("OPENAI_API_KEY");
-      const model = "whisper-1";
-      if (!openaiKey) return { error: "no-openai-key", status: 0, provider: "openai-whisper", model };
-      const form = new FormData();
-      form.append("file", new Blob([audioBytes], { type: audioMime }), `audio.${audioFormat}`);
-      form.append("model", model);
-      form.append("response_format", "text");
-      const r = await fetch("https://api.openai.com/v1/audio/transcriptions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${openaiKey}` },
-        body: form,
-      });
-      if (!r.ok) {
-        const errTxt = await r.text();
-        console.error("whisper error", r.status, errTxt.slice(0, 300));
-        return { error: errTxt.slice(0, 400), status: r.status, provider: "openai-whisper", model };
+    // Claude post-processing: Anthropic's Messages API does NOT accept audio.
+    // We use it for TEXT cleanup only — after a real STT model returns a
+    // transcript, send the text to Claude to clean up disfluencies and label
+    // speakers consistently as "Agent:" / "Caller:".
+    const claudePostProcess = async (raw: string): Promise<{ text: string; used: boolean; error?: string; status?: number }> => {
+      const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
+      if (!anthropicKey) return { text: raw, used: false, error: "no-anthropic-key" };
+      try {
+        const r = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: {
+            "x-api-key": anthropicKey,
+            "anthropic-version": "2023-06-01",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "claude-3-5-sonnet-20241022",
+            max_tokens: 8000,
+            system: "You clean up phone-call transcripts. Preserve the original language (French or English). Label speakers as 'Agent:' and 'Caller:' on separate lines. Keep meaning intact, remove duplicate stutters, fix obvious STT errors. Return ONLY the cleaned transcript — no preamble, no markdown, no commentary.",
+            messages: [{ role: "user", content: `Clean and re-label this transcript:\n\n${raw}` }],
+          }),
+        });
+        if (!r.ok) {
+          const errTxt = await r.text();
+          console.error("claude cleanup error", r.status, errTxt.slice(0, 300));
+          return { text: raw, used: false, error: errTxt.slice(0, 400), status: r.status };
+        }
+        const d = await r.json();
+        const cleaned = String(d?.content?.[0]?.text || "").trim();
+        return cleaned ? { text: cleaned, used: true } : { text: raw, used: false, error: "empty-cleanup" };
+      } catch (e: any) {
+        return { text: raw, used: false, error: e?.message || "err" };
       }
-      const text = (await r.text()).trim();
-      return { text, provider: "openai-whisper", model };
     };
 
-    // `disable_claude` flag kept for backwards compatibility — it now controls
-    // whether the Whisper fallback step runs.
     const disableClaude = body?.disable_claude === true;
     const attempts: Array<{ provider: string; model: string; status?: number; error?: string }> = [];
     let final: ProviderResult | null = null;
@@ -400,7 +407,6 @@ Deno.serve(async (req) => {
       () => tryLovable("google/gemini-2.5-flash"),
       () => tryLovable("openai/gpt-4o-mini"),
     ];
-    if (!disableClaude) steps.push(() => tryWhisper());
     for (const step of steps) {
       const res = await step();
       if (res.text) { final = res; break; }
@@ -410,6 +416,7 @@ Deno.serve(async (req) => {
         return json({ error: "credits-exhausted", details: res.error, attempts }, 402);
       }
     }
+
 
     if (!final?.text) {
       await writeTranscript(fallbackTranscript, "stub-all-providers-failed");
