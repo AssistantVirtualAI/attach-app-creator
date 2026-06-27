@@ -123,7 +123,7 @@ final class RTPAudioSession {
             "engineRestartTotal": engineRestartTotal,
             "lastEngineError": lastEngineError,
             "sessionState": sessionStateDescription(),
-            "audioBackend": "RemoteIO",
+            "audioBackend": "VoiceProcessingIO (AEC/NS/AGC)",
             "inputCallbacks": Int(inputCallbackCount),
             "renderCallbacks": Int(renderCallbackCount),
             "inputFrames": Int(inputFramesTotal),
