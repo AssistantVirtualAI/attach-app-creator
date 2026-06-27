@@ -126,7 +126,7 @@ export default function PlanipretAdminLayout() {
         });
       }
       if (cancelled) return;
-      if (!session?.user) { window.location.href = SSO_URL; return; }
+      if (!session?.user) { navigate("/login", { replace: true }); return; }
       await loadProfile(session.user);
     })();
 
@@ -136,7 +136,7 @@ export default function PlanipretAdminLayout() {
 
 
 
-  const logout = async () => { await supabase.auth.signOut(); window.location.href = SSO_URL; };
+  const logout = async () => { await supabase.auth.signOut(); navigate("/login", { replace: true }); };
 
   if (loading) return <div className="planipret-scope min-h-screen flex items-center justify-center" style={{ color: "var(--pp-text-muted)" }}>Chargement…</div>;
 
