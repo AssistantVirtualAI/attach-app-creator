@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Plug, Users, BarChart3 } from "lucide-react";
+import { loginWithRedirect, ROUTES } from "@/lib/routes";
 
 
 export default function PlanipretDashboard() {
@@ -13,7 +14,7 @@ export default function PlanipretDashboard() {
   useEffect(() => {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { navigate("/planipret/login", { replace: true }); return; }
+      if (!user) { navigate(loginWithRedirect(ROUTES.MPLANIPRET), { replace: true }); return; }
       const { data: me } = await supabase
         .from("planipret_profiles").select("role").eq("user_id", user.id).maybeSingle();
       if (me?.role !== "admin") { navigate("/mplanipret", { replace: true }); return; }
