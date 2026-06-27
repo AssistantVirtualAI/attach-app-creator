@@ -190,6 +190,10 @@ export default function MHome() {
         </button>
       </header>
 
+      <IdentityCard profile={profile} onLinked={reloadProfile} />
+
+
+
       {/* ===== PERIOD FILTER ===== */}
       <div className="flex items-center justify-between">
         <div className="pp-segmented">
