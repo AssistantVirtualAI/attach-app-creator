@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { loginWithRedirect, ROUTES } from "@/lib/routes";
 
 type Options = {
   enabled?: boolean;
@@ -44,7 +45,7 @@ export function useSessionTimeout(opts: Options = {}) {
       await supabase.auth.signOut();
     } finally {
       toast.info("Votre session a expiré pour des raisons de sécurité (inactivité).");
-      navigate("/planipret/login", { replace: true });
+      navigate(loginWithRedirect(ROUTES.MPLANIPRET), { replace: true });
     }
   };
 

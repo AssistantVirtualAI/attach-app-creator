@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { FormEvent, useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate, NavLink, Outlet, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,7 +18,7 @@ import { OnboardingTutorial } from "@/components/planipret/OnboardingTutorial";
 import { useAvaNavigation } from "@/hooks/useAvaNavigation";
 import AvaVoiceAgent from "@/components/planipret/mobile/AvaVoiceAgent";
 import AvaChatSheet from "@/components/planipret/mobile/AvaChatSheet";
-import { ROUTES, loginWithRedirect } from "@/lib/routes";
+import { ROUTES } from "@/lib/routes";
 import { recordRedirect } from "@/lib/debug/navDebug";
 
 const ACCENT = "#2E9BDC";
@@ -142,6 +142,10 @@ export default function PlanipretMobile() {
   const location = useLocation();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [accessError, setAccessError] = useState<"unauthenticated" | "missing_profile" | "load_failed" | null>(null);
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginLoading, setLoginLoading] = useState(false);
   const [dialerOpen, setDialerOpen] = useState(false);
   const [dialerInit, setDialerInit] = useState<string | undefined>(undefined);
   const [unreadMsg, setUnreadMsg] = useState(0);
@@ -218,20 +222,43 @@ export default function PlanipretMobile() {
   const loadProfile = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      const to = loginWithRedirect(ROUTES.MPLANIPRET);
-      recordRedirect(location.pathname, to, "PlanipretMobile.loadProfile", "no auth session");
-      navigate(to, { replace: true });
+      recordRedirect(location.pathname, ROUTES.MPLANIPRET, "PlanipretMobile.loadProfile", "no auth session — stay inside mobile app");
+      setProfile(null);
+      setAccessError("unauthenticated");
+      setLoading(false);
       return;
     }
-    const { data } = await supabase.from("planipret_profiles").select("*").eq("user_id", user.id).maybeSingle();
+    const { data, error } = await supabase.from("planipret_profiles").select("*").eq("user_id", user.id).maybeSingle();
+    if (error) {
+      recordRedirect(location.pathname, ROUTES.MPLANIPRET, "PlanipretMobile.loadProfile", "profile load failed");
+      setAccessError("load_failed");
+      setLoading(false);
+      return;
+    }
     if (!data) {
-      const to = loginWithRedirect(ROUTES.MPLANIPRET);
-      recordRedirect(location.pathname, to, "PlanipretMobile.loadProfile", "missing planipret_profiles row");
-      navigate(to, { replace: true });
+      recordRedirect(location.pathname, ROUTES.MPLANIPRET, "PlanipretMobile.loadProfile", "missing planipret_profiles row");
+      setAccessError("missing_profile");
+      setLoading(false);
       return;
     }
+    setAccessError(null);
     setProfile(data);
     setLoading(false);
+  };
+
+  const submitMobileLogin = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!loginEmail || !loginPassword) return;
+    setLoginLoading(true);
+    const { error } = await supabase.auth.signInWithPassword({ email: loginEmail.trim(), password: loginPassword });
+    setLoginLoading(false);
+    if (error) {
+      toast.error(error.message || "Connexion impossible");
+      return;
+    }
+    toast.success("Connexion réussie");
+    setLoading(true);
+    await loadProfile();
   };
 
   useEffect(() => {
@@ -241,6 +268,60 @@ export default function PlanipretMobile() {
   }, []);
 
   if (loading) return <div className="min-h-screen flex items-center justify-center" style={{ background: "#030810", color: "var(--pp-text-muted, #4A7FA5)" }}>Chargement…</div>;
+
+  if (accessError) {
+    return (
+      <Frame>
+        <div className="h-full flex items-center justify-center p-6" style={{ background: "var(--pp-bg-base)" }}>
+          <div className="pp-card p-6 text-center max-w-xs" style={{ padding: 24 }}>
+            <div className="w-14 h-14 mx-auto rounded-full flex items-center justify-center mb-4" style={{ background: "rgba(46,155,220,0.12)", color: "var(--pp-brand-accent)" }}>
+              <Lock className="w-7 h-7" />
+            </div>
+            <h2 style={{ fontFamily: "Inter,sans-serif", fontWeight: 700, fontSize: 18, color: "var(--pp-text-primary)", marginBottom: 8 }}>
+              {accessError === "unauthenticated" ? "Connexion mobile Planiprêt" : "Accès mobile Planiprêt"}
+            </h2>
+            {accessError === "unauthenticated" ? (
+              <form onSubmit={submitMobileLogin} className="space-y-3 text-left">
+                <p style={{ fontSize: 13, color: "var(--pp-text-secondary)", marginBottom: 12 }}>
+                  Connectez-vous directement dans l'application mobile. Cette page reste séparée du portail admin Planiprêt.
+                </p>
+                <input
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  type="email"
+                  autoComplete="email"
+                  placeholder="Courriel"
+                  className="w-full rounded-xl px-4 py-3 outline-none"
+                  style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }}
+                />
+                <input
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  type="password"
+                  autoComplete="current-password"
+                  placeholder="Mot de passe"
+                  className="w-full rounded-xl px-4 py-3 outline-none"
+                  style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }}
+                />
+                <button type="submit" disabled={loginLoading} className="pp-btn-primary w-full inline-block disabled:opacity-60">
+                  {loginLoading ? "Connexion…" : "Se connecter"}
+                </button>
+              </form>
+            ) : (
+              <>
+                <p style={{ fontSize: 13, color: "var(--pp-text-secondary)", marginBottom: 16 }}>
+                  {accessError === "missing_profile"
+                    ? "Votre compte est connecté, mais aucun profil mobile Planiprêt n'est lié à cet utilisateur."
+                    : "Impossible de charger votre profil mobile Planiprêt pour le moment."}
+                </p>
+                <button onClick={loadProfile} className="pp-btn-primary inline-block">Réessayer</button>
+              </>
+            )}
+          </div>
+        </div>
+      </Frame>
+    );
+  }
 
   if (profile && profile.mobile_app_enabled === false) {
     return (

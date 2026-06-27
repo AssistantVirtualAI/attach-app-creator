@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Mail, Lock, ArrowLeft, CheckCircle2, Loader2 } from "lucide-react";
+import { loginWithRedirect, ROUTES } from "@/lib/routes";
 
 export default function ResetPassword() {
   const [email, setEmail] = useState("");
@@ -14,7 +15,7 @@ export default function ResetPassword() {
     setError(null);
     setLoading(true);
     const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/planipret/login`,
+      redirectTo: `${window.location.origin}${loginWithRedirect(ROUTES.MPLANIPRET)}`,
     });
     setLoading(false);
     if (err) { setError(err.message); return; }
@@ -71,7 +72,7 @@ export default function ResetPassword() {
                  style={{ background: "rgba(0,212,170,0.08)", border: "1px solid rgba(0,212,170,0.25)", color: "#7FE7CB" }}>
               Lien envoyé à <b>{email}</b>
             </div>
-            <Link to="/planipret/login"
+            <Link to={loginWithRedirect(ROUTES.MPLANIPRET)}
                   className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm"
                   style={{ background: "linear-gradient(90deg,#2E9BDC,#00D4AA)", color: "#03101A" }}>
               <ArrowLeft className="w-4 h-4" /> Retour à la connexion
@@ -107,7 +108,7 @@ export default function ResetPassword() {
               {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Envoi...</> : "Envoyer le lien"}
             </button>
 
-            <Link to="/planipret/login"
+            <Link to={loginWithRedirect(ROUTES.MPLANIPRET)}
                   className="block text-center text-xs hover:underline pt-2"
                   style={{ color: "#4A7FA5" }}>
               ← Retour à la connexion

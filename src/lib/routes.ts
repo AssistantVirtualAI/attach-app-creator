@@ -40,6 +40,13 @@ export const ROUTES = {
 export const loginWithRedirect = (target: string) =>
   `${ROUTES.LOGIN}?redirect=${encodeURIComponent(target)}`;
 
+export const getSafeRedirect = (search: string): string | null => {
+  const target = new URLSearchParams(search).get("redirect");
+  if (!target || !target.startsWith("/") || target.startsWith("//") || target.includes("\\")) return null;
+  if (target === ROUTES.LOGIN || target.startsWith(`${ROUTES.LOGIN}?`) || target === "/auth" || target === "/post-login") return null;
+  return target;
+};
+
 /** Returns true if the path belongs to the Planiprêt MOBILE app. */
 export const isMplanipretPath = (path: string) =>
   path === ROUTES.MPLANIPRET || path.startsWith(`${ROUTES.MPLANIPRET}/`);

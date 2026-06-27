@@ -21,7 +21,7 @@ import PlanipretMobile from "./pages/planipret/PlanipretMobile";
 import { AppSeparationGuard } from "./components/auth/AppSeparationGuard";
 import { MplanipretGuard } from "./components/auth/MplanipretGuard";
 import RouteDebugOverlay from "./components/debug/RouteDebugOverlay";
-import { ROUTES } from "./lib/routes";
+import { ROUTES, loginWithRedirect } from "./lib/routes";
 import MHome from "./pages/planipret/mobile/MHome";
 import MCalls from "./pages/planipret/mobile/MCalls";
 import MMessages from "./pages/planipret/mobile/MMessages";
@@ -389,10 +389,10 @@ const App = () => (
 
                 {/* Planiprêt — auth via avastatistic.ca SSO */}
                 <Route path="/planipret" element={<Navigate to="/planipret/admin/overview" replace />} />
-                <Route path="/planipret/login" element={<Navigate to="/planipret/admin/overview" replace />} />
+                <Route path="/planipret/login" element={<Navigate to={loginWithRedirect(ROUTES.MPLANIPRET)} replace />} />
                 <Route path="/lemtel/setup/:token" element={<SoftphoneSetup />} />
                 <Route path="/lemtel/redeem/:token" element={<SoftphoneSetup />} />
-                <Route path={ROUTES.MPLANIPRET} element={<MplanipretGuard><AppSeparationGuard app="planipret"><PlanipretMobile /></AppSeparationGuard></MplanipretGuard>}>
+                <Route path={ROUTES.MPLANIPRET} element={<MplanipretGuard><PlanipretMobile /></MplanipretGuard>}>
                   <Route index element={<MHome />} />
                   <Route path="home" element={<MHome />} />
                   <Route path="calls" element={<MCalls />} />
