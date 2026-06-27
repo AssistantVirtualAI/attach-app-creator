@@ -38,17 +38,72 @@ export default function RecordingsScreen({
   const fr = lang === 'fr';
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Load recordings
-  useEffect(() => {
+  // Load recordings (real-time: refresh on focus + every 30s + after a call ends).
+  const reload = React.useCallback(() => {
     let cancelled = false;
-    setItems(null);
-    setError(null);
     const ext = isAdmin ? (extFilter === 'all' ? undefined : extFilter) : (myExtension || undefined);
     mobileApi.recordings(ext, { rangeDays })
       .then((rows) => { if (!cancelled) setItems(rows); })
-      .catch((e: any) => { if (!cancelled) { setError(e?.message || 'Failed to load recordings'); setItems([]); } });
+      .catch((e: any) => { if (!cancelled) { setError(e?.message || 'Failed to load recordings'); setItems((prev) => prev ?? []); } });
     return () => { cancelled = true; };
-  }, [extFilter, isAdmin, myExtension, creds?.accessToken, rangeDays]);
+  }, [extFilter, isAdmin, myExtension, rangeDays]);
+
+  useEffect(() => {
+    setItems(null);
+    setError(null);
+    const cancel = reload();
+    const poll = setInterval(reload, 30000);
+    const onFocus = () => reload();
+    const onCallEnded = () => { setTimeout(reload, 1500); setTimeout(reload, 8000); };
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('ava:callEnded', onCallEnded as any);
+    return () => {
+      cancel();
+      clearInterval(poll);
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('ava:callEnded', onCallEnded as any);
+    };
+  }, [reload, creds?.accessToken]);
+
+  // Probe which items are already cached on disk + prefetch the most recent ones.
+  useEffect(() => {
+    if (!items || items.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const next = new Set<string>();
+      await Promise.all(items.slice(0, 50).map(async (r) => {
+        const u = await getCachedRecordingUrl(r.id);
+        if (u) next.add(r.id);
+      }));
+      if (!cancelled) setCachedIds(next);
+    })();
+    // Background prefetch: top 5 most recent that aren't cached yet.
+    const top = items.slice(0, 5).map((r) => ({
+      id: r.id,
+      meta: {
+        recording_path: r.record_path, recording_name: r.record_name,
+        xml_cdr_uuid: r.xml_cdr_uuid || r.id, domain_uuid: r.domain_uuid,
+        domain_name: r.domain_name, organization_id: r.organization_id,
+        start_at: r.startedAt,
+      },
+    }));
+    prefetchRecordings(top, creds?.accessToken || null, creds?.organizationId || null,
+      creds?.domainUuid || creds?.fusionpbxDomainUuid || fallbackDomainUuid || null)
+      .then(() => {
+        if (cancelled) return;
+        Promise.all(top.map(async (t) => ({ id: t.id, u: await getCachedRecordingUrl(t.id) })))
+          .then((res) => {
+            if (cancelled) return;
+            setCachedIds((prev) => {
+              const n = new Set(prev);
+              res.forEach((r) => { if (r.u) n.add(r.id); });
+              return n;
+            });
+          });
+      });
+    return () => { cancelled = true; };
+  }, [items, creds?.accessToken, creds?.organizationId, creds?.domainUuid, creds?.fusionpbxDomainUuid, fallbackDomainUuid]);
+
 
   // Fallback: derive domain_uuid from /mobile-me when creds lack it.
   useEffect(() => {
