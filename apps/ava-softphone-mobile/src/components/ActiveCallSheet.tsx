@@ -7,6 +7,8 @@ import type { AudioProfile } from '../lib/sip/audioProfile';
 import { EMPTY_QUALITY } from '../lib/sip/callQuality';
 import { getAudioState, onAudioStateChange, setRoute, type AudioRoute, type AudioState } from '../lib/sip/audioOutput';
 import CallTimeline, { type CallPhase } from './CallTimeline';
+import IncomingCallerPanel from './IncomingCallerPanel';
+import { lookupCaller, type CallerLookup } from '../lib/sip/callerLookup';
 
 const PROFILE_CYCLE: AudioProfile[] = ['auto', 'hd', 'low-bandwidth'];
 
@@ -23,6 +25,7 @@ export default function ActiveCallSheet({
   const [audio, setAudio] = useState<AudioState>(getAudioState());
   const [toast, setToast] = useState<{ text: string; tone: 'ok' | 'err' | 'info' } | null>(null);
   const [recPending, setRecPending] = useState(false);
+  const [callerLookup, setCallerLookup] = useState<CallerLookup | null>(null);
 
   useEffect(() => onAudioStateChange(setAudio), []);
   useEffect(() => {
