@@ -25,6 +25,8 @@
         "@dnd-kit/sortable": "^10.0.0",
         "@dnd-kit/utilities": "^3.2.2",
         "@elevenlabs/client": "^0.12.0",
+        "@fontsource/epilogue": "^5.2.8",
+        "@fontsource/urbanist": "^5.2.7",
         "@hookform/resolvers": "^3.10.0",
         "@playwright/test": "^1.57.0",
         "@radix-ui/react-accordion": "^1.2.11",
@@ -281,6 +283,10 @@
     "@floating-ui/react-dom": ["@floating-ui/react-dom@2.1.4", "", { "dependencies": { "@floating-ui/dom": "^1.7.2" }, "peerDependencies": { "react": ">=16.8.0", "react-dom": ">=16.8.0" } }, "sha512-JbbpPhp38UmXDDAu60RJmbeme37Jbgsm7NrHGgzYYFKmblzRUh6Pa641dII6LsjwF4XlScDrde2UAzDo/b9KPw=="],
 
     "@floating-ui/utils": ["@floating-ui/utils@0.2.10", "", {}, "sha512-aGTxbpbg8/b5JfU1HXSrbH3wXZuLPJcNEcZQFMxLs3oSzgtVu6nFPkbbGGUvBcUjKV2YyB9Wxxabo+HEH9tcRQ=="],
+
+    "@fontsource/epilogue": ["@fontsource/epilogue@5.2.8", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@fontsource/epilogue/-/epilogue-5.2.8.tgz", {}, "sha512-+V1T+G9RXtLiImA1khsXG6jd5Io/UMJ6LJgYyAYShU9nzZJtI3G/4Hof9Zi6KUMmmH+oTxVN0rXdZc6AOK8Sqg=="],
+
+    "@fontsource/urbanist": ["@fontsource/urbanist@5.2.7", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@fontsource/urbanist/-/urbanist-5.2.7.tgz", {}, "sha512-tZE4qBBu+VBpfw8yMeLl6fzbY1sb4dnACXZLzlInp1KNONks47G/OYPY8yZajpeFQudLZlpVJu3xfS1Ph/QaFg=="],
 
     "@hookform/resolvers": ["@hookform/resolvers@3.10.0", "", { "peerDependencies": { "react-hook-form": "^7.0.0" } }, "sha512-79Dv+3mDF7i+2ajj7SkypSKHhl1cbln1OGavqrsF7p6mbUv11xpqpacPsGDCTRvCSjEEIez2ef1NveSVL3b0Ag=="],
 

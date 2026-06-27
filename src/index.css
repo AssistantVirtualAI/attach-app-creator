@@ -1320,3 +1320,274 @@ All colors MUST be HSL.
     .btn-futuristic:hover { transform: none; }
   }
 }
+
+/* ============================================================
+   PLANIPRÊT ADMIN — LIGHT NAVY TRUST THEME
+   Scope: `.planipret-admin-scope` (added in PlanipretAdminLayout)
+   Overrides the dark mobile tokens so all .pp-* utilities
+   automatically render with the premium light finance look.
+   ============================================================ */
+.planipret-admin-scope {
+  /* Surfaces */
+  --pp-bg-base: #F7F9FC;
+  --pp-bg-surface: #FFFFFF;
+  --pp-bg-elevated: #FFFFFF;
+  --pp-bg-deep: #FFFFFF;
+  --pp-bg-border: #E2E8F0;
+  --pp-bg-border-2: #DCE3EC;
+  /* Brand */
+  --pp-brand-accent: #3B6FA0;
+  --pp-brand-accent-2: #1E3A5F;
+  /* Semantic */
+  --pp-success: #0D7A5F;
+  --pp-agent: #6C5CE7;
+  --pp-warning: #C9A84C;
+  --pp-danger: #B23A48;
+  /* Text */
+  --pp-text-primary: #0F1B3D;
+  --pp-text-secondary: #324867;
+  --pp-text-muted: #5A6B85;
+  --pp-text-faint: #94A3B8;
+  /* Shadows */
+  --pp-shadow-sm: 0 1px 2px rgba(15,27,61,0.04), 0 1px 1px rgba(15,27,61,0.03);
+  --pp-shadow-md: 0 8px 24px -12px rgba(15,27,61,0.12), 0 2px 6px -2px rgba(15,27,61,0.06);
+  --pp-shadow-lg: 0 24px 48px -16px rgba(15,27,61,0.18);
+
+  background: var(--pp-bg-base);
+  color: var(--pp-text-primary);
+  font-family: 'Epilogue', 'Inter', system-ui, sans-serif;
+}
+.planipret-admin-scope h1,
+.planipret-admin-scope h2,
+.planipret-admin-scope h3,
+.planipret-admin-scope h4,
+.planipret-admin-scope .pp-heading {
+  font-family: 'Urbanist', 'Inter', system-ui, sans-serif;
+  letter-spacing: -0.015em;
+  color: var(--pp-text-primary);
+}
+.planipret-admin-scope .pp-kpi {
+  font-family: 'Urbanist', sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: var(--pp-text-primary);
+}
+.planipret-admin-scope .pp-eyebrow {
+  font-family: 'Urbanist', sans-serif;
+  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--pp-text-muted);
+}
+
+/* Cards */
+.planipret-admin-scope .pp-card,
+.planipret-admin-scope .pp-card-elevated {
+  background: var(--pp-bg-surface);
+  border: 1px solid var(--pp-bg-border);
+  border-radius: 16px;
+  box-shadow: var(--pp-shadow-sm);
+  transition: box-shadow 200ms ease, transform 200ms ease, border-color 200ms ease;
+}
+.planipret-admin-scope .pp-card:hover {
+  box-shadow: var(--pp-shadow-md);
+  border-color: var(--pp-bg-border-2);
+}
+.planipret-admin-scope .pp-card-accent-top {
+  position: relative;
+}
+.planipret-admin-scope .pp-card-accent-top::before {
+  content: "";
+  position: absolute; left: 0; right: 0; top: 0; height: 3px;
+  border-radius: 16px 16px 0 0;
+  background: linear-gradient(90deg, var(--pp-brand-accent-2), var(--pp-brand-accent));
+}
+
+/* Buttons */
+.planipret-admin-scope .pp-btn-primary {
+  background: var(--pp-brand-accent-2);
+  color: #fff;
+  border: 1px solid var(--pp-brand-accent-2);
+  border-radius: 10px;
+  padding: 8px 16px;
+  font-family: 'Urbanist', sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.01em;
+  box-shadow: var(--pp-shadow-sm);
+  transition: background 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+.planipret-admin-scope .pp-btn-primary:hover {
+  background: #16304E;
+  box-shadow: 0 6px 18px -8px rgba(30,58,95,0.45);
+}
+.planipret-admin-scope .pp-btn-primary:active { transform: translateY(1px); }
+.planipret-admin-scope .pp-btn-secondary {
+  background: #fff;
+  border: 1px solid var(--pp-bg-border);
+  color: var(--pp-text-primary);
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-family: 'Urbanist', sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+}
+.planipret-admin-scope .pp-btn-secondary:hover {
+  background: #F0F4F9;
+  border-color: var(--pp-brand-accent);
+  color: var(--pp-brand-accent-2);
+}
+
+/* Pills */
+.planipret-admin-scope .pp-pill {
+  font-family: 'Urbanist', sans-serif;
+  font-weight: 600;
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+.planipret-admin-scope .pp-pill-success { background: rgba(13,122,95,0.10); color: var(--pp-success); border: 1px solid rgba(13,122,95,0.25); }
+.planipret-admin-scope .pp-pill-danger  { background: rgba(178,58,72,0.10); color: var(--pp-danger);  border: 1px solid rgba(178,58,72,0.25); }
+.planipret-admin-scope .pp-pill-warning { background: rgba(201,168,76,0.14); color: #8A6E1F;           border: 1px solid rgba(201,168,76,0.35); }
+.planipret-admin-scope .pp-pill-accent  { background: rgba(59,111,160,0.10); color: var(--pp-brand-accent-2); border: 1px solid rgba(59,111,160,0.25); }
+
+/* Inputs */
+.planipret-admin-scope input,
+.planipret-admin-scope select,
+.planipret-admin-scope textarea {
+  background: #fff;
+  border-color: var(--pp-bg-border);
+  color: var(--pp-text-primary);
+}
+.planipret-admin-scope input:focus,
+.planipret-admin-scope select:focus,
+.planipret-admin-scope textarea:focus {
+  outline: 2px solid rgba(59,111,160,0.25);
+  border-color: var(--pp-brand-accent);
+}
+
+/* Tables */
+.planipret-admin-scope table { border-color: var(--pp-bg-border); }
+.planipret-admin-scope thead th {
+  background: #F0F4F9;
+  color: var(--pp-text-secondary);
+  font-family: 'Urbanist', sans-serif;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--pp-bg-border);
+}
+.planipret-admin-scope tbody tr { border-bottom: 1px solid #EEF2F7; }
+.planipret-admin-scope tbody tr:hover { background: rgba(59,111,160,0.04); }
+
+/* Modal & overlay */
+.planipret-admin-scope .pp-modal {
+  background: #fff;
+  border: 1px solid var(--pp-bg-border);
+  box-shadow: var(--pp-shadow-lg);
+}
+.planipret-admin-scope .pp-modal-header,
+.planipret-admin-scope .pp-modal-footer {
+  background: #F7F9FC;
+  border-color: var(--pp-bg-border);
+}
+.planipret-admin-scope .pp-modal-overlay {
+  background: rgba(15,27,61,0.45);
+  backdrop-filter: blur(4px);
+}
+
+/* Live dot stays green */
+.planipret-admin-scope .pp-live-dot {
+  background: var(--pp-success);
+  box-shadow: 0 0 0 4px rgba(13,122,95,0.15);
+}
+
+/* Empty states */
+.planipret-admin-scope .pp-empty-icon { color: var(--pp-text-faint); }
+.planipret-admin-scope .pp-empty-title { color: var(--pp-text-secondary); font-family: 'Urbanist', sans-serif; }
+.planipret-admin-scope .pp-empty-sub   { color: var(--pp-text-muted); }
+
+/* Sidebar nav (light) */
+.planipret-admin-scope .pp-sidebar {
+  background: #FFFFFF;
+  border-right: 1px solid var(--pp-bg-border);
+}
+.planipret-admin-scope .pp-sidebar-brand {
+  font-family: 'Urbanist', sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--pp-text-primary);
+}
+.planipret-admin-scope .pp-sidebar-sub {
+  font-family: 'Epilogue', sans-serif;
+  color: var(--pp-text-muted);
+}
+.planipret-admin-scope .pp-nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px 9px 16px;
+  margin: 2px 8px;
+  border-radius: 10px;
+  font-family: 'Urbanist', sans-serif;
+  font-weight: 500;
+  font-size: 13.5px;
+  color: var(--pp-text-secondary);
+  transition: background 140ms ease, color 140ms ease;
+}
+.planipret-admin-scope .pp-nav-item:hover {
+  background: #F0F4F9;
+  color: var(--pp-text-primary);
+}
+.planipret-admin-scope .pp-nav-item.is-active {
+  background: rgba(59,111,160,0.10);
+  color: var(--pp-brand-accent-2);
+  font-weight: 600;
+}
+.planipret-admin-scope .pp-nav-item.is-active::before {
+  content: "";
+  position: absolute; left: 0; top: 6px; bottom: 6px;
+  width: 3px; border-radius: 0 3px 3px 0;
+  background: var(--pp-brand-accent);
+}
+.planipret-admin-scope .pp-nav-section {
+  font-family: 'Urbanist', sans-serif;
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--pp-text-faint);
+  padding: 14px 18px 6px;
+}
+
+/* Header */
+.planipret-admin-scope .pp-app-header {
+  background: rgba(255,255,255,0.85);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--pp-bg-border);
+}
+.planipret-admin-scope .pp-search-bar {
+  background: #F0F4F9;
+  border: 1px solid var(--pp-bg-border);
+  color: var(--pp-text-muted);
+  border-radius: 10px;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+.planipret-admin-scope .pp-search-bar:hover {
+  background: #FFFFFF;
+  border-color: var(--pp-brand-accent);
+}
+.planipret-admin-scope .pp-kbd {
+  background: #fff;
+  border: 1px solid var(--pp-bg-border);
+  color: var(--pp-text-muted);
+  font-family: ui-monospace, monospace;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+

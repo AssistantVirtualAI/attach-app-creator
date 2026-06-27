@@ -1,25 +1,50 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { LayoutDashboard, Users, Phone, MessageSquare, Voicemail, Plug, BarChart3, LogOut, ShieldCheck, CheckSquare, Search } from "lucide-react";
+import {
+  LayoutDashboard, Users, Phone, MessageSquare, Voicemail, Plug,
+  BarChart3, LogOut, ShieldCheck, CheckSquare, Search, ChevronRight,
+} from "lucide-react";
 import SessionTimeoutModal from "@/components/planipret/SessionTimeoutModal";
 import { useAdminRealtime } from "@/hooks/useAdminRealtime";
 import NotificationsBell from "@/components/planipret/admin/NotificationsBell";
 import CommandPalette from "@/components/planipret/admin/CommandPalette";
 import { WorkspaceHeaderExtras } from "@/components/portals/WorkspaceHeaderExtras";
 
-const SSO_URL = "https://avastatistic.ca/login?redirect=planipret";
+type NavBadge = "brokers" | "missed" | "integrations" | "audit";
+type NavItem = { to: string; label: string; Icon: any; badge?: NavBadge };
+type NavGroup = { title: string; items: NavItem[] };
 
-const LINKS = [
-  { to: "/planipret/admin/overview", label: "Vue d'ensemble", Icon: LayoutDashboard, emoji: "🏠" },
-  { to: "/planipret/admin/users", label: "Courtiers", Icon: Users, emoji: "👥", badge: "brokers" as const },
-  { to: "/planipret/admin/calls", label: "Appels", Icon: Phone, emoji: "📞", badge: "missed" as const },
-  { to: "/planipret/admin/messages", label: "Messages", Icon: MessageSquare, emoji: "💬" },
-  { to: "/planipret/admin/voicemails", label: "Voicemails", Icon: Voicemail, emoji: "📬" },
-  { to: "/planipret/admin/reports", label: "Rapports", Icon: BarChart3, emoji: "📊" },
-  { to: "/planipret/admin/integrations", label: "Intégrations", Icon: Plug, emoji: "🔌", badge: "integrations" as const },
-  { to: "/planipret/admin/compliance", label: "Conformité", Icon: ShieldCheck, emoji: "🔏" },
-  { to: "/planipret/admin/audit-checklist", label: "Audit système", Icon: CheckSquare, emoji: "✅", badge: "audit" as const },
+const NAV: NavGroup[] = [
+  {
+    title: "Pilotage",
+    items: [
+      { to: "/planipret/admin/overview", label: "Vue d'ensemble", Icon: LayoutDashboard },
+      { to: "/planipret/admin/reports",  label: "Rapports",       Icon: BarChart3 },
+    ],
+  },
+  {
+    title: "Courtiers",
+    items: [
+      { to: "/planipret/admin/users", label: "Courtiers", Icon: Users, badge: "brokers" },
+    ],
+  },
+  {
+    title: "Communications",
+    items: [
+      { to: "/planipret/admin/calls",      label: "Appels",     Icon: Phone,         badge: "missed" },
+      { to: "/planipret/admin/messages",   label: "Messages",   Icon: MessageSquare },
+      { to: "/planipret/admin/voicemails", label: "Voicemails", Icon: Voicemail },
+    ],
+  },
+  {
+    title: "Système",
+    items: [
+      { to: "/planipret/admin/integrations",    label: "Intégrations", Icon: Plug,        badge: "integrations" },
+      { to: "/planipret/admin/compliance",      label: "Conformité",   Icon: ShieldCheck },
+      { to: "/planipret/admin/audit-checklist", label: "Audit",        Icon: CheckSquare, badge: "audit" },
+    ],
+  },
 ];
 
 const PAGE_TITLES: Record<string, string> = {
@@ -34,7 +59,8 @@ const PAGE_TITLES: Record<string, string> = {
   "/planipret/admin/compliance": "Conformité PIPEDA · Loi 25",
 };
 
-const initials = (n?: string) => (n ?? "A").split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase()).join("") || "A";
+const initials = (n?: string) =>
+  (n ?? "A").split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase()).join("") || "A";
 
 export default function PlanipretAdminLayout() {
   const navigate = useNavigate();
@@ -49,7 +75,7 @@ export default function PlanipretAdminLayout() {
   const realtimeOk = rtStatus === "live";
   const [paletteOpen, setPaletteOpen] = useState(false);
 
-  // Keyboard shortcuts: Cmd/Ctrl+K palette, "g <key>" navigation, "/" focus palette
+  // Keyboard shortcuts
   useEffect(() => {
     let gPressed = 0;
     const MAP: Record<string, string> = {
@@ -84,8 +110,6 @@ export default function PlanipretAdminLayout() {
     const loadProfile = async (user: any) => {
       const { data } = await supabase.from("planipret_profiles").select("*").eq("user_id", user.id).maybeSingle();
       if (cancelled) return;
-      // Access control is enforced via org_members / has_role, not via planipret_profiles.
-      // If a profile row exists with role=broker (non-admin), still send them to the mobile app.
       if (data && data.role && data.role !== "admin") { navigate("/mplanipret", { replace: true }); return; }
       setProfile(data ?? { full_name: user.email, role: "admin" });
       setLoading(false);
@@ -114,8 +138,6 @@ export default function PlanipretAdminLayout() {
     };
 
     (async () => {
-      // Wait up to 2s for the session to hydrate before bouncing to SSO.
-      // Prevents the login ↔ dashboard ping-pong on cold reloads.
       let session = (await supabase.auth.getSession()).data.session;
       if (!session?.user) {
         await new Promise<void>((resolve) => {
@@ -133,132 +155,193 @@ export default function PlanipretAdminLayout() {
     return () => { cancelled = true; };
   }, [navigate]);
 
-
-
-
   const logout = async () => { await supabase.auth.signOut(); navigate("/login", { replace: true }); };
 
-  if (loading) return <div className="planipret-scope min-h-screen flex items-center justify-center" style={{ color: "var(--pp-text-muted)" }}>Chargement…</div>;
+  if (loading) {
+    return (
+      <div className="planipret-scope planipret-admin-scope min-h-screen flex items-center justify-center"
+        style={{ color: "var(--pp-text-muted)", fontFamily: "'Epilogue', sans-serif" }}>
+        Chargement…
+      </div>
+    );
+  }
 
   const title = PAGE_TITLES[location.pathname] ?? "Tableau de bord";
   const dateLabel = new Date().toLocaleDateString("fr-CA", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const sectionLabel = NAV.find((g) => g.items.some((i) => i.to === location.pathname))?.title ?? "Administration";
+
+  const renderBadge = (b?: NavBadge) => {
+    if (b === "brokers" && brokerCount > 0) {
+      return (
+        <span style={{
+          fontSize: 10, fontWeight: 700, color: "var(--pp-text-secondary)",
+          background: "#EEF2F7", borderRadius: 6, padding: "1px 7px",
+        }}>{brokerCount}</span>
+      );
+    }
+    if (b === "missed" && missedCalls > 0) {
+      return (
+        <span style={{
+          fontSize: 10, fontWeight: 700, color: "#fff", background: "var(--pp-danger)",
+          borderRadius: 999, minWidth: 18, height: 18, display: "inline-flex",
+          alignItems: "center", justifyContent: "center", padding: "0 6px",
+        }}>{missedCalls}</span>
+      );
+    }
+    if (b === "integrations" && missingIntegrations > 0) {
+      return <span style={{ width: 8, height: 8, borderRadius: 999, background: "var(--pp-warning)", boxShadow: "0 0 0 4px rgba(201,168,76,0.20)" }} />;
+    }
+    if (b === "audit" && auditScore !== null) {
+      return (
+        <span style={{
+          fontSize: 10, fontWeight: 700, color: "#8A6E1F",
+          background: "rgba(201,168,76,0.14)", border: "1px solid rgba(201,168,76,0.35)",
+          borderRadius: 6, padding: "1px 7px",
+        }}>{auditScore}%</span>
+      );
+    }
+    return null;
+  };
 
   return (
-    <div className="planipret-scope min-h-screen flex" style={{ background: "var(--pp-bg-base)" }}>
+    <div className="planipret-scope planipret-admin-scope min-h-screen flex"
+      style={{ background: "var(--pp-bg-base)", fontFamily: "'Epilogue', sans-serif" }}>
       {/* Mobile redirect notice */}
-      <div className="md:hidden fixed inset-0 z-50 flex items-center justify-center p-6" style={{ background: "var(--pp-bg-base)" }}>
+      <div className="md:hidden fixed inset-0 z-50 flex items-center justify-center p-6"
+        style={{ background: "var(--pp-bg-base)" }}>
         <div className="text-center max-w-xs pp-card" style={{ padding: 24 }}>
-          <h2 style={{ fontFamily: "Inter,sans-serif", fontWeight: 700, fontSize: 18, color: "var(--pp-text-primary)", marginBottom: 8 }}>Dashboard admin</h2>
-          <p style={{ fontSize: 13, color: "var(--pp-text-secondary)", marginBottom: 16 }}>Le dashboard admin est optimisé pour desktop. Sur mobile, utilisez l'application courtier.</p>
-          <button onClick={() => navigate("/mplanipret")} className="pp-btn-primary">Ouvrir l'app mobile</button>
+          <h2 className="pp-heading" style={{ fontWeight: 700, fontSize: 18, marginBottom: 8 }}>
+            Dashboard admin
+          </h2>
+          <p style={{ fontSize: 13, color: "var(--pp-text-secondary)", marginBottom: 16 }}>
+            Le dashboard admin est optimisé pour desktop. Sur mobile, utilisez l'application courtier.
+          </p>
+          <button onClick={() => navigate("/mplanipret")} className="pp-btn-primary">
+            Ouvrir l'app mobile
+          </button>
         </div>
       </div>
 
-      {/* Sidebar — 240px */}
-      <aside className="hidden md:flex flex-col fixed left-0 top-0 h-screen w-[240px] z-40"
-        style={{ background: "#040B16", borderRight: "1px solid #0A1E35", fontFamily: "'DM Sans', sans-serif" }}>
-        <div className="px-4 pt-4 pb-3">
-          <div className="flex items-center gap-2.5">
-            <div className="flex items-center justify-center" style={{
-              width: 32, height: 32, borderRadius: 8,
-              background: "linear-gradient(135deg, #1A4A8A, #2E9BDC)",
-              fontSize: 16, lineHeight: 1,
-            }}>🏠</div>
+      {/* Sidebar */}
+      <aside className="pp-sidebar hidden md:flex flex-col fixed left-0 top-0 h-screen w-[248px] z-40">
+        {/* Brand */}
+        <div className="px-5 pt-5 pb-4" style={{ borderBottom: "1px solid var(--pp-bg-border)" }}>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center flex-shrink-0"
+              style={{
+                width: 38, height: 38, borderRadius: 10,
+                background: "linear-gradient(135deg, #1E3A5F, #3B6FA0)",
+                color: "#fff", fontFamily: "'Urbanist', sans-serif",
+                fontWeight: 700, fontSize: 16, letterSpacing: "0.02em",
+                boxShadow: "0 4px 12px -4px rgba(30,58,95,0.4)",
+              }}>P</div>
             <div className="min-w-0">
-              <div style={{ fontFamily: "Inter, sans-serif", fontWeight: 700, fontSize: 14, color: "#E8EDF5", letterSpacing: "0.04em" }}>PLANIPRÊT</div>
-              <div style={{ fontWeight: 500, fontSize: 10, color: "#2E9BDC" }}>AI Portal · Admin</div>
+              <div className="pp-sidebar-brand" style={{ fontSize: 15 }}>Planiprêt</div>
+              <div className="pp-sidebar-sub" style={{ fontSize: 11 }}>Admin Portal</div>
             </div>
           </div>
-          <div style={{ height: 1, marginTop: 12, background: "linear-gradient(90deg, #2E9BDC, transparent)", opacity: 0.35 }} />
         </div>
-        <nav className="flex-1 px-2.5 py-3 space-y-0.5 overflow-y-auto">
-          {LINKS.map(({ to, label, Icon, badge }) => (
-            <NavLink key={to} to={to}
-              className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg transition"
-              style={({ isActive }) => isActive
-                ? { background: "#0D2A4A", border: "1px solid rgba(46,155,220,0.2)", color: "#E8EDF5", fontSize: 13, fontWeight: 500 }
-                : { color: "#4A7FA5", border: "1px solid transparent", fontSize: 13, fontWeight: 500 }
-              }>
-              {({ isActive }) => (
-                <>
-                  <Icon className="w-4 h-4" style={{ color: isActive ? "#2E9BDC" : "currentColor" }} />
-                  <span className="flex-1">{label}</span>
-                  {badge === "brokers" && brokerCount > 0 && (
-                    <span style={{ fontSize: 9, fontWeight: 700, color: "#8FA8C0", background: "#0D1F35", border: "1px solid #0E2A45", borderRadius: 6, padding: "1px 6px" }}>{brokerCount}</span>
+
+        {/* Nav groups */}
+        <nav className="flex-1 py-2 overflow-y-auto">
+          {NAV.map((group) => (
+            <div key={group.title}>
+              <div className="pp-nav-section">{group.title}</div>
+              {group.items.map(({ to, label, Icon, badge }) => (
+                <NavLink key={to} to={to} end
+                  className={({ isActive }) => `pp-nav-item ${isActive ? "is-active" : ""}`}>
+                  {({ isActive }) => (
+                    <>
+                      <Icon className="w-[17px] h-[17px] flex-shrink-0"
+                        style={{ color: isActive ? "var(--pp-brand-accent-2)" : "var(--pp-text-muted)" }} />
+                      <span className="flex-1 truncate">{label}</span>
+                      {renderBadge(badge)}
+                    </>
                   )}
-                  {badge === "missed" && missedCalls > 0 && (
-                    <span style={{ fontSize: 9, fontWeight: 700, color: "#fff", background: "#E84C4C", borderRadius: 999, minWidth: 16, height: 16, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "0 5px" }}>{missedCalls}</span>
-                  )}
-                  {badge === "integrations" && missingIntegrations > 0 && (
-                    <span style={{ width: 8, height: 8, borderRadius: 999, background: "#F5A623", boxShadow: "0 0 8px rgba(245,166,35,.6)" }} />
-                  )}
-                  {badge === "audit" && auditScore !== null && (
-                    <span style={{ fontSize: 9, fontWeight: 700, color: "#F5A623", background: "#2A1A00", border: "1px solid #4A3000", borderRadius: 6, padding: "1px 6px" }}>{auditScore}%</span>
-                  )}
-                </>
-              )}
-            </NavLink>
+                </NavLink>
+              ))}
+            </div>
           ))}
         </nav>
-        <div style={{ padding: 14, borderTop: "1px solid #0A1E35" }}>
+
+        {/* Profile footer */}
+        <div style={{ padding: 14, borderTop: "1px solid var(--pp-bg-border)", background: "#FAFBFD" }}>
           <div className="flex items-center gap-3">
-            <div className="rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
-              style={{ width: 36, height: 36, background: "linear-gradient(135deg, #1A4A8A, #2E9BDC)" }}>
+            <div className="rounded-full flex items-center justify-center text-white flex-shrink-0"
+              style={{
+                width: 36, height: 36,
+                background: "linear-gradient(135deg, #1E3A5F, #3B6FA0)",
+                fontFamily: "'Urbanist', sans-serif", fontWeight: 700, fontSize: 12,
+                boxShadow: "0 2px 8px -2px rgba(30,58,95,0.4)",
+              }}>
               {initials(profile?.full_name)}
             </div>
             <div className="min-w-0 flex-1">
-              <p style={{ fontSize: 12, fontWeight: 600, color: "#E8EDF5" }} className="truncate">{profile?.full_name ?? "Admin"}</p>
-              <p style={{ fontSize: 10, color: "#4A7FA5" }}>Super Admin</p>
+              <p className="truncate" style={{ fontSize: 12.5, fontWeight: 600, color: "var(--pp-text-primary)", fontFamily: "'Urbanist', sans-serif" }}>
+                {profile?.full_name ?? "Admin"}
+              </p>
+              <p style={{ fontSize: 10.5, color: "var(--pp-text-muted)", letterSpacing: "0.04em" }}>
+                Super Admin
+              </p>
             </div>
             <button onClick={logout} title="Déconnexion"
               className="flex items-center justify-center rounded-lg transition"
-              style={{ width: 28, height: 28, color: "#4A7FA5", border: "1px solid transparent" }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "#0D1F35"; e.currentTarget.style.color = "#E84C4C"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#4A7FA5"; }}>
-              <LogOut className="w-3.5 h-3.5" />
+              style={{ width: 30, height: 30, color: "var(--pp-text-muted)", border: "1px solid transparent" }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "#FFF1F1"; e.currentTarget.style.color = "var(--pp-danger)"; e.currentTarget.style.borderColor = "rgba(178,58,72,0.20)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--pp-text-muted)"; e.currentTarget.style.borderColor = "transparent"; }}>
+              <LogOut className="w-4 h-4" />
             </button>
           </div>
         </div>
       </aside>
 
       {/* Main */}
-      <div className="hidden md:flex flex-1 flex-col ml-[240px]">
-        <header className="sticky top-0 flex items-center justify-between px-6 z-30"
-          style={{ height: 64, background: "#060D1A", borderBottom: "1px solid #0A1E35" }}>
-          <h1 style={{ fontFamily: "Inter,sans-serif", fontWeight: 700, fontSize: 18, color: "var(--pp-text-primary)" }}>{title}</h1>
-          <div className="flex items-center gap-4">
+      <div className="hidden md:flex flex-1 flex-col ml-[248px]">
+        <header className="pp-app-header sticky top-0 flex items-center justify-between px-7 z-30" style={{ height: 64 }}>
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="pp-eyebrow">{sectionLabel}</span>
+            <ChevronRight className="w-3.5 h-3.5" style={{ color: "var(--pp-text-faint)" }} />
+            <h1 className="pp-heading truncate" style={{ fontWeight: 700, fontSize: 18 }}>{title}</h1>
+          </div>
+
+          <div className="flex items-center gap-3">
             <button onClick={() => setPaletteOpen(true)}
-              className="flex items-center gap-2 px-3 h-8 rounded-lg text-xs transition"
-              style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border)", color: "var(--pp-text-muted)", minWidth: 220 }}
-              onMouseEnter={(e) => (e.currentTarget.style.borderColor = "var(--pp-brand-accent)")}
-              onMouseLeave={(e) => (e.currentTarget.style.borderColor = "var(--pp-bg-border)")}>
+              className="pp-search-bar flex items-center gap-2 px-3 h-9 text-xs"
+              style={{ minWidth: 280, fontFamily: "'Epilogue', sans-serif" }}>
               <Search className="w-3.5 h-3.5" />
-              <span className="flex-1 text-left">Rechercher…</span>
-              <kbd className="font-mono text-[10px] px-1.5 py-0.5 rounded"
-                style={{ background: "var(--pp-bg-deep)", border: "1px solid var(--pp-bg-border)" }}>⌘K</kbd>
+              <span className="flex-1 text-left">Rechercher courtiers, appels, intégrations…</span>
+              <kbd className="pp-kbd">⌘K</kbd>
             </button>
+
             <div className="flex items-center gap-1.5"
               style={{
-                background: realtimeOk ? "#0D3D2A" : "var(--pp-bg-elevated)",
-                border: `1px solid ${realtimeOk ? "#1A5A3F" : "var(--pp-bg-border-2)"}`,
-                borderRadius: 20, padding: "4px 12px",
+                background: realtimeOk ? "rgba(13,122,95,0.10)" : "#F0F4F9",
+                border: `1px solid ${realtimeOk ? "rgba(13,122,95,0.25)" : "var(--pp-bg-border)"}`,
+                borderRadius: 999, padding: "4px 10px",
               }}>
-              <span className={realtimeOk ? "pp-live-dot" : ""} style={!realtimeOk ? { width: 6, height: 6, borderRadius: "50%", background: "var(--pp-text-faint)" } : undefined} />
-              <span style={{ fontSize: 10, fontWeight: 600, color: realtimeOk ? "var(--pp-success)" : "var(--pp-text-muted)" }}>
-                {realtimeOk ? "En direct" : "Reconnexion…"}
+              <span className={realtimeOk ? "pp-live-dot" : ""}
+                style={!realtimeOk ? { width: 7, height: 7, borderRadius: "50%", background: "var(--pp-text-faint)", display: "inline-block" }
+                  : { width: 7, height: 7, borderRadius: "50%", display: "inline-block" }} />
+              <span style={{ fontSize: 10.5, fontWeight: 600, color: realtimeOk ? "var(--pp-success)" : "var(--pp-text-muted)", letterSpacing: "0.04em" }}>
+                {realtimeOk ? "EN DIRECT" : "RECONNEXION…"}
               </span>
             </div>
-            <div className="flex flex-col items-end gap-1">
-              <WorkspaceHeaderExtras />
-              <NotificationsBell />
+
+            <NotificationsBell />
+            <WorkspaceHeaderExtras />
+
+            <div className="hidden lg:flex flex-col items-end" style={{ paddingLeft: 4, borderLeft: "1px solid var(--pp-bg-border)", paddingInline: "12px 0", marginLeft: 4 }}>
+              <span className="capitalize" style={{ fontSize: 10.5, color: "var(--pp-text-muted)", fontFamily: "'Urbanist', sans-serif", fontWeight: 500, letterSpacing: "0.02em" }}>
+                {dateLabel}
+              </span>
             </div>
-            <span className="capitalize" style={{ fontSize: 10, color: "var(--pp-text-muted)" }}>{dateLabel}</span>
           </div>
         </header>
-        <main className="flex-1 p-6 overflow-y-auto">
+        <main className="flex-1 p-7 overflow-y-auto">
           <Outlet context={{ profile }} />
         </main>
       </div>
+
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
       <SessionTimeoutModal />
     </div>
