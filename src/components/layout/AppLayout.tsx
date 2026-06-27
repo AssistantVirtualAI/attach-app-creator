@@ -104,6 +104,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
   const visibleGroups = useMemo(() => sidebarGroups.filter(g => {
     const groupScope = g.scope ?? 'legacy';
     if (currentScope === 'admin') return false; // admin portal uses its own layout
+    if ((g as any).planipretOnly && !isPlanipretOrgSelected) return false;
     // Legacy AVA groups are visible for any non-Lemtel org (AVA standalone + Planipret).
     if (groupScope === 'legacy' && isLemtelOrgSelected) return false;
     if (g.lemtelOnly && !isLemtelOrgSelected) return false;
