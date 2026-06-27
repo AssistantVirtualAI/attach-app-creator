@@ -18,6 +18,9 @@ import { OnboardingTutorial } from "@/components/planipret/OnboardingTutorial";
 import { useAvaNavigation } from "@/hooks/useAvaNavigation";
 import AvaVoiceAgent from "@/components/planipret/mobile/AvaVoiceAgent";
 import AvaChatSheet from "@/components/planipret/mobile/AvaChatSheet";
+import MobileAuthScreen from "@/components/planipret/mobile/MobileAuthScreen";
+import MobileHeaderControls from "@/components/planipret/mobile/MobileHeaderControls";
+import { useMplanipretTheme } from "@/hooks/useMplanipretTheme";
 import { ROUTES } from "@/lib/routes";
 import { recordRedirect } from "@/lib/debug/navDebug";
 
@@ -269,6 +272,14 @@ export default function PlanipretMobile() {
 
   if (loading) return <div className="min-h-screen flex items-center justify-center" style={{ background: "#F7F9FC", color: "#5A6B85", fontFamily: "Urbanist,sans-serif" }}>Chargement…</div>;
 
+  if (accessError === "unauthenticated") {
+    return (
+      <Frame>
+        <MobileAuthScreen onLoggedIn={loadProfile} />
+      </Frame>
+    );
+  }
+
   if (accessError) {
     return (
       <Frame>
@@ -278,45 +289,14 @@ export default function PlanipretMobile() {
               <Lock className="w-7 h-7" />
             </div>
             <h2 style={{ fontFamily: "Inter,sans-serif", fontWeight: 700, fontSize: 18, color: "var(--pp-text-primary)", marginBottom: 8 }}>
-              {accessError === "unauthenticated" ? "Connexion mobile Planiprêt" : "Accès mobile Planiprêt"}
+              {accessError === "missing_profile" ? "Accès mobile Planiprêt" : "Accès mobile Planiprêt"}
             </h2>
-            {accessError === "unauthenticated" ? (
-              <form onSubmit={submitMobileLogin} className="space-y-3 text-left">
-                <p style={{ fontSize: 13, color: "var(--pp-text-secondary)", marginBottom: 12 }}>
-                  Connectez-vous directement dans l'application mobile. Cette page reste séparée du portail admin Planiprêt.
-                </p>
-                <input
-                  value={loginEmail}
-                  onChange={(e) => setLoginEmail(e.target.value)}
-                  type="email"
-                  autoComplete="email"
-                  placeholder="Courriel"
-                  className="w-full rounded-xl px-4 py-3 outline-none"
-                  style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }}
-                />
-                <input
-                  value={loginPassword}
-                  onChange={(e) => setLoginPassword(e.target.value)}
-                  type="password"
-                  autoComplete="current-password"
-                  placeholder="Mot de passe"
-                  className="w-full rounded-xl px-4 py-3 outline-none"
-                  style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }}
-                />
-                <button type="submit" disabled={loginLoading} className="pp-btn-primary w-full inline-block disabled:opacity-60">
-                  {loginLoading ? "Connexion…" : "Se connecter"}
-                </button>
-              </form>
-            ) : (
-              <>
-                <p style={{ fontSize: 13, color: "var(--pp-text-secondary)", marginBottom: 16 }}>
-                  {accessError === "missing_profile"
-                    ? "Votre compte est connecté, mais aucun profil mobile Planiprêt n'est lié à cet utilisateur."
-                    : "Impossible de charger votre profil mobile Planiprêt pour le moment."}
-                </p>
-                <button onClick={loadProfile} className="pp-btn-primary inline-block">Réessayer</button>
-              </>
-            )}
+            <p style={{ fontSize: 13, color: "var(--pp-text-secondary)", marginBottom: 16 }}>
+              {accessError === "missing_profile"
+                ? "Votre compte est connecté, mais aucun profil mobile Planiprêt n'est lié à cet utilisateur. / Your account is signed in, but no Planiprêt mobile profile is linked."
+                : "Impossible de charger votre profil mobile Planiprêt pour le moment. / Unable to load your Planiprêt mobile profile right now."}
+            </p>
+            <button onClick={loadProfile} className="pp-btn-primary inline-block">Réessayer / Retry</button>
           </div>
         </div>
       </Frame>
@@ -331,7 +311,7 @@ export default function PlanipretMobile() {
             <div className="w-14 h-14 mx-auto rounded-full flex items-center justify-center mb-4" style={{ background: "rgba(46,155,220,0.12)", color: "var(--pp-brand-accent)" }}>
               <Lock className="w-7 h-7" />
             </div>
-            <h2 style={{ fontFamily: "Inter,sans-serif", fontWeight: 700, fontSize: 18, color: "var(--pp-text-primary)", marginBottom: 8 }}>Application non activée</h2>
+            <h2 style={{ fontFamily: "Inter,sans-serif", fontWeight: 700, fontSize: 18, color: "var(--pp-text-primary)", marginBottom: 8 }}>Application non activée / App not activated</h2>
             <p style={{ fontSize: 13, color: "var(--pp-text-secondary)", marginBottom: 16 }}>Votre accès à l'application mobile n'a pas encore été activé. Contactez votre administrateur Planiprêt.</p>
             <a href="mailto:support@avastatistic.ca" className="pp-btn-primary inline-block">Contacter le support</a>
           </div>
@@ -339,6 +319,7 @@ export default function PlanipretMobile() {
       </Frame>
     );
   }
+
 
   return (
     <Frame>
@@ -362,20 +343,9 @@ export default function PlanipretMobile() {
             <span style={{ fontFamily: "Inter,sans-serif", fontWeight: 700, fontSize: 14, color: "var(--pp-text-primary)", letterSpacing: "-0.01em" }}>Planiprêt</span>
           </div>
 
-          {/* Settings — right */}
-          <button
-            onClick={() => navigate("/mplanipret/more")}
-            className="ml-auto flex items-center justify-center rounded-full active:scale-95 transition"
-            style={{
-              width: 32, height: 32,
-              background: "var(--pp-bg-elevated)",
-              border: "1px solid var(--pp-bg-border-2)",
-              color: "var(--pp-text-secondary)",
-            }}
-            aria-label="Paramètres"
-          >
-            <SettingsIcon className="w-4 h-4" />
-          </button>
+          {/* Lang + theme + profile — right */}
+          <MobileHeaderControls profile={profile} reloadProfile={loadProfile} />
+
         </header>
 
         <UniversalSearchBar />
@@ -483,18 +453,25 @@ export default function PlanipretMobile() {
 }
 
 function Frame({ children }: { children: React.ReactNode }) {
+  const { theme } = useMplanipretTheme();
   return (
-    <div className="planipret-scope planipret-mobile-scope min-h-screen w-full flex items-center justify-center md:p-6"
-      style={{ background: "linear-gradient(160deg, #EEF2F8 0%, #DCE3EC 100%)" }}>
-      <div className="overflow-hidden w-full md:w-[390px] md:h-[844px] h-screen md:rounded-[44px] relative"
+    <div className="planipret-scope planipret-mobile-scope planipret-mobile-frame-bg min-h-screen w-full flex items-center justify-center md:p-6"
+      data-pp-theme={theme}
+      style={{ background: theme === "dark"
+        ? "linear-gradient(160deg, #060D1A 0%, #0A1425 100%)"
+        : "linear-gradient(160deg, #EEF2F8 0%, #DCE3EC 100%)" }}>
+      <div className="planipret-mobile-phone overflow-hidden w-full md:w-[390px] md:h-[844px] h-screen md:rounded-[44px] relative"
         style={{
-          background: "#F7F9FC",
-          border: "1px solid #DCE3EC",
-          boxShadow: "0 0 0 6px #FFFFFF, 0 40px 120px rgba(15,27,61,0.18), inset 0 1px 0 rgba(255,255,255,0.6)",
+          background: "var(--pp-bg-base)",
+          border: "1px solid var(--pp-bg-border-2)",
+          boxShadow: theme === "dark"
+            ? "0 0 0 6px #08111F, 0 40px 120px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.04)"
+            : "0 0 0 6px #FFFFFF, 0 40px 120px rgba(15,27,61,0.18), inset 0 1px 0 rgba(255,255,255,0.6)",
         }}>
         {children}
       </div>
     </div>
   );
 }
+
 
