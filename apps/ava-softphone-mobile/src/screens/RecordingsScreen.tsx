@@ -5,6 +5,7 @@ import { mobileApi, RecordingEntry } from '../lib/mobileApi';
 import { Card, Chip, EmptyState, Skeleton, AIPanel } from '../components/ui/Primitives';
 import type { Creds } from '../lib/creds';
 import { restGet, loadPbxRecordingAudioMobile } from '../lib/mobileSupabase';
+import { downloadRecording, getCachedRecordingUrl, prefetchRecordings } from '../lib/recordingCache';
 import { showMobileToast } from '../lib/mobileToast';
 import { useCallAi } from '../hooks/useCallAi';
 import { useT } from '../lib/i18n';
@@ -30,22 +31,79 @@ export default function RecordingsScreen({
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [cachedIds, setCachedIds] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
   const { lang } = useT();
   const fr = lang === 'fr';
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Load recordings
-  useEffect(() => {
+  // Load recordings (real-time: refresh on focus + every 30s + after a call ends).
+  const reload = React.useCallback(() => {
     let cancelled = false;
-    setItems(null);
-    setError(null);
     const ext = isAdmin ? (extFilter === 'all' ? undefined : extFilter) : (myExtension || undefined);
     mobileApi.recordings(ext, { rangeDays })
       .then((rows) => { if (!cancelled) setItems(rows); })
-      .catch((e: any) => { if (!cancelled) { setError(e?.message || 'Failed to load recordings'); setItems([]); } });
+      .catch((e: any) => { if (!cancelled) { setError(e?.message || 'Failed to load recordings'); setItems((prev) => prev ?? []); } });
     return () => { cancelled = true; };
-  }, [extFilter, isAdmin, myExtension, creds?.accessToken, rangeDays]);
+  }, [extFilter, isAdmin, myExtension, rangeDays]);
+
+  useEffect(() => {
+    setItems(null);
+    setError(null);
+    const cancel = reload();
+    const poll = setInterval(reload, 30000);
+    const onFocus = () => reload();
+    const onCallEnded = () => { setTimeout(reload, 1500); setTimeout(reload, 8000); };
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('ava:callEnded', onCallEnded as any);
+    return () => {
+      cancel();
+      clearInterval(poll);
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('ava:callEnded', onCallEnded as any);
+    };
+  }, [reload, creds?.accessToken]);
+
+  // Probe which items are already cached on disk + prefetch the most recent ones.
+  useEffect(() => {
+    if (!items || items.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const next = new Set<string>();
+      await Promise.all(items.slice(0, 50).map(async (r) => {
+        const u = await getCachedRecordingUrl(r.id);
+        if (u) next.add(r.id);
+      }));
+      if (!cancelled) setCachedIds(next);
+    })();
+    // Background prefetch: top 5 most recent that aren't cached yet.
+    const top = items.slice(0, 5).map((r) => ({
+      id: r.id,
+      meta: {
+        recording_path: r.record_path, recording_name: r.record_name,
+        xml_cdr_uuid: r.xml_cdr_uuid || r.id, domain_uuid: r.domain_uuid,
+        domain_name: r.domain_name, organization_id: r.organization_id,
+        start_at: r.startedAt,
+      },
+    }));
+    prefetchRecordings(top, creds?.accessToken || null, creds?.organizationId || null,
+      creds?.domainUuid || creds?.fusionpbxDomainUuid || fallbackDomainUuid || null)
+      .then(() => {
+        if (cancelled) return;
+        Promise.all(top.map(async (t) => ({ id: t.id, u: await getCachedRecordingUrl(t.id) })))
+          .then((res) => {
+            if (cancelled) return;
+            setCachedIds((prev) => {
+              const n = new Set(prev);
+              res.forEach((r) => { if (r.u) n.add(r.id); });
+              return n;
+            });
+          });
+      });
+    return () => { cancelled = true; };
+  }, [items, creds?.accessToken, creds?.organizationId, creds?.domainUuid, creds?.fusionpbxDomainUuid, fallbackDomainUuid]);
+
 
   // Fallback: derive domain_uuid from /mobile-me when creds lack it.
   useEffect(() => {
@@ -76,6 +134,13 @@ export default function RecordingsScreen({
     return Array.from(set).sort();
   }, [items, domainExtensions, myExtension]);
 
+  const recMeta = (rec: RecordingEntry) => ({
+    recording_path: rec.record_path, recording_name: rec.record_name,
+    xml_cdr_uuid: rec.xml_cdr_uuid || rec.id, domain_uuid: rec.domain_uuid,
+    domain_name: rec.domain_name, organization_id: rec.organization_id,
+    start_at: rec.startedAt,
+  });
+
   const play = async (rec: RecordingEntry) => {
     if (playingId === rec.id) {
       audioRef.current?.pause();
@@ -84,32 +149,48 @@ export default function RecordingsScreen({
     }
     setLoadingId(rec.id);
     try {
-      const url = await loadPbxRecordingAudioMobile(
-        {
-          id: rec.id,
-          xml_cdr_uuid: rec.xml_cdr_uuid,
-          recording_path: rec.record_path,
-          recording_name: rec.record_name,
-          domain_uuid: rec.domain_uuid,
-          domain_name: rec.domain_name,
-          organization_id: rec.organization_id,
-          start_at: rec.startedAt,
-        },
-        creds?.accessToken || null,
-        creds?.organizationId || null,
-        creds?.domainUuid || creds?.fusionpbxDomainUuid || fallbackDomainUuid || null,
-      );
+      // Phase 5: serve from local cache first; if missing, download (and cache) on the fly.
+      let url = await getCachedRecordingUrl(rec.id);
+      if (!url) {
+        url = await downloadRecording(
+          rec.id, recMeta(rec),
+          creds?.accessToken || null,
+          creds?.organizationId || null,
+          creds?.domainUuid || creds?.fusionpbxDomainUuid || fallbackDomainUuid || null,
+        );
+        setCachedIds((prev) => new Set(prev).add(rec.id));
+      }
       if (audioRef.current) {
         audioRef.current.src = url;
         audioRef.current.play().catch(() => {});
       }
       setPlayingId(rec.id);
     } catch (e: any) {
-      showMobileToast(e?.message || 'Unable to load recording', 'error');
+      showMobileToast(e?.message || (fr ? 'Impossible de charger l\'enregistrement' : 'Unable to load recording'), 'error');
     } finally {
       setLoadingId(null);
     }
   };
+
+  const download = async (rec: RecordingEntry) => {
+    setDownloadingId(rec.id);
+    try {
+      await downloadRecording(
+        rec.id, recMeta(rec),
+        creds?.accessToken || null,
+        creds?.organizationId || null,
+        creds?.domainUuid || creds?.fusionpbxDomainUuid || fallbackDomainUuid || null,
+        { force: true },
+      );
+      setCachedIds((prev) => new Set(prev).add(rec.id));
+      showMobileToast(fr ? 'Enregistrement téléchargé pour écoute hors-ligne' : 'Recording downloaded for offline playback', 'success');
+    } catch (e: any) {
+      showMobileToast(e?.message || (fr ? 'Téléchargement échoué' : 'Download failed'), 'error');
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
 
   const toggleExpand = (id: string) => {
     setExpandedId((prev) => (prev === id ? null : id));
@@ -193,6 +274,18 @@ export default function RecordingsScreen({
               <div style={{ display: 'flex', gap: 4 }}>
                 <Chip tone="gold" size="xs">{Math.max(1, Math.round(r.durationSec / 60))}m</Chip>
                 {r.hasTranscript && <Chip tone="violet" size="xs">AI</Chip>}
+                {cachedIds.has(r.id) && <Chip tone="success" size="xs">{fr ? 'Hors-ligne' : 'Offline'}</Chip>}
+                <button
+                  onClick={() => download(r)}
+                  disabled={downloadingId === r.id}
+                  title={fr ? 'Télécharger pour écoute hors-ligne' : 'Download for offline playback'}
+                  style={{
+                    background: 'transparent', border: `1px solid ${colors.border}`, color: colors.signalGold,
+                    borderRadius: 8, padding: '2px 6px', fontSize: 10, fontWeight: 800,
+                    cursor: downloadingId === r.id ? 'wait' : 'pointer',
+                  }}>
+                  {downloadingId === r.id ? '…' : cachedIds.has(r.id) ? '↻' : '⬇'}
+                </button>
                 <button onClick={() => toggleExpand(r.id)} style={{
                   background: 'transparent', border: `1px solid ${colors.borderAI}`, color: colors.avaViolet,
                   borderRadius: 8, padding: '2px 6px', fontSize: 10, fontWeight: 800, cursor: 'pointer',

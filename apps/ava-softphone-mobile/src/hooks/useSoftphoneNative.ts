@@ -97,6 +97,9 @@ function ensureNativeCallEventBridge() {
       stopRingback();
       const friendly = describeEndReason(d?.reason);
       emitNativeCallSnapshot({ callState: 'idle', activeCallNumber: '', isMuted: false, isOnHold: false, isRecording: false, direction: null, endReason: friendly, callPhase: 'ended', lastSipCode: d?.code ?? null });
+      // Phase 5: notify the recordings screen so it refreshes promptly once
+      // the CDR/recording sync surfaces the new file server-side.
+      try { window.dispatchEvent(new CustomEvent('ava:callEnded', { detail: { reason: friendly, code: d?.code ?? null } })); } catch {}
     });
     const muteHandle = await CapacitorPjsip.addListener('muteChanged', (d: any) => {
       emitNativeCallSnapshot({ isMuted: !!d?.muted });
