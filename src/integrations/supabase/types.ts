@@ -8559,6 +8559,7 @@ export type Database = {
           voicemail_greeting_text: string | null
           voicemail_greeting_updated_at: string | null
           voicemail_greeting_voice_id: string | null
+          widget_enabled: boolean
         }
         Insert: {
           ava_autonomy_mode?: string
@@ -8624,6 +8625,7 @@ export type Database = {
           voicemail_greeting_text?: string | null
           voicemail_greeting_updated_at?: string | null
           voicemail_greeting_voice_id?: string | null
+          widget_enabled?: boolean
         }
         Update: {
           ava_autonomy_mode?: string
@@ -8689,6 +8691,7 @@ export type Database = {
           voicemail_greeting_text?: string | null
           voicemail_greeting_updated_at?: string | null
           voicemail_greeting_voice_id?: string | null
+          widget_enabled?: boolean
         }
         Relationships: []
       }
