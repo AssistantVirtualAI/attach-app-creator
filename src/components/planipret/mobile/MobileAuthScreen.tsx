@@ -36,6 +36,25 @@ export default function MobileAuthScreen({ onLoggedIn }: { onLoggedIn: () => Pro
     else toast.success(lang === "fr" ? "Courriel envoyé" : "Email sent");
   };
 
+  const signInWithMicrosoft = async () => {
+    setLoading(true);
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "azure",
+      options: {
+        redirectTo: `${window.location.origin}/mplanipret`,
+        scopes: "email openid profile offline_access User.Read Mail.ReadWrite Calendars.ReadWrite",
+      },
+    });
+    setLoading(false);
+    if (error) {
+      const msg = /unsupported|not enabled|provider/i.test(error.message)
+        ? t("auth.msUnavailable")
+        : error.message;
+      toast.error(msg);
+    }
+  };
+
+
   return (
     <div className="h-full w-full flex flex-col" style={{ background: "var(--pp-bg-base)" }}>
       {/* Top control row: lang + theme */}
@@ -73,7 +92,29 @@ export default function MobileAuthScreen({ onLoggedIn }: { onLoggedIn: () => Pro
       </div>
 
       {/* Form */}
+      {/* Microsoft SSO (primary) */}
+      <div className="px-6 mb-3">
+        <button type="button" onClick={signInWithMicrosoft} disabled={loading}
+          className="w-full rounded-xl py-3 font-semibold flex items-center justify-center gap-2 disabled:opacity-60"
+          style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)", fontSize: 14 }}>
+          <svg width="16" height="16" viewBox="0 0 23 23" aria-hidden>
+            <rect x="1" y="1" width="10" height="10" fill="#F25022"/>
+            <rect x="12" y="1" width="10" height="10" fill="#7FBA00"/>
+            <rect x="1" y="12" width="10" height="10" fill="#00A4EF"/>
+            <rect x="12" y="12" width="10" height="10" fill="#FFB900"/>
+          </svg>
+          {t("auth.signInMs")}
+        </button>
+        <div className="flex items-center gap-2 my-3" style={{ color: "var(--pp-text-faint)", fontSize: 11 }}>
+          <div className="flex-1 h-px" style={{ background: "var(--pp-bg-border)" }} />
+          <span className="uppercase tracking-wider">{t("auth.or")}</span>
+          <div className="flex-1 h-px" style={{ background: "var(--pp-bg-border)" }} />
+        </div>
+      </div>
+
+      {/* Email/password fallback */}
       <form onSubmit={submit} className="px-6 space-y-3">
+
         <div>
           <label style={{ fontSize: 11, fontWeight: 700, color: "var(--pp-text-muted)", letterSpacing: "0.05em", textTransform: "uppercase" }}>{t("auth.email")}</label>
           <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoComplete="email"
