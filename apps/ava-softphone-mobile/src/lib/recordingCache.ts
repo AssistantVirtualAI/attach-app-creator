@@ -28,7 +28,7 @@ function safeName(id: string) {
 async function getCachedNativePath(id: string): Promise<string | null> {
   if (!Capacitor.isNativePlatform()) return null;
   try {
-    const { Filesystem, Directory } = await import('@capacitor/filesystem');
+    const { Filesystem, Directory } = await import(/* @vite-ignore */ '@capacitor/filesystem');
     const path = `recordings/${safeName(id)}`;
     await Filesystem.stat({ path, directory: Directory.Data });
     const uri = await Filesystem.getUri({ path, directory: Directory.Data });
@@ -83,7 +83,7 @@ export async function downloadRecording(
   const blob = await resp.blob();
 
   if (Capacitor.isNativePlatform()) {
-    const { Filesystem, Directory } = await import('@capacitor/filesystem');
+    const { Filesystem, Directory } = await import(/* @vite-ignore */ '@capacitor/filesystem');
     const buf = await blob.arrayBuffer();
     const b64 = arrayBufferToBase64(buf);
     try { await Filesystem.mkdir({ path: 'recordings', directory: Directory.Data, recursive: true }); } catch {}
