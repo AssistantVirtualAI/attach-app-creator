@@ -1,70 +1,108 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useOutletContext, useNavigate } from "react-router-dom";
 
 import { supabase } from "@/integrations/supabase/client";
 import {
   Phone, PhoneMissed, MessageSquare, Voicemail,
   ArrowDownLeft, ArrowUpRight, X, Calendar, Headphones, Bot,
-  BellOff, Flame, Sparkles, ChevronRight, Mail, Users as UsersIcon, TrendingUp,
+  BellOff, Flame, Sparkles, ChevronRight, Mail, Users as UsersIcon,
+  CheckSquare, RefreshCw, AlertCircle,
 } from "lucide-react";
 import type { PlanipretMobileContext } from "../PlanipretMobile";
 import { toast } from "sonner";
-import AvaVoiceAgent from "@/components/planipret/mobile/AvaVoiceAgent";
 import PWAInstallBanner from "@/components/planipret/PWAInstallBanner";
 import { TEMP_EMOJI } from "@/components/planipret/leadHelpers";
 import { useMaestroPipelineToasts } from "@/hooks/useMaestroPipelineToasts";
-import heroStats from "@/assets/planipret-hero-stats.jpg.asset.json";
 import { safeEdgeFunction } from "@/lib/safeEdgeFunction";
 
+type Period = "day" | "week" | "month" | "shift";
+
+const PERIOD_LABEL: Record<Period, string> = {
+  day: "Aujourd'hui",
+  week: "Cette semaine",
+  month: "Ce mois",
+  shift: "Mon quart",
+};
+
+function periodRange(period: Period) {
+  const now = new Date();
+  const since = new Date(now);
+  if (period === "day") since.setHours(0, 0, 0, 0);
+  else if (period === "week") since.setDate(since.getDate() - 7);
+  else if (period === "month") since.setMonth(since.getMonth() - 1);
+  else if (period === "shift") since.setHours(Math.max(0, now.getHours() - 4), 0, 0, 0);
+  return { sinceIso: since.toISOString(), untilIso: now.toISOString() };
+}
+
 function Shimmer({ className = "" }: { className?: string }) {
-  return (
-    <div
-      className={`animate-pulse rounded ${className}`}
-      style={{ background: "var(--pp-bg-elevated)" }}
-    />
-  );
+  return <div className={`animate-pulse rounded ${className}`} style={{ background: "#E2E8F0" }} />;
 }
 
 export default function MHome() {
   const { profile, registerRefresh, openDialer, openAva, reloadProfile } =
     useOutletContext<PlanipretMobileContext>();
   const navigate = useNavigate();
-  const [stats, setStats] = useState({ calls: 0, missed: 0, sms: 0, voicemails: 0, team: 0, emails: 0, outbound: 0 });
+
+  const [period, setPeriod] = useState<Period>(() => {
+    try { return (localStorage.getItem("pp.mobile.period") as Period) || "day"; } catch { return "day"; }
+  });
+  useEffect(() => { try { localStorage.setItem("pp.mobile.period", period); } catch {} }, [period]);
+
+  const [stats, setStats] = useState({ calls: 0, missed: 0, sms: 0, voicemails: 0, meetings: 0, hotLeads: 0, tasks: 0, outbound: 0 });
   const [recent, setRecent] = useState<any[]>([]);
-  const [events, setEvents] = useState<any[] | null>(null);
-  const [eventsState, setEventsState] = useState<"loading" | "ready" | "no_m365" | "error">("loading");
-  const [brief, setBrief] = useState<string | null>(null);
-  const [briefLoading, setBriefLoading] = useState(false);
-  const [statsLoading, setStatsLoading] = useState(true);
-  const [sipOnline, setSipOnline] = useState(false);
   const [hotLeads, setHotLeads] = useState<any[]>([]);
   const [dueReminders, setDueReminders] = useState<any[]>([]);
-  const [maestroCounts, setMaestroCounts] = useState<any | null>(null);
+  const [meetings, setMeetings] = useState<any[]>([]);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [sipOnline, setSipOnline] = useState(false);
+
+  const [brief, setBrief] = useState<any | null>(null);
+  const [briefLoading, setBriefLoading] = useState(false);
+  const [briefErr, setBriefErr] = useState<string | null>(null);
 
   useMaestroPipelineToasts(profile?.user_id);
-
 
   const dateLabel = new Date().toLocaleDateString("fr-CA", {
     weekday: "long", day: "numeric", month: "long",
   });
+  const firstName = (profile?.full_name ?? "Courtier").split(" ")[0];
 
   const loadStats = async () => {
     if (!profile) return;
     setStatsLoading(true);
-    const start = new Date(); start.setHours(0, 0, 0, 0);
-    const startIso = start.toISOString();
+    const { sinceIso, untilIso } = periodRange(period);
     const nowIso = new Date().toISOString();
+    const weekEnd = new Date(); weekEnd.setDate(weekEnd.getDate() + 7);
 
-    const [callsRes, missedRes, smsRes, vmRes, recentRes, hotRes, remRes, teamRes, outboundRes] = await Promise.all([
-      supabase.from("planipret_phone_calls").select("id", { count: "exact", head: true }).eq("user_id", profile.user_id).gte("started_at", startIso),
-      supabase.from("planipret_phone_calls").select("id", { count: "exact", head: true }).eq("user_id", profile.user_id).eq("direction", "missed").gte("started_at", startIso),
-      supabase.from("planipret_phone_messages").select("id", { count: "exact", head: true }).eq("user_id", profile.user_id).is("read_at", null).eq("direction", "inbound"),
-      supabase.from("planipret_voicemails").select("id", { count: "exact", head: true }).eq("user_id", profile.user_id).eq("is_read", false).eq("folder", "inbox"),
-      supabase.from("planipret_phone_calls").select("id, direction, from_number, from_name, to_number, to_name, started_at, lead_score, lead_temperature, ai_summary").eq("user_id", profile.user_id).order("started_at", { ascending: false }).limit(3),
-      supabase.from("planipret_phone_calls").select("id, from_number, from_name, to_number, to_name, lead_score, lead_temperature, started_at, direction").eq("user_id", profile.user_id).gte("started_at", startIso).gte("lead_score", 8).order("lead_score", { ascending: false }).limit(5),
-      supabase.from("planipret_reminders").select("*").eq("user_id", profile.user_id).eq("status", "pending").lte("scheduled_at", nowIso).order("scheduled_at", { ascending: true }).limit(10),
-      supabase.from("planipret_team_messages").select("id", { count: "exact", head: true }).gte("created_at", startIso),
-      supabase.from("planipret_phone_messages").select("id", { count: "exact", head: true }).eq("user_id", profile.user_id).eq("direction", "outbound").gte("created_at", startIso),
+    const [callsRes, missedRes, smsRes, vmRes, recentRes, hotRes, remRes, outboundRes, meetingsRes, hotCountRes, tasksCountRes] = await Promise.all([
+      supabase.from("planipret_phone_calls").select("id", { count: "exact", head: true })
+        .eq("user_id", profile.user_id).gte("started_at", sinceIso).lte("started_at", untilIso),
+      supabase.from("planipret_phone_calls").select("id", { count: "exact", head: true })
+        .eq("user_id", profile.user_id).eq("direction", "missed").gte("started_at", sinceIso).lte("started_at", untilIso),
+      supabase.from("planipret_phone_messages").select("id", { count: "exact", head: true })
+        .eq("user_id", profile.user_id).is("read_at", null).eq("direction", "inbound"),
+      supabase.from("planipret_voicemails").select("id", { count: "exact", head: true })
+        .eq("user_id", profile.user_id).eq("is_read", false).eq("folder", "inbox"),
+      supabase.from("planipret_phone_calls")
+        .select("id, direction, from_number, from_name, to_number, to_name, started_at, lead_score, lead_temperature, ai_summary")
+        .eq("user_id", profile.user_id).order("started_at", { ascending: false }).limit(5),
+      supabase.from("planipret_phone_calls")
+        .select("id, from_number, from_name, to_number, to_name, lead_score, lead_temperature, started_at, direction")
+        .eq("user_id", profile.user_id).gte("started_at", sinceIso).gte("lead_score", 7)
+        .order("lead_score", { ascending: false }).limit(5),
+      supabase.from("planipret_reminders").select("*")
+        .eq("user_id", profile.user_id).eq("status", "pending").lte("scheduled_at", nowIso)
+        .order("scheduled_at", { ascending: true }).limit(10),
+      supabase.from("planipret_phone_messages").select("id", { count: "exact", head: true })
+        .eq("user_id", profile.user_id).eq("direction", "outbound").gte("created_at", sinceIso),
+      supabase.from("appointments")
+        .select("id, title, start_time, attendee_name, location_type, meeting_url")
+        .eq("host_user_id", profile.user_id).gte("start_time", new Date().toISOString()).lte("start_time", weekEnd.toISOString())
+        .order("start_time", { ascending: true }).limit(5),
+      supabase.from("planipret_phone_calls").select("id", { count: "exact", head: true })
+        .eq("user_id", profile.user_id).gte("lead_score", 7).gte("started_at", sinceIso).lte("started_at", untilIso),
+      supabase.from("planipret_reminders").select("id", { count: "exact", head: true })
+        .eq("user_id", profile.user_id).eq("status", "pending"),
     ]);
 
     setStats({
@@ -72,63 +110,44 @@ export default function MHome() {
       missed: missedRes.count ?? 0,
       sms: smsRes.count ?? 0,
       voicemails: vmRes.count ?? 0,
-      team: teamRes.count ?? 0,
-      emails: 0,
+      meetings: (meetingsRes.data ?? []).length,
+      hotLeads: hotCountRes.count ?? 0,
+      tasks: tasksCountRes.count ?? 0,
       outbound: outboundRes.count ?? 0,
     });
     setRecent(recentRes.data ?? []);
     setHotLeads(hotRes.data ?? []);
     setDueReminders(remRes.data ?? []);
+    setMeetings(meetingsRes.data ?? []);
     setSipOnline(!!profile.ns_jwt && (!profile.ns_jwt_expires_at || new Date(profile.ns_jwt_expires_at) > new Date()));
     setStatsLoading(false);
   };
 
-  const loadEvents = async () => {
-    if (!profile) return;
-    if (!profile.ms365_access_token) { setEventsState("no_m365"); return; }
-    setEventsState("loading");
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    const end = new Date(today); end.setHours(23, 59, 59, 999);
-    const { data, error } = await supabase.functions.invoke("ms365-actions", {
-      body: { action: "list_calendar_events", payload: { start: today.toISOString(), end: end.toISOString() } },
-    });
-    if (error || !(data as any)?.success) { setEventsState("error"); return; }
-    setEvents(((data as any).events ?? []).slice(0, 2));
-    setEventsState("ready");
+  const loadBrief = async (force = false) => {
+    setBriefLoading(true);
+    setBriefErr(null);
+    const { data, error } = await supabase.functions.invoke("pp-ava-brief", { body: { period, force } });
+    setBriefLoading(false);
+    if (error || (data as any)?.error) {
+      setBriefErr((data as any)?.error || error?.message || "brief unavailable");
+      return;
+    }
+    setBrief(data);
   };
 
-  const loadMaestroCounts = async () => {
-    try {
-      const { data, error } = await supabase.functions.invoke("maestro-counts", { body: {} });
-      if (error) return;
-      setMaestroCounts((data as any)?.counts ?? data ?? null);
-    } catch { /* silent */ }
-  };
-
-  useEffect(() => { loadStats(); loadEvents(); loadMaestroCounts(); /* eslint-disable-next-line */ }, [profile?.user_id]);
+  useEffect(() => { loadStats(); loadBrief(false); /* eslint-disable-next-line */ }, [profile?.user_id, period]);
   useEffect(() => {
-    registerRefresh(async () => { await Promise.all([loadStats(), loadEvents()]); });
+    registerRefresh(async () => { await Promise.all([loadStats(), loadBrief(true)]); });
     return () => registerRefresh(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile?.user_id]);
-
-  const playBrief = async () => {
-    setBriefLoading(true);
-    const { data, error } = await supabase.functions.invoke("ai-daily-brief", { body: {} });
-    setBriefLoading(false);
-    if (error || !(data as any)?.success) { toast.error("Impossible de générer le brief"); return; }
-    setBrief((data as any).briefing_text);
-  };
+  }, [profile?.user_id, period]);
 
   const reconnect = async () => {
     toast.loading("Reconnexion SIP…", { id: "sip-reconnect" });
     const { data, error, status } = await safeEdgeFunction("ns-auth", { body: {} });
     toast.dismiss("sip-reconnect");
     if (error || (data as any)?.success === false) {
-      const msg = status === 403
-        ? "Accès téléphonie non autorisé pour ce compte Planiprêt."
-        : ((data as any)?.error ?? error ?? "Connexion téléphonique impossible");
-      toast.error(msg);
+      toast.error(status === 403 ? "Accès téléphonie non autorisé." : ((data as any)?.error ?? error ?? "Connexion impossible"));
       return;
     }
     toast.success("Connexion téléphonique établie ✅");
@@ -136,105 +155,63 @@ export default function MHome() {
     loadStats();
   };
 
-  const firstName = (profile?.full_name ?? "Courtier").split(" ")[0];
+  const handleSuggestion = (sug: { kind: string; number?: string; label: string }) => {
+    if (sug.kind === "call" && sug.number) { openDialer(sug.number); return; }
+    if (sug.kind === "sms") { navigate("/mplanipret/messages"); return; }
+    if (sug.kind === "reminder") { navigate("/mplanipret/contacts"); return; }
+    toast.info(sug.label);
+  };
 
-  const totalComms = stats.calls + stats.sms + stats.team + stats.outbound + stats.emails;
+  const totalComms = useMemo(() => stats.calls + stats.sms + stats.outbound, [stats]);
 
   return (
     <div className="p-4 space-y-4 pb-8" style={{ background: "var(--pp-bg-base)", minHeight: "100%" }}>
       <PWAInstallBanner />
 
-      {/* ===== HERO IMAGE — résumé IA visuel ===== */}
-      <section
-        className="relative rounded-2xl overflow-hidden"
-        style={{ border: "1px solid var(--pp-bg-border-2)", height: 140 }}
-      >
-        <img
-          src={heroStats.url}
-          alt=""
-          width={1280}
-          height={640}
-          className="absolute inset-0 w-full h-full object-cover"
-          style={{ opacity: 0.55 }}
-        />
-        <div
-          className="absolute inset-0"
-          style={{ background: "linear-gradient(135deg, rgba(6,13,26,0.55) 0%, rgba(6,13,26,0.92) 100%)" }}
-        />
-        <div className="relative h-full p-4 flex flex-col justify-between">
-          <div className="flex items-center gap-1.5">
-            <Sparkles className="w-3.5 h-3.5" style={{ color: "var(--pp-agent)" }} />
-            <span className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: "var(--pp-agent)" }}>
-              Résumé IA — Aujourd'hui
-            </span>
-          </div>
-          <div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-bold tabular-nums" style={{ color: "var(--pp-text-primary)" }}>
-                {totalComms}
-              </span>
-              <span className="text-xs" style={{ color: "var(--pp-text-secondary)" }}>
-                communications
-              </span>
-            </div>
-            <div className="text-[11px] mt-0.5 flex items-center gap-3" style={{ color: "var(--pp-text-muted)" }}>
-              <span className="inline-flex items-center gap-1"><Phone className="w-3 h-3" />{stats.calls}</span>
-              <span className="inline-flex items-center gap-1"><MessageSquare className="w-3 h-3" />{stats.sms + stats.outbound}</span>
-              <span className="inline-flex items-center gap-1"><UsersIcon className="w-3 h-3" />{stats.team}</span>
-              <span className="inline-flex items-center gap-1"><TrendingUp className="w-3 h-3" style={{ color: "var(--pp-success)" }} /></span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-
-      {/* ===== Header ===== */}
-      <header className="flex items-start justify-between pt-2">
+      {/* ===== HEADER ===== */}
+      <header className="flex items-start justify-between">
         <div className="min-w-0">
-          <p className="text-[11px] uppercase tracking-[0.18em]" style={{ color: "var(--pp-text-muted)" }}>
-            {dateLabel}
-          </p>
-          <h1 className="text-2xl font-bold mt-0.5" style={{ color: "var(--pp-text-primary)" }}>
+          <p className="pp-eyebrow">{dateLabel}</p>
+          <h1 className="text-[26px] leading-tight font-bold mt-0.5">
             Bonjour, <span style={{ color: "var(--pp-brand-accent)" }}>{firstName}</span>
           </h1>
         </div>
         <button
           onClick={reconnect}
-          className={sipOnline ? "pp-status-ok" : "pp-status-off"}
+          className="pp-pill"
           style={{
-            display: "inline-flex", alignItems: "center", gap: 6,
-            padding: "6px 10px", borderRadius: 999, fontSize: 11, fontWeight: 600,
+            background: sipOnline ? "rgba(13,122,95,0.10)" : "rgba(178,58,72,0.10)",
+            color: sipOnline ? "var(--pp-success)" : "var(--pp-danger)",
+            border: `1px solid ${sipOnline ? "rgba(13,122,95,0.30)" : "rgba(178,58,72,0.30)"}`,
           }}
         >
-          <span
-            style={{
-              width: 6, height: 6, borderRadius: 999,
-              background: sipOnline ? "var(--pp-success)" : "var(--pp-danger)",
-              boxShadow: sipOnline ? "0 0 8px var(--pp-success)" : "0 0 8px var(--pp-danger)",
-            }}
-          />
+          <span style={{ width: 6, height: 6, borderRadius: 999, background: "currentColor", boxShadow: "0 0 6px currentColor" }} />
           {sipOnline ? "En ligne" : "Hors ligne"}
         </button>
       </header>
 
+      {/* ===== PERIOD FILTER ===== */}
+      <div className="flex items-center justify-between">
+        <div className="pp-segmented">
+          {(["day","week","month","shift"] as Period[]).map((p) => (
+            <button key={p} onClick={() => setPeriod(p)} className={period === p ? "is-active" : ""}>
+              {PERIOD_LABEL[p]}
+            </button>
+          ))}
+        </div>
+        <span className="text-[11px]" style={{ color: "var(--pp-text-muted)" }}>
+          {totalComms} comms
+        </span>
+      </div>
+
       {/* ===== DND BANNER ===== */}
       {profile?.dnd_enabled && (
-        <div
-          className="rounded-2xl p-3 flex items-center gap-3"
-          style={{
-            background: "rgba(232,76,76,0.08)",
-            border: "1px solid rgba(232,76,76,0.30)",
-            backdropFilter: "blur(12px)",
-          }}
-        >
+        <div className="rounded-2xl p-3 flex items-center gap-3"
+          style={{ background: "rgba(178,58,72,0.08)", border: "1px solid rgba(178,58,72,0.30)" }}>
           <BellOff className="w-5 h-5" style={{ color: "var(--pp-danger)" }} />
           <div className="flex-1 min-w-0">
-            <div className="text-xs font-bold" style={{ color: "var(--pp-danger)" }}>
-              Mode Ne pas déranger actif
-            </div>
-            <div className="text-[11px]" style={{ color: "var(--pp-text-secondary)" }}>
-              AVA répond à vos appels automatiquement
-            </div>
+            <div className="text-xs font-bold" style={{ color: "var(--pp-danger)" }}>Mode Ne pas déranger actif</div>
+            <div className="text-[11px]" style={{ color: "var(--pp-text-secondary)" }}>AVA répond à vos appels automatiquement</div>
           </div>
           <button
             onClick={async () => {
@@ -243,239 +220,150 @@ export default function MHome() {
               toast.success("Mode DND désactivé");
             }}
             className="text-[11px] font-semibold px-2.5 py-1 rounded-md text-white"
-            style={{ background: "var(--pp-danger)" }}
-          >
+            style={{ background: "var(--pp-danger)" }}>
             Désactiver
           </button>
         </div>
       )}
 
-      {/* ===== PRIORITY HERO ===== */}
-      {(dueReminders.length > 0 || hotLeads.length > 0) && (() => {
-        const overdue = dueReminders[0];
-        const hot = !overdue ? hotLeads[0] : null;
-        const target = overdue ?? hot;
-        if (!target) return null;
-        const name = overdue ? (overdue.contact_name ?? overdue.contact_number) : (hot.from_name ?? hot.from_number ?? hot.to_number);
-        const phone = overdue ? overdue.contact_number : (hot.from_number ?? hot.to_number);
-        const reason = overdue
-          ? `Rappel en retard${overdue.note ? ` • ${overdue.note}` : ""}`
-          : `Lead chaud • Score ${hot.lead_score}/10`;
-        return (
-          <section
-            className="rounded-2xl p-4 relative overflow-hidden"
-            style={{
-              background: "linear-gradient(135deg, rgba(232,76,76,0.18), rgba(232,76,76,0.04))",
-              border: "1px solid rgba(232,76,76,0.35)",
-              boxShadow: "0 8px 32px rgba(232,76,76,0.18)",
-            }}
-          >
-            <div
-              className="absolute -top-10 -right-10 w-32 h-32 rounded-full"
-              style={{ background: "rgba(232,76,76,0.25)", filter: "blur(40px)" }}
-            />
-            <div className="relative">
-              <div className="flex items-center gap-2 mb-1">
-                <Flame className="w-4 h-4" style={{ color: "var(--pp-danger)" }} />
-                <span className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: "var(--pp-danger)" }}>
-                  Priorité maintenant
-                </span>
-              </div>
-              <div className="text-lg font-bold truncate" style={{ color: "var(--pp-text-primary)" }}>
-                {name ?? "—"}
-              </div>
-              <div className="text-xs mb-3" style={{ color: "var(--pp-text-secondary)" }}>
-                {reason}
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => openDialer(phone ?? undefined)}
-                  className="flex-1 py-2.5 rounded-xl text-white text-sm font-semibold flex items-center justify-center gap-2"
-                  style={{ background: "linear-gradient(135deg, var(--pp-success), #00A88A)" }}
-                >
-                  <Phone className="w-4 h-4" /> Appeler
-                </button>
-                {overdue && (
-                  <button
-                    onClick={async () => {
-                      const next = new Date(Date.now() + 3600 * 1000).toISOString();
-                      await supabase.from("planipret_reminders").update({ scheduled_at: next }).eq("id", overdue.id);
-                      loadStats();
-                    }}
-                    className="px-3 py-2.5 rounded-xl text-xs"
-                    style={{
-                      background: "var(--pp-bg-elevated)",
-                      border: "1px solid var(--pp-bg-border-2)",
-                      color: "var(--pp-text-secondary)",
-                    }}
-                  >
-                    Reporter 1h
-                  </button>
-                )}
-              </div>
+      {/* ===== AI BRIEF (Navy gradient) ===== */}
+      <section
+        className="rounded-2xl p-4 relative overflow-hidden pp-card"
+        style={{
+          background: "linear-gradient(135deg, #FFFFFF 0%, #F0F4F9 100%)",
+          borderColor: "var(--pp-bg-border)",
+        }}
+      >
+        <div
+          className="absolute -top-12 -right-12 w-40 h-40 rounded-full"
+          style={{ background: "radial-gradient(circle, rgba(59,111,160,0.18), transparent 70%)" }}
+        />
+        <div className="relative">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4" style={{ color: "var(--pp-brand-accent)" }} />
+              <span className="pp-eyebrow">Brief AVA — {PERIOD_LABEL[period]}</span>
             </div>
-          </section>
-        );
-      })()}
+            <button
+              onClick={() => loadBrief(true)}
+              disabled={briefLoading}
+              className="text-[11px] px-2.5 py-1 rounded-full flex items-center gap-1 disabled:opacity-50"
+              style={{
+                background: "rgba(59,111,160,0.10)",
+                color: "var(--pp-brand-accent-2)",
+                border: "1px solid rgba(59,111,160,0.25)",
+                fontFamily: "Urbanist,sans-serif", fontWeight: 600,
+              }}>
+              <RefreshCw className={`w-3 h-3 ${briefLoading ? "animate-spin" : ""}`} />
+              {briefLoading ? "…" : "Régénérer"}
+            </button>
+          </div>
 
-      {/* ===== STATS GRID ===== */}
-      <section className="grid grid-cols-2 gap-3">
+          {briefLoading && !brief ? (
+            <div className="space-y-2">
+              <Shimmer className="h-4 w-3/4" />
+              <Shimmer className="h-3 w-full" />
+              <Shimmer className="h-3 w-2/3" />
+            </div>
+          ) : briefErr ? (
+            <div className="text-xs flex items-center gap-2" style={{ color: "var(--pp-danger)" }}>
+              <AlertCircle className="w-3.5 h-3.5" /> {briefErr}
+            </div>
+          ) : brief ? (
+            <>
+              <p className="text-[15px] font-semibold leading-snug" style={{ color: "var(--pp-text-primary)", fontFamily: "Urbanist,sans-serif" }}>
+                {brief.headline}
+              </p>
+              {brief.priorities?.length > 0 && (
+                <ol className="mt-3 space-y-1.5">
+                  {brief.priorities.slice(0, 5).map((p: string, i: number) => (
+                    <li key={i} className="flex items-start gap-2 text-[13px]" style={{ color: "var(--pp-text-secondary)" }}>
+                      <span
+                        className="mt-[2px] inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold flex-shrink-0"
+                        style={{ background: "var(--pp-brand-accent-2)", color: "#fff", fontFamily: "Urbanist,sans-serif" }}>
+                        {i + 1}
+                      </span>
+                      <span>{p}</span>
+                    </li>
+                  ))}
+                </ol>
+              )}
+              {brief.risks?.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {brief.risks.map((r: string, i: number) => (
+                    <span key={i} className="pp-pill pp-pill-warning">⚠ {r}</span>
+                  ))}
+                </div>
+              )}
+              {brief.suggestions?.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {brief.suggestions.map((s: any, i: number) => (
+                    <button key={i} onClick={() => handleSuggestion(s)}
+                      className="pp-pill pp-pill-accent active:scale-95 transition">
+                      {s.kind === "call" ? "📞" : s.kind === "sms" ? "💬" : s.kind === "email" ? "✉" : "⏰"} {s.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <p className="text-xs" style={{ color: "var(--pp-text-muted)" }}>Préparation du brief…</p>
+          )}
+
+          {profile?.voice_agent_enabled && (
+            <button onClick={openAva}
+              className="mt-3 w-full py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"
+              style={{
+                background: "rgba(108,92,231,0.10)",
+                border: "1px solid rgba(108,92,231,0.30)",
+                color: "var(--pp-agent)",
+                fontFamily: "Urbanist,sans-serif",
+              }}>
+              <Headphones className="w-3.5 h-3.5" /> Écouter avec AVA
+            </button>
+          )}
+        </div>
+      </section>
+
+      {/* ===== STATS GRID (6 KPI) ===== */}
+      <section className="grid grid-cols-3 gap-2.5">
         {statsLoading ? (
-          <>{[0, 1, 2, 3, 4, 5].map((i) => <Shimmer key={i} className="h-24" />)}</>
+          <>{[0,1,2,3,4,5].map((i) => <Shimmer key={i} className="h-[88px]" />)}</>
         ) : (
           <>
-            <StatCard
-              icon={<Phone className="w-4 h-4" />}
-              value={stats.calls}
-              label="Appels"
-              accent="var(--pp-brand-accent)"
-            />
-            <StatCard
-              icon={<PhoneMissed className="w-4 h-4" />}
-              value={stats.missed}
-              label="Manqués"
-              accent="var(--pp-danger)"
-              pulse={stats.missed > 0}
-            />
-            <StatCard
-              icon={<MessageSquare className="w-4 h-4" />}
-              value={stats.sms}
-              label="SMS non lus"
-              accent="var(--pp-success)"
-            />
-            <StatCard
-              icon={<Voicemail className="w-4 h-4" />}
-              value={stats.voicemails}
-              label="Voicemails"
-              accent="var(--pp-agent)"
-            />
-            <StatCard
-              icon={<UsersIcon className="w-4 h-4" />}
-              value={stats.team}
-              label="Équipe"
-              accent="#9B7FE8"
-            />
-            <StatCard
-              icon={<Mail className="w-4 h-4" />}
-              value={stats.outbound}
-              label="SMS envoyés"
-              accent="#FFB347"
-            />
+            <Kpi icon={<Phone className="w-3.5 h-3.5" />} value={stats.calls} label="Appels" accent="var(--pp-brand-accent)" onClick={() => navigate("/mplanipret/calls")} />
+            <Kpi icon={<PhoneMissed className="w-3.5 h-3.5" />} value={stats.missed} label="Manqués" accent="var(--pp-danger)" pulse={stats.missed > 0} onClick={() => navigate("/mplanipret/calls?tab=missed")} />
+            <Kpi icon={<MessageSquare className="w-3.5 h-3.5" />} value={stats.sms} label="SMS" accent="var(--pp-success)" onClick={() => navigate("/mplanipret/messages")} />
+            <Kpi icon={<Calendar className="w-3.5 h-3.5" />} value={stats.meetings} label="RDV" accent="var(--pp-brand-accent-2)" />
+            <Kpi icon={<Flame className="w-3.5 h-3.5" />} value={stats.hotLeads} label="Hot leads" accent="#C9582A" />
+            <Kpi icon={<CheckSquare className="w-3.5 h-3.5" />} value={stats.tasks} label="Tâches" accent="var(--pp-agent)" />
+            <Kpi icon={<Voicemail className="w-3.5 h-3.5" />} value={stats.voicemails} label="Voicemails" accent="#6C5CE7" onClick={() => navigate("/mplanipret/voicemail")} />
+            <Kpi icon={<Mail className="w-3.5 h-3.5" />} value={stats.outbound} label="Envoyés" accent="#7A8FB0" />
+            <Kpi icon={<UsersIcon className="w-3.5 h-3.5" />} value={totalComms} label="Total" accent="var(--pp-brand-accent-2)" />
           </>
         )}
       </section>
 
-      {/* ===== AI BRIEF ===== */}
-      <section
-        className="rounded-2xl p-4"
-        style={{
-          background: "linear-gradient(135deg, rgba(155,127,232,0.12), rgba(46,155,220,0.06))",
-          border: "1px solid rgba(155,127,232,0.25)",
-        }}
-      >
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4" style={{ color: "var(--pp-agent)" }} />
-            <h2 className="text-sm font-semibold" style={{ color: "var(--pp-text-primary)" }}>
-              Brief IA du jour
-            </h2>
-          </div>
-          <button
-            onClick={playBrief}
-            disabled={briefLoading}
-            className="text-[11px] px-3 py-1.5 rounded-full flex items-center gap-1.5 disabled:opacity-50 font-semibold"
-            style={{
-              background: "linear-gradient(135deg, var(--pp-agent), #6C3CE1)",
-              color: "white",
-              boxShadow: "0 2px 12px rgba(155,127,232,0.4)",
-            }}
-          >
-            <Headphones className="w-3 h-3" /> {briefLoading ? "..." : "Écouter"}
-          </button>
-        </div>
-        {briefLoading ? (
-          <div className="space-y-2">
-            <Shimmer className="h-3 w-3/4" />
-            <Shimmer className="h-3 w-full" />
-            <Shimmer className="h-3 w-2/3" />
-          </div>
-        ) : brief ? (
-          <p className="text-sm whitespace-pre-line" style={{ color: "var(--pp-text-primary)" }}>
-            {brief}
-          </p>
-        ) : (
-          <p className="text-xs" style={{ color: "var(--pp-text-muted)" }}>
-            Touchez « Écouter » pour générer votre résumé du jour.
-          </p>
-        )}
-        {profile?.voice_agent_enabled && (
-          <button
-            onClick={openAva}
-            className="mt-3 w-full py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"
-            style={{
-              background: "linear-gradient(135deg, rgba(155,127,232,0.18), rgba(108,60,225,0.18))",
-              border: "1px solid rgba(155,127,232,0.35)",
-              color: "var(--pp-agent)",
-            }}
-          >
-            <Bot className="w-3.5 h-3.5" /> Parler à AVA
-          </button>
-        )}
-      </section>
-
-
-      {/* ===== MAESTRO SNAPSHOT ===== */}
-      {maestroCounts && (() => {
-        const tasks = maestroCounts.tasks_due_today ?? maestroCounts.tasks_today ?? maestroCounts.open_tasks ?? 0;
-        const appts = maestroCounts.appointments_today ?? maestroCounts.todays_appointments ?? 0;
-        const leadsToCall = maestroCounts.leads_to_call ?? maestroCounts.followups_due ?? 0;
-        if (tasks + appts + leadsToCall === 0) return null;
-        return (
-          <section
-            className="rounded-2xl p-3 grid grid-cols-3 gap-2"
-            style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)" }}
-          >
-            <MaestroBadge label="Tâches" value={tasks} accent="var(--pp-brand-accent)" onClick={() => navigate("/mplanipret/contacts")} />
-            <MaestroBadge label="RDV jour" value={appts} accent="var(--pp-agent)" onClick={() => navigate("/mplanipret/home")} />
-            <MaestroBadge label="À rappeler" value={leadsToCall} accent="var(--pp-danger)" onClick={() => navigate("/mplanipret/calls?tab=missed")} />
-          </section>
-        );
-      })()}
-
       {/* ===== HOT LEADS ===== */}
       {hotLeads.length > 0 && (
-        <section className="pp-card rounded-2xl p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold flex items-center gap-1.5" style={{ color: "var(--pp-text-primary)" }}>
-              <Flame className="w-4 h-4" style={{ color: "var(--pp-danger)" }} /> Leads chauds
-            </h2>
-            <span className="text-[10px] uppercase tracking-wider" style={{ color: "var(--pp-text-muted)" }}>
-              {hotLeads.length}
-            </span>
-          </div>
-          <ul className="space-y-1">
+        <section className="pp-card p-4">
+          <SectionHead icon={<Flame className="w-4 h-4" style={{ color: "#C9582A" }} />} title="Leads chauds" count={hotLeads.length} />
+          <ul className="space-y-1.5">
             {hotLeads.map((l) => {
               const name = l.from_name || l.from_number || l.to_name || l.to_number;
               const phone = l.from_number || l.to_number;
               return (
-                <li
-                  key={l.id}
-                  className="flex items-center gap-3 py-2 px-2 rounded-lg"
-                  style={{ background: "rgba(232,76,76,0.04)" }}
-                >
+                <li key={l.id} className="flex items-center gap-3 py-2 px-2 rounded-lg"
+                  style={{ background: "rgba(201,88,42,0.05)" }}>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate" style={{ color: "var(--pp-text-primary)" }}>
-                      {name ?? "—"}
-                    </p>
+                    <p className="text-sm font-semibold truncate" style={{ color: "var(--pp-text-primary)" }}>{name ?? "—"}</p>
                     <p className="text-[11px]" style={{ color: "var(--pp-text-muted)" }}>
                       {TEMP_EMOJI.hot} Score {l.lead_score}/10
                     </p>
                   </div>
-                  <button
-                    onClick={() => openDialer(phone ?? undefined)}
+                  <button onClick={() => openDialer(phone ?? undefined)}
                     className="text-[11px] font-semibold px-3 py-1.5 rounded-lg text-white"
-                    style={{ background: "var(--pp-danger)" }}
-                  >
+                    style={{ background: "#C9582A", fontFamily: "Urbanist,sans-serif" }}>
                     Rappeler
                   </button>
                 </li>
@@ -485,42 +373,68 @@ export default function MHome() {
         </section>
       )}
 
-      {/* ===== DUE REMINDERS ===== */}
+      {/* ===== MEETINGS ===== */}
+      <section className="pp-card p-4">
+        <SectionHead icon={<Calendar className="w-4 h-4" style={{ color: "var(--pp-brand-accent)" }} />} title="Rendez-vous à venir" count={meetings.length} />
+        {statsLoading ? (
+          <div className="space-y-2"><Shimmer className="h-10" /><Shimmer className="h-10" /></div>
+        ) : meetings.length === 0 ? (
+          <p className="text-xs text-center py-3" style={{ color: "var(--pp-text-muted)" }}>
+            Aucun rendez-vous cette semaine
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {meetings.map((m) => {
+              const t = m.start_time ? new Date(m.start_time) : null;
+              return (
+                <li key={m.id} className="flex items-center gap-3 py-2">
+                  <div className="px-2.5 py-1.5 rounded-lg text-xs font-bold tabular-nums"
+                    style={{ background: "rgba(59,111,160,0.10)", color: "var(--pp-brand-accent-2)", border: "1px solid rgba(59,111,160,0.25)", fontFamily: "Urbanist,sans-serif" }}>
+                    {t ? t.toLocaleDateString("fr-CA", { day: "2-digit", month: "short" }) : "—"}
+                    {" "}
+                    {t ? t.toLocaleTimeString("fr-CA", { hour: "2-digit", minute: "2-digit" }) : ""}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm truncate font-medium" style={{ color: "var(--pp-text-primary)" }}>{m.title ?? "(Sans titre)"}</p>
+                    {m.attendee_name && (
+                      <p className="text-[11px] truncate" style={{ color: "var(--pp-text-muted)" }}>{m.attendee_name}</p>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+
+      {/* ===== TASKS / REMINDERS ===== */}
       {dueReminders.length > 0 && (
-        <section className="pp-card rounded-2xl p-4">
-          <h2 className="text-sm font-semibold mb-3" style={{ color: "var(--pp-text-primary)" }}>
-            ⏰ À rappeler
-          </h2>
-          <ul className="space-y-1">
+        <section className="pp-card p-4">
+          <SectionHead icon={<CheckSquare className="w-4 h-4" style={{ color: "var(--pp-agent)" }} />} title="Tâches à faire" count={dueReminders.length} />
+          <ul className="space-y-1.5">
             {dueReminders.map((r) => (
-              <li key={r.id} className="flex items-center gap-2 py-2 px-2 rounded-lg" style={{ background: "var(--pp-bg-elevated)" }}>
+              <li key={r.id} className="flex items-center gap-2 py-2 px-2 rounded-lg"
+                style={{ background: "#F7F9FC" }}>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate" style={{ color: "var(--pp-text-primary)" }}>
                     {r.contact_name ?? r.contact_number ?? "—"}
                   </p>
-                  {r.note && (
-                    <p className="text-[11px] truncate" style={{ color: "var(--pp-text-muted)" }}>{r.note}</p>
-                  )}
+                  {r.note && <p className="text-[11px] truncate" style={{ color: "var(--pp-text-muted)" }}>{r.note}</p>}
                 </div>
-                <button
-                  onClick={() => openDialer(r.contact_number ?? undefined)}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center text-white"
-                  style={{ background: "var(--pp-brand-accent)" }}
-                >
-                  <Phone className="w-3.5 h-3.5" />
-                </button>
+                {r.contact_number && (
+                  <button onClick={() => openDialer(r.contact_number)}
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-white"
+                    style={{ background: "var(--pp-brand-accent)" }}>
+                    <Phone className="w-3.5 h-3.5" />
+                  </button>
+                )}
                 <button
                   onClick={async () => {
                     await supabase.from("planipret_reminders").update({ status: "done" }).eq("id", r.id);
                     loadStats();
                   }}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center text-xs"
-                  style={{
-                    background: "var(--pp-bg-surface)",
-                    border: "1px solid var(--pp-bg-border-2)",
-                    color: "var(--pp-success)",
-                  }}
-                >
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold"
+                  style={{ background: "#fff", border: "1px solid var(--pp-bg-border)", color: "var(--pp-success)" }}>
                   ✓
                 </button>
               </li>
@@ -529,95 +443,19 @@ export default function MHome() {
         </section>
       )}
 
-      {/* ===== APPOINTMENTS ===== */}
-      <section className="pp-card rounded-2xl p-4">
-        <h2 className="text-sm font-semibold mb-3 flex items-center gap-1.5" style={{ color: "var(--pp-text-primary)" }}>
-          <Calendar className="w-4 h-4" style={{ color: "var(--pp-brand-accent)" }} /> Prochains rendez-vous
-        </h2>
-        {eventsState === "loading" && (
-          <div className="space-y-2"><Shimmer className="h-10" /><Shimmer className="h-10" /></div>
-        )}
-        {eventsState === "no_m365" && (
-          <div className="text-center py-3">
-            <p className="text-xs mb-2" style={{ color: "var(--pp-text-muted)" }}>
-              Connectez Microsoft 365 pour voir vos RDV
-            </p>
-            <button
-              onClick={() => navigate("/mplanipret/more")}
-              className="text-xs px-3 py-1.5 rounded-full text-white font-semibold"
-              style={{ background: "var(--pp-brand-accent)" }}
-            >
-              Connecter
-            </button>
-          </div>
-        )}
-        {eventsState === "error" && (
-          <div className="text-center py-3">
-            <p className="text-xs mb-2" style={{ color: "var(--pp-text-muted)" }}>
-              Impossible de charger les RDV
-            </p>
-            <button
-              onClick={loadEvents}
-              className="text-xs px-3 py-1.5 rounded-full"
-              style={{
-                border: "1px solid var(--pp-bg-border-2)",
-                color: "var(--pp-text-secondary)",
-              }}
-            >
-              Réessayer
-            </button>
-          </div>
-        )}
-        {eventsState === "ready" && (events?.length === 0 ? (
-          <p className="text-xs text-center py-2" style={{ color: "var(--pp-text-muted)" }}>
-            Aucun rendez-vous aujourd'hui 🎉
-          </p>
-        ) : (
-          <ul className="space-y-2">
-            {events!.map((e, i) => {
-              const t = e.start?.dateTime ? new Date(e.start.dateTime + (e.start.timeZone === "UTC" ? "Z" : "")) : null;
-              return (
-                <li key={i} className="flex items-center gap-3 py-2">
-                  <div
-                    className="px-2 py-1 rounded-lg text-xs font-bold tabular-nums"
-                    style={{
-                      background: "rgba(46,155,220,0.12)",
-                      color: "var(--pp-brand-accent)",
-                      border: "1px solid rgba(46,155,220,0.25)",
-                    }}
-                  >
-                    {t ? t.toLocaleTimeString("fr-CA", { hour: "2-digit", minute: "2-digit" }) : "--:--"}
-                  </div>
-                  <span className="text-sm truncate" style={{ color: "var(--pp-text-primary)" }}>
-                    {e.subject ?? "(Sans titre)"}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        ))}
-      </section>
-
       {/* ===== RECENT CALLS ===== */}
-      <section className="pp-card rounded-2xl p-4">
+      <section className="pp-card p-4">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold" style={{ color: "var(--pp-text-primary)" }}>
-            Appels récents
-          </h2>
-          <button
-            onClick={() => navigate("/mplanipret/calls")}
-            className="text-[11px] flex items-center gap-0.5"
-            style={{ color: "var(--pp-brand-accent)" }}
-          >
+          <h2 className="text-sm font-semibold pp-heading">Appels récents</h2>
+          <button onClick={() => navigate("/mplanipret/calls")}
+            className="text-[11px] flex items-center gap-0.5" style={{ color: "var(--pp-brand-accent)" }}>
             Tout voir <ChevronRight className="w-3 h-3" />
           </button>
         </div>
         {statsLoading ? (
-          <div className="space-y-2">{[0, 1, 2].map((i) => <Shimmer key={i} className="h-10" />)}</div>
+          <div className="space-y-2">{[0,1,2].map((i) => <Shimmer key={i} className="h-10" />)}</div>
         ) : recent.length === 0 ? (
-          <p className="text-sm py-4 text-center" style={{ color: "var(--pp-text-muted)" }}>
-            Aucun appel
-          </p>
+          <p className="text-sm py-4 text-center" style={{ color: "var(--pp-text-muted)" }}>Aucun appel</p>
         ) : (
           <ul className="space-y-1">
             {recent.map((c) => {
@@ -628,15 +466,11 @@ export default function MHome() {
               const name = inbound || missed ? (c.from_name || c.from_number) : (c.to_name || c.to_number);
               const phone = inbound || missed ? c.from_number : c.to_number;
               return (
-                <li
-                  key={c.id}
+                <li key={c.id}
                   className="flex items-center gap-3 py-2.5 px-2 rounded-lg active:opacity-70"
-                  onClick={() => openDialer(phone ?? undefined)}
-                >
-                  <span
-                    className="w-8 h-8 rounded-full flex items-center justify-center"
-                    style={{ background: "var(--pp-bg-elevated)", color }}
-                  >
+                  onClick={() => openDialer(phone ?? undefined)}>
+                  <span className="w-8 h-8 rounded-full flex items-center justify-center"
+                    style={{ background: "#F0F4F9", color }}>
                     <Icon className="w-3.5 h-3.5" />
                   </span>
                   <div className="flex-1 min-w-0">
@@ -644,7 +478,7 @@ export default function MHome() {
                       {name ?? "Inconnu"}
                       {c.ai_summary && (
                         <span className="text-[8px] px-1.5 py-0.5 rounded-full font-bold"
-                          style={{ background: "rgba(155,127,232,0.15)", color: "var(--pp-agent)", border: "1px solid rgba(155,127,232,0.3)" }}>
+                          style={{ background: "rgba(108,92,231,0.10)", color: "var(--pp-agent)", border: "1px solid rgba(108,92,231,0.30)", fontFamily: "Urbanist,sans-serif" }}>
                           🤖 IA
                         </span>
                       )}
@@ -659,67 +493,44 @@ export default function MHome() {
           </ul>
         )}
       </section>
-
-      {/* Floating AVA button is now rendered by the shell (PlanipretMobile). */}
-
     </div>
   );
 }
 
-function StatCard({
-  icon, value, label, accent, pulse,
-}: {
-  icon: React.ReactNode;
-  value: number;
-  label: string;
-  accent: string;
-  pulse?: boolean;
+function SectionHead({ icon, title, count }: { icon: React.ReactNode; title: string; count?: number }) {
+  return (
+    <div className="flex items-center justify-between mb-3">
+      <h2 className="text-sm font-semibold flex items-center gap-1.5 pp-heading">{icon} {title}</h2>
+      {count != null && <span className="pp-eyebrow">{count}</span>}
+    </div>
+  );
+}
+
+function Kpi({ icon, value, label, accent, pulse, onClick }: {
+  icon: React.ReactNode; value: number; label: string; accent: string; pulse?: boolean; onClick?: () => void;
 }) {
   return (
-    <div
-      className="rounded-2xl p-3 relative overflow-hidden"
+    <button onClick={onClick} disabled={!onClick}
+      className="rounded-2xl p-3 relative overflow-hidden text-left active:scale-[0.97] transition disabled:active:scale-100"
       style={{
         background: "var(--pp-bg-surface)",
-        border: "1px solid var(--pp-bg-border-2)",
-      }}
-    >
-      <div
-        className="absolute top-0 left-0 right-0 h-[2px]"
-        style={{ background: `linear-gradient(90deg, transparent, ${accent}, transparent)`, opacity: 0.6 }}
-      />
-      <div className="flex items-center justify-between mb-2">
-        <span
-          className="w-7 h-7 rounded-lg flex items-center justify-center"
-          style={{ background: `${accent}1A`, color: accent }}
-        >
-          {icon}
-        </span>
+        border: "1px solid var(--pp-bg-border)",
+        boxShadow: "var(--pp-shadow-sm)",
+      }}>
+      <div className="absolute top-0 left-0 right-0 h-[2px]"
+        style={{ background: `linear-gradient(90deg, transparent, ${accent}, transparent)`, opacity: 0.7 }} />
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="w-6 h-6 rounded-md flex items-center justify-center"
+          style={{ background: `${accent}1A`, color: accent }}>{icon}</span>
         {pulse && value > 0 && (
-          <span
-            className="w-2 h-2 rounded-full pp-pulse-red"
-            style={{ background: "var(--pp-danger)" }}
-          />
+          <span className="w-1.5 h-1.5 rounded-full" style={{ background: "var(--pp-danger)", boxShadow: "0 0 6px var(--pp-danger)" }} />
         )}
       </div>
-      <div className="text-2xl font-bold tabular-nums" style={{ color: "var(--pp-text-primary)" }}>
-        {value}
-      </div>
-      <div className="text-[10px] uppercase tracking-wider mt-0.5" style={{ color: "var(--pp-text-muted)" }}>
+      <div className="text-xl font-bold tabular-nums pp-kpi" style={{ color: "var(--pp-text-primary)" }}>{value}</div>
+      <div className="text-[9.5px] uppercase tracking-wider mt-0.5"
+        style={{ color: "var(--pp-text-muted)", fontFamily: "Urbanist,sans-serif", fontWeight: 600, letterSpacing: "0.10em" }}>
         {label}
       </div>
-    </div>
-  );
-}
-
-function MaestroBadge({ label, value, accent, onClick }: { label: string; value: number; accent: string; onClick?: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className="flex flex-col items-center justify-center py-2 rounded-xl transition active:scale-95"
-      style={{ background: "var(--pp-bg-elevated)", border: `1px solid ${accent}33` }}
-    >
-      <div className="text-xl font-bold tabular-nums" style={{ color: accent }}>{value}</div>
-      <div className="text-[10px] uppercase tracking-wide" style={{ color: "var(--pp-text-muted)" }}>{label}</div>
     </button>
   );
 }
