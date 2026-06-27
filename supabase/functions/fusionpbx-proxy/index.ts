@@ -2276,7 +2276,62 @@ Deno.serve(async (req) => {
       return json(r, r?.ok ? 200 : 500);
     }
 
-    if (action === "system-status") {
+    // Server-side recording toggle. Used as a fallback when the on-device SIP
+    // INFO Record:on/off is ignored by the PBX (e.g. extension lacks the
+    // record_session app permission). Calls FreeSWITCH `uuid_record` directly.
+    if (action === "record-call" || action === "start-record" || action === "stop-record") {
+      const uuid = String(body.uuid || params.uuid || body.call_uuid || params.call_uuid || "");
+      const startReq = action === "start-record" || (action === "record-call" && (body.start ?? params.start ?? true));
+      if (!uuid) return json({ error: "uuid required" }, 400);
+      const domainName = String(body.domain_name || params.domain_name || "").trim() || "default";
+      const ts = new Date().toISOString().replace(/[:.]/g, "-");
+      const recPath = `/var/lib/freeswitch/recordings/${domainName}/archive/${ts}-${uuid}.wav`;
+      const args = startReq
+        ? `${uuid} start ${recPath}`
+        : `${uuid} stop ${recPath}`;
+      const r = await pbxWrite(`commands`, "POST", {
+        commands: [{ command: "uuid_record", arguments: args }],
+      });
+      console.log("[record-call]", { uuid, startReq, ok: r?.ok, status: r?.status, recPath });
+      if (organization_id) {
+        await admin.from("audit_logs").insert({
+          organization_id, user_id: userId,
+          action: startReq ? "pbx.record_start" : "pbx.record_stop",
+          resource_type: "active_call", resource_id: uuid,
+          metadata: { uuid, recPath, ok: r?.ok, status: r?.status },
+        }).then(() => {}, () => {});
+      }
+      return json({ ok: !!r?.ok, recording: startReq, recPath, raw: r?.data, status: r?.status }, r?.ok ? 200 : 500);
+    }
+
+    // Health check: validates FusionPBX REST + PHP session credentials.
+    if (action === "pbx-health-check" || action === "health-check") {
+      const apiProbe = await pbxFetch(`domains?domain_uuid=${requestedDomain}`).catch((e: any) => ({ ok: false, status: 0, error: String(e?.message || e) }));
+      let sessionOk = false;
+      let sessionErr: string | null = null;
+      try {
+        const cookie = await getFusionSessionCookie(PBX_RECORDING_FILE_BASE);
+        sessionOk = !!cookie;
+      } catch (e: any) {
+        sessionErr = String(e?.message || e).slice(0, 240);
+      }
+      const result = {
+        ok: apiProbe.ok && sessionOk,
+        api: { ok: apiProbe.ok, status: apiProbe.status, error: (apiProbe as any).error || null, latency_ms: (apiProbe as any).latency_ms || null },
+        session: { ok: sessionOk, error: sessionErr },
+        secrets: {
+          FUSIONPBX_API_URL: !!Deno.env.get("FUSIONPBX_API_URL"),
+          FUSIONPBX_USERNAME: !!Deno.env.get("FUSIONPBX_USERNAME"),
+          FUSIONPBX_PASSWORD: !!Deno.env.get("FUSIONPBX_PASSWORD"),
+          FUSIONPBX_API_KEY: !!Deno.env.get("FUSIONPBX_API_KEY"),
+          FUSIONPBX_DOMAIN_UUID: !!Deno.env.get("FUSIONPBX_DOMAIN_UUID"),
+        },
+        domain: { requested: requestedDomain, source: _resolved.source },
+      };
+      console.log("[pbx-health-check]", JSON.stringify(result));
+      return json(result, 200);
+    }
+
       const [status, sofia] = await Promise.all([
         pbxWrite(`commands`, "POST", { commands: [{ command: "status", arguments: "" }] }),
         pbxWrite(`commands`, "POST", { commands: [{ command: "sofia", arguments: "status" }] }),
