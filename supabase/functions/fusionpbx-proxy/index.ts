@@ -2332,6 +2332,7 @@ Deno.serve(async (req) => {
       return json(result, 200);
     }
 
+    if (action === "system-status") {
       const [status, sofia] = await Promise.all([
         pbxWrite(`commands`, "POST", { commands: [{ command: "status", arguments: "" }] }),
         pbxWrite(`commands`, "POST", { commands: [{ command: "sofia", arguments: "status" }] }),
