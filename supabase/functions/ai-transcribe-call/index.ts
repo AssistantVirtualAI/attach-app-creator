@@ -364,42 +364,43 @@ Deno.serve(async (req) => {
       return { text: String(d?.choices?.[0]?.message?.content || "").trim(), provider: "lovable-ai", model, finishReason: d?.choices?.[0]?.finish_reason };
     };
 
-    const tryClaude = async (): Promise<ProviderResult> => {
-      const claudeKey = Deno.env.get("ANTHROPIC_API_KEY");
-      const model = "claude-opus-4-5";
-      if (!claudeKey) return { error: "no-anthropic-key", status: 0, provider: "anthropic", model };
-      const r = await fetch("https://api.anthropic.com/v1/messages", {
+    // OpenAI Whisper fallback — Anthropic Messages API does NOT accept audio
+    // input blocks, so the previous "Claude STT" path always returned 400 and
+    // never produced a transcript. We replace it with Whisper-1 (real STT)
+    // keyed by OPENAI_API_KEY. If the key is absent we skip silently.
+    const tryWhisper = async (): Promise<ProviderResult> => {
+      const openaiKey = Deno.env.get("OPENAI_API_KEY");
+      const model = "whisper-1";
+      if (!openaiKey) return { error: "no-openai-key", status: 0, provider: "openai-whisper", model };
+      const form = new FormData();
+      form.append("file", new Blob([audioBytes], { type: audioMime }), `audio.${audioFormat}`);
+      form.append("model", model);
+      form.append("response_format", "text");
+      const r = await fetch("https://api.openai.com/v1/audio/transcriptions", {
         method: "POST",
-        headers: { "x-api-key": claudeKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-        body: JSON.stringify({
-          model,
-          max_tokens: 8000,
-          messages: [{
-            role: "user",
-            content: [
-              { type: "text", text: sttPrompt },
-              { type: "input_audio", source: { type: "base64", media_type: audioMime, data: b64 } },
-            ],
-          }],
-        }),
+        headers: { Authorization: `Bearer ${openaiKey}` },
+        body: form,
       });
       if (!r.ok) {
         const errTxt = await r.text();
-        console.error("claude error", r.status, errTxt.slice(0, 300));
-        return { error: errTxt.slice(0, 400), status: r.status, provider: "anthropic", model };
+        console.error("whisper error", r.status, errTxt.slice(0, 300));
+        return { error: errTxt.slice(0, 400), status: r.status, provider: "openai-whisper", model };
       }
-      const d = await r.json();
-      return { text: String(d?.content?.[0]?.text || "").trim(), provider: "anthropic", model };
+      const text = (await r.text()).trim();
+      return { text, provider: "openai-whisper", model };
     };
 
+    // `disable_claude` flag kept for backwards compatibility — it now controls
+    // whether the Whisper fallback step runs.
     const disableClaude = body?.disable_claude === true;
     const attempts: Array<{ provider: string; model: string; status?: number; error?: string }> = [];
     let final: ProviderResult | null = null;
     const steps: Array<() => Promise<ProviderResult>> = [
       () => tryLovable("google/gemini-2.5-pro"),
+      () => tryLovable("google/gemini-2.5-flash"),
       () => tryLovable("openai/gpt-4o-mini"),
     ];
-    if (!disableClaude) steps.push(() => tryClaude());
+    if (!disableClaude) steps.push(() => tryWhisper());
     for (const step of steps) {
       const res = await step();
       if (res.text) { final = res; break; }
