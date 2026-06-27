@@ -493,10 +493,45 @@ function AuthenticatedShell({
 
 /* ─── Top header with hamburger dropdown + actions ─────────────────────── */
 function TopHeader({
-  tab, onNavigate, haptic,
-}: { tab: Tab; onNavigate: (t: Tab) => void; haptic: (s?: ImpactStyle) => Promise<void> }) {
+  tab, onNavigate, haptic, creds, onOpenProfile,
+}: { tab: Tab; onNavigate: (t: Tab) => void; haptic: (s?: ImpactStyle) => Promise<void>; creds: Creds; onOpenProfile: () => void }) {
   const [open, setOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  const { mode, toggle: toggleTheme } = useTheme();
+  const { lang, toggle: toggleLang, t: tr } = useT();
+  const [presence, setPresence] = useState<{ status: string; color: string }>({ status: 'available', color: '#22c55e' });
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!creds?.accessToken || !creds?.userId) return;
+    let cancelled = false;
+    const STATUS_COLORS: Record<string, string> = {
+      available: '#22c55e', busy: '#f59e0b', on_call: '#3b82f6', meeting: '#8b5cf6',
+      lunch: '#f97316', break: '#14b8a6', dnd: '#ef4444', away: '#94a3b8',
+      out_of_office: '#6366f1', offline: '#64748b',
+    };
+    (async () => {
+      try {
+        const [{ data: pres }, { data: prof }] = await Promise.all([
+          supabase.from('user_presence').select('status').eq('user_id', creds.userId!).maybeSingle(),
+          supabase.from('profiles').select('avatar_url').eq('id', creds.userId!).maybeSingle(),
+        ]);
+        if (cancelled) return;
+        const s = (pres?.status as string) || 'available';
+        setPresence({ status: s, color: STATUS_COLORS[s] || '#22c55e' });
+        if (prof?.avatar_url) setAvatarUrl(prof.avatar_url);
+      } catch {}
+    })();
+    const ch = supabase.channel(`presence-self-${creds.userId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_presence', filter: `user_id=eq.${creds.userId}` }, (payload: any) => {
+        const s = payload?.new?.status || 'available';
+        setPresence({ status: s, color: STATUS_COLORS[s] || '#22c55e' });
+      })
+      .subscribe();
+    return () => { cancelled = true; try { supabase.removeChannel(ch); } catch {} };
+  }, [creds?.accessToken, creds?.userId]);
+
+  const initials = (creds?.email || creds?.extension || 'U').slice(0, 2).toUpperCase();
   const { mode, toggle: toggleTheme } = useTheme();
   const { lang, toggle: toggleLang, t: tr } = useT();
   const titles: Partial<Record<Tab, string>> = {
