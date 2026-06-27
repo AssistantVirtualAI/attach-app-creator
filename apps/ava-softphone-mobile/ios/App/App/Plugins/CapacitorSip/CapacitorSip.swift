@@ -444,25 +444,26 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     }
 
     // MARK: - Audio route control (speaker / earpiece / bluetooth)
+    // Phase 2: never touch setCategory/setActive mid-call — the RemoteIO
+    // AudioUnit owns the session. We only flip overrideOutputAudioPort, which
+    // is the documented Apple way to toggle speaker vs receiver during a call.
     @objc func setAudioRoute(_ call: CAPPluginCall) {
         let route = (call.getString("route") ?? "auto").lowercased()
         let session = AVAudioSession.sharedInstance()
 
-        // Only (re)assert category if needed — touching it while the RemoteIO
-        // AudioUnit is running can momentarily kill the stream and surface
-        // "AVAudioSessionErrorCodeCannotInterruptOthers" on the JS side.
+        // If category was never configured (e.g. route changed before any call),
+        // configure it once with full Bluetooth options. Do NOT call setActive.
         if session.category != .playAndRecord || session.mode != .voiceChat {
-            let safeOptions: AVAudioSession.CategoryOptions = [.allowBluetooth, .allowBluetoothA2DP, .defaultToSpeaker]
-            do {
-                try session.setCategory(.playAndRecord, mode: .voiceChat, options: safeOptions)
-            } catch {
-                log("setAudioRoute: setCategory failed, retrying without A2DP: \(error.localizedDescription)")
-                do { try session.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetooth, .defaultToSpeaker]) }
-                catch { log("setAudioRoute: setCategory fallback also failed: \(error.localizedDescription)") }
+            var opts: AVAudioSession.CategoryOptions = [.allowBluetooth, .allowBluetoothA2DP, .defaultToSpeaker]
+            if #available(iOS 18.2, *) {
+                // .allowBluetoothHFP supersedes .allowBluetooth on iOS 18+
+                opts.insert(.allowBluetoothHFP)
             }
-            // Activate only if not already active — avoids 561017449 races.
-            do { try session.setActive(true, options: []) } catch {
-                log("setAudioRoute: setActive warn (continuing): \(error.localizedDescription)")
+            do {
+                try session.setCategory(.playAndRecord, mode: .voiceChat, options: opts)
+                log("[AudioRoute] setCategory playAndRecord/voiceChat opts=\(opts.rawValue)")
+            } catch {
+                log("[AudioRoute] setCategory failed: \(error.localizedDescription)")
             }
         }
 
@@ -470,7 +471,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
             switch route {
             case "speaker":
                 try session.overrideOutputAudioPort(.speaker)
-            case "earpiece", "receiver", "none":
+            case "earpiece", "receiver", "none", "auto":
                 try session.overrideOutputAudioPort(.none)
             case "bluetooth":
                 if let bt = session.availableInputs?.first(where: { input in
@@ -482,11 +483,13 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
             default:
                 break
             }
-            let outputs = session.currentRoute.outputs.map { "\($0.portType.rawValue)" }.joined(separator: ",")
-            log("audio route set → \(route) actual=\(outputs)")
+            // Read the ACTUAL route iOS applied — this is what the UI mirrors.
+            let outs = session.currentRoute.outputs
+            let outputs = outs.map { "\($0.portType.rawValue)" }.joined(separator: ",")
+            let names = outs.map { $0.portName }.joined(separator: ",")
+            log("[AudioRoute] applied=\(route) outputs=\(outputs) (\(names))")
             call.resolve(["ok": true, "route": route, "outputs": outputs])
         } catch {
-            // Surface a readable French message; JS toasts will show it.
             let nsErr = error as NSError
             let human: String
             switch route {
@@ -494,7 +497,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
             case "bluetooth": human = "Aucun périphérique Bluetooth disponible (code \(nsErr.code))"
             default:          human = "Changement de sortie audio refusé (code \(nsErr.code))"
             }
-            log("setAudioRoute error: \(nsErr) → \(human)")
+            log("[AudioRoute] error route=\(route) code=\(nsErr.code) domain=\(nsErr.domain) → \(human)")
             call.reject(human, "AUDIO_ROUTE_FAILED", error)
         }
     }
