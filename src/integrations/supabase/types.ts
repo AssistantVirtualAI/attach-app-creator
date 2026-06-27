@@ -8551,6 +8551,7 @@ export type Database = {
           privacy_version: string | null
           recording_consent: boolean
           role: string
+          status: string
           updated_at: string
           user_id: string
           voice_agent_enabled: boolean
@@ -8617,6 +8618,7 @@ export type Database = {
           privacy_version?: string | null
           recording_consent?: boolean
           role?: string
+          status?: string
           updated_at?: string
           user_id: string
           voice_agent_enabled?: boolean
@@ -8683,6 +8685,7 @@ export type Database = {
           privacy_version?: string | null
           recording_consent?: boolean
           role?: string
+          status?: string
           updated_at?: string
           user_id?: string
           voice_agent_enabled?: boolean
