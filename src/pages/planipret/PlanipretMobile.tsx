@@ -381,7 +381,9 @@ export default function PlanipretMobile() {
         <Dialer open={dialerOpen} onClose={() => setDialerOpen(false)} initial={dialerInit} />
         <InboundCallOverlay call={inbound} onClose={() => setInbound(null)} />
         {avaOpen && profile?.user_id && (
-          <AvaVoiceAgent userId={profile.user_id} onClose={() => setAvaOpen(false)} />
+          profile.voice_agent_enabled
+            ? <AvaVoiceAgent userId={profile.user_id} onClose={() => setAvaOpen(false)} />
+            : <AvaChatSheet userId={profile.user_id} onClose={() => setAvaOpen(false)} />
         )}
         <OfflineBanner />
       </div>
