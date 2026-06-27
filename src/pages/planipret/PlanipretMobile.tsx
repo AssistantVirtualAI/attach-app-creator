@@ -267,7 +267,7 @@ export default function PlanipretMobile() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center" style={{ background: "#030810", color: "var(--pp-text-muted, #4A7FA5)" }}>Chargement…</div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center" style={{ background: "#F7F9FC", color: "#5A6B85", fontFamily: "Urbanist,sans-serif" }}>Chargement…</div>;
 
   if (accessError) {
     return (
