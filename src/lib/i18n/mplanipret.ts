@@ -28,7 +28,11 @@ export const MP_DICT = {
       failed: "Connexion impossible",
       success: "Connexion réussie",
       separate: "Cette page est séparée du portail admin Planiprêt.",
+      signInMs: "Se connecter avec Microsoft",
+      or: "ou",
+      msUnavailable: "Microsoft SSO non disponible — contactez votre administrateur.",
     },
+
     legal: {
       tos: "Conditions d'utilisation",
       privacy: "Politique de confidentialité",
@@ -97,7 +101,11 @@ export const MP_DICT = {
       failed: "Sign-in failed",
       success: "Signed in",
       separate: "This page is separate from the Planiprêt admin portal.",
+      signInMs: "Sign in with Microsoft",
+      or: "or",
+      msUnavailable: "Microsoft SSO unavailable — contact your administrator.",
     },
+
     legal: {
       tos: "Terms of Use",
       privacy: "Privacy Policy",

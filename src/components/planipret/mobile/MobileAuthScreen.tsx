@@ -36,6 +36,25 @@ export default function MobileAuthScreen({ onLoggedIn }: { onLoggedIn: () => Pro
     else toast.success(lang === "fr" ? "Courriel envoyé" : "Email sent");
   };
 
+  const signInWithMicrosoft = async () => {
+    setLoading(true);
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "azure",
+      options: {
+        redirectTo: `${window.location.origin}/mplanipret`,
+        scopes: "email openid profile offline_access User.Read Mail.ReadWrite Calendars.ReadWrite",
+      },
+    });
+    setLoading(false);
+    if (error) {
+      const msg = /unsupported|not enabled|provider/i.test(error.message)
+        ? t("auth.msUnavailable")
+        : error.message;
+      toast.error(msg);
+    }
+  };
+
+
   return (
     <div className="h-full w-full flex flex-col" style={{ background: "var(--pp-bg-base)" }}>
       {/* Top control row: lang + theme */}
