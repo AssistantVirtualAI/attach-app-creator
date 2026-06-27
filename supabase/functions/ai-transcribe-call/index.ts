@@ -392,13 +392,15 @@ Deno.serve(async (req) => {
       return { text: String(d?.content?.[0]?.text || "").trim(), provider: "anthropic", model };
     };
 
+    const disableClaude = body?.disable_claude === true;
     const attempts: Array<{ provider: string; model: string; status?: number; error?: string }> = [];
     let final: ProviderResult | null = null;
-    for (const step of [
+    const steps: Array<() => Promise<ProviderResult>> = [
       () => tryLovable("google/gemini-2.5-pro"),
       () => tryLovable("openai/gpt-4o-mini"),
-      () => tryClaude(),
-    ]) {
+    ];
+    if (!disableClaude) steps.push(() => tryClaude());
+    for (const step of steps) {
       const res = await step();
       if (res.text) { final = res; break; }
       attempts.push({ provider: res.provider, model: res.model, status: res.status, error: (res.error || "empty").slice(0, 200) });
