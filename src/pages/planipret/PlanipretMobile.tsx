@@ -2,10 +2,11 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate, NavLink, Outlet, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
-import { Home, Phone, MessageSquare, Users, Phone as PhoneIcon, X, Delete, Plus, Lock, PhoneOff, Bot, Settings as SettingsIcon } from "lucide-react";
+import { Home, Phone, MessageSquare, Users, Phone as PhoneIcon, X, Delete, Plus, Lock, PhoneOff, Settings as SettingsIcon } from "lucide-react";
 import { toast } from "sonner";
 import planipretLogo from "@/assets/planipret-logo.png.asset.json";
 import avaWordmark from "@/assets/ava-wordmark.svg";
+import avaLogo from "@/assets/ava-statistics-logo.png.asset.json";
 import { usePullToRefresh, PullIndicator } from "@/hooks/usePullToRefresh";
 import { useRealtimeManager } from "@/hooks/useRealtimeManager";
 import InboundCallOverlay, { type InboundCall } from "@/components/InboundCallOverlay";
@@ -16,6 +17,7 @@ import UniversalSearchBar from "@/components/planipret/UniversalSearchBar";
 import { OnboardingTutorial } from "@/components/planipret/OnboardingTutorial";
 import { useAvaNavigation } from "@/hooks/useAvaNavigation";
 import AvaVoiceAgent from "@/components/planipret/mobile/AvaVoiceAgent";
+import AvaChatSheet from "@/components/planipret/mobile/AvaChatSheet";
 
 const ACCENT = "#2E9BDC";
 
@@ -24,7 +26,7 @@ export type PlanipretMobileContext = { profile: any; reloadProfile: () => Promis
 const TABS = [
   { to: "/mplanipret/home", label: "Accueil", Icon: Home },
   { to: "/mplanipret/calls", label: "Appels", Icon: Phone },
-  { to: "_fab", label: "", Icon: Bot },
+  { to: "_fab", label: "", Icon: Home },
   { to: "/mplanipret/messages", label: "Messages", Icon: MessageSquare },
   { to: "/mplanipret/contacts", label: "Contacts", Icon: Users },
 ];
@@ -248,30 +250,39 @@ export default function PlanipretMobile() {
   return (
     <Frame>
       <div className="h-full flex flex-col relative overflow-hidden" style={{ background: "var(--pp-bg-base)" }}>
-        {/* Top brand header */}
-        <header className="flex items-center gap-2 px-4 pt-3 pb-2"
+        {/* Top brand header — AVA (left) · Planiprêt (center) · Settings (right) */}
+        <header className="relative flex items-center px-4 pt-3 pb-2"
           style={{ background: "linear-gradient(180deg, #0A1628 0%, #060D1A 100%)", borderBottom: "1px solid var(--pp-bg-border)" }}>
-          <img src={planipretLogo.url} alt="Planiprêt" className="w-8 h-8 rounded-lg object-cover" />
-          <span style={{ fontFamily: "Inter,sans-serif", fontWeight: 700, fontSize: 14, color: "var(--pp-text-primary)", letterSpacing: "-0.01em" }}>Planiprêt</span>
-          <span className="ml-auto flex items-center gap-2">
+          {/* AVA icon — left */}
+          <div className="flex items-center gap-1.5">
+            <img src={avaLogo.url} alt="AVA" className="w-7 h-7 rounded-lg object-cover"
+              style={{ boxShadow: "0 0 12px rgba(155,127,232,0.45)" }} />
             <span className="flex items-center gap-1.5">
               <span className="pp-live-dot" />
-              <span style={{ fontSize: 10, color: "var(--pp-success)", fontWeight: 600 }}>SIP</span>
+              <span style={{ fontSize: 9, color: "var(--pp-success)", fontWeight: 700, letterSpacing: "0.05em" }}>SIP</span>
             </span>
-            <button
-              onClick={() => navigate("/mplanipret/more")}
-              className="flex items-center justify-center rounded-full active:scale-95 transition"
-              style={{
-                width: 32, height: 32,
-                background: "var(--pp-bg-elevated)",
-                border: "1px solid var(--pp-bg-border-2)",
-                color: "var(--pp-text-secondary)",
-              }}
-              aria-label="Paramètres"
-            >
-              <SettingsIcon className="w-4 h-4" />
-            </button>
-          </span>
+          </div>
+
+          {/* Planiprêt centered logo */}
+          <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2">
+            <img src={planipretLogo.url} alt="Planiprêt" className="w-7 h-7 rounded-lg object-cover" />
+            <span style={{ fontFamily: "Inter,sans-serif", fontWeight: 700, fontSize: 14, color: "var(--pp-text-primary)", letterSpacing: "-0.01em" }}>Planiprêt</span>
+          </div>
+
+          {/* Settings — right */}
+          <button
+            onClick={() => navigate("/mplanipret/more")}
+            className="ml-auto flex items-center justify-center rounded-full active:scale-95 transition"
+            style={{
+              width: 32, height: 32,
+              background: "var(--pp-bg-elevated)",
+              border: "1px solid var(--pp-bg-border-2)",
+              color: "var(--pp-text-secondary)",
+            }}
+            aria-label="Paramètres"
+          >
+            <SettingsIcon className="w-4 h-4" />
+          </button>
         </header>
 
         <UniversalSearchBar />
@@ -285,20 +296,23 @@ export default function PlanipretMobile() {
           <OnboardingTutorial profile={profile} onDone={loadProfile} />
         )}
 
-        {/* Center FAB — AVA voice agent */}
-        {profile?.voice_agent_enabled !== false && (
-          <button onClick={openAva}
-            className="absolute left-1/2 -translate-x-1/2 z-20 rounded-full flex items-center justify-center text-white active:scale-95 transition"
-            style={{
-              background: "linear-gradient(135deg, #2D1A5A, #9B7FE8)",
-              boxShadow: "0 4px 24px rgba(155,127,232,0.6)",
-              animation: "pp-glow-purple 2s ease-in-out infinite",
-              width: 58, height: 58, bottom: 76,
-            }}
-            aria-label="Parler à AVA">
-            <Bot className="w-7 h-7" />
-          </button>
-        )}
+        {/* Center FAB — AVA (voice if enabled, chat otherwise) */}
+        <button onClick={openAva}
+          className="absolute left-1/2 -translate-x-1/2 z-20 rounded-full flex items-center justify-center active:scale-95 transition overflow-hidden"
+          style={{
+            background: profile?.voice_agent_enabled
+              ? "linear-gradient(135deg, #2D1A5A, #9B7FE8, #E84CC9)"
+              : "linear-gradient(135deg, #1E3A8A, #6366F1, #9B7FE8)",
+            boxShadow: profile?.voice_agent_enabled
+              ? "0 6px 28px rgba(232,76,201,0.55), 0 0 0 2px rgba(155,127,232,0.25)"
+              : "0 6px 24px rgba(99,102,241,0.5), 0 0 0 2px rgba(99,102,241,0.2)",
+            animation: profile?.voice_agent_enabled ? "pp-glow-purple 2s ease-in-out infinite" : undefined,
+            width: 62, height: 62, bottom: 74, padding: 3,
+          }}
+          aria-label={profile?.voice_agent_enabled ? "Parler à AVA" : "Discuter avec AVA"}>
+          <img src={avaLogo.url} alt="AVA" className="w-full h-full rounded-full object-cover"
+            style={{ background: "#060D1A" }} />
+        </button>
 
         {/* Right FAB — Keypad (bleu) ou raccrocher (rouge) si appel actif */}
         <button onClick={activeCallId ? hangupActive : () => setDialerOpen(true)}
@@ -358,16 +372,20 @@ export default function PlanipretMobile() {
 
 
         {/* Powered by AVA footer */}
-        <div className="absolute bottom-0 inset-x-0 h-[22px] flex items-center justify-center gap-1.5 z-10"
+        <div className="absolute bottom-0 inset-x-0 h-[24px] flex items-center justify-center gap-2 z-10"
           style={{ background: "var(--pp-bg-deep)", borderTop: "1px solid var(--pp-bg-border)" }}>
-          <span style={{ fontSize: 9, color: "var(--pp-text-faint)", letterSpacing: "0.1em" }}>Powered by</span>
-          <img src={avaWordmark} alt="AVA" className="h-2.5 opacity-60" />
+          <span style={{ fontSize: 9, color: "var(--pp-text-faint)", letterSpacing: "0.12em", fontWeight: 600 }}>POWERED BY</span>
+          <img src={avaLogo.url} alt="AVA" className="w-3.5 h-3.5 rounded object-cover" style={{ boxShadow: "0 0 6px rgba(155,127,232,0.4)" }} />
+          <span style={{ fontSize: 9, color: "rgba(255,255,255,0.7)", letterSpacing: "0.08em", fontWeight: 700 }}>AVA</span>
+          <span style={{ fontSize: 8.5, color: "var(--pp-text-faint)", letterSpacing: "0.1em" }}>· DEVELOPED BY AVA</span>
         </div>
 
         <Dialer open={dialerOpen} onClose={() => setDialerOpen(false)} initial={dialerInit} />
         <InboundCallOverlay call={inbound} onClose={() => setInbound(null)} />
         {avaOpen && profile?.user_id && (
-          <AvaVoiceAgent userId={profile.user_id} onClose={() => setAvaOpen(false)} />
+          profile.voice_agent_enabled
+            ? <AvaVoiceAgent userId={profile.user_id} onClose={() => setAvaOpen(false)} />
+            : <AvaChatSheet userId={profile.user_id} onClose={() => setAvaOpen(false)} />
         )}
         <OfflineBanner />
       </div>
