@@ -1,9 +1,13 @@
 /**
  * Auto-reconnect helper: re-runs the provided callback when the app comes
- * back to the foreground or when the network reconnects. Both are best-effort
- * and silently noop on web/preview.
+ * back to the foreground or when the network reconnects / changes type
+ * (Wi-Fi ↔ cellular). iOS does not let us programmatically pick the radio,
+ * but we react on every handover so the SIP session re-registers on whichever
+ * link currently has connectivity (effectively "best-signal" handover).
  */
 import { Capacitor } from '@capacitor/core';
+
+let lastType: string | null = null;
 
 export async function attachNativeAutoReconnect(reconnect: () => void): Promise<() => void> {
   const cleanups: Array<() => void> = [];
@@ -13,7 +17,6 @@ export async function attachNativeAutoReconnect(reconnect: () => void): Promise<
     const { App } = await import('@capacitor/app');
     const sub = await App.addListener('appStateChange', (s) => {
       if (s.isActive) {
-        // eslint-disable-next-line no-console
         console.log('[NativeSIP] appStateChange:active → reconnect');
         reconnect();
       }
@@ -23,13 +26,27 @@ export async function attachNativeAutoReconnect(reconnect: () => void): Promise<
 
   try {
     const { Network } = await import('@capacitor/network');
+    try {
+      const cur = await Network.getStatus();
+      lastType = cur.connectionType ?? null;
+    } catch {}
     const sub = await Network.addListener('networkStatusChange', (s) => {
-      // eslint-disable-next-line no-console
-      console.log('[NativeSIP] networkStatusChange', s);
+      const nextType = s.connectionType ?? null;
+      const typeChanged = nextType !== lastType;
+      console.log('[NativeSIP] networkStatusChange', {
+        ...s,
+        previousType: lastType,
+        typeChanged,
+      });
+      lastType = nextType;
       if (s.connected) reconnect();
     });
     cleanups.push(() => { sub.remove().catch(() => {}); });
   } catch {}
 
   return () => { cleanups.forEach((c) => { try { c(); } catch {} }); };
+}
+
+export function currentConnectionType(): string | null {
+  return lastType;
 }

@@ -123,7 +123,7 @@ final class RTPAudioSession {
             "engineRestartTotal": engineRestartTotal,
             "lastEngineError": lastEngineError,
             "sessionState": sessionStateDescription(),
-            "audioBackend": "RemoteIO",
+            "audioBackend": "VoiceProcessingIO (AEC/NS/AGC)",
             "inputCallbacks": Int(inputCallbackCount),
             "renderCallbacks": Int(renderCallbackCount),
             "inputFrames": Int(inputFramesTotal),
@@ -309,9 +309,12 @@ final class RTPAudioSession {
         // Reset resampler phase for a clean start.
         txPhase = 0; rxPhase = 0; rxHoldSample = 0
 
+        // Phase 4: use VoiceProcessingIO instead of plain RemoteIO to get
+        // built-in AEC (echo cancellation), NS (noise suppression) and AGC
+        // (auto gain) handled by the OS Voice Processing unit.
         var desc = AudioComponentDescription(
             componentType: kAudioUnitType_Output,
-            componentSubType: kAudioUnitSubType_RemoteIO,
+            componentSubType: kAudioUnitSubType_VoiceProcessingIO,
             componentManufacturer: kAudioUnitManufacturer_Apple,
             componentFlags: 0, componentFlagsMask: 0
         )
@@ -410,6 +413,22 @@ final class RTPAudioSession {
             AudioComponentInstanceDispose(io); return false
         }
         NSLog("[RTP] RemoteIO input callback installed bus=1")
+
+        // Phase 4: configure VoiceProcessingIO — enable AEC (not bypassed),
+        // automatic gain control and ducking. Apple NS is always on with VPIO.
+        var bypass: UInt32 = 0
+        _ = AudioUnitSetProperty(io, kAUVoiceIOProperty_BypassVoiceProcessing,
+                                 kAudioUnitScope_Global, 0,
+                                 &bypass, UInt32(MemoryLayout<UInt32>.size))
+        var agc: UInt32 = 1
+        _ = AudioUnitSetProperty(io, kAUVoiceIOProperty_VoiceProcessingEnableAGC,
+                                 kAudioUnitScope_Global, 0,
+                                 &agc, UInt32(MemoryLayout<UInt32>.size))
+        var muteOut: UInt32 = 0
+        _ = AudioUnitSetProperty(io, kAUVoiceIOProperty_MuteOutput,
+                                 kAudioUnitScope_Global, 0,
+                                 &muteOut, UInt32(MemoryLayout<UInt32>.size))
+        NSLog("[RTP] VoiceProcessingIO configured: AEC=on NS=on AGC=on")
 
         NSLog("[RTP] AudioUnitInitialize begin")
         status = AudioUnitInitialize(io)

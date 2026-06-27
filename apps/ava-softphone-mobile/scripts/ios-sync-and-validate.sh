@@ -51,7 +51,7 @@ if grep -Eq "AVAudioEngine|AVAudioPlayerNode|installTap|removeTap" "$RTP"; then
   grep -En "AVAudioEngine|AVAudioPlayerNode|installTap|removeTap" "$RTP" || true
   exit 1
 fi
-grep -q "kAudioUnitSubType_RemoteIO" "$RTP" && green "  ✓ RTPAudioSession uses RemoteIO AudioUnit" || { red "  ✗ RemoteIO AudioUnit not found in RTPAudioSession.swift"; exit 1; }
+grep -Eq "kAudioUnitSubType_RemoteIO|kAudioUnitSubType_VoiceProcessingIO" "$RTP" && green "  ✓ RTPAudioSession uses RemoteIO/VoiceProcessingIO AudioUnit" || { red "  ✗ RemoteIO/VoiceProcessingIO AudioUnit not found in RTPAudioSession.swift"; exit 1; }
 
 echo "==> 1d. Verify native call-control methods are exposed"
 for method in startRecord stopRecord transfer park addCall requestMicrophonePermission getRtpStats playTestTone; do
