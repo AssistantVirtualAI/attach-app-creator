@@ -5,6 +5,7 @@ import { mobileApi, MeResponse } from '../lib/mobileApi';
 import { Card, Chip, SectionTitle, SettingsRow, StatusDot, AIPanel } from '../components/ui/Primitives';
 import { LemtelMark, AvaBadge } from '../components/Brand';
 import { checkAllPermissions, openAppSettings, type AllPermissions, type PermissionStatus } from '../lib/permissions';
+import { getAnnounceConsent, setAnnounceConsent } from '../lib/recordingConsent';
 import { useTheme } from '../lib/ThemeContext';
 import { useT } from '../lib/i18n';
 import type { Tab } from '../components/BottomTabs';
@@ -22,6 +23,7 @@ export default function SettingsScreen({
   const [perms, setPerms] = useState<AllPermissions | null>(null);
   const [haptics, setHaptics] = useState<boolean>(() => localStorage.getItem('ava.haptics') !== 'off');
   const [autoAnswer, setAutoAnswer] = useState<boolean>(() => localStorage.getItem('ava.autoAnswer') === 'on');
+  const [announceRec, setAnnounceRec] = useState<boolean>(() => getAnnounceConsent());
   
   const [ringtone, setRingtone] = useState<string>(() => localStorage.getItem('ava.ringtone') || 'AVA Default');
   const [audioOut, setAudioOut] = useState<string>(() => localStorage.getItem('ava.audioOut') || 'System default');
@@ -196,6 +198,12 @@ export default function SettingsScreen({
         <SettingsRow label={t('settings.dataSafety')} icon="🛡" onPress={() => openPortal('/data-safety')} />
         <SettingsRow label={t('settings.privacyPolicy')} icon="📄" onPress={() => openPortal('/privacy')} />
         <SettingsRow label={t('settings.termsOfService')} icon="📜" onPress={() => openPortal('/terms')} />
+        <SettingsRow
+          label={lang === 'fr' ? "Annoncer l'enregistrement d'appel" : 'Announce call recording'}
+          icon="🔔"
+          value={announceRec ? (lang === 'fr' ? 'Activé (recommandé)' : 'On (recommended)') : (lang === 'fr' ? 'Désactivé' : 'Off')}
+          onPress={() => { const next = !announceRec; setAnnounceRec(next); setAnnounceConsent(next); }}
+        />
         <SettingsRow label={t('settings.clearCache')} icon="🧹" onPress={clearCache} />
         <SettingsRow label={t('settings.deleteAccount')} icon="⚠" onPress={() => openPortal('/account/delete')} />
       </Card>

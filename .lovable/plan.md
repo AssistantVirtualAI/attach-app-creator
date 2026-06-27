@@ -1,117 +1,155 @@
-# Plan — Améliorations softphone mobile Lemtel
+# Apple App Store Compliance Plan — AVA Softphone Mobile
 
-Périmètre : `apps/ava-softphone-mobile/**` + Edge Functions `ai-transcribe-call` / `ai-analyze-call`. Aucun changement Lemtel desktop ni autres portails. Après chaque phase, étape de test explicite à valider avant de passer à la suivante.
+Goal: make `apps/ava-softphone-mobile` pass Apple's App Review (Guidelines 2.1, 2.5, 3.1, 4.0, 5.1.1, 5.1.5) and be fully deployable to TestFlight + the App Store.
+
+## 1. Info.plist — required keys & usage strings
+
+Update `apps/ava-softphone-mobile/ios/App/App/Info.plist` to match what the app actually does. Apple rejects vague or missing strings.
+
+- `NSMicrophoneUsageDescription` — clear French + English copy (calls).
+- `NSContactsUsageDescription` — only if Contacts screen is shipped; otherwise remove the import.
+- `NSCameraUsageDescription` — remove if no video call in v1 (avoid rejection for unused permission).
+- `NSPhotoLibraryUsageDescription` — keep only if avatar upload ships.
+- `NSUserTrackingUsageDescription` — add only if any analytics SDK is added; otherwise omit.
+- `NSLocalNetworkUsageDescription` + `NSBonjourServices` — keep (SIP).
+- `NSFaceIDUsageDescription` — add if biometric unlock is enabled.
+- `NSSpeechRecognitionUsageDescription` — remove unless on-device speech is used (transcription runs server-side).
+- `ITSAppUsesNonExemptEncryption` = `false` (calls use standard HTTPS/SRTP via system libs).
+- `UIBackgroundModes`: `audio`, `voip`, `remote-notification`. Remove `voip` if not using PushKit/CallKit — Apple rejects unused VoIP background mode (see §3).
+- `UIRequiresPersistentWiFi` = true.
+- `LSApplicationQueriesSchemes`: `tel`, `sms`, `mailto` (used by click-to-call fallbacks).
+- `CFBundleDisplayName` = "AVA Softphone", `CFBundleShortVersionString` = 1.0.0, `CFBundleVersion` auto-bumped by CI.
+
+## 2. CallKit + PushKit (required for VoIP background)
+
+Apple Guideline 4.5 / iOS 13+: VoIP apps **must** use CallKit + PushKit when receiving calls while backgrounded; plain background mode `voip` without PushKit is grounds for rejection.
+
+- Add native module `CallKitBridge.swift` (CXProvider + CXCallController) wired to `CapacitorSip` events (`incomingCall`, `callEnded`, `callAnswered`).
+- Add `PushKitBridge.swift` registering for `PKPushTypeVoIP` and forwarding the push to FusionPBX REGISTER refresh + display incoming UI via CallKit.
+- Backend: extend `mobile-push-token` edge function (create if missing) to store the VoIP push token per `pbx_extensions` row, and add edge function `pbx-voip-push` that the SIP server hits before INVITE to wake the device.
+- If we ship v1 **without** PushKit, remove `voip` from `UIBackgroundModes` and document that incoming calls only work while app is foregrounded — safer for first submission.
+
+## 3. Privacy Manifest (`PrivacyInfo.xcprivacy`) — mandatory since May 2024
+
+Add `apps/ava-softphone-mobile/ios/App/App/PrivacyInfo.xcprivacy` declaring:
+
+- `NSPrivacyCollectedDataTypes`: Contact Info (email, phone), Identifiers (User ID), Audio Data (calls), Customer Support, Diagnostics.
+- `NSPrivacyTracking` = false (we do not track across apps).
+- `NSPrivacyAccessedAPITypes` — required reason codes for: `UserDefaults` (CA92.1), `FileTimestamp` (C617.1), `SystemBootTime` (35F9.1), `DiskSpace` (E174.1). Capacitor uses these.
+- Mirror declarations in App Store Connect "Privacy Details".
+
+## 4. Sign in with Apple (Guideline 4.8)
+
+Because the app offers third-party sign-in (Google) and account creation, Apple **requires** Sign in with Apple as an equivalent option.
+
+- Enable Apple provider in Lovable Cloud auth (managed mode is fine for v1).
+- Add `signInWithApple()` button in `SignInScreen` with the official Apple button styling.
+- Capability: add "Sign in with Apple" in the Xcode project entitlements.
+
+## 5. Account deletion (Guideline 5.1.1(v))
+
+Already exists: `mobile-delete-account` edge function. Surface it visibly:
+
+- `SettingsScreen` → "Delete my account" row (red), confirmation dialog, calls `mobile-delete-account`, signs out, clears Keychain + LocalNotifications.
+- Add the same link in store listing's Support URL page.
+
+## 6. Permissions UX
+
+- Defer mic prompt to first dial attempt (not at launch).
+- Defer notification prompt to first successful sign-in (already done in `useDeviceNotifications`).
+- Add an in-app "Permissions" screen under Settings to re-open iOS Settings if any are denied.
+
+## 7. Legal & required URLs
+
+Already live at `avastatistic.ca`. Verify and link from app + App Store Connect:
+
+- Privacy Policy: `https://avastatistic.ca/privacy` — must mention call recording, transcription (server-side AI), data retention, account deletion link, contact email.
+- Terms of Service: `https://avastatistic.ca/terms` — required because of in-app paid features / subscriptions if any.
+- Support URL: `https://avastatistic.ca/support` (create page if missing) with email + delete-account link.
+- Marketing URL: optional.
+- EULA: use Apple's standard EULA unless custom needed.
+
+Add an in-app "About / Legal" row linking to Privacy + Terms (Guideline 5.1.1 requires in-app access).
+
+## 8. Call recording compliance
+
+iOS rejects recording without consent.
+
+- Before starting a recording, play a French + English beep and TTS notice ("This call is being recorded").
+- Add a setting toggle "Announce recording" defaulted ON, disabled-with-warning if user turns off.
+- Privacy policy must describe storage, retention, who can access recordings.
+
+## 9. App Store Connect metadata
+
+Files already in `apps/ava-softphone-mobile/store-metadata/ios/`. Verify each:
+
+- App name (30 chars), subtitle (30 chars), promotional text (170), description (4000), keywords (100), what's new.
+- Screenshots: 6.7" iPhone (1290×2796) and 6.5" iPhone (1284×2778) at minimum; 5.5" no longer required. Include localized French set.
+- App preview video (optional but recommended for VoIP).
+- Category: Primary = Business, Secondary = Productivity.
+- Age rating questionnaire — answer "Unrestricted Web Access" = No (we do not embed a browser).
+- Content rights: confirm we own AVA logo / brand.
+- Export compliance: standard encryption only → `ITSAppUsesNonExemptEncryption=false`.
+
+## 10. App icons & launch screen
+
+- Provide complete `AppIcon.appiconset` (all sizes incl. 1024×1024 marketing icon — no alpha, no rounded corners).
+- `LaunchScreen.storyboard` with AVA logo on `#0A1429` background, no text (Apple rejects launch screens with marketing copy).
+
+## 11. Capabilities & entitlements
+
+In Xcode target:
+
+- Push Notifications.
+- Background Modes: Audio, VoIP (only if PushKit shipped), Remote notifications.
+- Sign in with Apple.
+- Associated Domains (for universal links to `avastatistic.ca` deep links) — optional v1.
+- Keychain Sharing — only if extension sharing tokens.
+
+## 12. Build & release pipeline
+
+- Bump `MARKETING_VERSION` 1.0.0, `CURRENT_PROJECT_VERSION` 1.
+- `apps/ava-softphone-mobile/RELEASE.md` updated with: `npm install` → `npm run build` → `npx cap sync ios` → open Xcode → Archive → upload to TestFlight.
+- Add `scripts/ios-release.sh` wrapping the above and running `validate-ios-launch.sh`.
+- Enable App Store Connect API key in CI (optional v2).
+
+## 13. Pre-submission QA checklist
+
+Add `apps/ava-softphone-mobile/docs/app-store-review-checklist.md`:
+
+1. Fresh install → onboarding → sign-in (email, Google, Apple).
+2. Grant mic on first dial; verify outbound + inbound audio both ways.
+3. Receive missed call → lock-screen banner shows.
+4. Receive voicemail → banner shows; tap opens voicemail tab.
+5. Receive SMS → banner with preview; tap opens thread.
+6. Switch WiFi ↔ LTE during call → no drop.
+7. Account deletion flow → user removed, can't sign back in with same creds.
+8. App backgrounded for 10 min → re-register works.
+9. No crash on cold start without network.
+10. VoiceOver labels on all primary buttons (dial pad, answer, hangup).
+
+## 14. What to send the user once shipped to TestFlight
+
+Generate a one-page summary with: TestFlight invite link, what to test, known limitations (e.g. v1 = foreground-only calls if no PushKit), feedback email.
 
 ---
 
-## Phase 1 — Ringback sortant (rapide, fondation audio)
+## Technical details
 
-**Problème 6** : aucun son de sonnerie côté appelant.
+- Files to add: `ios/App/App/PrivacyInfo.xcprivacy`, `ios/App/CallKitBridge.swift`, `ios/App/PushKitBridge.swift`, `src/screens/PermissionsScreen.tsx`, `src/lib/recordingConsent.ts`, `docs/app-store-review-checklist.md`, `scripts/ios-release.sh`.
+- Files to edit: `ios/App/App/Info.plist`, `MobileApp.tsx` (Apple sign-in button, About/Legal row, Delete account row), `SettingsScreen.tsx`, `useSoftphoneNative.ts` (CallKit hooks), `RELEASE.md`.
+- Edge functions to add/extend: `mobile-push-token` (store VoIP token), `pbx-voip-push` (server-initiated push), audit log for account deletions already covered.
+- No DB schema change required beyond an optional `pbx_extensions.voip_push_token` column.
 
-Actions :
-- Vérifier `apps/ava-softphone-mobile/src/lib/sip/ringback.ts` (oscillateurs 440+480 Hz, cadence NA 2s on / 4s off).
-- Dans `useSoftphoneNative.ts` : démarrer ringback dès `callPhase === 'ringing'` SANS early-media ; stopper sur `early-media`, `active`, `ended`, `idle`.
-- Dans `CapacitorSip.swift` : confirmer émission de `provisional { code:180, hasSdp:false }` vs `183 hasSdp:true`.
-- Gérer route audio : ringback doit sortir sur earpiece par défaut, pas écraser la session RTP.
+## Out of scope (call out before build)
 
-**Test livré** : passer un appel vers une extension qui sonne sans répondre → entendre la tonalité de sonnerie locale ; décrocher → tonalité s'arrête net.
+- iPad-optimized layouts.
+- Apple Watch companion.
+- CarPlay integration.
+- In-app purchases / subscriptions (would trigger Guideline 3.1.1 + StoreKit work).
 
----
+## Open questions
 
-## Phase 2 — Speaker iOS
-
-**Problème 1** : bouton speaker inopérant.
-
-Actions :
-- `CapacitorSip.swift` : `setAudioRoute(route:)` doit appeler `AVAudioSession.overrideOutputAudioPort(.speaker | .none)` APRÈS `setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetoothHFP, .allowBluetooth, .defaultToSpeaker])`, puis renvoyer `outputs` réels via `currentRoute.outputs`.
-- Ne PAS toucher catégorie pendant un appel actif (cause connue de mute) ; uniquement `overrideOutputAudioPort`.
-- `audioOutput.ts` : déjà câblé sur le natif, vérifier que `applySink` HTML ne court-circuite pas le résultat natif.
-- Ajouter logs natifs `[AudioRoute] applied=speaker outputs=Speaker`.
-
-**Test livré** : en appel actif, toggler speaker → audio bascule haut-parleur ; re-toggle → earpiece ; bouton reflète l'état réel.
-
----
-
-## Phase 3 — Keypad standard
-
-**Problème 3** : retirer le style « glass » récent du keypad.
-
-Actions :
-- `apps/ava-softphone-mobile/src/components/Dialpad.tsx` : revenir à des boutons ronds standards (shadcn `Button variant="outline"`, taille 64px, typo system, ripple natif, halo discret au tap, pas de gradient radial, pas de `::before` shine).
-- Conserver le DTMF natif et l'haptique légère.
-
-**Test livré** : ouvrir le dialer → keypad sobre, lisibilité chiffres OK, tap clair, plus d'effet futuriste.
-
----
-
-## Phase 4 — Qualité audio + noise cancellation + focus voix
-
-**Problème 4** : son médiocre, pas de NS/AEC/AGC.
-
-Actions :
-- `RTPAudioSession.swift` (RemoteIO) : activer `voiceProcessingIO` (`kAudioUnitSubType_VoiceProcessingIO`) au lieu de `RemoteIO` pur → AEC + NS + AGC iOS natifs gratuits.
-  - Propriétés : `kAUVoiceIOProperty_BypassVoiceProcessing = 0`, `kAUVoiceIOProperty_VoiceProcessingEnableAGC = 1`, iOS 13+ `setAGCEnabled`, `setBypassVoiceProcessing(false)`.
-- `AVAudioSession` : mode `.voiceChat` (déjà), ajouter `setPreferredIOBufferDuration(0.02)` et `setPreferredSampleRate(48000)`.
-- Codec SDP : déjà PCMU/PCMA (G.711). Ajouter négo Opus 16 kHz si le PBX le supporte (offer `a=rtpmap:111 opus/48000/2` + `a=fmtp:111 useinbandfec=1; usedtx=1`). Fallback transparent à G.711.
-- Jitter buffer : implémenter buffer adaptatif 20–60 ms côté réception RTP (dejitter avant push vers RemoteIO) pour réduire les craquements.
-- Logs : `[Audio] codec=opus/48k AEC=on NS=on AGC=on bufferMs=20`.
-
-**Test livré** : appel test, parler dans un café (bruit ambiant) → l'interlocuteur n'entend que la voix ; tester écho en speaker → aucun retour ; mesurer MOS subjectif > G.711 baseline.
-
----
-
-## Phase 5 — Enregistrement + accès temps réel + pré-téléchargement
-
-**Problème 2** : record déclenché mais introuvable, accès temps réel + cache local manquants.
-
-Actions :
-- Diagnostic : vérifier que `CapacitorSip.startRecord()` invoque bien le PBX (`recording_action=start` sur FusionPBX via API ou DTMF `*1`) ET que le CDR remonte avec `record_path`.
-- Edge Function `pp-recordings-list` (ou existante) : exposer `recording_path`, `recording_status` (`pending|ready`) et URL signée 1h.
-- `RecordingsScreen.tsx` : 
-  - Subscription realtime sur `pbx_xml_cdr` (filter `record_path IS NOT NULL`) → injecte nouvelles entrées en haut.
-  - Badge « En traitement » tant que `record_status != ready`.
-- Pré-téléchargement : nouveau service `apps/ava-softphone-mobile/src/lib/recordings/prefetch.ts` qui, au montage de l'écran et sur événement realtime, télécharge silencieusement les 20 dernières en cache Capacitor `Filesystem` (Documents/recordings/<uuid>.wav). Lecture offline si présent.
-- UI : pastille « ⬇ Téléchargé » vs « ☁ Streaming ».
-
-**Test livré** : démarrer un appel → toggle Record (REC banner) → raccrocher → dans les 30 s la ligne apparaît dans Recordings sans refresh, statut passe `pending → ready`, fichier auto-téléchargé, lecture instantanée hors-ligne (mode avion).
-
----
-
-## Phase 6 — Transcription forcée + fallback Claude
-
-**Problème 5** : transcription échoue, besoin de fallback.
-
-Actions :
-- Forcer la transcription : à la fin de chaque appel enregistré, `useSoftphoneNative` déclenche `ai-transcribe-call` automatiquement (debounce 30 s pour laisser le PBX synchroniser le WAV). Plus de bouton manuel obligatoire ; bouton reste pour re-run.
-- Edge Function `ai-transcribe-call` : 
-  - Tentative 1 — Lovable AI `openai/gpt-4o-mini-transcribe` (déjà en place).
-  - Si erreur (`stub`, `recording-not-synced` après 3 retries espacés, `missing-ai-key`, réponse vide < 5 chars) → **fallback Claude** via `ANTHROPIC_API_KEY` (déjà en secrets) : utiliser `claude-3-5-sonnet` avec audio attaché en base64 (ou Claude Haiku audio si dispo) ; sinon convertir WAV en chunks et utiliser `messages` avec `input_audio`.
-  - Marquer `transcription_provider` dans `ai_call_insights` (`lovable|claude`).
-- `useCallAi.ts` : afficher provenance + bouton « Réessayer avec Claude » si fallback non auto-déclenché.
-- `ai-analyze-call` : inchangé, consomme le texte fourni.
-
-**Test livré** : appel test 30 s, raccrocher → 30 s plus tard, transcription apparaît automatiquement dans le détail de l'appel ; simuler échec Lovable (clé vide en dev) → fallback Claude s'enclenche, badge « via Claude » visible.
-
----
-
-## Détails techniques (référence dev)
-
-Fichiers principaux touchés :
-- `apps/ava-softphone-mobile/ios/App/App/CapacitorSip.swift` (P1, P2, P4, P5)
-- `apps/ava-softphone-mobile/ios/App/App/RTPAudioSession.swift` (P4 — VoiceProcessingIO)
-- `apps/ava-softphone-mobile/src/hooks/useSoftphoneNative.ts` (P1, P5, P6)
-- `apps/ava-softphone-mobile/src/lib/sip/ringback.ts` (P1)
-- `apps/ava-softphone-mobile/src/lib/sip/audioOutput.ts` (P2)
-- `apps/ava-softphone-mobile/src/components/Dialpad.tsx` (P3)
-- `apps/ava-softphone-mobile/src/screens/RecordingsScreen.tsx` (P5)
-- `apps/ava-softphone-mobile/src/lib/recordings/prefetch.ts` *(nouveau, P5)*
-- `apps/ava-softphone-mobile/src/hooks/useCallAi.ts` (P6)
-- `supabase/functions/ai-transcribe-call/index.ts` (P6 — fallback Claude)
-
-Après chaque phase touchant le natif iOS : `git pull` + `npx cap sync ios` + rebuild Xcode requis côté utilisateur.
-
-Aucun changement Lemtel desktop, aucun edit Landing, aucune migration de schéma (réutilisation tables existantes).
-
----
-
-Confirme et je commence par la **Phase 1 (ringback)**, ou indique une autre phase prioritaire.
+1. Ship PushKit/CallKit in v1, or submit foreground-only and add in v1.1? PushKit doubles iOS work but is needed for "real" softphone background calls.
+2. Is `avastatistic.ca/support` page live, or should it be created as part of this plan?
+3. Is the Apple Developer account already enrolled with the bundle ID `com.lemtel.softphone` provisioned?
