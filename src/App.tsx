@@ -728,7 +728,7 @@ const App = () => (
                 <Route path="/support" element={<Support />} />
                 <Route path="/legal" element={<Legal />} />
                 <Route path="/docs" element={<Docs />} />
-                <Route element={<ProtectedRoute><PlanipretOrgOnly><Outlet /></PlanipretOrgOnly></ProtectedRoute>}>
+                <Route element={<ProtectedRoute><Outlet /></ProtectedRoute>}>
                 <Route
                   path="/demo"
                   element={
