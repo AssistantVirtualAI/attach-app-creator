@@ -28,7 +28,7 @@ type Row = {
   last_test_success: boolean | null;
 };
 
-const SUPABASE_FUNCTIONS_BASE = "https://gejxisrqtvxavbrfcoxz.supabase.co/functions/v1";
+
 
 function deriveStatus(row?: Row): IntegrationStatus {
   if (!row) return "unconfigured";
