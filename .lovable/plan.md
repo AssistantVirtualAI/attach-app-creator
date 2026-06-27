@@ -1,89 +1,63 @@
-
 ## Objectif
+Refonte visuelle complète de l'app mobile Planiprêt (`/mplanipret`) : esthétique premium, branding AVA cohérent, bouton AVA intelligent (Claude chat OU agent vocal ElevenLabs selon activation), et conservation totale du backend (Supabase, NS-API, Claude, Edge Functions).
 
-Transformer `/planipret/admin/overview` en un cockpit visuel premium qui agrège toutes les stats mobile/courtiers + un module financier complet avec profits par service.
+## 1. Design System Planiprêt Mobile
+- Nouveau token set dans `src/styles/planipret-mobile.css` : palette navy (#0a1628) + accent doré Planiprêt + gradient AVA (bleu→violet→magenta du logo).
+- Glassmorphism profond (blur 24px, borders translucides 1px), ombres "elegant" multi-couches.
+- Typo : Inter pour le body, Space Grotesk pour les headings/stats — pas de fonts génériques.
+- Composants partagés réutilisés depuis Lemtel : `Dialpad`, `ActiveCallSheet`, boutons "Glass" — wrappés dans un thème Planiprêt (couleurs + gradients différents).
 
-## 1. Schéma DB (1 migration)
+## 2. Branding AVA + Planiprêt sur chaque page
+- **Page Auth** : grand logo AVA centré (le logo uploadé) + tagline "Planiprêt Mobile · Powered by AVA".
+- **Header global** (`PlaniMobileHeader.tsx`) sur chaque page mobile :
+  - Logo Planiprêt centré
+  - Petit logo AVA + "Powered by AVA" en bas du header
+  - Avatar courtier à droite
+- **Footer global** (`PlaniMobileFooter.tsx`) : "Developed by AVA" + mini logo, version build.
+- Assets : import du logo AVA fourni via `src/assets/ava-logo.png` (lovable-assets pointer).
 
-Ajouter le flag manquant pour le widget (les autres existent déjà) :
+## 3. Écrans rebuildés
+- **Home / Accueil** : conservée — refresh visuel uniquement (cartes glass, animations Framer). Stats personnelles courtier + section "Insights AVA" (Claude) en cartes premium avec gradient AVA.
+- **Calls** : timeline élégante, cartes recents glass, IA badges.
+- **Dialer / Active Call** : boutons existants Lemtel réutilisés (verrouillés visuellement Planiprêt).
+- **SMS / Voicemails / Profil** : carte list pattern uniforme.
 
-```text
-ALTER TABLE planipret_profiles
-  ADD COLUMN widget_enabled boolean NOT NULL DEFAULT false;
-```
-
-`mobile_app_enabled` et `voice_agent_enabled` existent déjà — réutilisés tels quels.
-
-## 2. Modèle financier (front, configurable)
-
-Constantes dans `src/lib/planipret/pricing.ts` :
-
-```text
-SALE_PRICE = 49.95
-COST_MOBILE = 8.00      → profit 41.95/user/mois
-COST_WIDGET = 18.99     → profit 30.96/user/mois
-COST_AI     = 25.00     → profit 24.95/user/mois
-```
-
-Calculs : revenus, coûts, profit, marge % par service + totaux mensuels et projection annuelle (×12).
-
-## 3. Nouvelle Vue d'ensemble — structure
+## 4. Bouton AVA intelligent (remplace l'ancien chatbot/agent)
+Un seul bouton flottant "AVA" en bas (FAB premium gradient) avec logique conditionnelle basée sur `planipret_profiles.voice_agent_enabled` :
 
 ```text
-┌─────────────────────────────────────────────────────────────┐
-│ Header : titre + filtre période (7j / 30j / 90j) + refresh │
-├─────────────────────────────────────────────────────────────┤
-│ Rangée 1 : 4 KPI hero (gradient glass, animation count-up)  │
-│  Appels jour · Courtiers actifs · SMS jour · Sessions AVA   │
-├─────────────────────────────────────────────────────────────┤
-│ Rangée 2 — BLOC FINANCIER (nouveau, mise en avant)          │
-│  ┌──────────┬──────────┬──────────┬──────────────────────┐  │
-│  │ Mobile   │ Widget   │ AI Agent │  TOTAL MRR / Profit  │  │
-│  │ N users  │ N users  │ N users  │  Donut services      │  │
-│  │ Rev/Cost │ Rev/Cost │ Rev/Cost │  Annual projection   │  │
-│  │ Profit$  │ Profit$  │ Profit$  │  Marge globale %     │  │
-│  └──────────┴──────────┴──────────┴──────────────────────┘  │
-│  Barre empilée : Revenus vs Coûts vs Profit par service     │
-├─────────────────────────────────────────────────────────────┤
-│ Rangée 3 : Activité 7j (area gradient) | Distribution appels│
-├─────────────────────────────────────────────────────────────┤
-│ Rangée 4 : Top 5 courtiers | Leads chauds                   │
-├─────────────────────────────────────────────────────────────┤
-│ Rangée 5 : Activité récente | Adoption mobile (heatmap)     │
-└─────────────────────────────────────────────────────────────┘
+voice_agent_enabled = TRUE  → ouvre AvaVoiceSheet (ElevenLabs WebRTC)
+voice_agent_enabled = FALSE → ouvre AvaChatSheet (Claude via pp-ava-chat)
 ```
 
-## 4. Stats ajoutées
+- **AvaVoiceSheet** : utilise `@elevenlabs/react` (`useConversation`) + Edge Function `pp-ava-voice-token` qui mint un `conversation_token` à partir de `ELEVENLABS_API_KEY` et de `planipret_profiles.elevenlabs_agent_id`.
+- **AvaChatSheet** : conserve l'intégration Claude existante (`pp-ava-chat`), juste relookée.
+- Le FAB affiche un micro pulsant (voix) ou une bulle (chat) selon le mode actif.
 
-- **Adoption mobile** : % courtiers avec `mobile_app_enabled=true` + dernière session
-- **Engagement** : appels/courtier moyens 7j, SMS/courtier
-- **Performance AI** : sessions AVA, taux de conversion lead chaud
-- **Voicemails non lus**, rappels en retard, leads par température
-- **Financier** : MRR, ARR, profit mensuel par service, marge globale, evolution mois précédent (delta %)
+## 5. Insights AVA sur Home (Claude)
+- Carte "Insights AVA" sur Home appelant `pp-ava-insights` (réutilise/étend `pp-ava-chat`) : envoie stats du courtier (appels, leads chauds, conversions 7j) à Claude, retourne 3 insights actionnables.
+- Skeleton + animation reveal Framer Motion.
 
-## 5. Refonte visuelle
+## 6. Conservation backend (intouché)
+- Aucune modif aux tables, RLS, ou Edge Functions existantes sauf ajout de `pp-ava-voice-token` (nouveau).
+- AVA org only, séparation Lemtel respectée.
+- Connexion ElevenLabs : utilise le standard connector → `ELEVENLABS_API_KEY` côté Edge Function uniquement.
 
-- Système design existant `pp-card` / `--pp-*` tokens conservé (cohérence portail)
-- KPI hero : gradient glass + barre d'accent gauche colorée par catégorie, micro-trend sparkline
-- Cartes financières : fond gradient subtil par service (mobile=cyan, widget=orange, AI=violet), valeur principale en 36px tabular-nums, profit en vert SUCCESS si positif
-- Animation count-up sur les chiffres au mount (CSS only, 600ms)
-- Donut profit par service avec total au centre
-- Sélecteur période en segmented control en haut à droite
-- Skeleton loaders au chargement initial
+## Détails techniques
+- Fichiers créés :
+  - `src/styles/planipret-mobile.css`
+  - `src/components/mplanipret/layout/PlaniMobileHeader.tsx`
+  - `src/components/mplanipret/layout/PlaniMobileFooter.tsx`
+  - `src/components/mplanipret/ava/AvaFab.tsx` (FAB conditionnel)
+  - `src/components/mplanipret/ava/AvaVoiceSheet.tsx`
+  - `src/components/mplanipret/ava/AvaChatSheet.tsx` (refonte)
+  - `src/components/mplanipret/home/AvaInsightsCard.tsx`
+  - `src/assets/ava-logo.png.asset.json` (pointer)
+  - `supabase/functions/pp-ava-voice-token/index.ts`
+- Fichiers édités : layout root `/mplanipret`, `MHome.tsx`, `MAuth.tsx` (branding), pages courantes pour wrapper Header/Footer.
+- Connector ElevenLabs : vérifier/lier via `standard_connectors`.
 
-## 6. Realtime
-
-Conserver le canal `admin-overview` existant + ajouter écoute UPDATE sur `planipret_profiles` (flags) pour recalcul auto du module financier.
-
-## Fichiers touchés
-
-- `supabase/migrations/...` — ajout colonne `widget_enabled`
-- `src/lib/planipret/pricing.ts` — nouveau, constantes + calculs
-- `src/pages/planipret/admin/PAOverview.tsx` — refonte complète
-- `src/components/planipret/admin/FinancialKpiCard.tsx` — nouveau
-- `src/components/planipret/admin/RevenueBreakdown.tsx` — nouveau (donut + barres empilées)
-
-## Hors scope (ce plan)
-
-- Autres pages admin (Courtiers, Appels, etc.) — refonte ultérieure si tu veux
-- Édition manuelle des flags `widget_enabled` / `voice_agent_enabled` depuis l'UI (à faire dans la page Courtiers si demandé)
+## Hors scope
+- Aucune modif des dashboards admin web `/planipret/admin/*`.
+- Aucun touch sur Lemtel.
+- Pas de changement de logique softphone/SIP/RTP.
