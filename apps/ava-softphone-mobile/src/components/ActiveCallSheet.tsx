@@ -67,6 +67,15 @@ export default function ActiveCallSheet({
   const isIncoming = sp.snap.callState === 'ringing-in';
   const isOutgoing = sp.snap.callState === 'ringing-out';
   const onHold = !!sp.snap.onHold || sp.snap.callState === 'held';
+
+  // Trigger caller-ID lookup as soon as we know we're ringing (incoming or outgoing).
+  useEffect(() => {
+    const phone = sp.snap.remoteNumber || sp.snap.remoteParty || sp.snap.remoteUri || '';
+    if (!phone || (!isIncoming && !isOutgoing)) { setCallerLookup(null); return; }
+    let cancelled = false;
+    lookupCaller(String(phone)).then((r) => { if (!cancelled) setCallerLookup(r); });
+    return () => { cancelled = true; };
+  }, [isIncoming, isOutgoing, sp.snap.remoteNumber, sp.snap.remoteParty, sp.snap.remoteUri]);
   const inCall = sp.snap.callState === 'active' || sp.snap.callState === 'held' || onHold;
   const isTransfer = !!sp.snap.transferring;
   const isEnded = sp.snap.callState === 'ended' || sp.snap.callState === 'idle';
@@ -169,6 +178,10 @@ export default function ActiveCallSheet({
           }}
         />
       </div>
+      {/* Caller ID — only during incoming ring */}
+      {isIncoming && (
+        <IncomingCallerPanel lookup={callerLookup} rawNumber={String(remote)} />
+      )}
 
       {/* Identity */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14 }}>
