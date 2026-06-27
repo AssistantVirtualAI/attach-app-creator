@@ -332,47 +332,93 @@ Deno.serve(async (req) => {
       return json({ transcript_text: fallbackTranscript, stub: true, reason: "audio-too-large", size: audioBytes.length });
     }
 
-    // Lovable AI Gateway (OpenAI-compatible) with inline audio
+    // Provider chain: Gemini (Lovable) → OpenAI gpt-4o-mini (Lovable) → Anthropic Claude.
     const b64 = bufToBase64(audioBytes);
-    const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { "Lovable-API-Key": lovableKey, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-pro",
-        max_tokens: 8000,
-        messages: [{
-          role: "user",
-          content: [
-            { type: "text", text: "Transcribe this phone call verbatim in the original language spoken (French or English). Label speakers as Agent: and Caller: on separate lines. Include filler words. Return ONLY the transcript text, no preamble, no commentary, no markdown." },
-            { type: "input_audio", input_audio: { data: b64, format: audioMime.split("/")[1] || "wav" } },
-          ],
-        }],
-      }),
-    });
-    if (!aiRes.ok) {
-      const errTxt = await aiRes.text();
-      console.error("ai gateway error", aiRes.status, errTxt);
-      // 429 / 402 are user-facing billing issues — surface them, don't silently stub
-      if (aiRes.status === 429 || aiRes.status === 402) {
-        await audit("ai-error", { error_code: aiRes.status === 429 ? "rate-limited" : "credits-exhausted", http_status: aiRes.status, message: errTxt.slice(0, 400), provider: "lovable-ai", model: "google/gemini-2.5-pro" });
-        return json({ error: aiRes.status === 429 ? "rate-limited" : "credits-exhausted", details: errTxt }, aiRes.status);
+    const audioFormat = audioMime.split("/")[1] || "wav";
+    const sttPrompt = "Transcribe this phone call verbatim in the original language spoken (French or English). Label speakers as Agent: and Caller: on separate lines. Include filler words. Return ONLY the transcript text, no preamble, no commentary, no markdown.";
+
+    type ProviderResult = { text?: string; provider: string; model: string; finishReason?: string; error?: string; status?: number };
+
+    const tryLovable = async (model: string): Promise<ProviderResult> => {
+      const r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { "Lovable-API-Key": lovableKey, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model,
+          max_tokens: 8000,
+          messages: [{
+            role: "user",
+            content: [
+              { type: "text", text: sttPrompt },
+              { type: "input_audio", input_audio: { data: b64, format: audioFormat } },
+            ],
+          }],
+        }),
+      });
+      if (!r.ok) {
+        const errTxt = await r.text();
+        console.error(`lovable ${model} error`, r.status, errTxt.slice(0, 300));
+        return { error: errTxt.slice(0, 400), status: r.status, provider: "lovable-ai", model };
       }
-      await writeTranscript(fallbackTranscript, `stub-ai-${aiRes.status}`);
-      await audit("ai-error", { error_code: `ai_gateway_${aiRes.status}`, http_status: aiRes.status, message: errTxt.slice(0, 400), provider: "lovable-ai", model: "google/gemini-2.5-pro" });
-      return json({ transcript_text: fallbackTranscript, stub: true, error: `ai_gateway_${aiRes.status}` });
+      const d = await r.json();
+      return { text: String(d?.choices?.[0]?.message?.content || "").trim(), provider: "lovable-ai", model, finishReason: d?.choices?.[0]?.finish_reason };
+    };
+
+    const tryClaude = async (): Promise<ProviderResult> => {
+      const claudeKey = Deno.env.get("ANTHROPIC_API_KEY");
+      const model = "claude-opus-4-5";
+      if (!claudeKey) return { error: "no-anthropic-key", status: 0, provider: "anthropic", model };
+      const r = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "x-api-key": claudeKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+        body: JSON.stringify({
+          model,
+          max_tokens: 8000,
+          messages: [{
+            role: "user",
+            content: [
+              { type: "text", text: sttPrompt },
+              { type: "input_audio", source: { type: "base64", media_type: audioMime, data: b64 } },
+            ],
+          }],
+        }),
+      });
+      if (!r.ok) {
+        const errTxt = await r.text();
+        console.error("claude error", r.status, errTxt.slice(0, 300));
+        return { error: errTxt.slice(0, 400), status: r.status, provider: "anthropic", model };
+      }
+      const d = await r.json();
+      return { text: String(d?.content?.[0]?.text || "").trim(), provider: "anthropic", model };
+    };
+
+    const attempts: Array<{ provider: string; model: string; status?: number; error?: string }> = [];
+    let final: ProviderResult | null = null;
+    for (const step of [
+      () => tryLovable("google/gemini-2.5-pro"),
+      () => tryLovable("openai/gpt-4o-mini"),
+      () => tryClaude(),
+    ]) {
+      const res = await step();
+      if (res.text) { final = res; break; }
+      attempts.push({ provider: res.provider, model: res.model, status: res.status, error: (res.error || "empty").slice(0, 200) });
+      if (res.status === 402) {
+        await audit("ai-error", { error_code: "credits-exhausted", http_status: 402, message: res.error, provider: res.provider, model: res.model });
+        return json({ error: "credits-exhausted", details: res.error, attempts }, 402);
+      }
     }
-    const data = await aiRes.json();
-    const finishReason = data?.choices?.[0]?.finish_reason;
-    const transcript_text = String(data?.choices?.[0]?.message?.content || "").trim();
-    console.log("ai-transcribe-call ai result", { finishReason, length: transcript_text.length, audioSource });
-    if (!transcript_text) {
-      await writeTranscript(fallbackTranscript, "stub-empty-ai");
-      await audit("ai-error", { error_code: "empty-ai-response", message: `finish_reason: ${finishReason}`, provider: "lovable-ai", model: "google/gemini-2.5-pro" });
-      return json({ transcript_text: fallbackTranscript, stub: true, reason: "empty-ai-response", finishReason });
+
+    if (!final?.text) {
+      await writeTranscript(fallbackTranscript, "stub-all-providers-failed");
+      await audit("ai-error", { error_code: "all-providers-failed", message: JSON.stringify(attempts).slice(0, 400) });
+      return json({ transcript_text: fallbackTranscript, stub: true, reason: "all-providers-failed", attempts }, 200);
     }
-    await writeTranscript(transcript_text, "lovable-ai/gemini-2.5-pro");
-    await audit("ok", { provider: "lovable-ai", model: "google/gemini-2.5-pro", metadata: { audioSource, length: transcript_text.length } });
-    return json({ transcript_text, audioSource, finishReason });
+
+    const providerLabel = `${final.provider}/${final.model}`;
+    console.log("ai-transcribe-call ai result", { provider: providerLabel, length: final.text.length, audioSource, attempts });
+    await writeTranscript(final.text, providerLabel);
+    await audit("ok", { provider: final.provider, model: final.model, metadata: { audioSource, length: final.text.length, attempts } });
+    return json({ transcript_text: final.text, audioSource, provider: providerLabel, attempts });
   } catch (e: any) {
     console.error("ai-transcribe-call error", e);
     await audit("error", { error_code: "exception", message: String(e?.message || e).slice(0, 400) });
