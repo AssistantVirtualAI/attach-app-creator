@@ -341,7 +341,7 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
     try {
       // Apple App Review + jurisdictional consent: play audible notice before recording.
       try {
-        const { playRecordingConsent } = await import('@/lib/recordingConsent');
+        const { playRecordingConsent } = await import('../lib/recordingConsent');
         await playRecordingConsent('fr');
       } catch {}
       await CapacitorPjsip.startRecord();
