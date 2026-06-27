@@ -76,6 +76,7 @@ export function useCallAi(callId: string | null, meta: CallAiMeta | undefined, o
     setError(null);
     setStage('transcribing');
     try {
+      const claudeFallback = (() => { try { return localStorage.getItem('ava.claudeFallback') !== 'off'; } catch { return true; } })();
       const t = await mobileApi.transcribeCall(callId, {
         recording_path: meta?.recording_path,
         recording_name: meta?.recording_name,
@@ -83,7 +84,9 @@ export function useCallAi(callId: string | null, meta: CallAiMeta | undefined, o
         xml_cdr_uuid: meta?.xml_cdr_uuid || callId,
         organization_id: meta?.organization_id,
         force: opts?.force,
+        disableClaude: !claudeFallback,
       });
+      if (t?.provider) { try { localStorage.setItem('ava.lastTranscriber', t.provider); } catch {} }
       if (t?.stub || t?.error) {
         const reason = t.reason || t.error || '';
         let friendly = '';
