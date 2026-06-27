@@ -1591,3 +1591,155 @@ All colors MUST be HSL.
   border-radius: 6px;
 }
 
+
+/* ============================================================
+   PLANIPRÊT MOBILE — NAVY TRUST LIGHT THEME
+   Scope: `.planipret-mobile-scope` (added on the mobile Frame).
+   Mirrors the admin tokens so the mobile app inherits the same
+   premium light finance look while keeping its own header/footer/tab utilities.
+   ============================================================ */
+.planipret-mobile-scope {
+  --pp-bg-base: #F7F9FC;
+  --pp-bg-surface: #FFFFFF;
+  --pp-bg-elevated: #F0F4F9;
+  --pp-bg-deep: #FFFFFF;
+  --pp-bg-border: #E2E8F0;
+  --pp-bg-border-2: #DCE3EC;
+  --pp-brand-accent: #3B6FA0;
+  --pp-brand-accent-2: #1E3A5F;
+  --pp-success: #0D7A5F;
+  --pp-agent: #6C5CE7;
+  --pp-warning: #C9A84C;
+  --pp-danger: #B23A48;
+  --pp-text-primary: #0F1B3D;
+  --pp-text-secondary: #324867;
+  --pp-text-muted: #5A6B85;
+  --pp-text-faint: #94A3B8;
+  --pp-shadow-sm: 0 1px 2px rgba(15,27,61,0.04), 0 1px 1px rgba(15,27,61,0.03);
+  --pp-shadow-md: 0 8px 24px -12px rgba(15,27,61,0.12), 0 2px 6px -2px rgba(15,27,61,0.06);
+  --pp-shadow-lg: 0 24px 48px -16px rgba(15,27,61,0.18);
+  background: var(--pp-bg-base);
+  color: var(--pp-text-primary);
+  font-family: 'Epilogue', 'Inter', system-ui, sans-serif;
+}
+.planipret-mobile-scope h1,
+.planipret-mobile-scope h2,
+.planipret-mobile-scope h3,
+.planipret-mobile-scope h4,
+.planipret-mobile-scope .pp-heading,
+.planipret-mobile-scope .pp-kpi {
+  font-family: 'Urbanist', 'Inter', system-ui, sans-serif;
+  letter-spacing: -0.018em;
+  color: var(--pp-text-primary);
+}
+.planipret-mobile-scope .pp-eyebrow {
+  font-family: 'Urbanist', sans-serif;
+  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--pp-text-muted);
+}
+.planipret-mobile-scope .pp-card,
+.planipret-mobile-scope .pp-card-elevated {
+  background: var(--pp-bg-surface);
+  border: 1px solid var(--pp-bg-border);
+  border-radius: 18px;
+  box-shadow: var(--pp-shadow-sm);
+}
+.planipret-mobile-scope .pp-btn-primary {
+  background: var(--pp-brand-accent-2);
+  color: #fff;
+  border: 1px solid var(--pp-brand-accent-2);
+  border-radius: 12px;
+  padding: 10px 16px;
+  font-family: 'Urbanist', sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  box-shadow: var(--pp-shadow-sm);
+}
+.planipret-mobile-scope .pp-btn-primary:active { transform: translateY(1px); }
+.planipret-mobile-scope .pp-btn-secondary {
+  background: #fff;
+  border: 1px solid var(--pp-bg-border);
+  color: var(--pp-text-primary);
+  border-radius: 12px;
+  padding: 10px 16px;
+  font-weight: 600;
+}
+.planipret-mobile-scope .pp-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border-radius: 999px;
+  font-family: 'Urbanist', sans-serif;
+  font-weight: 600; font-size: 10.5px; letter-spacing: 0.04em;
+}
+.planipret-mobile-scope .pp-pill-success { background: rgba(13,122,95,0.10); color: var(--pp-success); border: 1px solid rgba(13,122,95,0.25); }
+.planipret-mobile-scope .pp-pill-danger  { background: rgba(178,58,72,0.10); color: var(--pp-danger);  border: 1px solid rgba(178,58,72,0.25); }
+.planipret-mobile-scope .pp-pill-warning { background: rgba(201,168,76,0.14); color: #8A6E1F;           border: 1px solid rgba(201,168,76,0.35); }
+.planipret-mobile-scope .pp-pill-accent  { background: rgba(59,111,160,0.10); color: var(--pp-brand-accent-2); border: 1px solid rgba(59,111,160,0.25); }
+.planipret-mobile-scope .pp-live-dot {
+  background: var(--pp-success);
+  box-shadow: 0 0 0 3px rgba(13,122,95,0.18);
+}
+.planipret-mobile-scope input,
+.planipret-mobile-scope textarea {
+  background: #fff;
+  border-color: var(--pp-bg-border);
+  color: var(--pp-text-primary);
+}
+.planipret-mobile-scope input:focus,
+.planipret-mobile-scope textarea:focus {
+  outline: 2px solid rgba(59,111,160,0.25);
+  border-color: var(--pp-brand-accent);
+}
+/* Mobile-specific surfaces */
+.planipret-mobile-scope .pp-mobile-header {
+  background: rgba(255,255,255,0.92);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--pp-bg-border);
+}
+.planipret-mobile-scope .pp-mobile-tabbar {
+  background: rgba(255,255,255,0.95);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-top: 1px solid var(--pp-bg-border);
+}
+.planipret-mobile-scope .pp-mobile-footer {
+  background: #FFFFFF;
+  border-top: 1px solid var(--pp-bg-border);
+}
+.planipret-mobile-scope .pp-keypad-btn {
+  background: #FFFFFF !important;
+  border: 1px solid var(--pp-bg-border) !important;
+  color: var(--pp-text-primary) !important;
+  box-shadow: var(--pp-shadow-sm);
+}
+.planipret-mobile-scope .pp-keypad-btn:active {
+  background: #F0F4F9 !important;
+  border-color: var(--pp-brand-accent) !important;
+}
+/* Period filter segmented control */
+.planipret-mobile-scope .pp-segmented {
+  display: inline-flex;
+  padding: 3px;
+  background: #F0F4F9;
+  border: 1px solid var(--pp-bg-border);
+  border-radius: 12px;
+}
+.planipret-mobile-scope .pp-segmented button {
+  font-family: 'Urbanist', sans-serif;
+  font-weight: 600;
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+  color: var(--pp-text-muted);
+  padding: 6px 12px;
+  border-radius: 9px;
+  background: transparent;
+  transition: background 140ms ease, color 140ms ease;
+}
+.planipret-mobile-scope .pp-segmented button.is-active {
+  background: #FFFFFF;
+  color: var(--pp-brand-accent-2);
+  box-shadow: var(--pp-shadow-sm);
+}
