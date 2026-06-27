@@ -8566,7 +8566,10 @@ export type Database = {
           metadata: Json
           mobile_app_enabled: boolean
           ms365_access_token: string | null
+          ms365_display_name: string | null
+          ms365_email: string | null
           ms365_refresh_token: string | null
+          ms365_token_expiry: string | null
           notif_ai: boolean
           notif_appointment_reminder: boolean
           notif_calls: boolean
@@ -8578,9 +8581,13 @@ export type Database = {
           notif_sms: boolean
           notif_voicemails: boolean
           ns_domain: string | null
+          ns_extension: string | null
           ns_jwt: string | null
           ns_jwt_expires_at: string | null
+          ns_linked: boolean
+          ns_linked_at: string | null
           ns_refresh_token: string | null
+          ns_sip_username: string | null
           ns_user_id: string | null
           onboarding_completed: boolean
           onboarding_step: number
@@ -8590,6 +8597,10 @@ export type Database = {
           privacy_version: string | null
           recording_consent: boolean
           role: string
+          sip_domain: string | null
+          sip_password: string | null
+          sip_proxy: string | null
+          sip_username: string | null
           status: string
           updated_at: string
           user_id: string
@@ -8633,7 +8644,10 @@ export type Database = {
           metadata?: Json
           mobile_app_enabled?: boolean
           ms365_access_token?: string | null
+          ms365_display_name?: string | null
+          ms365_email?: string | null
           ms365_refresh_token?: string | null
+          ms365_token_expiry?: string | null
           notif_ai?: boolean
           notif_appointment_reminder?: boolean
           notif_calls?: boolean
@@ -8645,9 +8659,13 @@ export type Database = {
           notif_sms?: boolean
           notif_voicemails?: boolean
           ns_domain?: string | null
+          ns_extension?: string | null
           ns_jwt?: string | null
           ns_jwt_expires_at?: string | null
+          ns_linked?: boolean
+          ns_linked_at?: string | null
           ns_refresh_token?: string | null
+          ns_sip_username?: string | null
           ns_user_id?: string | null
           onboarding_completed?: boolean
           onboarding_step?: number
@@ -8657,6 +8675,10 @@ export type Database = {
           privacy_version?: string | null
           recording_consent?: boolean
           role?: string
+          sip_domain?: string | null
+          sip_password?: string | null
+          sip_proxy?: string | null
+          sip_username?: string | null
           status?: string
           updated_at?: string
           user_id: string
@@ -8700,7 +8722,10 @@ export type Database = {
           metadata?: Json
           mobile_app_enabled?: boolean
           ms365_access_token?: string | null
+          ms365_display_name?: string | null
+          ms365_email?: string | null
           ms365_refresh_token?: string | null
+          ms365_token_expiry?: string | null
           notif_ai?: boolean
           notif_appointment_reminder?: boolean
           notif_calls?: boolean
@@ -8712,9 +8737,13 @@ export type Database = {
           notif_sms?: boolean
           notif_voicemails?: boolean
           ns_domain?: string | null
+          ns_extension?: string | null
           ns_jwt?: string | null
           ns_jwt_expires_at?: string | null
+          ns_linked?: boolean
+          ns_linked_at?: string | null
           ns_refresh_token?: string | null
+          ns_sip_username?: string | null
           ns_user_id?: string | null
           onboarding_completed?: boolean
           onboarding_step?: number
@@ -8724,6 +8753,10 @@ export type Database = {
           privacy_version?: string | null
           recording_consent?: boolean
           role?: string
+          sip_domain?: string | null
+          sip_password?: string | null
+          sip_proxy?: string | null
+          sip_username?: string | null
           status?: string
           updated_at?: string
           user_id?: string

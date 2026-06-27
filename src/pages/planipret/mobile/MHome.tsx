@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import IdentityCard from "@/components/planipret/mobile/IdentityCard";
 import { useOutletContext, useNavigate } from "react-router-dom";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -189,6 +190,10 @@ export default function MHome() {
           {sipOnline ? "En ligne" : "Hors ligne"}
         </button>
       </header>
+
+      <IdentityCard profile={profile} onLinked={reloadProfile} />
+
+
 
       {/* ===== PERIOD FILTER ===== */}
       <div className="flex items-center justify-between">

@@ -1,0 +1,90 @@
+// Refreshes Microsoft 365 access tokens for Planiprêt brokers.
+// - Without body: refreshes the calling user (mobile app on 401 retry).
+// - With { all: true } via service role / cron: refreshes every profile whose
+//   token expires within 10 minutes.
+import { createClient } from "npm:@supabase/supabase-js@2";
+import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+
+async function refreshToken(refresh_token: string) {
+  const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  const { data: cfg } = await admin.from("planipret_integration_secrets").select("config").eq("provider", "microsoft").maybeSingle();
+  const c = (cfg?.config ?? {}) as Record<string, string>;
+  const clientId = c.client_id ?? Deno.env.get("MICROSOFT_CLIENT_ID");
+  const clientSecret = c.client_secret ?? Deno.env.get("MICROSOFT_CLIENT_SECRET");
+  const tenant = c.tenant_id ?? Deno.env.get("MICROSOFT_TENANT_ID") ?? "common";
+  if (!clientId || !clientSecret) throw new Error("MS365 not configured");
+
+  const body = new URLSearchParams({
+    client_id: clientId,
+    client_secret: clientSecret,
+    grant_type: "refresh_token",
+    refresh_token,
+    scope: "openid offline_access Mail.ReadWrite Calendars.ReadWrite User.Read",
+  });
+  const r = await fetch(`https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`, {
+    method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body,
+  });
+  const d = await r.json();
+  if (!r.ok) throw new Error(d.error_description ?? "refresh failed");
+  return {
+    access_token: d.access_token as string,
+    refresh_token: (d.refresh_token as string) ?? refresh_token,
+    expires_in: Number(d.expires_in ?? 3600),
+  };
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  try {
+    const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const body = await req.json().catch(() => ({} as any));
+
+    if (body?.all === true) {
+      const cutoff = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+      const { data: rows } = await admin.from("planipret_profiles")
+        .select("id, user_id, ms365_refresh_token, ms365_token_expiry")
+        .not("ms365_refresh_token", "is", null)
+        .or(`ms365_token_expiry.is.null,ms365_token_expiry.lt.${cutoff}`);
+      let ok = 0, fail = 0;
+      for (const r of rows ?? []) {
+        try {
+          const tok = await refreshToken(r.ms365_refresh_token!);
+          await admin.from("planipret_profiles").update({
+            ms365_access_token: tok.access_token,
+            ms365_refresh_token: tok.refresh_token,
+            ms365_token_expiry: new Date(Date.now() + tok.expires_in * 1000).toISOString(),
+          }).eq("id", r.id);
+          ok++;
+        } catch (_) { fail++; }
+      }
+      return j({ success: true, refreshed: ok, failed: fail });
+    }
+
+    // Per-user (authenticated) refresh
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const userClient = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: claims } = await userClient.auth.getClaims(authHeader.replace("Bearer ", ""));
+    const userId = claims?.claims?.sub as string | undefined;
+    if (!userId) return j({ error: "Unauthorized" }, 401);
+
+    const { data: profile } = await admin.from("planipret_profiles")
+      .select("ms365_refresh_token").eq("user_id", userId).maybeSingle();
+    if (!profile?.ms365_refresh_token) return j({ error: "no_refresh_token" }, 400);
+
+    const tok = await refreshToken(profile.ms365_refresh_token);
+    await admin.from("planipret_profiles").update({
+      ms365_access_token: tok.access_token,
+      ms365_refresh_token: tok.refresh_token,
+      ms365_token_expiry: new Date(Date.now() + tok.expires_in * 1000).toISOString(),
+    }).eq("user_id", userId);
+    return j({ success: true, expires_in: tok.expires_in });
+  } catch (e) {
+    return j({ error: (e as Error).message }, 500);
+  }
+});
+
+function j(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}

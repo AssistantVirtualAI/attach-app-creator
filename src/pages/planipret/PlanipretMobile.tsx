@@ -224,7 +224,8 @@ export default function PlanipretMobile() {
   }, [profile?.user_id, location.pathname]);
 
   const loadProfile = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { session } } = await supabase.auth.getSession();
+    const user = session?.user ?? null;
     if (!user) {
       recordRedirect(location.pathname, ROUTES.MPLANIPRET, "PlanipretMobile.loadProfile", "no auth session — stay inside mobile app");
       setProfile(null);
@@ -232,6 +233,22 @@ export default function PlanipretMobile() {
       setLoading(false);
       return;
     }
+    // Capture Microsoft 365 tokens once after Azure SSO redirect.
+    try {
+      const captured = sessionStorage.getItem("pp_ms_captured");
+      if (session.provider_token && captured !== session.access_token) {
+        await supabase.functions.invoke("ms365-store-session", {
+          body: {
+            provider_token: session.provider_token,
+            provider_refresh_token: (session as any).provider_refresh_token ?? null,
+            expires_in: 3600,
+            email: user.email,
+            display_name: (user.user_metadata as any)?.full_name ?? (user.user_metadata as any)?.name ?? null,
+          },
+        });
+        sessionStorage.setItem("pp_ms_captured", session.access_token);
+      }
+    } catch (_) { /* non-blocking */ }
     const { data, error } = await supabase.from("planipret_profiles").select("*").eq("user_id", user.id).maybeSingle();
     if (error) {
       recordRedirect(location.pathname, ROUTES.MPLANIPRET, "PlanipretMobile.loadProfile", "profile load failed");
