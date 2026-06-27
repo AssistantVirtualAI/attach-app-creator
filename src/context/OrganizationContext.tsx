@@ -99,14 +99,25 @@ export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     try {
       setIsLoading(true);
 
-      const { data: memberships, error: mErr } = await supabase
+      // Use get_accessible_org_ids RPC: super_admins see all orgs, others see their memberships.
+      let orgIds: string[] = [];
+      const { data: accessibleIds, error: accErr } = await supabase.rpc('get_accessible_org_ids', { _user_id: user.id });
+      if (!accErr && Array.isArray(accessibleIds)) {
+        orgIds = (accessibleIds as any[]).map((r: any) => (typeof r === 'string' ? r : r?.get_accessible_org_ids)).filter(Boolean);
+      }
+      if (orgIds.length === 0) {
+        const { data: memberships, error: mErr } = await supabase
+          .from('organization_members')
+          .select('organization_id, accepted_at')
+          .eq('user_id', user.id);
+        if (mErr) throw mErr;
+        orgIds = (memberships || []).map((m) => m.organization_id).filter(Boolean);
+      }
+      // Always pull memberships for the accepted_at field
+      const { data: memberships } = await supabase
         .from('organization_members')
         .select('organization_id, accepted_at')
         .eq('user_id', user.id);
-
-      if (mErr) throw mErr;
-
-      const orgIds = (memberships || []).map((m) => m.organization_id).filter(Boolean);
       if (orgIds.length === 0) {
         setOrganizations([]);
         setOrganizationMemberships([]);

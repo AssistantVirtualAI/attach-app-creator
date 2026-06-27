@@ -51,22 +51,26 @@ export async function getPostLoginRoute(userId: string): Promise<string> {
       ? (userRolesResult.value.data || []).map((r: any) => r.role as string)
       : [];
 
-    const inAvaStandalone = orgRows.some((r: any) => r.organization_id === AVA_STANDALONE_ORG_ID);
+    const setActiveOrg = (orgId: string) => {
+      try { localStorage.setItem('selected_organization_id', orgId); } catch { /* ignore */ }
+    };
 
     // AVA super admin → main dashboard with org switcher (Planipret / Lemtel / AVA)
     if (isSuper || appRoles.includes('super_admin')) {
+      // Default to AVA standalone for super admin; they can switch from the sidebar.
+      setActiveOrg(AVA_STANDALONE_ORG_ID);
       return '/dashboard';
     }
 
-
-    // Planipret org (admins and members both land on the Planipret admin portal)
+    // Planipret org → unified dashboard with Planipret pre-selected
     if (isPlanipretAdmin || isPlanipretMember) {
-      return '/planipret/admin/overview';
+      setActiveOrg(PLANIPRET_ORG_ID);
+      return '/dashboard';
     }
 
     // Lemtel routing
-    if (isLemtelAdmin) return '/lemtel/dashboard';
-    if (isLemtelMember) return '/org/lemtel/my/dashboard';
+    if (isLemtelAdmin) { setActiveOrg(LEMTEL_ORG_ID); return '/dashboard'; }
+    if (isLemtelMember) { setActiveOrg(LEMTEL_ORG_ID); return '/org/lemtel/my/dashboard'; }
 
     // Generic org admin → unified dashboard with switcher
     const orgRoles = orgRows.map((r: any) => r.role as string);
