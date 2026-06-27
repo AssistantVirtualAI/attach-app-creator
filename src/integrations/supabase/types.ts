@@ -7983,11 +7983,15 @@ export type Database = {
           full_name: string | null
           id: string
           last_name: string | null
+          last_synced_at: string | null
           metadata: Json
           mobile: string | null
           notes: string | null
           organization_id: string
           phone: string | null
+          phone_display: string | null
+          phone_normalized: string | null
+          photo_url: string | null
           source: string | null
           tags: Json
           updated_at: string
@@ -8002,11 +8006,15 @@ export type Database = {
           full_name?: string | null
           id?: string
           last_name?: string | null
+          last_synced_at?: string | null
           metadata?: Json
           mobile?: string | null
           notes?: string | null
           organization_id?: string
           phone?: string | null
+          phone_display?: string | null
+          phone_normalized?: string | null
+          photo_url?: string | null
           source?: string | null
           tags?: Json
           updated_at?: string
@@ -8021,11 +8029,15 @@ export type Database = {
           full_name?: string | null
           id?: string
           last_name?: string | null
+          last_synced_at?: string | null
           metadata?: Json
           mobile?: string | null
           notes?: string | null
           organization_id?: string
           phone?: string | null
+          phone_display?: string | null
+          phone_normalized?: string | null
+          photo_url?: string | null
           source?: string | null
           tags?: Json
           updated_at?: string

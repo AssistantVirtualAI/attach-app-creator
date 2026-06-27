@@ -7,6 +7,8 @@ import type { AudioProfile } from '../lib/sip/audioProfile';
 import { EMPTY_QUALITY } from '../lib/sip/callQuality';
 import { getAudioState, onAudioStateChange, setRoute, type AudioRoute, type AudioState } from '../lib/sip/audioOutput';
 import CallTimeline, { type CallPhase } from './CallTimeline';
+import IncomingCallerPanel from './IncomingCallerPanel';
+import { lookupCaller, type CallerLookup } from '../lib/sip/callerLookup';
 
 const PROFILE_CYCLE: AudioProfile[] = ['auto', 'hd', 'low-bandwidth'];
 
@@ -23,6 +25,7 @@ export default function ActiveCallSheet({
   const [audio, setAudio] = useState<AudioState>(getAudioState());
   const [toast, setToast] = useState<{ text: string; tone: 'ok' | 'err' | 'info' } | null>(null);
   const [recPending, setRecPending] = useState(false);
+  const [callerLookup, setCallerLookup] = useState<CallerLookup | null>(null);
 
   useEffect(() => onAudioStateChange(setAudio), []);
   useEffect(() => {
@@ -64,6 +67,15 @@ export default function ActiveCallSheet({
   const isIncoming = sp.snap.callState === 'ringing-in';
   const isOutgoing = sp.snap.callState === 'ringing-out';
   const onHold = !!sp.snap.onHold || sp.snap.callState === 'held';
+
+  // Trigger caller-ID lookup as soon as we know we're ringing (incoming or outgoing).
+  useEffect(() => {
+    const phone = sp.snap.remoteNumber || sp.snap.remoteParty || sp.snap.remoteUri || '';
+    if (!phone || (!isIncoming && !isOutgoing)) { setCallerLookup(null); return; }
+    let cancelled = false;
+    lookupCaller(String(phone)).then((r) => { if (!cancelled) setCallerLookup(r); });
+    return () => { cancelled = true; };
+  }, [isIncoming, isOutgoing, sp.snap.remoteNumber, sp.snap.remoteParty, sp.snap.remoteUri]);
   const inCall = sp.snap.callState === 'active' || sp.snap.callState === 'held' || onHold;
   const isTransfer = !!sp.snap.transferring;
   const isEnded = sp.snap.callState === 'ended' || sp.snap.callState === 'idle';
@@ -166,6 +178,10 @@ export default function ActiveCallSheet({
           }}
         />
       </div>
+      {/* Caller ID — only during incoming ring */}
+      {isIncoming && (
+        <IncomingCallerPanel lookup={callerLookup} rawNumber={String(remote)} />
+      )}
 
       {/* Identity */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14 }}>
