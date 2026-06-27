@@ -5,6 +5,7 @@ import { mobileApi, RecordingEntry } from '../lib/mobileApi';
 import { Card, Chip, EmptyState, Skeleton, AIPanel } from '../components/ui/Primitives';
 import type { Creds } from '../lib/creds';
 import { restGet, loadPbxRecordingAudioMobile } from '../lib/mobileSupabase';
+import { downloadRecording, getCachedRecordingUrl, prefetchRecordings } from '../lib/recordingCache';
 import { showMobileToast } from '../lib/mobileToast';
 import { useCallAi } from '../hooks/useCallAi';
 import { useT } from '../lib/i18n';
