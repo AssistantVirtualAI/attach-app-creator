@@ -102,18 +102,33 @@ export default function ActiveCallSheet({
   const record = async () => {
     const isRec = !!sp.snap.recording;
     const fn = isRec ? sp.stopRecord : sp.startRecord;
-    if (typeof fn !== 'function') {
-      setToast({ text: "Enregistrement non supporté par cette extension", tone: 'err' });
-      return;
-    }
     setRecPending(true);
     setToast({ text: isRec ? "Arrêt de l'enregistrement…" : "Démarrage de l'enregistrement…", tone: 'info' });
+    let nativeErr: any = null;
     try {
-      await fn();
-      setToast({ text: isRec ? "Enregistrement arrêté ✓" : "Enregistré ✓ — la conversation est capturée", tone: 'ok' });
+      if (typeof fn === 'function') {
+        await fn();
+        setToast({ text: isRec ? "Enregistrement arrêté ✓" : "Enregistré ✓ — la conversation est capturée", tone: 'ok' });
+        setRecPending(false);
+        return;
+      }
     } catch (e: any) {
-      const msg = e?.message || 'erreur inconnue';
-      setToast({ text: isRec ? `Erreur — arrêt impossible: ${msg}` : `Erreur — démarrage impossible: ${msg}`, tone: 'err' });
+      nativeErr = e;
+      console.error('[ActiveCall] native record failed', e?.message || e);
+    }
+    // Fallback: ask the PBX directly via fusionpbx-proxy.
+    try {
+      const callUuid = (sp.snap as any).callId || (sp.snap as any).callUuid || '';
+      const { supabase } = await import('../lib/mobileSupabase');
+      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
+        body: { action: 'record-call', uuid: callUuid, start: !isRec, domain_name: (sp.snap as any).domain },
+      });
+      if (error || !data?.ok) throw new Error(error?.message || data?.error || 'PBX rejected uuid_record');
+      setToast({ text: isRec ? "Arrêt côté PBX ✓" : "Enregistré côté PBX ✓", tone: 'ok' });
+    } catch (e: any) {
+      const msg = nativeErr?.message || e?.message || 'erreur inconnue';
+      console.error('[ActiveCall] proxy record fallback failed', e?.message || e);
+      setToast({ text: `Erreur enregistrement: ${msg}`, tone: 'err' });
     } finally {
       setRecPending(false);
     }

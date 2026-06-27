@@ -309,19 +309,27 @@ Deno.serve(async (req) => {
       return json({ transcript_text: fallbackTranscript, stub: true, reason: "missing-ai-key", fetchErrors });
     }
     if (!audioBytes || audioBytes.length === 0) {
-      // Friendlier reason when there's no recording metadata at all yet.
+      // Surface specific PBX errors so the UI can show actionable messages.
+      const errBlob = fetchErrors.join(" | ");
+      const isAuth = /FUSIONPBX_AUTH_FAILED|login[_ ]failed|401|403/i.test(errBlob);
+      const isNotFound = /RECORDING_NOT_FOUND|no-url|file_missing/i.test(errBlob);
       const hasAnyPath = !!(recording_path || call?.recording_path || recording_name || call?.recording_name || sourceUrl);
       let reason: string;
       let retryAfterMs = 0;
-      if (storagePendingSync) {
+      if (isAuth) {
+        reason = "pbx-auth-failed";
+      } else if (storagePendingSync) {
         reason = "recording-pending-sync";
-        retryAfterMs = 15000; // client should auto-retry with backoff
+        retryAfterMs = 15000;
+      } else if (isNotFound) {
+        reason = "recording-not-found";
       } else {
         reason = hasAnyPath ? "no-audio" : "recording-not-synced";
         if (reason === "recording-not-synced") retryAfterMs = 20000;
       }
+      console.error("ai-transcribe-call NO_AUDIO", { call_record_id, reason, fetchErrors });
       await writeTranscript(fallbackTranscript, `stub-${reason}`);
-      await audit(reason, { error_code: reason, message: `fetch errors: ${fetchErrors.join("; ") || "none"}`, metadata: { fetchErrors, retryAfterMs } });
+      await audit(reason, { error_code: reason, message: `fetch errors: ${errBlob || "none"}`, metadata: { fetchErrors, retryAfterMs } });
       return json({ transcript_text: fallbackTranscript, stub: true, reason, fetchErrors, retry_after_ms: retryAfterMs, pending_sync: storagePendingSync || reason === "recording-not-synced" }, 200);
     }
 

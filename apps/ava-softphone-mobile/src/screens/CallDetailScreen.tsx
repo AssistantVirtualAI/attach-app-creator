@@ -160,12 +160,16 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
         const reason = t.reason || t.error || '';
         const fetchTxt = (t.fetchErrors || []).join(' ');
         let friendly = '';
-        if (reason === 'recording-not-synced' || reason === 'no-recording' || /RECORDING_NOT_FOUND/i.test(fetchTxt)) {
+        if (reason === 'pbx-auth-failed' || /FUSIONPBX_AUTH_FAILED|login[_ ]failed/i.test(fetchTxt)) {
+          friendly = "Identifiants FusionPBX expirés — l'administrateur doit rafraîchir FUSIONPBX_USERNAME / FUSIONPBX_PASSWORD.";
+        } else if (reason === 'recording-not-found' || /RECORDING_NOT_FOUND/i.test(fetchTxt)) {
+          friendly = "Enregistrement introuvable sur le PBX (le fichier .mp3/.wav n'est plus sur le disque FusionPBX).";
+        } else if (reason === 'recording-not-synced' || reason === 'no-recording') {
           friendly = "Enregistrement non disponible — l'appel n'a pas été enregistré, ou la synchro PBX n'est pas encore terminée. Réessayez dans ~30 s.";
         } else if (reason === 'missing-ai-key') {
           friendly = "Clé IA manquante côté serveur. Contactez l'administrateur.";
         } else {
-          friendly = `Transcription indisponible: ${reason || 'erreur inconnue'}`;
+          friendly = `Transcription indisponible: ${reason || 'erreur inconnue'}${fetchTxt ? ` — ${fetchTxt.slice(0, 160)}` : ''}`;
         }
         throw new Error(friendly);
       }

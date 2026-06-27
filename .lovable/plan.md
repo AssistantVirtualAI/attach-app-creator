@@ -1,77 +1,45 @@
-# Phase 4 — Noise Cancellation + Network Intelligence
+# Fix Call Recording + Transcription (Lemtel mobile)
 
-Scope: `/mplanipret` mobile app only. Lemtel softphone untouched. Backend & Edge Functions unchanged.
+## Problem 1 — Record button errors
 
-## 4.1 — Audio processing & noise cancellation
+**Investigate first** (build mode):
+- `ios/App/App/CapacitorSip.swift`: confirm `startRecording` / `stopRecording` are in `pluginMethods` and implemented. Currently `startRecord` exists but UI calls `startRecording` — name mismatch is the likely cause.
+- `src/lib/sip/nativeSipProvider.ts`: verify `startRecording` / `stopRecording` are exported and forward to the native plugin with `{ callId }`.
+- Capture exact error via `console.error` in the catch block of the Record button handler so it appears in dev logs.
 
-**New file `src/lib/planipret/audio/audioConstraints.ts`**
-- Export `getAudioConstraints(mode: 'standard' | 'office' | 'phone')` returning the WebRTC constraints from the spec (echoCancellation, noiseSuppression, autoGainControl, sampleRate, channelCount, latency, suppressLocalAudioPlayback).
-- `phone` mode → narrowband 8 kHz; `office` mode → add RNNoise WASM hook.
+**Fix**:
+1. In `CapacitorSip.swift`: add/rename `startRecording` and `stopRecording` `@objc` methods; register both in `pluginMethods`. Implementation calls FusionPBX REST `POST /api/v2/cmd/record_start` (and `record_stop`) with `uuid=<activeCallId>` via the existing `fusionpbx-proxy` edge function (don't put PBX creds on device).
+2. In `nativeSipProvider.ts`: export `startRecording(callId)` / `stopRecording(callId)` that call `CapacitorPjsip.startRecording({ callId })`.
+3. In the record button handler (`ActiveCallSheet.tsx`): surface the real error via toast + `console.error`, flip `isRecording` only on success.
 
-**New file `src/lib/planipret/audio/rnnoise.ts`**
-- Lazy-load `@jitsi/rnnoise-wasm` AudioWorklet, expose `applyRnnoise(stream)` returning a processed `MediaStream`.
-- Graceful fallback to raw stream if WASM unavailable.
+## Problem 2 — Transcription fails (RECORDING_NOT_FOUND)
 
-**New file `src/lib/planipret/audio/vad.ts`**
-- AnalyserNode-based Voice Activity Detection.
-- Emits `speaking`/`silent` events + level (0–10) for the VU meter.
-- Auto-mute timer: off / 30 s / 60 s (configurable).
+**Edge function changes**:
 
-**New file `src/lib/planipret/audio/audioRouter.ts`**
-- Wraps native `audioOutput.ts` calls (already used by Lemtel) — earpiece / speaker / Bluetooth.
-- Reuses existing native bridge; **no Swift changes**.
+`supabase/functions/fusionpbx-proxy/index.ts`:
+- New action `findRecording({ callUuid, domain })` that tries paths in order:
+  1. CDR `record_path` + `record_name` from DB
+  2. `/var/lib/freeswitch/recordings/<domain>/archive/<YYYY>/<Mon>/<DD>/<uuid>.{mp3,wav}`
+  3. `/var/lib/freeswitch/recordings/<domain>/<uuid>.{mp3,wav}`
+  4. `/tmp/<uuid>.{mp3,wav}`
+- Log every attempt: full URL, HTTP status, response body snippet.
+- Return `{ found, path, size, attempts: [...] }`.
+- New action `healthCheck` that hits FusionPBX login endpoint and returns `{ ok, status, expiresAt }`.
 
-**New component `src/components/planipret/mobile/call/CallAudioSheet.tsx`**
-- Bottom sheet with: mic toggle, speaker selector, NC toggle + 3-mode picker (Standard / Bureau / Téléphone), 10-bar real-time VU meter, pulsing green border on active speech.
+`supabase/functions/ai-transcribe-call/index.ts`:
+- Call `fusionpbx-proxy:findRecording` first; if not found, return structured error `{ code: 'RECORDING_NOT_FOUND', attempts }`.
+- Log: fetch URL, HTTP status, content-length, error body.
+- On 401/403 from PBX → return `{ code: 'PBX_AUTH_FAILED' }` so UI prompts to refresh creds.
+- Keep STT chain: `openai/gpt-4o-mini-transcribe` via Lovable AI Gateway (per project standard) with Claude post-processing.
 
-## 4.2 — Network intelligence
+**Auto-trigger + UI**:
+- In `useSoftphoneNative.ts` on `callEnded` (recorded calls only): wait 10s, invoke `ai-transcribe-call` with `{ callUuid }`.
+- `CallDetailScreen.tsx`: render specific error from edge function — `RECORDING_NOT_FOUND` → "Enregistrement introuvable sur le PBX (chemins testés: …)"; `PBX_AUTH_FAILED` → "Identifiants FusionPBX expirés"; generic → message + retry button.
 
-**Install**: `@capacitor/network` (already a Capacitor project).
+## Files
+**Modified**: `ios/App/App/CapacitorSip.swift`, `src/lib/sip/nativeSipProvider.ts`, `src/components/lemtel/ActiveCallSheet.tsx`, `src/hooks/useSoftphoneNative.ts`, `src/components/lemtel/CallDetailScreen.tsx`, `supabase/functions/fusionpbx-proxy/index.ts`, `supabase/functions/ai-transcribe-call/index.ts`.
 
-**New file `src/lib/planipret/network/networkMonitor.ts`**
-- Singleton. `init()` registers `Network.addListener('networkStatusChange')` + 5 s `checkSignalQuality()` interval during active call only.
-- `measureWifiQuality()` pings the SIP edge (HEAD request) 3× → returns `{ rtt, loss }`.
-- Classifies: Excellent (<50 ms), Bon (50–150), Acceptable (150–300), Mauvais (>300), Warning if loss >5 %.
-- Emits events via tiny `EventTarget`.
+**Secrets check**: verify `FUSIONPBX_USERNAME`, `FUSIONPBX_PASSWORD`, `FUSIONPBX_BASE_URL`, `LOVABLE_API_KEY` exist; request refresh via `add_secret` only if health-check fails.
 
-**Handover logic** (`networkMonitor.attemptHandover()`):
-- Pre-register SIP on new transport, send re-INVITE, confirm RTP, drop old. Implemented as orchestration over existing `useSoftphoneNative` — calls `prewarmAudio()` + `reinvite()` already exposed by `CapacitorSip`. No native code changes.
-
-**New component `src/components/planipret/mobile/call/NetworkBadge.tsx`**
-- Top-of-call pill: 📶 + label + color (green/yellow/orange/red). Animated "Reconnexion..." state.
-
-**Settings (MMore)**
-- New section "Réseau" with 3 toggles (auto-switch, prefer-WiFi, background-calls) persisted in `localStorage` under `pp_network_prefs`.
-- Live status line: "Réseau actuel: WiFi — 12 ms".
-
-## 4.3 — Bluetooth auto-detection
-
-**Install**: `@capacitor-community/bluetooth-le`.
-
-**New file `src/lib/planipret/audio/bluetoothManager.ts`**
-- `scanAudioDevices()` on app launch (via existing onboarding hook).
-- `autoConnectLast()` from `localStorage.pp_last_bt_device`.
-- Listen for connect/disconnect → call `audioRouter.switchTo(...)`.
-- Rules: headset connect → switch to headset; disconnect → fallback to earpiece (not speaker); car BT → switch automatically.
-
-**Permission strings**
-- Append to `docs/mplanipret-native-config.md`: `NSBluetoothAlwaysUsageDescription` (iOS) + `BLUETOOTH_CONNECT` (Android API 31+).
-- Onboarding screen 5 already covers the runtime prompt — extend `reqBluetooth()` to call the new manager when native plugin is present.
-
-## Wiring
-
-- `PlanipretMobile.tsx` → mount `<NetworkBadge/>` + `<CallAudioSheet/>` inside the existing active-call layout.
-- `MMore.tsx` → add Réseau section.
-- `MobilePermissionsOnboarding.tsx` → call `bluetoothManager.scanAudioDevices()` on Bluetooth screen completion.
-
-## Out of scope (acknowledged limits)
-
-- True sub-500 ms SIP handover requires native iOS work in `CapacitorSip.swift`; this plan wires the orchestration and UI but actual re-INVITE on alternate interface is best-effort on iOS without additional Swift changes.
-- krisp.ai SDK requires a paid licence key — using free RNNoise WASM instead.
-
-## Technical notes
-
-- All new files scoped under `src/lib/planipret/**` and `src/components/planipret/mobile/call/**` — zero impact on Lemtel.
-- Reuses existing `audioOutput.ts` and `CapacitorSip` native bridge.
-- No DB migrations, no Edge Function changes.
-- Bilingual strings added to `src/lib/i18n/mplanipret.ts`.
+## Out of scope
+Planiprêt mobile, route changes, Lemtel SIP signaling/audio path.

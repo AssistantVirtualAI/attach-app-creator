@@ -1122,15 +1122,22 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     /// Server-side recording toggle via SIP INFO `Record: on|off` (NetSapiens / FusionPBX standard).
     /// Falls back to DTMF feature code `*1` for PBX that don't support the INFO method.
     @objc func startRecord(_ call: CAPPluginCall) {
-        if callActiveId.isEmpty || callState != "active" {
+        if callActiveId.isEmpty {
+            log("startRecord rejected: no active call (state=\(callState))")
             call.reject("no active call")
+            return
+        }
+        if callState != "active" && callState != "hold" && callState != "early" {
+            log("startRecord rejected: invalid state=\(callState) id=\(callActiveId)")
+            call.reject("call not active (state=\(callState))")
             return
         }
         isRecording = true
         callCseq += 1
         sendInfoRecord(on: true)
         notifyListeners("recordingChanged", data: ["recording": true])
-        call.resolve(["ok": true, "recording": true])
+        log("startRecord ok callId=\(callActiveId) state=\(callState)")
+        call.resolve(["ok": true, "recording": true, "callId": callActiveId])
     }
 
     @objc func stopRecord(_ call: CAPPluginCall) {
