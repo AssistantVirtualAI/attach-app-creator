@@ -1,63 +1,76 @@
 ## Objectif
-Refonte visuelle complète de l'app mobile Planiprêt (`/mplanipret`) : esthétique premium, branding AVA cohérent, bouton AVA intelligent (Claude chat OU agent vocal ElevenLabs selon activation), et conservation totale du backend (Supabase, NS-API, Claude, Edge Functions).
 
-## 1. Design System Planiprêt Mobile
-- Nouveau token set dans `src/styles/planipret-mobile.css` : palette navy (#0a1628) + accent doré Planiprêt + gradient AVA (bleu→violet→magenta du logo).
-- Glassmorphism profond (blur 24px, borders translucides 1px), ombres "elegant" multi-couches.
-- Typo : Inter pour le body, Space Grotesk pour les headings/stats — pas de fonts génériques.
-- Composants partagés réutilisés depuis Lemtel : `Dialpad`, `ActiveCallSheet`, boutons "Glass" — wrappés dans un thème Planiprêt (couleurs + gradients différents).
+Passer le portail `/planipret/admin/*` d'un thème glassmorphism sombre à une esthétique **claire, premium, finance/immobilier** — palette Navy Trust sur fond clair, typographie Urbanist + Epilogue, structure sidebar dashboard épurée.
 
-## 2. Branding AVA + Planiprêt sur chaque page
-- **Page Auth** : grand logo AVA centré (le logo uploadé) + tagline "Planiprêt Mobile · Powered by AVA".
-- **Header global** (`PlaniMobileHeader.tsx`) sur chaque page mobile :
-  - Logo Planiprêt centré
-  - Petit logo AVA + "Powered by AVA" en bas du header
-  - Avatar courtier à droite
-- **Footer global** (`PlaniMobileFooter.tsx`) : "Developed by AVA" + mini logo, version build.
-- Assets : import du logo AVA fourni via `src/assets/ava-logo.png` (lovable-assets pointer).
+## Direction visuelle verrouillée
 
-## 3. Écrans rebuildés
-- **Home / Accueil** : conservée — refresh visuel uniquement (cartes glass, animations Framer). Stats personnelles courtier + section "Insights AVA" (Claude) en cartes premium avec gradient AVA.
-- **Calls** : timeline élégante, cartes recents glass, IA badges.
-- **Dialer / Active Call** : boutons existants Lemtel réutilisés (verrouillés visuellement Planiprêt).
-- **SMS / Voicemails / Profil** : carte list pattern uniforme.
+**Palette (HSL tokens dans `src/index.css` sous un scope `.planipret-admin-scope`)**
+- `--pp-bg`: `#F7F9FC` (fond app)
+- `--pp-surface`: `#FFFFFF` (cartes)
+- `--pp-surface-alt`: `#E8EDF3` (sidebar, hover)
+- `--pp-border`: `#DCE3EC`
+- `--pp-text`: `#0F1B3D` (navy foncé)
+- `--pp-text-muted`: `#5A6B85`
+- `--pp-primary`: `#1E3A5F` (navy)
+- `--pp-accent`: `#3B6FA0` (bleu action)
+- `--pp-success`: `#0D7A5F`, `--pp-warn`: `#C9A84C`, `--pp-danger`: `#B23A48`
+- Ombres douces : `--pp-shadow-sm: 0 1px 2px rgba(15,27,61,.04)`, `--pp-shadow-md: 0 8px 24px -12px rgba(15,27,61,.12)`
 
-## 4. Bouton AVA intelligent (remplace l'ancien chatbot/agent)
-Un seul bouton flottant "AVA" en bas (FAB premium gradient) avec logique conditionnelle basée sur `planipret_profiles.voice_agent_enabled` :
+**Typographie** — `@fontsource/urbanist` (headings, 600/700) + `@fontsource/epilogue` (body, 400/500). Tracking serré sur les KPI (`-0.02em`), majuscules espacées sur les labels de section.
+
+**Layout** — sidebar dashboard fixe (240px ouverte / 64px collapsed), header sticky 56px, contenu sur grille 12 colonnes avec gouttières 24px.
+
+## Changements par zone
+
+### 1. Shell admin (`PlanipretAdminLayout.tsx`)
+- Fond `--pp-bg`, sidebar sur `--pp-surface` avec bordure droite fine.
+- Logo Planiprêt en haut + "AVA Statistic" en petit dessous le logo.
+- Sections sidebar avec labels capitalisés (`Vue d'ensemble`, `Courtiers`, `Communications`, `Finance`, `Système`).
+- Item actif : pastille bleue + fond `--pp-surface-alt`, barre verticale gauche 3px en `--pp-accent`.
+- Header : breadcrumb à gauche, recherche centrale, cluster droite (notifs, profil, environnement).
+- Profil dropdown : avatar initiales + nom + rôle, séparateur, déconnexion.
+
+### 2. Page Vue d'ensemble (`PAOverview.tsx`)
+- Hero KPI : 4 cartes blanches arrondies 16px, ombre douce, icône colorée à gauche, valeur en Urbanist 32px, delta en pilule.
+- Section "Profit mensuel" : grand graphique aire avec gradient navy→transparent, légende minimale.
+- Grille 2 colonnes : « Adoption services » (heatmap par courtier) | « Top performers ».
+- Cartes financières (Mobile/Widget/AI) : ligne dégradée colorée en bordure haute, valeurs grandes, marge en vert.
+
+### 3. Pages secondaires (Users, Reports, Settings, etc.)
+- Tables : header sticky `--pp-surface-alt`, lignes alternées subtiles, hover `--pp-accent/5`.
+- Boutons primaires : `--pp-primary` plein, hover plus foncé, focus ring 2px `--pp-accent`.
+- Inputs : fond blanc, bordure `--pp-border`, focus ring `--pp-accent`.
+- Toasts/dialogs : fond blanc, bordures fines, pas de glass blur.
+
+### 4. Composants partagés
+- Nouveau `PPStatCard`, `PPSectionHeader`, `PPDataTable` (variantes Tailwind via `cva`) pour cohérence.
+- Badges statut (Actif/Inactif/Trial) couleurs sémantiques claires.
+
+## Implémentation technique
 
 ```text
-voice_agent_enabled = TRUE  → ouvre AvaVoiceSheet (ElevenLabs WebRTC)
-voice_agent_enabled = FALSE → ouvre AvaChatSheet (Claude via pp-ava-chat)
+src/
+├── index.css              + bloc .planipret-admin-scope { --pp-* tokens, font vars }
+├── main.tsx               + import "@fontsource/urbanist/600.css" etc.
+├── components/planipret/admin/
+│   ├── PlanipretAdminLayout.tsx   (refonte shell + sidebar)
+│   ├── PPStatCard.tsx             (nouveau)
+│   ├── PPSectionHeader.tsx        (nouveau)
+│   └── PPProfileMenu.tsx          (refonte light)
+└── pages/planipret/admin/
+    ├── PAOverview.tsx     (refonte complète sections)
+    ├── PAUsers.tsx        (table light + filtres)
+    ├── PAReports.tsx      (cartes + charts clairs)
+    └── PASettings.tsx     (sections cards)
 ```
 
-- **AvaVoiceSheet** : utilise `@elevenlabs/react` (`useConversation`) + Edge Function `pp-ava-voice-token` qui mint un `conversation_token` à partir de `ELEVENLABS_API_KEY` et de `planipret_profiles.elevenlabs_agent_id`.
-- **AvaChatSheet** : conserve l'intégration Claude existante (`pp-ava-chat`), juste relookée.
-- Le FAB affiche un micro pulsant (voix) ou une bulle (chat) selon le mode actif.
+Dépendances : `bun add @fontsource/urbanist @fontsource/epilogue`.
 
-## 5. Insights AVA sur Home (Claude)
-- Carte "Insights AVA" sur Home appelant `pp-ava-insights` (réutilise/étend `pp-ava-chat`) : envoie stats du courtier (appels, leads chauds, conversions 7j) à Claude, retourne 3 insights actionnables.
-- Skeleton + animation reveal Framer Motion.
+## Hors scope (préservé tel quel)
+- Toute logique backend, Edge Functions, requêtes Supabase, pricing.
+- L'app mobile `/mplanipret` (déjà refondue séparément).
+- Le portail admin Lemtel et le dashboard AVA principal.
+- Aucune modification des routes ou des permissions.
 
-## 6. Conservation backend (intouché)
-- Aucune modif aux tables, RLS, ou Edge Functions existantes sauf ajout de `pp-ava-voice-token` (nouveau).
-- AVA org only, séparation Lemtel respectée.
-- Connexion ElevenLabs : utilise le standard connector → `ELEVENLABS_API_KEY` côté Edge Function uniquement.
-
-## Détails techniques
-- Fichiers créés :
-  - `src/styles/planipret-mobile.css`
-  - `src/components/mplanipret/layout/PlaniMobileHeader.tsx`
-  - `src/components/mplanipret/layout/PlaniMobileFooter.tsx`
-  - `src/components/mplanipret/ava/AvaFab.tsx` (FAB conditionnel)
-  - `src/components/mplanipret/ava/AvaVoiceSheet.tsx`
-  - `src/components/mplanipret/ava/AvaChatSheet.tsx` (refonte)
-  - `src/components/mplanipret/home/AvaInsightsCard.tsx`
-  - `src/assets/ava-logo.png.asset.json` (pointer)
-  - `supabase/functions/pp-ava-voice-token/index.ts`
-- Fichiers édités : layout root `/mplanipret`, `MHome.tsx`, `MAuth.tsx` (branding), pages courantes pour wrapper Header/Footer.
-- Connector ElevenLabs : vérifier/lier via `standard_connectors`.
-
-## Hors scope
-- Aucune modif des dashboards admin web `/planipret/admin/*`.
-- Aucun touch sur Lemtel.
-- Pas de changement de logique softphone/SIP/RTP.
+## Critère de succès
+Le portail respire : fonds clairs, navy comme couleur d'autorité, or/vert pour valeurs financières, typographie premium lisible, hiérarchie immédiate des KPI, zéro bruit visuel glassy résiduel.
