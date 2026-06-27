@@ -73,7 +73,7 @@ export async function setRoute(next: AudioRoute): Promise<boolean> {
     } else {
       route = next;
     }
-    if (audioEl) {
+    if (audioEl && !Capacitor.isNativePlatform()) {
       try { await applySink(audioEl, route); } catch (e) {
         if (!nativeOk) console.warn('[audioOutput] setSinkId failed', e);
       }
