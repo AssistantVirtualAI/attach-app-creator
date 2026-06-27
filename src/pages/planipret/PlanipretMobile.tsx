@@ -344,8 +344,8 @@ export default function PlanipretMobile() {
     <Frame>
       <div className="h-full flex flex-col relative overflow-hidden" style={{ background: "var(--pp-bg-base)" }}>
         {/* Top brand header — AVA (left) · Planiprêt (center) · Settings (right) */}
-        <header className="relative flex items-center px-4 pt-3 pb-2"
-          style={{ background: "linear-gradient(180deg, #0A1628 0%, #060D1A 100%)", borderBottom: "1px solid var(--pp-bg-border)" }}>
+        <header className="relative flex items-center px-4 pt-3 pb-2 pp-mobile-header">
+
           {/* AVA icon — left */}
           <div className="flex items-center gap-1.5">
             <img src={avaLogo.url} alt="AVA" className="w-7 h-7 rounded-lg object-cover"
