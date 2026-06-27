@@ -72,12 +72,22 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
       });
       const contentType = response.headers.get('content-type') || '';
       if (!response.ok || !contentType.includes('audio')) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(
-          err.error === 'RECORDING_NOT_FOUND'
-            ? 'Recording not available — file may have been deleted from the PBX after the retention period.'
-            : err.message || 'No recording available for this call.'
-        );
+        const err: any = await response.json().catch(() => ({}));
+        let msg: string;
+        if (err?.error === 'RECORDING_NOT_FOUND') {
+          if (err?.session_logged_in === false) {
+            msg = 'PBX rejected the recording session — FusionPBX credentials look invalid or expired. Ask the admin to refresh FUSIONPBX_USERNAME / FUSIONPBX_PASSWORD.';
+          } else if (err?.file_missing) {
+            msg = 'Recording file no longer exists on the PBX disk (likely past the retention window).';
+          } else {
+            msg = 'Recording is not reachable on the PBX (file missing or path mismatch).';
+          }
+        } else if (err?.error === 'Forbidden') {
+          msg = 'You are not allowed to listen to this call (extension scope).';
+        } else {
+          msg = err?.message || err?.error || 'No recording available for this call.';
+        }
+        throw new Error(msg);
       }
       const blob = await response.blob();
       return URL.createObjectURL(blob);
