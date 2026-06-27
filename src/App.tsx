@@ -392,7 +392,7 @@ const App = () => (
                 <Route path="/planipret/login" element={<Navigate to={loginWithRedirect(ROUTES.MPLANIPRET)} replace />} />
                 <Route path="/lemtel/setup/:token" element={<SoftphoneSetup />} />
                 <Route path="/lemtel/redeem/:token" element={<SoftphoneSetup />} />
-                <Route path={ROUTES.MPLANIPRET} element={<MplanipretGuard><AppSeparationGuard app="planipret"><PlanipretMobile /></AppSeparationGuard></MplanipretGuard>}>
+                <Route path={ROUTES.MPLANIPRET} element={<MplanipretGuard><PlanipretMobile /></MplanipretGuard>}>
                   <Route index element={<MHome />} />
                   <Route path="home" element={<MHome />} />
                   <Route path="calls" element={<MCalls />} />

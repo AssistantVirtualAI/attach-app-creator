@@ -1,14 +1,14 @@
 import { ReactNode, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { ROUTES, loginWithRedirect } from "@/lib/routes";
+import { ROUTES } from "@/lib/routes";
 import { recordRedirect } from "@/lib/debug/navDebug";
 
 /**
  * Dedicated access guard for the Planiprêt MOBILE app (`/mplanipret/*`).
  *
  * Rules:
- *  - Unauthenticated users go to /login with redirect back to /mplanipret.
+ *  - Unauthenticated users stay on /mplanipret and see the mobile login.
  *  - Lemtel-only users are blocked (sent to /portal).
  *  - This guard will NEVER redirect to /planipret/admin — the admin portal
  *    is a completely separate surface. If the user has no Planiprêt profile
@@ -27,9 +27,8 @@ export function MplanipretGuard({ children }: { children: ReactNode }) {
       if (cancelled) return;
 
       if (!user) {
-        const to = loginWithRedirect(ROUTES.MPLANIPRET);
-        recordRedirect(location.pathname, to, "MplanipretGuard", "no auth session");
-        navigate(to, { replace: true });
+        recordRedirect(location.pathname, ROUTES.MPLANIPRET, "MplanipretGuard", "no auth session — render inline mobile login");
+        setState("allow");
         return;
       }
 
