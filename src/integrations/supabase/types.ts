@@ -8057,6 +8057,45 @@ export type Database = {
         }
         Relationships: []
       }
+      planipret_integration_config: {
+        Row: {
+          config_data: Json
+          created_at: string
+          id: string
+          integration_key: string
+          is_configured: boolean
+          is_enabled: boolean
+          last_test_result: string | null
+          last_test_success: boolean | null
+          last_tested_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          config_data?: Json
+          created_at?: string
+          id?: string
+          integration_key: string
+          is_configured?: boolean
+          is_enabled?: boolean
+          last_test_result?: string | null
+          last_test_success?: boolean | null
+          last_tested_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          config_data?: Json
+          created_at?: string
+          id?: string
+          integration_key?: string
+          is_configured?: boolean
+          is_enabled?: boolean
+          last_test_result?: string | null
+          last_test_success?: boolean | null
+          last_tested_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       planipret_integration_secrets: {
         Row: {
           config: Json
