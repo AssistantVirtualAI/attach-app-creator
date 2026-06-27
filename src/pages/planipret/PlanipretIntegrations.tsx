@@ -399,10 +399,259 @@ export default function PlanipretIntegrations() {
           </div>
         </IntegrationCard>
 
-        {/* Batch 3 placeholders */}
-        <ComingSoon emoji="🔗" name="Webhooks & Automatisation" description="Pipeline post-appel" />
-        <ComingSoon emoji="📱" name="Application Mobile" description="iOS · Android · Push" fullWidth />
-        <ComingSoon emoji="🔏" name="Conformité PIPEDA / Loi 25" description="Rétention, consentements" />
+        {/* ───────── CARD 6 — WEBHOOKS ───────── */}
+        <IntegrationCard
+          integrationKey="webhooks" name="Webhooks & Automatisation"
+          description="Pipeline post-appel — notifications événements en temps réel"
+          emoji="🔗"
+          status={deriveStatus(rows.webhooks)}
+          enabled={rows.webhooks?.is_enabled ?? false}
+          lastTestedAt={rows.webhooks?.last_tested_at}
+          lastTestResult={rows.webhooks?.last_test_result}
+          lastTestSuccess={rows.webhooks?.last_test_success}
+          onToggleEnabled={(v) => toggleEnabled("webhooks", v)}
+          onSave={() => save("webhooks", ["endpoint_url", "secret"])}
+          onTest={() => test("webhooks")}
+        >
+          <InfoBanner>
+            Les événements sont envoyés en POST JSON avec l'en-tête <code>x-pp-signature</code> (HMAC-SHA256).
+            <div className="mt-2">
+              <CopyButton
+                value={`${typeof window !== "undefined" ? window.location.origin : ""}/functions/v1/ns-webhook-receiver`}
+                label="Copier URL réception NS"
+              />
+            </div>
+          </InfoBanner>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Field label="Endpoint URL" required hint="POST signé pour vos automatisations">
+              <TextInput value={getField("webhooks", "endpoint_url")}
+                onChange={(e) => setField("webhooks", "endpoint_url", e.target.value)}
+                placeholder="https://hooks.zapier.com/..." />
+            </Field>
+            <Field label="Secret de signature" required hint="Utilisé pour HMAC x-pp-signature">
+              <div className="flex gap-2">
+                <SecretInput value={draft.webhooks?.secret ?? ""}
+                  onChange={(v) => setField("webhooks", "secret", v)}
+                  hasSavedValue={!!rows.webhooks?.config_data?.secret} />
+                <button type="button"
+                  onClick={() => {
+                    const buf = new Uint8Array(32);
+                    crypto.getRandomValues(buf);
+                    const hex = Array.from(buf).map((b) => b.toString(16).padStart(2, "0")).join("");
+                    setField("webhooks", "secret", hex);
+                    toast.success("Secret généré — pensez à sauvegarder");
+                  }}
+                  className="px-3 rounded-lg text-xs font-semibold whitespace-nowrap"
+                  style={{ background: "#0D1F35", border: "1px solid #2E9BDC", color: "#2E9BDC" }}>
+                  Générer
+                </button>
+              </div>
+            </Field>
+            <Field label="Timeout (ms)" hint="2000 – 30000">
+              <TextInput type="number" min={2000} max={30000}
+                value={getField("webhooks", "timeout_ms", "10000")}
+                onChange={(e) => setField("webhooks", "timeout_ms", e.target.value)} />
+            </Field>
+            <Field label="Tentatives en cas d'échec" hint="0 – 5">
+              <TextInput type="number" min={0} max={5}
+                value={getField("webhooks", "retry_attempts", "3")}
+                onChange={(e) => setField("webhooks", "retry_attempts", e.target.value)} />
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-4">
+            {[
+              { k: "evt_call_completed",   label: "📞 Appel terminé" },
+              { k: "evt_voicemail_new",    label: "📬 Voicemail" },
+              { k: "evt_sms_inbound",      label: "💬 SMS entrant" },
+              { k: "evt_lead_hot",         label: "🔥 Lead chaud" },
+              { k: "evt_appointment_book", label: "📅 RDV pris" },
+              { k: "evt_transcript_ready", label: "📝 Transcript prêt" },
+            ].map((s) => {
+              const on = getField("webhooks", s.k, "true") === "true";
+              return (
+                <button key={s.k} type="button"
+                  onClick={() => setField("webhooks", s.k, on ? "false" : "true")}
+                  className="px-3 py-2 rounded-lg text-xs font-medium text-left"
+                  style={{
+                    background: on ? "rgba(46,155,220,0.1)" : "#0D1F35",
+                    border: `1px solid ${on ? "#2E9BDC" : "#0E2A45"}`,
+                    color: on ? "#2E9BDC" : "#8FA8C0",
+                  }}>
+                  {on ? "✓ " : ""}{s.label}
+                </button>
+              );
+            })}
+          </div>
+        </IntegrationCard>
+
+        {/* ───────── CARD 7 — MOBILE APP ───────── */}
+        <IntegrationCard
+          integrationKey="mobile_app" name="Application Mobile"
+          description="iOS · Android · Notifications push — synchronisation 350 courtiers"
+          emoji="📱" fullWidth
+          status={deriveStatus(rows.mobile_app)}
+          enabled={rows.mobile_app?.is_enabled ?? false}
+          lastTestedAt={rows.mobile_app?.last_tested_at}
+          lastTestResult={rows.mobile_app?.last_test_result}
+          lastTestSuccess={rows.mobile_app?.last_test_success}
+          onToggleEnabled={(v) => toggleEnabled("mobile_app", v)}
+          onSave={() => save("mobile_app", ["app_url"])}
+          onTest={() => test("mobile_app")}
+        >
+          <InfoBanner>
+            Statut en direct des courtiers connectés. La configuration est lue par l'app mobile via Realtime
+            (table <code>planipret_integration_config</code>).
+          </InfoBanner>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Field label="URL de l'application" required>
+              <TextInput value={getField("mobile_app", "app_url", `${typeof window !== "undefined" ? window.location.origin : ""}/mplanipret`)}
+                onChange={(e) => setField("mobile_app", "app_url", e.target.value)}
+                placeholder="https://app.planipret.ca/mplanipret" />
+            </Field>
+            <Field label="Version minimale supportée" hint="Force-update si version inférieure">
+              <TextInput value={getField("mobile_app", "min_version", "1.0.0")}
+                onChange={(e) => setField("mobile_app", "min_version", e.target.value)}
+                placeholder="1.0.0" />
+            </Field>
+            <Field label="Firebase Server Key (FCM)" hint="Notifications push Android">
+              <SecretInput value={draft.mobile_app?.fcm_server_key ?? ""}
+                onChange={(v) => setField("mobile_app", "fcm_server_key", v)}
+                hasSavedValue={!!rows.mobile_app?.config_data?.fcm_server_key} />
+            </Field>
+            <Field label="APNs Key ID (iOS)" hint="Notifications push iOS">
+              <TextInput value={getField("mobile_app", "apns_key_id")}
+                onChange={(e) => setField("mobile_app", "apns_key_id", e.target.value)}
+                placeholder="ABCD123456" />
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-4">
+            {[
+              { k: "feat_calls",         label: "📞 Appels" },
+              { k: "feat_messaging",     label: "💬 SMS" },
+              { k: "feat_voicemail",     label: "📬 Voicemail" },
+              { k: "feat_ava_voice",     label: "🎙️ AVA Voice" },
+              { k: "feat_ava_chat",      label: "🤖 AVA Chat" },
+              { k: "feat_calendar",      label: "📅 Agenda" },
+              { k: "feat_crm",           label: "🏢 CRM" },
+              { k: "feat_push",          label: "🔔 Push" },
+            ].map((s) => {
+              const on = getField("mobile_app", s.k, "true") === "true";
+              return (
+                <button key={s.k} type="button"
+                  onClick={() => setField("mobile_app", s.k, on ? "false" : "true")}
+                  className="px-3 py-2 rounded-lg text-xs font-medium text-left"
+                  style={{
+                    background: on ? "rgba(46,155,220,0.1)" : "#0D1F35",
+                    border: `1px solid ${on ? "#2E9BDC" : "#0E2A45"}`,
+                    color: on ? "#2E9BDC" : "#8FA8C0",
+                  }}>
+                  {on ? "✓ " : ""}{s.label}
+                </button>
+              );
+            })}
+          </div>
+        </IntegrationCard>
+
+        {/* ───────── CARD 8 — COMPLIANCE ───────── */}
+        <IntegrationCard
+          integrationKey="compliance" name="Conformité PIPEDA / Loi 25"
+          description="Rétention des données · Consentements · Audit"
+          emoji="🔏" fullWidth
+          status={deriveStatus(rows.compliance)}
+          enabled={rows.compliance?.is_enabled ?? false}
+          lastTestedAt={rows.compliance?.last_tested_at}
+          lastTestResult={rows.compliance?.last_test_result}
+          lastTestSuccess={rows.compliance?.last_test_success}
+          onToggleEnabled={(v) => toggleEnabled("compliance", v)}
+          onSave={() => save("compliance", ["dpo_email"])}
+          onTest={() => test("compliance")}
+        >
+          <InfoBanner tone="warn">
+            Loi 25 (Québec) et PIPEDA exigent un consentement explicite pour l'enregistrement d'appels
+            et une politique de rétention documentée. Les durées s'appliquent via l'edge function <code>pp-data-retention</code>.
+          </InfoBanner>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <Field label="Email du DPO" required hint="Responsable de la protection des données">
+              <TextInput value={getField("compliance", "dpo_email")}
+                onChange={(e) => setField("compliance", "dpo_email", e.target.value)}
+                placeholder="dpo@planipret.ca" />
+            </Field>
+            <Field label="Juridiction" hint="QC / CA / autre">
+              <select
+                value={getField("compliance", "jurisdiction", "QC")}
+                onChange={(e) => setField("compliance", "jurisdiction", e.target.value)}
+                style={{ background: "#0D1F35", border: "1px solid #0E2A45", borderRadius: 10, padding: "10px 14px", color: "#E8EDF5", fontSize: 13, width: "100%", outline: "none" }}>
+                <option value="QC">Québec (Loi 25)</option>
+                <option value="CA">Canada (PIPEDA)</option>
+                <option value="EU">Europe (RGPD)</option>
+              </select>
+            </Field>
+            <Field label="Région de stockage" hint="Localisation des données">
+              <select
+                value={getField("compliance", "data_region", "ca-central-1")}
+                onChange={(e) => setField("compliance", "data_region", e.target.value)}
+                style={{ background: "#0D1F35", border: "1px solid #0E2A45", borderRadius: 10, padding: "10px 14px", color: "#E8EDF5", fontSize: 13, width: "100%", outline: "none" }}>
+                <option value="ca-central-1">🇨🇦 Canada Central</option>
+                <option value="us-east-1">🇺🇸 US East</option>
+                <option value="eu-west-1">🇪🇺 EU West</option>
+              </select>
+            </Field>
+          </div>
+
+          <div className="mt-4">
+            <div style={{ fontSize: 12, color: "#4A7FA5", fontWeight: 600, marginBottom: 8 }}>
+              Durées de rétention (jours)
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {[
+                { k: "retention_calls",       label: "Appels", def: "365" },
+                { k: "retention_messages",    label: "SMS", def: "365" },
+                { k: "retention_voicemails",  label: "Voicemails", def: "180" },
+                { k: "retention_recordings",  label: "Enregistrements", def: "90" },
+                { k: "retention_transcripts", label: "Transcripts", def: "730" },
+                { k: "retention_insights",    label: "IA / Insights", def: "730" },
+                { k: "retention_audit",       label: "Audit logs", def: "730" },
+              ].map((f) => (
+                <Field key={f.k} label={f.label}>
+                  <TextInput type="number" min={1} max={3650}
+                    value={getField("compliance", f.k, f.def)}
+                    onChange={(e) => setField("compliance", f.k, e.target.value)} />
+                </Field>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-4">
+            {[
+              { k: "consent_call_recording", label: "🎙️ Consentement enregistrement" },
+              { k: "consent_ai_analysis",    label: "🤖 Consentement analyse IA" },
+              { k: "consent_marketing",      label: "📣 Consentement marketing" },
+              { k: "right_to_erasure",       label: "🗑️ Droit à l'oubli activé" },
+              { k: "data_portability",       label: "📤 Portabilité activée" },
+              { k: "encryption_at_rest",     label: "🔒 Chiffrement au repos" },
+            ].map((s) => {
+              const on = getField("compliance", s.k, "true") === "true";
+              return (
+                <button key={s.k} type="button"
+                  onClick={() => setField("compliance", s.k, on ? "false" : "true")}
+                  className="px-3 py-2 rounded-lg text-xs font-medium text-left"
+                  style={{
+                    background: on ? "rgba(46,155,220,0.1)" : "#0D1F35",
+                    border: `1px solid ${on ? "#2E9BDC" : "#0E2A45"}`,
+                    color: on ? "#2E9BDC" : "#8FA8C0",
+                  }}>
+                  {on ? "✓ " : ""}{s.label}
+                </button>
+              );
+            })}
+          </div>
+        </IntegrationCard>
+
 
       </div>
     </div>
@@ -418,20 +667,3 @@ function HealthPill({ color, bg, border, label }: { color: string; bg: string; b
   );
 }
 
-function ComingSoon({ emoji, name, description, fullWidth }: { emoji: string; name: string; description: string; fullWidth?: boolean }) {
-  return (
-    <div className={fullWidth ? "md:col-span-2" : ""}
-      style={{ background: "#0A1628", border: "1px dashed #0E2A45", borderRadius: 16, padding: 16, opacity: 0.75 }}>
-      <div className="flex items-center gap-3">
-        <div className="text-2xl w-10 h-10 rounded-lg flex items-center justify-center"
-          style={{ background: "#0D1F35", border: "1px solid #0E2A45" }}>{emoji}</div>
-        <div className="flex-1">
-          <div style={{ fontFamily: "Inter, sans-serif", fontWeight: 700, fontSize: 15, color: "#E8EDF5" }}>{name}</div>
-          <div style={{ fontSize: 12, color: "#4A7FA5", marginTop: 2 }}>{description}</div>
-        </div>
-        <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold"
-          style={{ background: "#0D1F35", border: "1px solid #0E2A45", color: "#4A7FA5" }}>Bientôt</span>
-      </div>
-    </div>
-  );
-}

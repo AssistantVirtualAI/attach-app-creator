@@ -51,6 +51,9 @@ Deno.serve(async (req) => {
         case "elevenlabs": result = await testElevenLabs(cfg); break;
         case "ms365":      result = await testMs365(cfg); break;
         case "maestro":    result = await testMaestro(cfg); break;
+        case "webhooks":   result = await testWebhooks(cfg); break;
+        case "mobile_app": result = await testMobileApp(admin); break;
+        case "compliance": result = await testCompliance(admin, cfg); break;
         default:           result = { success: false, message: `Tests not implemented for ${integration_key}` };
       }
     } catch (e) {
@@ -136,6 +139,53 @@ async function testMaestro(cfg: Record<string, string>): Promise<TestResult> {
   if (!base || !key) return { success: false, message: "Missing api_url / api_key" };
   const r = await fetch(`${base}/health`, { headers: { Authorization: `Bearer ${key}` } });
   return { success: r.ok, message: r.ok ? `Maestro joignable (${r.status})` : `HTTP ${r.status}` };
+}
+
+async function testWebhooks(cfg: Record<string, string>): Promise<TestResult> {
+  const url = cfg.endpoint_url;
+  if (!url) return { success: false, message: "Missing endpoint_url" };
+  if (!cfg.secret) return { success: false, message: "Missing secret (generate one)" };
+  try {
+    const r = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-pp-signature": "test", "x-pp-event": "ping" },
+      body: JSON.stringify({ type: "ping", source: "planipret", ts: Date.now() }),
+    });
+    const txt = await r.text();
+    return {
+      success: r.ok,
+      message: r.ok ? `Webhook OK (${r.status})` : `HTTP ${r.status}: ${txt.slice(0, 120)}`,
+    };
+  } catch (e) {
+    return { success: false, message: `Unreachable: ${String((e as Error).message ?? e)}` };
+  }
+}
+
+async function testMobileApp(admin: ReturnType<typeof createClient>): Promise<TestResult> {
+  const since = new Date(Date.now() - 7 * 86_400_000).toISOString();
+  const { count: total } = await admin.from("planipret_profiles").select("user_id", { count: "exact", head: true });
+  const { count: active } = await admin.from("planipret_profiles")
+    .select("user_id", { count: "exact", head: true })
+    .gte("updated_at", since);
+  return {
+    success: true,
+    message: `Mobile App · ${active ?? 0}/${total ?? 0} courtiers actifs (7j)`,
+    details: { total: total ?? 0, active_7d: active ?? 0 },
+  };
+}
+
+async function testCompliance(admin: ReturnType<typeof createClient>, cfg: Record<string, string>): Promise<TestResult> {
+  const { data: pol } = await admin.from("planipret_retention_policy").select("*").limit(1).maybeSingle();
+  const fields = ["calls_retention_days", "messages_retention_days", "voicemails_retention_days", "ai_insights_retention_days", "audit_logs_retention_days"];
+  const missing = fields.filter((f) => !pol?.[f]);
+  const ok = missing.length === 0 && cfg.consent_call_recording === "true";
+  return {
+    success: ok,
+    message: ok
+      ? "Conformité OK · politique de rétention active · consentements activés"
+      : `Manquant: ${missing.join(", ") || "consentement enregistrement"}`,
+    details: { policy: pol ?? null, consents: cfg },
+  };
 }
 
 function json(body: unknown, status = 200) {
