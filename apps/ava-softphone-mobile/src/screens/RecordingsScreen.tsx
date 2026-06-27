@@ -345,7 +345,7 @@ function RecordingAiPanel({ rec }: { rec: RecordingEntry }) {
         <>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
             <div style={{ fontSize: 10, color: colors.avaViolet, letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 800 }}>{statusText}</div>
-            <button onClick={run} disabled={running} style={{
+            <button onClick={() => run()} disabled={running} style={{
               padding: '6px 10px', borderRadius: 999, border: 'none',
               background: running ? 'rgba(255,255,255,0.06)' : `linear-gradient(135deg, ${colors.avaViolet}, ${colors.avaCyan})`,
               color: '#fff', fontSize: 11, fontWeight: 800, cursor: running ? 'wait' : 'pointer',
