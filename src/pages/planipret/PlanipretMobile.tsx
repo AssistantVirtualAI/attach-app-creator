@@ -453,18 +453,25 @@ export default function PlanipretMobile() {
 }
 
 function Frame({ children }: { children: React.ReactNode }) {
+  const { theme } = useMplanipretTheme();
   return (
-    <div className="planipret-scope planipret-mobile-scope min-h-screen w-full flex items-center justify-center md:p-6"
-      style={{ background: "linear-gradient(160deg, #EEF2F8 0%, #DCE3EC 100%)" }}>
-      <div className="overflow-hidden w-full md:w-[390px] md:h-[844px] h-screen md:rounded-[44px] relative"
+    <div className="planipret-scope planipret-mobile-scope planipret-mobile-frame-bg min-h-screen w-full flex items-center justify-center md:p-6"
+      data-pp-theme={theme}
+      style={{ background: theme === "dark"
+        ? "linear-gradient(160deg, #060D1A 0%, #0A1425 100%)"
+        : "linear-gradient(160deg, #EEF2F8 0%, #DCE3EC 100%)" }}>
+      <div className="planipret-mobile-phone overflow-hidden w-full md:w-[390px] md:h-[844px] h-screen md:rounded-[44px] relative"
         style={{
-          background: "#F7F9FC",
-          border: "1px solid #DCE3EC",
-          boxShadow: "0 0 0 6px #FFFFFF, 0 40px 120px rgba(15,27,61,0.18), inset 0 1px 0 rgba(255,255,255,0.6)",
+          background: "var(--pp-bg-base)",
+          border: "1px solid var(--pp-bg-border-2)",
+          boxShadow: theme === "dark"
+            ? "0 0 0 6px #08111F, 0 40px 120px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.04)"
+            : "0 0 0 6px #FFFFFF, 0 40px 120px rgba(15,27,61,0.18), inset 0 1px 0 rgba(255,255,255,0.6)",
         }}>
         {children}
       </div>
     </div>
   );
 }
+
 
