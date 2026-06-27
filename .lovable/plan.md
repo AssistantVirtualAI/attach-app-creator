@@ -1,76 +1,124 @@
+# Plan — Refonte mobile Planiprêt (Navy Trust + Accueil pro courtier)
+
 ## Objectif
+Aligner `/mplanipret` sur l'élégance du portail admin (palette Navy Trust claire, typo Urbanist + Epilogue) et transformer la page d'accueil en véritable cockpit courtier : stats réelles, filtres temporels, résumé IA quotidien/hebdo/mensuel.
 
-Passer le portail `/planipret/admin/*` d'un thème glassmorphism sombre à une esthétique **claire, premium, finance/immobilier** — palette Navy Trust sur fond clair, typographie Urbanist + Epilogue, structure sidebar dashboard épurée.
+---
 
-## Direction visuelle verrouillée
+## 1. Système visuel "Navy Trust Mobile"
 
-**Palette (HSL tokens dans `src/index.css` sous un scope `.planipret-admin-scope`)**
-- `--pp-bg`: `#F7F9FC` (fond app)
-- `--pp-surface`: `#FFFFFF` (cartes)
-- `--pp-surface-alt`: `#E8EDF3` (sidebar, hover)
-- `--pp-border`: `#DCE3EC`
-- `--pp-text`: `#0F1B3D` (navy foncé)
-- `--pp-text-muted`: `#5A6B85`
-- `--pp-primary`: `#1E3A5F` (navy)
-- `--pp-accent`: `#3B6FA0` (bleu action)
-- `--pp-success`: `#0D7A5F`, `--pp-warn`: `#C9A84C`, `--pp-danger`: `#B23A48`
-- Ombres douces : `--pp-shadow-sm: 0 1px 2px rgba(15,27,61,.04)`, `--pp-shadow-md: 0 8px 24px -12px rgba(15,27,61,.12)`
+Créer `src/styles/planipret-mobile-theme.css` scopé sous `.mplanipret-scope` (isolé du dark theme actuel et du scope admin) :
 
-**Typographie** — `@fontsource/urbanist` (headings, 600/700) + `@fontsource/epilogue` (body, 400/500). Tracking serré sur les KPI (`-0.02em`), majuscules espacées sur les labels de section.
+- Fond app : `#F7F9FC`, surfaces : `#FFFFFF` avec ombre douce `0 4px 24px rgba(30,58,95,0.06)`
+- Navy `#1E3A5F` (titres/CTA), accent `#3B6FA0`, succès `#10B981`, alerte `#F59E0B`, danger `#EF4444`
+- Typo : Urbanist (KPI, titres, FAB), Epilogue (corps, listes)
+- Composants : `pp-mobile-card`, `pp-mobile-kpi`, `pp-mobile-pill`, `pp-mobile-tab`, `pp-mobile-sheet` — même langage que `pp-card / pp-pill` admin
+- Header sticky vitrifié (blur léger sur `rgba(247,249,252,0.85)`), logo Planiprêt centré, badge AVA gauche, cloche notif droite
+- FAB AVA conservé (logo coloré) mais re-stylé bordure navy + halo doux
+- Footer "POWERED BY AVA" conservé, recoloré navy/accent
 
-**Layout** — sidebar dashboard fixe (240px ouverte / 64px collapsed), header sticky 56px, contenu sur grille 12 colonnes avec gouttières 24px.
+Mise à jour des écrans existants pour utiliser le nouveau scope sans toucher la logique :
+- `PlanipretMobile.tsx` (frame + login intégré)
+- `pages/mplanipret/Home.tsx`, `Calls.tsx`, `Messages.tsx`, `Calendar.tsx`, `Contacts.tsx`, `Settings.tsx`
+- `AvaChatSheet.tsx`, `AvaVoiceAgent` wrapper
 
-## Changements par zone
+Aucune modification des Edge Functions ni des hooks de données.
 
-### 1. Shell admin (`PlanipretAdminLayout.tsx`)
-- Fond `--pp-bg`, sidebar sur `--pp-surface` avec bordure droite fine.
-- Logo Planiprêt en haut + "AVA Statistic" en petit dessous le logo.
-- Sections sidebar avec labels capitalisés (`Vue d'ensemble`, `Courtiers`, `Communications`, `Finance`, `Système`).
-- Item actif : pastille bleue + fond `--pp-surface-alt`, barre verticale gauche 3px en `--pp-accent`.
-- Header : breadcrumb à gauche, recherche centrale, cluster droite (notifs, profil, environnement).
-- Profil dropdown : avatar initiales + nom + rôle, séparateur, déconnexion.
+---
 
-### 2. Page Vue d'ensemble (`PAOverview.tsx`)
-- Hero KPI : 4 cartes blanches arrondies 16px, ombre douce, icône colorée à gauche, valeur en Urbanist 32px, delta en pilule.
-- Section "Profit mensuel" : grand graphique aire avec gradient navy→transparent, légende minimale.
-- Grille 2 colonnes : « Adoption services » (heatmap par courtier) | « Top performers ».
-- Cartes financières (Mobile/Widget/AI) : ligne dégradée colorée en bordure haute, valeurs grandes, marge en vert.
+## 2. Accueil enrichi — Cockpit courtier
 
-### 3. Pages secondaires (Users, Reports, Settings, etc.)
-- Tables : header sticky `--pp-surface-alt`, lignes alternées subtiles, hover `--pp-accent/5`.
-- Boutons primaires : `--pp-primary` plein, hover plus foncé, focus ring 2px `--pp-accent`.
-- Inputs : fond blanc, bordure `--pp-border`, focus ring `--pp-accent`.
-- Toasts/dialogs : fond blanc, bordures fines, pas de glass blur.
+### 2.1 En-tête personnalisé
+- Salutation dynamique ("Bonjour Marc — mercredi 14h22")
+- Statut SIP + DND + transfert (déjà dispo via `mobile-dashboard`)
+- Sélecteur de période global : **Aujourd'hui · Cette semaine · Ce mois · Mon quart** (persisté `localStorage`)
 
-### 4. Composants partagés
-- Nouveau `PPStatCard`, `PPSectionHeader`, `PPDataTable` (variantes Tailwind via `cva`) pour cohérence.
-- Badges statut (Actif/Inactif/Trial) couleurs sémantiques claires.
+### 2.2 Bandeau KPI (6 cartes, données réelles)
+Source : `mobile-dashboard` + nouveaux agrégats Planiprêt (déjà tables existantes, pas de migration) :
+1. **Appels** (répondus / manqués) — `planipret_phone_calls`
+2. **SMS non lus** — `planipret_phone_messages`
+3. **Courriels** non lus — `planipret_profiles` (compte Gmail/Outlook déjà sync via `calendar_integrations` / future colonne mail si présente, sinon section vide gracieuse)
+4. **Meetings cette semaine** — `appointments` filtré par `user_id`
+5. **Leads chauds** — `planipret_phone_calls.lead_score >= 7` + `leads.status`
+6. **Tâches à faire** — `planipret_reminders` non complétées
 
-## Implémentation technique
+Cartes `pp-mobile-kpi` avec micro-sparkline (Recharts léger déjà présent).
+
+### 2.3 Sections détaillées (collapsibles, ordre courtier)
+- **🔥 Leads chauds** (top 5) — nom, score, dernière interaction, CTA Appeler/SMS
+- **📅 Rendez-vous à venir** (semaine) — heure, client, type, lien visio si dispo
+- **✅ Tâches du jour** — checkbox inline (update `planipret_reminders`)
+- **📞 Appels manqués prioritaires** — avec badge "rappel suggéré"
+- **💬 Conversations non lues** — SMS + chat équipe
+- **📧 Courriels en attente** (si intégration présente)
+
+Chaque section respecte le filtre de période. Pull-to-refresh global (hook existant `usePullToRefresh`).
+
+### 2.4 Résumé IA AVA — "Brief du jour"
+Nouvelle carte en haut, sous le KPI, **fixe et magnifique** :
+- 3 modes via segmented control : **Jour / Semaine / Mois**
+- Génération via nouvelle Edge Function **`pp-ava-brief`** (calque sur `pp-ava-chat` existant, même provider Lovable AI Gateway, `google/gemini-3-flash-preview`)
+  - Input : profil courtier + agrégats (appels, leads, RDV, tâches, SMS) sur la période
+  - Output structuré Zod : `{ headline, priorities[3], risks[], suggestions[3] }`
+  - Cache 30 min en `planipret_ai_insights` (table existante) pour éviter coûts
+- UI : headline gras navy, 3 priorités numérotées, chips suggestion cliquables (call/sms/reminder via payload — réutilise `SuggestionSchema` de `pp-ava-chat`)
+- Bouton "Régénérer" + "Écouter" (TTS optionnel via AVA voice si activé)
+
+### 2.5 États vides & erreurs
+- Skeletons Navy doux
+- Message clair si intégration manquante (ex. calendrier non connecté → CTA "Connecter")
+- Mode dégradé respecté (déjà géré pour `pp-ns-users`)
+
+---
+
+## 3. Détails techniques
+
+- **Aucune migration DB** (tables `planipret_phone_calls`, `appointments`, `planipret_reminders`, `planipret_ai_insights`, `planipret_phone_messages` déjà présentes)
+- **Nouvelle Edge Function** : `supabase/functions/pp-ava-brief/index.ts` (verify_jwt off, JWT validé en code, CORS standard, gateway helper partagé)
+- **Nouveau hook** : `src/hooks/usePlanipretBrief.ts` (React Query, key `[brief, period, userId]`, TTL 30 min)
+- **Nouveau hook** : `src/hooks/usePlanipretHomeStats.ts` agrégateur unique appelant `mobile-dashboard` + queries Supabase scopées RLS (utilisateur connecté)
+- **Composants nouveaux** sous `src/components/mplanipret/home/` : `PeriodFilter.tsx`, `KpiGrid.tsx`, `BriefCard.tsx`, `HotLeadsList.tsx`, `MeetingsList.tsx`, `TasksList.tsx`, `MissedCallsList.tsx`, `UnreadThreadsList.tsx`, `EmailsList.tsx`
+- **Theme CSS** scopé : aucune fuite vers admin ou autres apps
+- **Backend Lemtel intact** : aucune touche à `useSoftphone*`, `CapacitorSip`, RTP, etc.
+
+---
+
+## 4. Livrables & validation
+
+1. Thème Navy Trust mobile appliqué à toutes les pages `/mplanipret/*`
+2. Accueil refondu avec 6 KPI + 6 sections + Brief IA
+3. Filtre période fonctionnel et persistant
+4. Edge Function `pp-ava-brief` déployée et testée
+5. Test Playwright : `/mplanipret/home` charge, affiche KPI, brief IA visible, filtre change les données
+6. Aucun impact sur `/planipret/admin/*` ni Lemtel
 
 ```text
-src/
-├── index.css              + bloc .planipret-admin-scope { --pp-* tokens, font vars }
-├── main.tsx               + import "@fontsource/urbanist/600.css" etc.
-├── components/planipret/admin/
-│   ├── PlanipretAdminLayout.tsx   (refonte shell + sidebar)
-│   ├── PPStatCard.tsx             (nouveau)
-│   ├── PPSectionHeader.tsx        (nouveau)
-│   └── PPProfileMenu.tsx          (refonte light)
-└── pages/planipret/admin/
-    ├── PAOverview.tsx     (refonte complète sections)
-    ├── PAUsers.tsx        (table light + filtres)
-    ├── PAReports.tsx      (cartes + charts clairs)
-    └── PASettings.tsx     (sections cards)
+┌──────────────────────────────┐
+│  AVA  ·  Planiprêt  ·  🔔    │  header glass navy
+├──────────────────────────────┤
+│  Bonjour Marc — mer 14:22    │
+│  [Jour][Semaine][Mois][Quart]│  filtre
+│                              │
+│  ┌───────── BRIEF AVA ─────┐ │
+│  │ "3 leads chauds à rappe-│ │
+│  │  ler avant 17h..."      │ │
+│  │  1. Appeler Dupuis      │ │
+│  │  2. Confirmer RDV Roy   │ │
+│  │  3. Relancer Tremblay   │ │
+│  │  [Régénérer] [Écouter]  │ │
+│  └─────────────────────────┘ │
+│                              │
+│  [Appels][SMS][Mails]        │
+│  [RDV  ][Hot ][Tâches]       │  KPI
+│                              │
+│  🔥 Leads chauds   >         │
+│  📅 RDV semaine    >         │
+│  ✅ Tâches du jour >         │
+│  📞 Manqués        >         │
+│  💬 Non lus        >         │
+│  📧 Courriels      >         │
+│                              │
+│       (•) FAB AVA            │
+│  POWERED BY AVA · DEV BY AVA │
+└──────────────────────────────┘
 ```
-
-Dépendances : `bun add @fontsource/urbanist @fontsource/epilogue`.
-
-## Hors scope (préservé tel quel)
-- Toute logique backend, Edge Functions, requêtes Supabase, pricing.
-- L'app mobile `/mplanipret` (déjà refondue séparément).
-- Le portail admin Lemtel et le dashboard AVA principal.
-- Aucune modification des routes ou des permissions.
-
-## Critère de succès
-Le portail respire : fonds clairs, navy comme couleur d'autorité, or/vert pour valeurs financières, typographie premium lisible, hiérarchie immédiate des KPI, zéro bruit visuel glassy résiduel.
