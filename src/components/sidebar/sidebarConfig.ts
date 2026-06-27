@@ -198,7 +198,30 @@ const MY_GROUPS: NavGroup[] = [
   },
 ];
 
-export const sidebarGroups: NavGroup[] = [...LEGACY_GROUPS, ...ORG_GROUPS, ...MY_GROUPS];
+// =========================================================================
+// PLANIPRET sidebar — shown only when Planipret org is selected
+// =========================================================================
+const PLANIPRET_GROUPS: NavGroup[] = [
+  {
+    id: 'planipret', labelKey: '🏠 Planiprêt', icon: LayoutDashboard, scope: 'legacy', planipretOnly: true,
+    items: [
+      { nameKey: "Vue d'ensemble", href: '/planipret/admin/overview', icon: LayoutDashboard },
+      { nameKey: 'Courtiers', href: '/planipret/admin/users', icon: Users },
+      { nameKey: 'Appels', href: '/planipret/admin/calls', icon: Phone },
+      { nameKey: 'Messages', href: '/planipret/admin/messages', icon: MessageSquare },
+      { nameKey: 'Voicemails', href: '/planipret/admin/voicemails', icon: Voicemail },
+      { nameKey: 'Leads', href: '/planipret/admin/leads', icon: UserPlus },
+      { nameKey: 'Rapports', href: '/planipret/admin/reports', icon: BarChart3 },
+      { nameKey: 'Templates SMS', href: '/planipret/admin/templates', icon: MessageCircle },
+      { nameKey: 'Intégrations', href: '/planipret/admin/integrations', icon: Sliders },
+      { nameKey: 'Conformité', href: '/planipret/admin/compliance', icon: Shield },
+      { nameKey: 'Audit système', href: '/planipret/admin/audit-checklist', icon: Shield },
+      { nameKey: "Journal d'audit", href: '/planipret/admin/audit', icon: BookOpen },
+    ],
+  },
+];
+
+export const sidebarGroups: NavGroup[] = [...LEGACY_GROUPS, ...PLANIPRET_GROUPS, ...ORG_GROUPS, ...MY_GROUPS];
 
 export function getSidebarScope(pathname: string): 'org' | 'my' | 'legacy' | 'admin' {
   if (pathname.startsWith('/admin')) return 'admin';
