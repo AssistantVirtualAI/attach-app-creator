@@ -210,6 +210,25 @@ export default function SettingsScreen({
         <SettingsRow label={t('settings.deleteAccount')} icon="⚠" onPress={() => openPortal('/account/delete')} />
       </Card>
 
+      {/* Transcription */}
+      <SectionTitle eyebrow="AI" title={lang === 'fr' ? 'Transcription' : 'Transcription'} />
+      <Card padded={false}>
+        <SettingsRow
+          label={lang === 'fr' ? 'Fournisseur actif (dernier appel)' : 'Active provider (last call)'}
+          icon="🧠"
+          value={lastTranscriber}
+          onPress={() => setLastTranscriber(localStorage.getItem('ava.lastTranscriber') || '—')}
+        />
+        <SettingsRow
+          label={lang === 'fr' ? 'Repli Claude (Anthropic)' : 'Claude fallback (Anthropic)'}
+          icon="🛟"
+          value={claudeFallback
+            ? (lang === 'fr' ? 'Activé — utilisé si Gemini & GPT échouent' : 'On — used if Gemini & GPT fail')
+            : (lang === 'fr' ? 'Désactivé' : 'Off')}
+          onPress={() => { const next = !claudeFallback; setClaudeFallback(next); localStorage.setItem('ava.claudeFallback', next ? 'on' : 'off'); }}
+        />
+      </Card>
+
       {/* Support & about */}
       <SectionTitle eyebrow={t('settings.about')} title={t('settings.helpSupport')} />
       <Card padded={false}>
