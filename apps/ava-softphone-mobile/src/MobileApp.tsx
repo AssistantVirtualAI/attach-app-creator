@@ -429,7 +429,10 @@ function AuthenticatedShell({
         tab={tab}
         onNavigate={(t) => { haptic(ImpactStyle.Light); setTab(t); }}
         haptic={haptic}
+        creds={creds}
+        onOpenProfile={() => setProfileOpen(true)}
       />
+
 
 
 
