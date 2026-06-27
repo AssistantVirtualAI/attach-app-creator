@@ -248,13 +248,162 @@ export default function PlanipretIntegrations() {
           </div>
         </IntegrationCard>
 
-        {/* Placeholders for Batches 2 & 3 — keep visual footprint */}
-        <ComingSoon emoji="🔵" name="Microsoft 365" description="Email · Calendrier · Teams Chat" fullWidth />
-        <ComingSoon emoji="🎙️" name="ElevenLabs — Agent AVA" description="Agent vocal IA, voix Charlotte" />
-        <ComingSoon emoji="🏢" name="Maestro CRM (Kanguru)" description="Clients, tâches, RDV, pipeline" />
+        {/* ───────── CARD 1 — MICROSOFT 365 ───────── */}
+        <IntegrationCard
+          integrationKey="ms365" name="Microsoft 365"
+          description="Outlook Email · Calendar · Teams Chat · OneDrive"
+          emoji="🔵" fullWidth
+          status={deriveStatus(rows.ms365)}
+          enabled={rows.ms365?.is_enabled ?? false}
+          lastTestedAt={rows.ms365?.last_tested_at}
+          lastTestResult={rows.ms365?.last_test_result}
+          lastTestSuccess={rows.ms365?.last_test_success}
+          onToggleEnabled={(v) => toggleEnabled("ms365", v)}
+          onSave={() => save("ms365", ["tenant_id", "client_id", "client_secret"])}
+          onTest={() => test("ms365")}
+        >
+          <InfoBanner>
+            Créez une App Registration dans Azure AD pour <strong>planipret.ca</strong>.
+            Permissions requises (Application): <code>Mail.ReadWrite</code>, <code>Mail.Send</code>,
+            <code>Calendars.ReadWrite</code>, <code>Chat.ReadWrite</code>, <code>Files.ReadWrite.All</code>, <code>User.Read.All</code>.
+            <div className="mt-2 flex items-center gap-2">
+              <a href="https://portal.azure.com" target="_blank" rel="noreferrer"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium"
+                style={{ background: "#0D1F35", border: "1px solid #0E2A45", color: "#2E9BDC" }}>
+                Ouvrir Azure Portal →
+              </a>
+              <CopyButton value={`${window.location.origin}/auth/ms365/callback`} label="Copier Redirect URI" />
+            </div>
+          </InfoBanner>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Field label="Tenant ID" required hint="Azure AD → Overview → Directory (tenant) ID">
+              <TextInput value={getField("ms365", "tenant_id")}
+                onChange={(e) => setField("ms365", "tenant_id", e.target.value)}
+                placeholder="00000000-0000-0000-0000-000000000000" />
+            </Field>
+            <Field label="Client ID (Application ID)" required>
+              <TextInput value={getField("ms365", "client_id")}
+                onChange={(e) => setField("ms365", "client_id", e.target.value)}
+                placeholder="00000000-0000-0000-0000-000000000000" />
+            </Field>
+            <Field label="Client Secret" required hint="Certificates & secrets → New client secret">
+              <SecretInput value={draft.ms365?.client_secret ?? ""}
+                onChange={(v) => setField("ms365", "client_secret", v)}
+                hasSavedValue={!!rows.ms365?.config_data?.client_secret} />
+            </Field>
+            <Field label="Redirect URI" hint="À copier exactement dans Azure Portal">
+              <TextInput readOnly value={`${typeof window !== "undefined" ? window.location.origin : ""}/auth/ms365/callback`} />
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-4">
+            {[
+              { k: "scope_mail",     label: "📧 Outlook Mail" },
+              { k: "scope_calendar", label: "📅 Calendar" },
+              { k: "scope_teams",    label: "💬 Teams Chat" },
+              { k: "scope_onedrive", label: "📁 OneDrive" },
+            ].map((s) => {
+              const on = getField("ms365", s.k, "true") === "true";
+              return (
+                <button key={s.k} type="button"
+                  onClick={() => setField("ms365", s.k, on ? "false" : "true")}
+                  className="px-3 py-2 rounded-lg text-xs font-medium text-left"
+                  style={{
+                    background: on ? "rgba(46,155,220,0.1)" : "#0D1F35",
+                    border: `1px solid ${on ? "#2E9BDC" : "#0E2A45"}`,
+                    color: on ? "#2E9BDC" : "#8FA8C0",
+                  }}>
+                  {on ? "✓ " : ""}{s.label}
+                </button>
+              );
+            })}
+          </div>
+        </IntegrationCard>
+
+        {/* ───────── CARD 4 — ELEVENLABS ───────── */}
+        <IntegrationCard
+          integrationKey="elevenlabs" name="ElevenLabs — Agent AVA"
+          description="Agent vocal IA · Voix française québécoise"
+          emoji="🎙️"
+          status={deriveStatus(rows.elevenlabs)}
+          enabled={rows.elevenlabs?.is_enabled ?? false}
+          lastTestedAt={rows.elevenlabs?.last_tested_at}
+          lastTestResult={rows.elevenlabs?.last_test_result}
+          lastTestSuccess={rows.elevenlabs?.last_test_success}
+          onToggleEnabled={(v) => toggleEnabled("elevenlabs", v)}
+          onSave={() => save("elevenlabs", ["api_key"])}
+          onTest={() => test("elevenlabs")}
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Field label="ElevenLabs API Key" required hint="elevenlabs.io → Profile → API Keys">
+              <SecretInput value={draft.elevenlabs?.api_key ?? ""}
+                onChange={(v) => setField("elevenlabs", "api_key", v)}
+                hasSavedValue={!!rows.elevenlabs?.config_data?.api_key}
+                placeholder="sk_•••••••••••••••••••••••••••••" />
+            </Field>
+            <Field label="Agent ID par défaut" hint="ID de l'agent à utiliser pour les nouveaux courtiers">
+              <TextInput value={getField("elevenlabs", "default_agent_id")}
+                onChange={(e) => setField("elevenlabs", "default_agent_id", e.target.value)}
+                placeholder="agent_xxxxxxxxxxxxx" />
+            </Field>
+            <Field label="Nom de l'agent">
+              <TextInput value={getField("elevenlabs", "agent_name", "AVA - Planiprêt")}
+                onChange={(e) => setField("elevenlabs", "agent_name", e.target.value)} />
+            </Field>
+            <Field label="Voice ID (Charlotte FR-CA)" hint="Par défaut: XB0fDUnXU5powFXDhCwa">
+              <TextInput value={getField("elevenlabs", "voice_id", "XB0fDUnXU5powFXDhCwa")}
+                onChange={(e) => setField("elevenlabs", "voice_id", e.target.value)} />
+            </Field>
+          </div>
+          <InfoBanner tone="warn">
+            L'agent vocal sera activable <strong>par courtier</strong> depuis Gestion Utilisateurs (+25 $/mois par activation).
+          </InfoBanner>
+        </IntegrationCard>
+
+        {/* ───────── CARD 3 — MAESTRO CRM ───────── */}
+        <IntegrationCard
+          integrationKey="maestro" name="Maestro CRM (Kanguru)"
+          description="Clients · Tâches · RDV · Pipeline · SMS"
+          emoji="🏢"
+          status={deriveStatus(rows.maestro)}
+          enabled={rows.maestro?.is_enabled ?? false}
+          lastTestedAt={rows.maestro?.last_tested_at}
+          lastTestResult={rows.maestro?.last_test_result}
+          lastTestSuccess={rows.maestro?.last_test_success}
+          onToggleEnabled={(v) => toggleEnabled("maestro", v)}
+          onSave={() => save("maestro", ["api_url", "api_key"])}
+          onTest={() => test("maestro")}
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Field label="API URL Maestro" required>
+              <TextInput value={getField("maestro", "api_url")}
+                onChange={(e) => setField("maestro", "api_url", e.target.value)}
+                placeholder="https://api.maestro-crm.ca/v1" />
+            </Field>
+            <Field label="API Key" required>
+              <SecretInput value={draft.maestro?.api_key ?? ""}
+                onChange={(v) => setField("maestro", "api_key", v)}
+                hasSavedValue={!!rows.maestro?.config_data?.api_key} />
+            </Field>
+            <Field label="Webhook secret" hint="Pour vérifier les webhooks entrants Maestro">
+              <SecretInput value={draft.maestro?.webhook_secret ?? ""}
+                onChange={(v) => setField("maestro", "webhook_secret", v)}
+                hasSavedValue={!!rows.maestro?.config_data?.webhook_secret} />
+            </Field>
+            <Field label="Pipeline par défaut (ID)">
+              <TextInput value={getField("maestro", "default_pipeline_id")}
+                onChange={(e) => setField("maestro", "default_pipeline_id", e.target.value)}
+                placeholder="pipeline_prêt_hypothécaire" />
+            </Field>
+          </div>
+        </IntegrationCard>
+
+        {/* Batch 3 placeholders */}
         <ComingSoon emoji="🔗" name="Webhooks & Automatisation" description="Pipeline post-appel" />
         <ComingSoon emoji="📱" name="Application Mobile" description="iOS · Android · Push" fullWidth />
         <ComingSoon emoji="🔏" name="Conformité PIPEDA / Loi 25" description="Rétention, consentements" />
+
       </div>
     </div>
   );
