@@ -9,6 +9,7 @@ import { getAudioState, onAudioStateChange, setRoute, type AudioRoute, type Audi
 import CallTimeline, { type CallPhase } from './CallTimeline';
 import IncomingCallerPanel from './IncomingCallerPanel';
 import { lookupCaller, type CallerLookup } from '../lib/sip/callerLookup';
+import { useT } from '../lib/i18n';
 
 const PROFILE_CYCLE: AudioProfile[] = ['auto', 'hd', 'low-bandwidth'];
 
@@ -19,6 +20,7 @@ export default function ActiveCallSheet({
   sp: any;
   haptic: (s?: ImpactStyle) => Promise<void>;
 }) {
+  const { tx } = useT();
   const [timer, setTimer] = useState(0);
   const [showKeypad, setShowKeypad] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
@@ -44,10 +46,10 @@ export default function ActiveCallSheet({
     haptic(ImpactStyle.Light);
     try {
       const ok = await setRoute(next);
-      if (!ok) setToast({ text: `Bascule audio impossible vers ${routeLabel(next)}`, tone: 'err' });
+      if (!ok) setToast({ text: tx(`Bascule audio impossible vers ${routeLabel(next)}`, `Unable to switch audio to ${routeLabel(next)}`), tone: 'err' });
     } catch (e: any) {
       const msg = e?.message ? `: ${e.message}` : '';
-      setToast({ text: `Impossible de basculer sur ${routeLabel(next)}${msg}`, tone: 'err' });
+      setToast({ text: tx(`Impossible de basculer sur ${routeLabel(next)}${msg}`, `Unable to switch to ${routeLabel(next)}${msg}`), tone: 'err' });
     }
   };
 
@@ -103,24 +105,24 @@ export default function ActiveCallSheet({
   };
 
   const transfer = () => {
-    const target = window.prompt('Transfer to extension or number:');
+    const target = window.prompt(tx('Transférer vers extension ou numéro :', 'Transfer to extension or number:'));
     if (target) safeCall('transfer', () => sp.transfer?.(target));
   };
   const park = () => safeCall('park', () => sp.park?.());
   const addCall = () => {
-    const target = window.prompt('Add call to:');
+    const target = window.prompt(tx("Ajouter l'appel à :", 'Add call to:'));
     if (target) safeCall('addCall', () => sp.addCall?.(target) ?? sp.call?.(target));
   };
   const record = async () => {
     const isRec = !!sp.snap.recording;
     const fn = isRec ? sp.stopRecord : sp.startRecord;
     setRecPending(true);
-    setToast({ text: isRec ? "Arrêt de l'enregistrement…" : "Démarrage de l'enregistrement…", tone: 'info' });
+    setToast({ text: isRec ? tx("Arrêt de l'enregistrement…", 'Stopping recording…') : tx("Démarrage de l'enregistrement…", 'Starting recording…'), tone: 'info' });
     let nativeErr: any = null;
     try {
       if (typeof fn === 'function') {
         await fn();
-        setToast({ text: isRec ? "Enregistrement arrêté ✓" : "Enregistré ✓ — la conversation est capturée", tone: 'ok' });
+        setToast({ text: isRec ? tx("Enregistrement arrêté ✓", 'Recording stopped ✓') : tx("Enregistré ✓ — la conversation est capturée", 'Recording ✓ — conversation is captured'), tone: 'ok' });
         setRecPending(false);
         return;
       }
@@ -136,11 +138,11 @@ export default function ActiveCallSheet({
         body: { action: 'record-call', uuid: callUuid, start: !isRec, domain_name: (sp.snap as any).domain },
       });
       if (error || !data?.ok) throw new Error(error?.message || data?.error || 'PBX rejected uuid_record');
-      setToast({ text: isRec ? "Arrêt côté PBX ✓" : "Enregistré côté PBX ✓", tone: 'ok' });
+      setToast({ text: isRec ? tx("Arrêt côté PBX ✓", 'Stopped via PBX ✓') : tx("Enregistré côté PBX ✓", 'Recording via PBX ✓'), tone: 'ok' });
     } catch (e: any) {
-      const msg = nativeErr?.message || e?.message || 'erreur inconnue';
+      const msg = nativeErr?.message || e?.message || tx('erreur inconnue', 'unknown error');
       console.error('[ActiveCall] proxy record fallback failed', e?.message || e);
-      setToast({ text: `Erreur enregistrement: ${msg}`, tone: 'err' });
+      setToast({ text: tx(`Erreur enregistrement: ${msg}`, `Recording error: ${msg}`), tone: 'err' });
     } finally {
       setRecPending(false);
     }
@@ -231,7 +233,7 @@ export default function ActiveCallSheet({
               animation: 'rec-pulse 1.2s ease-in-out infinite',
               boxShadow: `0 0 10px ${colors.danger}`,
             }} />
-            Enregistrement en cours
+            {tx('Enregistrement en cours', 'Recording in progress')}
           </div>
         )}
 
@@ -245,7 +247,7 @@ export default function ActiveCallSheet({
             color: colors.mutedSilver, textTransform: 'uppercase',
           }}>
             <span style={{ fontSize: 13 }}>{routeIcon(audio.route)}</span>
-            <span>Sortie · {routeLabel(audio.route)}</span>
+            <span>{tx('Sortie', 'Output')} · {routeLabel(audio.route)}</span>
             {audio.busy && <span style={{ color: colors.avaCyan }}>…</span>}
           </div>
         )}
@@ -304,7 +306,7 @@ export default function ActiveCallSheet({
           <Ctrl
             label={
               audioBusy ? (audioStatus === 'retrying' ? `Retry ${audioRestartAttempts}` : 'Audio…')
-              : recPending ? (sp.snap.recording ? 'Arrêt…' : 'Démarrage…')
+              : recPending ? (sp.snap.recording ? tx('Arrêt…', 'Stopping…') : tx('Démarrage…', 'Starting…'))
               : sp.snap.recording ? 'Stop Rec' : 'Record'
             }
             icon={audioBusy || recPending ? '…' : sp.snap.recording ? '■' : '●'}
@@ -400,6 +402,8 @@ export default function ActiveCallSheet({
 }
 
 function routeLabel(r: AudioRoute) {
+  const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('ava.mobile.lang') === 'en') ? 'en' : 'fr';
+  if (lang === 'en') return r === 'speaker' ? 'Speaker' : r === 'bluetooth' ? 'Bluetooth' : 'Earpiece';
   return r === 'speaker' ? 'Haut-parleur' : r === 'bluetooth' ? 'Bluetooth' : 'Écouteur';
 }
 function routeIcon(r: AudioRoute) {

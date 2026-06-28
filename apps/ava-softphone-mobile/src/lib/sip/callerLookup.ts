@@ -4,6 +4,7 @@
  */
 import { supabase } from '../mobileSupabase';
 import { normalizePhone, formatDisplay } from '../phoneNormalize';
+import { txStatic } from '../i18n';
 
 export interface CallerLookup {
   found: boolean;
@@ -27,7 +28,7 @@ export async function lookupCaller(rawNumber: string): Promise<CallerLookup> {
   const fallback: CallerLookup = {
     found: false,
     source: null,
-    name: formatDisplay(normalized) || rawNumber || 'Inconnu',
+    name: formatDisplay(normalized) || rawNumber || txStatic('Inconnu', 'Unknown'),
     display_number: formatDisplay(normalized) || rawNumber,
     raw_number: rawNumber,
     phone_normalized: normalized,

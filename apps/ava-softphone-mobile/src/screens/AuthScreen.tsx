@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import type { Creds } from '../lib/creds';
 import SipConfigScreen from './SipConfigScreen';
+import { txStatic as tx } from '../lib/i18n';
 
 type Mode = 'extension' | 'email';
 type Screen = 'login' | 'sip' | 'forgot';
@@ -50,14 +51,14 @@ class AuthError extends Error {
 
 const mapAuthError = (raw: string): string => {
   const m = (raw || '').toLowerCase();
-  if (m.includes('invalid_credentials') || m.includes('invalid login')) return 'Adresse e-mail ou mot de passe incorrect.';
-  if (m.includes('extension_not_found')) return 'Extension introuvable.';
-  if (m.includes('app_access_disabled') || m.includes('mobile_access_disabled')) return "L'accès mobile n'a pas été activé pour cette extension. Contactez votre administrateur.";
-  if (m.includes('ambiguous_extension')) return 'Plusieurs extensions correspondent — veuillez saisir le domaine SIP.';
-  if (m.includes('rate') && m.includes('limit')) return 'Trop de tentatives. Veuillez patienter avant de réessayer.';
-  if (m.includes('network') || m.includes('failed to fetch') || m.includes('load failed')) return 'Erreur réseau — vérifiez votre connexion.';
-  if (m.includes('session') || m.includes('jwt')) return 'Votre session a expiré. Veuillez vous reconnecter.';
-  return raw || "Une erreur est survenue. Veuillez réessayer.";
+  if (m.includes('invalid_credentials') || m.includes('invalid login')) return tx('Adresse e-mail ou mot de passe incorrect.', 'Incorrect email or password.');
+  if (m.includes('extension_not_found')) return tx('Extension introuvable.', 'Extension not found.');
+  if (m.includes('app_access_disabled') || m.includes('mobile_access_disabled')) return tx("L'accès mobile n'a pas été activé pour cette extension. Contactez votre administrateur.", 'Mobile access has not been enabled for this extension. Contact your administrator.');
+  if (m.includes('ambiguous_extension')) return tx('Plusieurs extensions correspondent — veuillez saisir le domaine SIP.', 'Multiple extensions match — please enter the SIP domain.');
+  if (m.includes('rate') && m.includes('limit')) return tx('Trop de tentatives. Veuillez patienter avant de réessayer.', 'Too many attempts. Please wait before trying again.');
+  if (m.includes('network') || m.includes('failed to fetch') || m.includes('load failed')) return tx('Erreur réseau — vérifiez votre connexion.', 'Network error — check your connection.');
+  if (m.includes('session') || m.includes('jwt')) return tx('Votre session a expiré. Veuillez vous reconnecter.', 'Your session has expired. Please sign in again.');
+  return raw || tx("Une erreur est survenue. Veuillez réessayer.", 'An error occurred. Please try again.');
 };
 
 export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: Creds) => void }) {
@@ -207,7 +208,7 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null); setFailure(null);
-    if (!validate()) { setFailure({ step: 'validation', code: 'invalid_input', message: 'Veuillez corriger les champs en évidence.' }); return; }
+    if (!validate()) { setFailure({ step: 'validation', code: 'invalid_input', message: tx('Veuillez corriger les champs en évidence.', 'Please correct the highlighted fields.') }); return; }
     setBusy(true);
     try {
       if (mode === 'email') await submitEmail();
@@ -217,7 +218,7 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
         setFailure({ step: e.step, code: e.code, message: e.message, detail: e.detail });
         setError(mapAuthError(e.code + ' ' + e.message));
       } else {
-        setFailure({ step: 'network', code: 'unknown', message: e?.message || 'Erreur inconnue' });
+        setFailure({ step: 'network', code: 'unknown', message: e?.message || tx('Erreur inconnue', 'Unknown error') });
         setError(mapAuthError(e?.message));
       }
       // eslint-disable-next-line no-console
@@ -242,17 +243,17 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
             <ModeToggle mode={mode} accent={accent} onChange={(m) => { setMode(m); setError(null); setFieldErrors({}); }} />
 
 
-            <Field label="URL du portail" value={portalUrl} onChange={setPortalUrl} type="url" />
+            <Field label={tx('URL du portail', 'Portal URL')} value={portalUrl} onChange={setPortalUrl} type="url" />
             {mode === 'email' ? (
               <>
-                <Field label="Adresse e-mail" value={email} onChange={(v) => { setEmail(v); setFieldErrors((f) => ({ ...f, email: '' })); }} type="email" placeholder="vous@entreprise.com" autoFocus error={fieldErrors.email} />
-                <Field label="Mot de passe" value={password} onChange={(v) => { setPassword(v); setFieldErrors((f) => ({ ...f, password: '' })); }} type="password" placeholder="••••••••" error={fieldErrors.password} />
+                <Field label={tx('Adresse e-mail', 'Email address')} value={email} onChange={(v) => { setEmail(v); setFieldErrors((f) => ({ ...f, email: '' })); }} type="email" placeholder={tx('vous@entreprise.com', 'you@company.com')} autoFocus error={fieldErrors.email} />
+                <Field label={tx('Mot de passe', 'Password')} value={password} onChange={(v) => { setPassword(v); setFieldErrors((f) => ({ ...f, password: '' })); }} type="password" placeholder="••••••••" error={fieldErrors.password} />
               </>
             ) : (
               <>
-                <Field label="Extension" value={extension} onChange={(v) => { setExtension(v); setFieldErrors((f) => ({ ...f, extension: '' })); }} placeholder="ex. 1001" autoFocus error={fieldErrors.extension} />
-                <Field label="Domaine SIP" value={sipDomain} onChange={setSipDomain} placeholder="lemtel.lemtel.tel" />
-                <Field label="Mot de passe SIP" value={password} onChange={(v) => { setPassword(v); setFieldErrors((f) => ({ ...f, password: '' })); }} type="password" placeholder="••••••••" error={fieldErrors.password} />
+                <Field label={tx('Extension', 'Extension')} value={extension} onChange={(v) => { setExtension(v); setFieldErrors((f) => ({ ...f, extension: '' })); }} placeholder={tx('ex. 1001', 'e.g. 1001')} autoFocus error={fieldErrors.extension} />
+                <Field label={tx('Domaine SIP', 'SIP domain')} value={sipDomain} onChange={setSipDomain} placeholder="lemtel.lemtel.tel" />
+                <Field label={tx('Mot de passe SIP', 'SIP password')} value={password} onChange={(v) => { setPassword(v); setFieldErrors((f) => ({ ...f, password: '' })); }} type="password" placeholder="••••••••" error={fieldErrors.password} />
               </>
             )}
 
@@ -265,7 +266,7 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
               style={{ marginTop: 6, height: 50, borderRadius: 14, fontSize: 14, cursor: busy ? 'wait' : 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
             >
               {busy && <Spinner />}
-              {busy ? 'Connexion…' : 'Se connecter'}
+              {busy ? tx('Connexion…', 'Signing in…') : tx('Se connecter', 'Sign in')}
             </button>
 
             {mode === 'email' && (
@@ -274,7 +275,7 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
                 onClick={() => setScreen('forgot')}
                 style={ghostLink}
               >
-                Mot de passe oublié ?
+                {tx('Mot de passe oublié ?', 'Forgot password?')}
               </button>
             )}
 
@@ -283,13 +284,13 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
               onClick={() => setScreen('sip')}
               style={ghostBtn}
             >
-              Configuration SIP manuelle
+              {tx('Configuration SIP manuelle', 'Manual SIP configuration')}
             </button>
 
             <div style={{ fontSize: 10.5, color: C.textDim, lineHeight: 1.5, textAlign: 'center', marginTop: 2 }}>
               {mode === 'extension'
-                ? "Utilisez le même mot de passe SIP défini sur votre extension dans le portail (ou dans FusionPBX). Si vous n'en avez pas, demandez à votre administrateur de le configurer."
-                : "Connectez-vous avec l'adresse e-mail et le mot de passe associés à votre compte du portail Lemtel."}
+                ? tx("Utilisez le même mot de passe SIP défini sur votre extension dans le portail (ou dans FusionPBX). Si vous n'en avez pas, demandez à votre administrateur de le configurer.", 'Use the same SIP password set on your extension in the portal (or in FusionPBX). If you don\u2019t have one, ask your administrator to configure it.')
+                : tx("Connectez-vous avec l'adresse e-mail et le mot de passe associés à votre compte du portail Lemtel.", 'Sign in with the email address and password tied to your Lemtel portal account.')}
             </div>
           </form>
         </div>
@@ -321,8 +322,8 @@ function ForgotPasswordScreen({ initialEmail, accent, onBack }: { initialEmail: 
 
   const goConfirm = () => {
     setError(null);
-    if (!email.trim()) { setFieldErr("L'adresse e-mail est requise."); return; }
-    if (!isEmail(email)) { setFieldErr('Saisissez une adresse e-mail valide.'); return; }
+    if (!email.trim()) { setFieldErr(tx("L'adresse e-mail est requise.", 'Email address is required.')); return; }
+    if (!isEmail(email)) { setFieldErr(tx('Saisissez une adresse e-mail valide.', 'Enter a valid email address.')); return; }
     setFieldErr('');
     setStep('confirm');
   };
@@ -346,7 +347,7 @@ function ForgotPasswordScreen({ initialEmail, accent, onBack }: { initialEmail: 
         throw new Error(detail?.msg || detail?.error || `HTTP ${res.status}`);
       }
       setCooldown(RESEND_COOLDOWN_SECONDS);
-      if (opts?.resend) setResentInfo('E-mail de réinitialisation renvoyé.');
+      if (opts?.resend) setResentInfo(tx('E-mail de réinitialisation renvoyé.', 'Reset email resent.'));
       setStep('sent');
     } catch (e: any) {
       setError(mapAuthError(e?.message));
@@ -364,15 +365,15 @@ function ForgotPasswordScreen({ initialEmail, accent, onBack }: { initialEmail: 
           {step === 'form' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
-                <h2 style={headingStyle}>Réinitialiser le mot de passe</h2>
-                <p style={subheadingStyle}>Saisissez l'adresse e-mail de votre compte et nous vous enverrons un lien de réinitialisation.</p>
+                <h2 style={headingStyle}>{tx('Réinitialiser le mot de passe', 'Reset password')}</h2>
+                <p style={subheadingStyle}>{tx("Saisissez l'adresse e-mail de votre compte et nous vous enverrons un lien de réinitialisation.", 'Enter your account email and we will send you a reset link.')}</p>
               </div>
               <Field
-                label="Adresse e-mail"
+                label={tx('Adresse e-mail', 'Email address')}
                 value={email}
                 onChange={(v) => { setEmail(v); setFieldErr(''); }}
                 type="email"
-                placeholder="vous@entreprise.com"
+                placeholder={tx('vous@entreprise.com', 'you@company.com')}
                 autoFocus
                 error={fieldErr}
               />
@@ -384,17 +385,17 @@ function ForgotPasswordScreen({ initialEmail, accent, onBack }: { initialEmail: 
                 className="lemtel-btn-primary"
                 style={{ height: 50, borderRadius: 14, fontSize: 14, cursor: 'pointer' }}
               >
-                Continuer
+                {tx('Continuer', 'Continue')}
               </button>
-              <button type="button" onClick={onBack} style={ghostBtn}>Retour à la connexion</button>
+              <button type="button" onClick={onBack} style={ghostBtn}>{tx('Retour à la connexion', 'Back to sign in')}</button>
             </div>
           )}
 
           {step === 'confirm' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
-                <h2 style={headingStyle}>Envoyer le lien de réinitialisation ?</h2>
-                <p style={subheadingStyle}>Nous enverrons un lien unique de réinitialisation à :</p>
+                <h2 style={headingStyle}>{tx('Envoyer le lien de réinitialisation ?', 'Send the reset link?')}</h2>
+                <p style={subheadingStyle}>{tx('Nous enverrons un lien unique de réinitialisation à :', 'We\u2019ll send a one-time reset link to:')}</p>
                 <div style={{ marginTop: 8, padding: '10px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`, color: C.textIce, fontWeight: 600, fontSize: 14, wordBreak: 'break-all' }}>{email}</div>
               </div>
               {error && <ErrorBanner>{error}</ErrorBanner>}
@@ -406,9 +407,9 @@ function ForgotPasswordScreen({ initialEmail, accent, onBack }: { initialEmail: 
                 style={{ height: 50, borderRadius: 14, fontSize: 14, cursor: busy ? 'wait' : 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
               >
                 {busy && <Spinner />}
-                {busy ? 'Envoi…' : 'Envoyer le lien'}
+                {busy ? tx('Envoi…', 'Sending…') : tx('Envoyer le lien', 'Send link')}
               </button>
-              <button type="button" onClick={() => setStep('form')} style={ghostBtn} disabled={busy}>Annuler</button>
+              <button type="button" onClick={() => setStep('form')} style={ghostBtn} disabled={busy}>{tx('Annuler', 'Cancel')}</button>
             </div>
           )}
 
@@ -420,9 +421,9 @@ function ForgotPasswordScreen({ initialEmail, accent, onBack }: { initialEmail: 
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 color: C.green, fontSize: 26, fontWeight: 800,
               }}>✓</div>
-              <h2 style={{ ...headingStyle, textAlign: 'center' }}>Vérifiez votre boîte de réception</h2>
+              <h2 style={{ ...headingStyle, textAlign: 'center' }}>{tx('Vérifiez votre boîte de réception', 'Check your inbox')}</h2>
               <p style={{ ...subheadingStyle, textAlign: 'center' }}>
-                Si un compte existe pour <strong style={{ color: C.textIce }}>{email}</strong>, vous recevrez un lien de réinitialisation sous peu. Ouvrez-le sur cet appareil ou sur un navigateur de bureau pour définir un nouveau mot de passe.
+                {tx('Si un compte existe pour', 'If an account exists for')} <strong style={{ color: C.textIce }}>{email}</strong>{tx(', vous recevrez un lien de réinitialisation sous peu. Ouvrez-le sur cet appareil ou sur un navigateur de bureau pour définir un nouveau mot de passe.', ', you will receive a reset link shortly. Open it on this device or on a desktop browser to set a new password.')}
               </p>
               {resentInfo && (
                 <div style={{
@@ -451,13 +452,13 @@ function ForgotPasswordScreen({ initialEmail, accent, onBack }: { initialEmail: 
               >
                 {busy && <Spinner />}
                 {busy
-                  ? 'Envoi…'
+                  ? tx('Envoi…', 'Sending…')
                   : cooldown > 0
-                    ? `Renvoyer dans ${cooldown}s`
-                    : "Renvoyer l'e-mail"}
+                    ? tx(`Renvoyer dans ${cooldown}s`, `Resend in ${cooldown}s`)
+                    : tx("Renvoyer l'e-mail", 'Resend email')}
               </button>
               <button type="button" onClick={onBack} className="lemtel-btn-primary" style={{ height: 50, borderRadius: 14, fontSize: 14, cursor: 'pointer' }}>
-                Retour à la connexion
+                {tx('Retour à la connexion', 'Back to sign in')}
               </button>
             </div>
           )}
@@ -488,7 +489,7 @@ function Brand() {
         <img src="/ava-logo.png" alt="Lemtel" width={72} height={72} style={{ display: 'block', borderRadius: 16 }} />
       </div>
       <div style={{ marginTop: 14, fontSize: 22, fontWeight: 800, color: C.textIce, letterSpacing: 0.2 }}>Lemtel</div>
-      <div style={{ marginTop: 4, fontSize: 11, color: C.textSub, letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 600 }}>Téléphonie d'entreprise IA</div>
+      <div style={{ marginTop: 4, fontSize: 11, color: C.textSub, letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 600 }}>{tx("Téléphonie d'entreprise IA", 'AI business telephony')}</div>
     </div>
   );
 }
@@ -500,7 +501,7 @@ function Footer() {
       fontSize: 11, color: C.textDim, letterSpacing: 0.4,
       position: 'relative', zIndex: 1,
     }}>
-      Conçu par <span style={{ color: C.gold, fontWeight: 600 }}>AVA Statistic · assistantvirtualai.com</span>
+      {tx('Conçu par', 'Crafted by')} <span style={{ color: C.gold, fontWeight: 600 }}>AVA Statistic · assistantvirtualai.com</span>
     </div>
   );
 }
@@ -554,7 +555,7 @@ function AccentSwitch({ accent, onChange, readOnly }: { accent: Accent; onChange
             disabled={readOnly}
             onClick={() => onChange?.(o.id)}
             aria-pressed={active}
-            title={`Thème : ${o.label}`}
+            title={tx('Thème : ', 'Theme: ') + o.label}
             style={{
               border: 'none', cursor: readOnly ? 'default' : 'pointer',
               padding: '5px 10px', borderRadius: 999,
@@ -585,12 +586,12 @@ function ErrorBanner({ children, failure }: { children: React.ReactNode; failure
       <div>{children}</div>
       {failure && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-          <span style={chipStyle('step')}>étape : {failure.step}</span>
-          <span style={chipStyle('code')}>code : {failure.code}</span>
+          <span style={chipStyle('step')}>{tx('étape', 'step')} : {failure.step}</span>
+          <span style={chipStyle('code')}>{tx('code', 'code')} : {failure.code}</span>
           {failure.detail && (
             <button type="button" onClick={() => setOpen((o) => !o)}
               style={{ ...chipStyle('toggle'), cursor: 'pointer' }}>
-              {open ? 'masquer les détails' : 'détails'}
+              {open ? tx('masquer les détails', 'hide details') : tx('détails', 'details')}
             </button>
           )}
         </div>

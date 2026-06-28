@@ -10,8 +10,10 @@
  */
 import React, { useEffect, useState } from 'react';
 import { perf, isPerfOverlayEnabled } from '../lib/perfMetrics';
+import { useT } from '../lib/i18n';
 
 export default function PerfOverlay() {
+  const { tx } = useT();
   const [, setTick] = useState(0);
   const [open, setOpen] = useState(true);
   const [enabled] = useState(isPerfOverlayEnabled());
@@ -38,27 +40,27 @@ export default function PerfOverlay() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
         <strong style={{ color: '#9fd0ff' }}>Perf</strong>
         <div style={{ display: 'flex', gap: 6 }}>
-          <button onClick={() => perf.reset()} style={btn}>Réinit.</button>
+          <button onClick={() => perf.reset()} style={btn}>{tx('Réinit.', 'Reset')}</button>
           <button onClick={() => setOpen(o => !o)} style={btn}>{open ? '–' : '+'}</button>
         </div>
       </div>
       {open && (
         <>
           <div style={{ marginTop: 6 }}>
-            Req : <b>{snap.counters.requests}</b> · Hits : <b>{snap.counters.cacheHits}</b> · Misses : <b>{snap.counters.cacheMisses}</b>
+            {tx('Req', 'Req')} : <b>{snap.counters.requests}</b> · {tx('Hits', 'Hits')} : <b>{snap.counters.cacheHits}</b> · {tx('Misses', 'Misses')} : <b>{snap.counters.cacheMisses}</b>
           </div>
-          <div>Taux cache : <b>{hitRate}%</b> · Dédup : <b>{snap.counters.inflightDedupes}</b> · Err : <b>{snap.counters.errors}</b></div>
-          <div style={{ marginTop: 6, opacity: 0.9 }}>Chargements récents :</div>
+          <div>{tx('Taux cache', 'Cache rate')} : <b>{hitRate}%</b> · {tx('Dédup', 'Dedup')} : <b>{snap.counters.inflightDedupes}</b> · {tx('Err', 'Err')} : <b>{snap.counters.errors}</b></div>
+          <div style={{ marginTop: 6, opacity: 0.9 }}>{tx('Chargements récents :', 'Recent loads:')}</div>
           <div style={{ maxHeight: 160, overflow: 'auto' }}>
             {snap.timings.slice(0, 6).map(t => (
               <div key={t.key} style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.key}</span>
                 <span style={{ color: t.lastMs > 1500 ? '#ffb4a8' : '#a8ffcf' }}>
-                  {Math.round(t.lastMs)}ms · moy {Math.round(t.avgMs)}
+                  {Math.round(t.lastMs)}ms · {tx('moy', 'avg')} {Math.round(t.avgMs)}
                 </span>
               </div>
             ))}
-            {snap.timings.length === 0 && <div style={{ opacity: 0.6 }}>Aucune mesure pour l'instant.</div>}
+            {snap.timings.length === 0 && <div style={{ opacity: 0.6 }}>{tx("Aucune mesure pour l'instant.", 'No measurements yet.')}</div>}
           </div>
         </>
       )}

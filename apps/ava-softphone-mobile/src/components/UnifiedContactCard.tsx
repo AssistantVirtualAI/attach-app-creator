@@ -4,6 +4,7 @@
  */
 import React from 'react';
 import { colors, font, radius } from '../lib/theme';
+import { useT } from '../lib/i18n';
 import type { CallerLookup } from '../lib/sip/callerLookup';
 
 interface Props {
@@ -14,6 +15,7 @@ interface Props {
 }
 
 export default function UnifiedContactCard({ lookup, onCall, onSms, maestroLinkBase }: Props) {
+  const { tx } = useT();
   const name = lookup.name;
   const initial = (name || '#').trim().charAt(0).toUpperCase();
   const mobile = lookup.ms_meta?.mobile ?? lookup.display_number;
@@ -42,16 +44,16 @@ export default function UnifiedContactCard({ lookup, onCall, onSms, maestroLinkB
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {mobile && <Row icon="📱" label="Mobile" value={mobile} onPress={onCall ? () => onCall(mobile) : undefined} />}
+        {mobile && <Row icon="📱" label={tx('Mobile', 'Mobile')} value={mobile} onPress={onCall ? () => onCall(mobile) : undefined} />}
         {business.map((n, i) => (
-          <Row key={`b-${i}`} icon="📞" label="Bureau" value={n} onPress={onCall ? () => onCall(n) : undefined} />
+          <Row key={`b-${i}`} icon="📞" label={tx('Bureau', 'Office')} value={n} onPress={onCall ? () => onCall(n) : undefined} />
         ))}
-        {email && <Row icon="📧" label="Courriel" value={email} onPress={() => { try { window.open(`mailto:${email}`); } catch {} }} />}
+        {email && <Row icon="📧" label={tx('Courriel', 'Email')} value={email} onPress={() => { try { window.open(`mailto:${email}`); } catch {} }} />}
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
         {onCall && mobile && (
-          <ActionButton color={colors.success} onClick={() => onCall(mobile)} label="Appeler" icon="📞" />
+          <ActionButton color={colors.success} onClick={() => onCall(mobile)} label={tx('Appeler', 'Call')} icon="📞" />
         )}
         {onSms && mobile && (
           <ActionButton color="#2456ff" onClick={() => onSms(mobile)} label="SMS" icon="💬" />

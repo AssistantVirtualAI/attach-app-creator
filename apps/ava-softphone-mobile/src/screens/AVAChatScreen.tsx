@@ -1,17 +1,26 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { colors, font, gradients, radius, shadow } from '../lib/theme';
 import { mobileApi } from '../lib/mobileApi';
+import { useT } from '../lib/i18n';
 
 type Msg = { id: string; role: 'user' | 'assistant'; text: string; pending?: boolean };
 
-const SUGGESTIONS = [
+const SUGGESTIONS_FR = [
   "Combien d'appels avons-nous reçus aujourd'hui ?",
   'Qui a manqué le plus d\u2019appels cette semaine ?',
   'Résume le dernier appel de Quebec Auto',
   "Quelle file a le plus long temps d'attente ?",
 ];
+const SUGGESTIONS_EN = [
+  "How many calls did we receive today?",
+  "Who missed the most calls this week?",
+  "Summarize the latest call from Quebec Auto",
+  "Which queue has the longest wait time?",
+];
 
 export default function AVAChatScreen() {
+  const { tx, lang } = useT();
+  const SUGGESTIONS = lang === 'fr' ? SUGGESTIONS_FR : SUGGESTIONS_EN;
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
@@ -38,7 +47,7 @@ export default function AVAChatScreen() {
       const reply = await mobileApi.chat(text, msgs.map((m) => ({ role: m.role, content: m.text })));
       setMsgs((m) => m.map((x) => x.id === placeholder.id ? { ...x, text: reply.answer || '…', pending: false } : x));
     } catch (e: any) {
-      setMsgs((m) => m.map((x) => x.id === placeholder.id ? { ...x, text: `Désolé — ${e.message || 'AVA est indisponible.'}`, pending: false } : x));
+      setMsgs((m) => m.map((x) => x.id === placeholder.id ? { ...x, text: `${tx('Désolé', 'Sorry')} — ${e.message || tx('AVA est indisponible.', 'AVA is unavailable.')}`, pending: false } : x));
     } finally {
       setBusy(false);
       setTimeout(() => taRef.current?.focus(), 50);
@@ -55,7 +64,7 @@ export default function AVAChatScreen() {
         }}>✦</div>
         <div>
           <div style={{ fontSize: font.lg, fontWeight: 800, color: colors.textIce, letterSpacing: -0.3 }}>AVA</div>
-          <div style={{ fontSize: font.xs, color: colors.mutedSilver }}>Votre assistant téléphonique IA · données PBX en direct</div>
+          <div style={{ fontSize: font.xs, color: colors.mutedSilver }}>{tx('Votre assistant téléphonique IA · données PBX en direct', 'Your AI phone assistant · live PBX data')}</div>
         </div>
       </div>
 
@@ -64,7 +73,7 @@ export default function AVAChatScreen() {
         {msgs.length === 0 && (
           <div style={{ marginTop: 18 }}>
             <div style={{ fontSize: font.md, fontWeight: 700, color: colors.textIce, marginBottom: 8 }}>
-              Posez n'importe quelle question à AVA sur votre système téléphonique.
+              {tx("Posez n'importe quelle question à AVA sur votre système téléphonique.", 'Ask AVA anything about your phone system.')}
             </div>
             <div style={{ display: 'grid', gap: 8 }}>
               {SUGGESTIONS.map((s) => (
@@ -120,7 +129,7 @@ export default function AVAChatScreen() {
             ref={taRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Message AVA…"
+            placeholder={tx('Message AVA…', 'Message AVA…')}
             rows={1}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
@@ -134,7 +143,7 @@ export default function AVAChatScreen() {
           <button
             onClick={() => send()}
             disabled={!input.trim() || busy}
-            aria-label="Envoyer"
+            aria-label={tx('Envoyer', 'Send')}
             style={{
               width: 38, height: 38, borderRadius: '50%',
               border: 'none', cursor: input.trim() && !busy ? 'pointer' : 'not-allowed',
