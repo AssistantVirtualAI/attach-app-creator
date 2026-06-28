@@ -427,11 +427,21 @@ Deno.serve(async (req) => {
       return { text: String(d?.text || "").trim(), provider: "openai", model: "whisper-1" };
     };
 
+    // Mark as processing so the UI badge can show "en cours" via polling/Realtime.
+    await audit("processing", { provider: "openai", model: "whisper-1", message: "STT started — Whisper-1 primary" });
+
+    // PRIMARY: OpenAI Whisper-1 (best accuracy on 8kHz phone audio).
     let sttResult = await tryOpenAIWhisper();
-    if (!sttResult.text) {
+    if (sttResult.text) {
+      console.log("[ai-transcribe-call] STT OK via Whisper-1", { length: sttResult.text.length });
+    } else {
       attempts.push({ provider: sttResult.provider, model: sttResult.model, status: sttResult.status, error: (sttResult.error || "empty").slice(0, 200) });
-      // FALLBACK: Lovable Gateway (Gemini-based) STT.
+      console.warn("[ai-transcribe-call] Whisper-1 FAILED → falling back to Gemini (Lovable Gateway)", {
+        status: sttResult.status, error: (sttResult.error || "empty").slice(0, 200),
+      });
+      // FALLBACK ONLY: Lovable Gateway gpt-4o-mini-transcribe (Gemini-backed).
       sttResult = await tryGatewayTranscribe("openai/gpt-4o-mini-transcribe");
+      if (sttResult.text) console.log("[ai-transcribe-call] STT OK via Gemini fallback");
     }
     const final: ProviderResult | null = sttResult.text ? sttResult : null;
     if (!sttResult.text) {
