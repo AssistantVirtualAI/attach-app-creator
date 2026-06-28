@@ -541,6 +541,7 @@ type AvaMsg = {
 };
 
 function AvaChat({ profile, openAva, openDialer }: { profile: any; openAva: () => void; openDialer: (n?: string) => void }) {
+  const { t, lang } = useMplanipretLang();
   const [msgs, setMsgs] = useState<AvaMsg[]>([]);
   const [text, setText] = useAvaDraft(profile?.user_id, "ava-chat");
   const [sending, setSending] = useState(false);
@@ -607,20 +608,20 @@ function AvaChat({ profile, openAva, openDialer }: { profile: any; openAva: () =
         style={{ borderBottom: "1px solid var(--pp-bg-border)" }}
       >
         <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider" style={{ color: "var(--pp-agent)" }}>
-          <Sparkles className="w-3 h-3" /> Assistant AVA
+          <Sparkles className="w-3 h-3" /> {t("messages.avaAssistant")}
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setHistoryOpen(true)}
             className="text-[11px] flex items-center gap-1"
             style={{ color: "var(--pp-text-muted)" }}
-            title="Historique"
+            title={t("messages.avaHistory")}
           >
-            <History className="w-3.5 h-3.5" /> Historique
+            <History className="w-3.5 h-3.5" /> {t("messages.avaHistory")}
           </button>
           {msgs.length > 0 && (
             <button onClick={clear} className="text-[11px]" style={{ color: "var(--pp-text-muted)" }}>
-              Effacer
+              {t("messages.clear")}
             </button>
           )}
         </div>
@@ -641,9 +642,9 @@ function AvaChat({ profile, openAva, openDialer }: { profile: any; openAva: () =
             >
               <Bot className="w-7 h-7 text-white" />
             </div>
-            <p className="font-semibold" style={{ color: "var(--pp-text-primary)" }}>Bonjour, je suis AVA</p>
+            <p className="font-semibold" style={{ color: "var(--pp-text-primary)" }}>{t("messages.avaHello")}</p>
             <p className="text-xs mt-1" style={{ color: "var(--pp-text-muted)" }}>
-              Demandez-moi un brief, planifiez un rappel, ou cherchez un contact.
+              {t("messages.avaHelp")}
             </p>
             <div className="flex flex-wrap justify-center gap-1.5 mt-4">
               {[
@@ -700,7 +701,7 @@ function AvaChat({ profile, openAva, openDialer }: { profile: any; openAva: () =
                       <p className="whitespace-pre-wrap break-words">{m.message}</p>
                     </div>
                     <p className={`text-[10px] mt-1 ${mine ? "text-right" : "text-left"}`} style={{ color: "var(--pp-text-faint)" }}>
-                      {fmtTime(m.created_at)}
+                      {fmtTime(m.created_at, lang, t)}
                     </p>
                   </div>
                 </div>
@@ -718,7 +719,7 @@ function AvaChat({ profile, openAva, openDialer }: { profile: any; openAva: () =
                 color: "var(--pp-agent)",
               }}
             >
-              <Loader2 className="w-3 h-3 animate-spin" /> AVA réfléchit…
+              <Loader2 className="w-3 h-3 animate-spin" /> {t("messages.avaThinking")}
             </div>
           </div>
         )}
@@ -726,14 +727,14 @@ function AvaChat({ profile, openAva, openDialer }: { profile: any; openAva: () =
       </div>
       <Composer
         text={text} setText={setText} onSend={send} sending={sending}
-        placeholder="Demandez à AVA…" accent="agent"
+        placeholder={t("messages.avaPlaceholder")} accent="agent"
         leftAction={
           profile?.voice_agent_enabled ? (
             <button
               onClick={openAva}
               className="p-2 rounded-full"
               style={{ color: "var(--pp-agent)" }}
-              title="Mode vocal"
+              title={t("messages.voiceMode")}
             >
               <Mic className="w-5 h-5" />
             </button>
