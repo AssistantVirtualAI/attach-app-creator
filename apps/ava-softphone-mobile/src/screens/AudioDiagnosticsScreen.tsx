@@ -66,25 +66,25 @@ export default function AudioDiagnosticsScreen() {
 
   return (
     <div style={{ padding: 16, color: '#e2e8f0', background: '#0b1220', minHeight: '100%' }}>
-      <h2 style={{ marginTop: 0 }}>Diagnostic audio</h2>
+      <h2 style={{ marginTop: 0 }}>{tx('Diagnostic audio', 'Audio diagnostics')}</h2>
 
       <section style={{ background: '#0f172a', padding: 12, borderRadius: 12, marginBottom: 16 }}>
-        <h3 style={{ marginTop: 0, fontSize: 15 }}>Test pré-appel</h3>
+        <h3 style={{ marginTop: 0, fontSize: 15 }}>{tx('Test pré-appel', 'Pre-call test')}</h3>
         <p style={{ color: '#94a3b8', fontSize: 12 }}>
-          Joue un ton 440 Hz pendant 2 s sur la sortie active et démarre RemoteIO pour mesurer le pic micro.
+          {tx('Joue un ton 440 Hz pendant 2 s sur la sortie active et démarre RemoteIO pour mesurer le pic micro.', 'Plays a 440 Hz tone for 2 s on the active output and starts RemoteIO to measure mic peak.')}
         </p>
         <button onClick={runToneTest} disabled={tone.running}
           style={{ padding: '10px 16px', borderRadius: 8, background: '#2563eb', color: '#fff', border: 0 }}>
-          {tone.running ? 'Test en cours…' : '▶ Lancer le test'}
+          {tone.running ? tx('Test en cours…', 'Running…') : tx('▶ Lancer le test', '▶ Run test')}
         </button>
         <div style={{ marginTop: 10 }}>
-          {row('Pic micro', `${(tone.micPeak * 100).toFixed(1)}%`)}
-          {row('Route audio', tone.route)}
+          {row(tx('Pic micro', 'Mic peak'), `${(tone.micPeak * 100).toFixed(1)}%`)}
+          {row(tx('Route audio', 'Audio route'), tone.route)}
         </div>
       </section>
 
       <section style={{ background: '#0f172a', padding: 12, borderRadius: 12, marginBottom: 16 }}>
-        <h3 style={{ marginTop: 0, fontSize: 15 }}>Forcer la route</h3>
+        <h3 style={{ marginTop: 0, fontSize: 15 }}>{tx('Forcer la route', 'Force route')}</h3>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {(['auto','speaker','earpiece','bluetooth'] as const).map(r => (
             <button key={r} onClick={() => setRouteTo(r)}
@@ -93,23 +93,23 @@ export default function AudioDiagnosticsScreen() {
             </button>
           ))}
         </div>
-        <p style={{ color: '#94a3b8', fontSize: 12, marginTop: 8 }}>Route actuelle : {route || '—'}</p>
+        <p style={{ color: '#94a3b8', fontSize: 12, marginTop: 8 }}>{tx('Route actuelle', 'Current route')} : {route || '—'}</p>
       </section>
 
       <section style={{ background: '#0f172a', padding: 12, borderRadius: 12, marginBottom: 16 }}>
-        <h3 style={{ marginTop: 0, fontSize: 15 }}>Stats RTP (temps réel)</h3>
+        <h3 style={{ marginTop: 0, fontSize: 15 }}>{tx('Stats RTP (temps réel)', 'RTP stats (real-time)')}</h3>
         {stats?.running ? (
           <div>
             {row('Local', `${stats.localIp}:${stats.localPort}`)}
             {row('Remote', `${stats.remoteIp}:${stats.remotePort}`)}
-            {row('TX paquets', stats.txPackets)}
-            {row('RX paquets', stats.rxPackets)}
+            {row(tx('TX paquets', 'TX packets'), stats.txPackets)}
+            {row(tx('RX paquets', 'RX packets'), stats.rxPackets)}
             {row('TX bytes', stats.txBytes)}
             {row('RX bytes', stats.rxBytes)}
-            {row('Seq sortante', stats.seqOut)}
-            {row('Seq entrante', stats.lastSeq)}
-            {row('Pic micro', `${((stats.micPeak ?? 0) * 100).toFixed(1)}%`)}
-            {row('Pic RX', `${((stats.rxPeak ?? 0) * 100).toFixed(1)}%`)}
+            {row(tx('Seq sortante', 'Seq out'), stats.seqOut)}
+            {row(tx('Seq entrante', 'Seq in'), stats.lastSeq)}
+            {row(tx('Pic micro', 'Mic peak'), `${((stats.micPeak ?? 0) * 100).toFixed(1)}%`)}
+            {row(tx('Pic RX', 'RX peak'), `${((stats.rxPeak ?? 0) * 100).toFixed(1)}%`)}
             {row('Uptime', `${(((stats.uptimeMs ?? 0) / 1000) | 0)} s`)}
             {row('Route', stats.route)}
             {row('Backend', stats.audioBackend || '—')}
@@ -117,19 +117,19 @@ export default function AudioDiagnosticsScreen() {
             {row('Render callbacks', stats.renderCallbacks ?? 0)}
             {row('Input frames', stats.inputFrames ?? 0)}
             {row('Render frames', stats.renderFrames ?? 0)}
-            {row('Format capture', stats.tapFormat || '—')}
+            {row(tx('Format capture', 'Capture format'), stats.tapFormat || '—')}
             {row('Converter', stats.converterFormat || '—')}
             {row('Session', stats.sessionState || '—')}
-            {row('RemoteIO erreur', stats.lastEngineError || '—')}
+            {row(tx('RemoteIO erreur', 'RemoteIO error'), stats.lastEngineError || '—')}
           </div>
         ) : (
-          <p style={{ color: '#94a3b8', fontSize: 12 }}>Aucun appel actif. Les stats apparaîtront pendant l'appel.</p>
+          <p style={{ color: '#94a3b8', fontSize: 12 }}>{tx("Aucun appel actif. Les stats apparaîtront pendant l'appel.", 'No active call. Stats will appear during the call.')}</p>
         )}
       </section>
 
       <section style={{ background: '#0f172a', padding: 12, borderRadius: 12 }}>
-        <h3 style={{ marginTop: 0, fontSize: 15 }}>Événements Bluetooth / route</h3>
-        {btEvents.length === 0 && <p style={{ color: '#94a3b8', fontSize: 12 }}>Aucun changement détecté.</p>}
+        <h3 style={{ marginTop: 0, fontSize: 15 }}>{tx('Événements Bluetooth / route', 'Bluetooth / route events')}</h3>
+        {btEvents.length === 0 && <p style={{ color: '#94a3b8', fontSize: 12 }}>{tx('Aucun changement détecté.', 'No changes detected.')}</p>}
         {btEvents.map((e, i) => (
           <div key={i} style={{ fontSize: 12, padding: '4px 0', borderBottom: '1px solid #1f2937' }}>
             <span style={{ color: '#94a3b8' }}>{new Date(e.t).toLocaleTimeString()} </span>
