@@ -417,7 +417,7 @@ function AuthenticatedShell({
     <div style={{
       display: 'flex', flexDirection: 'column', height: '100vh',
       background: gradients.app,
-      paddingTop: 'calc(var(--safe-top) + 32px)',
+      paddingTop: 'calc(var(--safe-top) + 52px)',
       paddingBottom: 'var(--safe-bottom)',
       color: colors.textIce,
       position: 'relative',
