@@ -394,8 +394,8 @@ function ForgotPasswordScreen({ initialEmail, accent, onBack }: { initialEmail: 
           {step === 'confirm' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
-                <h2 style={headingStyle}>Envoyer le lien de réinitialisation ?</h2>
-                <p style={subheadingStyle}>Nous enverrons un lien unique de réinitialisation à :</p>
+                <h2 style={headingStyle}>{tx('Envoyer le lien de réinitialisation ?', 'Send the reset link?')}</h2>
+                <p style={subheadingStyle}>{tx('Nous enverrons un lien unique de réinitialisation à :', 'We\u2019ll send a one-time reset link to:')}</p>
                 <div style={{ marginTop: 8, padding: '10px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`, color: C.textIce, fontWeight: 600, fontSize: 14, wordBreak: 'break-all' }}>{email}</div>
               </div>
               {error && <ErrorBanner>{error}</ErrorBanner>}
@@ -407,9 +407,9 @@ function ForgotPasswordScreen({ initialEmail, accent, onBack }: { initialEmail: 
                 style={{ height: 50, borderRadius: 14, fontSize: 14, cursor: busy ? 'wait' : 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
               >
                 {busy && <Spinner />}
-                {busy ? 'Envoi…' : 'Envoyer le lien'}
+                {busy ? tx('Envoi…', 'Sending…') : tx('Envoyer le lien', 'Send link')}
               </button>
-              <button type="button" onClick={() => setStep('form')} style={ghostBtn} disabled={busy}>Annuler</button>
+              <button type="button" onClick={() => setStep('form')} style={ghostBtn} disabled={busy}>{tx('Annuler', 'Cancel')}</button>
             </div>
           )}
 
