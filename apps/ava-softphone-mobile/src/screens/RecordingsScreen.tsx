@@ -315,6 +315,30 @@ export default function RecordingsScreen({
               </div>
             </div>
           </div>
+          {playbackErrors[r.id] && (() => {
+            const err = playbackErrors[r.id];
+            const kindLabel = err.kind === 'login_failed' ? (fr ? 'Connexion PBX échouée' : 'PBX login failed')
+              : err.kind === 'file_missing' ? (fr ? 'Fichier audio absent du PBX' : 'Audio file missing on PBX')
+              : err.kind === 'missing_secret' ? (fr ? 'Configuration Vault manquante' : 'Vault config missing')
+              : err.kind === 'http_error' ? (fr ? 'Erreur HTTP PBX' : 'PBX HTTP error')
+              : err.kind === 'forbidden' ? (fr ? 'Accès refusé' : 'Access denied')
+              : err.kind === 'internal' ? (fr ? 'Erreur interne du proxy' : 'Proxy internal error')
+              : (fr ? 'Lecture impossible' : 'Playback failed');
+            return (
+              <div style={{ marginTop: 8, padding: 10, borderRadius: radius.md, border: `1px solid ${colors.danger}55`, background: `${colors.danger}10` }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <div style={{ color: colors.danger, fontSize: 11, fontWeight: 800 }}>⚠ {kindLabel}</div>
+                  {err.statuses.length > 0 && <Chip tone="danger" size="xs">HTTP {err.statuses.join('/')}</Chip>}
+                </div>
+                <div style={{ color: colors.mutedSilver, fontSize: 11, lineHeight: 1.4, wordBreak: 'break-word' }}>{err.message}</div>
+                {err.ref && (
+                  <div style={{ marginTop: 6, fontFamily: 'JetBrains Mono, monospace', fontSize: 9.5, color: colors.mutedSilver, opacity: 0.8 }}>
+                    {fr ? 'Réf. support' : 'Support ref'} : {err.ref}{err.code ? ` · ${err.code}` : ''}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
           {expandedId === r.id && (
             <RecordingAiPanel rec={r} />
           )}
