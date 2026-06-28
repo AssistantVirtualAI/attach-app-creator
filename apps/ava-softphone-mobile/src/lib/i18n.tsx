@@ -575,9 +575,26 @@ export function MobileI18nProvider({ children }: { children: ReactNode }) {
 export function useT() {
   const c = useContext(I18nCtx);
   if (!c) {
-    return { lang: 'en' as Lang, setLang: () => {}, toggle: () => {}, t: ((k: Key) => (DICT.en as any)[k] ?? k) as Ctx['t'] };
+    return {
+      lang: 'en' as Lang,
+      setLang: () => {},
+      toggle: () => {},
+      t: ((k: Key) => (DICT.en as any)[k] ?? k) as Ctx['t'],
+      tx: (_fr: string, en: string) => en,
+    };
   }
-  return c;
+  return { ...c, tx: (fr: string, en: string) => (c.lang === 'fr' ? fr : en) };
+}
+
+/** Module-level helper for non-React code paths (toasts, hooks). Reads the
+ *  persisted language from localStorage so messages match the active locale. */
+export function txStatic(fr: string, en: string): string {
+  try {
+    const v = localStorage.getItem(STORAGE);
+    return v === 'en' ? en : fr;
+  } catch {
+    return fr;
+  }
 }
 
 /**
