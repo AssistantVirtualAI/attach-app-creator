@@ -1920,10 +1920,12 @@ Deno.serve(async (req) => {
             cookie = await getFusionSessionCookie(fileBase);
           } catch (e: any) {
             loginError = String(e?.message || e).slice(0, 200);
-            console.log("[get-recording] FusionPBX login failed:", loginError, {
+            cidLog("[get-recording] FusionPBX login failed", {
               origin: fusionBaseOrigin(fileBase),
+              error: loginError,
               has_username: !!Deno.env.get("FUSIONPBX_USERNAME"),
               has_password: !!Deno.env.get("FUSIONPBX_PASSWORD"),
+              has_api_key_fallback: !!Deno.env.get("FUSIONPBX_API_KEY"),
             });
             attemptsSession.push({ url: `${fusionBaseOrigin(fileBase)}/login.php`, status: 0, content_type: `login_failed: ${loginError}` });
           }
