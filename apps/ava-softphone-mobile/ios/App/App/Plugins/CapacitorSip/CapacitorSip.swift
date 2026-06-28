@@ -46,9 +46,9 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     private let sipQueue = DispatchQueue(label: "pjsip.worker", qos: .userInitiated)
 
     private var pjsuaStarted = false
-    private var accId: pjsua_acc_id = PJSUA_INVALID_ID
-    private var currentCallId: pjsua_call_id = PJSUA_INVALID_ID
-    private var recorderId: pjsua_recorder_id = PJSUA_INVALID_ID
+    private var accId: pjsua_acc_id = pjsua_acc_id(PJSUA_INVALID_ID.rawValue)
+    private var currentCallId: pjsua_call_id = pjsua_call_id(PJSUA_INVALID_ID.rawValue)
+    private var recorderId: pjsua_recorder_id = pjsua_recorder_id(PJSUA_INVALID_ID.rawValue)
     private var recorderPath: String?
 
     // C callbacks need a static reference to reach back into the instance.
@@ -62,15 +62,15 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         // native UI must drive the SDK, not the other way around.
         CallKitManager.shared.onAnswer = { [weak self] in
             self?.sipQueue.async {
-                guard let self = self, self.currentCallId != PJSUA_INVALID_ID else { return }
+                guard let self = self, self.currentCallId != pjsua_call_id(PJSUA_INVALID_ID.rawValue) else { return }
                 pjsua_call_answer(self.currentCallId, 200, nil, nil)
             }
         }
         CallKitManager.shared.onEnd = { [weak self] in
             self?.sipQueue.async {
-                guard let self = self, self.currentCallId != PJSUA_INVALID_ID else { return }
+                guard let self = self, self.currentCallId != pjsua_call_id(PJSUA_INVALID_ID.rawValue) else { return }
                 pjsua_call_hangup(self.currentCallId, 0, nil, nil)
-                self.currentCallId = PJSUA_INVALID_ID
+                self.currentCallId = pjsua_call_id(PJSUA_INVALID_ID.rawValue)
             }
         }
 
@@ -85,7 +85,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
                 let r = pjsua_set_snd_dev(PJMEDIA_AUD_DEFAULT_CAPTURE_DEV, PJMEDIA_AUD_DEFAULT_PLAYBACK_DEV)
                 print("[CapacitorPjsip] 🔊 pjsua_set_snd_dev via sipQueue: \(r)")
                 // Reconnect audio conference if a call is already active
-                if self.currentCallId != PJSUA_INVALID_ID {
+                if self.currentCallId != pjsua_call_id(PJSUA_INVALID_ID.rawValue) {
                     var info = pjsua_call_info()
                     pjsua_call_get_info(self.currentCallId, &info)
                     pjsua_conf_connect(info.conf_slot, 0)
@@ -197,7 +197,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
                         plugin.notifyBg("callStateChanged", ["state": "active"])
                     case PJSIP_INV_STATE_DISCONNECTED:
                         if plugin.currentCallId == callId {
-                            plugin.currentCallId = PJSUA_INVALID_ID
+                            plugin.currentCallId = pjsua_call_id(PJSUA_INVALID_ID.rawValue)
                         }
                         CallKitManager.shared.reportEnded()
                         plugin.notifyBg("callEnded", ["reason": "remote_bye"])
@@ -292,9 +292,9 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
             accCfg.cred_info.0.data_type = Int32(PJSIP_CRED_DATA_PLAIN_PASSWD.rawValue)
             accCfg.cred_info.0.data = self.pjStrDup(password)
 
-            if self.accId != PJSUA_INVALID_ID {
+            if self.accId != pjsua_acc_id(PJSUA_INVALID_ID.rawValue) {
                 pjsua_acc_del(self.accId)
-                self.accId = PJSUA_INVALID_ID
+                self.accId = pjsua_acc_id(PJSUA_INVALID_ID.rawValue)
             }
 
             let status = pjsua_acc_add(&accCfg, pj_bool_t(PJ_TRUE.rawValue), &self.accId)
@@ -310,9 +310,9 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     @objc func disconnect(_ call: CAPPluginCall) {
         sipQueue.async { [weak self] in
             guard let self = self else { return }
-            if self.accId != PJSUA_INVALID_ID {
+            if self.accId != pjsua_acc_id(PJSUA_INVALID_ID.rawValue) {
                 pjsua_acc_del(self.accId)
-                self.accId = PJSUA_INVALID_ID
+                self.accId = pjsua_acc_id(PJSUA_INVALID_ID.rawValue)
             }
             call.resolve(["ok": true])
         }
@@ -326,11 +326,11 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         guard !number.isEmpty else { call.reject("number required"); return }
 
         sipQueue.async { [weak self] in
-            guard let self = self, self.accId != PJSUA_INVALID_ID else {
+            guard let self = self, self.accId != pjsua_acc_id(PJSUA_INVALID_ID.rawValue) else {
                 call.reject("not registered"); return
             }
             let uri = "sip:\(number)@\(domain);transport=tcp"
-            var callId: pjsua_call_id = PJSUA_INVALID_ID
+            var callId: pjsua_call_id = pjsua_call_id(PJSUA_INVALID_ID.rawValue)
             let status = self.withPjStr(uri) { dst -> pj_status_t in
                 pjsua_call_make_call(self.accId, &dst, nil, nil, nil, &callId)
             }
@@ -346,9 +346,9 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     @objc func hangup(_ call: CAPPluginCall) {
         sipQueue.async { [weak self] in
             guard let self = self else { return }
-            if self.currentCallId != PJSUA_INVALID_ID {
+            if self.currentCallId != pjsua_call_id(PJSUA_INVALID_ID.rawValue) {
                 pjsua_call_hangup(self.currentCallId, 0, nil, nil)
-                self.currentCallId = PJSUA_INVALID_ID
+                self.currentCallId = pjsua_call_id(PJSUA_INVALID_ID.rawValue)
             }
             call.resolve(["ok": true])
         }
@@ -357,7 +357,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     @objc func answer(_ call: CAPPluginCall) {
         sipQueue.async { [weak self] in
             guard let self = self else { return }
-            if self.currentCallId != PJSUA_INVALID_ID {
+            if self.currentCallId != pjsua_call_id(PJSUA_INVALID_ID.rawValue) {
                 pjsua_call_answer(self.currentCallId, 200, nil, nil)
             }
             call.resolve(["ok": true])
@@ -367,7 +367,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     @objc func setMute(_ call: CAPPluginCall) {
         let muted = call.getBool("muted") ?? false
         sipQueue.async { [weak self] in
-            guard let self = self, self.currentCallId != PJSUA_INVALID_ID else {
+            guard let self = self, self.currentCallId != pjsua_call_id(PJSUA_INVALID_ID.rawValue) else {
                 call.resolve(["ok": true]); return
             }
             var info = pjsua_call_info()
@@ -385,7 +385,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     @objc func setHold(_ call: CAPPluginCall) {
         let hold = call.getBool("onHold") ?? call.getBool("held") ?? false
         sipQueue.async { [weak self] in
-            guard let self = self, self.currentCallId != PJSUA_INVALID_ID else {
+            guard let self = self, self.currentCallId != pjsua_call_id(PJSUA_INVALID_ID.rawValue) else {
                 call.resolve(["ok": true]); return
             }
             if hold {
@@ -402,7 +402,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         let digit = call.getString("digit") ?? call.getString("digits") ?? ""
         guard !digit.isEmpty else { call.resolve(); return }
         sipQueue.async { [weak self] in
-            guard let self = self, self.currentCallId != PJSUA_INVALID_ID else {
+            guard let self = self, self.currentCallId != pjsua_call_id(PJSUA_INVALID_ID.rawValue) else {
                 call.resolve(); return
             }
             _ = self.withPjStr(digit) { d -> pj_status_t in
@@ -464,7 +464,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
 
     @objc func getRtpStats(_ call: CAPPluginCall) {
         sipQueue.async { [weak self] in
-            guard let self = self, self.currentCallId != PJSUA_INVALID_ID else {
+            guard let self = self, self.currentCallId != pjsua_call_id(PJSUA_INVALID_ID.rawValue) else {
                 call.resolve(["running": false]); return
             }
             var info = pjsua_call_info()
@@ -481,12 +481,12 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
 
     @objc func startRecord(_ call: CAPPluginCall) {
         sipQueue.async { [weak self] in
-            guard let self = self, self.currentCallId != PJSUA_INVALID_ID else {
+            guard let self = self, self.currentCallId != pjsua_call_id(PJSUA_INVALID_ID.rawValue) else {
                 call.resolve(["ok": false, "recording": false]); return
             }
             let docs = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true).first ?? NSTemporaryDirectory()
             let path = "\(docs)/call-\(Int(Date().timeIntervalSince1970)).wav"
-            var recId: pjsua_recorder_id = PJSUA_INVALID_ID
+            var recId: pjsua_recorder_id = pjsua_recorder_id(PJSUA_INVALID_ID.rawValue)
             let status = self.withPjStr(path) { p -> pj_status_t in
                 pjsua_recorder_create(&p, 0, nil, 0, 0, &recId)
             }
@@ -506,9 +506,9 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     @objc func stopRecord(_ call: CAPPluginCall) {
         sipQueue.async { [weak self] in
             guard let self = self else { return }
-            if self.recorderId != PJSUA_INVALID_ID {
+            if self.recorderId != pjsua_recorder_id(PJSUA_INVALID_ID.rawValue) {
                 pjsua_recorder_destroy(self.recorderId)
-                self.recorderId = PJSUA_INVALID_ID
+                self.recorderId = pjsua_recorder_id(PJSUA_INVALID_ID.rawValue)
             }
             let path = self.recorderPath ?? ""
             self.recorderPath = nil
@@ -522,7 +522,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         let target = call.getString("target") ?? ""
         guard !target.isEmpty else { call.reject("target required"); return }
         sipQueue.async { [weak self] in
-            guard let self = self, self.currentCallId != PJSUA_INVALID_ID else {
+            guard let self = self, self.currentCallId != pjsua_call_id(PJSUA_INVALID_ID.rawValue) else {
                 call.resolve(["ok": false, "target": target]); return
             }
             let uri = target.contains("@") ? "sip:\(target)" : "sip:\(target)@lemtel.lemtel.tel"
@@ -536,7 +536,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     @objc func park(_ call: CAPPluginCall) {
         let code = call.getString("code") ?? "*68"
         sipQueue.async { [weak self] in
-            guard let self = self, self.currentCallId != PJSUA_INVALID_ID else {
+            guard let self = self, self.currentCallId != pjsua_call_id(PJSUA_INVALID_ID.rawValue) else {
                 call.resolve(["ok": false, "code": code]); return
             }
             let uri = "sip:\(code)@lemtel.lemtel.tel"
@@ -552,11 +552,11 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         guard !target.isEmpty else { call.reject("target required"); return }
         // Place a second call; PJSIP supports multiple concurrent calls natively.
         sipQueue.async { [weak self] in
-            guard let self = self, self.accId != PJSUA_INVALID_ID else {
+            guard let self = self, self.accId != pjsua_acc_id(PJSUA_INVALID_ID.rawValue) else {
                 call.resolve(["ok": false, "target": target]); return
             }
             let uri = "sip:\(target)@lemtel.lemtel.tel;transport=tcp"
-            var newCallId: pjsua_call_id = PJSUA_INVALID_ID
+            var newCallId: pjsua_call_id = pjsua_call_id(PJSUA_INVALID_ID.rawValue)
             _ = self.withPjStr(uri) { d -> pj_status_t in
                 pjsua_call_make_call(self.accId, &d, nil, nil, nil, &newCallId)
             }
