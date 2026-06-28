@@ -407,6 +407,7 @@ type TeamMsg = {
 };
 
 function TeamChat({ profile }: { profile: any }) {
+  const { t, lang } = useMplanipretLang();
   const [msgs, setMsgs] = useState<TeamMsg[]>([]);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
@@ -433,7 +434,7 @@ function TeamChat({ profile }: { profile: any }) {
         .select("id, full_name")
         .in("id", ids);
       const map: Record<string, string> = {};
-      (profs ?? []).forEach((p: any) => { map[p.id] = p.full_name ?? "Courtier"; });
+      (profs ?? []).forEach((p: any) => { map[p.id] = p.full_name ?? t("messages.broker"); });
       setSenderNames(map);
     }
   };
@@ -481,7 +482,7 @@ function TeamChat({ profile }: { profile: any }) {
           className="text-[11px] flex items-center gap-1 normal-case tracking-normal"
           style={{ color: "var(--pp-agent)" }}
         >
-          <Sparkles className="w-3 h-3" /> Résumer
+          <Sparkles className="w-3 h-3" /> {t("messages.summarize")}
         </button>
       </div>
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2">
@@ -490,11 +491,11 @@ function TeamChat({ profile }: { profile: any }) {
             <Loader2 className="w-5 h-5 animate-spin mx-auto" />
           </div>
         ) : msgs.length === 0 ? (
-          <EmptyState Icon={Users} title="Salon vide" sub="Soyez le premier à écrire à l'équipe." />
+          <EmptyState Icon={Users} title={t("messages.teamEmptyTitle")} sub={t("messages.teamEmptySub")} />
         ) : (
           msgs.map((m) => {
             const mine = m.sender_id === profile?.id;
-            const name = senderNames[m.sender_id] ?? "Courtier";
+            const name = senderNames[m.sender_id] ?? t("messages.broker");
             return (
               <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
                 <div className="max-w-[78%]">
@@ -505,7 +506,7 @@ function TeamChat({ profile }: { profile: any }) {
                     <p className="whitespace-pre-wrap break-words">{m.message}</p>
                   </div>
                   <p className={`text-[10px] mt-1 ${mine ? "text-right" : "text-left"}`} style={{ color: "var(--pp-text-faint)" }}>
-                    {fmtTime(m.created_at)}
+                    {fmtTime(m.created_at, lang, t)}
                   </p>
                 </div>
               </div>
@@ -514,13 +515,13 @@ function TeamChat({ profile }: { profile: any }) {
         )}
         <div ref={bottomRef} />
       </div>
-      <Composer text={text} setText={setText} onSend={send} sending={sending} placeholder="Message à l'équipe…" />
+      <Composer text={text} setText={setText} onSend={send} sending={sending} placeholder={t("messages.teamPlaceholder")} />
 
       <AvaSummarizeSheet
         open={sumOpen}
         source="team"
         title={`#${channel}`}
-        content={msgs.map((m) => `${senderNames[m.sender_id] ?? "Membre"}: ${m.message}`).join("\n")}
+        content={msgs.map((m) => `${senderNames[m.sender_id] ?? t("messages.member")}: ${m.message}`).join("\n")}
         onClose={() => setSumOpen(false)}
         onInsert={(t) => setText((cur) => cur ? `${cur} ${t}` : t)}
       />
