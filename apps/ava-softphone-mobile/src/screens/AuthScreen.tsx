@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import type { Creds } from '../lib/creds';
 import SipConfigScreen from './SipConfigScreen';
+import { txStatic as tx } from '../lib/i18n';
 
 type Mode = 'extension' | 'email';
 type Screen = 'login' | 'sip' | 'forgot';
