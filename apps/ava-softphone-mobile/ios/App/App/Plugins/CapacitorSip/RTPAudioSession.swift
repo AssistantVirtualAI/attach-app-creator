@@ -707,7 +707,7 @@ final class RTPAudioSession {
         let queued = sendBuffer.count
         audioLock.unlock()
 
-        for f in framesToSend { sendRTPFrame(f) }
+        for f in framesToSend { sendRTPFrame(f); tapOutbound8k(f) }
         if inputCallbackCount == 1 || inputCallbackCount % 50 == 0 {
             NSLog("[RTP] input cb #\(inputCallbackCount) hwFrames=\(n) micPeak=\(String(format: "%.3f", micPeak)) queued=\(queued) txPackets=\(txPackets)")
         }
