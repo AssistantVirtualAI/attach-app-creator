@@ -828,6 +828,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
                             self.sendRegister(authHeader: nil)
                         }
                     }
+                    self.startOptionsKeepalive()
                 }
             }
         } else if let n = Int(code), n >= 400 {
