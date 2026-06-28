@@ -166,10 +166,17 @@ export async function loadPbxRecordingAudioMobile(
     },
   };
 
+  // Per-attempt correlation id (echoed in edge function logs + error responses)
+  // so user-visible failures can be quoted to support and grepped server-side.
+  const requestId = (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
+    ? (crypto as any).randomUUID()
+    : `rec-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
   const signed = await fetch(`${SUPABASE_URL}/functions/v1/fusionpbx-proxy`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'X-Request-Id': requestId,
       apikey: SUPABASE_ANON,
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
@@ -188,6 +195,7 @@ export async function loadPbxRecordingAudioMobile(
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'X-Request-Id': requestId,
       apikey: SUPABASE_ANON,
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
