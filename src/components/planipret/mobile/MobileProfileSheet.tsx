@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
@@ -6,6 +6,47 @@ import { toast } from "sonner";
 import { X, LogOut, Globe, Moon, Sun, KeyRound, CheckCircle2 } from "lucide-react";
 import { useMplanipretLang } from "@/hooks/useMplanipretLang";
 import { useMplanipretTheme } from "@/hooks/useMplanipretTheme";
+
+/**
+ * Runtime overlay assertion — verifies the profile sheet renders ABOVE the app
+ * on iOS/Android (and web). Checks: portaled to <body>, position:fixed, full
+ * viewport coverage, z-index >= 99999, and no DOM ancestor with a higher
+ * z-index in the same stacking context. Logs a console.error in dev/preview if
+ * any invariant fails so regressions surface immediately.
+ */
+function assertOverlayOnTop(el: HTMLElement | null) {
+  if (!el || typeof window === "undefined") return;
+  try {
+    const issues: string[] = [];
+    if (el.parentElement !== document.body) issues.push("not portaled to <body>");
+    const cs = window.getComputedStyle(el);
+    if (cs.position !== "fixed") issues.push(`position is ${cs.position} (expected fixed)`);
+    const z = parseInt(cs.zIndex || "0", 10);
+    if (!Number.isFinite(z) || z < 99999) issues.push(`z-index ${cs.zIndex} < 99999`);
+    const r = el.getBoundingClientRect();
+    if (r.width < window.innerWidth - 1 || r.height < window.innerHeight - 1) {
+      issues.push(`overlay ${Math.round(r.width)}x${Math.round(r.height)} smaller than viewport ${window.innerWidth}x${window.innerHeight}`);
+    }
+    // Scan siblings under <body> for any element with a higher z-index that
+    // could occlude us. (Portals from other libs land here too.)
+    Array.from(document.body.children).forEach((sib) => {
+      if (sib === el || !(sib instanceof HTMLElement)) return;
+      const sz = parseInt(window.getComputedStyle(sib).zIndex || "0", 10);
+      if (Number.isFinite(sz) && sz > z) {
+        issues.push(`sibling <${sib.tagName.toLowerCase()}> has higher z-index ${sz}`);
+      }
+    });
+    if (issues.length) {
+      // eslint-disable-next-line no-console
+      console.error("[MobileProfileSheet] overlay assertion failed:", issues.join("; "));
+    } else if (import.meta.env?.DEV) {
+      // eslint-disable-next-line no-console
+      console.debug("[MobileProfileSheet] overlay OK (fixed, z=" + z + ", portal=body)");
+    }
+  } catch {
+    /* ignore */
+  }
+}
 
 const STATUSES: Array<{ key: "available" | "busy" | "break" | "offline"; color: string }> = [
   { key: "available", color: "#10B981" },
