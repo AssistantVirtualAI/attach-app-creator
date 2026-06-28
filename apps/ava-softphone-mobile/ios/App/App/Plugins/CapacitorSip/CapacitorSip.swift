@@ -91,6 +91,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     private var lastNonce: String?
     private var lastRealm: String?
     private var registerTimer: Timer?
+    private var optionsTimer: Timer?
     private var rxBuffer: String = ""
 
     // MARK: - Call state
@@ -441,6 +442,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     @objc func setLogLevel(_ call: CAPPluginCall) { call.resolve(["ok": true, "level": call.getInt("level") ?? 3]) }
 
     @objc func unregister(_ call: CAPPluginCall) {
+        stopOptionsKeepalive()
         connection?.cancel()
         connection = nil
         registered = false
