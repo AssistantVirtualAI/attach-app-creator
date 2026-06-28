@@ -5,6 +5,22 @@
  * - Wire app pause/resume hooks
  */
 import { Capacitor } from '@capacitor/core';
+import { primeRingbackContext } from './sip/ringback';
+
+// Unlock the WebAudio AudioContext on the very first user gesture so the
+// ringback tone can play instantly when the user later taps "Call".
+// Must run on every platform (native + web preview).
+let _ringbackPrimed = false;
+const _primeOnce = () => {
+  if (_ringbackPrimed) return;
+  _ringbackPrimed = true;
+  try { primeRingbackContext(); } catch {}
+};
+if (typeof document !== 'undefined') {
+  document.addEventListener('touchstart', _primeOnce, { once: true, passive: true });
+  document.addEventListener('click', _primeOnce, { once: true });
+  document.addEventListener('keydown', _primeOnce, { once: true });
+}
 
 export async function bootNative(): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
