@@ -87,6 +87,73 @@ final class RTPAudioSession {
         onAudioStateChanged?(status, data)
     }
 
+    // MARK: - Live transcription taps
+    /// Emitted ~every 100ms with PCM16LE mono 16kHz bytes for inbound (remote
+    /// caller) audio. CapacitorSip wires this to an OpenAI Realtime relay.
+    var onLivePcmInbound: ((Data) -> Void)?
+    /// Same as above for outbound (local mic) audio.
+    var onLivePcmOutbound: ((Data) -> Void)?
+    private var liveInboundAccum16k = [Int16]()
+    private var liveOutboundAccum16k = [Int16]()
+    private let liveChunkSamples16k = 1600 // 100ms @ 16kHz
+    private let liveTapLock = NSLock()
+    private var liveTapPrevIn: Int16 = 0
+    private var liveTapPrevOut: Int16 = 0
+
+    /// Upsample 8kHz Int16 samples to 16kHz with linear interpolation.
+    @inline(__always)
+    private func upsample8to16(_ samples: [Int16], prev: inout Int16) -> [Int16] {
+        var out = [Int16](); out.reserveCapacity(samples.count * 2)
+        for s in samples {
+            let mid = Int32(prev) + Int32(s)
+            out.append(Int16(mid / 2))
+            out.append(s)
+            prev = s
+        }
+        return out
+    }
+
+    private func emitLiveChunkIfReady(_ accum: inout [Int16], cb: ((Data) -> Void)?) {
+        guard let cb = cb else { return }
+        while accum.count >= liveChunkSamples16k {
+            let chunk = Array(accum.prefix(liveChunkSamples16k))
+            accum.removeFirst(liveChunkSamples16k)
+            var data = Data(capacity: chunk.count * 2)
+            for s in chunk {
+                let u = UInt16(bitPattern: s)
+                data.append(UInt8(u & 0xFF))
+                data.append(UInt8((u >> 8) & 0xFF))
+            }
+            cb(data)
+        }
+    }
+
+    fileprivate func tapInbound8k(_ samples: [Int16]) {
+        guard onLivePcmInbound != nil else { return }
+        liveTapLock.lock()
+        let up = upsample8to16(samples, prev: &liveTapPrevIn)
+        liveInboundAccum16k.append(contentsOf: up)
+        emitLiveChunkIfReady(&liveInboundAccum16k, cb: onLivePcmInbound)
+        liveTapLock.unlock()
+    }
+
+    fileprivate func tapOutbound8k(_ samples: [Int16]) {
+        guard onLivePcmOutbound != nil else { return }
+        liveTapLock.lock()
+        let up = upsample8to16(samples, prev: &liveTapPrevOut)
+        liveOutboundAccum16k.append(contentsOf: up)
+        emitLiveChunkIfReady(&liveOutboundAccum16k, cb: onLivePcmOutbound)
+        liveTapLock.unlock()
+    }
+
+    func resetLiveTapBuffers() {
+        liveTapLock.lock()
+        liveInboundAccum16k.removeAll(keepingCapacity: false)
+        liveOutboundAccum16k.removeAll(keepingCapacity: false)
+        liveTapPrevIn = 0; liveTapPrevOut = 0
+        liveTapLock.unlock()
+    }
+
     // MARK: - Diagnostics
     private(set) var txPackets: UInt64 = 0
     private(set) var rxPackets: UInt64 = 0
@@ -640,7 +707,7 @@ final class RTPAudioSession {
         let queued = sendBuffer.count
         audioLock.unlock()
 
-        for f in framesToSend { sendRTPFrame(f) }
+        for f in framesToSend { sendRTPFrame(f); tapOutbound8k(f) }
         if inputCallbackCount == 1 || inputCallbackCount % 50 == 0 {
             NSLog("[RTP] input cb #\(inputCallbackCount) hwFrames=\(n) micPeak=\(String(format: "%.3f", micPeak)) queued=\(queued) txPackets=\(txPackets)")
         }
@@ -812,6 +879,7 @@ final class RTPAudioSession {
                     self.playQueue.removeFirst(drop)
                 }
                 self.audioLock.unlock()
+                self.tapInbound8k(samples)
                 if self.rxPackets == 1 || self.rxPackets % 50 == 0 {
                     NSLog("[RTP] rx packet #\(self.rxPackets) bytes=\(n) payload=\(payloadCount) seq=\(self.lastRemoteSeq) rxPeak=\(String(format: "%.3f", self.rxPeak)) playQueue=\(self.playQueue.count)")
                 }

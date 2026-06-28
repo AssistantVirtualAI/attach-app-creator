@@ -9,6 +9,8 @@ import { getAudioState, onAudioStateChange, setRoute, type AudioRoute, type Audi
 import CallTimeline, { type CallPhase } from './CallTimeline';
 import IncomingCallerPanel from './IncomingCallerPanel';
 import { lookupCaller, type CallerLookup } from '../lib/sip/callerLookup';
+import LiveTranscriptPanel from './LiveTranscriptPanel';
+import { useMobileCredentials } from '../hooks/useMobileCredentials';
 import { useT } from '../lib/i18n';
 
 const PROFILE_CYCLE: AudioProfile[] = ['auto', 'hd', 'low-bandwidth'];
@@ -21,6 +23,7 @@ export default function ActiveCallSheet({
   haptic: (s?: ImpactStyle) => Promise<void>;
 }) {
   const { tx } = useT();
+  const { organizationId } = useMobileCredentials();
   const [timer, setTimer] = useState(0);
   const [showKeypad, setShowKeypad] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
@@ -164,6 +167,14 @@ export default function ActiveCallSheet({
         endReason={endReasonText}
         endCode={sp.lastSipCode ?? null}
       />
+      {/* Live transcription (diarized: outbound=Agent, inbound=Client). */}
+      {(sp.snap.callState === 'active' || sp.snap.callState === 'held') && organizationId && (
+        <LiveTranscriptPanel
+          callRecordId={String((sp.snap as any).callId || (sp.snap as any).callUuid || '')}
+          organizationId={organizationId}
+          active={sp.snap.callState === 'active' || sp.snap.callState === 'held'}
+        />
+      )}
       {/* Top brand strip */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 16px 8px', padding: '10px 12px', borderRadius: radius.lg, background: 'rgba(255,255,255,0.04)', border: `1px solid ${stateAccent}55`, boxShadow: shadow.glass }}>
         <span style={{ fontSize: 10, letterSpacing: 1.6, fontWeight: 800, color: stateAccent, textTransform: 'uppercase' }}>
