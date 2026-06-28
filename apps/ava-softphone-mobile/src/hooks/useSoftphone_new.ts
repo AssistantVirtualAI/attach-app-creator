@@ -72,7 +72,7 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
         }));
         cleanups.push(await onNativeSipEvent('callStateChanged', (d) => {
           if (cancelled) return;
-          if (d?.state === 'active')  { setCallState('active'); startTimer(); stopRingback(); }
+          if (d?.state === 'active')  { setCallState('active'); startTimer(); stopRingback('active'); }
           if (d?.state === 'ringing') { setCallState('ringing'); if (d?.number) setActiveCallNumber(d.number); }
         }));
         cleanups.push(await onNativeSipEvent('callEnded', () => {
@@ -82,7 +82,7 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
           setIsMuted(false);
           setIsOnHold(false);
           stopTimer();
-          stopRingback();
+          stopRingback('callEnded');
         }));
 
         console.log('[NativeSIP] Calling initAccount...');
