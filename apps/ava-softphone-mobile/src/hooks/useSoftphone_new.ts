@@ -17,6 +17,7 @@ export interface SIPConfig {
 }
 import { CapacitorPjsip, onNativeSipEvent } from '../lib/sip/nativeSipProvider';
 import { primeRingbackContext, startRingback, stopRingback } from '../lib/sip/ringback';
+import { startIncomingRing, stopIncomingRing } from '../lib/sip/incomingRingtone';
 // Stub to avoid pulling in callQuality.ts → RTCPeerConnection
 type CallQuality = { mos: number; packetLoss: number; jitter: number; rtt: number };
 const EMPTY_QUALITY: CallQuality = { mos: 0, packetLoss: 0, jitter: 0, rtt: 0 };
@@ -68,11 +69,16 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
         cleanups.push(await onNativeSipEvent('callReceived', (d) => {
           if (cancelled) return;
           setActiveCallNumber(d?.from || 'Unknown');
-          setCallState('ringing');
+          setCallState('ringing-in' as CallState);
+          // Ring + vibrate on incoming.
+          try { startIncomingRing(); } catch {}
         }));
         cleanups.push(await onNativeSipEvent('callStateChanged', (d) => {
           if (cancelled) return;
-          if (d?.state === 'active')  { setCallState('active'); startTimer(); stopRingback('active'); }
+          if (d?.state === 'active')  {
+            setCallState('active'); startTimer();
+            stopRingback('active'); stopIncomingRing();
+          }
           if (d?.state === 'ringing') {
             setCallState('ringing');
             if (d?.number) setActiveCallNumber(d.number);
@@ -89,6 +95,7 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
           setIsOnHold(false);
           stopTimer();
           stopRingback('callEnded');
+          stopIncomingRing();
         }));
 
         console.log('[NativeSIP] Calling initAccount...');
@@ -131,8 +138,8 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
     });
     return true;
   };
-  const hangup = () => { stopRingback('hangup'); CapacitorPjsip.hangup().catch(() => {}); };
-  const answer = () => { CapacitorPjsip.answer().catch(() => {}); };
+  const hangup = () => { stopRingback('hangup'); stopIncomingRing(); CapacitorPjsip.hangup().catch(() => {}); };
+  const answer = () => { stopIncomingRing(); CapacitorPjsip.answer().catch(() => {}); };
   const mute   = () => { CapacitorPjsip.setMute({ muted: true }).catch(() => {});  setIsMuted(true); };
   const unmute = () => { CapacitorPjsip.setMute({ muted: false }).catch(() => {}); setIsMuted(false); };
   const hold   = () => { CapacitorPjsip.setHold({ onHold: true }).catch(() => {});  setIsOnHold(true); };

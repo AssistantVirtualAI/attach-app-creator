@@ -58,7 +58,9 @@ export interface CapacitorSipPlugin {
   transfer(options: { target: string }): Promise<{ ok: boolean; target: string }>;
   park(options?: { code?: string }): Promise<{ ok: boolean; code: string }>;
   addCall(options: { target: string }): Promise<{ ok: boolean; target: string }>;
-  setLiveTranscriptionEnabled(options: { enabled: boolean }): Promise<{ ok: boolean; enabled: boolean }>;
+  // Live transcription removed — kept as deprecated no-op signature so
+  // legacy callers don't break the type check. Will be deleted in a follow-up.
+  setLiveTranscriptionEnabled?(options: { enabled: boolean }): Promise<{ ok: boolean; enabled: boolean }>;
   addListener(event: string, callback: (data: any) => void): Promise<{ remove: () => Promise<void> }>;
   removeAllListeners(): Promise<void>;
 }
