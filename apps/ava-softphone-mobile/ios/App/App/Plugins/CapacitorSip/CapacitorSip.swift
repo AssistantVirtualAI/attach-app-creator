@@ -275,6 +275,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
                 call.reject("make_call failed: \(status)"); return
             }
             self.currentCallId = callId
+            CallKitManager.shared.reportOutgoing(to: number)
             call.resolve(["ok": true, "status": "calling", "callId": Int(callId)])
         }
     }
