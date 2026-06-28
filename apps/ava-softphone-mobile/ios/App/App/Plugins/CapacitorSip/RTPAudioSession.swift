@@ -161,6 +161,7 @@ final class RTPAudioSession {
     private(set) var rxBytes: UInt64 = 0
     private(set) var lastRemoteSeq: UInt16 = 0
     private(set) var lastRemotePort: UInt16 = 0
+    private(set) var lastRemoteIp: String = ""
     private(set) var micPeak: Float = 0
     private(set) var rxPeak: Float = 0
     private(set) var startedAt: Date?
