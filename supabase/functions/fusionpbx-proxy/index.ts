@@ -247,7 +247,8 @@ Deno.serve(async (req) => {
     FUSIONPBX_API_KEY = required("FUSIONPBX_API_KEY");
     FUSIONPBX_DOMAIN_UUID = required("FUSIONPBX_DOMAIN_UUID");
   } catch (e: any) {
-    return json(e, 400);
+    cidLog("[secrets] MISSING_SECRET", { secret: e?.secret, action: body?.action });
+    return json({ ...e, correlation_id: correlationId }, 400, { "X-Request-Id": correlationId });
   }
 
   // FusionPBX returns Basic auth with the raw API key as the password value
