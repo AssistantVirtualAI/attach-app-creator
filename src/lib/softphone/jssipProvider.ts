@@ -264,16 +264,19 @@ class JsSipProvider {
       }, 6000);
 
       const sockets = fallbackUrls.map((u) => new (JsSIP as any).WebSocketInterface(u));
+      // q=1.0 matches the iOS PJSIP config so FusionPBX forks to both
+      // the portal and the mobile app simultaneously (parallel forking).
+      // register_expires 120 = same as mobile keep-alive interval.
       const ua = new (JsSIP as any).UA({
         sockets,
         uri: `sip:${cfg.extension}@${cfg.sipDomain}`,
         password: cfg.password,
         authorization_user: cfg.extension,
         realm: cfg.sipDomain,
-        contact_uri: `sip:${cfg.extension}@${cfg.sipDomain};transport=wss`,
+        contact_uri: `sip:${cfg.extension}@${cfg.sipDomain};transport=wss;q=1.0`,
         register: true,
         session_timers: false,
-        register_expires: 300,
+        register_expires: 120,
         connection_recovery_min_interval: 2,
         connection_recovery_max_interval: 30,
         user_agent: "AVA Softphone 1.1",

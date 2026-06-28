@@ -1,6 +1,8 @@
 // FusionPBX v7 REST proxy for the AVA Statistic / Lemtel app.
 // All client calls authenticate via Supabase JWT; the FusionPBX credentials
 // (URL, username, API key, domain UUID) live only in Vault.
+// Deployed: 2026-06-28 — fix: strip `extension` query param from CDR API calls
+// (FusionPBX xml_cdr table has no `extension` column → SQL error → NO_CDR_ENDPOINT)
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
