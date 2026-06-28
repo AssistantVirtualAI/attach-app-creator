@@ -32,10 +32,11 @@ export function primeRingbackContext(): void {
 }
 
 export function startRingback() {
-  if (running) return;
+  if (running) { console.log('[ringback] already running — no-op'); return; }
   const c = ensureCtx();
-  if (!c) return;
+  if (!c) { console.warn('[ringback] no AudioContext available'); return; }
   running = true;
+  console.log('[ringback] start@gesture state=', c.state);
   try {
     gain = c.createGain();
     gain.gain.value = 0;
@@ -55,11 +56,13 @@ export function startRingback() {
     setTimeout(tick, ON);
   } catch (e) {
     console.warn('[ringback] start failed', e);
-    stopRingback();
+    stopRingback('error');
   }
 }
 
-export function stopRingback() {
+export function stopRingback(reason: string = 'manual') {
+  if (!running && !cadenceId && !oscA) return;
+  console.log('[ringback] stop reason=', reason);
   running = false;
   if (cadenceId) { clearInterval(cadenceId); cadenceId = null; }
   try { oscA?.stop(); } catch {} try { oscB?.stop(); } catch {}

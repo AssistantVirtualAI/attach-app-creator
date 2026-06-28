@@ -72,7 +72,7 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
         }));
         cleanups.push(await onNativeSipEvent('callStateChanged', (d) => {
           if (cancelled) return;
-          if (d?.state === 'active')  { setCallState('active'); startTimer(); stopRingback(); }
+          if (d?.state === 'active')  { setCallState('active'); startTimer(); stopRingback('active'); }
           if (d?.state === 'ringing') { setCallState('ringing'); if (d?.number) setActiveCallNumber(d.number); }
         }));
         cleanups.push(await onNativeSipEvent('callEnded', () => {
@@ -82,7 +82,7 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
           setIsMuted(false);
           setIsOnHold(false);
           stopTimer();
-          stopRingback();
+          stopRingback('callEnded');
         }));
 
         console.log('[NativeSIP] Calling initAccount...');
@@ -119,13 +119,13 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
     setActiveCallNumber(number);
     setCallState('ringing');
     CapacitorPjsip.makeCall({ number }).catch((e) => {
-      stopRingback();
+      stopRingback('makeCallFailed');
       setCallState('idle');
       setSipError(e?.message || 'makeCall failed');
     });
     return true;
   };
-  const hangup = () => { stopRingback(); CapacitorPjsip.hangup().catch(() => {}); };
+  const hangup = () => { stopRingback('hangup'); CapacitorPjsip.hangup().catch(() => {}); };
   const answer = () => { CapacitorPjsip.answer().catch(() => {}); };
   const mute   = () => { CapacitorPjsip.setMute({ muted: true }).catch(() => {});  setIsMuted(true); };
   const unmute = () => { CapacitorPjsip.setMute({ muted: false }).catch(() => {}); setIsMuted(false); };

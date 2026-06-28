@@ -106,6 +106,12 @@ final class RTPAudioSession {
     private var renderCallbackCount: UInt64 = 0
     private var inputFramesTotal: UInt64 = 0
     private var renderFramesTotal: UInt64 = 0
+    // Jitter / codec metrics.
+    private(set) var underrunCount: UInt64 = 0
+    private(set) var reprimeCount: UInt64 = 0
+    private(set) var primedAtLeastOnce: Bool = false
+    private(set) var lastJitterBufferSize: Int = 0
+    private var lastStatsLog: Date = Date()
 
     func snapshot() -> [String: Any] {
         return [
@@ -137,7 +143,14 @@ final class RTPAudioSession {
             "inputCallbacks": Int(inputCallbackCount),
             "renderCallbacks": Int(renderCallbackCount),
             "inputFrames": Int(inputFramesTotal),
-            "renderFrames": Int(renderFramesTotal)
+            "renderFrames": Int(renderFramesTotal),
+            // Jitter/codec quality
+            "jitterUnderruns": Int(underrunCount),
+            "jitterReprimes": Int(reprimeCount),
+            "jitterBufferPackets": lastJitterBufferSize / 160,
+            "jitterPrimed": bufferPrimed,
+            "jitterMinPackets": minBufferPackets,
+            "codec": "PCMU 8kHz → linear-interp upsample 48kHz / avg downsample"
         ]
     }
 
@@ -658,6 +671,12 @@ final class RTPAudioSession {
         if !bufferPrimed {
             if playQueue.count >= minBufferSamples {
                 bufferPrimed = true
+                if !primedAtLeastOnce {
+                    primedAtLeastOnce = true
+                    NSLog("[RTP][jitter] FIRST PRIME ok — buffer=\(playQueue.count / 160) packets (>= \(minBufferPackets))")
+                } else {
+                    NSLog("[RTP][jitter] RE-PRIMED — buffer=\(playQueue.count / 160) packets, totalReprimes=\(reprimeCount)")
+                }
             } else {
                 // Stay primed-low: output silence this callback.
                 audioLock.unlock()
@@ -677,6 +696,8 @@ final class RTPAudioSession {
                 } else {
                     // Underrun — re-prime to absorb future jitter.
                     bufferPrimed = false
+                    underrunCount &+= 1
+                    reprimeCount &+= 1
                     curr = 0
                 }
             }
@@ -690,6 +711,7 @@ final class RTPAudioSession {
         currRxSample = curr
         rxInterpStep = step
         let remaining = playQueue.count
+        lastJitterBufferSize = remaining
         audioLock.unlock()
 
         for buffer in abl {
@@ -701,6 +723,12 @@ final class RTPAudioSession {
         }
         if renderCallbackCount == 1 || renderCallbackCount % 50 == 0 {
             NSLog("[RTP] render cb #\(renderCallbackCount) hwFrames=\(needed) drained8k=\(drained) avail8k=\(available)→\(remaining) rxPackets=\(rxPackets) rxPeak=\(String(format: "%.3f", rxPeak))")
+        }
+        // 5-second structured stats line — used to verify jitter buffer / codec health.
+        let now = Date()
+        if now.timeIntervalSince(lastStatsLog) >= 5.0 {
+            lastStatsLog = now
+            NSLog("[RTP][stats] rx=\(rxPackets) tx=\(txPackets) underruns=\(underrunCount) reprimes=\(reprimeCount) buffer=\(remaining/160)pkts primed=\(bufferPrimed) micPeak=\(String(format: "%.2f", micPeak)) rxPeak=\(String(format: "%.2f", rxPeak))")
         }
         return noErr
     }
