@@ -110,12 +110,16 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     /// Must be called at the start of any sipQueue.async block that invokes PJSUA.
     // Storage for pj_thread_register — must persist for the lifetime of the thread.
     // One slot per concurrent thread; sipQueue is serial so one is enough.
-    private var _pjThreadDesc = pj_thread_desc()
+    // pj_thread_desc is a fixed-size C array (char[512]); Swift sees it as an
+    // opaque tuple. We allocate it on the heap so we can take a stable pointer.
+    private let _pjThreadDescPtr: UnsafeMutableRawPointer =
+        UnsafeMutableRawPointer.allocate(byteCount: 512, alignment: 16)
     private var _pjThread: OpaquePointer? = nil
 
     private func registerThreadIfNeeded() {
         if pj_thread_is_registered() == 0 {
-            _ = pj_thread_register("sipQueue", &_pjThreadDesc, &_pjThread)
+            let descPtr = _pjThreadDescPtr.assumingMemoryBound(to: CChar.self)
+            _ = pj_thread_register("sipQueue", descPtr, &_pjThread)
         }
     }
 
@@ -395,7 +399,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
             if hold {
                 pjsua_call_set_hold(self.currentCallId, nil)
             } else {
-                pjsua_call_reinvite(self.currentCallId, pj_bool_t(PJ_TRUE.rawValue), nil)
+                pjsua_call_reinvite(self.currentCallId, UInt32(PJ_TRUE.rawValue), nil)
             }
             self.notifyBg("holdChanged", ["onHold": hold])
             call.resolve(["ok": true, "onHold": hold])
@@ -419,7 +423,12 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     @objc func setLogLevel(_ call: CAPPluginCall) {
         let level = call.getInt("level") ?? 3
         sipQueue.async {
-            pjsua_set_log_level(UInt32(max(0, min(5, level))))
+            // pjsua_set_log_level may not be available in all PJSIP builds;
+            // update the logging config via pjsua_reconfigure_logging instead.
+            var logCfg = pjsua_logging_config()
+            pjsua_logging_config_default(&logCfg)
+            logCfg.console_level = UInt32(max(0, min(5, level)))
+            pjsua_reconfigure_logging(&logCfg)
             call.resolve(["level": level])
         }
     }
