@@ -2,11 +2,14 @@ import { useCallback, useEffect, useState } from "react";
 import { MP_DICT, type MpLang, type MpDict } from "@/lib/i18n/mplanipret";
 
 const KEY = "mplanipret-lang";
+const GLOBAL_KEY = "ava-language";
 
 function detect(): MpLang {
   try {
     const v = localStorage.getItem(KEY);
     if (v === "fr" || v === "en") return v;
+    const global = localStorage.getItem(GLOBAL_KEY);
+    if (global === "fr" || global === "en") return global;
   } catch {}
   if (typeof navigator !== "undefined") {
     return (navigator.language || "fr").toLowerCase().startsWith("en") ? "en" : "fr";
@@ -27,8 +30,28 @@ export function useMplanipretLang() {
     return () => { listeners.delete(fn); };
   }, []);
 
+  useEffect(() => {
+    try { document.documentElement.lang = lang; } catch {}
+  }, [lang]);
+
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if ((e.key === KEY || e.key === GLOBAL_KEY) && (e.newValue === "fr" || e.newValue === "en")) {
+        setLangState(e.newValue);
+        emit(e.newValue);
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
   const setLang = useCallback((l: MpLang) => {
-    try { localStorage.setItem(KEY, l); } catch {}
+    try {
+      localStorage.setItem(KEY, l);
+      localStorage.setItem(GLOBAL_KEY, l);
+      document.documentElement.lang = l;
+    } catch {}
+    setLangState(l);
     emit(l);
   }, []);
 

@@ -12,6 +12,7 @@ import type { PlanipretMobileContext } from "../PlanipretMobile";
 import { TEMP_COLORS, TEMP_EMOJI, TEMP_LABEL, tempBorder, callbackDelayToDate, delayLabel, type LeadTemp } from "@/components/planipret/leadHelpers";
 import ContactTimeline from "@/components/planipret/ContactTimeline";
 import RecordingsList from "@/components/planipret/mobile/recordings/RecordingsList";
+import { useMplanipretLang } from "@/hooks/useMplanipretLang";
 
 
 const PRIMARY = "var(--pp-brand-accent-2)";
@@ -71,7 +72,7 @@ const otherNumber = (c: Call) => (isOutbound(c) ? c.to_number : c.from_number) |
 const otherName = (c: Call) => (isOutbound(c) ? c.to_name : c.from_name) || "";
 const displayLabel = (c: Call) => otherName(c) || otherNumber(c) || "Inconnu";
 
-const frenchDateTime = (iso: string) => {
+const localizedDateTime = (iso: string, lang: "fr" | "en", todayLabel: string, yesterdayLabel: string) => {
   const d = new Date(iso);
   const today = new Date();
   const yest = new Date(); yest.setDate(today.getDate() - 1);
@@ -79,20 +80,22 @@ const frenchDateTime = (iso: string) => {
   const isYest = d.toDateString() === yest.toDateString();
   const hh = String(d.getHours()).padStart(2, "0");
   const mm = String(d.getMinutes()).padStart(2, "0");
-  if (sameDay) return `Aujourd'hui, ${hh}h${mm}`;
-  if (isYest) return `Hier, ${hh}h${mm}`;
-  return `${d.toLocaleDateString("fr-CA", { day: "2-digit", month: "short" })}, ${hh}h${mm}`;
+  const sep = lang === "en" ? ":" : "h";
+  if (sameDay) return `${todayLabel}, ${hh}${sep}${mm}`;
+  if (isYest) return `${yesterdayLabel}, ${hh}${sep}${mm}`;
+  return `${d.toLocaleDateString(lang === "en" ? "en-CA" : "fr-CA", { day: "2-digit", month: "short" })}, ${hh}${sep}${mm}`;
 };
-const frenchDuration = (s: number | null) => {
+const localizedDuration = (s: number | null, lang: "fr" | "en") => {
   if (!s) return "—";
   const m = Math.floor(s / 60);
   const sec = s % 60;
-  if (m === 0) return `${sec} sec`;
+  if (m === 0) return `${sec} ${lang === "en" ? "sec" : "sec"}`;
   return `${m} min ${sec} sec`;
 };
 
 // ---------- main ----------
 export default function MCalls() {
+  const { t, lang } = useMplanipretLang();
   const { profile, openDialer, registerRefresh } = useOutletContext<PlanipretMobileContext>();
   const [params, setParams] = useSearchParams();
   const initialTab = (params.get("tab") as any) || "recents";
@@ -167,7 +170,7 @@ export default function MCalls() {
         }}
       >
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold" style={{ color: "var(--pp-text-primary)" }}>Appels</h1>
+          <h1 className="text-2xl font-bold" style={{ color: "var(--pp-text-primary)" }}>{t("calls.title")}</h1>
           <button
             onClick={() => { setSearchOpen((v) => !v); if (searchOpen) setSearch(""); }}
             className="w-9 h-9 rounded-full flex items-center justify-center"
@@ -175,7 +178,7 @@ export default function MCalls() {
               background: searchOpen ? "var(--pp-bg-elevated)" : "transparent",
               color: "var(--pp-text-secondary)",
             }}
-            aria-label="Rechercher"
+            aria-label={t("common.search")}
           >
             {searchOpen ? <X className="w-5 h-5" /> : <Search className="w-5 h-5" />}
           </button>
@@ -186,7 +189,7 @@ export default function MCalls() {
               autoFocus
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Rechercher un numéro..."
+              placeholder={t("calls.searchNumber")}
               className="w-full px-3 py-2 rounded-xl text-sm outline-none"
               style={{
                 background: "var(--pp-bg-elevated)",
@@ -202,18 +205,18 @@ export default function MCalls() {
           style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)" }}
         >
           {[
-            { k: "recents", label: "Récents" },
-            { k: "active", label: "Actifs" },
-            { k: "missed", label: "Manqués" },
-            { k: "recordings", label: "Enreg." },
-            { k: "voicemails", label: "Vocaux" },
-          ].map((t) => {
-            const active = tab === (t.k as any);
-            const isMissedTab = t.k === "missed";
+            { k: "recents", label: t("calls.tabs.recents") },
+            { k: "active", label: t("calls.tabs.active") },
+            { k: "missed", label: t("calls.tabs.missed") },
+            { k: "recordings", label: t("calls.tabs.recordings") },
+            { k: "voicemails", label: t("calls.tabs.voicemails") },
+          ].map((tabDef) => {
+            const active = tab === (tabDef.k as any);
+            const isMissedTab = tabDef.k === "missed";
             return (
               <button
-                key={t.k}
-                onClick={() => { setTab(t.k as any); const np = new URLSearchParams(params); np.set("tab", t.k); setParams(np, { replace: true }); }}
+                key={tabDef.k}
+                onClick={() => { setTab(tabDef.k as any); const np = new URLSearchParams(params); np.set("tab", tabDef.k); setParams(np, { replace: true }); }}
 
                 className="flex-1 py-2 text-xs font-semibold rounded-full transition flex items-center justify-center gap-1.5"
                 style={
@@ -226,7 +229,7 @@ export default function MCalls() {
                     : { color: "var(--pp-text-muted)" }
                 }
               >
-                {t.label}
+                {tabDef.label}
                 {isMissedTab && missedCount > 0 && (
                   <span
                     className="text-[10px] text-white px-1.5 rounded-full"
@@ -263,7 +266,7 @@ export default function MCalls() {
                 className="text-xs flex items-center gap-1 px-2 py-1"
                 style={{ color: "var(--pp-text-muted)" }}
               >
-                <RefreshCw className={`w-3 h-3 ${refreshing ? "animate-spin" : ""}`} /> Actualiser
+                <RefreshCw className={`w-3 h-3 ${refreshing ? "animate-spin" : ""}`} /> {t("common.refresh")}
               </button>
             </div>
             {loading ? (
@@ -314,6 +317,7 @@ export default function MCalls() {
 
 // ---------- row ----------
 function CallRow({ call, onTap, onCall, showCallBtn }: { call: Call; onTap: () => void; onCall: () => void; showCallBtn?: boolean }) {
+  const { t, lang } = useMplanipretLang();
   const missed = isMissed(call);
   const out = isOutbound(call);
   const dirColor = missed ? "var(--pp-danger)" : out ? "var(--pp-success)" : "var(--pp-brand-accent)";
@@ -342,10 +346,10 @@ function CallRow({ call, onTap, onCall, showCallBtn }: { call: Call; onTap: () =
               className="font-semibold text-[15px] truncate"
               style={{ color: missed ? "var(--pp-danger)" : "var(--pp-text-primary)" }}
             >
-              {displayLabel(call)}
+              {displayLabel(call) === "Inconnu" ? t("common.unknown") : displayLabel(call)}
             </div>
             <div className="text-xs truncate" style={{ color: "var(--pp-text-muted)" }}>
-              {frenchDateTime(call.started_at)} · {frenchDuration(call.duration_seconds)}
+              {localizedDateTime(call.started_at, lang, t("common.today"), t("common.yesterday"))} · {localizedDuration(call.duration_seconds, lang)}
             </div>
           </div>
         </button>
@@ -354,7 +358,7 @@ function CallRow({ call, onTap, onCall, showCallBtn }: { call: Call; onTap: () =
             <span
               className="rounded-full p-1.5 flex items-center justify-center"
               style={{ background: "rgba(155,127,232,0.15)", color: "var(--pp-agent)" }}
-              title="Analyse IA"
+              title={t("calls.aiAnalysis")}
             >
               <Bot className="w-3.5 h-3.5" />
             </span>
@@ -368,7 +372,7 @@ function CallRow({ call, onTap, onCall, showCallBtn }: { call: Call; onTap: () =
               background: "rgba(46,155,220,0.15)",
               color: "var(--pp-brand-accent)",
             }}
-            aria-label="Rappeler"
+            aria-label={t("common.callBack")}
           >
             <Phone className="w-4 h-4" />
           </button>
@@ -381,10 +385,11 @@ function CallRow({ call, onTap, onCall, showCallBtn }: { call: Call; onTap: () =
 
 // ---------- empty ----------
 function EmptyState({ tab }: { tab: "recents" | "active" | "missed" }) {
+  const { t } = useMplanipretLang();
   const cfg = {
-    recents: { Icon: Phone, title: "Aucun appel dans l'historique", sub: "Vos appels apparaîtront ici." },
-    active: { Icon: Phone, title: "Aucun appel actif en ce moment", sub: "Utilisez le bouton 📞 pour passer un appel." },
-    missed: { Icon: PhoneMissed, title: "Aucun appel manqué 🎉", sub: "Tout est sous contrôle." },
+    recents: { Icon: Phone, title: t("calls.noRecentsTitle"), sub: t("calls.noRecentsSub") },
+    active: { Icon: Phone, title: t("calls.noActiveTitle"), sub: t("calls.noActiveSub") },
+    missed: { Icon: PhoneMissed, title: t("calls.noMissedTitle"), sub: t("calls.noMissedSub") },
   }[tab];
   return (
     <div className="p-10 text-center">
@@ -409,6 +414,7 @@ function CallDetailSheet({
 }: {
   call: Call; userId: string; onClose: () => void; openDialer: (n?: string) => void; onUpdated: (c: Call) => void;
 }) {
+  const { t, lang } = useMplanipretLang();
   const [insight, setInsight] = useState<Insight | null>(null);
   const [recLoading, setRecLoading] = useState(false);
   const [txLoading, setTxLoading] = useState(false);
@@ -456,20 +462,20 @@ function CallDetailSheet({
     setRecLoading(true);
     const { data, error } = await supabase.functions.invoke("ns-recordings", { body: { call_id: call.ns_call_id ?? call.id } });
     setRecLoading(false);
-    if (error || !(data as any)?.recording_url) { toast.error("Enregistrement non disponible"); return; }
+    if (error || !(data as any)?.recording_url) { toast.error(t("calls.recordingUnavailable")); return; }
     await supabase.from("planipret_phone_calls").update({ recording_url: (data as any).recording_url }).eq("id", call.id);
     await refreshCall();
-    toast.success("Enregistrement récupéré");
+    toast.success(t("calls.recordingFetched"));
   };
 
   const fetchTranscript = async () => {
     setTxLoading(true);
     const { data, error } = await supabase.functions.invoke("ns-transcription", { body: { call_id: call.ns_call_id ?? call.id } });
     setTxLoading(false);
-    if (error || !(data as any)?.transcript) { toast.error("Transcription non disponible"); return; }
+    if (error || !(data as any)?.transcript) { toast.error(t("calls.transcriptUnavailable")); return; }
     await supabase.from("planipret_phone_calls").update({ transcript: (data as any).transcript }).eq("id", call.id);
     await refreshCall();
-    toast.success("Transcription récupérée");
+    toast.success(t("calls.transcriptFetched"));
   };
 
   const analyzeAI = async () => {
@@ -477,8 +483,8 @@ function CallDetailSheet({
     setAiLoading(true);
     const { data, error } = await supabase.functions.invoke("ai-analyze-call", { body: { call_id: call.id, transcript: call.transcript } });
     setAiLoading(false);
-    if (error) { toast.error(error.message ?? "Échec de l'analyse"); return; }
-    toast.success("Analyse IA terminée ✅");
+    if (error) { toast.error(error.message ?? t("common.failed")); return; }
+    toast.success(t("calls.analysisDone"));
     await refreshCall();
     const { data: ins } = await supabase.from("planipret_ai_insights").select("*").eq("call_id", call.id).maybeSingle();
     setInsight((ins as any) ?? null);
@@ -519,10 +525,10 @@ function CallDetailSheet({
   const copyTranscript = async () => {
     if (!call.transcript) return;
     await navigator.clipboard.writeText(call.transcript);
-    toast.success("Transcription copiée");
+    toast.success(t("calls.transcriptCopied"));
   };
 
-  const direction = isOutbound(call) ? "Sortant" : isMissed(call) ? "Manqué" : "Entrant";
+  const direction = isOutbound(call) ? t("calls.outbound") : isMissed(call) ? t("calls.missed") : t("calls.inbound");
   const dirColor = isMissed(call) ? DANGER : isOutbound(call) ? SUCCESS : ACCENT;
 
   const objections: string[] = (insight?.suggested_actions?.objections as string[]) || (meta.objections as string[]) || [];
@@ -553,20 +559,20 @@ function CallDetailSheet({
         {/* Drag handle + close */}
         <div className="pt-3 pb-2 flex flex-col items-center relative shrink-0">
           <div style={{ width: 36, height: 4, background: "var(--pp-bg-border-2)", borderRadius: 2 }} />
-          <button onClick={onClose} className="absolute right-3 top-2 p-2.5 rounded-full" style={{ minWidth: 44, minHeight: 44, color: "var(--pp-text-secondary)" }} aria-label="Fermer">
+          <button onClick={onClose} className="absolute right-3 top-2 p-2.5 rounded-full" style={{ minWidth: 44, minHeight: 44, color: "var(--pp-text-secondary)" }} aria-label={t("common.close")}>
             <X className="w-5 h-5 mx-auto" />
           </button>
         </div>
 
         {/* Caller header */}
         <div className="px-5 pb-3 shrink-0" style={{ borderBottom: "1px solid var(--pp-bg-border)" }}>
-          <div className="text-lg font-bold truncate" style={{ color: "var(--pp-text-primary)" }}>{displayLabel(call)}</div>
+          <div className="text-lg font-bold truncate" style={{ color: "var(--pp-text-primary)" }}>{displayLabel(call) === "Inconnu" ? t("common.unknown") : displayLabel(call)}</div>
           {otherName(call) && <div className="text-xs mt-0.5" style={{ color: "var(--pp-text-muted)" }}>{otherNumber(call)}</div>}
           <div className="mt-1.5 flex items-center gap-2 text-[11px]" style={{ color: "var(--pp-text-secondary)" }}>
             <span className="px-2 py-0.5 rounded-full font-semibold" style={{ background: `${dirColor}1F`, color: dirColor, border: `1px solid ${dirColor}55` }}>{direction}</span>
-            <span>{frenchDateTime(call.started_at)}</span>
+            <span>{localizedDateTime(call.started_at, lang, t("common.today"), t("common.yesterday"))}</span>
             <span style={{ color: "var(--pp-text-faint)" }}>·</span>
-            <span>{frenchDuration(call.duration_seconds)}</span>
+            <span>{localizedDuration(call.duration_seconds, lang)}</span>
           </div>
           <div className="mt-3 flex gap-2">
             <button
@@ -574,7 +580,7 @@ function CallDetailSheet({
               className="flex-1 py-2 rounded-xl text-white text-sm font-semibold flex items-center justify-center gap-2"
               style={{ background: "linear-gradient(135deg, var(--pp-brand-accent-2), var(--pp-brand-accent))" }}
             >
-              <Phone className="w-4 h-4" /> Rappeler
+              <Phone className="w-4 h-4" /> {t("common.callBack")}
             </button>
             <button
               onClick={() => setActiveTab("transcript")}
@@ -642,7 +648,7 @@ function CallDetailSheet({
                   <div className="flex justify-end mb-2">
                     <button onClick={copyTranscript} className="text-[11px] px-2.5 py-1 rounded-md flex items-center gap-1"
                       style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>
-                      <Copy className="w-3 h-3" /> Copier
+                      <Copy className="w-3 h-3" /> {t("calls.copyTranscript")}
                     </button>
                   </div>
                   <div className="text-xs whitespace-pre-wrap leading-relaxed" style={{ color: "var(--pp-text-primary)", maxHeight: 360, overflowY: "auto" }}>

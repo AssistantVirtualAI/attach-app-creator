@@ -13,6 +13,7 @@ import AvaHistorySheet from "@/components/planipret/ava/AvaHistorySheet";
 import CoachOverlay from "@/components/planipret/ava/CoachOverlay";
 import { callAva, type AvaSuggestion } from "@/services/avaProactive";
 import { useAvaDraft } from "@/hooks/useAvaDraft";
+import { useMplanipretLang } from "@/hooks/useMplanipretLang";
 
 type SubTab = "sms" | "team" | "ava" | "emails" | "roster";
 
@@ -49,6 +50,7 @@ const fmtTime = (iso: string) => {
 };
 
 export default function MMessages() {
+  const { t } = useMplanipretLang();
   const { profile, openDialer, openAva, registerRefresh } = useOutletContext<PlanipretMobileContext>();
   const [sub, setSub] = useState<SubTab>("sms");
 
@@ -58,17 +60,17 @@ export default function MMessages() {
         className="px-4 pt-5 pb-3"
         style={{ background: "var(--pp-bg-deep)", borderBottom: "1px solid var(--pp-bg-border)" }}
       >
-        <h1 className="text-2xl font-bold mb-3" style={{ color: "var(--pp-text-primary)" }}>Messages</h1>
+        <h1 className="text-2xl font-bold mb-3" style={{ color: "var(--pp-text-primary)" }}>{t("messages.title")}</h1>
         <div
           className="flex rounded-full p-1"
           style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)" }}
         >
           {[
-            { k: "sms" as SubTab, label: "SMS", Icon: MessageSquare },
-            { k: "team" as SubTab, label: "Équipe", Icon: Users },
-            { k: "roster" as SubTab, label: "Annuaire", Icon: Users },
-            { k: "ava" as SubTab, label: "AVA", Icon: Bot },
-            { k: "emails" as SubTab, label: "Emails", Icon: Mail },
+            { k: "sms" as SubTab, label: t("messages.tabs.sms"), Icon: MessageSquare },
+            { k: "team" as SubTab, label: t("messages.tabs.team"), Icon: Users },
+            { k: "roster" as SubTab, label: t("messages.tabs.roster"), Icon: Users },
+            { k: "ava" as SubTab, label: t("messages.tabs.ava"), Icon: Bot },
+            { k: "emails" as SubTab, label: t("messages.tabs.emails"), Icon: Mail },
           ].map((t) => {
             const active = sub === t.k;
             return (
@@ -109,6 +111,7 @@ export default function MMessages() {
 // SMS TAB (original threads)
 // ============================================================
 function SmsList({ profile, openDialer, registerRefresh }: any) {
+  const { t } = useMplanipretLang();
   const myExt = profile?.extension ?? "";
   const [messages, setMessages] = useState<Msg[]>([]);
   const [loading, setLoading] = useState(true);
@@ -183,7 +186,7 @@ function SmsList({ profile, openDialer, registerRefresh }: any) {
             boxShadow: "0 2px 12px rgba(46,155,220,0.4)",
           }}
         >
-          <Plus className="w-3.5 h-3.5" /> Nouveau
+          <Plus className="w-3.5 h-3.5" /> {t("common.new")}
         </button>
       </div>
 
@@ -194,13 +197,13 @@ function SmsList({ profile, openDialer, registerRefresh }: any) {
           ))}
         </div>
       ) : threads.length === 0 ? (
-        <EmptyState Icon={MessageSquare} title="Aucun message" sub="Touchez « Nouveau » pour démarrer." />
+        <EmptyState Icon={MessageSquare} title={t("messages.noMessages")} sub={t("messages.startNew")} />
       ) : (
         <ul className="space-y-1.5">
-          {threads.map((t) => (
-            <li key={t.number}>
+          {threads.map((thread) => (
+            <li key={thread.number}>
               <button
-                onClick={() => setActiveThread(t.number)}
+                onClick={() => setActiveThread(thread.number)}
                 className="w-full px-3 py-3 flex items-center gap-3 rounded-2xl text-left active:opacity-80"
                 style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)" }}
               >
@@ -208,20 +211,20 @@ function SmsList({ profile, openDialer, registerRefresh }: any) {
                   className="w-11 h-11 rounded-full flex items-center justify-center text-white text-sm font-semibold flex-shrink-0"
                   style={{ background: "linear-gradient(135deg, var(--pp-brand-accent), var(--pp-brand-accent-2))" }}
                 >
-                  {initials(t.number)}
+                  {initials(thread.number)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-sm truncate" style={{ color: "var(--pp-text-primary)" }}>{t.number}</p>
-                  <p className="text-xs truncate" style={{ color: "var(--pp-text-muted)" }}>{t.preview || "(pas de contenu)"}</p>
+                  <p className="font-semibold text-sm truncate" style={{ color: "var(--pp-text-primary)" }}>{thread.number}</p>
+                  <p className="text-xs truncate" style={{ color: "var(--pp-text-muted)" }}>{thread.preview || t("messages.noContent")}</p>
                 </div>
                 <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                  <span className="text-[11px]" style={{ color: "var(--pp-text-faint)" }}>{fmtTime(t.last.created_at)}</span>
-                  {t.unread > 0 && (
+                  <span className="text-[11px]" style={{ color: "var(--pp-text-faint)" }}>{fmtTime(thread.last.created_at)}</span>
+                  {thread.unread > 0 && (
                     <span
                       className="min-w-[18px] h-[18px] px-1 rounded-full text-white text-[10px] font-semibold flex items-center justify-center"
                       style={{ background: "var(--pp-danger)" }}
                     >
-                      {t.unread}
+                      {thread.unread}
                     </span>
                   )}
                 </div>
@@ -239,15 +242,15 @@ function SmsList({ profile, openDialer, registerRefresh }: any) {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-3">
-              <h2 className="font-semibold" style={{ color: "var(--pp-text-primary)" }}>Nouveau message</h2>
-              <button onClick={() => setNewOpen(false)} className="p-1 rounded-full" style={{ color: "var(--pp-text-muted)" }}>
+              <h2 className="font-semibold" style={{ color: "var(--pp-text-primary)" }}>{t("messages.newMessage")}</h2>
+              <button onClick={() => setNewOpen(false)} className="p-1 rounded-full" style={{ color: "var(--pp-text-muted)" }} aria-label={t("common.close")}>
                 <X className="w-4 h-4" />
               </button>
             </div>
             <input
               type="tel"
               inputMode="tel"
-              placeholder="Numéro de téléphone"
+              placeholder={t("messages.phoneNumber")}
               value={newNumber}
               onChange={(e) => setNewNumber(e.target.value)}
               className="w-full px-3 py-2.5 rounded-lg text-sm outline-none"
@@ -276,6 +279,7 @@ function ThreadView({ number, myExt, userId, messages, onBack, onCall, onSent }:
   number: string; myExt: string; userId: string; messages: Msg[];
   onBack: () => void; onCall: (n: string) => void; onSent: (m: Msg) => void;
 }) {
+  const { t } = useMplanipretLang();
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [tplOpen, setTplOpen] = useState(false);
@@ -316,7 +320,7 @@ function ThreadView({ number, myExt, userId, messages, onBack, onCall, onSent }:
         className="flex items-center gap-2 px-3 py-3"
         style={{ background: "var(--pp-bg-deep)", borderBottom: "1px solid var(--pp-bg-border)" }}
       >
-        <button onClick={onBack} className="p-1.5 rounded-full" style={{ color: "var(--pp-text-secondary)" }}>
+        <button onClick={onBack} className="p-1.5 rounded-full" style={{ color: "var(--pp-text-secondary)" }} aria-label={t("common.close")}>
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div className="flex-1 min-w-0">
@@ -336,7 +340,7 @@ function ThreadView({ number, myExt, userId, messages, onBack, onCall, onSent }:
           className="px-3 py-1.5 rounded-full text-white text-xs font-semibold flex items-center gap-1.5"
           style={{ background: "linear-gradient(135deg, var(--pp-success), #00A88A)" }}
         >
-          <Phone className="w-3.5 h-3.5" /> Appeler
+          <Phone className="w-3.5 h-3.5" /> {t("common.call")}
         </button>
       </header>
 
