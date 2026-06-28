@@ -586,12 +586,12 @@ function ErrorBanner({ children, failure }: { children: React.ReactNode; failure
       <div>{children}</div>
       {failure && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-          <span style={chipStyle('step')}>étape : {failure.step}</span>
-          <span style={chipStyle('code')}>code : {failure.code}</span>
+          <span style={chipStyle('step')}>{tx('étape', 'step')} : {failure.step}</span>
+          <span style={chipStyle('code')}>{tx('code', 'code')} : {failure.code}</span>
           {failure.detail && (
             <button type="button" onClick={() => setOpen((o) => !o)}
               style={{ ...chipStyle('toggle'), cursor: 'pointer' }}>
-              {open ? 'masquer les détails' : 'détails'}
+              {open ? tx('masquer les détails', 'hide details') : tx('détails', 'details')}
             </button>
           )}
         </div>
