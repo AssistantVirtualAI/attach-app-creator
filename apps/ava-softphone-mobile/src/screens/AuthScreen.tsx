@@ -501,7 +501,7 @@ function Footer() {
       fontSize: 11, color: C.textDim, letterSpacing: 0.4,
       position: 'relative', zIndex: 1,
     }}>
-      Conçu par <span style={{ color: C.gold, fontWeight: 600 }}>AVA Statistic · assistantvirtualai.com</span>
+      {tx('Conçu par', 'Crafted by')} <span style={{ color: C.gold, fontWeight: 600 }}>AVA Statistic · assistantvirtualai.com</span>
     </div>
   );
 }
