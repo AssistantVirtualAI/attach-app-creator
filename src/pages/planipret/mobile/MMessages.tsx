@@ -759,6 +759,7 @@ function AvaChat({ profile, openAva, openDialer }: { profile: any; openAva: () =
 // EMAILS TAB (M365)
 // ============================================================
 function EmailsList({ profile, openAva: _openAva }: { profile: any; openAva: () => void }) {
+  const { t, lang } = useMplanipretLang();
   const [emails, setEmails] = useState<any[] | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "no_m365" | "error">("loading");
   const [active, setActive] = useState<any | null>(null);
@@ -789,14 +790,14 @@ function EmailsList({ profile, openAva: _openAva }: { profile: any; openAva: () 
             boxShadow: "0 2px 12px rgba(46,155,220,0.4)",
           }}
         >
-          <Plus className="w-3.5 h-3.5" /> Composer
+          <Plus className="w-3.5 h-3.5" /> {t("messages.emailCompose")}
         </button>
         <button
           onClick={load}
           className="text-xs flex items-center gap-1 px-2 py-1"
           style={{ color: "var(--pp-text-muted)" }}
         >
-          <RefreshCw className={`w-3 h-3 ${state === "loading" ? "animate-spin" : ""}`} /> Actualiser
+          <RefreshCw className={`w-3 h-3 ${state === "loading" ? "animate-spin" : ""}`} /> {t("common.refresh")}
         </button>
       </div>
 
@@ -814,40 +815,40 @@ function EmailsList({ profile, openAva: _openAva }: { profile: any; openAva: () 
           style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)" }}
         >
           <Mail className="w-10 h-10 mx-auto mb-3" style={{ color: "var(--pp-brand-accent)" }} />
-          <p className="font-semibold" style={{ color: "var(--pp-text-primary)" }}>Microsoft 365 non connecté</p>
+          <p className="font-semibold" style={{ color: "var(--pp-text-primary)" }}>{t("messages.m365NotConnected")}</p>
           <p className="text-xs mt-1 mb-3" style={{ color: "var(--pp-text-muted)" }}>
-            Connectez votre compte M365 pour voir vos emails ici.
+            {t("messages.m365ConnectDesc")}
           </p>
           <a
             href="/mplanipret/more"
             className="inline-block text-xs px-4 py-2 rounded-full text-white font-semibold"
             style={{ background: "linear-gradient(135deg, var(--pp-brand-accent), var(--pp-brand-accent-2))" }}
           >
-            Connecter M365
+            {t("messages.connectM365")}
           </a>
         </div>
       )}
 
       {state === "error" && (
         <div className="text-center py-10">
-          <p className="text-sm" style={{ color: "var(--pp-text-muted)" }}>Impossible de charger les emails</p>
+          <p className="text-sm" style={{ color: "var(--pp-text-muted)" }}>{t("messages.emailsLoadFailed")}</p>
           <button
             onClick={load}
             className="mt-3 text-xs px-3 py-1.5 rounded-full"
             style={{ border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}
           >
-            Réessayer
+            {t("common.retry")}
           </button>
         </div>
       )}
 
       {state === "ready" && (emails?.length === 0 ? (
-        <EmptyState Icon={Mail} title="Boîte vide" sub="Aucun email récent." />
+        <EmptyState Icon={Mail} title={t("messages.emptyInbox")} sub={t("messages.noRecentEmail")} />
       ) : (
         <ul className="space-y-1.5">
           {emails!.map((e: any, i: number) => {
-            const from = e.from?.emailAddress?.name ?? e.from?.emailAddress?.address ?? "Expéditeur";
-            const subject = e.subject ?? "(Sans objet)";
+            const from = e.from?.emailAddress?.name ?? e.from?.emailAddress?.address ?? t("messages.sender");
+            const subject = e.subject ?? t("messages.noSubject");
             const preview = e.bodyPreview ?? "";
             const received = e.receivedDateTime ?? e.created_at;
             const unread = e.isRead === false;
@@ -865,7 +866,7 @@ function EmailsList({ profile, openAva: _openAva }: { profile: any; openAva: () 
                   <div className="flex items-start justify-between gap-2 mb-1">
                     <p className="font-semibold text-sm truncate" style={{ color: "var(--pp-text-primary)" }}>{from}</p>
                     <span className="text-[10px] shrink-0" style={{ color: "var(--pp-text-faint)" }}>
-                      {received ? fmtTime(received) : ""}
+                      {received ? fmtTime(received, lang, t) : ""}
                     </span>
                   </div>
                   <p className="text-xs truncate mb-1" style={{ color: "var(--pp-text-secondary)" }}>{subject}</p>
@@ -896,9 +897,10 @@ function EmailsList({ profile, openAva: _openAva }: { profile: any; openAva: () 
 }
 
 function EmailDetailSheet({ email, onClose, onReply }: { email: any; onClose: () => void; onReply: (init: { to?: string; subject?: string; body?: string }) => void }) {
-  const from = email.from?.emailAddress?.name ?? email.from?.emailAddress?.address ?? "Expéditeur";
+  const { t } = useMplanipretLang();
+  const from = email.from?.emailAddress?.name ?? email.from?.emailAddress?.address ?? t("messages.sender");
   const fromAddr = email.from?.emailAddress?.address ?? "";
-  const subject = email.subject ?? "(Sans objet)";
+  const subject = email.subject ?? t("messages.noSubject");
   const preview = email.bodyPreview ?? "";
   const [sumOpen, setSumOpen] = useState(false);
 
@@ -920,7 +922,7 @@ function EmailDetailSheet({ email, onClose, onReply }: { email: any; onClose: ()
           <div>
             <p className="text-base font-semibold" style={{ color: "var(--pp-text-primary)" }}>{subject}</p>
             <p className="text-xs mt-1" style={{ color: "var(--pp-text-muted)" }}>
-              De <span style={{ color: "var(--pp-text-secondary)" }}>{from}</span> {fromAddr && `<${fromAddr}>`}
+              {t("messages.from")} <span style={{ color: "var(--pp-text-secondary)" }}>{from}</span> {fromAddr && `<${fromAddr}>`}
             </p>
           </div>
 
@@ -933,14 +935,14 @@ function EmailDetailSheet({ email, onClose, onReply }: { email: any; onClose: ()
               color: "var(--pp-agent)",
             }}
           >
-            <Sparkles className="w-4 h-4" /> Résumer avec AVA
+            <Sparkles className="w-4 h-4" /> {t("messages.summarizeWithAva")}
           </button>
 
           <div
             className="rounded-xl p-3 text-sm whitespace-pre-wrap"
             style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}
           >
-            {preview || "(Aperçu non disponible)"}
+            {preview || t("messages.previewUnavailable")}
           </div>
         </div>
 
@@ -954,7 +956,7 @@ function EmailDetailSheet({ email, onClose, onReply }: { email: any; onClose: ()
             className="flex-1 py-2.5 rounded-full text-white font-semibold text-sm flex items-center justify-center gap-2"
             style={{ background: "linear-gradient(135deg, var(--pp-brand-accent), var(--pp-brand-accent-2))" }}
           >
-            <Reply className="w-4 h-4" /> Répondre
+            <Reply className="w-4 h-4" /> {t("messages.reply")}
           </button>
         </div>
       </div>
@@ -980,23 +982,24 @@ function EmailDetailSheet({ email, onClose, onReply }: { email: any; onClose: ()
 
 
 function EmailComposeSheet({ init, onClose, onSent }: { init: { to?: string; subject?: string; body?: string }; onClose: () => void; onSent: () => void }) {
+  const { t } = useMplanipretLang();
   const [to, setTo] = useState(init.to ?? "");
   const [subject, setSubject] = useState(init.subject ?? "");
   const [body, setBody] = useState(init.body ?? "");
   const [sending, setSending] = useState(false);
 
   const send = async () => {
-    if (!to.trim()) { toast.error("Destinataire requis"); return; }
+    if (!to.trim()) { toast.error(t("messages.recipientRequired")); return; }
     setSending(true);
     const { data, error } = await supabase.functions.invoke("ms365-actions", {
       body: { action: "send_email", payload: { to: to.split(",").map((s) => s.trim()).filter(Boolean), subject, body: body.replace(/\n/g, "<br/>") } },
     });
     setSending(false);
     if (error || !(data as any)?.success) {
-      toast.error("Échec de l'envoi");
+      toast.error(t("messages.emailSendFailed"));
       return;
     }
-    toast.success("Email envoyé");
+    toast.success(t("messages.emailSent"));
     onSent();
   };
 
@@ -1011,7 +1014,7 @@ function EmailComposeSheet({ init, onClose, onSent }: { init: { to?: string; sub
           <button onClick={onClose} className="p-1.5 rounded-full" style={{ color: "var(--pp-text-secondary)" }}>
             <X className="w-5 h-5" />
           </button>
-          <p className="text-xs uppercase tracking-wider" style={{ color: "var(--pp-text-muted)" }}>Nouveau message</p>
+          <p className="text-xs uppercase tracking-wider" style={{ color: "var(--pp-text-muted)" }}>{t("messages.newEmail")}</p>
           <button
             onClick={send}
             disabled={sending || !to.trim()}
@@ -1019,22 +1022,22 @@ function EmailComposeSheet({ init, onClose, onSent }: { init: { to?: string; sub
             style={{ background: "linear-gradient(135deg, var(--pp-brand-accent), var(--pp-brand-accent-2))" }}
           >
             {sending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
-            Envoyer
+            {t("common.send")}
           </button>
         </div>
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
           <input
-            value={to} onChange={(e) => setTo(e.target.value)} placeholder="À : email@exemple.com"
+            value={to} onChange={(e) => setTo(e.target.value)} placeholder={t("messages.toPlaceholder")}
             className="w-full px-3 py-2 rounded-lg text-sm outline-none"
             style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }}
           />
           <input
-            value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Objet"
+            value={subject} onChange={(e) => setSubject(e.target.value)} placeholder={t("messages.subject")}
             className="w-full px-3 py-2 rounded-lg text-sm outline-none"
             style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }}
           />
           <textarea
-            value={body} onChange={(e) => setBody(e.target.value)} placeholder="Votre message…"
+            value={body} onChange={(e) => setBody(e.target.value)} placeholder={t("messages.yourMessage")}
             rows={14}
             className="w-full px-3 py-2 rounded-lg text-sm outline-none resize-none"
             style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }}
