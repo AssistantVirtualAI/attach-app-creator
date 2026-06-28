@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Play, Pause, Sparkles, Mic, RotateCw, Check, Settings2, ChevronDown, ChevronUp } from "lucide-react";
+import { useMplanipretLang } from "@/hooks/useMplanipretLang";
 
 type Voice = {
   voice_id: string;
@@ -44,6 +45,7 @@ const TOKENS = {
 };
 
 export default function GreetingStudio({ profile, onProfileChange }: { profile: Profile; onProfileChange?: () => void }) {
+  const { t, lang } = useMplanipretLang();
   const [voices, setVoices] = useState<Voice[] | null>(null);
   const [voicesError, setVoicesError] = useState<string | null>(null);
   const [selectedVoice, setSelectedVoice] = useState<string | null>(profile.voicemail_greeting_voice_id ?? null);
@@ -61,7 +63,7 @@ export default function GreetingStudio({ profile, onProfileChange }: { profile: 
   const [previewing, setPreviewing] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  const fullName = profile.full_name ?? "votre courtier";
+  const fullName = profile.full_name ?? t("greeting.defaultBroker");
   const charCount = text.length;
   const counterColor = charCount > 480 ? "#EF4444" : charCount > 400 ? "#F59E0B" : "#10B981";
 
@@ -103,19 +105,19 @@ export default function GreetingStudio({ profile, onProfileChange }: { profile: 
   };
 
   const improveText = async () => {
-    if (text.trim().length < 10) { toast.error("Écrivez d'abord un brouillon (10 caractères min)"); return; }
+    if (text.trim().length < 10) { toast.error(t("greeting.draftTooShort")); return; }
     setImproving(true);
-    const { data, error } = await supabase.functions.invoke("pp-greeting-improve", { body: { text, language: "fr" } });
+    const { data, error } = await supabase.functions.invoke("pp-greeting-improve", { body: { text, language: lang } });
     setImproving(false);
-    if (error || !(data as any)?.success) { toast.error("Échec amélioration"); return; }
+    if (error || !(data as any)?.success) { toast.error(t("greeting.improveFailed")); return; }
     setText((data as any).improved);
-    toast.success("✨ Texte amélioré par l'IA");
+    toast.success(t("greeting.improved"));
   };
 
   const generate = async (pushToNs: boolean) => {
     if (!selectedVoice || text.length < 10) return;
     setGenerating(true);
-    setGenStep(pushToNs ? "📞 Activation..." : "🎙️ Génération...");
+    setGenStep(pushToNs ? t("greeting.activation") : t("greeting.generation"));
     const { data, error } = await supabase.functions.invoke("pp-greeting-generate", {
       body: {
         text,
@@ -127,7 +129,7 @@ export default function GreetingStudio({ profile, onProfileChange }: { profile: 
     setGenerating(false);
     setGenStep("");
     if (error || !(data as any)?.success) {
-      toast.error((data as any)?.error ?? error?.message ?? "Échec génération");
+      toast.error((data as any)?.error ?? error?.message ?? t("greeting.generateFailed"));
       return;
     }
     const d = data as any;
@@ -135,10 +137,10 @@ export default function GreetingStudio({ profile, onProfileChange }: { profile: 
     setPreviewPath(d.storage_path);
     setPreviewVoiceName(d.voice_name);
     if (pushToNs) {
-      toast.success(d.pushed_to_ns ? "🎙️ Boîte vocale activée !" : `Audio créé mais NS push échoué: ${d.push_error}`);
+      toast.success(d.pushed_to_ns ? t("greeting.activated") : `${t("greeting.pushFailed")}: ${d.push_error}`);
       onProfileChange?.();
     } else {
-      toast.success("✅ Audio généré");
+      toast.success(t("greeting.audioGenerated"));
     }
   };
 
@@ -146,19 +148,19 @@ export default function GreetingStudio({ profile, onProfileChange }: { profile: 
     <div className="space-y-4 pb-8" style={{ background: TOKENS.bg }}>
       {/* Header */}
       <div>
-        <h2 className="text-[18px] font-bold" style={{ color: TOKENS.text }}>Personnaliser votre boîte vocale</h2>
-        <p className="text-[13px] mt-1" style={{ color: TOKENS.muted }}>Générez un message professionnel avec une voix IA ElevenLabs</p>
+        <h2 className="text-[18px] font-bold" style={{ color: TOKENS.text }}>{t("greeting.title")}</h2>
+        <p className="text-[13px] mt-1" style={{ color: TOKENS.muted }}>{t("greeting.subtitle")}</p>
       </div>
 
       {/* Current greeting card */}
       <div className="rounded-2xl p-4" style={{ background: TOKENS.card, border: `1px solid ${TOKENS.border}` }}>
         <div className="flex items-center justify-between mb-2">
-          <span className="text-[11px] uppercase tracking-wider" style={{ color: TOKENS.muted }}>📬 Boîte vocale actuelle</span>
+          <span className="text-[11px] uppercase tracking-wider" style={{ color: TOKENS.muted }}>{t("greeting.current")}</span>
           <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold"
             style={profile.voicemail_greeting_active
               ? { background: "rgba(16,185,129,0.15)", color: "#10B981" }
               : { background: "rgba(245,158,11,0.15)", color: "#F59E0B" }}>
-            {profile.voicemail_greeting_active ? "✅ Active" : "⚠️ Par défaut"}
+            {profile.voicemail_greeting_active ? t("greeting.active") : t("greeting.default")}
           </span>
         </div>
         {currentAudioUrl ? (
@@ -171,23 +173,23 @@ export default function GreetingStudio({ profile, onProfileChange }: { profile: 
             )}
             {profile.voicemail_greeting_updated_at && (
               <p className="text-[10px] mt-1" style={{ color: TOKENS.muted }}>
-                Mise à jour {new Date(profile.voicemail_greeting_updated_at).toLocaleDateString("fr-CA")}
+                {t("greeting.updated")} {new Date(profile.voicemail_greeting_updated_at).toLocaleDateString(lang === "en" ? "en-CA" : "fr-CA")}
               </p>
             )}
           </>
         ) : (
           <div className="text-center py-4">
             <Mic className="w-8 h-8 mx-auto mb-2 opacity-40" style={{ color: TOKENS.muted }} />
-            <p className="text-[13px]" style={{ color: TOKENS.text }}>Aucun message personnalisé</p>
-            <p className="text-[11px] mt-1" style={{ color: TOKENS.muted }}>Votre boîte vocale utilise le message par défaut.</p>
+            <p className="text-[13px]" style={{ color: TOKENS.text }}>{t("greeting.noCustom")}</p>
+            <p className="text-[11px] mt-1" style={{ color: TOKENS.muted }}>{t("greeting.noCustomSub")}</p>
           </div>
         )}
       </div>
 
       {/* Step 1 - Voice */}
       <div>
-        <div className="text-[10px] uppercase tracking-widest mb-2 font-semibold" style={{ color: TOKENS.muted }}>1️⃣ Choisir une voix</div>
-        {voicesError && <div className="text-[12px] p-3 rounded-xl" style={{ background: "rgba(239,68,68,0.1)", color: "#EF4444" }}>Impossible de charger les voix. {voicesError}</div>}
+        <div className="text-[10px] uppercase tracking-widest mb-2 font-semibold" style={{ color: TOKENS.muted }}>{t("greeting.chooseVoice")}</div>
+        {voicesError && <div className="text-[12px] p-3 rounded-xl" style={{ background: "rgba(239,68,68,0.1)", color: "#EF4444" }}>{t("greeting.voiceLoadFailed")} {voicesError}</div>}
         {!voices && !voicesError && (
           <div className="grid grid-cols-2 gap-2">
             {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-20 rounded-xl animate-pulse" style={{ background: TOKENS.card }} />)}
@@ -215,13 +217,13 @@ export default function GreetingStudio({ profile, onProfileChange }: { profile: 
                       : v.category === "natural"
                       ? { background: "rgba(16,185,129,0.15)", color: "#10B981" }
                       : { background: "rgba(155,127,232,0.15)", color: "#9B7FE8" }}>
-                    {v.category === "professional" ? "Pro" : v.category === "natural" ? "Naturel" : "Custom"}
+                    {v.category === "professional" ? "Pro" : v.category === "natural" ? t("greeting.natural") : t("greeting.custom")}
                   </span>
                   {v.preview_url && (
                     <button onClick={(e) => { e.stopPropagation(); playVoicePreview(v); }}
                       className="text-[10px] px-2 py-0.5 rounded flex items-center gap-1"
                       style={{ background: "rgba(255,255,255,0.05)", color: TOKENS.text }}>
-                      {previewing === v.voice_id ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />} Aperçu
+                      {previewing === v.voice_id ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />} {t("greeting.preview")}
                     </button>
                   )}
                 </div>
@@ -233,7 +235,7 @@ export default function GreetingStudio({ profile, onProfileChange }: { profile: 
 
       {/* Step 2 - Text */}
       <div>
-        <div className="text-[10px] uppercase tracking-widest mb-2 font-semibold" style={{ color: TOKENS.muted }}>2️⃣ Rédiger votre message</div>
+        <div className="text-[10px] uppercase tracking-widest mb-2 font-semibold" style={{ color: TOKENS.muted }}>{t("greeting.writeMessage")}</div>
         <div className="flex gap-2 overflow-x-auto pb-2 mb-2 -mx-1 px-1">
           {TEMPLATES.map((t) => (
             <button key={t.key} onClick={() => applyTemplate(t.key)}
@@ -241,54 +243,54 @@ export default function GreetingStudio({ profile, onProfileChange }: { profile: 
               style={activeTemplate === t.key
                 ? { background: TOKENS.borderActive, color: "white" }
                 : { background: TOKENS.card, color: TOKENS.text, border: `1px solid ${TOKENS.border}` }}>
-              {t.label}
+              {t.lang === "en" ? t.label : (t.key === "pro_fr" ? (lang === "en" ? "🏢 Professional" : t.label) : t.key === "out_fr" ? (lang === "en" ? "📞 Away" : t.label) : t.key === "ah_fr" ? (lang === "en" ? "🌙 Evening/WE" : t.label) : t.label)}
             </button>
           ))}
         </div>
         <textarea value={text} onChange={(e) => { setText(e.target.value.slice(0, 500)); setActiveTemplate(null); }}
-          placeholder="Écrivez votre message de boîte vocale ici..."
+          placeholder={t("greeting.placeholder")}
           className="w-full rounded-xl p-3 text-[14px] resize-y outline-none"
           style={{ background: TOKENS.card, border: `1px solid ${TOKENS.border}`, color: TOKENS.text, minHeight: 160, lineHeight: 1.7 }} />
         <div className="flex items-center justify-between mt-2">
-          <span className="text-[11px] font-semibold" style={{ color: counterColor }}>{charCount}/500 caractères</span>
+          <span className="text-[11px] font-semibold" style={{ color: counterColor }}>{charCount}/500 {t("greeting.chars")}</span>
           <button onClick={improveText} disabled={improving}
             className="text-[11px] px-3 py-1.5 rounded-lg flex items-center gap-1 font-medium disabled:opacity-50"
             style={{ background: "rgba(155,127,232,0.15)", color: "#9B7FE8" }}>
-            <Sparkles className="w-3.5 h-3.5" /> {improving ? "..." : "Améliorer avec IA"}
+            <Sparkles className="w-3.5 h-3.5" /> {improving ? "..." : t("greeting.improve")}
           </button>
         </div>
       </div>
 
       {/* Step 3 - Generate */}
       <div>
-        <div className="text-[10px] uppercase tracking-widest mb-2 font-semibold" style={{ color: TOKENS.muted }}>3️⃣ Prévisualiser et générer</div>
+        <div className="text-[10px] uppercase tracking-widest mb-2 font-semibold" style={{ color: TOKENS.muted }}>{t("greeting.previewGenerate")}</div>
         <button onClick={() => generate(false)}
           disabled={!selectedVoice || text.length < 10 || generating}
           className="w-full h-[52px] rounded-xl text-[15px] font-semibold text-white disabled:opacity-50 transition"
           style={{ background: "linear-gradient(135deg,#1A4A8A,#2E9BDC)" }}>
-          {generating ? genStep : "🎙️ Générer l'audio"}
+          {generating ? genStep : t("greeting.generateAudio")}
         </button>
 
         {previewUrl && (
           <div className="mt-3 rounded-2xl p-4"
             style={{ background: "linear-gradient(135deg,rgba(46,155,220,0.1),rgba(0,212,170,0.1))", border: "1px solid rgba(46,155,220,0.3)" }}>
-            <div className="text-[15px] font-semibold mb-2" style={{ color: "#00D4AA" }}>✅ Audio généré avec succès</div>
+            <div className="text-[15px] font-semibold mb-2" style={{ color: "#00D4AA" }}>{t("greeting.audioSuccess")}</div>
             <audio controls src={previewUrl} className="w-full h-9 mb-3" style={{ filter: "invert(0.9)" }} />
             <div className="flex items-center gap-2 mb-3">
               <span className="text-[10px] px-2 py-0.5 rounded" style={{ background: "rgba(255,255,255,0.05)", color: TOKENS.text }}>
-                Voix : {previewVoiceName}
+                {t("greeting.voice")} : {previewVoiceName}
               </span>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <button onClick={() => generate(false)} disabled={generating}
                 className="h-11 rounded-xl text-[13px] font-medium flex items-center justify-center gap-1.5"
                 style={{ background: TOKENS.card, color: TOKENS.text, border: `1px solid ${TOKENS.border}` }}>
-                <RotateCw className="w-4 h-4" /> Régénérer
+                <RotateCw className="w-4 h-4" /> {t("greeting.regenerate")}
               </button>
               <button onClick={() => generate(true)} disabled={generating}
                 className="h-11 rounded-xl text-[13px] font-semibold flex items-center justify-center gap-1.5 text-white"
                 style={{ background: "linear-gradient(135deg,#10B981,#00A88A)" }}>
-                <Check className="w-4 h-4" /> Activer
+                <Check className="w-4 h-4" /> {t("greeting.activate")}
               </button>
             </div>
           </div>
@@ -299,15 +301,15 @@ export default function GreetingStudio({ profile, onProfileChange }: { profile: 
       <button onClick={() => setShowSettings((s) => !s)}
         className="w-full flex items-center justify-between text-[12px] px-3 py-2 rounded-xl"
         style={{ background: TOKENS.card, color: TOKENS.muted, border: `1px solid ${TOKENS.border}` }}>
-        <span className="flex items-center gap-2"><Settings2 className="w-3.5 h-3.5" /> Paramètres avancés</span>
+        <span className="flex items-center gap-2"><Settings2 className="w-3.5 h-3.5" /> {t("greeting.advanced")}</span>
         {showSettings ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
       </button>
       {showSettings && (
         <div className="rounded-xl p-4 space-y-3" style={{ background: TOKENS.card, border: `1px solid ${TOKENS.border}` }}>
           {([
-            ["stability", "Stabilité"],
-            ["similarity_boost", "Ressemblance"],
-            ["style", "Style"],
+            ["stability", t("greeting.stability")],
+            ["similarity_boost", t("greeting.similarity")],
+            ["style", t("greeting.style")],
           ] as const).map(([k, label]) => (
             <div key={k}>
               <div className="flex justify-between text-[11px] mb-1" style={{ color: TOKENS.muted }}>
@@ -319,7 +321,7 @@ export default function GreetingStudio({ profile, onProfileChange }: { profile: 
             </div>
           ))}
           <button onClick={() => setSettings({ stability: 0.6, similarity_boost: 0.8, style: 0.3 })}
-            className="text-[11px]" style={{ color: TOKENS.muted }}>Réinitialiser</button>
+            className="text-[11px]" style={{ color: TOKENS.muted }}>{t("greeting.reset")}</button>
         </div>
       )}
     </div>

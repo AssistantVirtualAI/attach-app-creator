@@ -12,12 +12,14 @@ import { CalendarSyncCard } from "@/components/planipret/CalendarSyncCard";
 import { SiriShortcutsCard } from "@/components/planipret/SiriShortcutsCard";
 import { safeEdgeFunction } from "@/lib/safeEdgeFunction";
 import MNetworkSection from "@/components/planipret/mobile/MNetworkSection";
+import { useMplanipretLang } from "@/hooks/useMplanipretLang";
 
 const initials = (name?: string) =>
   (name ?? "").split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase()).join("") || "?";
 
 export default function MMore() {
   const { profile, reloadProfile } = useOutletContext<PlanipretMobileContext>();
+  const { t } = useMplanipretLang();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const [editOpen, setEditOpen] = useState(false);
@@ -30,7 +32,7 @@ export default function MMore() {
   const [agentOn, setAgentOn] = useState<boolean>(() => localStorage.getItem("planipret_agent_on") !== "0");
   const [monthStats, setMonthStats] = useState<{ calls: number; leads: number; rate: number }>({ calls: 0, leads: 0, rate: 0 });
 
-  useEffect(() => { if (params.get("ms365") === "ok") toast.success("Microsoft 365 connecté ✅"); }, [params]);
+  useEffect(() => { if (params.get("ms365") === "ok") toast.success(t("more.msConnected")); }, [params, t]);
 
   useEffect(() => {
     if (darkMode) document.documentElement.classList.add("dark");
@@ -70,10 +72,10 @@ export default function MMore() {
     const { data, error, status } = await safeEdgeFunction("ns-auth", { body: { action: "refresh" } });
     setReconnecting(false);
     if (error || (data as any)?.success === false) {
-      toast.error(status === 403 ? "Accès téléphonie non autorisé pour ce compte Planiprêt." : ((data as any)?.error ?? error ?? "Échec de connexion."));
+      toast.error(status === 403 ? t("more.phoneUnauthorized") : ((data as any)?.error ?? error ?? t("more.connectionFailed")));
       return;
     }
-    toast.success("Connexion téléphonique établie ✅");
+    toast.success(t("more.phoneConnected"));
     await reloadProfile();
   };
 
@@ -82,7 +84,7 @@ export default function MMore() {
     const cfg = (data?.config ?? {}) as any;
     const clientId = cfg.client_id;
     const tenant = cfg.tenant_id ?? "common";
-    if (!clientId) { toast.error("Microsoft 365 non configuré par l'admin"); return; }
+    if (!clientId) { toast.error(t("more.msNotConfigured")); return; }
     const redirect = `${window.location.origin}/auth/ms365/callback`;
     const scope = encodeURIComponent("openid profile email Mail.ReadWrite Calendars.ReadWrite offline_access");
     const { data: { user } } = await supabase.auth.getUser();
@@ -91,25 +93,25 @@ export default function MMore() {
   };
 
   const disconnectMs365 = async () => {
-    if (!confirm("Déconnecter Microsoft 365 ?")) return;
+    if (!confirm(t("more.disconnectMs"))) return;
     await supabase.from("planipret_profiles").update({ ms365_access_token: null, ms365_refresh_token: null }).eq("user_id", profile.user_id);
     await reloadProfile();
-    toast.success("Microsoft 365 déconnecté");
+    toast.success(t("more.msDisconnected"));
   };
 
   const toggleNotif = async (on: boolean) => {
     if (on && "Notification" in window) {
       const perm = await Notification.requestPermission();
-      if (perm !== "granted") { toast.error("Permission refusée"); return; }
+      if (perm !== "granted") { toast.error(t("more.permissionDenied")); return; }
     }
     setNotifEnabled(on);
     localStorage.setItem("planipret_notif", on ? "1" : "0");
   };
 
   const logout = async () => {
-    if (!confirm("Êtes-vous sûr de vouloir vous déconnecter?")) return;
+    if (!confirm(t("more.logoutConfirm"))) return;
     await supabase.auth.signOut();
-    toast.success("Déconnecté avec succès");
+    toast.success(t("more.logoutSuccess"));
     navigate("/login", { replace: true });
   };
 
@@ -134,7 +136,7 @@ export default function MMore() {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <p className="truncate" style={{ fontFamily: "Inter,sans-serif", fontWeight: 700, fontSize: 17, color: "var(--pp-text-primary)" }}>
-              {profile?.full_name ?? "Courtier"}
+              {profile?.full_name ?? t("home.broker")}
             </p>
           </div>
           <p className="truncate" style={{ fontFamily: "DM Sans,sans-serif", fontSize: 12, color: "var(--pp-text-muted)" }}>
@@ -150,75 +152,75 @@ export default function MMore() {
             color: "var(--pp-text-secondary)", fontSize: 11, fontFamily: "DM Sans,sans-serif", fontWeight: 600,
           }}
         >
-          <Edit3 className="w-3 h-3" /> Modifier
+          <Edit3 className="w-3 h-3" /> {t("more.edit")}
         </button>
       </header>
 
       {/* Month stats */}
       <div className="grid grid-cols-3 gap-2">
-        <MiniStat label="Appels" value={monthStats.calls} accent="var(--pp-brand-accent)" />
-        <MiniStat label="Leads" value={monthStats.leads} accent="var(--pp-color-success)" />
-        <MiniStat label="Taux" value={`${monthStats.rate}%`} accent="var(--pp-color-agent)" />
+        <MiniStat label={t("more.monthStats.calls")} value={monthStats.calls} accent="var(--pp-brand-accent)" />
+        <MiniStat label={t("more.monthStats.leads")} value={monthStats.leads} accent="var(--pp-color-success)" />
+        <MiniStat label={t("more.monthStats.rate")} value={`${monthStats.rate}%`} accent="var(--pp-color-agent)" />
       </div>
 
-      <Section title="Pipeline & Performance">
-        <Row icon={<BarChart3 className="w-4 h-4" />} label="Pipeline des dossiers" onClick={() => navigate("/mplanipret/pipeline")} chevron />
-        <Row icon={<BarChart3 className="w-4 h-4" />} label="Mes performances" onClick={() => navigate("/mplanipret/stats")} chevron />
+      <Section title={t("more.sections.pipeline")}>
+        <Row icon={<BarChart3 className="w-4 h-4" />} label={t("more.pipelineFiles")} onClick={() => navigate("/mplanipret/pipeline")} chevron />
+        <Row icon={<BarChart3 className="w-4 h-4" />} label={t("more.performance")} onClick={() => navigate("/mplanipret/stats")} chevron />
       </Section>
 
-      <Section title="Mon compte">
-        <Row icon={<User className="w-4 h-4" />} label="Mon profil" onClick={() => setEditOpen(true)} chevron />
-        <Row icon={<Lock className="w-4 h-4" />} label="Changer le mot de passe" onClick={() => navigate("/reset-password")} chevron />
-        <Row icon={<Download className="w-4 h-4" />} label="Mes données" sub="Téléchargez toutes vos données (Loi 25 / PIPEDA)"
+      <Section title={t("more.sections.account")}>
+        <Row icon={<User className="w-4 h-4" />} label={t("more.myProfile")} onClick={() => setEditOpen(true)} chevron />
+        <Row icon={<Lock className="w-4 h-4" />} label={t("more.changePassword")} onClick={() => navigate("/reset-password")} chevron />
+        <Row icon={<Download className="w-4 h-4" />} label={t("more.myData")} sub={t("more.myDataSub")}
           onClick={async () => {
-            toast.info("Préparation de votre export…");
+            toast.info(t("more.preparingExport"));
             const { data: { session } } = await supabase.auth.getSession();
             const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/pp-gdpr-export`, {
               method: "POST",
               headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
               body: JSON.stringify({ broker_id: profile.id }),
             });
-            if (!res.ok) { toast.error("Échec de l'export"); return; }
+            if (!res.ok) { toast.error(t("more.exportFailed")); return; }
             const blob = await res.blob();
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url; a.download = `mes-donnees-planipret.json`; a.click();
             URL.revokeObjectURL(url);
-            toast.success("Export téléchargé ✅");
+            toast.success(t("more.exportDownloaded"));
           }} chevron />
       </Section>
 
-      <Section title="Téléphonie">
+      <Section title={t("more.sections.phone")}>
         <Row
           icon={<Phone className="w-4 h-4" />}
-          label="Connexion téléphonique"
+          label={t("more.phoneConnection")}
           onClick={reconnectNs}
-          right={<StatusPill ok={nsConnected} label={reconnecting ? "…" : nsConnected ? "Connecté" : "Hors ligne"} />}
+          right={<StatusPill ok={nsConnected} label={reconnecting ? "…" : nsConnected ? t("more.connected") : t("home.offline")} />}
         />
-        <Row icon={<Info className="w-4 h-4" />} label="Mon extension"
+        <Row icon={<Info className="w-4 h-4" />} label={t("more.myExtension")}
           right={<span style={{ fontSize: 12, color: "var(--pp-text-muted)" }}>{profile?.extension ?? "—"}</span>} />
-        <Row icon={<Voicemail className="w-4 h-4" />} label="Messagerie vocale"
+        <Row icon={<Voicemail className="w-4 h-4" />} label={t("more.voicemail")}
           onClick={() => navigate("/mplanipret/calls?tab=voicemails")} chevron />
       </Section>
 
-      <Section title="Disponibilité">
+      <Section title={t("more.sections.availability")}>
         <Row
           icon={<BellOff className="w-4 h-4" style={profile?.dnd_enabled ? { color: "var(--pp-color-danger)" } : undefined} />}
-          label="Mode Ne pas déranger"
-          sub={profile?.dnd_enabled ? "Actif — AVA répond pour vous" : "Inactif"}
+          label={t("more.dnd")}
+          sub={profile?.dnd_enabled ? t("more.dndActiveSub") : t("more.inactive")}
           right={<Toggle on={!!profile?.dnd_enabled} onChange={async (v) => {
             await supabase.from("planipret_profiles").update({ dnd_enabled: v }).eq("user_id", profile.user_id);
             await reloadProfile();
-            toast.success(v ? "DND activé" : "DND désactivé");
+            toast.success(v ? t("more.dndEnabled") : t("home.dndDisabled"));
           }} />}
         />
-        <Row icon={<SettingsIcon className="w-4 h-4" />} label="Configurer le mode DND" onClick={() => setDndOpen(true)} chevron />
+        <Row icon={<SettingsIcon className="w-4 h-4" />} label={t("more.configureDnd")} onClick={() => setDndOpen(true)} chevron />
       </Section>
 
-      <Section title="Intégrations">
+      <Section title={t("more.sections.integrations")}>
         <Row icon={<Mail className="w-4 h-4" style={{ color: "#3FA3F0" }} />} label="Microsoft 365"
           onClick={ms365Connected ? disconnectMs365 : connectMs365}
-          right={<StatusPill ok={ms365Connected} label={ms365Connected ? "Connecté" : "—"} />} chevron />
+          right={<StatusPill ok={ms365Connected} label={ms365Connected ? t("more.connected") : "—"} />} chevron />
         {ms365Connected && (
           <div style={{ padding: 8 }}>
             <CalendarSyncCard profile={profile} />
@@ -231,29 +233,29 @@ export default function MMore() {
       </div>
 
       {profile?.voice_agent_enabled && (
-        <Section title="Assistant IA">
-          <Row icon={<Bot className="w-4 h-4" style={{ color: "var(--pp-color-agent)" }} />} label="Assistant vocal AVA"
-            sub="AVA peut répondre à vos appels et gérer vos tâches"
+        <Section title={t("more.sections.assistant")}>
+          <Row icon={<Bot className="w-4 h-4" style={{ color: "var(--pp-color-agent)" }} />} label={t("more.voiceAssistant")}
+            sub={t("more.voiceAssistantSub")}
             right={<Toggle on={agentOn} onChange={(v) => { setAgentOn(v); localStorage.setItem("planipret_agent_on", v ? "1" : "0"); }} />} />
-          <Row icon={<Sparkles className="w-4 h-4" />} label="Personnaliser AVA" onClick={() => setCustomizeOpen(true)} chevron />
+          <Row icon={<Sparkles className="w-4 h-4" />} label={t("more.customizeAva")} onClick={() => setCustomizeOpen(true)} chevron />
         </Section>
       )}
 
-      <Section title="Préférences">
-        <Row icon={<Bell className="w-4 h-4" />} label="Notifications" right={<Toggle on={notifEnabled} onChange={toggleNotif} />} />
-        <Row icon={<Moon className="w-4 h-4" />} label="Mode sombre" right={<Toggle on={darkMode} onChange={setDarkMode} />} />
+      <Section title={t("more.sections.prefs")}>
+        <Row icon={<Bell className="w-4 h-4" />} label={t("more.notifications")} right={<Toggle on={notifEnabled} onChange={toggleNotif} />} />
+        <Row icon={<Moon className="w-4 h-4" />} label={t("more.darkMode")} right={<Toggle on={darkMode} onChange={setDarkMode} />} />
       </Section>
 
       <MNetworkSection />
 
       <NotificationsSection profile={profile} reloadProfile={reloadProfile} />
 
-      <Section title="Aide & support">
-        <Row icon={<HelpCircle className="w-4 h-4" />} label="Centre d'aide" onClick={() => setHelpOpen(true)} chevron />
-        <Row icon={<MessageCircle className="w-4 h-4" />} label="Contacter le support"
+      <Section title={t("more.sections.support")}>
+        <Row icon={<HelpCircle className="w-4 h-4" />} label={t("more.helpCenter")} onClick={() => setHelpOpen(true)} chevron />
+        <Row icon={<MessageCircle className="w-4 h-4" />} label={t("more.contactSupport")}
           onClick={() => { window.location.href = "mailto:support@avastatistic.ca?subject=Support%20Planipr%C3%AAt%20AI%20Portal"; }} chevron />
-        <Row icon={<Shield className="w-4 h-4" />} label="Politique de confidentialité" onClick={() => navigate("/planipret/privacy")} chevron />
-        <Row icon={<Info className="w-4 h-4" />} label="Version de l'app" right={<span style={{ fontSize: 12, color: "var(--pp-text-faint)" }}>v1.0.0 (build 1)</span>} />
+        <Row icon={<Shield className="w-4 h-4" />} label={t("more.privacy")} onClick={() => navigate("/planipret/privacy")} chevron />
+        <Row icon={<Info className="w-4 h-4" />} label={t("more.appVersion")} right={<span style={{ fontSize: 12, color: "var(--pp-text-faint)" }}>v1.0.0 (build 1)</span>} />
       </Section>
 
       <button
@@ -265,7 +267,7 @@ export default function MMore() {
           color: "var(--pp-color-danger)", fontFamily: "Inter,sans-serif", fontWeight: 600, fontSize: 14,
         }}
       >
-        <LogOut className="w-4 h-4" /> Se déconnecter
+        <LogOut className="w-4 h-4" /> {t("common.logout")}
       </button>
 
       <div style={{ height: 16 }} />
@@ -395,6 +397,7 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
 }
 
 function NotificationsSection({ profile, reloadProfile }: { profile: any; reloadProfile: () => Promise<void> }) {
+  const { t } = useMplanipretLang();
   const { subscribe, sendTest, busy } = usePlanipretPush();
   const setPref = async (field: string, val: boolean) => {
     await (supabase.from("planipret_profiles") as any).update({ [field]: val }).eq("user_id", profile.user_id);
@@ -405,19 +408,19 @@ function NotificationsSection({ profile, reloadProfile }: { profile: any; reload
     if (ok) await reloadProfile();
   };
   return (
-    <Section title="Notifications push">
-      <Row icon={<Bell className="w-4 h-4" />} label="Activer notifications push" onClick={enablePush} sub="Recevoir des alertes même app fermée" chevron />
-      <Row icon={<Phone className="w-4 h-4" />} label="Appels entrants" right={<Toggle on={!!profile?.notif_calls} onChange={(v) => setPref("notif_calls", v)} />} />
-      <Row icon={<Bell className="w-4 h-4" />} label="Nouveaux SMS" right={<Toggle on={!!profile?.notif_sms} onChange={(v) => setPref("notif_sms", v)} />} />
-      <Row icon={<Voicemail className="w-4 h-4" />} label="Nouveaux voicemails" right={<Toggle on={!!profile?.notif_voicemails} onChange={(v) => setPref("notif_voicemails", v)} />} />
-      <Row icon={<Sparkles className="w-4 h-4" />} label="Analyses IA prêtes" right={<Toggle on={!!profile?.notif_ai} onChange={(v) => setPref("notif_ai", v)} />} />
-      <Row icon={<Bell className="w-4 h-4" />} label="Rappels" right={<Toggle on={!!profile?.notif_reminders} onChange={(v) => setPref("notif_reminders", v)} />} />
-      <Row icon={<Sparkles className="w-4 h-4" />} label="Leads chauds sans suivi" right={<Toggle on={profile?.notif_hot_leads !== false} onChange={(v) => setPref("notif_hot_leads", v)} />} />
-      <Row icon={<Bell className="w-4 h-4" />} label="Rappel RDV imminents" right={<Toggle on={profile?.notif_appointment_reminder !== false} onChange={(v) => setPref("notif_appointment_reminder", v)} />} />
-      <Row icon={<Phone className="w-4 h-4" />} label="Appels manqués non traités" right={<Toggle on={profile?.notif_missed_call !== false} onChange={(v) => setPref("notif_missed_call", v)} />} />
-      <Row icon={<Sparkles className="w-4 h-4" />} label="Briefing matinal (08:30)" right={<Toggle on={profile?.notif_morning_brief !== false} onChange={(v) => setPref("notif_morning_brief", v)} />} />
-      <Row icon={<Sparkles className="w-4 h-4" />} label="Résumé fin de journée (17:30)" right={<Toggle on={profile?.notif_eod_summary !== false} onChange={(v) => setPref("notif_eod_summary", v)} />} />
-      <Row icon={<Sparkles className="w-4 h-4" />} label={busy ? "Envoi…" : "Tester une notification"} onClick={() => sendTest(profile.user_id)} chevron />
+    <Section title={t("more.pushNotifications")}>
+      <Row icon={<Bell className="w-4 h-4" />} label={t("more.enablePush")} onClick={enablePush} sub={t("more.pushSub")} chevron />
+      <Row icon={<Phone className="w-4 h-4" />} label={t("more.incomingCalls")} right={<Toggle on={!!profile?.notif_calls} onChange={(v) => setPref("notif_calls", v)} />} />
+      <Row icon={<Bell className="w-4 h-4" />} label={t("more.newSms")} right={<Toggle on={!!profile?.notif_sms} onChange={(v) => setPref("notif_sms", v)} />} />
+      <Row icon={<Voicemail className="w-4 h-4" />} label={t("more.newVoicemails")} right={<Toggle on={!!profile?.notif_voicemails} onChange={(v) => setPref("notif_voicemails", v)} />} />
+      <Row icon={<Sparkles className="w-4 h-4" />} label={t("more.aiReady")} right={<Toggle on={!!profile?.notif_ai} onChange={(v) => setPref("notif_ai", v)} />} />
+      <Row icon={<Bell className="w-4 h-4" />} label={t("more.reminders")} right={<Toggle on={!!profile?.notif_reminders} onChange={(v) => setPref("notif_reminders", v)} />} />
+      <Row icon={<Sparkles className="w-4 h-4" />} label={t("more.hotLeadsNoFollow")} right={<Toggle on={profile?.notif_hot_leads !== false} onChange={(v) => setPref("notif_hot_leads", v)} />} />
+      <Row icon={<Bell className="w-4 h-4" />} label={t("more.appointmentReminder")} right={<Toggle on={profile?.notif_appointment_reminder !== false} onChange={(v) => setPref("notif_appointment_reminder", v)} />} />
+      <Row icon={<Phone className="w-4 h-4" />} label={t("more.untreatedMissedCalls")} right={<Toggle on={profile?.notif_missed_call !== false} onChange={(v) => setPref("notif_missed_call", v)} />} />
+      <Row icon={<Sparkles className="w-4 h-4" />} label={t("more.morningBrief")} right={<Toggle on={profile?.notif_morning_brief !== false} onChange={(v) => setPref("notif_morning_brief", v)} />} />
+      <Row icon={<Sparkles className="w-4 h-4" />} label={t("more.eodSummary")} right={<Toggle on={profile?.notif_eod_summary !== false} onChange={(v) => setPref("notif_eod_summary", v)} />} />
+      <Row icon={<Sparkles className="w-4 h-4" />} label={busy ? t("more.sending") : t("more.testNotification")} onClick={() => sendTest(profile.user_id)} chevron />
     </Section>
   );
 }
@@ -481,42 +484,44 @@ const primaryBtn: React.CSSProperties = {
 };
 
 function EditProfileSheet({ profile, onClose, onSaved }: { profile: any; onClose: () => void; onSaved: () => Promise<void> }) {
+  const { t } = useMplanipretLang();
   const [name, setName] = useState(profile?.full_name ?? "");
   const [busy, setBusy] = useState(false);
   const save = async () => {
     setBusy(true);
     const { error } = await supabase.from("planipret_profiles").update({ full_name: name }).eq("user_id", profile.user_id);
     setBusy(false);
-    if (error) { toast.error("Erreur"); return; }
-    toast.success("Profil mis à jour");
+    if (error) { toast.error(t("common.failed")); return; }
+    toast.success(t("more.profileUpdated"));
     await onSaved();
     onClose();
   };
   return (
-    <Sheet title="Mon profil" onClose={onClose}>
-      <label style={labelStyle}>Nom complet</label>
+    <Sheet title={t("more.myProfile")} onClose={onClose}>
+      <label style={labelStyle}>{t("more.fullName")}</label>
       <input value={name} onChange={(e) => setName(e.target.value)} style={fieldStyle} />
-      <label style={labelStyle}>Email</label>
+      <label style={labelStyle}>{t("more.email")}</label>
       <input value={profile?.email ?? ""} readOnly style={{ ...fieldStyle, opacity: 0.6 }} />
-      <label style={labelStyle}>Extension</label>
+      <label style={labelStyle}>{t("profile.extension")}</label>
       <input value={profile?.extension ?? ""} readOnly style={{ ...fieldStyle, opacity: 0.6 }} />
-      <label style={labelStyle}>Domaine</label>
+      <label style={labelStyle}>{t("more.domain")}</label>
       <input value={profile?.ns_domain ?? ""} readOnly style={{ ...fieldStyle, opacity: 0.6 }} />
       <button onClick={save} disabled={busy} style={{ ...primaryBtn, opacity: busy ? 0.5 : 1 }}>
-        {busy ? "Enregistrement…" : "Sauvegarder"}
+        {busy ? t("common.saving") : t("common.save")}
       </button>
     </Sheet>
   );
 }
 
 function HelpSheet({ onClose }: { onClose: () => void }) {
+  const { t } = useMplanipretLang();
   const faq = [
-    { q: "Comment passer un appel?", a: "Utilisez le bouton 📞 bleu en bas de l'écran." },
-    { q: "Comment activer l'agent AVA?", a: "Contactez votre administrateur Planiprêt." },
-    { q: "Mes appels ne fonctionnent pas?", a: "Vérifiez votre connexion dans Plus → Connexion téléphonique." },
+    { q: t("more.helpFaqCallQ"), a: t("more.helpFaqCallA") },
+    { q: t("more.helpFaqAvaQ"), a: t("more.helpFaqAvaA") },
+    { q: t("more.helpFaqCallsQ"), a: t("more.helpFaqCallsA") },
   ];
   return (
-    <Sheet title="Centre d'aide" onClose={onClose}>
+    <Sheet title={t("more.helpCenter")} onClose={onClose}>
       <div className="space-y-3">
         {faq.map((f, i) => (
           <div key={i} className="pb-3" style={{ borderBottom: "1px solid var(--pp-bg-border)" }}>
@@ -530,19 +535,20 @@ function HelpSheet({ onClose }: { onClose: () => void }) {
 }
 
 function CustomizeSheet({ profile, onClose, onSaved }: { profile: any; onClose: () => void; onSaved: () => Promise<void> }) {
+  const { t } = useMplanipretLang();
   const [lang, setLang] = useState<string>(profile?.language ?? "fr");
   const [busy, setBusy] = useState(false);
   const save = async () => {
     setBusy(true);
     await supabase.from("planipret_profiles").update({ language: lang }).eq("user_id", profile.user_id);
     setBusy(false);
-    toast.success("Préférences sauvegardées");
+    toast.success(t("more.preferencesSaved"));
     await onSaved();
     onClose();
   };
   return (
-    <Sheet title="Personnaliser AVA" onClose={onClose}>
-      <p style={{ ...labelStyle, marginTop: 0 }}>AVA répond en :</p>
+    <Sheet title={t("more.customizeAva")} onClose={onClose}>
+      <p style={{ ...labelStyle, marginTop: 0 }}>{t("more.avaRespondsIn")}</p>
       <div className="flex gap-2">
         {(["fr", "en"] as const).map((l) => {
           const active = lang === l;
@@ -564,13 +570,14 @@ function CustomizeSheet({ profile, onClose, onSaved }: { profile: any; onClose: 
         })}
       </div>
       <button onClick={save} disabled={busy} style={{ ...primaryBtn, opacity: busy ? 0.5 : 1 }}>
-        {busy ? "…" : "Sauvegarder"}
+        {busy ? "…" : t("common.save")}
       </button>
     </Sheet>
   );
 }
 
 function DndSheet({ profile, onClose, onSaved }: { profile: any; onClose: () => void; onSaved: () => Promise<void> }) {
+  const { t } = useMplanipretLang();
   const [enabled, setEnabled] = useState<boolean>(!!profile?.dnd_enabled);
   const [auto, setAuto] = useState<boolean>(!!profile?.dnd_auto_schedule);
   const [start, setStart] = useState<string>(profile?.dnd_start_time?.slice(0, 5) ?? "18:00");
@@ -587,37 +594,37 @@ function DndSheet({ profile, onClose, onSaved }: { profile: any; onClose: () => 
       dnd_message_fr: msg,
     }).eq("user_id", profile.user_id);
     setBusy(false);
-    if (error) { toast.error("Erreur"); return; }
-    toast.success("Préférences DND enregistrées");
+    if (error) { toast.error(t("common.failed")); return; }
+    toast.success(t("more.dndSaved"));
     await onSaved();
     onClose();
   };
   return (
-    <Sheet title="Mode Ne pas déranger" onClose={onClose}>
+    <Sheet title={t("more.dnd")} onClose={onClose}>
       <div className="flex items-center justify-between py-2" style={{ borderBottom: "1px solid var(--pp-bg-border)" }}>
-        <span style={{ fontSize: 13, color: "var(--pp-text-primary)" }}>Activer le mode DND</span>
+        <span style={{ fontSize: 13, color: "var(--pp-text-primary)" }}>{t("more.enableDnd")}</span>
         <Toggle on={enabled} onChange={setEnabled} />
       </div>
       <div className="flex items-center justify-between py-2" style={{ borderBottom: "1px solid var(--pp-bg-border)" }}>
-        <span style={{ fontSize: 13, color: "var(--pp-text-primary)" }}>Activation auto selon horaire</span>
+        <span style={{ fontSize: 13, color: "var(--pp-text-primary)" }}>{t("more.autoSchedule")}</span>
         <Toggle on={auto} onChange={setAuto} />
       </div>
       {auto && (
         <div className="grid grid-cols-2 gap-3 py-3">
           <div>
-            <label style={labelStyle}>Début</label>
+            <label style={labelStyle}>{t("more.start")}</label>
             <input type="time" value={start} onChange={(e) => setStart(e.target.value)} style={fieldStyle} />
           </div>
           <div>
-            <label style={labelStyle}>Fin</label>
+            <label style={labelStyle}>{t("more.end")}</label>
             <input type="time" value={end} onChange={(e) => setEnd(e.target.value)} style={fieldStyle} />
           </div>
         </div>
       )}
-      <label style={labelStyle}>Message de réponse automatique</label>
+      <label style={labelStyle}>{t("more.autoReplyMessage")}</label>
       <textarea value={msg} onChange={(e) => setMsg(e.target.value)} rows={4} style={{ ...fieldStyle, resize: "none" }} />
       <button onClick={save} disabled={busy} style={{ ...primaryBtn, opacity: busy ? 0.5 : 1 }}>
-        {busy ? "…" : "Sauvegarder"}
+        {busy ? "…" : t("common.save")}
       </button>
     </Sheet>
   );

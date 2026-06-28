@@ -22,6 +22,7 @@ import AvaChatSheet from "@/components/planipret/mobile/AvaChatSheet";
 import MobileAuthScreen from "@/components/planipret/mobile/MobileAuthScreen";
 import MobileHeaderControls from "@/components/planipret/mobile/MobileHeaderControls";
 import { useMplanipretTheme } from "@/hooks/useMplanipretTheme";
+import { useMplanipretLang } from "@/hooks/useMplanipretLang";
 import { ROUTES } from "@/lib/routes";
 import { recordRedirect } from "@/lib/debug/navDebug";
 
@@ -30,11 +31,11 @@ const ACCENT = "#2E9BDC";
 export type PlanipretMobileContext = { profile: any; reloadProfile: () => Promise<void>; openDialer: (number?: string) => void; openAva: () => void; registerRefresh: (fn: (() => Promise<void> | void) | null) => void };
 
 const TABS = [
-  { to: "/mplanipret/home", label: "Accueil", Icon: Home },
-  { to: "/mplanipret/calls", label: "Appels", Icon: Phone },
+  { to: "/mplanipret/home", labelKey: "tabs.home", Icon: Home },
+  { to: "/mplanipret/calls", labelKey: "tabs.calls", Icon: Phone },
   { to: "_fab", label: "", Icon: Home },
-  { to: "/mplanipret/messages", label: "Messages", Icon: MessageSquare },
-  { to: "/mplanipret/contacts", label: "Contacts", Icon: Users },
+  { to: "/mplanipret/messages", labelKey: "tabs.messages", Icon: MessageSquare },
+  { to: "/mplanipret/contacts", labelKey: "tabs.contacts", Icon: Users },
 ];
 
 
@@ -46,6 +47,7 @@ const KEYS: Array<{ d: string; l?: string }> = [
 ];
 
 function Dialer({ open, onClose, initial }: { open: boolean; onClose: () => void; initial?: string }) {
+  const { t } = useMplanipretLang();
   const [number, setNumber] = useState("");
   const [calling, setCalling] = useState(false);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -63,10 +65,10 @@ function Dialer({ open, onClose, initial }: { open: boolean; onClose: () => void
     const { data, error } = await supabase.functions.invoke("ns-calls", { body: { action: "start", destination: number } });
     setCalling(false);
     if (error || (data as any)?.success === false) {
-      toast.error((data as any)?.error ?? error?.message ?? "Échec de l'appel");
+      toast.error((data as any)?.error ?? error?.message ?? t("dialer.callFailed"));
       return;
     }
-    toast.success("Appel lancé");
+    toast.success(t("dialer.callStarted"));
     setNumber("");
     onClose();
   };
@@ -85,7 +87,7 @@ function Dialer({ open, onClose, initial }: { open: boolean; onClose: () => void
           initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 28, stiffness: 280 }}>
           <div className="pt-3 pb-2 flex flex-col items-center relative">
             <div style={{ width: 36, height: 4, background: "var(--pp-bg-border-2)", borderRadius: 2 }} />
-            <button onClick={onClose} className="absolute right-3 top-3 p-2.5 rounded-full" style={{ color: "var(--pp-text-secondary)", minWidth: 44, minHeight: 44 }} aria-label="Fermer"><X className="w-5 h-5 mx-auto" /></button>
+            <button onClick={onClose} className="absolute right-3 top-3 p-2.5 rounded-full" style={{ color: "var(--pp-text-secondary)", minWidth: 44, minHeight: 44 }} aria-label={t("common.close")}><X className="w-5 h-5 mx-auto" /></button>
           </div>
           <div className="flex-1 flex flex-col px-6 pt-4 overflow-hidden">
             <div className="text-center min-h-[56px] flex items-center justify-center px-5 py-5">
@@ -96,7 +98,7 @@ function Dialer({ open, onClose, initial }: { open: boolean; onClose: () => void
                 color: number ? "var(--pp-text-primary)" : "var(--pp-text-faint)",
                 letterSpacing: "-0.01em",
               }}>
-                {number || "Entrer un numéro…"}
+                {number || t("dialer.enterNumber")}
               </span>
             </div>
             <div className="grid grid-cols-3 gap-3 mt-2 mx-auto" style={{ maxWidth: 288 }}>
@@ -115,12 +117,12 @@ function Dialer({ open, onClose, initial }: { open: boolean; onClose: () => void
             </div>
             <div className="grid grid-cols-3 items-center gap-3 mt-5 mx-auto" style={{ maxWidth: 288 }}>
               <button onClick={() => append("+")} className="mx-auto flex items-center justify-center active:scale-95 transition"
-                style={{ width: 48, height: 48, borderRadius: "50%", background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-muted)" }} aria-label="Plus">
+                style={{ width: 48, height: 48, borderRadius: "50%", background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-muted)" }} aria-label={t("dialer.plus")}>
                 <Plus className="w-5 h-5" />
               </button>
               <button onClick={startCall} disabled={!number || calling}
                 className="mx-auto flex items-center justify-center text-white disabled:opacity-50 active:scale-95 transition"
-                style={{ width: 72, height: 72, borderRadius: "50%", background: "linear-gradient(135deg, #0D5C2A, #00D4AA)", boxShadow: "0 4px 20px rgba(0,212,170,0.5)" }} aria-label="Appeler">
+                style={{ width: 72, height: 72, borderRadius: "50%", background: "linear-gradient(135deg, #0D5C2A, #00D4AA)", boxShadow: "0 4px 20px rgba(0,212,170,0.5)" }} aria-label={t("common.call")}>
                 <PhoneIcon className="w-7 h-7" />
               </button>
               <button
@@ -129,11 +131,11 @@ function Dialer({ open, onClose, initial }: { open: boolean; onClose: () => void
                 onPointerLeave={() => { if (holdTimer.current) { clearTimeout(holdTimer.current); holdTimer.current = null; } }}
                 onContextMenu={(e) => { e.preventDefault(); setNumber(""); }}
                 className="mx-auto flex items-center justify-center active:scale-95 transition"
-                style={{ width: 48, height: 48, borderRadius: "50%", background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-muted)" }} aria-label="Effacer (hold 1s pour tout effacer)">
+                style={{ width: 48, height: 48, borderRadius: "50%", background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-muted)" }} aria-label={t("dialer.clear")}>
                 <Delete className="w-5 h-5" />
               </button>
             </div>
-            {calling && <div className="mt-4 text-center text-sm" style={{ color: "var(--pp-text-muted)" }}>Appel en cours…</div>}
+            {calling && <div className="mt-4 text-center text-sm" style={{ color: "var(--pp-text-muted)" }}>{t("dialer.callInProgress")}</div>}
           </div>
         </motion.div>
       )}
@@ -144,6 +146,7 @@ function Dialer({ open, onClose, initial }: { open: boolean; onClose: () => void
 export default function PlanipretMobile() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { t } = useMplanipretLang();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [accessError, setAccessError] = useState<"unauthenticated" | "missing_profile" | "load_failed" | null>(null);
@@ -288,7 +291,7 @@ export default function PlanipretMobile() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center" style={{ background: "#F7F9FC", color: "#5A6B85", fontFamily: "Urbanist,sans-serif" }}>Chargement…</div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center" style={{ background: "#F7F9FC", color: "#5A6B85", fontFamily: "Urbanist,sans-serif" }}>{t("common.loading")}</div>;
 
   if (accessError === "unauthenticated") {
     return (
@@ -307,14 +310,14 @@ export default function PlanipretMobile() {
               <Lock className="w-7 h-7" />
             </div>
             <h2 style={{ fontFamily: "Inter,sans-serif", fontWeight: 700, fontSize: 18, color: "var(--pp-text-primary)", marginBottom: 8 }}>
-              {accessError === "missing_profile" ? "Accès mobile Planiprêt" : "Accès mobile Planiprêt"}
+              {t("access.missingTitle")}
             </h2>
             <p style={{ fontSize: 13, color: "var(--pp-text-secondary)", marginBottom: 16 }}>
               {accessError === "missing_profile"
-                ? "Votre compte est connecté, mais aucun profil mobile Planiprêt n'est lié à cet utilisateur. / Your account is signed in, but no Planiprêt mobile profile is linked."
-                : "Impossible de charger votre profil mobile Planiprêt pour le moment. / Unable to load your Planiprêt mobile profile right now."}
+                ? t("access.missingProfile")
+                : t("access.loadFailed")}
             </p>
-            <button onClick={loadProfile} className="pp-btn-primary inline-block">Réessayer / Retry</button>
+            <button onClick={loadProfile} className="pp-btn-primary inline-block">{t("common.retry")}</button>
           </div>
         </div>
       </Frame>
@@ -329,9 +332,9 @@ export default function PlanipretMobile() {
             <div className="w-14 h-14 mx-auto rounded-full flex items-center justify-center mb-4" style={{ background: "rgba(46,155,220,0.12)", color: "var(--pp-brand-accent)" }}>
               <Lock className="w-7 h-7" />
             </div>
-            <h2 style={{ fontFamily: "Inter,sans-serif", fontWeight: 700, fontSize: 18, color: "var(--pp-text-primary)", marginBottom: 8 }}>Application non activée / App not activated</h2>
-            <p style={{ fontSize: 13, color: "var(--pp-text-secondary)", marginBottom: 16 }}>Votre accès à l'application mobile n'a pas encore été activé. Contactez votre administrateur Planiprêt.</p>
-            <a href="mailto:support@avastatistic.ca" className="pp-btn-primary inline-block">Contacter le support</a>
+            <h2 style={{ fontFamily: "Inter,sans-serif", fontWeight: 700, fontSize: 18, color: "var(--pp-text-primary)", marginBottom: 8 }}>{t("access.notActivated")}</h2>
+            <p style={{ fontSize: 13, color: "var(--pp-text-secondary)", marginBottom: 16 }}>{t("access.notActivatedDesc")}</p>
+            <a href="mailto:support@avastatistic.ca" className="pp-btn-primary inline-block">{t("access.contactSupport")}</a>
           </div>
         </div>
       </Frame>
@@ -343,7 +346,10 @@ export default function PlanipretMobile() {
     <Frame>
       <div className="h-full flex flex-col relative overflow-hidden" style={{ background: "var(--pp-bg-base)" }}>
         {/* Top brand header — AVA (left) · Planiprêt (center) · Settings (right) */}
-        <header className="relative flex items-center px-4 pt-3 pb-2 pp-mobile-header">
+        <header
+          className="relative flex items-center px-4 pp-mobile-header"
+          style={{ marginTop: "calc(env(safe-area-inset-top, 0px) + 56px)", paddingTop: 18, paddingBottom: 12 }}
+        >
 
           {/* AVA icon — left */}
           <div className="flex items-center gap-1.5">
@@ -393,7 +399,7 @@ export default function PlanipretMobile() {
             animation: profile?.voice_agent_enabled ? "pp-glow-purple 2s ease-in-out infinite" : undefined,
             width: 62, height: 62, bottom: 74, padding: 3,
           }}
-          aria-label={profile?.voice_agent_enabled ? "Parler à AVA" : "Discuter avec AVA"}>
+          aria-label={profile?.voice_agent_enabled ? t("dialer.talkToAva") : t("dialer.chatWithAva")}>
           <img src={avaLogo.url} alt="AVA" className="w-full h-full rounded-full object-cover"
             style={{ background: "#060D1A" }} />
         </button>
@@ -412,7 +418,7 @@ export default function PlanipretMobile() {
             animation: activeCallId ? "pp-pulse-red 1.5s infinite" : undefined,
             width: 50, height: 50,
           }}
-          aria-label={activeCallId ? "Raccrocher" : "Composer un numéro"}>
+          aria-label={activeCallId ? t("dialer.hangup") : t("dialer.dialNumber")}>
           {activeCallId ? <PhoneOff className="w-5 h-5" /> : <PhoneIcon className="w-5 h-5" />}
         </button>
 
@@ -421,11 +427,11 @@ export default function PlanipretMobile() {
         <nav className="absolute bottom-[22px] inset-x-0 grid grid-cols-5 z-10 pp-mobile-tabbar"
           style={{ height: 70 }}>
 
-          {TABS.map((t) => {
-            if (t.to === "_fab") return <div key="fab-slot" />;
-            const badge = t.to.endsWith("/messages") ? unreadMsg : 0;
+          {TABS.map((tabItem) => {
+            if (tabItem.to === "_fab") return <div key="fab-slot" />;
+            const badge = tabItem.to.endsWith("/messages") ? unreadMsg : 0;
             return (
-              <NavLink key={t.to} to={t.to}
+              <NavLink key={tabItem.to} to={tabItem.to}
                 className="relative flex flex-col items-center justify-center gap-1 text-[9px] font-semibold pt-1.5"
                 style={({ isActive }) => ({ color: isActive ? "var(--pp-brand-accent)" : "var(--pp-text-faint)" })}>
                 {({ isActive }) => (
@@ -434,7 +440,7 @@ export default function PlanipretMobile() {
                       <span className="absolute top-1 w-1 h-1 rounded-full" style={{ background: "var(--pp-brand-accent)" }} />
                     )}
                     <div className="relative">
-                      <t.Icon className="w-[22px] h-[22px]" strokeWidth={isActive ? 2.4 : 1.8} />
+                      <tabItem.Icon className="w-[22px] h-[22px]" strokeWidth={isActive ? 2.4 : 1.8} />
                       {badge > 0 && (
                         <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 px-1 rounded-full text-white text-[9px] font-bold flex items-center justify-center"
                           style={{ background: "var(--pp-danger)" }}>
@@ -442,7 +448,7 @@ export default function PlanipretMobile() {
                         </span>
                       )}
                     </div>
-                    <span style={{ letterSpacing: "0.02em" }}>{t.label}</span>
+                    <span style={{ letterSpacing: "0.02em" }}>{"labelKey" in tabItem ? t(tabItem.labelKey) : ""}</span>
                   </>
                 )}
               </NavLink>
@@ -453,10 +459,10 @@ export default function PlanipretMobile() {
 
         {/* Powered by AVA footer */}
         <div className="absolute bottom-0 inset-x-0 h-[24px] flex items-center justify-center gap-2 z-10 pp-mobile-footer">
-          <span style={{ fontFamily: "Urbanist,sans-serif", fontSize: 9, color: "var(--pp-text-muted)", letterSpacing: "0.14em", fontWeight: 600 }}>POWERED BY</span>
+          <span style={{ fontFamily: "Urbanist,sans-serif", fontSize: 9, color: "var(--pp-text-muted)", letterSpacing: "0.14em", fontWeight: 600 }}>{t("footer.poweredBy")}</span>
           <img src={avaLogo.url} alt="AVA" className="w-3.5 h-3.5 rounded object-cover" />
           <span style={{ fontFamily: "Urbanist,sans-serif", fontSize: 9, color: "var(--pp-brand-accent-2)", letterSpacing: "0.10em", fontWeight: 700 }}>AVA</span>
-          <span style={{ fontSize: 8.5, color: "var(--pp-text-faint)", letterSpacing: "0.1em" }}>· DEVELOPED BY AVA</span>
+          <span style={{ fontSize: 8.5, color: "var(--pp-text-faint)", letterSpacing: "0.1em" }}>· {t("footer.developedBy")}</span>
         </div>
 
 

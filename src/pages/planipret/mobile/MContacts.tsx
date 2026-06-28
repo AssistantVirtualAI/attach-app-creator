@@ -5,6 +5,7 @@ import AvaSummarizeSheet from "@/components/planipret/ava/AvaSummarizeSheet";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { PlanipretMobileContext } from "../PlanipretMobile";
+import { useMplanipretLang } from "@/hooks/useMplanipretLang";
 
 type Tab = "maestro" | "phone" | "recents";
 
@@ -24,6 +25,7 @@ function Avatar({ name }: { name: string }) {
 }
 
 export default function MContacts() {
+  const { t } = useMplanipretLang();
   const { openDialer } = useOutletContext<PlanipretMobileContext>();
   const [tab, setTab] = useState<Tab>("maestro");
   const [q, setQ] = useState("");
@@ -82,7 +84,7 @@ export default function MContacts() {
   return (
     <div className="p-4 pb-2">
       <h1 style={{ fontFamily: "Inter,sans-serif", fontWeight: 700, fontSize: 22, color: "var(--pp-text-primary)", marginBottom: 12 }}>
-        Contacts
+        {t("contacts.title")}
       </h1>
 
       {/* Search */}
@@ -92,7 +94,7 @@ export default function MContacts() {
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Rechercher un contact…"
+          placeholder={t("contacts.search")}
           className="flex-1 bg-transparent outline-none text-sm"
           style={{ color: "var(--pp-text-primary)", fontFamily: "DM Sans, sans-serif" }}
         />
@@ -101,9 +103,9 @@ export default function MContacts() {
       {/* Pill tabs */}
       <div className="flex gap-1 p-1 mb-4" style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)", borderRadius: 12 }}>
         {([
-          { id: "maestro", label: "Maestro CRM", Icon: Users },
-          { id: "phone", label: "Téléphone", Icon: Smartphone },
-          { id: "recents", label: "Récents", Icon: Clock },
+          { id: "maestro", label: t("contacts.maestro"), Icon: Users },
+          { id: "phone", label: t("contacts.phone"), Icon: Smartphone },
+          { id: "recents", label: t("contacts.recents"), Icon: Clock },
         ] as const).map((p) => {
           const active = tab === p.id;
           return (
@@ -124,12 +126,12 @@ export default function MContacts() {
       </div>
 
       {/* Content */}
-      {loading && <div className="text-center py-8 text-sm" style={{ color: "var(--pp-text-muted)" }}>Chargement…</div>}
+      {loading && <div className="text-center py-8 text-sm" style={{ color: "var(--pp-text-muted)" }}>{t("common.loading")}</div>}
 
       {!loading && tab === "maestro" && list.length === 0 && (
         <div className="text-center py-8 pp-card" style={{ padding: 32 }}>
           <Users className="w-10 h-10 mx-auto mb-3" style={{ color: "var(--pp-text-faint)" }} />
-          <div style={{ color: "var(--pp-text-secondary)", fontSize: 13 }}>Aucun contact Maestro</div>
+          <div style={{ color: "var(--pp-text-secondary)", fontSize: 13 }}>{t("contacts.noMaestro")}</div>
         </div>
       )}
 
@@ -137,10 +139,10 @@ export default function MContacts() {
         <div className="text-center py-8 pp-card" style={{ padding: 32 }}>
           <Smartphone className="w-10 h-10 mx-auto mb-3" style={{ color: "var(--pp-text-faint)" }} />
           <div style={{ color: "var(--pp-text-secondary)", fontSize: 13, marginBottom: 12 }}>
-            Accès aux contacts du téléphone
+            {t("contacts.phoneAccess")}
           </div>
           <div style={{ color: "var(--pp-text-muted)", fontSize: 11 }}>
-            Disponible dans l'app native (iOS / Android)
+            {t("contacts.nativeOnly")}
           </div>
         </div>
       )}
@@ -161,14 +163,14 @@ export default function MContacts() {
                 <Avatar name={name || "?"} />
                 <div className="flex-1 min-w-0">
                   <div style={{ fontFamily: "Inter,sans-serif", fontWeight: 600, fontSize: 14, color: "var(--pp-text-primary)" }}
-                    className="truncate">{name || "Sans nom"}</div>
+                    className="truncate">{name || t("contacts.noName")}</div>
                   <div style={{ fontFamily: "DM Sans,sans-serif", fontSize: 11, color: "var(--pp-text-muted)" }}
                     className="truncate">{sub}</div>
                 </div>
                 <button onClick={(e) => { e.stopPropagation(); phone && openDialer(phone); }}
                   className="flex items-center justify-center active:scale-95 transition"
                   style={{ width: 32, height: 32, borderRadius: "50%", background: "rgba(46,155,220,0.12)", border: "1px solid rgba(46,155,220,0.3)", color: "var(--pp-brand-accent)" }}
-                  aria-label="Appeler">
+                  aria-label={t("common.call")}>
                   <Phone className="w-3.5 h-3.5" />
                 </button>
                 {tab === "maestro" && (
@@ -201,6 +203,7 @@ export default function MContacts() {
 function ContactDetailSheet({
   contact, onClose, onCall,
 }: { contact: any; onClose: () => void; onCall: (phone: string) => void }) {
+  const { t, lang } = useMplanipretLang();
   const [history, setHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [creatingTask, setCreatingTask] = useState(false);
@@ -232,12 +235,12 @@ function ContactDetailSheet({
     setCreatingTask(true);
     try {
       const { error } = await supabase.functions.invoke("maestro-task", {
-        body: { client_id: maestroId, title: `Suivi ${name}`, priority: "medium" },
+        body: { client_id: maestroId, title: `${t("contacts.followUp")} ${name}`, priority: "medium" },
       });
       if (error) throw error;
-      toast.success("Tâche créée dans Maestro");
+      toast.success(t("contacts.taskCreated"));
     } catch (e: any) {
-      toast.error("Échec création tâche", { description: e?.message });
+      toast.error(t("contacts.taskCreateFailed"), { description: e?.message });
     } finally {
       setCreatingTask(false);
     }
@@ -266,12 +269,12 @@ function ContactDetailSheet({
             {phone && <div className="text-xs" style={{ color: "var(--pp-text-muted)" }}>{phone}</div>}
             {contact.email && <div className="text-xs" style={{ color: "var(--pp-text-muted)" }}>{contact.email}</div>}
           </div>
-          <button onClick={onClose} className="p-1" style={{ color: "var(--pp-text-muted)" }}><X className="w-5 h-5" /></button>
+          <button onClick={onClose} className="p-1" style={{ color: "var(--pp-text-muted)" }} aria-label={t("common.close")}><X className="w-5 h-5" /></button>
         </div>
 
         {/* Quick actions */}
         <div className="grid grid-cols-5 gap-2 mb-4">
-          <QuickAction icon={<Phone className="w-4 h-4" />} label="Appeler" onClick={() => phone && onCall(phone)} disabled={!phone} />
+          <QuickAction icon={<Phone className="w-4 h-4" />} label={t("common.call")} onClick={() => phone && onCall(phone)} disabled={!phone} />
           <QuickAction icon={<MessageSquare className="w-4 h-4" />} label="SMS" onClick={() => phone && onCall(phone)} disabled={!phone} />
           <QuickAction icon={<Mail className="w-4 h-4" />} label="Email" onClick={() => contact.email && window.open(`mailto:${contact.email}`)} disabled={!contact.email} />
           <QuickAction icon={creatingTask ? <Loader2 className="w-4 h-4 animate-spin" /> : <ListChecks className="w-4 h-4" />} label="Tâche" onClick={createTask} disabled={creatingTask} />
@@ -293,7 +296,7 @@ function ContactDetailSheet({
         </div>
         {loading ? (
           <div className="py-8 text-center text-xs" style={{ color: "var(--pp-text-muted)" }}>
-            <Loader2 className="w-4 h-4 animate-spin mx-auto mb-2" /> Chargement…
+            <Loader2 className="w-4 h-4 animate-spin mx-auto mb-2" /> {t("common.loading")}
           </div>
         ) : history.length === 0 ? (
           <div className="py-6 text-center text-xs" style={{ color: "var(--pp-text-muted)" }}>
@@ -315,7 +318,7 @@ function ContactDetailSheet({
                     </div>
                   )}
                   <div className="text-[10px] mt-0.5" style={{ color: "var(--pp-text-muted)" }}>
-                    {h.created_at || h.date ? new Date(h.created_at || h.date).toLocaleString("fr-CA") : ""}
+                    {h.created_at || h.date ? new Date(h.created_at || h.date).toLocaleString(lang === "en" ? "en-CA" : "fr-CA") : ""}
                   </div>
                 </div>
               </li>

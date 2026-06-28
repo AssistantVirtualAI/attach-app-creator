@@ -15,15 +15,9 @@ import PWAInstallBanner from "@/components/planipret/PWAInstallBanner";
 import { TEMP_EMOJI } from "@/components/planipret/leadHelpers";
 import { useMaestroPipelineToasts } from "@/hooks/useMaestroPipelineToasts";
 import { safeEdgeFunction } from "@/lib/safeEdgeFunction";
+import { useMplanipretLang } from "@/hooks/useMplanipretLang";
 
 type Period = "day" | "week" | "month" | "shift";
-
-const PERIOD_LABEL: Record<Period, string> = {
-  day: "Aujourd'hui",
-  week: "Cette semaine",
-  month: "Ce mois",
-  shift: "Mon quart",
-};
 
 function periodRange(period: Period) {
   const now = new Date();
@@ -40,6 +34,7 @@ function Shimmer({ className = "" }: { className?: string }) {
 }
 
 export default function MHome() {
+  const { t, lang } = useMplanipretLang();
   const { profile, registerRefresh, openDialer, openAva, reloadProfile } =
     useOutletContext<PlanipretMobileContext>();
   const navigate = useNavigate();
@@ -63,10 +58,17 @@ export default function MHome() {
 
   useMaestroPipelineToasts(profile?.user_id);
 
-  const dateLabel = new Date().toLocaleDateString("fr-CA", {
+  const periodLabel: Record<Period, string> = {
+    day: t("home.period.day"),
+    week: t("home.period.week"),
+    month: t("home.period.month"),
+    shift: t("home.period.shift"),
+  };
+
+  const dateLabel = new Date().toLocaleDateString(lang === "en" ? "en-CA" : "fr-CA", {
     weekday: "long", day: "numeric", month: "long",
   });
-  const firstName = (profile?.full_name ?? "Courtier").split(" ")[0];
+  const firstName = (profile?.full_name ?? t("home.broker")).split(" ")[0];
 
   const loadStats = async () => {
     if (!profile) return;
@@ -144,14 +146,14 @@ export default function MHome() {
   }, [profile?.user_id, period]);
 
   const reconnect = async () => {
-    toast.loading("Reconnexion SIP…", { id: "sip-reconnect" });
+    toast.loading(t("home.reconnecting"), { id: "sip-reconnect" });
     const { data, error, status } = await safeEdgeFunction("ns-auth", { body: {} });
     toast.dismiss("sip-reconnect");
     if (error || (data as any)?.success === false) {
-      toast.error(status === 403 ? "Accès téléphonie non autorisé." : ((data as any)?.error ?? error ?? "Connexion impossible"));
+      toast.error(status === 403 ? t("home.phoneUnauthorized") : ((data as any)?.error ?? error ?? t("home.connectionImpossible")));
       return;
     }
-    toast.success("Connexion téléphonique établie ✅");
+    toast.success(t("home.phoneConnected"));
     await reloadProfile();
     loadStats();
   };
@@ -174,7 +176,7 @@ export default function MHome() {
         <div className="min-w-0">
           <p className="pp-eyebrow">{dateLabel}</p>
           <h1 className="text-[26px] leading-tight font-bold mt-0.5">
-            Bonjour, <span style={{ color: "var(--pp-brand-accent)" }}>{firstName}</span>
+            {t("home.hello")}, <span style={{ color: "var(--pp-brand-accent)" }}>{firstName}</span>
           </h1>
         </div>
         <button
@@ -187,7 +189,7 @@ export default function MHome() {
           }}
         >
           <span style={{ width: 6, height: 6, borderRadius: 999, background: "currentColor", boxShadow: "0 0 6px currentColor" }} />
-          {sipOnline ? "En ligne" : "Hors ligne"}
+          {sipOnline ? t("home.online") : t("home.offline")}
         </button>
       </header>
 
@@ -200,7 +202,7 @@ export default function MHome() {
         <div className="pp-segmented">
           {(["day","week","month","shift"] as Period[]).map((p) => (
             <button key={p} onClick={() => setPeriod(p)} className={period === p ? "is-active" : ""}>
-              {PERIOD_LABEL[p]}
+              {periodLabel[p]}
             </button>
           ))}
         </div>
@@ -215,18 +217,18 @@ export default function MHome() {
           style={{ background: "rgba(178,58,72,0.08)", border: "1px solid rgba(178,58,72,0.30)" }}>
           <BellOff className="w-5 h-5" style={{ color: "var(--pp-danger)" }} />
           <div className="flex-1 min-w-0">
-            <div className="text-xs font-bold" style={{ color: "var(--pp-danger)" }}>Mode Ne pas déranger actif</div>
-            <div className="text-[11px]" style={{ color: "var(--pp-text-secondary)" }}>AVA répond à vos appels automatiquement</div>
+              <div className="text-xs font-bold" style={{ color: "var(--pp-danger)" }}>{t("home.dndTitle")}</div>
+              <div className="text-[11px]" style={{ color: "var(--pp-text-secondary)" }}>{t("home.dndSub")}</div>
           </div>
           <button
             onClick={async () => {
               await supabase.from("planipret_profiles").update({ dnd_enabled: false }).eq("user_id", profile.user_id);
               await reloadProfile();
-              toast.success("Mode DND désactivé");
+              toast.success(t("home.dndDisabled"));
             }}
             className="text-[11px] font-semibold px-2.5 py-1 rounded-md text-white"
             style={{ background: "var(--pp-danger)" }}>
-            Désactiver
+            {t("home.disable")}
           </button>
         </div>
       )}
@@ -247,7 +249,7 @@ export default function MHome() {
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <Sparkles className="w-4 h-4" style={{ color: "var(--pp-brand-accent)" }} />
-              <span className="pp-eyebrow">Brief AVA — {PERIOD_LABEL[period]}</span>
+              <span className="pp-eyebrow">{t("home.brief")} — {periodLabel[period]}</span>
             </div>
             <button
               onClick={() => loadBrief(true)}
@@ -260,7 +262,7 @@ export default function MHome() {
                 fontFamily: "Urbanist,sans-serif", fontWeight: 600,
               }}>
               <RefreshCw className={`w-3 h-3 ${briefLoading ? "animate-spin" : ""}`} />
-              {briefLoading ? "…" : "Régénérer"}
+              {briefLoading ? "…" : t("home.regenerate")}
             </button>
           </div>
 
@@ -312,7 +314,7 @@ export default function MHome() {
               )}
             </>
           ) : (
-            <p className="text-xs" style={{ color: "var(--pp-text-muted)" }}>Préparation du brief…</p>
+            <p className="text-xs" style={{ color: "var(--pp-text-muted)" }}>{t("home.preparingBrief")}</p>
           )}
 
           {profile?.voice_agent_enabled && (
@@ -324,7 +326,7 @@ export default function MHome() {
                 color: "var(--pp-agent)",
                 fontFamily: "Urbanist,sans-serif",
               }}>
-              <Headphones className="w-3.5 h-3.5" /> Écouter avec AVA
+              <Headphones className="w-3.5 h-3.5" /> {t("home.listenWithAva")}
             </button>
           )}
         </div>
@@ -336,15 +338,15 @@ export default function MHome() {
           <>{[0,1,2,3,4,5].map((i) => <Shimmer key={i} className="h-[88px]" />)}</>
         ) : (
           <>
-            <Kpi icon={<Phone className="w-3.5 h-3.5" />} value={stats.calls} label="Appels" accent="var(--pp-brand-accent)" onClick={() => navigate("/mplanipret/calls")} />
-            <Kpi icon={<PhoneMissed className="w-3.5 h-3.5" />} value={stats.missed} label="Manqués" accent="var(--pp-danger)" pulse={stats.missed > 0} onClick={() => navigate("/mplanipret/calls?tab=missed")} />
-            <Kpi icon={<MessageSquare className="w-3.5 h-3.5" />} value={stats.sms} label="SMS" accent="var(--pp-success)" onClick={() => navigate("/mplanipret/messages")} />
-            <Kpi icon={<Calendar className="w-3.5 h-3.5" />} value={stats.meetings} label="RDV" accent="var(--pp-brand-accent-2)" />
-            <Kpi icon={<Flame className="w-3.5 h-3.5" />} value={stats.hotLeads} label="Hot leads" accent="#C9582A" />
-            <Kpi icon={<CheckSquare className="w-3.5 h-3.5" />} value={stats.tasks} label="Tâches" accent="var(--pp-agent)" />
-            <Kpi icon={<Voicemail className="w-3.5 h-3.5" />} value={stats.voicemails} label="Voicemails" accent="#6C5CE7" onClick={() => navigate("/mplanipret/voicemail")} />
-            <Kpi icon={<Mail className="w-3.5 h-3.5" />} value={stats.outbound} label="Envoyés" accent="#7A8FB0" />
-            <Kpi icon={<UsersIcon className="w-3.5 h-3.5" />} value={totalComms} label="Total" accent="var(--pp-brand-accent-2)" />
+            <Kpi icon={<Phone className="w-3.5 h-3.5" />} value={stats.calls} label={t("home.kpi.calls")} accent="var(--pp-brand-accent)" onClick={() => navigate("/mplanipret/calls")} />
+            <Kpi icon={<PhoneMissed className="w-3.5 h-3.5" />} value={stats.missed} label={t("home.kpi.missed")} accent="var(--pp-danger)" pulse={stats.missed > 0} onClick={() => navigate("/mplanipret/calls?tab=missed")} />
+            <Kpi icon={<MessageSquare className="w-3.5 h-3.5" />} value={stats.sms} label={t("home.kpi.sms")} accent="var(--pp-success)" onClick={() => navigate("/mplanipret/messages")} />
+            <Kpi icon={<Calendar className="w-3.5 h-3.5" />} value={stats.meetings} label={t("home.kpi.meetings")} accent="var(--pp-brand-accent-2)" />
+            <Kpi icon={<Flame className="w-3.5 h-3.5" />} value={stats.hotLeads} label={t("home.kpi.hotLeads")} accent="#C9582A" />
+            <Kpi icon={<CheckSquare className="w-3.5 h-3.5" />} value={stats.tasks} label={t("home.kpi.tasks")} accent="var(--pp-agent)" />
+            <Kpi icon={<Voicemail className="w-3.5 h-3.5" />} value={stats.voicemails} label={t("home.kpi.voicemails")} accent="#6C5CE7" onClick={() => navigate("/mplanipret/voicemail")} />
+            <Kpi icon={<Mail className="w-3.5 h-3.5" />} value={stats.outbound} label={t("home.kpi.sent")} accent="#7A8FB0" />
+            <Kpi icon={<UsersIcon className="w-3.5 h-3.5" />} value={totalComms} label={t("home.kpi.total")} accent="var(--pp-brand-accent-2)" />
           </>
         )}
       </section>
@@ -352,7 +354,7 @@ export default function MHome() {
       {/* ===== HOT LEADS ===== */}
       {hotLeads.length > 0 && (
         <section className="pp-card p-4">
-          <SectionHead icon={<Flame className="w-4 h-4" style={{ color: "#C9582A" }} />} title="Leads chauds" count={hotLeads.length} />
+          <SectionHead icon={<Flame className="w-4 h-4" style={{ color: "#C9582A" }} />} title={t("home.hotLeads")} count={hotLeads.length} />
           <ul className="space-y-1.5">
             {hotLeads.map((l) => {
               const name = l.from_name || l.from_number || l.to_name || l.to_number;
@@ -363,13 +365,13 @@ export default function MHome() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold truncate" style={{ color: "var(--pp-text-primary)" }}>{name ?? "—"}</p>
                     <p className="text-[11px]" style={{ color: "var(--pp-text-muted)" }}>
-                      {TEMP_EMOJI.hot} Score {l.lead_score}/10
+                      {TEMP_EMOJI.hot} {t("home.score")} {l.lead_score}/10
                     </p>
                   </div>
                   <button onClick={() => openDialer(phone ?? undefined)}
                     className="text-[11px] font-semibold px-3 py-1.5 rounded-lg text-white"
                     style={{ background: "#C9582A", fontFamily: "Urbanist,sans-serif" }}>
-                    Rappeler
+                    {t("common.callBack")}
                   </button>
                 </li>
               );
@@ -380,27 +382,27 @@ export default function MHome() {
 
       {/* ===== MEETINGS ===== */}
       <section className="pp-card p-4">
-        <SectionHead icon={<Calendar className="w-4 h-4" style={{ color: "var(--pp-brand-accent)" }} />} title="Rendez-vous à venir" count={meetings.length} />
+        <SectionHead icon={<Calendar className="w-4 h-4" style={{ color: "var(--pp-brand-accent)" }} />} title={t("home.upcomingMeetings")} count={meetings.length} />
         {statsLoading ? (
           <div className="space-y-2"><Shimmer className="h-10" /><Shimmer className="h-10" /></div>
         ) : meetings.length === 0 ? (
           <p className="text-xs text-center py-3" style={{ color: "var(--pp-text-muted)" }}>
-            Aucun rendez-vous cette semaine
+            {t("home.noMeetings")}
           </p>
         ) : (
           <ul className="space-y-2">
             {meetings.map((m) => {
-              const t = m.start_time ? new Date(m.start_time) : null;
+              const meetingDate = m.start_time ? new Date(m.start_time) : null;
               return (
                 <li key={m.id} className="flex items-center gap-3 py-2">
                   <div className="px-2.5 py-1.5 rounded-lg text-xs font-bold tabular-nums"
                     style={{ background: "rgba(59,111,160,0.10)", color: "var(--pp-brand-accent-2)", border: "1px solid rgba(59,111,160,0.25)", fontFamily: "Urbanist,sans-serif" }}>
-                    {t ? t.toLocaleDateString("fr-CA", { day: "2-digit", month: "short" }) : "—"}
+                    {meetingDate ? meetingDate.toLocaleDateString(lang === "en" ? "en-CA" : "fr-CA", { day: "2-digit", month: "short" }) : "—"}
                     {" "}
-                    {t ? t.toLocaleTimeString("fr-CA", { hour: "2-digit", minute: "2-digit" }) : ""}
+                    {meetingDate ? meetingDate.toLocaleTimeString(lang === "en" ? "en-CA" : "fr-CA", { hour: "2-digit", minute: "2-digit" }) : ""}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm truncate font-medium" style={{ color: "var(--pp-text-primary)" }}>{m.title ?? "(Sans titre)"}</p>
+                    <p className="text-sm truncate font-medium" style={{ color: "var(--pp-text-primary)" }}>{m.title ?? t("home.untitled")}</p>
                     {m.attendee_name && (
                       <p className="text-[11px] truncate" style={{ color: "var(--pp-text-muted)" }}>{m.attendee_name}</p>
                     )}
@@ -415,7 +417,7 @@ export default function MHome() {
       {/* ===== TASKS / REMINDERS ===== */}
       {dueReminders.length > 0 && (
         <section className="pp-card p-4">
-          <SectionHead icon={<CheckSquare className="w-4 h-4" style={{ color: "var(--pp-agent)" }} />} title="Tâches à faire" count={dueReminders.length} />
+          <SectionHead icon={<CheckSquare className="w-4 h-4" style={{ color: "var(--pp-agent)" }} />} title={t("home.tasksDue")} count={dueReminders.length} />
           <ul className="space-y-1.5">
             {dueReminders.map((r) => (
               <li key={r.id} className="flex items-center gap-2 py-2 px-2 rounded-lg"
@@ -451,16 +453,16 @@ export default function MHome() {
       {/* ===== RECENT CALLS ===== */}
       <section className="pp-card p-4">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold pp-heading">Appels récents</h2>
+          <h2 className="text-sm font-semibold pp-heading">{t("home.recentCalls")}</h2>
           <button onClick={() => navigate("/mplanipret/calls")}
             className="text-[11px] flex items-center gap-0.5" style={{ color: "var(--pp-brand-accent)" }}>
-            Tout voir <ChevronRight className="w-3 h-3" />
+            {t("home.seeAll")} <ChevronRight className="w-3 h-3" />
           </button>
         </div>
         {statsLoading ? (
           <div className="space-y-2">{[0,1,2].map((i) => <Shimmer key={i} className="h-10" />)}</div>
         ) : recent.length === 0 ? (
-          <p className="text-sm py-4 text-center" style={{ color: "var(--pp-text-muted)" }}>Aucun appel</p>
+          <p className="text-sm py-4 text-center" style={{ color: "var(--pp-text-muted)" }}>{t("home.noCalls")}</p>
         ) : (
           <ul className="space-y-1">
             {recent.map((c) => {
@@ -480,16 +482,16 @@ export default function MHome() {
                   </span>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate flex items-center gap-1.5" style={{ color: "var(--pp-text-primary)" }}>
-                      {name ?? "Inconnu"}
+                      {name ?? t("common.unknown")}
                       {c.ai_summary && (
                         <span className="text-[8px] px-1.5 py-0.5 rounded-full font-bold"
                           style={{ background: "rgba(108,92,231,0.10)", color: "var(--pp-agent)", border: "1px solid rgba(108,92,231,0.30)", fontFamily: "Urbanist,sans-serif" }}>
-                          🤖 IA
+                          🤖 {t("home.ai")}
                         </span>
                       )}
                     </p>
                     <p className="text-[11px]" style={{ color: "var(--pp-text-muted)" }}>
-                      {c.started_at ? new Date(c.started_at).toLocaleTimeString("fr-CA", { hour: "2-digit", minute: "2-digit" }) : ""}
+                      {c.started_at ? new Date(c.started_at).toLocaleTimeString(lang === "en" ? "en-CA" : "fr-CA", { hour: "2-digit", minute: "2-digit" }) : ""}
                     </p>
                   </div>
                 </li>

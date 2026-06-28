@@ -6,6 +6,7 @@ import { Plus, X, Phone, Sparkles } from "lucide-react";
 import CoachOverlay from "@/components/planipret/ava/CoachOverlay";
 import { callAva, type AvaSuggestion } from "@/services/avaProactive";
 import type { PlanipretMobileContext } from "../PlanipretMobile";
+import { useMplanipretLang } from "@/hooks/useMplanipretLang";
 
 type Card = {
   id: string;
@@ -18,18 +19,19 @@ type Card = {
   updated_at: string;
 };
 
-const STAGES: Array<{ key: string; label: string; emoji: string }> = [
-  { key: "new", label: "Nouveau", emoji: "🆕" },
-  { key: "qualified", label: "Qualifié", emoji: "✅" },
-  { key: "analyzing", label: "En analyse", emoji: "🔍" },
-  { key: "submitted", label: "Soumis", emoji: "📋" },
-  { key: "approved", label: "Approuvé", emoji: "🎉" },
-  { key: "closed", label: "Fermé", emoji: "🔒" },
+const STAGES: Array<{ key: string; emoji: string }> = [
+  { key: "new", emoji: "🆕" },
+  { key: "qualified", emoji: "✅" },
+  { key: "analyzing", emoji: "🔍" },
+  { key: "submitted", emoji: "📋" },
+  { key: "approved", emoji: "🎉" },
+  { key: "closed", emoji: "🔒" },
 ];
 
 const PRIMARY = "var(--pp-brand-accent-2)";
 
 export default function MPipeline() {
+  const { t } = useMplanipretLang();
   const { profile, openDialer, openAva } = useOutletContext<PlanipretMobileContext>();
   const [cards, setCards] = useState<Card[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,8 +52,8 @@ export default function MPipeline() {
     const prev = cards;
     setCards((cs) => cs.map((c) => c.id === id ? { ...c, stage } : c));
     const { error } = await supabase.from("planipret_pipeline").update({ stage }).eq("id", id);
-    if (error) { setCards(prev); toast.error("Erreur"); return; }
-    toast.success("Étape mise à jour");
+    if (error) { setCards(prev); toast.error(t("pipeline.error")); return; }
+    toast.success(t("pipeline.stageUpdated"));
     // Best-effort Maestro sync
     const card = cards.find((c) => c.id === id);
     if (card?.maestro_contact_id) {
@@ -63,8 +65,8 @@ export default function MPipeline() {
     <div className="h-full flex flex-col" style={{ background: "#F4F6F9" }}>
       <div className="px-4 pt-5 pb-3 bg-white border-b border-slate-100 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: "var(--pp-text-primary)" }}>📊 Pipeline</h1>
-          <p className="text-xs text-slate-500">{cards.length} dossier{cards.length > 1 ? "s" : ""}</p>
+          <h1 className="text-2xl font-bold" style={{ color: "var(--pp-text-primary)" }}>{t("pipeline.title")}</h1>
+          <p className="text-xs text-slate-500">{cards.length} {cards.length > 1 ? t("pipeline.files") : t("pipeline.file")}</p>
         </div>
         <button onClick={() => setAddOpen(true)} className="w-9 h-9 rounded-full text-white flex items-center justify-center" style={{ background: PRIMARY }}>
           <Plus className="w-5 h-5" />
@@ -72,7 +74,7 @@ export default function MPipeline() {
       </div>
 
       {loading ? (
-        <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">Chargement…</div>
+        <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">{t("pipeline.loading")}</div>
       ) : (
         <div className="flex-1 overflow-x-auto">
           <div className="flex gap-3 p-3 h-full" style={{ width: "max-content" }}>
@@ -81,12 +83,12 @@ export default function MPipeline() {
               return (
                 <div key={s.key} className="w-[260px] flex flex-col bg-white rounded-2xl shadow-sm">
                   <div className="px-3 py-2 border-b border-slate-100 flex items-center justify-between">
-                    <span className="text-xs font-semibold" style={{ color: "var(--pp-text-primary)" }}>{s.emoji} {s.label}</span>
+                    <span className="text-xs font-semibold" style={{ color: "var(--pp-text-primary)" }}>{s.emoji} {t(`pipeline.stages.${s.key}`)}</span>
                     <span className="text-[11px] text-slate-400 tabular-nums">{items.length}</span>
                   </div>
                   <div className="flex-1 p-2 space-y-2 overflow-y-auto">
                     {items.length === 0 ? (
-                      <p className="text-[11px] text-slate-300 text-center py-4">Aucun dossier</p>
+                      <p className="text-[11px] text-slate-300 text-center py-4">{t("pipeline.noFile")}</p>
                     ) : items.map((c) => (
                       <button key={c.id} onClick={() => setSelected(c)}
                         className="w-full text-left bg-slate-50 hover:bg-slate-100 rounded-lg p-2.5">
@@ -117,6 +119,7 @@ export default function MPipeline() {
 }
 
 function DetailSheet({ card, profile, openDialer, openAva, onClose, onMove, onChanged }: { card: Card; profile: any; openDialer: (n?: string) => void; openAva: () => void; onClose: () => void; onMove: (id: string, stage: string) => void; onChanged: () => void }) {
+  const { t } = useMplanipretLang();
   const [notes, setNotes] = useState(card.notes ?? "");
   const [busy, setBusy] = useState(false);
   const [coachOpen, setCoachOpen] = useState(false);
@@ -128,7 +131,7 @@ function DetailSheet({ card, profile, openDialer, openAva, onClose, onMove, onCh
     setBusy(true);
     await supabase.from("planipret_pipeline").update({ notes }).eq("id", card.id);
     setBusy(false);
-    toast.success("Notes enregistrées");
+    toast.success(t("pipeline.notesSaved"));
     onChanged();
   };
 
@@ -137,10 +140,10 @@ function DetailSheet({ card, profile, openDialer, openAva, onClose, onMove, onCh
     setCoachLoading(true);
     setCoachReply("");
     setCoachSuggestions([]);
-    const stageLabel = STAGES.find((s) => s.key === card.stage)?.label ?? card.stage;
+    const stageLabel = t(`pipeline.stages.${card.stage}`) || card.stage;
     const res = await callAva({
       mode: "recommend",
-      message: `Dossier "${card.contact_name}" à l'étape "${stageLabel}". Quelle est la meilleure prochaine action pour faire avancer ce deal ?`,
+      message: t("pipeline.coachPrompt").replace("{name}", card.contact_name).replace("{stage}", stageLabel),
       context: { card: { name: card.contact_name, number: card.contact_number, stage: card.stage, notes: card.notes }, broker: profile?.full_name },
     });
     setCoachReply(res.reply);
@@ -163,21 +166,21 @@ function DetailSheet({ card, profile, openDialer, openAva, onClose, onMove, onCh
         <button onClick={askCoach}
           className="w-full mb-3 py-2 rounded-lg flex items-center justify-center gap-1.5 text-white text-sm font-semibold"
           style={{ background: "linear-gradient(135deg,#2D1A5A,#9B7FE8)" }}>
-          <Sparkles className="w-4 h-4" /> Conseil AVA
+          <Sparkles className="w-4 h-4" /> {t("pipeline.avaAdvice")}
         </button>
 
-        <label className="block text-xs text-slate-500 mb-1">Étape</label>
+        <label className="block text-xs text-slate-500 mb-1">{t("pipeline.stage")}</label>
         <select value={card.stage} onChange={(e) => onMove(card.id, e.target.value)}
           className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm mb-3">
-          {STAGES.map((s) => <option key={s.key} value={s.key}>{s.emoji} {s.label}</option>)}
+          {STAGES.map((s) => <option key={s.key} value={s.key}>{s.emoji} {t(`pipeline.stages.${s.key}`)}</option>)}
         </select>
 
-        <label className="block text-xs text-slate-500 mb-1">Notes</label>
+        <label className="block text-xs text-slate-500 mb-1">{t("pipeline.notes")}</label>
         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={4} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm mb-3" />
 
         <div className="flex gap-2">
           <button onClick={saveNotes} disabled={busy} className="flex-1 py-2.5 rounded-lg text-white text-sm font-semibold" style={{ background: PRIMARY }}>
-            {busy ? "…" : "Enregistrer"}
+            {busy ? "…" : t("common.save")}
           </button>
           {!card.maestro_contact_id && (
             <button onClick={async () => {
@@ -185,11 +188,11 @@ function DetailSheet({ card, profile, openDialer, openAva, onClose, onMove, onCh
               const mid = (data as any)?.contact_id ?? (data as any)?.id;
               if (mid) {
                 await supabase.from("planipret_pipeline").update({ maestro_contact_id: mid }).eq("id", card.id);
-                toast.success("Créé dans Maestro");
+                toast.success(t("pipeline.createdInMaestro"));
                 onChanged();
-              } else toast.error("Échec Maestro");
+              } else toast.error(t("pipeline.maestroFailed"));
             }} className="px-3 py-2.5 rounded-lg text-sm border border-slate-200 text-slate-700">
-              Créer dans Maestro
+              {t("pipeline.createInMaestro")}
             </button>
           )}
         </div>
@@ -197,8 +200,8 @@ function DetailSheet({ card, profile, openDialer, openAva, onClose, onMove, onCh
 
       <CoachOverlay
         open={coachOpen}
-        title={`Conseil AVA — ${card.contact_name}`}
-        subtitle={coachLoading ? "AVA réfléchit…" : coachReply}
+        title={`${t("pipeline.avaAdvice")} — ${card.contact_name}`}
+        subtitle={coachLoading ? t("pipeline.thinking") : coachReply}
         suggestions={coachSuggestions}
         ctx={{ openDialer, openAva, userId: profile?.user_id }}
         onClose={() => setCoachOpen(false)}
@@ -208,36 +211,37 @@ function DetailSheet({ card, profile, openDialer, openAva, onClose, onMove, onCh
 }
 
 function AddSheet({ userId, onClose, onAdded }: { userId: string; onClose: () => void; onAdded: () => void }) {
+  const { t } = useMplanipretLang();
   const [name, setName] = useState("");
   const [number, setNumber] = useState("");
   const [stage, setStage] = useState("new");
   const [busy, setBusy] = useState(false);
   const save = async () => {
-    if (!name.trim()) { toast.error("Nom requis"); return; }
+    if (!name.trim()) { toast.error(t("pipeline.nameRequired")); return; }
     setBusy(true);
     const { error } = await supabase.from("planipret_pipeline").insert({ user_id: userId, contact_name: name, contact_number: number || null, stage });
     setBusy(false);
-    if (error) { toast.error("Erreur"); return; }
-    toast.success("Dossier ajouté");
+    if (error) { toast.error(t("pipeline.error")); return; }
+    toast.success(t("pipeline.fileAdded"));
     onAdded();
   };
   return (
     <div className="absolute inset-0 z-40 flex items-end bg-black/40" onClick={onClose}>
       <div className="w-full bg-white rounded-t-3xl p-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-bold" style={{ color: "var(--pp-text-primary)" }}>Nouveau dossier</h2>
+          <h2 className="text-lg font-bold" style={{ color: "var(--pp-text-primary)" }}>{t("pipeline.newFile")}</h2>
           <button onClick={onClose}><X className="w-5 h-5 text-slate-500" /></button>
         </div>
-        <label className="block text-xs text-slate-500 mb-1">Nom du contact</label>
+        <label className="block text-xs text-slate-500 mb-1">{t("pipeline.contactName")}</label>
         <input value={name} onChange={(e) => setName(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm mb-3" />
-        <label className="block text-xs text-slate-500 mb-1">Numéro</label>
+        <label className="block text-xs text-slate-500 mb-1">{t("pipeline.number")}</label>
         <input value={number} onChange={(e) => setNumber(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm mb-3" />
-        <label className="block text-xs text-slate-500 mb-1">Étape initiale</label>
+        <label className="block text-xs text-slate-500 mb-1">{t("pipeline.initialStage")}</label>
         <select value={stage} onChange={(e) => setStage(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm mb-3">
-          {STAGES.map((s) => <option key={s.key} value={s.key}>{s.emoji} {s.label}</option>)}
+          {STAGES.map((s) => <option key={s.key} value={s.key}>{s.emoji} {t(`pipeline.stages.${s.key}`)}</option>)}
         </select>
         <button onClick={save} disabled={busy} className="w-full py-2.5 rounded-lg text-white text-sm font-semibold" style={{ background: PRIMARY }}>
-          {busy ? "…" : "Ajouter"}
+          {busy ? "…" : t("pipeline.add")}
         </button>
       </div>
     </div>

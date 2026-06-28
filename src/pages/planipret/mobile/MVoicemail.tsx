@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Mic, Play, Pause, Phone, Save, Forward, Trash2, FileText, X } from "lucide-react";
 import type { PlanipretMobileContext } from "../PlanipretMobile";
 import GreetingStudio from "@/components/planipret/mobile/voicemail/GreetingStudio";
+import { useMplanipretLang } from "@/hooks/useMplanipretLang";
 
 const PRIMARY = "var(--pp-brand-accent-2)";
 
@@ -23,24 +24,26 @@ type VM = {
   created_at: string;
 };
 
-const fmtDur = (s: number | null) => {
+const fmtDur = (s: number | null, lang: "fr" | "en") => {
   if (!s) return "—";
   const m = Math.floor(s / 60); const r = s % 60;
-  if (m === 0) return `${r} sec`;
-  return `${m} min ${String(r).padStart(2, "0")} sec`;
+  if (m === 0) return lang === "en" ? `${r}s` : `${r} sec`;
+  return lang === "en" ? `${m}m ${String(r).padStart(2, "0")}s` : `${m} min ${String(r).padStart(2, "0")} sec`;
 };
 
-const fmtDate = (iso: string) => {
+const fmtDate = (iso: string, lang: "fr" | "en", t: (key: string) => string) => {
   const d = new Date(iso);
   const now = new Date();
   const yest = new Date(); yest.setDate(now.getDate() - 1);
-  const hh = `${String(d.getHours()).padStart(2, "0")}h${String(d.getMinutes()).padStart(2, "0")}`;
-  if (d.toDateString() === now.toDateString()) return `Aujourd'hui ${hh}`;
-  if (d.toDateString() === yest.toDateString()) return `Hier ${hh}`;
-  return d.toLocaleDateString("fr-CA", { day: "2-digit", month: "short" }) + ` ${hh}`;
+  const locale = lang === "en" ? "en-CA" : "fr-CA";
+  const hh = d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
+  if (d.toDateString() === now.toDateString()) return `${t("common.today")} ${hh}`;
+  if (d.toDateString() === yest.toDateString()) return `${t("common.yesterday")} ${hh}`;
+  return d.toLocaleDateString(locale, { day: "2-digit", month: "short" }) + ` ${hh}`;
 };
 
 export default function MVoicemail() {
+  const { t, lang } = useMplanipretLang();
   const { profile, openDialer, registerRefresh, reloadProfile } = useOutletContext<PlanipretMobileContext>();
   const [tab, setTab] = useState<"greeting" | "inbox" | "saved">("greeting");
   const [items, setItems] = useState<VM[]>([]);
@@ -70,7 +73,7 @@ export default function MVoicemail() {
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "planipret_voicemails", filter: `user_id=eq.${profile.user_id}` }, (payload) => {
         const v = payload.new as VM;
         setItems((p) => [v, ...p]);
-        toast(`📬 Nouveau voicemail de ${v.from_number ?? "inconnu"}`);
+        toast(`📬 ${t("voicemail.newFrom")} ${v.from_number ?? t("voicemail.unknownLower")}`);
       })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
@@ -86,7 +89,7 @@ export default function MVoicemail() {
   };
 
   const removeVm = async (vm: VM) => {
-    if (!confirm("Supprimer ce voicemail ?")) return;
+    if (!confirm(t("voicemail.deleteConfirm"))) return;
     if (vm.ns_vm_id) {
       await supabase.functions.invoke("ns-voicemail", {
         method: "DELETE" as any,
@@ -95,18 +98,18 @@ export default function MVoicemail() {
     }
     await supabase.from("planipret_voicemails").delete().eq("id", vm.id);
     setItems((p) => p.filter((x) => x.id !== vm.id));
-    toast.success("Voicemail supprimé");
+    toast.success(t("voicemail.deleted"));
   };
 
   const saveVm = async (vm: VM) => {
     await supabase.from("planipret_voicemails").update({ folder: "saved" }).eq("id", vm.id);
     setItems((p) => p.map((x) => x.id === vm.id ? { ...x, folder: "saved" } : x));
-    toast.success("Voicemail sauvegardé");
+    toast.success(t("voicemail.saved"));
   };
 
   const fetchTranscript = async (vm: VM) => {
     const { data, error } = await supabase.functions.invoke("ns-transcription", { body: { vm_id: vm.ns_vm_id ?? vm.id } });
-    if (error || (data as any)?.success === false) { toast.error("Échec de la transcription"); return; }
+    if (error || (data as any)?.success === false) { toast.error(t("voicemail.transcriptFailed")); return; }
     const txt = (data as any)?.transcript ?? (data as any)?.data?.transcript ?? "";
     if (txt) {
       await supabase.from("planipret_voicemails").update({ transcript: txt }).eq("id", vm.id);
@@ -118,7 +121,7 @@ export default function MVoicemail() {
     <div className="p-4">
       <header className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <h1 className="text-xl font-bold" style={{ color: "var(--pp-text-primary)" }}>Boîte vocale</h1>
+          <h1 className="text-xl font-bold" style={{ color: "var(--pp-text-primary)" }}>{t("voicemail.title")}</h1>
           {unreadInbox > 0 && <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-red-500 text-white text-[10px] font-semibold flex items-center justify-center">{unreadInbox}</span>}
         </div>
       </header>
@@ -128,7 +131,7 @@ export default function MVoicemail() {
           <button key={k} onClick={() => setTab(k)}
             className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${tab === k ? "text-white shadow-sm" : "bg-white text-slate-600"}`}
             style={tab === k ? { background: PRIMARY } : undefined}>
-            {k === "greeting" ? "🎙️ Ma boîte" : k === "inbox" ? "📬 Reçus" : "💾 Sauvegardés"}
+            {t(`voicemail.tabs.${k}`)}
           </button>
         ))}
       </div>
@@ -139,7 +142,7 @@ export default function MVoicemail() {
         <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="bg-white rounded-2xl h-16 animate-pulse" />)}</div>
       ) : filtered.length === 0 ? (
         <div className="bg-white rounded-2xl p-8 text-center shadow-sm mt-8 text-slate-500 text-sm">
-          {tab === "inbox" ? "📬 Aucun voicemail reçu" : "💾 Aucun voicemail sauvegardé"}
+          {tab === "inbox" ? t("voicemail.emptyInbox") : t("voicemail.emptySaved")}
         </div>
       ) : (
         <div className="space-y-2">
@@ -154,8 +157,8 @@ export default function MVoicemail() {
                   {!vm.is_read && <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-blue-500 border-2 border-white" />}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className={`text-sm truncate ${vm.is_read ? "" : "font-semibold"}`} style={{ color: "var(--pp-text-primary)" }}>{vm.from_name || vm.from_number || "Inconnu"}</p>
-                  <p className="text-[11px] text-slate-500">{fmtDate(vm.received_at ?? vm.created_at)} · {fmtDur(vm.duration_seconds)}</p>
+                  <p className={`text-sm truncate ${vm.is_read ? "" : "font-semibold"}`} style={{ color: "var(--pp-text-primary)" }}>{vm.from_name || vm.from_number || t("common.unknown")}</p>
+                  <p className="text-[11px] text-slate-500">{fmtDate(vm.received_at ?? vm.created_at, lang, t)} · {fmtDur(vm.duration_seconds, lang)}</p>
                 </div>
                 <div className="w-8 h-8 rounded-full flex items-center justify-center text-white" style={{ background: PRIMARY }}>
                   {expanded === vm.id ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
@@ -170,15 +173,15 @@ export default function MVoicemail() {
                       <div className="bg-slate-50 rounded-lg p-2 text-xs text-slate-700 whitespace-pre-wrap">{vm.transcript}</div>
                     ) : (
                       <button onClick={() => fetchTranscript(vm)} className="w-full py-2 rounded-lg bg-slate-100 text-xs font-medium text-slate-700 flex items-center justify-center gap-1.5">
-                        <FileText className="w-3.5 h-3.5" /> Obtenir la transcription
+                        <FileText className="w-3.5 h-3.5" /> {t("voicemail.getTranscript")}
                       </button>
                     )}
                   </div>
                   <div className="grid grid-cols-4 gap-1.5 mt-3">
-                    <ActionBtn icon={<Phone className="w-4 h-4" />} label="Rappeler" onClick={() => openDialer(vm.from_number ?? "")} />
-                    {tab === "inbox" && <ActionBtn icon={<Save className="w-4 h-4" />} label="Sauver" onClick={() => saveVm(vm)} />}
-                    <ActionBtn icon={<Forward className="w-4 h-4" />} label="Transfert" onClick={() => setForwardFor(vm)} />
-                    <ActionBtn icon={<Trash2 className="w-4 h-4" />} label="Suppr." onClick={() => removeVm(vm)} danger />
+                    <ActionBtn icon={<Phone className="w-4 h-4" />} label={t("common.callBack")} onClick={() => openDialer(vm.from_number ?? "")} />
+                    {tab === "inbox" && <ActionBtn icon={<Save className="w-4 h-4" />} label={t("voicemail.saveShort")} onClick={() => saveVm(vm)} />}
+                    <ActionBtn icon={<Forward className="w-4 h-4" />} label={t("voicemail.forward")} onClick={() => setForwardFor(vm)} />
+                    <ActionBtn icon={<Trash2 className="w-4 h-4" />} label={t("voicemail.deleteShort")} onClick={() => removeVm(vm)} danger />
                   </div>
                 </div>
               )}
@@ -203,6 +206,7 @@ function ActionBtn({ icon, label, onClick, danger }: { icon: React.ReactNode; la
 }
 
 function AudioPlayer({ vm }: { vm: VM }) {
+  const { t } = useMplanipretLang();
   const [src, setSrc] = useState<string | null>(vm.audio_url);
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -244,12 +248,13 @@ function AudioPlayer({ vm }: { vm: VM }) {
         <span className="text-[10px] text-slate-500 tabular-nums">{fmtT(progress)} / {fmtT(dur || 0)}</span>
         <button onClick={cycleSpeed} className="px-2 py-1 rounded bg-white text-[10px] font-semibold text-slate-700">{speed}x</button>
       </div>
-      {!src && <p className="text-[10px] text-slate-400 mt-1">Chargement de l'audio…</p>}
+      {!src && <p className="text-[10px] text-slate-400 mt-1">{t("voicemail.audioLoading")}</p>}
     </div>
   );
 }
 
 function ForwardModal({ vm, onClose }: { vm: VM; onClose: () => void }) {
+  const { t } = useMplanipretLang();
   const [ext, setExt] = useState("");
   const [busy, setBusy] = useState(false);
   const submit = async () => {
@@ -257,20 +262,20 @@ function ForwardModal({ vm, onClose }: { vm: VM; onClose: () => void }) {
     setBusy(true);
     const { data, error } = await supabase.functions.invoke("ns-voicemail/forward", { body: { vm_id: vm.ns_vm_id ?? vm.id, to_user: ext.trim() } });
     setBusy(false);
-    if (error || (data as any)?.success === false) { toast.error("Échec du transfert"); return; }
-    toast.success("Voicemail transféré");
+    if (error || (data as any)?.success === false) { toast.error(t("voicemail.forwardFailed")); return; }
+    toast.success(t("voicemail.forwarded"));
     onClose();
   };
   return (
     <div className="absolute inset-0 z-40 flex items-end md:items-center md:justify-center bg-black/40" onClick={onClose}>
       <div className="bg-white w-full md:w-[360px] rounded-t-2xl md:rounded-2xl p-4" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="font-semibold" style={{ color: "var(--pp-text-primary)" }}>Transférer le voicemail</h2>
+          <h2 className="font-semibold" style={{ color: "var(--pp-text-primary)" }}>{t("voicemail.forwardTitle")}</h2>
           <button onClick={onClose} className="p-1 rounded-full hover:bg-slate-100"><X className="w-4 h-4" /></button>
         </div>
-        <input value={ext} onChange={(e) => setExt(e.target.value)} placeholder="Extension ou utilisateur" className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm" />
+        <input value={ext} onChange={(e) => setExt(e.target.value)} placeholder={t("voicemail.extensionOrUser")} className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm" />
         <button onClick={submit} disabled={!ext.trim() || busy} className="w-full mt-3 py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-50" style={{ background: PRIMARY }}>
-          {busy ? "Envoi…" : "Transférer"}
+          {busy ? t("voicemail.sending") : t("voicemail.transfer")}
         </button>
       </div>
     </div>

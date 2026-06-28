@@ -13,6 +13,7 @@ import AvaHistorySheet from "@/components/planipret/ava/AvaHistorySheet";
 import CoachOverlay from "@/components/planipret/ava/CoachOverlay";
 import { callAva, type AvaSuggestion } from "@/services/avaProactive";
 import { useAvaDraft } from "@/hooks/useAvaDraft";
+import { useMplanipretLang } from "@/hooks/useMplanipretLang";
 
 type SubTab = "sms" | "team" | "ava" | "emails" | "roster";
 
@@ -37,18 +38,19 @@ const initials = (s: string) => {
   return clean.slice(-2).toUpperCase();
 };
 
-const fmtTime = (iso: string) => {
+const fmtTime = (iso: string, lang: "fr" | "en" = "fr", t?: (key: string) => string) => {
   const d = new Date(iso);
   const now = new Date();
   const yest = new Date(); yest.setDate(now.getDate() - 1);
   if (d.toDateString() === now.toDateString()) {
-    return `${String(d.getHours()).padStart(2, "0")}h${String(d.getMinutes()).padStart(2, "0")}`;
+    return d.toLocaleTimeString(lang === "en" ? "en-CA" : "fr-CA", { hour: "2-digit", minute: "2-digit" });
   }
-  if (d.toDateString() === yest.toDateString()) return "Hier";
-  return d.toLocaleDateString("fr-CA", { day: "2-digit", month: "2-digit" });
+  if (d.toDateString() === yest.toDateString()) return t ? t("common.yesterday") : (lang === "en" ? "Yesterday" : "Hier");
+  return d.toLocaleDateString(lang === "en" ? "en-CA" : "fr-CA", { day: "2-digit", month: "2-digit" });
 };
 
 export default function MMessages() {
+  const { t } = useMplanipretLang();
   const { profile, openDialer, openAva, registerRefresh } = useOutletContext<PlanipretMobileContext>();
   const [sub, setSub] = useState<SubTab>("sms");
 
@@ -58,23 +60,23 @@ export default function MMessages() {
         className="px-4 pt-5 pb-3"
         style={{ background: "var(--pp-bg-deep)", borderBottom: "1px solid var(--pp-bg-border)" }}
       >
-        <h1 className="text-2xl font-bold mb-3" style={{ color: "var(--pp-text-primary)" }}>Messages</h1>
+        <h1 className="text-2xl font-bold mb-3" style={{ color: "var(--pp-text-primary)" }}>{t("messages.title")}</h1>
         <div
           className="flex rounded-full p-1"
           style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)" }}
         >
           {[
-            { k: "sms" as SubTab, label: "SMS", Icon: MessageSquare },
-            { k: "team" as SubTab, label: "Équipe", Icon: Users },
-            { k: "roster" as SubTab, label: "Annuaire", Icon: Users },
-            { k: "ava" as SubTab, label: "AVA", Icon: Bot },
-            { k: "emails" as SubTab, label: "Emails", Icon: Mail },
-          ].map((t) => {
-            const active = sub === t.k;
+            { k: "sms" as SubTab, label: t("messages.tabs.sms"), Icon: MessageSquare },
+            { k: "team" as SubTab, label: t("messages.tabs.team"), Icon: Users },
+            { k: "roster" as SubTab, label: t("messages.tabs.roster"), Icon: Users },
+            { k: "ava" as SubTab, label: t("messages.tabs.ava"), Icon: Bot },
+            { k: "emails" as SubTab, label: t("messages.tabs.emails"), Icon: Mail },
+          ].map((item) => {
+            const active = sub === item.k;
             return (
               <button
-                key={t.k}
-                onClick={() => setSub(t.k)}
+                key={item.k}
+                onClick={() => setSub(item.k)}
                 className="flex-1 py-2 text-[11px] font-semibold rounded-full transition flex items-center justify-center gap-1"
                 style={
                   active
@@ -86,7 +88,7 @@ export default function MMessages() {
                     : { color: "var(--pp-text-muted)" }
                 }
               >
-                <t.Icon className="w-3.5 h-3.5" /> {t.label}
+                <item.Icon className="w-3.5 h-3.5" /> {item.label}
               </button>
             );
           })}
@@ -109,6 +111,7 @@ export default function MMessages() {
 // SMS TAB (original threads)
 // ============================================================
 function SmsList({ profile, openDialer, registerRefresh }: any) {
+  const { t } = useMplanipretLang();
   const myExt = profile?.extension ?? "";
   const [messages, setMessages] = useState<Msg[]>([]);
   const [loading, setLoading] = useState(true);
@@ -183,7 +186,7 @@ function SmsList({ profile, openDialer, registerRefresh }: any) {
             boxShadow: "0 2px 12px rgba(46,155,220,0.4)",
           }}
         >
-          <Plus className="w-3.5 h-3.5" /> Nouveau
+          <Plus className="w-3.5 h-3.5" /> {t("common.new")}
         </button>
       </div>
 
@@ -194,13 +197,13 @@ function SmsList({ profile, openDialer, registerRefresh }: any) {
           ))}
         </div>
       ) : threads.length === 0 ? (
-        <EmptyState Icon={MessageSquare} title="Aucun message" sub="Touchez « Nouveau » pour démarrer." />
+        <EmptyState Icon={MessageSquare} title={t("messages.noMessages")} sub={t("messages.startNew")} />
       ) : (
         <ul className="space-y-1.5">
-          {threads.map((t) => (
-            <li key={t.number}>
+          {threads.map((thread) => (
+            <li key={thread.number}>
               <button
-                onClick={() => setActiveThread(t.number)}
+                onClick={() => setActiveThread(thread.number)}
                 className="w-full px-3 py-3 flex items-center gap-3 rounded-2xl text-left active:opacity-80"
                 style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)" }}
               >
@@ -208,20 +211,20 @@ function SmsList({ profile, openDialer, registerRefresh }: any) {
                   className="w-11 h-11 rounded-full flex items-center justify-center text-white text-sm font-semibold flex-shrink-0"
                   style={{ background: "linear-gradient(135deg, var(--pp-brand-accent), var(--pp-brand-accent-2))" }}
                 >
-                  {initials(t.number)}
+                  {initials(thread.number)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-sm truncate" style={{ color: "var(--pp-text-primary)" }}>{t.number}</p>
-                  <p className="text-xs truncate" style={{ color: "var(--pp-text-muted)" }}>{t.preview || "(pas de contenu)"}</p>
+                  <p className="font-semibold text-sm truncate" style={{ color: "var(--pp-text-primary)" }}>{thread.number}</p>
+                  <p className="text-xs truncate" style={{ color: "var(--pp-text-muted)" }}>{thread.preview || t("messages.noContent")}</p>
                 </div>
                 <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                  <span className="text-[11px]" style={{ color: "var(--pp-text-faint)" }}>{fmtTime(t.last.created_at)}</span>
-                  {t.unread > 0 && (
+                  <span className="text-[11px]" style={{ color: "var(--pp-text-faint)" }}>{fmtTime(thread.last.created_at)}</span>
+                  {thread.unread > 0 && (
                     <span
                       className="min-w-[18px] h-[18px] px-1 rounded-full text-white text-[10px] font-semibold flex items-center justify-center"
                       style={{ background: "var(--pp-danger)" }}
                     >
-                      {t.unread}
+                      {thread.unread}
                     </span>
                   )}
                 </div>
@@ -239,15 +242,15 @@ function SmsList({ profile, openDialer, registerRefresh }: any) {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-3">
-              <h2 className="font-semibold" style={{ color: "var(--pp-text-primary)" }}>Nouveau message</h2>
-              <button onClick={() => setNewOpen(false)} className="p-1 rounded-full" style={{ color: "var(--pp-text-muted)" }}>
+              <h2 className="font-semibold" style={{ color: "var(--pp-text-primary)" }}>{t("messages.newMessage")}</h2>
+              <button onClick={() => setNewOpen(false)} className="p-1 rounded-full" style={{ color: "var(--pp-text-muted)" }} aria-label={t("common.close")}>
                 <X className="w-4 h-4" />
               </button>
             </div>
             <input
               type="tel"
               inputMode="tel"
-              placeholder="Numéro de téléphone"
+              placeholder={t("messages.phoneNumber")}
               value={newNumber}
               onChange={(e) => setNewNumber(e.target.value)}
               className="w-full px-3 py-2.5 rounded-lg text-sm outline-none"
@@ -263,7 +266,7 @@ function SmsList({ profile, openDialer, registerRefresh }: any) {
               className="w-full mt-3 py-2.5 rounded-lg text-white font-medium text-sm disabled:opacity-50"
               style={{ background: "linear-gradient(135deg, var(--pp-brand-accent), var(--pp-brand-accent-2))" }}
             >
-              Continuer
+              {t("common.continue")}
             </button>
           </div>
         </div>
@@ -276,6 +279,7 @@ function ThreadView({ number, myExt, userId, messages, onBack, onCall, onSent }:
   number: string; myExt: string; userId: string; messages: Msg[];
   onBack: () => void; onCall: (n: string) => void; onSent: (m: Msg) => void;
 }) {
+  const { t, lang } = useMplanipretLang();
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [tplOpen, setTplOpen] = useState(false);
@@ -306,7 +310,7 @@ function ThreadView({ number, myExt, userId, messages, onBack, onCall, onSent }:
     const { data, error } = await supabase.functions.invoke("ns-sms", { body: { to: number, message: body, type: "sms" } });
     setSending(false);
     if (error || (data as any)?.success === false) {
-      toast.error((data as any)?.error ?? error?.message ?? "Échec de l'envoi");
+      toast.error((data as any)?.error ?? error?.message ?? t("messages.sendFailed"));
     }
   };
 
@@ -316,18 +320,18 @@ function ThreadView({ number, myExt, userId, messages, onBack, onCall, onSent }:
         className="flex items-center gap-2 px-3 py-3"
         style={{ background: "var(--pp-bg-deep)", borderBottom: "1px solid var(--pp-bg-border)" }}
       >
-        <button onClick={onBack} className="p-1.5 rounded-full" style={{ color: "var(--pp-text-secondary)" }}>
+        <button onClick={onBack} className="p-1.5 rounded-full" style={{ color: "var(--pp-text-secondary)" }} aria-label={t("common.close")}>
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-sm truncate" style={{ color: "var(--pp-text-primary)" }}>{number}</p>
-          <p className="text-[11px]" style={{ color: "var(--pp-text-muted)" }}>{ordered.length} message{ordered.length > 1 ? "s" : ""}</p>
+          <p className="text-[11px]" style={{ color: "var(--pp-text-muted)" }}>{ordered.length} {ordered.length > 1 ? t("messages.messages") : t("messages.message")}</p>
         </div>
         <button
           onClick={() => setSumOpen(true)}
           className="p-1.5 rounded-full"
           style={{ color: "var(--pp-agent)" }}
-          title="Résumer avec AVA"
+          title={t("messages.summarizeWithAva")}
         >
           <Sparkles className="w-4 h-4" />
         </button>
@@ -336,7 +340,7 @@ function ThreadView({ number, myExt, userId, messages, onBack, onCall, onSent }:
           className="px-3 py-1.5 rounded-full text-white text-xs font-semibold flex items-center gap-1.5"
           style={{ background: "linear-gradient(135deg, var(--pp-success), #00A88A)" }}
         >
-          <Phone className="w-3.5 h-3.5" /> Appeler
+          <Phone className="w-3.5 h-3.5" /> {t("common.call")}
         </button>
       </header>
 
@@ -356,7 +360,7 @@ function ThreadView({ number, myExt, userId, messages, onBack, onCall, onSent }:
                   {m.body && <p className="whitespace-pre-wrap break-words">{m.body}</p>}
                 </div>
                 <p className={`text-[10px] mt-1 ${out ? "text-right" : "text-left"}`} style={{ color: "var(--pp-text-faint)" }}>
-                  {fmtTime(m.created_at)}{m.status === "sending" ? " · envoi…" : ""}
+                  {fmtTime(m.created_at, lang, t)}{m.status === "sending" ? ` · ${t("common.sending")}` : ""}
                 </p>
               </div>
             </div>
@@ -368,12 +372,12 @@ function ThreadView({ number, myExt, userId, messages, onBack, onCall, onSent }:
       <Composer
         text={text} setText={setText} onSend={send} sending={sending}
         leftAction={
-          <button onClick={() => setTplOpen(true)} className="p-2 rounded-full" style={{ color: "var(--pp-brand-accent)" }} title="Templates">
+          <button onClick={() => setTplOpen(true)} className="p-2 rounded-full" style={{ color: "var(--pp-brand-accent)" }} title={t("messages.templates")}>
             <Zap className="w-5 h-5" />
           </button>
         }
         extra={
-          <button onClick={() => toast("Pièce jointe : bientôt disponible")} className="p-2 rounded-full" style={{ color: "var(--pp-text-muted)" }}>
+          <button onClick={() => toast(t("messages.attachmentSoon"))} className="p-2 rounded-full" style={{ color: "var(--pp-text-muted)" }}>
             <Paperclip className="w-5 h-5" />
           </button>
         }
@@ -382,8 +386,8 @@ function ThreadView({ number, myExt, userId, messages, onBack, onCall, onSent }:
       <AvaSummarizeSheet
         open={sumOpen}
         source="sms"
-        title={`SMS avec ${number}`}
-        content={ordered.map((m) => `${m.direction === "outbound" ? "Moi" : number}: ${m.body ?? ""}`).join("\n")}
+        title={`${t("messages.smsWith")} ${number}`}
+        content={ordered.map((m) => `${m.direction === "outbound" ? t("common.me") : number}: ${m.body ?? ""}`).join("\n")}
         onClose={() => setSumOpen(false)}
         onInsert={(t) => setText((cur) => cur ? `${cur} ${t}` : t)}
       />
@@ -403,6 +407,7 @@ type TeamMsg = {
 };
 
 function TeamChat({ profile }: { profile: any }) {
+  const { t, lang } = useMplanipretLang();
   const [msgs, setMsgs] = useState<TeamMsg[]>([]);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
@@ -429,7 +434,7 @@ function TeamChat({ profile }: { profile: any }) {
         .select("id, full_name")
         .in("id", ids);
       const map: Record<string, string> = {};
-      (profs ?? []).forEach((p: any) => { map[p.id] = p.full_name ?? "Courtier"; });
+      (profs ?? []).forEach((p: any) => { map[p.id] = p.full_name ?? t("messages.broker"); });
       setSenderNames(map);
     }
   };
@@ -477,7 +482,7 @@ function TeamChat({ profile }: { profile: any }) {
           className="text-[11px] flex items-center gap-1 normal-case tracking-normal"
           style={{ color: "var(--pp-agent)" }}
         >
-          <Sparkles className="w-3 h-3" /> Résumer
+          <Sparkles className="w-3 h-3" /> {t("messages.summarize")}
         </button>
       </div>
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2">
@@ -486,11 +491,11 @@ function TeamChat({ profile }: { profile: any }) {
             <Loader2 className="w-5 h-5 animate-spin mx-auto" />
           </div>
         ) : msgs.length === 0 ? (
-          <EmptyState Icon={Users} title="Salon vide" sub="Soyez le premier à écrire à l'équipe." />
+          <EmptyState Icon={Users} title={t("messages.teamEmptyTitle")} sub={t("messages.teamEmptySub")} />
         ) : (
           msgs.map((m) => {
             const mine = m.sender_id === profile?.id;
-            const name = senderNames[m.sender_id] ?? "Courtier";
+            const name = senderNames[m.sender_id] ?? t("messages.broker");
             return (
               <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
                 <div className="max-w-[78%]">
@@ -501,7 +506,7 @@ function TeamChat({ profile }: { profile: any }) {
                     <p className="whitespace-pre-wrap break-words">{m.message}</p>
                   </div>
                   <p className={`text-[10px] mt-1 ${mine ? "text-right" : "text-left"}`} style={{ color: "var(--pp-text-faint)" }}>
-                    {fmtTime(m.created_at)}
+                    {fmtTime(m.created_at, lang, t)}
                   </p>
                 </div>
               </div>
@@ -510,13 +515,13 @@ function TeamChat({ profile }: { profile: any }) {
         )}
         <div ref={bottomRef} />
       </div>
-      <Composer text={text} setText={setText} onSend={send} sending={sending} placeholder="Message à l'équipe…" />
+      <Composer text={text} setText={setText} onSend={send} sending={sending} placeholder={t("messages.teamPlaceholder")} />
 
       <AvaSummarizeSheet
         open={sumOpen}
         source="team"
         title={`#${channel}`}
-        content={msgs.map((m) => `${senderNames[m.sender_id] ?? "Membre"}: ${m.message}`).join("\n")}
+        content={msgs.map((m) => `${senderNames[m.sender_id] ?? t("messages.member")}: ${m.message}`).join("\n")}
         onClose={() => setSumOpen(false)}
         onInsert={(t) => setText((cur) => cur ? `${cur} ${t}` : t)}
       />
@@ -536,6 +541,7 @@ type AvaMsg = {
 };
 
 function AvaChat({ profile, openAva, openDialer }: { profile: any; openAva: () => void; openDialer: (n?: string) => void }) {
+  const { t, lang } = useMplanipretLang();
   const [msgs, setMsgs] = useState<AvaMsg[]>([]);
   const [text, setText] = useAvaDraft(profile?.user_id, "ava-chat");
   const [sending, setSending] = useState(false);
@@ -602,20 +608,20 @@ function AvaChat({ profile, openAva, openDialer }: { profile: any; openAva: () =
         style={{ borderBottom: "1px solid var(--pp-bg-border)" }}
       >
         <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider" style={{ color: "var(--pp-agent)" }}>
-          <Sparkles className="w-3 h-3" /> Assistant AVA
+          <Sparkles className="w-3 h-3" /> {t("messages.avaAssistant")}
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setHistoryOpen(true)}
             className="text-[11px] flex items-center gap-1"
             style={{ color: "var(--pp-text-muted)" }}
-            title="Historique"
+            title={t("messages.avaHistory")}
           >
-            <History className="w-3.5 h-3.5" /> Historique
+            <History className="w-3.5 h-3.5" /> {t("messages.avaHistory")}
           </button>
           {msgs.length > 0 && (
             <button onClick={clear} className="text-[11px]" style={{ color: "var(--pp-text-muted)" }}>
-              Effacer
+              {t("messages.clear")}
             </button>
           )}
         </div>
@@ -636,9 +642,9 @@ function AvaChat({ profile, openAva, openDialer }: { profile: any; openAva: () =
             >
               <Bot className="w-7 h-7 text-white" />
             </div>
-            <p className="font-semibold" style={{ color: "var(--pp-text-primary)" }}>Bonjour, je suis AVA</p>
+            <p className="font-semibold" style={{ color: "var(--pp-text-primary)" }}>{t("messages.avaHello")}</p>
             <p className="text-xs mt-1" style={{ color: "var(--pp-text-muted)" }}>
-              Demandez-moi un brief, planifiez un rappel, ou cherchez un contact.
+              {t("messages.avaHelp")}
             </p>
             <div className="flex flex-wrap justify-center gap-1.5 mt-4">
               {[
@@ -695,7 +701,7 @@ function AvaChat({ profile, openAva, openDialer }: { profile: any; openAva: () =
                       <p className="whitespace-pre-wrap break-words">{m.message}</p>
                     </div>
                     <p className={`text-[10px] mt-1 ${mine ? "text-right" : "text-left"}`} style={{ color: "var(--pp-text-faint)" }}>
-                      {fmtTime(m.created_at)}
+                      {fmtTime(m.created_at, lang, t)}
                     </p>
                   </div>
                 </div>
@@ -713,7 +719,7 @@ function AvaChat({ profile, openAva, openDialer }: { profile: any; openAva: () =
                 color: "var(--pp-agent)",
               }}
             >
-              <Loader2 className="w-3 h-3 animate-spin" /> AVA réfléchit…
+              <Loader2 className="w-3 h-3 animate-spin" /> {t("messages.avaThinking")}
             </div>
           </div>
         )}
@@ -721,14 +727,14 @@ function AvaChat({ profile, openAva, openDialer }: { profile: any; openAva: () =
       </div>
       <Composer
         text={text} setText={setText} onSend={send} sending={sending}
-        placeholder="Demandez à AVA…" accent="agent"
+        placeholder={t("messages.avaPlaceholder")} accent="agent"
         leftAction={
           profile?.voice_agent_enabled ? (
             <button
               onClick={openAva}
               className="p-2 rounded-full"
               style={{ color: "var(--pp-agent)" }}
-              title="Mode vocal"
+              title={t("messages.voiceMode")}
             >
               <Mic className="w-5 h-5" />
             </button>
@@ -753,6 +759,7 @@ function AvaChat({ profile, openAva, openDialer }: { profile: any; openAva: () =
 // EMAILS TAB (M365)
 // ============================================================
 function EmailsList({ profile, openAva: _openAva }: { profile: any; openAva: () => void }) {
+  const { t, lang } = useMplanipretLang();
   const [emails, setEmails] = useState<any[] | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "no_m365" | "error">("loading");
   const [active, setActive] = useState<any | null>(null);
@@ -783,14 +790,14 @@ function EmailsList({ profile, openAva: _openAva }: { profile: any; openAva: () 
             boxShadow: "0 2px 12px rgba(46,155,220,0.4)",
           }}
         >
-          <Plus className="w-3.5 h-3.5" /> Composer
+          <Plus className="w-3.5 h-3.5" /> {t("messages.emailCompose")}
         </button>
         <button
           onClick={load}
           className="text-xs flex items-center gap-1 px-2 py-1"
           style={{ color: "var(--pp-text-muted)" }}
         >
-          <RefreshCw className={`w-3 h-3 ${state === "loading" ? "animate-spin" : ""}`} /> Actualiser
+          <RefreshCw className={`w-3 h-3 ${state === "loading" ? "animate-spin" : ""}`} /> {t("common.refresh")}
         </button>
       </div>
 
@@ -808,40 +815,40 @@ function EmailsList({ profile, openAva: _openAva }: { profile: any; openAva: () 
           style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)" }}
         >
           <Mail className="w-10 h-10 mx-auto mb-3" style={{ color: "var(--pp-brand-accent)" }} />
-          <p className="font-semibold" style={{ color: "var(--pp-text-primary)" }}>Microsoft 365 non connecté</p>
+          <p className="font-semibold" style={{ color: "var(--pp-text-primary)" }}>{t("messages.m365NotConnected")}</p>
           <p className="text-xs mt-1 mb-3" style={{ color: "var(--pp-text-muted)" }}>
-            Connectez votre compte M365 pour voir vos emails ici.
+            {t("messages.m365ConnectDesc")}
           </p>
           <a
             href="/mplanipret/more"
             className="inline-block text-xs px-4 py-2 rounded-full text-white font-semibold"
             style={{ background: "linear-gradient(135deg, var(--pp-brand-accent), var(--pp-brand-accent-2))" }}
           >
-            Connecter M365
+            {t("messages.connectM365")}
           </a>
         </div>
       )}
 
       {state === "error" && (
         <div className="text-center py-10">
-          <p className="text-sm" style={{ color: "var(--pp-text-muted)" }}>Impossible de charger les emails</p>
+          <p className="text-sm" style={{ color: "var(--pp-text-muted)" }}>{t("messages.emailsLoadFailed")}</p>
           <button
             onClick={load}
             className="mt-3 text-xs px-3 py-1.5 rounded-full"
             style={{ border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}
           >
-            Réessayer
+            {t("common.retry")}
           </button>
         </div>
       )}
 
       {state === "ready" && (emails?.length === 0 ? (
-        <EmptyState Icon={Mail} title="Boîte vide" sub="Aucun email récent." />
+        <EmptyState Icon={Mail} title={t("messages.emptyInbox")} sub={t("messages.noRecentEmail")} />
       ) : (
         <ul className="space-y-1.5">
           {emails!.map((e: any, i: number) => {
-            const from = e.from?.emailAddress?.name ?? e.from?.emailAddress?.address ?? "Expéditeur";
-            const subject = e.subject ?? "(Sans objet)";
+            const from = e.from?.emailAddress?.name ?? e.from?.emailAddress?.address ?? t("messages.sender");
+            const subject = e.subject ?? t("messages.noSubject");
             const preview = e.bodyPreview ?? "";
             const received = e.receivedDateTime ?? e.created_at;
             const unread = e.isRead === false;
@@ -859,7 +866,7 @@ function EmailsList({ profile, openAva: _openAva }: { profile: any; openAva: () 
                   <div className="flex items-start justify-between gap-2 mb-1">
                     <p className="font-semibold text-sm truncate" style={{ color: "var(--pp-text-primary)" }}>{from}</p>
                     <span className="text-[10px] shrink-0" style={{ color: "var(--pp-text-faint)" }}>
-                      {received ? fmtTime(received) : ""}
+                      {received ? fmtTime(received, lang, t) : ""}
                     </span>
                   </div>
                   <p className="text-xs truncate mb-1" style={{ color: "var(--pp-text-secondary)" }}>{subject}</p>
@@ -890,9 +897,10 @@ function EmailsList({ profile, openAva: _openAva }: { profile: any; openAva: () 
 }
 
 function EmailDetailSheet({ email, onClose, onReply }: { email: any; onClose: () => void; onReply: (init: { to?: string; subject?: string; body?: string }) => void }) {
-  const from = email.from?.emailAddress?.name ?? email.from?.emailAddress?.address ?? "Expéditeur";
+  const { t } = useMplanipretLang();
+  const from = email.from?.emailAddress?.name ?? email.from?.emailAddress?.address ?? t("messages.sender");
   const fromAddr = email.from?.emailAddress?.address ?? "";
-  const subject = email.subject ?? "(Sans objet)";
+  const subject = email.subject ?? t("messages.noSubject");
   const preview = email.bodyPreview ?? "";
   const [sumOpen, setSumOpen] = useState(false);
 
@@ -914,7 +922,7 @@ function EmailDetailSheet({ email, onClose, onReply }: { email: any; onClose: ()
           <div>
             <p className="text-base font-semibold" style={{ color: "var(--pp-text-primary)" }}>{subject}</p>
             <p className="text-xs mt-1" style={{ color: "var(--pp-text-muted)" }}>
-              De <span style={{ color: "var(--pp-text-secondary)" }}>{from}</span> {fromAddr && `<${fromAddr}>`}
+              {t("messages.from")} <span style={{ color: "var(--pp-text-secondary)" }}>{from}</span> {fromAddr && `<${fromAddr}>`}
             </p>
           </div>
 
@@ -927,14 +935,14 @@ function EmailDetailSheet({ email, onClose, onReply }: { email: any; onClose: ()
               color: "var(--pp-agent)",
             }}
           >
-            <Sparkles className="w-4 h-4" /> Résumer avec AVA
+            <Sparkles className="w-4 h-4" /> {t("messages.summarizeWithAva")}
           </button>
 
           <div
             className="rounded-xl p-3 text-sm whitespace-pre-wrap"
             style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}
           >
-            {preview || "(Aperçu non disponible)"}
+            {preview || t("messages.previewUnavailable")}
           </div>
         </div>
 
@@ -948,7 +956,7 @@ function EmailDetailSheet({ email, onClose, onReply }: { email: any; onClose: ()
             className="flex-1 py-2.5 rounded-full text-white font-semibold text-sm flex items-center justify-center gap-2"
             style={{ background: "linear-gradient(135deg, var(--pp-brand-accent), var(--pp-brand-accent-2))" }}
           >
-            <Reply className="w-4 h-4" /> Répondre
+            <Reply className="w-4 h-4" /> {t("messages.reply")}
           </button>
         </div>
       </div>
@@ -974,23 +982,24 @@ function EmailDetailSheet({ email, onClose, onReply }: { email: any; onClose: ()
 
 
 function EmailComposeSheet({ init, onClose, onSent }: { init: { to?: string; subject?: string; body?: string }; onClose: () => void; onSent: () => void }) {
+  const { t } = useMplanipretLang();
   const [to, setTo] = useState(init.to ?? "");
   const [subject, setSubject] = useState(init.subject ?? "");
   const [body, setBody] = useState(init.body ?? "");
   const [sending, setSending] = useState(false);
 
   const send = async () => {
-    if (!to.trim()) { toast.error("Destinataire requis"); return; }
+    if (!to.trim()) { toast.error(t("messages.recipientRequired")); return; }
     setSending(true);
     const { data, error } = await supabase.functions.invoke("ms365-actions", {
       body: { action: "send_email", payload: { to: to.split(",").map((s) => s.trim()).filter(Boolean), subject, body: body.replace(/\n/g, "<br/>") } },
     });
     setSending(false);
     if (error || !(data as any)?.success) {
-      toast.error("Échec de l'envoi");
+      toast.error(t("messages.emailSendFailed"));
       return;
     }
-    toast.success("Email envoyé");
+    toast.success(t("messages.emailSent"));
     onSent();
   };
 
@@ -1005,7 +1014,7 @@ function EmailComposeSheet({ init, onClose, onSent }: { init: { to?: string; sub
           <button onClick={onClose} className="p-1.5 rounded-full" style={{ color: "var(--pp-text-secondary)" }}>
             <X className="w-5 h-5" />
           </button>
-          <p className="text-xs uppercase tracking-wider" style={{ color: "var(--pp-text-muted)" }}>Nouveau message</p>
+          <p className="text-xs uppercase tracking-wider" style={{ color: "var(--pp-text-muted)" }}>{t("messages.newEmail")}</p>
           <button
             onClick={send}
             disabled={sending || !to.trim()}
@@ -1013,22 +1022,22 @@ function EmailComposeSheet({ init, onClose, onSent }: { init: { to?: string; sub
             style={{ background: "linear-gradient(135deg, var(--pp-brand-accent), var(--pp-brand-accent-2))" }}
           >
             {sending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
-            Envoyer
+            {t("common.send")}
           </button>
         </div>
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
           <input
-            value={to} onChange={(e) => setTo(e.target.value)} placeholder="À : email@exemple.com"
+            value={to} onChange={(e) => setTo(e.target.value)} placeholder={t("messages.toPlaceholder")}
             className="w-full px-3 py-2 rounded-lg text-sm outline-none"
             style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }}
           />
           <input
-            value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Objet"
+            value={subject} onChange={(e) => setSubject(e.target.value)} placeholder={t("messages.subject")}
             className="w-full px-3 py-2 rounded-lg text-sm outline-none"
             style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }}
           />
           <textarea
-            value={body} onChange={(e) => setBody(e.target.value)} placeholder="Votre message…"
+            value={body} onChange={(e) => setBody(e.target.value)} placeholder={t("messages.yourMessage")}
             rows={14}
             className="w-full px-3 py-2 rounded-lg text-sm outline-none resize-none"
             style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }}
@@ -1043,12 +1052,13 @@ function EmailComposeSheet({ init, onClose, onSent }: { init: { to?: string; sub
 // SHARED PRIMITIVES
 // ============================================================
 function Composer({
-  text, setText, onSend, sending, placeholder = "Écrire un message…", leftAction, extra, accent = "brand",
+  text, setText, onSend, sending, placeholder, leftAction, extra, accent = "brand",
 }: {
   text: string; setText: (v: string) => void; onSend: () => void; sending: boolean;
   placeholder?: string; leftAction?: React.ReactNode; extra?: React.ReactNode;
   accent?: "brand" | "agent";
 }) {
+  const { t } = useMplanipretLang();
   const accentBg =
     accent === "agent"
       ? "linear-gradient(135deg, var(--pp-agent), #6C3CE1)"
@@ -1064,7 +1074,7 @@ function Composer({
         value={text}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSend(); } }}
-        placeholder={placeholder}
+        placeholder={placeholder ?? t("messages.yourMessage")}
         className="flex-1 px-3 py-2 rounded-full text-sm outline-none"
         style={{
           background: "var(--pp-bg-elevated)",
