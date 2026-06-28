@@ -4,6 +4,7 @@
  */
 import React from 'react';
 import { colors, font, radius } from '../lib/theme';
+import { useT } from '../lib/i18n';
 import type { CallerLookup } from '../lib/sip/callerLookup';
 
 interface Props {
