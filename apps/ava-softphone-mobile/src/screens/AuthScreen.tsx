@@ -243,17 +243,17 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
             <ModeToggle mode={mode} accent={accent} onChange={(m) => { setMode(m); setError(null); setFieldErrors({}); }} />
 
 
-            <Field label="URL du portail" value={portalUrl} onChange={setPortalUrl} type="url" />
+            <Field label={tx('URL du portail', 'Portal URL')} value={portalUrl} onChange={setPortalUrl} type="url" />
             {mode === 'email' ? (
               <>
-                <Field label="Adresse e-mail" value={email} onChange={(v) => { setEmail(v); setFieldErrors((f) => ({ ...f, email: '' })); }} type="email" placeholder="vous@entreprise.com" autoFocus error={fieldErrors.email} />
-                <Field label="Mot de passe" value={password} onChange={(v) => { setPassword(v); setFieldErrors((f) => ({ ...f, password: '' })); }} type="password" placeholder="••••••••" error={fieldErrors.password} />
+                <Field label={tx('Adresse e-mail', 'Email address')} value={email} onChange={(v) => { setEmail(v); setFieldErrors((f) => ({ ...f, email: '' })); }} type="email" placeholder={tx('vous@entreprise.com', 'you@company.com')} autoFocus error={fieldErrors.email} />
+                <Field label={tx('Mot de passe', 'Password')} value={password} onChange={(v) => { setPassword(v); setFieldErrors((f) => ({ ...f, password: '' })); }} type="password" placeholder="••••••••" error={fieldErrors.password} />
               </>
             ) : (
               <>
-                <Field label="Extension" value={extension} onChange={(v) => { setExtension(v); setFieldErrors((f) => ({ ...f, extension: '' })); }} placeholder="ex. 1001" autoFocus error={fieldErrors.extension} />
-                <Field label="Domaine SIP" value={sipDomain} onChange={setSipDomain} placeholder="lemtel.lemtel.tel" />
-                <Field label="Mot de passe SIP" value={password} onChange={(v) => { setPassword(v); setFieldErrors((f) => ({ ...f, password: '' })); }} type="password" placeholder="••••••••" error={fieldErrors.password} />
+                <Field label={tx('Extension', 'Extension')} value={extension} onChange={(v) => { setExtension(v); setFieldErrors((f) => ({ ...f, extension: '' })); }} placeholder={tx('ex. 1001', 'e.g. 1001')} autoFocus error={fieldErrors.extension} />
+                <Field label={tx('Domaine SIP', 'SIP domain')} value={sipDomain} onChange={setSipDomain} placeholder="lemtel.lemtel.tel" />
+                <Field label={tx('Mot de passe SIP', 'SIP password')} value={password} onChange={(v) => { setPassword(v); setFieldErrors((f) => ({ ...f, password: '' })); }} type="password" placeholder="••••••••" error={fieldErrors.password} />
               </>
             )}
 
@@ -266,7 +266,7 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
               style={{ marginTop: 6, height: 50, borderRadius: 14, fontSize: 14, cursor: busy ? 'wait' : 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
             >
               {busy && <Spinner />}
-              {busy ? 'Connexion…' : 'Se connecter'}
+              {busy ? tx('Connexion…', 'Signing in…') : tx('Se connecter', 'Sign in')}
             </button>
 
             {mode === 'email' && (
@@ -275,7 +275,7 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
                 onClick={() => setScreen('forgot')}
                 style={ghostLink}
               >
-                Mot de passe oublié ?
+                {tx('Mot de passe oublié ?', 'Forgot password?')}
               </button>
             )}
 
@@ -284,13 +284,13 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
               onClick={() => setScreen('sip')}
               style={ghostBtn}
             >
-              Configuration SIP manuelle
+              {tx('Configuration SIP manuelle', 'Manual SIP configuration')}
             </button>
 
             <div style={{ fontSize: 10.5, color: C.textDim, lineHeight: 1.5, textAlign: 'center', marginTop: 2 }}>
               {mode === 'extension'
-                ? "Utilisez le même mot de passe SIP défini sur votre extension dans le portail (ou dans FusionPBX). Si vous n'en avez pas, demandez à votre administrateur de le configurer."
-                : "Connectez-vous avec l'adresse e-mail et le mot de passe associés à votre compte du portail Lemtel."}
+                ? tx("Utilisez le même mot de passe SIP défini sur votre extension dans le portail (ou dans FusionPBX). Si vous n'en avez pas, demandez à votre administrateur de le configurer.", 'Use the same SIP password set on your extension in the portal (or in FusionPBX). If you don\u2019t have one, ask your administrator to configure it.')
+                : tx("Connectez-vous avec l'adresse e-mail et le mot de passe associés à votre compte du portail Lemtel.", 'Sign in with the email address and password tied to your Lemtel portal account.')}
             </div>
           </form>
         </div>
