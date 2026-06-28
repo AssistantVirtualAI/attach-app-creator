@@ -271,6 +271,20 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
             pjsua_acc_config_default(&accCfg)
             accCfg.id = self.pjStrDup("sip:\(username)@\(domain)")
             accCfg.reg_uri = self.pjStrDup("sip:\(server);transport=tcp")
+
+            // Correction 1 — Expiry 3600s pour priorité supérieure à Ringotel (2623s)
+            // FreeSWITCH route l'INVITE entrant au contact avec le plus grand expires.
+            // Ringotel s'enregistre avec expires=2623 — on dépasse avec 3600.
+            accCfg.reg_timeout = 3600
+            accCfg.reg_retry_interval = 30
+
+            // Correction 2 — Forcer un contact propre sans +sip.ice
+            // PJSIP ajoute +sip.ice dans le Contact header même quand
+            // mediaCfg.enable_ice = 0, car le flag ICE est aussi dans accCfg.
+            // Ce paramètre parasite le routage FreeSWITCH et empêche les appels
+            // entrants d'être routés vers cette app.
+            accCfg.force_contact = self.pjStrDup("sip:\(username)@\(server);transport=tcp")
+
             accCfg.cred_count = 1
             accCfg.cred_info.0.realm = self.pjStrDup("*")
             accCfg.cred_info.0.scheme = self.pjStrDup("digest")
