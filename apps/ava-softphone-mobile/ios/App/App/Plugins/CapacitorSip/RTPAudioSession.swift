@@ -52,9 +52,19 @@ final class RTPAudioSession {
     private let audioLock = NSLock()
     /// Outgoing PCM samples (already decimated to 8kHz) awaiting RTP framing.
     private var sendBuffer = [Int16]()
+    /// Raw 48kHz mic samples awaiting 6-sample averaging downsample.
+    private var downsampleAccum = [Int16]()
     /// Incoming PCM jitter buffer at 8kHz drained by the render callback.
     private var playQueue = [Int16]()
     private let maxPlayQueueSamples = 8000 // ~1s safety cap
+    /// Minimum jitter buffer prime before playback starts (3 packets = 60ms @ 8kHz).
+    private let minBufferPackets = 3
+    private let minBufferSamples = 3 * 160
+    private var bufferPrimed = false
+    /// Linear interpolation state for 8k→48k upsample.
+    private var prevRxSample: Int16 = 0
+    private var currRxSample: Int16 = 0
+    private var rxInterpStep: Int = 0  // 0..decimation-1
 
     // MARK: - Engine recovery
     private var engineRestartAttempts: Int = 0
