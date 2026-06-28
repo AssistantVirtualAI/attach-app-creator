@@ -934,9 +934,9 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     private func startOptionsKeepalive() {
         optionsTimer?.invalidate()
         optionsTimer = Timer.scheduledTimer(withTimeInterval: 25, repeats: true) { [weak self] _ in
-            self?.sendOptions()
+            DispatchQueue.global(qos: .background).async { self?.sendOptions() }
         }
-        log("OPTIONS keepalive started (25s)")
+        log("OPTIONS keepalive started (25s, background dispatch)")
     }
 
     private func stopOptionsKeepalive() {
@@ -1023,6 +1023,10 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
             ? (RTPAudioSession.primaryLocalIPv4() ?? "0.0.0.0")
             : localRtpIp
         let port = localRtpPort > 0 ? Int(localRtpPort) : localSdpPort
+        guard port > 0 else {
+            log("ERROR buildSdp: localRtpPort=0 and localSdpPort=0 — RTP socket not bound; refusing to emit SDP with m=audio 0")
+            return ""
+        }
         let direction = hold ? "a=sendonly" : "a=sendrecv"
         var sdp = ""
         sdp += "v=0\r\n"
@@ -1047,6 +1051,11 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         let uri = "sip:\(number)@\(domain)"
         callRemoteUri = uri
         let sdp = buildSdp()
+        guard !sdp.isEmpty else {
+            log("ABORT INVITE → empty SDP (RTP socket not bound). Notifying registrationFailed for visibility.")
+            notifyListeners("callEnded", data: ["callId": callActiveId, "reason": "sdp-port-zero"])
+            return
+        }
         log("LOCAL SDP (INVITE) >>>\n\(sdp)")
         var msg = ""
         msg += "INVITE \(uri) SIP/2.0\r\n"

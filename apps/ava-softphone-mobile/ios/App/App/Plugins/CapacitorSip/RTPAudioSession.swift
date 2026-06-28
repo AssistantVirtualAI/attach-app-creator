@@ -161,6 +161,7 @@ final class RTPAudioSession {
     private(set) var rxBytes: UInt64 = 0
     private(set) var lastRemoteSeq: UInt16 = 0
     private(set) var lastRemotePort: UInt16 = 0
+    private(set) var lastRemoteIp: String = ""
     private(set) var micPeak: Float = 0
     private(set) var rxPeak: Float = 0
     private(set) var startedAt: Date?
@@ -269,9 +270,6 @@ final class RTPAudioSession {
     }
 
     func start(remoteIp: String, remotePort: UInt16) {
-        guard !running else { return }
-        guard sockfd >= 0 else { NSLog("[RTP] start without socket"); return }
-        running = true
         var addr = sockaddr_in()
         addr.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
         addr.sin_family = sa_family_t(AF_INET)
@@ -280,7 +278,8 @@ final class RTPAudioSession {
         self.remoteAddr = addr
         self.hasRemote = true
         self.lastRemotePort = remotePort
-        self.startedAt = Date()
+        self.lastRemoteIp = remoteIp
+        NSLog("[RTP] remote set to \(remoteIp):\(remotePort) hasRemote=true")
         NSLog("[RTP] start remote=\(remoteIp):\(remotePort) local=\(localIp):\(localPort)")
         startReceiveLoop()
         if ioUnit == nil {
@@ -802,7 +801,13 @@ final class RTPAudioSession {
 
     // MARK: - RTP send
     private func sendRTPFrame(_ samples: [Int16]) {
-        guard hasRemote, sockfd >= 0 else { return }
+        guard sockfd >= 0 else { return }
+        guard hasRemote else {
+            if txPackets % 50 == 0 {
+                NSLog("[RTP] WARN no remote addr set, dropping TX (txPackets=\(txPackets))")
+            }
+            return
+        }
         var packet = Data(capacity: 12 + samples.count)
         packet.append(0x80)
         packet.append(0x00) // PT=0 PCMU
@@ -817,13 +822,20 @@ final class RTPAudioSession {
         packet.append(UInt8((ssrc >> 16) & 0xFF))
         packet.append(UInt8((ssrc >> 8) & 0xFF))
         packet.append(UInt8(ssrc & 0xFF))
-        for s in samples { packet.append(RTPAudioSession.linearToUlaw(s)) }
+        // Attenuate mic by 0.6 to prevent clipping at the remote party.
+        // AGC in VoiceProcessingIO compensates for soft input; this kills the
+        // "too loud / distorted" complaint without making whispers inaudible.
+        for s in samples {
+            let attenuated = Int16(clamping: (Int32(s) * 6) / 10)
+            packet.append(RTPAudioSession.linearToUlaw(attenuated))
+        }
         sequenceNumber = sequenceNumber &+ 1
         timestamp = timestamp &+ UInt32(samples.count)
 
         let fd = sockfd
         var addr = remoteAddr
         let pktLen = packet.count
+        let seqForLog = sequenceNumber
         txQueue.async {
             packet.withUnsafeBytes { raw in
                 _ = withUnsafePointer(to: &addr) { ptr in
@@ -836,6 +848,9 @@ final class RTPAudioSession {
         }
         txPackets &+= 1
         txBytes &+= UInt64(pktLen)
+        if txPackets == 1 || txPackets % 50 == 0 {
+            NSLog("[RTP] TX seq=\(seqForLog) → \(lastRemoteIp):\(lastRemotePort) txPackets=\(txPackets)")
+        }
     }
 
     // MARK: - RTP receive
