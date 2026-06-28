@@ -322,8 +322,8 @@ function ForgotPasswordScreen({ initialEmail, accent, onBack }: { initialEmail: 
 
   const goConfirm = () => {
     setError(null);
-    if (!email.trim()) { setFieldErr("L'adresse e-mail est requise."); return; }
-    if (!isEmail(email)) { setFieldErr('Saisissez une adresse e-mail valide.'); return; }
+    if (!email.trim()) { setFieldErr(tx("L'adresse e-mail est requise.", 'Email address is required.')); return; }
+    if (!isEmail(email)) { setFieldErr(tx('Saisissez une adresse e-mail valide.', 'Enter a valid email address.')); return; }
     setFieldErr('');
     setStep('confirm');
   };
