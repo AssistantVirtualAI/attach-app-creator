@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { MP_DICT, type MpLang, type MpDict } from "@/lib/i18n/mplanipret";
+import { useLanguage } from "@/context/LanguageContext";
 
 const KEY = "mplanipret-lang";
 const GLOBAL_KEY = "ava-language";
@@ -22,6 +23,7 @@ const listeners = new Set<(l: MpLang) => void>();
 function emit(l: MpLang) { listeners.forEach((fn) => fn(l)); }
 
 export function useMplanipretLang() {
+  const { language: globalLang, setLanguage: setGlobalLanguage } = useLanguage();
   const [lang, setLangState] = useState<MpLang>(detect);
 
   useEffect(() => {
@@ -33,6 +35,16 @@ export function useMplanipretLang() {
   useEffect(() => {
     try { document.documentElement.lang = lang; } catch {}
   }, [lang]);
+
+  useEffect(() => {
+    if (globalLang !== "fr" && globalLang !== "en") return;
+    setLangState(globalLang);
+    try {
+      localStorage.setItem(KEY, globalLang);
+      document.documentElement.lang = globalLang;
+    } catch {}
+    emit(globalLang);
+  }, [globalLang]);
 
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
@@ -51,9 +63,10 @@ export function useMplanipretLang() {
       localStorage.setItem(GLOBAL_KEY, l);
       document.documentElement.lang = l;
     } catch {}
+    setGlobalLanguage(l);
     setLangState(l);
     emit(l);
-  }, []);
+  }, [setGlobalLanguage]);
 
   const toggle = useCallback(() => setLang(lang === "fr" ? "en" : "fr"), [lang, setLang]);
 
