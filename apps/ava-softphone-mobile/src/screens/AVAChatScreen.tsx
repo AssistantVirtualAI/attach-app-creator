@@ -47,7 +47,7 @@ export default function AVAChatScreen() {
       const reply = await mobileApi.chat(text, msgs.map((m) => ({ role: m.role, content: m.text })));
       setMsgs((m) => m.map((x) => x.id === placeholder.id ? { ...x, text: reply.answer || '…', pending: false } : x));
     } catch (e: any) {
-      setMsgs((m) => m.map((x) => x.id === placeholder.id ? { ...x, text: `Désolé — ${e.message || 'AVA est indisponible.'}`, pending: false } : x));
+      setMsgs((m) => m.map((x) => x.id === placeholder.id ? { ...x, text: `${tx('Désolé', 'Sorry')} — ${e.message || tx('AVA est indisponible.', 'AVA is unavailable.')}`, pending: false } : x));
     } finally {
       setBusy(false);
       setTimeout(() => taRef.current?.focus(), 50);
