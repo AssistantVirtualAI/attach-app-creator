@@ -676,6 +676,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
                 log("ACK received — call confirmed")
             }
         case "BYE":
+            NSLog("[SIP] BYE received from remote — who sent it? callId=\(callActiveId) callState=\(callState)")
             send200OK(to: msg)
             let id = callActiveId
             stopRtp()
