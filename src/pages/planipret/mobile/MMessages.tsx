@@ -38,15 +38,15 @@ const initials = (s: string) => {
   return clean.slice(-2).toUpperCase();
 };
 
-const fmtTime = (iso: string) => {
+const fmtTime = (iso: string, lang: "fr" | "en" = "fr", t?: (key: string) => string) => {
   const d = new Date(iso);
   const now = new Date();
   const yest = new Date(); yest.setDate(now.getDate() - 1);
   if (d.toDateString() === now.toDateString()) {
-    return `${String(d.getHours()).padStart(2, "0")}h${String(d.getMinutes()).padStart(2, "0")}`;
+    return d.toLocaleTimeString(lang === "en" ? "en-CA" : "fr-CA", { hour: "2-digit", minute: "2-digit" });
   }
-  if (d.toDateString() === yest.toDateString()) return "Hier";
-  return d.toLocaleDateString("fr-CA", { day: "2-digit", month: "2-digit" });
+  if (d.toDateString() === yest.toDateString()) return t ? t("common.yesterday") : (lang === "en" ? "Yesterday" : "Hier");
+  return d.toLocaleDateString(lang === "en" ? "en-CA" : "fr-CA", { day: "2-digit", month: "2-digit" });
 };
 
 export default function MMessages() {
@@ -71,12 +71,12 @@ export default function MMessages() {
             { k: "roster" as SubTab, label: t("messages.tabs.roster"), Icon: Users },
             { k: "ava" as SubTab, label: t("messages.tabs.ava"), Icon: Bot },
             { k: "emails" as SubTab, label: t("messages.tabs.emails"), Icon: Mail },
-          ].map((t) => {
-            const active = sub === t.k;
+          ].map((item) => {
+            const active = sub === item.k;
             return (
               <button
-                key={t.k}
-                onClick={() => setSub(t.k)}
+                key={item.k}
+                onClick={() => setSub(item.k)}
                 className="flex-1 py-2 text-[11px] font-semibold rounded-full transition flex items-center justify-center gap-1"
                 style={
                   active
@@ -88,7 +88,7 @@ export default function MMessages() {
                     : { color: "var(--pp-text-muted)" }
                 }
               >
-                <t.Icon className="w-3.5 h-3.5" /> {t.label}
+                <item.Icon className="w-3.5 h-3.5" /> {item.label}
               </button>
             );
           })}
@@ -266,7 +266,7 @@ function SmsList({ profile, openDialer, registerRefresh }: any) {
               className="w-full mt-3 py-2.5 rounded-lg text-white font-medium text-sm disabled:opacity-50"
               style={{ background: "linear-gradient(135deg, var(--pp-brand-accent), var(--pp-brand-accent-2))" }}
             >
-              Continuer
+              {t("common.continue")}
             </button>
           </div>
         </div>
@@ -279,7 +279,7 @@ function ThreadView({ number, myExt, userId, messages, onBack, onCall, onSent }:
   number: string; myExt: string; userId: string; messages: Msg[];
   onBack: () => void; onCall: (n: string) => void; onSent: (m: Msg) => void;
 }) {
-  const { t } = useMplanipretLang();
+  const { t, lang } = useMplanipretLang();
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [tplOpen, setTplOpen] = useState(false);
@@ -310,7 +310,7 @@ function ThreadView({ number, myExt, userId, messages, onBack, onCall, onSent }:
     const { data, error } = await supabase.functions.invoke("ns-sms", { body: { to: number, message: body, type: "sms" } });
     setSending(false);
     if (error || (data as any)?.success === false) {
-      toast.error((data as any)?.error ?? error?.message ?? "Échec de l'envoi");
+      toast.error((data as any)?.error ?? error?.message ?? t("messages.sendFailed"));
     }
   };
 
@@ -325,13 +325,13 @@ function ThreadView({ number, myExt, userId, messages, onBack, onCall, onSent }:
         </button>
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-sm truncate" style={{ color: "var(--pp-text-primary)" }}>{number}</p>
-          <p className="text-[11px]" style={{ color: "var(--pp-text-muted)" }}>{ordered.length} message{ordered.length > 1 ? "s" : ""}</p>
+          <p className="text-[11px]" style={{ color: "var(--pp-text-muted)" }}>{ordered.length} {ordered.length > 1 ? t("messages.messages") : t("messages.message")}</p>
         </div>
         <button
           onClick={() => setSumOpen(true)}
           className="p-1.5 rounded-full"
           style={{ color: "var(--pp-agent)" }}
-          title="Résumer avec AVA"
+          title={t("messages.summarizeWithAva")}
         >
           <Sparkles className="w-4 h-4" />
         </button>
@@ -360,7 +360,7 @@ function ThreadView({ number, myExt, userId, messages, onBack, onCall, onSent }:
                   {m.body && <p className="whitespace-pre-wrap break-words">{m.body}</p>}
                 </div>
                 <p className={`text-[10px] mt-1 ${out ? "text-right" : "text-left"}`} style={{ color: "var(--pp-text-faint)" }}>
-                  {fmtTime(m.created_at)}{m.status === "sending" ? " · envoi…" : ""}
+                  {fmtTime(m.created_at, lang, t)}{m.status === "sending" ? ` · ${t("common.sending")}` : ""}
                 </p>
               </div>
             </div>
@@ -372,12 +372,12 @@ function ThreadView({ number, myExt, userId, messages, onBack, onCall, onSent }:
       <Composer
         text={text} setText={setText} onSend={send} sending={sending}
         leftAction={
-          <button onClick={() => setTplOpen(true)} className="p-2 rounded-full" style={{ color: "var(--pp-brand-accent)" }} title="Templates">
+          <button onClick={() => setTplOpen(true)} className="p-2 rounded-full" style={{ color: "var(--pp-brand-accent)" }} title={t("messages.templates")}>
             <Zap className="w-5 h-5" />
           </button>
         }
         extra={
-          <button onClick={() => toast("Pièce jointe : bientôt disponible")} className="p-2 rounded-full" style={{ color: "var(--pp-text-muted)" }}>
+          <button onClick={() => toast(t("messages.attachmentSoon"))} className="p-2 rounded-full" style={{ color: "var(--pp-text-muted)" }}>
             <Paperclip className="w-5 h-5" />
           </button>
         }
@@ -386,8 +386,8 @@ function ThreadView({ number, myExt, userId, messages, onBack, onCall, onSent }:
       <AvaSummarizeSheet
         open={sumOpen}
         source="sms"
-        title={`SMS avec ${number}`}
-        content={ordered.map((m) => `${m.direction === "outbound" ? "Moi" : number}: ${m.body ?? ""}`).join("\n")}
+        title={`${t("messages.smsWith")} ${number}`}
+        content={ordered.map((m) => `${m.direction === "outbound" ? t("common.me") : number}: ${m.body ?? ""}`).join("\n")}
         onClose={() => setSumOpen(false)}
         onInsert={(t) => setText((cur) => cur ? `${cur} ${t}` : t)}
       />
