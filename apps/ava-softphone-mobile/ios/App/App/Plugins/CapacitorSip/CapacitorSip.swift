@@ -441,6 +441,29 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
 
     @objc func setLogLevel(_ call: CAPPluginCall) { call.resolve(["ok": true, "level": call.getInt("level") ?? 3]) }
 
+    // MARK: - Live transcription taps (PCM16LE 16k base64 → JS)
+    // JS subscribes via plugin events `livePcmInbound` / `livePcmOutbound`.
+    // Enable/disable from JS so we don't pay base64 cost when not transcribing.
+    @objc func setLiveTranscriptionEnabled(_ call: CAPPluginCall) {
+        let enabled = call.getBool("enabled") ?? false
+        guard let rtp = rtp else { call.resolve(["ok": false, "reason": "no-rtp"]); return }
+        if enabled {
+            rtp.resetLiveTapBuffers()
+            rtp.onLivePcmInbound = { [weak self] data in
+                self?.notifyListeners("livePcmInbound", data: ["b64": data.base64EncodedString()])
+            }
+            rtp.onLivePcmOutbound = { [weak self] data in
+                self?.notifyListeners("livePcmOutbound", data: ["b64": data.base64EncodedString()])
+            }
+        } else {
+            rtp.onLivePcmInbound = nil
+            rtp.onLivePcmOutbound = nil
+            rtp.resetLiveTapBuffers()
+        }
+        call.resolve(["ok": true, "enabled": enabled])
+    }
+
+
     @objc func unregister(_ call: CAPPluginCall) {
         stopOptionsKeepalive()
         connection?.cancel()
