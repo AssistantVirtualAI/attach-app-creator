@@ -1203,14 +1203,25 @@ Deno.serve(async (req) => {
 
       for (const ep of ordered) {
         const isPhp = ep.endsWith(".php");
-        // The FusionPBX v7 generic API treats unknown query params as SQL filters.
-        // Sending `order`/`order_by` creates `AND order = $1`, which crashes because
-        // `order` is reserved. Keep this request to supported paging/filter fields.
-        // FusionPBX v7 xml_cdr table does NOT have an `extension` column.
-        // The field is `extension_uuid` (a FK). Passing `extension=XXX` as a
-        // query param causes a SQL error: "column extension does not exist".
-        // Strip it here; extension-level filtering is done post-fetch in JS.
-        const { extension: _stripExt, ...safeExtraQp } = extraQp as any;
+        // The FusionPBX v7 generic API turns EVERY query param into a SQL
+        // `column = value` equality. The xml_cdr table does NOT have columns
+        // named `extension`, `order`, `order_by`, `page_size`, etc. Passing
+        // any of those produces "column does not exist" errors.
+        //
+        // Use a strict allowlist of real xml_cdr columns. Anything else
+        // (notably `extension`) is filtered post-fetch in JS.
+        const ALLOWED_CDR_PARAMS = new Set([
+          "domain_uuid", "extension_uuid", "limit", "offset",
+          "direction", "hangup_cause", "missed_call",
+          "caller_id_number", "caller_id_name",
+          "destination_number", "start_stamp", "end_stamp",
+        ]);
+        const safeExtraQp: Record<string, string> = {};
+        for (const [k, v] of Object.entries(extraQp || {})) {
+          if (ALLOWED_CDR_PARAMS.has(k) && v != null && v !== "") {
+            safeExtraQp[k] = String(v);
+          }
+        }
         const qp = new URLSearchParams({
           domain_uuid: requestedDomain || FUSIONPBX_DOMAIN_UUID,
           limit: "100",
