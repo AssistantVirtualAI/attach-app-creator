@@ -707,9 +707,10 @@ final class RTPAudioSession {
         audioLock.unlock()
 
         for f in framesToSend { sendRTPFrame(f); tapOutbound8k(f) }
-        if inputCallbackCount == 1 || inputCallbackCount % 50 == 0 {
-            NSLog("[RTP] input cb #\(inputCallbackCount) hwFrames=\(n) micPeak=\(String(format: "%.3f", micPeak)) queued=\(queued) txPackets=\(txPackets)")
-        }
+        // Per-callback NSLog removed — was blocking the realtime audio thread
+        // every ~20ms and contributing to UI freezes. Stats are logged every 5s
+        // from the render callback instead.
+        _ = queued
         return noErr
     }
 
