@@ -50,6 +50,9 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     private var currentCallId: pjsua_call_id = pjsua_call_id(PJSUA_INVALID_ID.rawValue)
     private var recorderId: pjsua_recorder_id = pjsua_recorder_id(PJSUA_INVALID_ID.rawValue)
     private var recorderPath: String?
+    // Domain stored at initAccount time so makeCall can build the correct SIP URI
+    // without requiring the caller to pass it again.
+    private var currentDomain: String = "lemtel.lemtel.tel"
     // VoIP push token received from PushKit (set by AppDelegate).
     private var voipPushToken: String? = UserDefaults.standard.string(forKey: "ava.voipPushToken")
 
@@ -343,7 +346,8 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
                 call.reject("pjsua_acc_add failed: \(status)")
                 return
             }
-
+            // Persist domain so makeCall can build the correct SIP URI.
+            self.currentDomain = domain
             call.resolve(["ok": true, "status": "ok"])
         }
     }
@@ -364,7 +368,9 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
 
     @objc func makeCall(_ call: CAPPluginCall) {
         let number = call.getString("number") ?? call.getString("destination") ?? ""
-        let domain = call.getString("domain") ?? "lemtel.lemtel.tel"
+        // Prefer the domain stored at registration time; fall back to the value
+        // passed by the caller (for legacy callers), then to the hard-coded default.
+        let domain = call.getString("domain") ?? (self.currentDomain.isEmpty ? "lemtel.lemtel.tel" : self.currentDomain)
         guard !number.isEmpty else { call.reject("number required"); return }
 
         sipQueue.async { [weak self] in

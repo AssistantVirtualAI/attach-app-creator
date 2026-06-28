@@ -56,8 +56,11 @@ async function getFusionSessionCookie(baseUrl: string): Promise<string> {
   if (cached?.cookie && cached.expiresAt > now) return cached.cookie;
 
   const username = Deno.env.get("FUSIONPBX_USERNAME") || "";
-  const password = Deno.env.get("FUSIONPBX_PASSWORD") || "";
-  if (!username || !password) throw new Error("FUSIONPBX_PASSWORD not configured");
+  // FUSIONPBX_PASSWORD is the web UI password used for PHP session login.
+  // Fall back to FUSIONPBX_API_KEY if FUSIONPBX_PASSWORD is not set — on some
+  // FusionPBX installs the API key and the web password are the same value.
+  const password = Deno.env.get("FUSIONPBX_PASSWORD") || Deno.env.get("FUSIONPBX_API_KEY") || "";
+  if (!username || !password) throw new Error("FUSIONPBX_PASSWORD (or FUSIONPBX_API_KEY as fallback) not configured in Supabase Vault");
 
   // 1. Hit /login.php on the same host that will serve the audio to bootstrap
   // the host-scoped PHPSESSID cookie. Recording downloads are served by

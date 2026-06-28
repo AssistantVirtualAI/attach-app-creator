@@ -202,10 +202,18 @@ export async function loadPbxRecordingAudioMobile(
     let parsed: any = null;
     try { parsed = JSON.parse(text); } catch { /* not json */ }
     const code = parsed?.error || '';
-    if (code === 'RECORDING_NOT_FOUND') throw new Error('File deleted from PBX after retention period');
-    if (code === 'LOGIN_FAILED') throw new Error('PBX authentication failed');
-    if (code === 'Forbidden') throw new Error('You do not have access to this recording.');
-    throw new Error(parsed?.message || parsed?.error || text.slice(0, 200) || `Recording unavailable (${res.status})`);
+    if (code === 'MISSING_SECRET') throw new Error(`Configuration manquante dans Supabase Vault : ${parsed?.secret || 'secret inconnu'}. Contactez votre administrateur.`);
+    if (code === 'RECORDING_NOT_FOUND') {
+      const detail = parsed?.session_logged_in === false
+        ? 'Connexion au PBX échouée — vérifiez FUSIONPBX_USERNAME et FUSIONPBX_PASSWORD dans le Vault Supabase.'
+        : parsed?.file_missing === true
+        ? 'Fichier audio introuvable sur le PBX (supprimé après la période de rétention).'
+        : 'Enregistrement non accessible sur le PBX. Vérifiez les secrets Supabase Vault (FUSIONPBX_API_URL, FUSIONPBX_USERNAME, FUSIONPBX_PASSWORD, FUSIONPBX_API_KEY).';
+      throw new Error(detail);
+    }
+    if (code === 'LOGIN_FAILED') throw new Error('Connexion au PBX échouée — vérifiez FUSIONPBX_USERNAME et FUSIONPBX_PASSWORD dans le Vault Supabase.');
+    if (code === 'Forbidden') throw new Error('Accès refusé à cet enregistrement.');
+    throw new Error(parsed?.message || parsed?.error || text.slice(0, 200) || `Enregistrement non disponible (${res.status})`);
   }
 
   const blob = await res.blob();
