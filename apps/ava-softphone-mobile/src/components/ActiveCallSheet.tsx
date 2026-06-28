@@ -9,6 +9,8 @@ import { getAudioState, onAudioStateChange, setRoute, type AudioRoute, type Audi
 import CallTimeline, { type CallPhase } from './CallTimeline';
 import IncomingCallerPanel from './IncomingCallerPanel';
 import { lookupCaller, type CallerLookup } from '../lib/sip/callerLookup';
+import LiveTranscriptPanel from './LiveTranscriptPanel';
+import { useMobileCredentials } from '../hooks/useMobileCredentials';
 import { useT } from '../lib/i18n';
 
 const PROFILE_CYCLE: AudioProfile[] = ['auto', 'hd', 'low-bandwidth'];
