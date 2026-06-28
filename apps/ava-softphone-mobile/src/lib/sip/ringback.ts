@@ -1,73 +1,50 @@
-// Local ringback tone generator (North-American cadence: 2s on / 4s off,
-// 440 + 480 Hz). Used when the PBX does not send early media so the user
-// hears that the call is actually ringing.
-let ctx: AudioContext | null = null;
-let oscA: OscillatorNode | null = null;
-let oscB: OscillatorNode | null = null;
-let gain: GainNode | null = null;
-let cadenceId: ReturnType<typeof setInterval> | null = null;
-let running = false;
+// Simple, reliable local ringback (440 + 480 Hz) used when the PBX does
+// not send early media. Replaces the previous ramped/cadenced implementation
+// which was fragile on iOS WKWebView and could leave the AudioContext stuck.
 
-function ensureCtx(): AudioContext | null {
-  try {
-    if (!ctx) {
-      const Ctor: any = (window as any).AudioContext || (window as any).webkitAudioContext;
-      if (!Ctor) return null;
-      ctx = new Ctor();
-    }
-    if (ctx && ctx.state === 'suspended') void ctx.resume();
-    return ctx;
-  } catch { return null; }
-}
+let audioCtx: AudioContext | null = null;
+let ringInterval: ReturnType<typeof setInterval> | null = null;
 
-/**
- * Prime the AudioContext synchronously during a user gesture (e.g. the call
- * button tap). iOS Safari/WKWebView only allows AudioContext creation inside
- * a gesture handler; calling this here guarantees ringback can play later
- * even though the actual oscillator nodes are created asynchronously after
- * the SIP stack starts the INVITE.
- */
 export function primeRingbackContext(): void {
-  void ensureCtx();
-}
-
-export function startRingback() {
-  if (running) { console.log('[ringback] already running — no-op'); return; }
-  const c = ensureCtx();
-  if (!c) { console.warn('[ringback] no AudioContext available'); return; }
-  running = true;
-  console.log('[ringback] start@gesture state=', c.state);
+  if (audioCtx) return;
   try {
-    gain = c.createGain();
-    gain.gain.value = 0;
-    gain.connect(c.destination);
-    oscA = c.createOscillator(); oscA.frequency.value = 440; oscA.connect(gain); oscA.start();
-    oscB = c.createOscillator(); oscB.frequency.value = 480; oscB.connect(gain); oscB.start();
-
-    const ON = 2000, OFF = 4000;
-    const ramp = (target: number) => {
-      if (!gain || !ctx) return;
-      gain.gain.cancelScheduledValues(ctx.currentTime);
-      gain.gain.linearRampToValueAtTime(target, ctx.currentTime + 0.05);
-    };
-    ramp(0.08);
-    const tick = () => { ramp(0); setTimeout(() => running && ramp(0.08), OFF); };
-    cadenceId = setInterval(tick, ON + OFF);
-    setTimeout(tick, ON);
-  } catch (e) {
-    console.warn('[ringback] start failed', e);
-    stopRingback('error');
-  }
+    const Ctor: any = (window as any).AudioContext || (window as any).webkitAudioContext;
+    if (Ctor) audioCtx = new Ctor();
+  } catch { /* ignore */ }
 }
 
-export function stopRingback(reason: string = 'manual') {
-  if (!running && !cadenceId && !oscA) return;
-  console.log('[ringback] stop reason=', reason);
-  running = false;
-  if (cadenceId) { clearInterval(cadenceId); cadenceId = null; }
-  try { oscA?.stop(); } catch {} try { oscB?.stop(); } catch {}
-  try { oscA?.disconnect(); oscB?.disconnect(); gain?.disconnect(); } catch {}
-  oscA = oscB = null; gain = null;
+export function startRingback(): void {
+  if (!audioCtx) primeRingbackContext();
+  if (!audioCtx) { console.warn('[ringback] no AudioContext'); return; }
+  if (audioCtx.state === 'suspended') { void audioCtx.resume(); }
+  stopRingback();
+
+  const playRing = () => {
+    if (!audioCtx) return;
+    try {
+      const osc1 = audioCtx.createOscillator();
+      const osc2 = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc1.frequency.value = 440;
+      osc2.frequency.value = 480;
+      gain.gain.value = 0.15;
+      osc1.connect(gain); osc2.connect(gain); gain.connect(audioCtx.destination);
+      osc1.start();
+      osc2.start();
+      osc1.stop(audioCtx.currentTime + 2);
+      osc2.stop(audioCtx.currentTime + 2);
+    } catch (e) {
+      console.warn('[ringback] playRing failed', e);
+    }
+  };
+
+  playRing();
+  ringInterval = setInterval(playRing, 6000);
+  console.log('[ringback] started');
+}
+
+export function stopRingback(_reason: string = 'manual'): void {
+  if (ringInterval) { clearInterval(ringInterval); ringInterval = null; }
 }
 
 export function describeEndReason(raw: string | undefined | null): string | null {
@@ -81,7 +58,7 @@ export function describeEndReason(raw: string | undefined | null): string | null
   if (r.includes('404')) return 'Numéro introuvable';
   if (r.includes('403')) return 'Appel interdit';
   if (r.includes('remote_bye')) return 'Le correspondant a raccroché';
-  if (r.includes('local_hangup')) return null; // user initiated
-  if (r.includes('5') && /\b5\d\d\b/.test(r)) return 'Erreur serveur PBX';
+  if (r.includes('local_hangup')) return null;
+  if (/\b5\d\d\b/.test(r)) return 'Erreur serveur PBX';
   return null;
 }

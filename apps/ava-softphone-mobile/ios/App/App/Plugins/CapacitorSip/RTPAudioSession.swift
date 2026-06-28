@@ -707,9 +707,10 @@ final class RTPAudioSession {
         audioLock.unlock()
 
         for f in framesToSend { sendRTPFrame(f); tapOutbound8k(f) }
-        if inputCallbackCount == 1 || inputCallbackCount % 50 == 0 {
-            NSLog("[RTP] input cb #\(inputCallbackCount) hwFrames=\(n) micPeak=\(String(format: "%.3f", micPeak)) queued=\(queued) txPackets=\(txPackets)")
-        }
+        // Per-callback NSLog removed — was blocking the realtime audio thread
+        // every ~20ms and contributing to UI freezes. Stats are logged every 5s
+        // from the render callback instead.
+        _ = queued
         return noErr
     }
 
@@ -787,9 +788,9 @@ final class RTPAudioSession {
                 dst.update(from: src.baseAddress!, count: needed)
             }
         }
-        if renderCallbackCount == 1 || renderCallbackCount % 50 == 0 {
-            NSLog("[RTP] render cb #\(renderCallbackCount) hwFrames=\(needed) drained8k=\(drained) avail8k=\(available)→\(remaining) rxPackets=\(rxPackets) rxPeak=\(String(format: "%.3f", rxPeak))")
-        }
+        // Per-callback render log removed — fired ~46×/sec and slowed the audio
+        // render thread. Only the 5-second stats line below remains.
+        _ = drained; _ = available
         // 5-second structured stats line — used to verify jitter buffer / codec health.
         let now = Date()
         if now.timeIntervalSince(lastStatsLog) >= 5.0 {
@@ -848,7 +849,7 @@ final class RTPAudioSession {
         }
         txPackets &+= 1
         txBytes &+= UInt64(pktLen)
-        if txPackets == 1 || txPackets % 50 == 0 {
+        if txPackets == 1 || txPackets % 500 == 0 {
             NSLog("[RTP] TX seq=\(seqForLog) → \(lastRemoteIp):\(lastRemotePort) txPackets=\(txPackets)")
         }
     }
@@ -895,7 +896,7 @@ final class RTPAudioSession {
                 }
                 self.audioLock.unlock()
                 self.tapInbound8k(samples)
-                if self.rxPackets == 1 || self.rxPackets % 50 == 0 {
+                if self.rxPackets == 1 || self.rxPackets % 500 == 0 {
                     NSLog("[RTP] rx packet #\(self.rxPackets) bytes=\(n) payload=\(payloadCount) seq=\(self.lastRemoteSeq) rxPeak=\(String(format: "%.3f", self.rxPeak)) playQueue=\(self.playQueue.count)")
                 }
             }
