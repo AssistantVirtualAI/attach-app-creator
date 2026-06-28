@@ -6,6 +6,7 @@
  */
 import React from 'react';
 import { colors, font, radius } from '../lib/theme';
+import { useT } from '../lib/i18n';
 import type { CallerLookup } from '../lib/sip/callerLookup';
 
 interface Props {
@@ -13,12 +14,12 @@ interface Props {
   rawNumber: string;
 }
 
-function sourceLabel(s: CallerLookup['source']): string | null {
+function sourceLabel(s: CallerLookup['source'], fr: boolean): string | null {
   switch (s) {
-    case 'maestro': return 'Client Maestro';
-    case 'broker': return 'Collègue Planiprêt';
-    case 'microsoft': return 'Contact Microsoft';
-    case 'device': return 'Contact téléphone';
+    case 'maestro': return fr ? 'Client Maestro' : 'Maestro client';
+    case 'broker': return fr ? 'Collègue Planiprêt' : 'Planiprêt colleague';
+    case 'microsoft': return fr ? 'Contact Microsoft' : 'Microsoft contact';
+    case 'device': return fr ? 'Contact téléphone' : 'Phone contact';
     default: return null;
   }
 }
@@ -32,9 +33,11 @@ function crmLine(l: CallerLookup): string | null {
 }
 
 export default function IncomingCallerPanel({ lookup, rawNumber }: Props) {
+  const { lang, tx } = useT();
+  const fr = lang === 'fr';
   const name = lookup?.found ? lookup.name : (lookup?.display_number || rawNumber);
-  const sub = lookup?.found ? lookup.display_number : 'Inconnu';
-  const tag = lookup?.found ? sourceLabel(lookup.source) : null;
+  const sub = lookup?.found ? lookup.display_number : tx('Inconnu', 'Unknown');
+  const tag = lookup?.found ? sourceLabel(lookup.source, fr) : null;
   const crm = lookup?.found ? crmLine(lookup) : null;
   const company = lookup?.found ? lookup.company : null;
   const photo = lookup?.found ? lookup.photo_url : null;
