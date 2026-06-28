@@ -167,6 +167,14 @@ export default function ActiveCallSheet({
         endReason={endReasonText}
         endCode={sp.lastSipCode ?? null}
       />
+      {/* Live transcription (diarized: outbound=Agent, inbound=Client). */}
+      {(sp.snap.callState === 'active' || sp.snap.callState === 'held') && organizationId && (
+        <LiveTranscriptPanel
+          callRecordId={String((sp.snap as any).callId || (sp.snap as any).callUuid || '')}
+          organizationId={organizationId}
+          active={sp.snap.callState === 'active' || sp.snap.callState === 'held'}
+        />
+      )}
       {/* Top brand strip */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 16px 8px', padding: '10px 12px', borderRadius: radius.lg, background: 'rgba(255,255,255,0.04)', border: `1px solid ${stateAccent}55`, boxShadow: shadow.glass }}>
         <span style={{ fontSize: 10, letterSpacing: 1.6, fontWeight: 800, color: stateAccent, textTransform: 'uppercase' }}>
