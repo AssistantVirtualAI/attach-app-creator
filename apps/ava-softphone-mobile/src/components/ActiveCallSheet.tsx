@@ -6,6 +6,7 @@ import CallQualityGauge from './CallQualityGauge';
 import type { AudioProfile } from '../lib/sip/audioProfile';
 import { EMPTY_QUALITY } from '../lib/sip/callQuality';
 import { getAudioState, onAudioStateChange, setRoute, type AudioRoute, type AudioState } from '../lib/sip/audioOutput';
+import CallTimeline, { type CallPhase } from './CallTimeline';
 import CallStatusBadge from './CallStatusBadge';
 import { isVibrationEnabled } from '../lib/sip/ringPreferences';
 import IncomingCallerPanel from './IncomingCallerPanel';
@@ -171,9 +172,13 @@ export default function ActiveCallSheet({
       {/* Live transcription removed during calls — caused app freeze (background audio tap + main-thread work). Transcription now only runs post-call. */}
       {/* Top brand strip */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 16px 8px', padding: '10px 12px', borderRadius: radius.lg, background: 'rgba(255,255,255,0.04)', border: `1px solid ${stateAccent}55`, boxShadow: shadow.glass }}>
-        <span style={{ fontSize: 10, letterSpacing: 1.6, fontWeight: 800, color: stateAccent, textTransform: 'uppercase' }}>
-          {stateLabel}
-        </span>
+        <CallStatusBadge
+          callState={sp.snap.callState}
+          incoming={isIncoming}
+          ringing={isOutgoing || isIncoming}
+          vibrating={isIncoming && isVibrationEnabled()}
+        />
+
         <CallQualityGauge
           quality={sp.snap.quality || sp.quality || EMPTY_QUALITY}
           profile={(sp.audioProfile as AudioProfile) || 'auto'}
