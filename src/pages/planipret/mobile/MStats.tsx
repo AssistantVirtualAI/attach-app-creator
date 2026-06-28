@@ -6,6 +6,7 @@ import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, PieChart, Pi
 import type { PlanipretMobileContext } from "../PlanipretMobile";
 import CoachOverlay from "@/components/planipret/ava/CoachOverlay";
 import { callAva, type AvaSuggestion } from "@/services/avaProactive";
+import { useMplanipretLang } from "@/hooks/useMplanipretLang";
 
 
 type Period = "week" | "month" | "quarter";
@@ -16,6 +17,7 @@ const SUCCESS = "#10B981";
 const DANGER = "#E84C4C";
 
 export default function MStats() {
+  const { t, lang } = useMplanipretLang();
   const { profile, openDialer, openAva } = useOutletContext<PlanipretMobileContext>();
   const navigate = useNavigate();
   const [period, setPeriod] = useState<Period>("week");
@@ -56,7 +58,7 @@ export default function MStats() {
     const days = period === "week" ? 7 : period === "month" ? 30 : 90;
     const buckets = new Array(days).fill(0).map((_, i) => {
       const d = new Date(Date.now() - (days - 1 - i) * 86400000);
-      return { label: d.toLocaleDateString("fr-CA", { weekday: "short", day: "2-digit" }), out: 0, in: 0, missed: 0, date: d.toDateString() };
+      return { label: d.toLocaleDateString(lang === "en" ? "en-CA" : "fr-CA", { weekday: "short", day: "2-digit" }), out: 0, in: 0, missed: 0, date: d.toDateString() };
     });
     for (const c of calls) {
       const dStr = new Date(c.created_at).toDateString();
@@ -65,21 +67,21 @@ export default function MStats() {
       else if (c.direction === "outbound") b.out++; else b.in++;
     }
     return buckets;
-  }, [calls, period]);
+  }, [calls, period, lang]);
 
   const donut = useMemo(() => {
     const out = calls.filter((c) => c.direction === "outbound" && c.status !== "missed").length;
     const inc = calls.filter((c) => c.direction === "inbound" && c.status !== "missed" && (c.duration_seconds ?? 0) > 0).length;
     const miss = calls.filter((c) => c.status === "missed" || (c.duration_seconds ?? 0) === 0).length;
-    return [{ name: "Sortants", value: out, color: ACCENT }, { name: "Entrants", value: inc, color: SUCCESS }, { name: "Manqués", value: miss, color: DANGER }];
-  }, [calls]);
+    return [{ name: t("stats.outbound"), value: out, color: ACCENT }, { name: t("stats.inbound"), value: inc, color: SUCCESS }, { name: t("stats.missed"), value: miss, color: DANGER }];
+  }, [calls, t]);
 
   const funnel = useMemo(() => {
     const qualified = leads.length;
     const inPipe = leads.filter((l) => ["proposition", "negotiation", "discovery"].includes(l.stage)).length;
     const approved = leads.filter((l) => l.stage === "won" || l.stage === "approved").length;
-    return [{ label: "Appels", value: kpi.total }, { label: "Leads qualifiés", value: qualified }, { label: "En pipeline", value: inPipe }, { label: "Approuvés", value: approved }];
-  }, [leads, kpi.total]);
+    return [{ label: t("home.kpi.calls"), value: kpi.total }, { label: t("stats.qualifiedLeads"), value: qualified }, { label: t("stats.inPipeline"), value: inPipe }, { label: t("stats.approved"), value: approved }];
+  }, [leads, kpi.total, t]);
 
   const bestDay = useMemo(() => {
     const top = [...dailyData].sort((a, b) => (b.out + b.in) - (a.out + a.in))[0];
@@ -91,8 +93,8 @@ export default function MStats() {
       <header className="flex items-center gap-2 mb-4">
         <button onClick={() => navigate(-1)} className="p-1.5 rounded-full hover:bg-slate-100"><ArrowLeft className="w-5 h-5" /></button>
         <div>
-          <h1 className="text-xl font-bold" style={{ color: "var(--pp-text-primary)" }}>Mes performances</h1>
-          <p className="text-xs text-slate-400">{profile?.full_name ?? ""} · {new Date().toLocaleDateString("fr-CA", { month: "long", year: "numeric" })}</p>
+          <h1 className="text-xl font-bold" style={{ color: "var(--pp-text-primary)" }}>{t("stats.title")}</h1>
+          <p className="text-xs text-slate-400">{profile?.full_name ?? ""} · {new Date().toLocaleDateString(lang === "en" ? "en-CA" : "fr-CA", { month: "long", year: "numeric" })}</p>
         </div>
       </header>
 
@@ -101,7 +103,7 @@ export default function MStats() {
           <button key={p} onClick={() => setPeriod(p)}
             className="flex-1 py-1.5 rounded-full font-medium transition"
             style={{ background: period === p ? "white" : "transparent", color: period === p ? PRIMARY : "#64748b", boxShadow: period === p ? "0 1px 3px rgba(0,0,0,0.1)" : "none" }}>
-            {p === "week" ? "Semaine" : p === "month" ? "Mois" : "3 mois"}
+            {t(`stats.periods.${p}`)}
           </button>
         ))}
       </div>
@@ -114,7 +116,7 @@ export default function MStats() {
           setCoachSuggestions([]);
           const res = await callAva({
             mode: "recommend",
-            message: `Analyse mes performances sur la période (${period}) et donne-moi 3 conseils actionnables pour améliorer mon taux de conversion.`,
+            message: t("stats.coachPrompt").replace("{period}", t(`stats.periods.${period}`)),
             context: {
               period,
               kpi,
@@ -130,19 +132,19 @@ export default function MStats() {
         className="w-full mb-4 py-2.5 rounded-xl flex items-center justify-center gap-2 text-white font-semibold text-sm shadow-md active:scale-[0.98] transition"
         style={{ background: "linear-gradient(135deg,#2D1A5A,#9B7FE8)", boxShadow: "0 4px 16px rgba(155,127,232,0.35)" }}
       >
-        <Sparkles className="w-4 h-4" /> Coach AVA — analyser mes perfs
+        <Sparkles className="w-4 h-4" /> {t("stats.coachButton")}
       </button>
 
 
       <div className="grid grid-cols-2 gap-2 mb-4">
-        <Kpi label="Total appels" value={kpi.total} icon={<Phone className="w-4 h-4" />} />
-        <Kpi label="Taux réponse" value={`${kpi.response}%`} icon={<TrendingUp className="w-4 h-4" />} />
-        <Kpi label="Durée moy." value={`${Math.floor(kpi.avgDur / 60)}m${kpi.avgDur % 60}s`} />
-        <Kpi label="Score moy." value={String(kpi.avgScore)} />
+        <Kpi label={t("stats.totalCalls")} value={kpi.total} icon={<Phone className="w-4 h-4" />} />
+        <Kpi label={t("stats.responseRate")} value={`${kpi.response}%`} icon={<TrendingUp className="w-4 h-4" />} />
+        <Kpi label={t("stats.avgDuration")} value={`${Math.floor(kpi.avgDur / 60)}m${kpi.avgDur % 60}s`} />
+        <Kpi label={t("stats.avgScore")} value={String(kpi.avgScore)} />
       </div>
 
       <div className="bg-white rounded-2xl p-3 mb-4 shadow-sm">
-        <div className="text-xs font-semibold text-slate-500 mb-2">Appels par jour</div>
+        <div className="text-xs font-semibold text-slate-500 mb-2">{t("stats.callsPerDay")}</div>
         <div style={{ width: "100%", height: 180 }}>
           <ResponsiveContainer>
             <BarChart data={dailyData}>
@@ -158,7 +160,7 @@ export default function MStats() {
       </div>
 
       <div className="bg-white rounded-2xl p-3 mb-4 shadow-sm">
-        <div className="text-xs font-semibold text-slate-500 mb-2">Répartition</div>
+        <div className="text-xs font-semibold text-slate-500 mb-2">{t("stats.breakdown")}</div>
         <div style={{ width: "100%", height: 180 }}>
           <ResponsiveContainer>
             <PieChart>
@@ -172,7 +174,7 @@ export default function MStats() {
       </div>
 
       <div className="bg-white rounded-2xl p-3 mb-4 shadow-sm">
-        <div className="text-xs font-semibold text-slate-500 mb-2">Conversion des leads</div>
+        <div className="text-xs font-semibold text-slate-500 mb-2">{t("stats.leadConversion")}</div>
         {funnel.map((f, i) => {
           const max = funnel[0].value || 1;
           const w = Math.max(15, (f.value / max) * 100);
@@ -191,19 +193,19 @@ export default function MStats() {
         {bestDay && (
           <div className="bg-white rounded-xl p-3 flex items-center gap-3 shadow-sm">
             <Award className="w-6 h-6 text-amber-500" />
-            <div className="text-sm">🏆 Meilleur jour: <strong>{bestDay.count} appels</strong> le {bestDay.label}</div>
+            <div className="text-sm">🏆 {t("stats.bestDay")}: <strong>{bestDay.count} {t("stats.calls")}</strong> {lang === "fr" ? "le" : "on"} {bestDay.label}</div>
           </div>
         )}
         <div className="bg-white rounded-xl p-3 flex items-center gap-3 shadow-sm">
           <Flame className="w-6 h-6 text-orange-500" />
-          <div className="text-sm">⚡ Performance solide ce {period === "week" ? "semaine" : "mois"}</div>
+          <div className="text-sm">⚡ {t("stats.solidPerformance")} {period === "week" ? t("stats.weekSuffix") : period === "quarter" ? t("stats.quarterSuffix") : t("stats.monthSuffix")}</div>
         </div>
       </div>
 
       <CoachOverlay
         open={coachOpen}
         title="Coach AVA"
-        subtitle={coachLoading ? "AVA analyse vos performances…" : coachReply}
+        subtitle={coachLoading ? t("stats.analyzing") : coachReply}
         suggestions={coachSuggestions}
         ctx={{ openDialer, openAva, userId: profile?.user_id }}
         onClose={() => setCoachOpen(false)}
