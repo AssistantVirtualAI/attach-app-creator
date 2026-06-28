@@ -6,7 +6,8 @@ import CallQualityGauge from './CallQualityGauge';
 import type { AudioProfile } from '../lib/sip/audioProfile';
 import { EMPTY_QUALITY } from '../lib/sip/callQuality';
 import { getAudioState, onAudioStateChange, setRoute, type AudioRoute, type AudioState } from '../lib/sip/audioOutput';
-import CallTimeline, { type CallPhase } from './CallTimeline';
+import CallStatusBadge from './CallStatusBadge';
+import { isVibrationEnabled } from '../lib/sip/ringPreferences';
 import IncomingCallerPanel from './IncomingCallerPanel';
 import { lookupCaller, type CallerLookup } from '../lib/sip/callerLookup';
 // LiveTranscriptPanel intentionally not imported — live transcription disabled during calls.
