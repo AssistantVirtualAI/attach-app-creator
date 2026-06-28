@@ -62,10 +62,10 @@ export default function MobileProfileSheet({
   const initials = (profile?.full_name || profile?.email || "?")
     .split(/\s+/).map((s: string) => s[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
 
-  return (
+  return createPortal(
     <AnimatePresence>
-      <motion.div className="absolute inset-0 z-40 flex items-end"
-        style={{ background: "rgba(0,0,0,0.45)" }}
+      <motion.div className="fixed inset-0 flex items-end"
+        style={{ background: "rgba(0,0,0,0.45)", zIndex: 99999 }}
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}>
         <motion.div onClick={(e) => e.stopPropagation()}
           className="w-full max-h-[88%] overflow-y-auto"
