@@ -415,6 +415,11 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
             call.resolve(["ok": true, "held": hold, "noop": true])
             return
         }
+        if pendingHold != nil {
+            // Guard against burst taps producing duplicate re-INVITEs.
+            call.resolve(["ok": false, "held": hold, "pending": true, "reason": "hold-already-pending"])
+            return
+        }
         pendingHold = hold
         callCseq += 1
         sendReInvite(hold: hold)
