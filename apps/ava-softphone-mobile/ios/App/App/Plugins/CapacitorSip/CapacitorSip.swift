@@ -57,7 +57,8 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     private var voipPushToken: String? = UserDefaults.standard.string(forKey: "ava.voipPushToken")
 
     // C callbacks need a static reference to reach back into the instance.
-    fileprivate static weak var shared: CapacitorPjsip?
+    // internal (not fileprivate) so AppDelegate can reach shared + notifyBg
+    internal static weak var shared: CapacitorPjsip?
 
     /// Called by AppDelegate when PushKit delivers a new VoIP token.
     public func setVoipPushToken(_ token: String?) {
@@ -167,7 +168,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         return pj_str_t(ptr: cstr, slen: pj_ssize_t(strlen(cstr)))
     }
 
-    private func notifyBg(_ event: String, _ data: [String: Any]) {
+    internal func notifyBg(_ event: String, _ data: [String: Any]) {
         sipQueue.async { [weak self] in
             guard let self = self else { return }
             self.registerThreadIfNeeded()
