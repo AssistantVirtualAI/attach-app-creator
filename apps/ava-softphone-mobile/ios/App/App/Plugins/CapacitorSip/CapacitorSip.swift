@@ -1023,6 +1023,10 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
             ? (RTPAudioSession.primaryLocalIPv4() ?? "0.0.0.0")
             : localRtpIp
         let port = localRtpPort > 0 ? Int(localRtpPort) : localSdpPort
+        guard port > 0 else {
+            log("ERROR buildSdp: localRtpPort=0 and localSdpPort=0 — RTP socket not bound; refusing to emit SDP with m=audio 0")
+            return ""
+        }
         let direction = hold ? "a=sendonly" : "a=sendrecv"
         var sdp = ""
         sdp += "v=0\r\n"
