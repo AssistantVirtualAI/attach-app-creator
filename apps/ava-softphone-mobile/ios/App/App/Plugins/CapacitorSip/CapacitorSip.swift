@@ -1051,6 +1051,11 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         let uri = "sip:\(number)@\(domain)"
         callRemoteUri = uri
         let sdp = buildSdp()
+        guard !sdp.isEmpty else {
+            log("ABORT INVITE → empty SDP (RTP socket not bound). Notifying registrationFailed for visibility.")
+            notifyListeners("callEnded", data: ["callId": callActiveId, "reason": "sdp-port-zero"])
+            return
+        }
         log("LOCAL SDP (INVITE) >>>\n\(sdp)")
         var msg = ""
         msg += "INVITE \(uri) SIP/2.0\r\n"
