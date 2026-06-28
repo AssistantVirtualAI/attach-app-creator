@@ -1206,10 +1206,15 @@ Deno.serve(async (req) => {
         // The FusionPBX v7 generic API treats unknown query params as SQL filters.
         // Sending `order`/`order_by` creates `AND order = $1`, which crashes because
         // `order` is reserved. Keep this request to supported paging/filter fields.
+        // FusionPBX v7 xml_cdr table does NOT have an `extension` column.
+        // The field is `extension_uuid` (a FK). Passing `extension=XXX` as a
+        // query param causes a SQL error: "column extension does not exist".
+        // Strip it here; extension-level filtering is done post-fetch in JS.
+        const { extension: _stripExt, ...safeExtraQp } = extraQp as any;
         const qp = new URLSearchParams({
           domain_uuid: requestedDomain || FUSIONPBX_DOMAIN_UUID,
           limit: "100",
-          ...extraQp,
+          ...safeExtraQp,
         });
         if (isPhp) {
           qp.set("key", FUSIONPBX_API_KEY);
