@@ -18,6 +18,9 @@ import AVFoundation
     public var onAnswer: (() -> Void)?
     /// Called by CallKit when the user taps End in the native UI.
     public var onEnd: (() -> Void)?
+    /// Called by CallKit when the audio session is activated.
+    /// CapacitorSip dispatches pjsua_set_snd_dev on sipQueue from this callback.
+    public var onAudioActivated: (() -> Void)?
 
     private override init() {
         let cfg = CXProviderConfiguration(localizedName: "Lemtel")
@@ -77,9 +80,16 @@ extension CallKitManager: CXProviderDelegate {
         action.fulfill()
     }
 
-    /// iOS has activated the audio session for us — PJSIP can now safely
-    /// start RTP. This is the Apple-mandated ordering that prevents the
-    /// "no audio" / one-way audio bugs on CallKit calls.
-    public func provider(_ provider: CXProvider, didActivate audioSession: AVAudioSession) {}
-    public func provider(_ provider: CXProvider, didDeactivate audioSession: AVAudioSession) {}
+    /// iOS has activated the audio session — forward to CapacitorSip which will
+    /// call pjsua_set_snd_dev on the PJLIB-registered sipQueue thread.
+    /// NEVER call pjsua_set_snd_dev directly here: CallKit runs this on its own
+    /// internal thread which is NOT registered in PJLIB → assertion crash.
+    public func provider(_ provider: CXProvider, didActivate audioSession: AVAudioSession) {
+        print("[CallKitManager] ✅ AVAudioSession activated by CallKit")
+        onAudioActivated?()
+    }
+
+    public func provider(_ provider: CXProvider, didDeactivate audioSession: AVAudioSession) {
+        print("[CallKitManager] 🔇 AVAudioSession deactivated by CallKit")
+    }
 }

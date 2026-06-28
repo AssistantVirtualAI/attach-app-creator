@@ -56,6 +56,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
 
     public override func load() {
         CapacitorPjsip.shared = self
+
         // Wire CallKit actions to PJSIP. Apple requires CallKit to own the
         // audio session lifecycle for VoIP apps — answering/ending from the
         // native UI must drive the SDK, not the other way around.
@@ -72,6 +73,28 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
                 self.currentCallId = PJSUA_INVALID_ID
             }
         }
+
+        // CRITICAL: CallKit calls didActivate on its own internal thread which is
+        // NOT registered in PJLIB. Calling pjsua_set_snd_dev directly from didActivate
+        // causes: "Assertion failed: Calling pjlib from unknown/external thread"
+        // Solution: dispatch pjsua_set_snd_dev on sipQueue (a PJLIB-registered thread).
+        CallKitManager.shared.onAudioActivated = { [weak self] in
+            self?.sipQueue.async {
+                guard let self = self else { return }
+                self.registerThreadIfNeeded()
+                let r = pjsua_set_snd_dev(PJMEDIA_AUD_DEFAULT_CAPTURE_DEV, PJMEDIA_AUD_DEFAULT_PLAYBACK_DEV)
+                print("[CapacitorPjsip] 🔊 pjsua_set_snd_dev via sipQueue: \(r)")
+                // Reconnect audio conference if a call is already active
+                if self.currentCallId != PJSUA_INVALID_ID {
+                    var info = pjsua_call_info()
+                    pjsua_call_get_info(self.currentCallId, &info)
+                    pjsua_conf_connect(info.conf_slot, 0)
+                    pjsua_conf_connect(0, info.conf_slot)
+                    print("[CapacitorPjsip] 🔊 conf_connect conf_slot=\(info.conf_slot)")
+                }
+            }
+        }
+
         NSLog("[CapacitorPjsip] load — plugin ready, PJSUA will init on first initAccount")
     }
 
@@ -82,6 +105,16 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     }
 
     // MARK: - Helpers
+
+    /// Registers the current thread with PJLIB if not already registered.
+    /// Must be called at the start of any sipQueue.async block that invokes PJSUA.
+    private func registerThreadIfNeeded() {
+        if pj_thread_is_registered() == 0 {
+            var desc = pj_thread_desc()
+            var thread: UnsafeMutablePointer<pj_thread_t>?
+            _ = pj_thread_register("sipQueue", &desc, &thread)
+        }
+    }
 
     /// Build a transient pj_str_t backed by a Swift String. The returned
     /// pj_str_t is only valid for the duration of `body`.
@@ -168,8 +201,20 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
                         }
                         CallKitManager.shared.reportEnded()
                         plugin.notifyBg("callEnded", ["reason": "remote_bye"])
+                        plugin.notifyBg("callStateChanged", ["state": "ended"])
                     default:
                         break
+                    }
+                }
+                cfg.cb.on_call_media_state = { callId in
+                    guard let plugin = CapacitorPjsip.shared else { return }
+                    var info = pjsua_call_info()
+                    pjsua_call_get_info(callId, &info)
+                    let mediaStatus = info.media.0.status
+                    if mediaStatus == PJSUA_CALL_MEDIA_ACTIVE {
+                        pjsua_conf_connect(info.conf_slot, 0)
+                        pjsua_conf_connect(0, info.conf_slot)
+                        print("[CapacitorPjsip] ✅ Audio connected conf_slot=\(info.conf_slot)")
                     }
                 }
                 cfg.cb.on_incoming_call = { _, callId, _ in
@@ -192,6 +237,10 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
                 mediaCfg.snd_clock_rate = 0
                 mediaCfg.ec_tail_len = 200
                 mediaCfg.no_vad = 0
+                // Disable ICE: FreeSWITCH/FusionPBX does not support ICE in SDP.
+                // Without this, PJSIP waits for ICE negotiation that never completes
+                // and RTP never starts → no audio in either direction.
+                mediaCfg.enable_ice = 0
 
                 status = pjsua_init(&cfg, &logCfg, &mediaCfg)
                 guard status == PJ_SUCCESS.rawValue else {
