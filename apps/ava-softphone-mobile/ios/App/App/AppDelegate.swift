@@ -161,7 +161,7 @@ extension AppDelegate: PKPushRegistryDelegate {
 
     /// Called when the VoIP push token is invalidated (e.g. app reinstall).
     func pushRegistry(_ registry: PKPushRegistry, didInvalidatePushTokenFor type: PKPushType) {
-        NSLog("[VoIP] \u26A0\uFE0F PushKit token invalidated")
+        NSLog("[VoIP] \u{26A0} PushKit token invalidated")
         UserDefaults.standard.removeObject(forKey: "ava.voipPushToken")
         CapacitorPjsip.shared?.setVoipPushToken(nil)
     }
