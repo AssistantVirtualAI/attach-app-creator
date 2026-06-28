@@ -3035,14 +3035,15 @@ Deno.serve(async (req) => {
 
     return json({ error: "UNKNOWN_ACTION", action }, 400);
   } catch (e: any) {
+    cidLog("[fusionpbx-proxy] INTERNAL error", { action, error: e?.message || String(e), stack: e?.stack?.split("\n").slice(0, 4) });
     if (organization_id) {
       await admin.from("pbx_sync_jobs").insert({
         organization_id, job_type: action, status: "failed",
         started_at: new Date().toISOString(),
         completed_at: new Date().toISOString(),
-        error: e?.message || String(e),
+        error: `[cid:${correlationId}] ${e?.message || String(e)}`,
       });
     }
-    return json({ error: "INTERNAL", message: e?.message || String(e) }, 500);
+    return json({ error: "INTERNAL", correlation_id: correlationId, message: e?.message || String(e) }, 500, { "X-Request-Id": correlationId });
   }
 });
