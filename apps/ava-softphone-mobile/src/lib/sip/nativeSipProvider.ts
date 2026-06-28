@@ -58,6 +58,7 @@ export interface CapacitorSipPlugin {
   transfer(options: { target: string }): Promise<{ ok: boolean; target: string }>;
   park(options?: { code?: string }): Promise<{ ok: boolean; code: string }>;
   addCall(options: { target: string }): Promise<{ ok: boolean; target: string }>;
+  setLiveTranscriptionEnabled(options: { enabled: boolean }): Promise<{ ok: boolean; enabled: boolean }>;
   addListener(event: string, callback: (data: any) => void): Promise<{ remove: () => Promise<void> }>;
   removeAllListeners(): Promise<void>;
 }
