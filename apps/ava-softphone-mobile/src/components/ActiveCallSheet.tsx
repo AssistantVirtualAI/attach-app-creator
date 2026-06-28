@@ -20,6 +20,7 @@ export default function ActiveCallSheet({
   sp: any;
   haptic: (s?: ImpactStyle) => Promise<void>;
 }) {
+  const { tx } = useT();
   const [timer, setTimer] = useState(0);
   const [showKeypad, setShowKeypad] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
