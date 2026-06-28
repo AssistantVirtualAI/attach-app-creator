@@ -2010,16 +2010,37 @@ Deno.serve(async (req) => {
           attempts.push({ url: safeUrl(url), status: 0, content_type: e?.name === "AbortError" ? "timeout" : undefined });
         }
       }
-      // Determine whether session login actually succeeded so the client can
-      // distinguish "PHPSESSID login failed" from "file truly missing on PBX disk".
-      const fileMissing = attemptsSession.some(a =>
+      // Classify the failure so the client can surface an actionable message
+      // (login broken vs. file deleted vs. PBX HTTP error) and the operator can
+      // grep one structured log line per failed playback.
+      const sessionLoginFailed = attemptsSession.some(a =>
+        a.status === 0 && (a.content_type || "").startsWith("login_failed")
+      );
+      const fileMissing = !sessionLoginFailed && attemptsSession.some(a =>
         (a.status === 404) ||
         (a.status === 200 && !(a.content_type || "").includes("text/html"))
       );
-      const sessionLoggedIn = FUSION_SESSIONS.size > 0;
-      console.log("[get-recording] RECORDING_NOT_FOUND", JSON.stringify({
+      const sessionLoggedIn = !sessionLoginFailed && FUSION_SESSIONS.size > 0;
+      const httpStatuses = Array.from(new Set([
+        ...attemptsSession.map(a => a.status),
+        ...attempts.map(a => a.status),
+      ].filter(s => s > 0))).sort((a, b) => a - b);
+      const failureKind: "login_failed" | "file_missing" | "http_error" | "unknown" =
+        sessionLoginFailed ? "login_failed"
+        : fileMissing ? "file_missing"
+        : httpStatuses.length > 0 ? "http_error"
+        : "unknown";
+      const loginErrorDetail =
+        attemptsSession.find(a => (a.content_type || "").startsWith("login_failed"))
+          ?.content_type?.replace(/^login_failed:\s*/, "") || null;
+
+      cidLog("[get-recording] RECORDING_NOT_FOUND", JSON.stringify({
+        failure_kind: failureKind,
+        http_statuses: httpStatuses,
         xml_cdr_uuid, record_name, record_path, domain_name, recorded_at,
         session_logged_in: sessionLoggedIn,
+        session_login_failed: sessionLoginFailed,
+        login_error: loginErrorDetail,
         file_missing_signal: fileMissing,
         session_attempts_count: attemptsSession.length,
         legacy_attempts_count: attempts.length,
@@ -2029,14 +2050,21 @@ Deno.serve(async (req) => {
       return json({
         ok: false,
         error: "RECORDING_NOT_FOUND",
-        message: fileMissing
+        failure_kind: failureKind,
+        correlation_id: correlationId,
+        http_statuses: httpStatuses,
+        message: sessionLoginFailed
+          ? `FusionPBX login failed (${loginErrorDetail || 'unknown error'}). Vault secrets FUSIONPBX_USERNAME / FUSIONPBX_PASSWORD are likely incorrect.`
+          : fileMissing
           ? "FusionPBX session authenticated successfully, but the recording file is missing from PBX storage (the .mp3/.wav is no longer on disk)."
           : "The PBX has CDR metadata for this call, but the recording file is not reachable on the PBX storage path.",
         session_logged_in: sessionLoggedIn,
+        session_login_failed: sessionLoginFailed,
+        login_error: loginErrorDetail,
         file_missing: fileMissing,
         attempts,
         session_attempts: attemptsSession,
-      }, 200, { "X-Recording-Status": "not-found" });
+      }, 200, { "X-Recording-Status": "not-found", "X-Request-Id": correlationId });
     }
 
     // ---- Signed-URL recording delivery ----
