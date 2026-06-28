@@ -73,7 +73,7 @@ export default function AVAChatScreen() {
         {msgs.length === 0 && (
           <div style={{ marginTop: 18 }}>
             <div style={{ fontSize: font.md, fontWeight: 700, color: colors.textIce, marginBottom: 8 }}>
-              Posez n'importe quelle question à AVA sur votre système téléphonique.
+              {tx("Posez n'importe quelle question à AVA sur votre système téléphonique.", 'Ask AVA anything about your phone system.')}
             </div>
             <div style={{ display: 'grid', gap: 8 }}>
               {SUGGESTIONS.map((s) => (
