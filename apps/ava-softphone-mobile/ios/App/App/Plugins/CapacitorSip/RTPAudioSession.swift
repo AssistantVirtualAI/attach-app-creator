@@ -592,24 +592,30 @@ final class RTPAudioSession {
         for i in 0..<n { let a = abs(scratch[i]); if a > peak { peak = a } }
         micPeak = Float(peak) / 32767.0
 
-        // Integer decimation 48000 → 8000 (every 6th sample). txPhase counts
-        // skipped samples across callbacks so we never lose alignment.
-        var decimated = [Int16]()
-        decimated.reserveCapacity(n / decimation + 1)
-        var skip = Int(txPhase)
-        for i in 0..<n {
-            if skip == 0 {
-                decimated.append(isMuted ? 0 : scratch[i])
-                skip = decimation - 1
-            } else {
-                skip -= 1
-            }
-        }
-        txPhase = Double(skip)
-
+        // 48000 → 8000 downsample using 6-sample averaging (better SNR than
+        // sample-and-hold decimation). Accumulator carries the partial window
+        // across callbacks so we never lose alignment.
         var framesToSend: [[Int16]] = []
         audioLock.lock()
-        sendBuffer.append(contentsOf: decimated)
+        if isMuted {
+            // Push silence at 8k rate.
+            let outCount = (downsampleAccum.count + n) / decimation
+            sendBuffer.append(contentsOf: [Int16](repeating: 0, count: outCount))
+            downsampleAccum.removeAll(keepingCapacity: true)
+        } else {
+            downsampleAccum.reserveCapacity(downsampleAccum.count + n)
+            for i in 0..<n { downsampleAccum.append(scratch[i]) }
+            var consumed = 0
+            while consumed + decimation <= downsampleAccum.count {
+                var sum: Int32 = 0
+                for j in 0..<decimation { sum &+= Int32(downsampleAccum[consumed + j]) }
+                let avg = sum / Int32(decimation)
+                let clamped = max(Int32(Int16.min), min(Int32(Int16.max), avg))
+                sendBuffer.append(Int16(clamped))
+                consumed += decimation
+            }
+            if consumed > 0 { downsampleAccum.removeFirst(consumed) }
+        }
         while sendBuffer.count >= frameSamples {
             let frame = Array(sendBuffer.prefix(frameSamples))
             sendBuffer.removeFirst(frameSamples)
