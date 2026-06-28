@@ -201,6 +201,20 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
   const fmt = (s: number) => `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
   const hasTranscript = (data?.transcript?.length || 0) > 0;
   const aiDone = hasTranscript && !!data?.summary;
+
+  // --- Transcription badge state (visible at the top of the AI section) ---
+  const liveStatus: 'processing' | 'done' | 'failed' | 'missing' =
+    transcribing ? 'processing'
+    : (data?.transcriptionStatus as any) || (hasTranscript ? 'done' : (transcribeError ? 'failed' : 'missing'));
+  const provider = data?.transcriptionProvider || null;
+  const badgeLabel = liveStatus === 'processing' ? (fr ? '⏳ Transcription en cours' : '⏳ Transcribing')
+    : liveStatus === 'done' ? (fr ? '✅ Transcription terminée' : '✅ Transcription complete')
+    : liveStatus === 'failed' ? (fr ? '❌ Transcription échouée' : '❌ Transcription failed')
+    : (fr ? '• Transcription non lancée' : '• Not transcribed');
+  const badgeTone: 'cyan' | 'success' | 'danger' | 'silver' =
+    liveStatus === 'processing' ? 'cyan' : liveStatus === 'done' ? 'success' : liveStatus === 'failed' ? 'danger' : 'silver';
+  const badgeColor = badgeTone === 'success' ? '#10b981' : badgeTone === 'danger' ? colors.danger : badgeTone === 'cyan' ? colors.avaCyan : colors.mutedSilver;
+
   const statusText = transcribing
     ? aiStage === 'analyzing' ? (fr ? 'Analyse IA : en cours — scoring/coaching' : 'AI analysis: in progress — scoring/coaching') : (fr ? 'Analyse IA : transcription en cours' : 'AI analysis: transcribing')
     : aiDone || data?.aiCached ? (fr ? 'Analyse IA : déjà traité — cache réutilisé' : 'AI analysis: cached')
