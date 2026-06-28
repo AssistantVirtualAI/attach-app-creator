@@ -788,9 +788,9 @@ final class RTPAudioSession {
                 dst.update(from: src.baseAddress!, count: needed)
             }
         }
-        if renderCallbackCount == 1 || renderCallbackCount % 50 == 0 {
-            NSLog("[RTP] render cb #\(renderCallbackCount) hwFrames=\(needed) drained8k=\(drained) avail8k=\(available)→\(remaining) rxPackets=\(rxPackets) rxPeak=\(String(format: "%.3f", rxPeak))")
-        }
+        // Per-callback render log removed — fired ~46×/sec and slowed the audio
+        // render thread. Only the 5-second stats line below remains.
+        _ = drained; _ = available
         // 5-second structured stats line — used to verify jitter buffer / codec health.
         let now = Date()
         if now.timeIntervalSince(lastStatsLog) >= 5.0 {
