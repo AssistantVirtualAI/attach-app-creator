@@ -896,7 +896,7 @@ final class RTPAudioSession {
                 }
                 self.audioLock.unlock()
                 self.tapInbound8k(samples)
-                if self.rxPackets == 1 || self.rxPackets % 50 == 0 {
+                if self.rxPackets == 1 || self.rxPackets % 500 == 0 {
                     NSLog("[RTP] rx packet #\(self.rxPackets) bytes=\(n) payload=\(payloadCount) seq=\(self.lastRemoteSeq) rxPeak=\(String(format: "%.3f", self.rxPeak)) playQueue=\(self.playQueue.count)")
                 }
             }
