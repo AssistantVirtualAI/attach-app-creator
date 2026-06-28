@@ -218,7 +218,7 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
         setFailure({ step: e.step, code: e.code, message: e.message, detail: e.detail });
         setError(mapAuthError(e.code + ' ' + e.message));
       } else {
-        setFailure({ step: 'network', code: 'unknown', message: e?.message || 'Erreur inconnue' });
+        setFailure({ step: 'network', code: 'unknown', message: e?.message || tx('Erreur inconnue', 'Unknown error') });
         setError(mapAuthError(e?.message));
       }
       // eslint-disable-next-line no-console
