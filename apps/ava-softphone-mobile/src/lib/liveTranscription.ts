@@ -45,6 +45,15 @@ const wsUrl = () =>
   SUPABASE_URL.replace(/^http/, 'ws') + '/functions/v1/realtime-stt-relay';
 
 export function startLiveTranscription(opts: StartOpts): LiveTranscriptionHandle {
+  // EMERGENCY: live transcription disabled — it caused device freezes during
+  // calls. Transcription now runs only post-call via manual user action.
+  return {
+    stop: async () => {},
+    onSegment: () => () => {},
+    onStatus: () => () => {},
+  } as unknown as LiveTranscriptionHandle;
+  // eslint-disable-next-line no-unreachable
+  void opts;
   const segListeners = new Set<(s: LiveSegment) => void>();
   const statusListeners = new Set<(s: LiveStatusEvent) => void>();
   const emitSeg = (s: LiveSegment) => segListeners.forEach((cb) => { try { cb(s); } catch {} });
