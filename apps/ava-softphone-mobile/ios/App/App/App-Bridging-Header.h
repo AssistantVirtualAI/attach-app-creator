@@ -4,4 +4,8 @@
 #import <Foundation/Foundation.h>
 #import <Capacitor/Capacitor.h>
 
+// PJSIP SDK — exposes pjsua C API to Swift (CapacitorSip.swift).
+#import <pjsua.h>
+
 #endif
+
