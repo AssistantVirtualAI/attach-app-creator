@@ -302,12 +302,10 @@ Deno.serve(async (req) => {
 
     console.log("ai-transcribe-call audio resolution", { call_record_id, audioSource, bytes: audioBytes?.length || 0, fetchErrors });
 
-    const lovableKey = Deno.env.get("LOVABLE_API_KEY");
-    if (!lovableKey) {
-      await writeTranscript(fallbackTranscript, "stub-no-key");
-      await audit("missing-key", { error_code: "LOVABLE_API_KEY", message: "Lovable AI key not configured", provider: "lovable-ai" });
-      return json({ transcript_text: fallbackTranscript, stub: true, reason: "missing-ai-key", fetchErrors });
-    }
+    const lovableKey = Deno.env.get("LOVABLE_API_KEY") || null;
+    // NOTE: We do NOT abort here if lovableKey is absent — Whisper (OPENAI_API_KEY) is
+    // the primary provider and does not need LOVABLE_API_KEY. Lovable Gateway is only
+    // used as a fallback after Whisper fails. We only abort if BOTH keys are absent.
     if (!audioBytes || audioBytes.length === 0) {
       // Surface specific PBX errors so the UI can show actionable messages.
       const errBlob = fetchErrors.join(" | ");
@@ -348,6 +346,7 @@ Deno.serve(async (req) => {
     type ProviderResult = { text?: string; provider: string; model: string; error?: string; status?: number };
 
     const tryGatewayTranscribe = async (model: string): Promise<ProviderResult> => {
+      if (!lovableKey) return { error: "no-lovable-key", provider: "lovable-ai", model };
       const ext = ({ mpeg: "mp3", mp3: "mp3", wav: "wav", webm: "webm", ogg: "ogg", mp4: "m4a" } as Record<string, string>)[audioFormat] || "wav";
       const fd = new FormData();
       fd.append("model", model);
@@ -430,6 +429,13 @@ Deno.serve(async (req) => {
       return { text: String(d?.text || "").trim(), provider: "openai", model: "whisper-1" };
     };
 
+    // Guard: abort early only if BOTH providers are unavailable.
+    const openaiKeyPresent = !!Deno.env.get("OPENAI_API_KEY");
+    if (!openaiKeyPresent && !lovableKey) {
+      await writeTranscript(fallbackTranscript, "stub-no-key");
+      await audit("missing-key", { error_code: "no-ai-keys", message: "Neither OPENAI_API_KEY nor LOVABLE_API_KEY is configured", provider: "none" });
+      return json({ transcript_text: fallbackTranscript, stub: true, reason: "missing-ai-key", fetchErrors });
+    }
     // Mark as processing so the UI badge can show "en cours" via polling/Realtime.
     await audit("processing", { provider: "openai", model: "whisper-1", message: "STT started — Whisper-1 primary" });
 
