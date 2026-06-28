@@ -16,6 +16,7 @@ export interface SIPConfig {
   host?: string;
 }
 import { CapacitorPjsip, onNativeSipEvent } from '../lib/sip/nativeSipProvider';
+import { primeRingbackContext, startRingback, stopRingback } from '../lib/sip/ringback';
 // Stub to avoid pulling in callQuality.ts → RTCPeerConnection
 type CallQuality = { mos: number; packetLoss: number; jitter: number; rtt: number };
 const EMPTY_QUALITY: CallQuality = { mos: 0, packetLoss: 0, jitter: 0, rtt: 0 };
