@@ -56,6 +56,22 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
 
     public override func load() {
         CapacitorPjsip.shared = self
+        // Wire CallKit actions to PJSIP. Apple requires CallKit to own the
+        // audio session lifecycle for VoIP apps — answering/ending from the
+        // native UI must drive the SDK, not the other way around.
+        CallKitManager.shared.onAnswer = { [weak self] in
+            self?.sipQueue.async {
+                guard let self = self, self.currentCallId != PJSUA_INVALID_ID else { return }
+                pjsua_call_answer(self.currentCallId, 200, nil, nil)
+            }
+        }
+        CallKitManager.shared.onEnd = { [weak self] in
+            self?.sipQueue.async {
+                guard let self = self, self.currentCallId != PJSUA_INVALID_ID else { return }
+                pjsua_call_hangup(self.currentCallId, 0, nil, nil)
+                self.currentCallId = PJSUA_INVALID_ID
+            }
+        }
         NSLog("[CapacitorPjsip] load — plugin ready, PJSUA will init on first initAccount")
     }
 
