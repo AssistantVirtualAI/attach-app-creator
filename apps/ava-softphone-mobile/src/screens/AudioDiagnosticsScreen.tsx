@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { CapacitorSipNative } from '../lib/sip/nativeSipProvider';
+import { useT } from '../lib/i18n';
 
 type Stats = Awaited<ReturnType<typeof CapacitorSipNative.getRtpStats>>;
 
 export default function AudioDiagnosticsScreen() {
+  const { tx } = useT();
   const [stats, setStats] = useState<Stats | null>(null);
   const [route, setRoute] = useState<string>('');
   const [btEvents, setBtEvents] = useState<Array<{ t: number; outputs: string[]; bluetooth: boolean }>>([]);
