@@ -934,9 +934,9 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     private func startOptionsKeepalive() {
         optionsTimer?.invalidate()
         optionsTimer = Timer.scheduledTimer(withTimeInterval: 25, repeats: true) { [weak self] _ in
-            self?.sendOptions()
+            DispatchQueue.global(qos: .background).async { self?.sendOptions() }
         }
-        log("OPTIONS keepalive started (25s)")
+        log("OPTIONS keepalive started (25s, background dispatch)")
     }
 
     private func stopOptionsKeepalive() {
