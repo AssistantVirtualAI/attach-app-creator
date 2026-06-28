@@ -10,8 +10,10 @@
  */
 import React, { useEffect, useState } from 'react';
 import { perf, isPerfOverlayEnabled } from '../lib/perfMetrics';
+import { useT } from '../lib/i18n';
 
 export default function PerfOverlay() {
+  const { tx } = useT();
   const [, setTick] = useState(0);
   const [open, setOpen] = useState(true);
   const [enabled] = useState(isPerfOverlayEnabled());
