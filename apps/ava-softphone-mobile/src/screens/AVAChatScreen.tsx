@@ -1,17 +1,26 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { colors, font, gradients, radius, shadow } from '../lib/theme';
 import { mobileApi } from '../lib/mobileApi';
+import { useT } from '../lib/i18n';
 
 type Msg = { id: string; role: 'user' | 'assistant'; text: string; pending?: boolean };
 
-const SUGGESTIONS = [
+const SUGGESTIONS_FR = [
   "Combien d'appels avons-nous reçus aujourd'hui ?",
   'Qui a manqué le plus d\u2019appels cette semaine ?',
   'Résume le dernier appel de Quebec Auto',
   "Quelle file a le plus long temps d'attente ?",
 ];
+const SUGGESTIONS_EN = [
+  "How many calls did we receive today?",
+  "Who missed the most calls this week?",
+  "Summarize the latest call from Quebec Auto",
+  "Which queue has the longest wait time?",
+];
 
 export default function AVAChatScreen() {
+  const { tx, lang } = useT();
+  const SUGGESTIONS = lang === 'fr' ? SUGGESTIONS_FR : SUGGESTIONS_EN;
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
