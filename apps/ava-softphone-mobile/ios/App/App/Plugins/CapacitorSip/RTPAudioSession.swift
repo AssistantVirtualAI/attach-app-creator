@@ -269,9 +269,6 @@ final class RTPAudioSession {
     }
 
     func start(remoteIp: String, remotePort: UInt16) {
-        guard !running else { return }
-        guard sockfd >= 0 else { NSLog("[RTP] start without socket"); return }
-        running = true
         var addr = sockaddr_in()
         addr.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
         addr.sin_family = sa_family_t(AF_INET)
@@ -280,7 +277,8 @@ final class RTPAudioSession {
         self.remoteAddr = addr
         self.hasRemote = true
         self.lastRemotePort = remotePort
-        self.startedAt = Date()
+        self.lastRemoteIp = remoteIp
+        NSLog("[RTP] remote set to \(remoteIp):\(remotePort) hasRemote=true")
         NSLog("[RTP] start remote=\(remoteIp):\(remotePort) local=\(localIp):\(localPort)")
         startReceiveLoop()
         if ioUnit == nil {
