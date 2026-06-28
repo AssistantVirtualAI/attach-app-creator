@@ -65,7 +65,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
                 log("route auto-switch error: \(error.localizedDescription)")
             }
         }
-        notifyListeners("audioRouteChanged", data: [
+        notifyBg("audioRouteChanged", data: [
             "reason": reasonRaw,
             "outputs": outputs,
             "bluetooth": hasBT
@@ -125,7 +125,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         if rtp != nil { return }
         let session = RTPAudioSession()
         session.onAudioStateChanged = { [weak self] status, data in
-            self?.notifyListeners("audioStateChanged", data: data)
+            self?.notifyBg("audioStateChanged", data: data)
         }
         do {
             try session.prepareLocalSocket()
@@ -253,7 +253,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         let sameAccount = (self.server == server && self.username == username && self.password == password)
         if sameAccount && registered {
             log("initAccount skipped — already registered for \(username)@\(server)")
-            notifyListeners("registration", data: ["state": "registered", "status": "registered"])
+            notifyBg("registration", data: ["state": "registered", "status": "registered"])
             call.resolve(["ok": true, "alreadyRegistered": true])
             return
         }
@@ -278,18 +278,18 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
             guard let self = self else { return }
             self.log("mic permission granted=\(granted)")
             let deniedReason = self.microphoneDeniedReason()
-            self.notifyListeners("micPermission", data: [
+            self.notifyBg("micPermission", data: [
                 "granted": granted,
                 "status": granted ? "granted" : "denied",
                 "reason": granted ? "" : deniedReason
             ])
             if !granted {
-                self.notifyListeners("registration", data: [
+                self.notifyBg("registration", data: [
                     "state": "error",
                     "status": "error",
                     "reason": deniedReason
                 ])
-                self.notifyListeners("registrationFailed", data: ["reason": deniedReason])
+                self.notifyBg("registrationFailed", data: ["reason": deniedReason])
                 call.reject(deniedReason)
                 return
             }
@@ -348,7 +348,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         requestMicPermission { [weak self] granted in
             guard let self = self else { return }
             let reason = granted ? "" : self.microphoneDeniedReason()
-            self.notifyListeners("micPermission", data: [
+            self.notifyBg("micPermission", data: [
                 "granted": granted,
                 "status": granted ? "granted" : "denied",
                 "reason": reason
@@ -412,7 +412,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         isMuted = muted
         rtp?.setMuted(muted)
         log("mute changed muted=\(muted) — RTP samples \(muted ? "zeroed" : "live"), AVAudioSession unchanged")
-        notifyListeners("muteChanged", data: ["muted": muted])
+        notifyBg("muteChanged", data: ["muted": muted])
         call.resolve(["ok": true, "muted": muted])
     }
 
@@ -436,7 +436,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         callCseq += 1
         sendReInvite(hold: hold)
         // NOTE: don't mark held/resumed until the PBX confirms with 200 OK.
-        notifyListeners("holdPending", data: ["held": hold, "onHold": hold])
+        notifyBg("holdPending", data: ["held": hold, "onHold": hold])
         call.resolve(["ok": true, "held": hold, "pending": true])
     }
 
@@ -461,10 +461,10 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         if enabled {
             rtp.resetLiveTapBuffers()
             rtp.onLivePcmInbound = { [weak self] data in
-                self?.notifyListeners("livePcmInbound", data: ["b64": data.base64EncodedString()])
+                self?.notifyBg("livePcmInbound", data: ["b64": data.base64EncodedString()])
             }
             rtp.onLivePcmOutbound = { [weak self] data in
-                self?.notifyListeners("livePcmOutbound", data: ["b64": data.base64EncodedString()])
+                self?.notifyBg("livePcmOutbound", data: ["b64": data.base64EncodedString()])
             }
         } else {
             rtp.onLivePcmInbound = nil
@@ -480,7 +480,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         connection?.cancel()
         connection = nil
         registered = false
-        notifyListeners("registration", data: ["state": "unregistered"])
+        notifyBg("registration", data: ["state": "unregistered"])
         call.resolve(["ok": true])
     }
 
@@ -599,11 +599,11 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
             self.log("nw state=\(state)")
             switch state {
             case .ready:
-                self.notifyListeners("registration", data: ["state": "connecting"])
+                self.notifyBg("registration", data: ["state": "connecting"])
                 self.startReceive()
                 self.sendRegister(authHeader: nil)
             case .failed(let err):
-                self.notifyListeners("registrationFailed", data: ["reason": "socket: \(err.localizedDescription)"])
+                self.notifyBg("registrationFailed", data: ["reason": "socket: \(err.localizedDescription)"])
             case .cancelled:
                 self.registered = false
             default: break
@@ -621,7 +621,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
             }
             if let error = error {
                 self.log("rx error: \(error.localizedDescription)")
-                self.notifyListeners("registrationFailed", data: ["reason": error.localizedDescription])
+                self.notifyBg("registrationFailed", data: ["reason": error.localizedDescription])
                 return
             }
             if !isComplete { self.startReceive() }
@@ -714,7 +714,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         // Send 100 Trying then 180 Ringing
         sendResponseToInvite(code: 100, reason: "Trying")
         sendResponseToInvite(code: 180, reason: "Ringing")
-        notifyListeners("callReceived", data: ["from": fromNumber, "callId": callActiveId])
+        notifyBg("callReceived", data: ["from": fromNumber, "callId": callActiveId])
         emitCallState("ringing", direction: "in", number: fromNumber)
     }
 
@@ -806,7 +806,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
                         pendingHold = nil
                     }
                     log("CALL_EVENT|reINVITE_200_OK|held=\(isOnHold)|callState=\(callState)|callId=\(callActiveId)")
-                    notifyListeners("holdChanged", data: ["held": isOnHold, "onHold": isOnHold])
+                    notifyBg("holdChanged", data: ["held": isOnHold, "onHold": isOnHold])
                 } else {
                     if callDirection.isEmpty { callDirection = "out" }
                     callState = "active"
@@ -845,13 +845,13 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
                 let isProxyAuth = wwwLine.lowercased().hasPrefix("proxy-authenticate:") || code == "407"
                 sendRegister(authHeader: buildAuthHeader(method: "REGISTER", uri: "sip:\(domain)", realm: realm, nonce: nonce, proxy: isProxyAuth))
             } else {
-                notifyListeners("registrationFailed", data: ["reason": "401 without auth header"])
+                notifyBg("registrationFailed", data: ["reason": "401 without auth header"])
             }
         } else if code == "200" {
             if !registered {
                 registered = true
                 log("REGISTERED ✓ — notifying JS")
-                notifyListeners("registration", data: ["state": "registered", "status": "registered", "extension": username])
+                notifyBg("registration", data: ["state": "registered", "status": "registered", "extension": username])
                 DispatchQueue.main.async {
                     self.registerTimer?.invalidate()
                     self.registerTimer = Timer.scheduledTimer(withTimeInterval: 50, repeats: true) { _ in
@@ -866,7 +866,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
                 }
             }
         } else if let n = Int(code), n >= 400 {
-            notifyListeners("registrationFailed", data: ["reason": "REGISTER \(code)"])
+            notifyBg("registrationFailed", data: ["reason": "REGISTER \(code)"])
         }
     }
 
@@ -920,13 +920,13 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
 
         log(">>> REGISTER cseq=\(cseq)\(authHeader != nil ? " (with auth)" : "")")
         guard let conn = connection else {
-            notifyListeners("registrationFailed", data: ["reason": "no connection"])
+            notifyBg("registrationFailed", data: ["reason": "no connection"])
             return
         }
         conn.send(content: msg.data(using: .utf8), completion: .contentProcessed { [weak self] error in
             if let error = error {
                 self?.log("send error: \(error.localizedDescription)")
-                self?.notifyListeners("registrationFailed", data: ["reason": error.localizedDescription])
+                self?.notifyBg("registrationFailed", data: ["reason": error.localizedDescription])
             }
         })
     }
@@ -1064,7 +1064,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         let sdp = buildSdp()
         guard !sdp.isEmpty else {
             log("ABORT INVITE → empty SDP (RTP socket not bound). Notifying registrationFailed for visibility.")
-            notifyListeners("callEnded", data: ["callId": callActiveId, "reason": "sdp-port-zero"])
+            notifyBg("callEnded", data: ["callId": callActiveId, "reason": "sdp-port-zero"])
             return
         }
         log("LOCAL SDP (INVITE) >>>\n\(sdp)")
@@ -1231,7 +1231,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         isRecording = true
         callCseq += 1
         sendInfoRecord(on: true)
-        notifyListeners("recordingChanged", data: ["recording": true])
+        notifyBg("recordingChanged", data: ["recording": true])
         log("startRecord ok callId=\(callActiveId) state=\(callState)")
         call.resolve(["ok": true, "recording": true, "callId": callActiveId])
     }
@@ -1244,7 +1244,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         isRecording = false
         callCseq += 1
         sendInfoRecord(on: false)
-        notifyListeners("recordingChanged", data: ["recording": false])
+        notifyBg("recordingChanged", data: ["recording": false])
         call.resolve(["ok": true, "recording": false])
     }
 
@@ -1280,10 +1280,10 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
             isOnHold = true
             callCseq += 1
             sendReInvite(hold: true)
-            notifyListeners("holdChanged", data: ["held": true, "onHold": true])
+            notifyBg("holdChanged", data: ["held": true, "onHold": true])
         }
         // Notify JS so it can fire a fresh makeCall() once the hold is acknowledged.
-        notifyListeners("addCallRequested", data: ["target": target])
+        notifyBg("addCallRequested", data: ["target": target])
         call.resolve(["ok": true, "target": target, "note": "follow up with makeCall on JS side"])
     }
 
