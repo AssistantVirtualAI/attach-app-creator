@@ -2,8 +2,11 @@
 // not send early media. Replaces the previous ramped/cadenced implementation
 // which was fragile on iOS WKWebView and could leave the AudioContext stuck.
 
+import { getRingVolume } from './ringPreferences';
+
 let audioCtx: AudioContext | null = null;
 let ringInterval: ReturnType<typeof setInterval> | null = null;
+
 
 export function primeRingbackContext(): void {
   if (audioCtx) return;
