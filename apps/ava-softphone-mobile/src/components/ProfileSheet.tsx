@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, LogOut, KeyRound, Camera, Check } from 'lucide-react';
+import { X, LogOut, KeyRound, Camera, Check, Bell } from 'lucide-react';
+import RingSettingsSheet from './RingSettingsSheet';
 import { colors, font, radius, gradients } from '../lib/theme';
 import type { Creds } from '../lib/creds';
 
@@ -44,6 +45,7 @@ export default function ProfileSheet({
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [pwOpen, setPwOpen] = useState(false);
+  const [ringOpen, setRingOpen] = useState(false);
   const [pwNew, setPwNew] = useState('');
   const [pwConfirm, setPwConfirm] = useState('');
   const [pwBusy, setPwBusy] = useState(false);
@@ -291,10 +293,17 @@ export default function ProfileSheet({
             )}
           </div>
         )}
+        <button onClick={() => setRingOpen(true)} style={rowBtn}>
+          <Bell size={18} />
+          <span style={{ flex: 1, textAlign: 'left' }}>Ring & vibration</span>
+          <span style={{ fontSize: 11, color: colors.mutedSilver }}>›</span>
+        </button>
         <button onClick={onSignOut} style={{ ...rowBtn, color: '#ef4444', marginTop: 8 }}>
           <LogOut size={18} />
           <span style={{ flex: 1, textAlign: 'left' }}>Sign out</span>
         </button>
+        <RingSettingsSheet open={ringOpen} onClose={() => setRingOpen(false)} />
+
       </div>
     </div>
   ), document.body);
