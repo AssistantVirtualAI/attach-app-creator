@@ -365,15 +365,15 @@ function ForgotPasswordScreen({ initialEmail, accent, onBack }: { initialEmail: 
           {step === 'form' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
-                <h2 style={headingStyle}>Réinitialiser le mot de passe</h2>
-                <p style={subheadingStyle}>Saisissez l'adresse e-mail de votre compte et nous vous enverrons un lien de réinitialisation.</p>
+                <h2 style={headingStyle}>{tx('Réinitialiser le mot de passe', 'Reset password')}</h2>
+                <p style={subheadingStyle}>{tx("Saisissez l'adresse e-mail de votre compte et nous vous enverrons un lien de réinitialisation.", 'Enter your account email and we will send you a reset link.')}</p>
               </div>
               <Field
-                label="Adresse e-mail"
+                label={tx('Adresse e-mail', 'Email address')}
                 value={email}
                 onChange={(v) => { setEmail(v); setFieldErr(''); }}
                 type="email"
-                placeholder="vous@entreprise.com"
+                placeholder={tx('vous@entreprise.com', 'you@company.com')}
                 autoFocus
                 error={fieldErr}
               />
@@ -385,9 +385,9 @@ function ForgotPasswordScreen({ initialEmail, accent, onBack }: { initialEmail: 
                 className="lemtel-btn-primary"
                 style={{ height: 50, borderRadius: 14, fontSize: 14, cursor: 'pointer' }}
               >
-                Continuer
+                {tx('Continuer', 'Continue')}
               </button>
-              <button type="button" onClick={onBack} style={ghostBtn}>Retour à la connexion</button>
+              <button type="button" onClick={onBack} style={ghostBtn}>{tx('Retour à la connexion', 'Back to sign in')}</button>
             </div>
           )}
 
