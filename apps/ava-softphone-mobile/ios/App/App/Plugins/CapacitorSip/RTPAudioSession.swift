@@ -106,6 +106,12 @@ final class RTPAudioSession {
     private var renderCallbackCount: UInt64 = 0
     private var inputFramesTotal: UInt64 = 0
     private var renderFramesTotal: UInt64 = 0
+    // Jitter / codec metrics.
+    private(set) var underrunCount: UInt64 = 0
+    private(set) var reprimeCount: UInt64 = 0
+    private(set) var primedAtLeastOnce: Bool = false
+    private(set) var lastJitterBufferSize: Int = 0
+    private var lastStatsLog: Date = Date()
 
     func snapshot() -> [String: Any] {
         return [
@@ -137,7 +143,14 @@ final class RTPAudioSession {
             "inputCallbacks": Int(inputCallbackCount),
             "renderCallbacks": Int(renderCallbackCount),
             "inputFrames": Int(inputFramesTotal),
-            "renderFrames": Int(renderFramesTotal)
+            "renderFrames": Int(renderFramesTotal),
+            // Jitter/codec quality
+            "jitterUnderruns": Int(underrunCount),
+            "jitterReprimes": Int(reprimeCount),
+            "jitterBufferPackets": lastJitterBufferSize / 160,
+            "jitterPrimed": bufferPrimed,
+            "jitterMinPackets": minBufferPackets,
+            "codec": "PCMU 8kHz → linear-interp upsample 48kHz / avg downsample"
         ]
     }
 
