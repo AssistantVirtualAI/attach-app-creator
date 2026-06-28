@@ -73,7 +73,13 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
         cleanups.push(await onNativeSipEvent('callStateChanged', (d) => {
           if (cancelled) return;
           if (d?.state === 'active')  { setCallState('active'); startTimer(); stopRingback('active'); }
-          if (d?.state === 'ringing') { setCallState('ringing'); if (d?.number) setActiveCallNumber(d.number); }
+          if (d?.state === 'ringing') {
+            setCallState('ringing');
+            if (d?.number) setActiveCallNumber(d.number);
+            // PBX sent 183 Session Progress with early media — stop the local
+            // ringback tone so the carrier announcement/audio is audible.
+            if (d?.stage === 'early_media') stopRingback('early-media');
+          }
         }));
         cleanups.push(await onNativeSipEvent('callEnded', () => {
           if (cancelled) return;

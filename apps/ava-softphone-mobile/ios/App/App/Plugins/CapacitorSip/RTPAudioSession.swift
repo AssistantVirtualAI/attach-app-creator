@@ -820,32 +820,55 @@ final class RTPAudioSession {
         }
     }
 
-    // MARK: - μ-law
+    // MARK: - μ-law (G.711 PCMU)
+    // Lookup tables built once from the standard ITU-T G.711 algorithm
+    // (BIAS = 0x84 = 132). Per-sample table reads remove branches in the
+    // RTP hot path while guaranteeing bit-identical output to the algorithm.
+    private static let muLawDecompress: [Int16] = {
+        var table = [Int16](repeating: 0, count: 256)
+        for i in 0..<256 {
+            let u = (~UInt8(i)) & 0xFF
+            let sign = u & 0x80
+            let exponent = Int32((u >> 4) & 0x07)
+            let mantissa = Int32(u & 0x0F)
+            var sample: Int32 = ((mantissa << 3) + 0x84) << exponent
+            sample -= 0x84
+            table[i] = Int16(sign != 0 ? -sample : sample)
+        }
+        return table
+    }()
+
+    private static let muLawCompress: [UInt8] = {
+        var table = [UInt8](repeating: 0, count: 65536)
+        for raw in 0..<65536 {
+            let pcm = Int16(bitPattern: UInt16(raw))
+            let BIAS: Int32 = 0x84
+            let CLIP: Int32 = 32635
+            var sample = Int32(pcm)
+            let sign: Int32 = sample < 0 ? 0x7F : 0xFF
+            if sample < 0 { sample = -sample }
+            if sample > CLIP { sample = CLIP }
+            sample += BIAS
+            var exponent: Int32 = 7
+            var expMask: Int32 = 0x4000
+            while (sample & expMask) == 0 && exponent > 0 { exponent -= 1; expMask >>= 1 }
+            let mantissa = (sample >> (exponent + 3)) & 0x0F
+            let ulaw = ~(sign & ((exponent << 4) | mantissa)) & 0xFF
+            table[raw] = UInt8(ulaw & 0xFF)
+        }
+        return table
+    }()
+
+    @inline(__always)
     static func linearToUlaw(_ pcm: Int16) -> UInt8 {
-        let BIAS: Int32 = 0x84
-        let CLIP: Int32 = 32635
-        var sample = Int32(pcm)
-        let sign: Int32 = sample < 0 ? 0x7F : 0xFF
-        if sample < 0 { sample = -sample }
-        if sample > CLIP { sample = CLIP }
-        sample += BIAS
-        var exponent: Int32 = 7
-        var expMask: Int32 = 0x4000
-        while (sample & expMask) == 0 && exponent > 0 { exponent -= 1; expMask >>= 1 }
-        let mantissa = (sample >> (exponent + 3)) & 0x0F
-        let ulaw = ~(sign & ((exponent << 4) | mantissa)) & 0xFF
-        return UInt8(ulaw & 0xFF)
+        return muLawCompress[Int(UInt16(bitPattern: pcm))]
     }
 
+    @inline(__always)
     static func ulawToLinear(_ u: UInt8) -> Int16 {
-        let inv = ~u
-        let sign = inv & 0x80
-        let exponent = Int32((inv >> 4) & 0x07)
-        let mantissa = Int32(inv & 0x0F)
-        var sample: Int32 = ((mantissa << 3) + 0x84) << exponent
-        sample -= 0x84
-        return Int16(sign != 0 ? -sample : sample)
+        return muLawDecompress[Int(u)]
     }
+
 
     // MARK: - Helpers
     private func err(_ m: String) -> NSError {
