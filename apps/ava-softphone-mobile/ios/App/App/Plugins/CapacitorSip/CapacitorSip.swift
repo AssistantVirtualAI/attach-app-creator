@@ -63,12 +63,14 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         CallKitManager.shared.onAnswer = { [weak self] in
             self?.sipQueue.async {
                 guard let self = self, self.currentCallId != pjsua_call_id(PJSUA_INVALID_ID.rawValue) else { return }
+                self.registerThreadIfNeeded() // PJLIB thread registration required
                 pjsua_call_answer(self.currentCallId, 200, nil, nil)
             }
         }
         CallKitManager.shared.onEnd = { [weak self] in
             self?.sipQueue.async {
                 guard let self = self, self.currentCallId != pjsua_call_id(PJSUA_INVALID_ID.rawValue) else { return }
+                self.registerThreadIfNeeded() // PJLIB thread registration required
                 pjsua_call_hangup(self.currentCallId, 0, nil, nil)
                 self.currentCallId = pjsua_call_id(PJSUA_INVALID_ID.rawValue)
             }
