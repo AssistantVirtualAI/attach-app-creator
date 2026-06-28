@@ -108,11 +108,14 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
 
     /// Registers the current thread with PJLIB if not already registered.
     /// Must be called at the start of any sipQueue.async block that invokes PJSUA.
+    // Storage for pj_thread_register — must persist for the lifetime of the thread.
+    // One slot per concurrent thread; sipQueue is serial so one is enough.
+    private var _pjThreadDesc = pj_thread_desc()
+    private var _pjThread: OpaquePointer? = nil
+
     private func registerThreadIfNeeded() {
         if pj_thread_is_registered() == 0 {
-            var desc = pj_thread_desc()
-            var thread: UnsafeMutablePointer<pj_thread_t>?
-            _ = pj_thread_register("sipQueue", &desc, &thread)
+            _ = pj_thread_register("sipQueue", &_pjThreadDesc, &_pjThread)
         }
     }
 
@@ -121,8 +124,9 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     private func withPjStr<T>(_ s: String, _ body: (inout pj_str_t) -> T) -> T {
         var str = s
         return str.withUTF8 { buf in
+            let base = buf.baseAddress!
             var pj = pj_str_t(
-                ptr: UnsafeMutablePointer<CChar>(mutating: buf.baseAddress?.withMemoryRebound(to: CChar.self, capacity: buf.count) { $0 }),
+                ptr: UnsafeMutableRawPointer(mutating: base).assumingMemoryBound(to: CChar.self),
                 slen: pj_ssize_t(buf.count)
             )
             return body(&pj)
@@ -132,7 +136,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     /// Convert a Swift String to a heap-allocated pj_str_t (caller must keep
     /// the backing CString alive — used for account config that PJSUA copies).
     private func pjStrDup(_ s: String) -> pj_str_t {
-        let cstr = strdup(s)
+        let cstr = strdup(s)!
         return pj_str_t(ptr: cstr, slen: pj_ssize_t(strlen(cstr)))
     }
 
