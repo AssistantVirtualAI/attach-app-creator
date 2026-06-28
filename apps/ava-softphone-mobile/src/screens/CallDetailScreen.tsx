@@ -295,6 +295,30 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
             </Card>
           )}
 
+          {/* Transcription status badge (always visible when recording exists) */}
+          {data.hasRecording && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10,
+              padding: '8px 12px', borderRadius: 999,
+              background: 'rgba(255,255,255,0.04)',
+              border: `1px solid ${badgeColor}55`,
+              fontSize: 12, fontWeight: 700, color: badgeColor,
+            }}>
+              {liveStatus === 'processing' && <Loader2 size={13} className="spin" />}
+              <span>{badgeLabel}</span>
+              {provider && liveStatus !== 'missing' && (
+                <span style={{ color: colors.mutedSilver, fontWeight: 500, marginLeft: 4 }}>
+                  · {fr ? 'Fournisseur' : 'Provider'}: {provider}
+                </span>
+              )}
+              {liveStatus === 'failed' && data.transcriptionError && (
+                <span style={{ color: colors.mutedSilver, fontWeight: 500, marginLeft: 4, fontSize: 11 }}>
+                  — {String(data.transcriptionError).slice(0, 80)}
+                </span>
+              )}
+            </div>
+          )}
+
           {/* Transcribe CTA when missing */}
           {data.hasRecording && !hasTranscript && (
             <Card style={{ marginBottom: 14 }} accent="violet">
@@ -329,6 +353,7 @@ export default function CallDetailScreen({ id, onBack }: { id: string; onBack: (
                   <div style={{ fontSize: 10, color: colors.avaViolet, letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 800 }}>{statusText}</div>
                   <div style={{ marginTop: 4, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     <Chip tone="success" size="xs">{fr ? 'Transcription en cache' : 'Transcript cached'}</Chip>
+                    {provider && <Chip tone={provider.includes('Whisper') ? 'cyan' : 'violet'} size="xs">{provider}</Chip>}
                     {data.summary && <Chip tone="violet" size="xs">{fr ? 'Aperçu en cache' : 'Insight cached'}</Chip>}
                     {data.qualityScore > 0 && <Chip tone="gold" size="xs">{fr ? 'Score' : 'Score'} {data.qualityScore}/100</Chip>}
                     {data.coachingScore != null && <Chip tone="cyan" size="xs">{fr ? 'Coaching' : 'Coaching'} {data.coachingScore}/5</Chip>}
