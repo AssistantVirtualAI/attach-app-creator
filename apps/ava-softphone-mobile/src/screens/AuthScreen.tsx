@@ -421,9 +421,9 @@ function ForgotPasswordScreen({ initialEmail, accent, onBack }: { initialEmail: 
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 color: C.green, fontSize: 26, fontWeight: 800,
               }}>✓</div>
-              <h2 style={{ ...headingStyle, textAlign: 'center' }}>Vérifiez votre boîte de réception</h2>
+              <h2 style={{ ...headingStyle, textAlign: 'center' }}>{tx('Vérifiez votre boîte de réception', 'Check your inbox')}</h2>
               <p style={{ ...subheadingStyle, textAlign: 'center' }}>
-                Si un compte existe pour <strong style={{ color: C.textIce }}>{email}</strong>, vous recevrez un lien de réinitialisation sous peu. Ouvrez-le sur cet appareil ou sur un navigateur de bureau pour définir un nouveau mot de passe.
+                {tx('Si un compte existe pour', 'If an account exists for')} <strong style={{ color: C.textIce }}>{email}</strong>{tx(', vous recevrez un lien de réinitialisation sous peu. Ouvrez-le sur cet appareil ou sur un navigateur de bureau pour définir un nouveau mot de passe.', ', you will receive a reset link shortly. Open it on this device or on a desktop browser to set a new password.')}
               </p>
               {resentInfo && (
                 <div style={{
@@ -452,13 +452,13 @@ function ForgotPasswordScreen({ initialEmail, accent, onBack }: { initialEmail: 
               >
                 {busy && <Spinner />}
                 {busy
-                  ? 'Envoi…'
+                  ? tx('Envoi…', 'Sending…')
                   : cooldown > 0
-                    ? `Renvoyer dans ${cooldown}s`
-                    : "Renvoyer l'e-mail"}
+                    ? tx(`Renvoyer dans ${cooldown}s`, `Resend in ${cooldown}s`)
+                    : tx("Renvoyer l'e-mail", 'Resend email')}
               </button>
               <button type="button" onClick={onBack} className="lemtel-btn-primary" style={{ height: 50, borderRadius: 14, fontSize: 14, cursor: 'pointer' }}>
-                Retour à la connexion
+                {tx('Retour à la connexion', 'Back to sign in')}
               </button>
             </div>
           )}
