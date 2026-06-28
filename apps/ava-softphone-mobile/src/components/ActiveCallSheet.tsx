@@ -306,7 +306,7 @@ export default function ActiveCallSheet({
           <Ctrl
             label={
               audioBusy ? (audioStatus === 'retrying' ? `Retry ${audioRestartAttempts}` : 'Audio…')
-              : recPending ? (sp.snap.recording ? 'Arrêt…' : 'Démarrage…')
+              : recPending ? (sp.snap.recording ? tx('Arrêt…', 'Stopping…') : tx('Démarrage…', 'Starting…'))
               : sp.snap.recording ? 'Stop Rec' : 'Record'
             }
             icon={audioBusy || recPending ? '…' : sp.snap.recording ? '■' : '●'}
