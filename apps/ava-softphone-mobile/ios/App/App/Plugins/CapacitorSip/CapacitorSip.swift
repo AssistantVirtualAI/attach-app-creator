@@ -811,6 +811,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
                 } else {
                     if callDirection.isEmpty { callDirection = "out" }
                     callState = "active"
+                    NSLog("[SIP] 200 OK INVITE received — sending ACK, call should be active now (callId=\(callActiveId))")
                     // Defer RTP start by 200ms to let SDP negotiation settle on
                     // the remote side (avoids first-second clipping on some PBXs).
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
@@ -820,11 +821,18 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
                     emitCallState("active", direction: "out", stage: "answered", code: code)
                 }
             } else if let n = Int(code), n >= 300 {
-                sendAck(to: msg, withinDialog: false)
-                let id = callActiveId
-                stopRtp()
-                emitCallEnded(firstLine, callId: id)
-                resetCallState()
+                // Guard: if the call already went active, do NOT tear it down on
+                // a late/spurious >=300 response (e.g. a stray 481 to a stale
+                // CSeq). Just log and ignore — only BYE may end an active call.
+                if callState == "active" || callState == "hold" {
+                    NSLog("[SIP] ignoring late INVITE \(code) — call already active (callId=\(callActiveId))")
+                } else {
+                    sendAck(to: msg, withinDialog: false)
+                    let id = callActiveId
+                    stopRtp()
+                    emitCallEnded(firstLine, callId: id)
+                    resetCallState()
+                }
             }
 
         }
