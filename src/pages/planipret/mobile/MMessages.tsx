@@ -1052,12 +1052,13 @@ function EmailComposeSheet({ init, onClose, onSent }: { init: { to?: string; sub
 // SHARED PRIMITIVES
 // ============================================================
 function Composer({
-  text, setText, onSend, sending, placeholder = "Écrire un message…", leftAction, extra, accent = "brand",
+  text, setText, onSend, sending, placeholder, leftAction, extra, accent = "brand",
 }: {
   text: string; setText: (v: string) => void; onSend: () => void; sending: boolean;
   placeholder?: string; leftAction?: React.ReactNode; extra?: React.ReactNode;
   accent?: "brand" | "agent";
 }) {
+  const { t } = useMplanipretLang();
   const accentBg =
     accent === "agent"
       ? "linear-gradient(135deg, var(--pp-agent), #6C3CE1)"
@@ -1073,7 +1074,7 @@ function Composer({
         value={text}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSend(); } }}
-        placeholder={placeholder}
+        placeholder={placeholder ?? t("messages.yourMessage")}
         className="flex-1 px-3 py-2 rounded-full text-sm outline-none"
         style={{
           background: "var(--pp-bg-elevated)",
