@@ -401,7 +401,38 @@ Deno.serve(async (req) => {
 
     const disableClaude = body?.disable_claude === true;
     const attempts: Array<{ provider: string; model: string; status?: number; error?: string }> = [];
-    const sttResult = await tryGatewayTranscribe("openai/gpt-4o-mini-transcribe");
+
+    // PRIMARY: OpenAI Whisper-1 — best accuracy on 8kHz phone audio.
+    const tryOpenAIWhisper = async (): Promise<ProviderResult> => {
+      const openaiKey = Deno.env.get("OPENAI_API_KEY");
+      if (!openaiKey) return { error: "no-openai-key", provider: "openai", model: "whisper-1" };
+      const ext = ({ mpeg: "mp3", mp3: "mp3", wav: "wav", webm: "webm", ogg: "ogg", mp4: "m4a" } as Record<string, string>)[audioFormat] || "wav";
+      const fd = new FormData();
+      fd.append("model", "whisper-1");
+      fd.append("file", new Blob([audioBytes!], { type: audioMime }), `recording.${ext}`);
+      fd.append("language", "fr");
+      fd.append("response_format", "json");
+      fd.append("prompt", sttPrompt);
+      const r = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${openaiKey}` },
+        body: fd,
+      });
+      if (!r.ok) {
+        const errTxt = await r.text();
+        console.error("openai whisper error", r.status, errTxt.slice(0, 300));
+        return { error: errTxt.slice(0, 400), status: r.status, provider: "openai", model: "whisper-1" };
+      }
+      const d = await r.json();
+      return { text: String(d?.text || "").trim(), provider: "openai", model: "whisper-1" };
+    };
+
+    let sttResult = await tryOpenAIWhisper();
+    if (!sttResult.text) {
+      attempts.push({ provider: sttResult.provider, model: sttResult.model, status: sttResult.status, error: (sttResult.error || "empty").slice(0, 200) });
+      // FALLBACK: Lovable Gateway (Gemini-based) STT.
+      sttResult = await tryGatewayTranscribe("openai/gpt-4o-mini-transcribe");
+    }
     const final: ProviderResult | null = sttResult.text ? sttResult : null;
     if (!sttResult.text) {
       attempts.push({ provider: sttResult.provider, model: sttResult.model, status: sttResult.status, error: (sttResult.error || "empty").slice(0, 200) });
