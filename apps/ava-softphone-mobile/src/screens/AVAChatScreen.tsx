@@ -64,7 +64,7 @@ export default function AVAChatScreen() {
         }}>✦</div>
         <div>
           <div style={{ fontSize: font.lg, fontWeight: 800, color: colors.textIce, letterSpacing: -0.3 }}>AVA</div>
-          <div style={{ fontSize: font.xs, color: colors.mutedSilver }}>Votre assistant téléphonique IA · données PBX en direct</div>
+          <div style={{ fontSize: font.xs, color: colors.mutedSilver }}>{tx('Votre assistant téléphonique IA · données PBX en direct', 'Your AI phone assistant · live PBX data')}</div>
         </div>
       </div>
 
