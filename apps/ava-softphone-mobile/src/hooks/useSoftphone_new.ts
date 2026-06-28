@@ -119,13 +119,13 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
     setActiveCallNumber(number);
     setCallState('ringing');
     CapacitorPjsip.makeCall({ number }).catch((e) => {
-      stopRingback();
+      stopRingback('makeCallFailed');
       setCallState('idle');
       setSipError(e?.message || 'makeCall failed');
     });
     return true;
   };
-  const hangup = () => { stopRingback(); CapacitorPjsip.hangup().catch(() => {}); };
+  const hangup = () => { stopRingback('hangup'); CapacitorPjsip.hangup().catch(() => {}); };
   const answer = () => { CapacitorPjsip.answer().catch(() => {}); };
   const mute   = () => { CapacitorPjsip.setMute({ muted: true }).catch(() => {});  setIsMuted(true); };
   const unmute = () => { CapacitorPjsip.setMute({ muted: false }).catch(() => {}); setIsMuted(false); };
