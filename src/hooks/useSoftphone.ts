@@ -19,15 +19,25 @@ function detectSoftphonePlatform(): "app" | "desktop" | "mobile" {
   return "app";
 }
 
+function sanitizeWss(u: any): string | null {
+  if (typeof u !== "string" || !u) return null;
+  return /^wss?:\/\//i.test(u) ? u : null;
+}
+
 function buildConfig(raw: any): SoftphoneConfig {
   const extension = raw.extension;
   const sipDomain = raw.sipDomain || raw.sip_domain || "lemtel.lemtel.tel";
+  const primary = sanitizeWss(raw.wssUrl || raw.wss_url) || "wss://pbxnode.lemtel.tel:7443";
+  const fallbacks = ((raw.wssUrls || raw.wss_urls || []) as any[])
+    .map(sanitizeWss)
+    .filter((u): u is string => !!u);
+  const wssUrls = Array.from(new Set([primary, ...fallbacks, "wss://pbxnode.lemtel.tel:7443", "wss://node.lemtelcloud.net:7443"]));
   return {
     extension,
     displayName: raw.displayName || raw.display_name || extension,
     sipDomain,
-    wssUrl: raw.wssUrl || raw.wss_url || "wss://lemtel.lemtel.tel:7443",
-    wssUrls: raw.wssUrls || raw.wss_urls || [],
+    wssUrl: primary,
+    wssUrls,
     password: raw.password || raw.sip_password || "",
     mock: !!raw.mock,
     passwordSource: raw.passwordSource || raw.password_source || undefined,
