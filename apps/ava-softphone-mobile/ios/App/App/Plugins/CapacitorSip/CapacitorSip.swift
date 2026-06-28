@@ -106,39 +106,31 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
-        // MARK: - Helpers
-    /// Registers the current pthread with PJLIB if not already registered.
-    /// Each unique pthread gets its own heap-allocated pj_thread_desc (512 bytes)
-    /// stored in a thread-local slot via pthread_key. This avoids the
-    /// "thread->signature" assertion crash that occurs when a single shared buffer
-    /// is reused across different pthreads that GCD assigns to sipQueue over time.
-    private static var _pjTLSKey: pthread_key_t = {
-        var key = pthread_key_t()
-        // Destructor frees the per-thread buffer when the pthread exits.
-        pthread_key_create(&key) { ptr in
-            guard let p = ptr else { return }
-            // The buffer is 512+8 bytes: first 8 bytes hold the OpaquePointer to
-            // pj_thread_t so we can keep it alive alongside the desc buffer.
-            p.deallocate()
-        }
-        return key
-    }()
+    // MARK: - PJLIB thread registration
+    // pj_thread_register requires a unique, zeroed 512-byte descriptor buffer per
+    // pthread. We keep a dictionary keyed by pthread_t so each pthread always gets
+    // its own fresh buffer. The lock protects concurrent dictionary access.
+    private var _pjThreadMap: [UInt: UnsafeMutableRawPointer] = [:]
+    private let _pjThreadLock = NSLock()
 
     private func registerThreadIfNeeded() {
         guard pj_thread_is_registered() == 0 else { return }
-        // Allocate a per-thread block: 8 bytes for OpaquePointer + 512 bytes for desc.
-        let blockSize = 8 + 512
+        let tid = UInt(bitPattern: pthread_self())
+        _pjThreadLock.lock()
         let block: UnsafeMutableRawPointer
-        if let existing = pthread_getspecific(CapacitorPjsip._pjTLSKey) {
+        if let existing = _pjThreadMap[tid] {
+            // Same pthread, same buffer — but zero it first so pj_thread_register
+            // sees a clean descriptor (handles pjsua restart within the same pthread).
+            existing.initializeMemory(as: UInt8.self, repeating: 0, count: 8 + 512)
             block = existing
         } else {
-            block = UnsafeMutableRawPointer.allocate(byteCount: blockSize, alignment: 16)
-            block.initializeMemory(as: UInt8.self, repeating: 0, count: blockSize)
-            pthread_setspecific(CapacitorPjsip._pjTLSKey, block)
+            let b = UnsafeMutableRawPointer.allocate(byteCount: 8 + 512, alignment: 16)
+            b.initializeMemory(as: UInt8.self, repeating: 0, count: 8 + 512)
+            _pjThreadMap[tid] = b
+            block = b
         }
-        // First 8 bytes: pointer to pj_thread_t (OpaquePointer)
+        _pjThreadLock.unlock()
         let threadPtrPtr = block.assumingMemoryBound(to: OpaquePointer?.self)
-        // Next 512 bytes: pj_thread_desc buffer
         let descPtr = (block + 8).assumingMemoryBound(to: Int.self)
         _ = pj_thread_register("sipQueue", descPtr, threadPtrPtr)
     }
