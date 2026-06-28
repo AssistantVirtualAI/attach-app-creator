@@ -434,9 +434,9 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
 
     @objc func setLogLevel(_ call: CAPPluginCall) {
         let level = call.getInt("level") ?? 3
-        sipQueue.async {
+        sipQueue.async { [weak self] in
+            self?.registerThreadIfNeeded()
             guard let self = self else { return }
-            self.registerThreadIfNeeded()
             // pjsua_set_log_level may not be available in all PJSIP builds;
             // update the logging config via pjsua_reconfigure_logging instead.
             var logCfg = pjsua_logging_config()
