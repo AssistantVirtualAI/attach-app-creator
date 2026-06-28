@@ -131,6 +131,12 @@ async function getFusionSessionCookie(baseUrl: string): Promise<string> {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  // Per-request correlation id. Echoed in every error response + every log line
+  // so the client can quote it to support and we can trace one playback request
+  // end-to-end across login + recording fetch attempts.
+  const correlationId = (req.headers.get("x-request-id") || crypto.randomUUID()).slice(0, 36);
+  const cidLog = (...args: unknown[]) => console.log(`[cid:${correlationId}]`, ...args);
+
   const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
   // Identify caller (JWT in Authorization header OR service-role for pg_cron)
@@ -241,7 +247,8 @@ Deno.serve(async (req) => {
     FUSIONPBX_API_KEY = required("FUSIONPBX_API_KEY");
     FUSIONPBX_DOMAIN_UUID = required("FUSIONPBX_DOMAIN_UUID");
   } catch (e: any) {
-    return json(e, 400);
+    cidLog("[secrets] MISSING_SECRET", { secret: e?.secret, action: body?.action });
+    return json({ ...e, correlation_id: correlationId }, 400, { "X-Request-Id": correlationId });
   }
 
   // FusionPBX returns Basic auth with the raw API key as the password value
@@ -1913,10 +1920,12 @@ Deno.serve(async (req) => {
             cookie = await getFusionSessionCookie(fileBase);
           } catch (e: any) {
             loginError = String(e?.message || e).slice(0, 200);
-            console.log("[get-recording] FusionPBX login failed:", loginError, {
+            cidLog("[get-recording] FusionPBX login failed", {
               origin: fusionBaseOrigin(fileBase),
+              error: loginError,
               has_username: !!Deno.env.get("FUSIONPBX_USERNAME"),
               has_password: !!Deno.env.get("FUSIONPBX_PASSWORD"),
+              has_api_key_fallback: !!Deno.env.get("FUSIONPBX_API_KEY"),
             });
             attemptsSession.push({ url: `${fusionBaseOrigin(fileBase)}/login.php`, status: 0, content_type: `login_failed: ${loginError}` });
           }
@@ -2001,16 +2010,37 @@ Deno.serve(async (req) => {
           attempts.push({ url: safeUrl(url), status: 0, content_type: e?.name === "AbortError" ? "timeout" : undefined });
         }
       }
-      // Determine whether session login actually succeeded so the client can
-      // distinguish "PHPSESSID login failed" from "file truly missing on PBX disk".
-      const fileMissing = attemptsSession.some(a =>
+      // Classify the failure so the client can surface an actionable message
+      // (login broken vs. file deleted vs. PBX HTTP error) and the operator can
+      // grep one structured log line per failed playback.
+      const sessionLoginFailed = attemptsSession.some(a =>
+        a.status === 0 && (a.content_type || "").startsWith("login_failed")
+      );
+      const fileMissing = !sessionLoginFailed && attemptsSession.some(a =>
         (a.status === 404) ||
         (a.status === 200 && !(a.content_type || "").includes("text/html"))
       );
-      const sessionLoggedIn = FUSION_SESSIONS.size > 0;
-      console.log("[get-recording] RECORDING_NOT_FOUND", JSON.stringify({
+      const sessionLoggedIn = !sessionLoginFailed && FUSION_SESSIONS.size > 0;
+      const httpStatuses = Array.from(new Set([
+        ...attemptsSession.map(a => a.status),
+        ...attempts.map(a => a.status),
+      ].filter(s => s > 0))).sort((a, b) => a - b);
+      const failureKind: "login_failed" | "file_missing" | "http_error" | "unknown" =
+        sessionLoginFailed ? "login_failed"
+        : fileMissing ? "file_missing"
+        : httpStatuses.length > 0 ? "http_error"
+        : "unknown";
+      const loginErrorDetail =
+        attemptsSession.find(a => (a.content_type || "").startsWith("login_failed"))
+          ?.content_type?.replace(/^login_failed:\s*/, "") || null;
+
+      cidLog("[get-recording] RECORDING_NOT_FOUND", JSON.stringify({
+        failure_kind: failureKind,
+        http_statuses: httpStatuses,
         xml_cdr_uuid, record_name, record_path, domain_name, recorded_at,
         session_logged_in: sessionLoggedIn,
+        session_login_failed: sessionLoginFailed,
+        login_error: loginErrorDetail,
         file_missing_signal: fileMissing,
         session_attempts_count: attemptsSession.length,
         legacy_attempts_count: attempts.length,
@@ -2020,14 +2050,21 @@ Deno.serve(async (req) => {
       return json({
         ok: false,
         error: "RECORDING_NOT_FOUND",
-        message: fileMissing
+        failure_kind: failureKind,
+        correlation_id: correlationId,
+        http_statuses: httpStatuses,
+        message: sessionLoginFailed
+          ? `FusionPBX login failed (${loginErrorDetail || 'unknown error'}). Vault secrets FUSIONPBX_USERNAME / FUSIONPBX_PASSWORD are likely incorrect.`
+          : fileMissing
           ? "FusionPBX session authenticated successfully, but the recording file is missing from PBX storage (the .mp3/.wav is no longer on disk)."
           : "The PBX has CDR metadata for this call, but the recording file is not reachable on the PBX storage path.",
         session_logged_in: sessionLoggedIn,
+        session_login_failed: sessionLoginFailed,
+        login_error: loginErrorDetail,
         file_missing: fileMissing,
         attempts,
         session_attempts: attemptsSession,
-      }, 200, { "X-Recording-Status": "not-found" });
+      }, 200, { "X-Recording-Status": "not-found", "X-Request-Id": correlationId });
     }
 
     // ---- Signed-URL recording delivery ----
@@ -2998,14 +3035,15 @@ Deno.serve(async (req) => {
 
     return json({ error: "UNKNOWN_ACTION", action }, 400);
   } catch (e: any) {
+    cidLog("[fusionpbx-proxy] INTERNAL error", { action, error: e?.message || String(e), stack: e?.stack?.split("\n").slice(0, 4) });
     if (organization_id) {
       await admin.from("pbx_sync_jobs").insert({
         organization_id, job_type: action, status: "failed",
         started_at: new Date().toISOString(),
         completed_at: new Date().toISOString(),
-        error: e?.message || String(e),
+        error: `[cid:${correlationId}] ${e?.message || String(e)}`,
       });
     }
-    return json({ error: "INTERNAL", message: e?.message || String(e) }, 500);
+    return json({ error: "INTERNAL", correlation_id: correlationId, message: e?.message || String(e) }, 500, { "X-Request-Id": correlationId });
   }
 });

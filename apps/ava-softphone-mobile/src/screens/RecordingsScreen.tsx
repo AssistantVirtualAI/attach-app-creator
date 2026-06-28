@@ -33,6 +33,7 @@ export default function RecordingsScreen({
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [cachedIds, setCachedIds] = useState<Set<string>>(new Set());
+  const [playbackErrors, setPlaybackErrors] = useState<Record<string, { kind: string; code: string; ref: string; message: string; statuses: number[] }>>({});
   const [search, setSearch] = useState('');
   const { lang } = useT();
   const fr = lang === 'fr';
@@ -141,6 +142,21 @@ export default function RecordingsScreen({
     start_at: rec.startedAt,
   });
 
+  const captureError = (rec: RecordingEntry, e: any, fallback: string) => {
+    const msg = e?.message || fallback;
+    setPlaybackErrors((prev) => ({
+      ...prev,
+      [rec.id]: {
+        kind: String(e?.failure_kind || e?.code || 'unknown'),
+        code: String(e?.code || ''),
+        ref: String(e?.correlation_id || ''),
+        message: msg,
+        statuses: Array.isArray(e?.http_statuses) ? e.http_statuses : [],
+      },
+    }));
+    showMobileToast(msg, 'error');
+  };
+
   const play = async (rec: RecordingEntry) => {
     if (playingId === rec.id) {
       audioRef.current?.pause();
@@ -148,6 +164,7 @@ export default function RecordingsScreen({
       return;
     }
     setLoadingId(rec.id);
+    setPlaybackErrors((prev) => { const n = { ...prev }; delete n[rec.id]; return n; });
     try {
       // Phase 5: serve from local cache first; if missing, download (and cache) on the fly.
       let url = await getCachedRecordingUrl(rec.id);
@@ -166,7 +183,7 @@ export default function RecordingsScreen({
       }
       setPlayingId(rec.id);
     } catch (e: any) {
-      showMobileToast(e?.message || (fr ? 'Impossible de charger l\'enregistrement' : 'Unable to load recording'), 'error');
+      captureError(rec, e, fr ? 'Impossible de charger l\'enregistrement' : 'Unable to load recording');
     } finally {
       setLoadingId(null);
     }
@@ -174,6 +191,7 @@ export default function RecordingsScreen({
 
   const download = async (rec: RecordingEntry) => {
     setDownloadingId(rec.id);
+    setPlaybackErrors((prev) => { const n = { ...prev }; delete n[rec.id]; return n; });
     try {
       await downloadRecording(
         rec.id, recMeta(rec),
@@ -185,11 +203,12 @@ export default function RecordingsScreen({
       setCachedIds((prev) => new Set(prev).add(rec.id));
       showMobileToast(fr ? 'Enregistrement téléchargé pour écoute hors-ligne' : 'Recording downloaded for offline playback', 'success');
     } catch (e: any) {
-      showMobileToast(e?.message || (fr ? 'Téléchargement échoué' : 'Download failed'), 'error');
+      captureError(rec, e, fr ? 'Téléchargement échoué' : 'Download failed');
     } finally {
       setDownloadingId(null);
     }
   };
+
 
 
   const toggleExpand = (id: string) => {
@@ -296,6 +315,30 @@ export default function RecordingsScreen({
               </div>
             </div>
           </div>
+          {playbackErrors[r.id] && (() => {
+            const err = playbackErrors[r.id];
+            const kindLabel = err.kind === 'login_failed' ? (fr ? 'Connexion PBX échouée' : 'PBX login failed')
+              : err.kind === 'file_missing' ? (fr ? 'Fichier audio absent du PBX' : 'Audio file missing on PBX')
+              : err.kind === 'missing_secret' ? (fr ? 'Configuration Vault manquante' : 'Vault config missing')
+              : err.kind === 'http_error' ? (fr ? 'Erreur HTTP PBX' : 'PBX HTTP error')
+              : err.kind === 'forbidden' ? (fr ? 'Accès refusé' : 'Access denied')
+              : err.kind === 'internal' ? (fr ? 'Erreur interne du proxy' : 'Proxy internal error')
+              : (fr ? 'Lecture impossible' : 'Playback failed');
+            return (
+              <div style={{ marginTop: 8, padding: 10, borderRadius: radius.md, border: `1px solid ${colors.danger}55`, background: `${colors.danger}10` }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <div style={{ color: colors.danger, fontSize: 11, fontWeight: 800 }}>⚠ {kindLabel}</div>
+                  {err.statuses.length > 0 && <Chip tone="danger" size="xs">HTTP {err.statuses.join('/')}</Chip>}
+                </div>
+                <div style={{ color: colors.mutedSilver, fontSize: 11, lineHeight: 1.4, wordBreak: 'break-word' }}>{err.message}</div>
+                {err.ref && (
+                  <div style={{ marginTop: 6, fontFamily: 'JetBrains Mono, monospace', fontSize: 9.5, color: colors.mutedSilver, opacity: 0.8 }}>
+                    {fr ? 'Réf. support' : 'Support ref'} : {err.ref}{err.code ? ` · ${err.code}` : ''}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
           {expandedId === r.id && (
             <RecordingAiPanel rec={r} />
           )}
