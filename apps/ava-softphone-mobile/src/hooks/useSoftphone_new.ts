@@ -16,6 +16,7 @@ export interface SIPConfig {
   host?: string;
 }
 import { CapacitorPjsip, onNativeSipEvent } from '../lib/sip/nativeSipProvider';
+import { primeRingbackContext, startRingback, stopRingback } from '../lib/sip/ringback';
 // Stub to avoid pulling in callQuality.ts → RTCPeerConnection
 type CallQuality = { mos: number; packetLoss: number; jitter: number; rtt: number };
 const EMPTY_QUALITY: CallQuality = { mos: 0, packetLoss: 0, jitter: 0, rtt: 0 };
@@ -71,7 +72,7 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
         }));
         cleanups.push(await onNativeSipEvent('callStateChanged', (d) => {
           if (cancelled) return;
-          if (d?.state === 'active')  { setCallState('active'); startTimer(); }
+          if (d?.state === 'active')  { setCallState('active'); startTimer(); stopRingback(); }
           if (d?.state === 'ringing') { setCallState('ringing'); if (d?.number) setActiveCallNumber(d.number); }
         }));
         cleanups.push(await onNativeSipEvent('callEnded', () => {
@@ -81,6 +82,7 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
           setIsMuted(false);
           setIsOnHold(false);
           stopTimer();
+          stopRingback();
         }));
 
         console.log('[NativeSIP] Calling initAccount...');
@@ -109,15 +111,21 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
 
   const call = (number: string) => {
     if (sipStatus !== 'registered') return false;
+    // Prime AudioContext synchronously inside the user gesture so iOS allows
+    // ringback playback later. Then start the local ringback tone immediately
+    // — don't wait for the SIP 100/180 round-trip (1–2s of dead air otherwise).
+    primeRingbackContext();
+    startRingback();
     setActiveCallNumber(number);
     setCallState('ringing');
     CapacitorPjsip.makeCall({ number }).catch((e) => {
+      stopRingback();
       setCallState('idle');
       setSipError(e?.message || 'makeCall failed');
     });
     return true;
   };
-  const hangup = () => { CapacitorPjsip.hangup().catch(() => {}); };
+  const hangup = () => { stopRingback(); CapacitorPjsip.hangup().catch(() => {}); };
   const answer = () => { CapacitorPjsip.answer().catch(() => {}); };
   const mute   = () => { CapacitorPjsip.setMute({ muted: true }).catch(() => {});  setIsMuted(true); };
   const unmute = () => { CapacitorPjsip.setMute({ muted: false }).catch(() => {}); setIsMuted(false); };

@@ -20,6 +20,17 @@ function ensureCtx(): AudioContext | null {
   } catch { return null; }
 }
 
+/**
+ * Prime the AudioContext synchronously during a user gesture (e.g. the call
+ * button tap). iOS Safari/WKWebView only allows AudioContext creation inside
+ * a gesture handler; calling this here guarantees ringback can play later
+ * even though the actual oscillator nodes are created asynchronously after
+ * the SIP stack starts the INVITE.
+ */
+export function primeRingbackContext(): void {
+  void ensureCtx();
+}
+
 export function startRingback() {
   if (running) return;
   const c = ensureCtx();

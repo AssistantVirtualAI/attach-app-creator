@@ -415,6 +415,11 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
             call.resolve(["ok": true, "held": hold, "noop": true])
             return
         }
+        if pendingHold != nil {
+            // Guard against burst taps producing duplicate re-INVITEs.
+            call.resolve(["ok": false, "held": hold, "pending": true, "reason": "hold-already-pending"])
+            return
+        }
         pendingHold = hold
         callCseq += 1
         sendReInvite(hold: hold)
@@ -769,8 +774,12 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
                 } else {
                     if callDirection.isEmpty { callDirection = "out" }
                     callState = "active"
-                    startRtpIfReady()
-                    log("CALL_EVENT|INVITE_200_OK→active|callId=\(callActiveId)")
+                    // Defer RTP start by 200ms to let SDP negotiation settle on
+                    // the remote side (avoids first-second clipping on some PBXs).
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+                        self?.startRtpIfReady()
+                    }
+                    log("CALL_EVENT|INVITE_200_OK→active|callId=\(callActiveId)|rtpDelayMs=200")
                     emitCallState("active", direction: "out", stage: "answered", code: code)
                 }
             } else if let n = Int(code), n >= 300 {
