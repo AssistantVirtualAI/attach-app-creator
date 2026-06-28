@@ -143,7 +143,7 @@ export default function AVAChatScreen() {
           <button
             onClick={() => send()}
             disabled={!input.trim() || busy}
-            aria-label="Envoyer"
+            aria-label={tx('Envoyer', 'Send')}
             style={{
               width: 38, height: 38, borderRadius: '50%',
               border: 'none', cursor: input.trim() && !busy ? 'pointer' : 'not-allowed',
