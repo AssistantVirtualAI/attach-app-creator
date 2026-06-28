@@ -51,14 +51,14 @@ class AuthError extends Error {
 
 const mapAuthError = (raw: string): string => {
   const m = (raw || '').toLowerCase();
-  if (m.includes('invalid_credentials') || m.includes('invalid login')) return 'Adresse e-mail ou mot de passe incorrect.';
-  if (m.includes('extension_not_found')) return 'Extension introuvable.';
-  if (m.includes('app_access_disabled') || m.includes('mobile_access_disabled')) return "L'accès mobile n'a pas été activé pour cette extension. Contactez votre administrateur.";
-  if (m.includes('ambiguous_extension')) return 'Plusieurs extensions correspondent — veuillez saisir le domaine SIP.';
-  if (m.includes('rate') && m.includes('limit')) return 'Trop de tentatives. Veuillez patienter avant de réessayer.';
-  if (m.includes('network') || m.includes('failed to fetch') || m.includes('load failed')) return 'Erreur réseau — vérifiez votre connexion.';
-  if (m.includes('session') || m.includes('jwt')) return 'Votre session a expiré. Veuillez vous reconnecter.';
-  return raw || "Une erreur est survenue. Veuillez réessayer.";
+  if (m.includes('invalid_credentials') || m.includes('invalid login')) return tx('Adresse e-mail ou mot de passe incorrect.', 'Incorrect email or password.');
+  if (m.includes('extension_not_found')) return tx('Extension introuvable.', 'Extension not found.');
+  if (m.includes('app_access_disabled') || m.includes('mobile_access_disabled')) return tx("L'accès mobile n'a pas été activé pour cette extension. Contactez votre administrateur.", 'Mobile access has not been enabled for this extension. Contact your administrator.');
+  if (m.includes('ambiguous_extension')) return tx('Plusieurs extensions correspondent — veuillez saisir le domaine SIP.', 'Multiple extensions match — please enter the SIP domain.');
+  if (m.includes('rate') && m.includes('limit')) return tx('Trop de tentatives. Veuillez patienter avant de réessayer.', 'Too many attempts. Please wait before trying again.');
+  if (m.includes('network') || m.includes('failed to fetch') || m.includes('load failed')) return tx('Erreur réseau — vérifiez votre connexion.', 'Network error — check your connection.');
+  if (m.includes('session') || m.includes('jwt')) return tx('Votre session a expiré. Veuillez vous reconnecter.', 'Your session has expired. Please sign in again.');
+  return raw || tx("Une erreur est survenue. Veuillez réessayer.", 'An error occurred. Please try again.');
 };
 
 export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: Creds) => void }) {
