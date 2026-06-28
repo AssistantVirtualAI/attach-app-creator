@@ -15,6 +15,7 @@ interface Props {
 }
 
 export default function UnifiedContactCard({ lookup, onCall, onSms, maestroLinkBase }: Props) {
+  const { tx } = useT();
   const name = lookup.name;
   const initial = (name || '#').trim().charAt(0).toUpperCase();
   const mobile = lookup.ms_meta?.mobile ?? lookup.display_number;
