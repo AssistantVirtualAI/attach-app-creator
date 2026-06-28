@@ -233,7 +233,7 @@ export default function ActiveCallSheet({
               animation: 'rec-pulse 1.2s ease-in-out infinite',
               boxShadow: `0 0 10px ${colors.danger}`,
             }} />
-            Enregistrement en cours
+            {tx('Enregistrement en cours', 'Recording in progress')}
           </div>
         )}
 
