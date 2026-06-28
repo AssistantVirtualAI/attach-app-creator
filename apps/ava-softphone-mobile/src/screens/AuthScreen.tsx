@@ -555,7 +555,7 @@ function AccentSwitch({ accent, onChange, readOnly }: { accent: Accent; onChange
             disabled={readOnly}
             onClick={() => onChange?.(o.id)}
             aria-pressed={active}
-            title={`Thème : ${o.label}`}
+            title={tx('Thème : ', 'Theme: ') + o.label}
             style={{
               border: 'none', cursor: readOnly ? 'default' : 'pointer',
               padding: '5px 10px', borderRadius: 999,
