@@ -407,14 +407,15 @@ class JsSipProvider {
   async call(number: string) {
     if (!this.config) return;
     this.logCall("info", `Dialing ${number}`);
+    this.update({
+      callState: "ringing-out",
+      remoteIdentity: number,
+      remoteNumber: number,
+      direction: "out",
+      lastCallError: undefined,
+    });
     if (this.config.mock || !this.ua) {
       this.clearMockTimers();
-      this.update({
-        callState: "ringing-out",
-        remoteIdentity: number,
-        remoteNumber: number,
-        direction: "out",
-      });
       this.mockTimers.push(
         setTimeout(() => {
           if (this.snap.callState === "ringing-out") {
@@ -439,7 +440,8 @@ class JsSipProvider {
       } catch (micErr: any) {
         const msg = `Microphone unavailable: ${micErr?.message || micErr}`;
         this.logCall("error", msg);
-        this.update({ lastCallError: msg, errorCause: msg });
+        this.update({ callState: "ended", lastCallError: msg, errorCause: msg });
+        setTimeout(() => this.resetCall(), 1500);
         return;
       }
 
@@ -455,7 +457,8 @@ class JsSipProvider {
     } catch (err: any) {
       const msg = String(err?.message || err);
       this.logCall("error", `ua.call() threw: ${msg}`);
-      this.update({ lastCallError: msg });
+      this.update({ callState: "ended", lastCallError: msg });
+      setTimeout(() => this.resetCall(), 1500);
     }
   }
 

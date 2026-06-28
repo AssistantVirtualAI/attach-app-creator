@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { sipProvider, SoftphoneSnapshot, SoftphoneConfig } from "@/lib/softphone/jssipProvider";
-import { ringtone } from "@/lib/softphone/ringtonePlayer";
+import { ringback, ringtone } from "@/lib/softphone/ringtonePlayer";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -132,6 +132,13 @@ export function useSoftphone() {
       ringtone.stop();
     }
   }, [snap.callState, snap.remoteIdentity, snap.remoteNumber]);
+
+  // Local outgoing ringback, aligned with the mobile app behavior.
+  useEffect(() => {
+    if (snap.callState === "ringing-out") ringback.start();
+    else ringback.stop();
+    return () => ringback.stop();
+  }, [snap.callState]);
 
   // Presence: flip to on_call when active; revert to previous on end
   const prevStatusRef = useRef<string | null>(null);

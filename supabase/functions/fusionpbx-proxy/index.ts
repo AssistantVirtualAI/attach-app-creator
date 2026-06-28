@@ -1299,6 +1299,28 @@ Deno.serve(async (req) => {
     if (action === "list-cdrs" || action === "sync-cdrs" || action === "get-cdrs" || action === "backfill-cdrs") {
       const b: any = body;
       const extension: string | undefined = params.extension ?? b.extension;
+      const requestedExtension = String(extension || "").trim();
+      const cdrValueMatchesExtension = (value: unknown) => {
+        if (!requestedExtension || value == null) return false;
+        const raw = String(value).trim();
+        if (!raw) return false;
+        const userPart = raw.replace(/^sip:/i, "").split("@")[0]?.trim() || raw;
+        const digits = userPart.replace(/[^0-9+]/g, "");
+        return userPart === requestedExtension || digits === requestedExtension || digits === requestedExtension.replace(/[^0-9+]/g, "");
+      };
+      const cdrMatchesRequestedExtension = (cdr: any) => {
+        if (!requestedExtension) return true;
+        return [
+          cdr.extension,
+          cdr.extension_number,
+          cdr.caller_extension,
+          cdr.extension_uuid,
+          cdr.caller_id_number,
+          cdr.destination_number,
+          cdr.caller_destination,
+          cdr.source_number,
+        ].some(cdrValueMatchesExtension);
+      };
       const isBackfill = action === "backfill-cdrs";
       const pageSize: number = parseInt(String(params.page_size ?? b.page_size ?? (isBackfill ? 500 : (params.limit ?? b.limit ?? 100))));
       const maxPages: number = parseInt(String(params.max_pages ?? b.max_pages ?? (isBackfill ? 50 : 1)));
@@ -1334,7 +1356,9 @@ Deno.serve(async (req) => {
           limit: String(pageSize),
           offset: String(startOffset + i * pageSize),
         };
-        if (extension) extra.extension = extension;
+        // Do NOT pass `extension` to FusionPBX xml_cdr. Its v7 generic API
+        // converts every query param into SQL (`extension = ...`) but xml_cdr
+        // has no `extension` column. Extension filtering happens post-fetch.
         const r = await fetchCdrsWithFallback(extra);
         if (!r.ok) {
           if (i === 0) {
@@ -1349,7 +1373,7 @@ Deno.serve(async (req) => {
           break;
         }
         lastEndpoint = r.endpoint;
-        const cdrs = r.records;
+        const cdrs = requestedExtension ? r.records.filter(cdrMatchesRequestedExtension) : r.records;
         if (i === 0) firstPage = cdrs;
         totalFetched += cdrs.length;
         pages++;
