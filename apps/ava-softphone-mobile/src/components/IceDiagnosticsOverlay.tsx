@@ -163,7 +163,7 @@ export default function IceDiagnosticsOverlay() {
               border: '1px solid #334155', font: 'inherit', cursor: 'pointer',
             }}
           >
-            {copied ? '✓ Copié' : 'Copier diagnostic'}
+            {copied ? '✓ Copied' : 'Copy diagnostic'}
           </button>
         </>
       )}
