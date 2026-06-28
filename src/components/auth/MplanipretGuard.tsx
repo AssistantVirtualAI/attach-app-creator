@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { ROUTES } from "@/lib/routes";
 import { recordRedirect } from "@/lib/debug/navDebug";
+import { useMplanipretLang } from "@/hooks/useMplanipretLang";
 
 /**
  * Dedicated access guard for the Planiprêt MOBILE app (`/mplanipret/*`).
@@ -18,6 +19,7 @@ import { recordRedirect } from "@/lib/debug/navDebug";
 export function MplanipretGuard({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { t } = useMplanipretLang();
   const [state, setState] = useState<"checking" | "allow">("checking");
 
   useEffect(() => {
@@ -57,7 +59,7 @@ export function MplanipretGuard({ children }: { children: ReactNode }) {
         data-testid="mplanipret-guard-loading"
         style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#030810", color: "#4A7FA5" }}
       >
-        Chargement…
+        {t("common.loading")}
       </div>
     );
   }
