@@ -171,6 +171,10 @@ export interface CallDetail extends CallRecord {
   aiStatus?: 'cached' | 'processing' | 'failed' | 'missing';
   aiError?: string | null;
   aiCached?: boolean;
+  transcriptionStatus?: 'pending' | 'processing' | 'done' | 'failed' | 'missing';
+  transcriptionProvider?: string | null;
+  transcriptionProviderRaw?: string | null;
+  transcriptionError?: string | null;
   intent: string;
   tags: string[];
 }
