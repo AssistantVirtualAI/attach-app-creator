@@ -208,7 +208,7 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null); setFailure(null);
-    if (!validate()) { setFailure({ step: 'validation', code: 'invalid_input', message: 'Veuillez corriger les champs en évidence.' }); return; }
+    if (!validate()) { setFailure({ step: 'validation', code: 'invalid_input', message: tx('Veuillez corriger les champs en évidence.', 'Please correct the highlighted fields.') }); return; }
     setBusy(true);
     try {
       if (mode === 'email') await submitEmail();
