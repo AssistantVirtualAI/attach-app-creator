@@ -118,7 +118,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
 
     private func registerThreadIfNeeded() {
         if pj_thread_is_registered() == 0 {
-            let descPtr = _pjThreadDescPtr.assumingMemoryBound(to: CChar.self)
+            let descPtr = _pjThreadDescPtr.assumingMemoryBound(to: Int.self)
             _ = pj_thread_register("sipQueue", descPtr, &_pjThread)
         }
     }
