@@ -313,13 +313,17 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
             // entrants d'être routés vers cette app.
             // Build contact URI — include pn-prid (push token) if available
             // so FusionPBX mod_sofia can wake the app via APNs VoIP push.
+            // q=1.0 = priorité maximale pour le forking FreeSWITCH.
+            // ka_interval=15 = keep-alive TCP toutes les 15s pour maintenir
+            // la connexion active en arrière-plan (workaround avant PushKit).
+            accCfg.ka_interval = 15
             if let token = self.voipPushToken, !token.isEmpty {
-                let contact = "sip:\(username)@\(server);transport=tcp;pn-prid=\(token);pn-param=apns.voip;pn-provider=apns"
+                let contact = "sip:\(username)@\(server);transport=tcp;pn-prid=\(token);pn-param=apns.voip;pn-provider=apns;q=1.0"
                 accCfg.force_contact = self.pjStrDup(contact)
-                NSLog("[CapacitorPjsip] REGISTER contact with VoIP push token")
+                NSLog("[CapacitorPjsip] REGISTER contact with VoIP push token q=1.0")
             } else {
-                accCfg.force_contact = self.pjStrDup("sip:\(username)@\(server);transport=tcp")
-                NSLog("[CapacitorPjsip] REGISTER contact without push token (PushKit not ready yet)")
+                accCfg.force_contact = self.pjStrDup("sip:\(username)@\(server);transport=tcp;q=1.0")
+                NSLog("[CapacitorPjsip] REGISTER contact without push token q=1.0")
             }
 
             accCfg.cred_count = 1
