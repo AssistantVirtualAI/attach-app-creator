@@ -402,6 +402,8 @@ export default function ActiveCallSheet({
 }
 
 function routeLabel(r: AudioRoute) {
+  const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('ava.mobile.lang') === 'en') ? 'en' : 'fr';
+  if (lang === 'en') return r === 'speaker' ? 'Speaker' : r === 'bluetooth' ? 'Bluetooth' : 'Earpiece';
   return r === 'speaker' ? 'Haut-parleur' : r === 'bluetooth' ? 'Bluetooth' : 'Écouteur';
 }
 function routeIcon(r: AudioRoute) {
