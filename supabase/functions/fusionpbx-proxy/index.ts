@@ -131,6 +131,12 @@ async function getFusionSessionCookie(baseUrl: string): Promise<string> {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  // Per-request correlation id. Echoed in every error response + every log line
+  // so the client can quote it to support and we can trace one playback request
+  // end-to-end across login + recording fetch attempts.
+  const correlationId = (req.headers.get("x-request-id") || crypto.randomUUID()).slice(0, 36);
+  const cidLog = (...args: unknown[]) => console.log(`[cid:${correlationId}]`, ...args);
+
   const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
   // Identify caller (JWT in Authorization header OR service-role for pg_cron)
