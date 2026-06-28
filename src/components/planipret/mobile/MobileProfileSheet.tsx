@@ -99,13 +99,19 @@ export default function MobileProfileSheet({
     window.location.href = "/mplanipret";
   };
 
+  const overlayRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const id = window.setTimeout(() => assertOverlayOnTop(overlayRef.current), 50);
+    return () => window.clearTimeout(id);
+  }, []);
+
   const current = profile?.status ?? "available";
   const initials = (profile?.full_name || profile?.email || "?")
     .split(/\s+/).map((s: string) => s[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
 
   return createPortal(
     <AnimatePresence>
-      <motion.div className="fixed inset-0 flex items-end"
+      <motion.div ref={overlayRef} data-testid="mobile-profile-sheet-overlay" className="fixed inset-0 flex items-end"
         style={{ background: "rgba(0,0,0,0.45)", zIndex: 99999 }}
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}>
         <motion.div onClick={(e) => e.stopPropagation()}
