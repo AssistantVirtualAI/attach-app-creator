@@ -30,7 +30,8 @@ export function startRingback(): void {
       const gain = audioCtx.createGain();
       osc1.frequency.value = 440;
       osc2.frequency.value = 480;
-      gain.gain.value = 0.15;
+      const v = getRingVolume();
+      gain.gain.value = Math.min(0.3, 0.25 * v);
       osc1.connect(gain); osc2.connect(gain); gain.connect(audioCtx.destination);
       osc1.start();
       osc2.start();
