@@ -4614,6 +4614,45 @@ export type Database = {
         }
         Relationships: []
       }
+      pbx_call_live_transcripts: {
+        Row: {
+          call_record_id: string
+          id: string
+          organization_id: string
+          segment_idx: number
+          source: string
+          speaker: string
+          started_at: string
+          status: string
+          text: string
+          updated_at: string
+        }
+        Insert: {
+          call_record_id: string
+          id?: string
+          organization_id: string
+          segment_idx?: number
+          source?: string
+          speaker?: string
+          started_at?: string
+          status?: string
+          text?: string
+          updated_at?: string
+        }
+        Update: {
+          call_record_id?: string
+          id?: string
+          organization_id?: string
+          segment_idx?: number
+          source?: string
+          speaker?: string
+          started_at?: string
+          status?: string
+          text?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       pbx_call_queues: {
         Row: {
           client_id: string | null
