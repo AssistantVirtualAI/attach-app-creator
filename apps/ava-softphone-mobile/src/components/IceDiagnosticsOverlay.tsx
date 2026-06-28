@@ -144,7 +144,7 @@ export default function IceDiagnosticsOverlay() {
               ⚠ {errors[0].where}: {errors[0].message.slice(0, 80)}
             </div>
           )}
-          <div style={{ marginTop: 6, color: '#64748b' }}>candidats (5 récents)</div>
+          <div style={{ marginTop: 6, color: '#64748b' }}>candidates (5 recent)</div>
           {candidates.length === 0 && <div style={{ color: '#475569' }}>—</div>}
           {candidates.map((c, i) => (
             <div key={i} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
