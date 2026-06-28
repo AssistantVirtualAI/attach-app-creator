@@ -247,7 +247,7 @@ export default function ActiveCallSheet({
             color: colors.mutedSilver, textTransform: 'uppercase',
           }}>
             <span style={{ fontSize: 13 }}>{routeIcon(audio.route)}</span>
-            <span>Sortie · {routeLabel(audio.route)}</span>
+            <span>{tx('Sortie', 'Output')} · {routeLabel(audio.route)}</span>
             {audio.busy && <span style={{ color: colors.avaCyan }}>…</span>}
           </div>
         )}
