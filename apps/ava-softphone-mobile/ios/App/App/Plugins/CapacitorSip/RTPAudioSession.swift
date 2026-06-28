@@ -849,7 +849,7 @@ final class RTPAudioSession {
         }
         txPackets &+= 1
         txBytes &+= UInt64(pktLen)
-        if txPackets == 1 || txPackets % 50 == 0 {
+        if txPackets == 1 || txPackets % 500 == 0 {
             NSLog("[RTP] TX seq=\(seqForLog) → \(lastRemoteIp):\(lastRemotePort) txPackets=\(txPackets)")
         }
     }
