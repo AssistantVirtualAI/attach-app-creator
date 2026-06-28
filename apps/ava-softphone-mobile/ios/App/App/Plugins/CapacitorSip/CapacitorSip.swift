@@ -216,13 +216,11 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
                         plugin.notifyBg("callStateChanged", ["state": "ringing", "direction": "out"])
                     case PJSIP_INV_STATE_CONFIRMED:
                         plugin.currentCallId = callId
-                        CallKitManager.shared.reportConnected()
                         plugin.notifyBg("callStateChanged", ["state": "active"])
                     case PJSIP_INV_STATE_DISCONNECTED:
                         if plugin.currentCallId == callId {
                             plugin.currentCallId = pjsua_call_id(PJSUA_INVALID_ID.rawValue)
                         }
-                        CallKitManager.shared.reportEnded()
                         plugin.notifyBg("callEnded", ["reason": "remote_bye"])
                         plugin.notifyBg("callStateChanged", ["state": "ended"])
                     default:
@@ -246,7 +244,6 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
                     var info = pjsua_call_info()
                     pjsua_call_get_info(callId, &info)
                     let remote = String(cString: info.remote_info.ptr)
-                    CallKitManager.shared.reportIncoming(from: remote)
                     plugin.notifyBg("callReceived", ["from": remote])
                 }
 
@@ -363,7 +360,6 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
                 call.reject("make_call failed: \(status)"); return
             }
             self.currentCallId = callId
-            CallKitManager.shared.reportOutgoing(to: number)
             call.resolve(["ok": true, "status": "calling", "callId": Int(callId)])
         }
     }
