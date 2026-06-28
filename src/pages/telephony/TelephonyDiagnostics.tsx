@@ -66,6 +66,25 @@ export default function TelephonyDiagnostics() {
       const ping = await supabase.functions.invoke('fusionpbx-proxy', { body: { organization_id: LEMTEL_ORG, action: 'ping' } });
       add({ id: 'pbx-ping', group: 'backend', label: 'FusionPBX API reachability', status: ping.error || (ping.data as any)?.error ? 'fail' : 'pass', detail: (ping.data as any)?.latency_ms ? `${(ping.data as any).latency_ms}ms` : ping.error?.message || (ping.data as any)?.message || 'OK', fix: 'Check FusionPBX URL, API key, IP allowlist, and backend secrets.' });
 
+      // PBX web session health check — required for recording downloads
+      const hc = await supabase.functions.invoke('fusionpbx-proxy', { body: { organization_id: LEMTEL_ORG, action: 'pbx-health-check' } });
+      const hcData = (hc.data as any) || {};
+      const missingSecrets = hcData.secrets ? Object.entries(hcData.secrets).filter(([, v]) => !v).map(([k]) => k) : [];
+      add({
+        id: 'pbx-session',
+        group: 'backend',
+        label: 'FusionPBX web session (recording downloads)',
+        status: hc.error ? 'fail' : !hcData.session?.ok ? 'fail' : missingSecrets.length ? 'warn' : 'pass',
+        detail: hc.error
+          ? hc.error.message
+          : !hcData.session?.ok
+          ? `Login failed: ${hcData.session?.error || 'unknown error'} — check FUSIONPBX_PASSWORD in Vault`
+          : missingSecrets.length
+          ? `Missing Vault secrets: ${missingSecrets.join(', ')}`
+          : `Session OK · API ${hcData.api?.ok ? 'OK' : 'FAIL'} (${hcData.api?.latency_ms ?? '?'}ms)`,
+        fix: 'Set FUSIONPBX_PASSWORD (FusionPBX web UI password) in Supabase Vault. If it equals FUSIONPBX_API_KEY, the fallback will be used automatically.',
+      });
+
       const creds = await supabase.functions.invoke('softphone-credentials');
       add({ id: 'softphone-creds', group: 'sip', label: 'Softphone credentials', status: creds.error || (creds.data as any)?.error ? 'fail' : 'pass', detail: (creds.data as any)?.extension ? `Extension ${(creds.data as any).extension}` : creds.error?.message || (creds.data as any)?.message || 'Credentials returned', fix: 'Link the portal user to a softphone user and verify PBX encryption key.' });
 
