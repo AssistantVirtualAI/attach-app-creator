@@ -23,6 +23,7 @@ export default function ActiveCallSheet({
   haptic: (s?: ImpactStyle) => Promise<void>;
 }) {
   const { tx } = useT();
+  const { organizationId } = useMobileCredentials();
   const [timer, setTimer] = useState(0);
   const [showKeypad, setShowKeypad] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
