@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { ArrowLeft, Phone, MessageSquare, Voicemail, User, Mail, Sparkles, Loader2 } from "lucide-react";
+import { useMplanipretLang } from "@/hooks/useMplanipretLang";
 
 type Result = { calls: any[]; messages: any[]; voicemails: any[]; insights: any[]; contacts: any[]; emails: any[] };
 
@@ -13,6 +14,7 @@ function highlight(text: string, q: string) {
 }
 
 export default function MSearch() {
+  const { t, lang } = useMplanipretLang();
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const q = params.get("q") ?? "";
@@ -42,13 +44,13 @@ export default function MSearch() {
     <div className="p-3">
       <header className="flex items-center gap-2 mb-3">
         <button onClick={() => navigate(-1)} className="p-1.5 rounded-full hover:bg-slate-100"><ArrowLeft className="w-5 h-5" /></button>
-        <div className="font-semibold text-slate-800">Résultats: « {q} »</div>
+        <div className="font-semibold text-slate-800">{t("searchPage.results")}: « {q} »</div>
       </header>
 
       {!q && (
         <div>
-          <div className="text-xs text-slate-400 mb-2 px-1">Recherches récentes</div>
-          {recent.length === 0 ? <div className="text-sm text-slate-400 px-1">Aucune</div> : (
+          <div className="text-xs text-slate-400 mb-2 px-1">{t("searchPage.recentSearches")}</div>
+          {recent.length === 0 ? <div className="text-sm text-slate-400 px-1">{t("common.none")}</div> : (
             <div className="space-y-1">
               {recent.map((r) => (
                 <button key={r} onClick={() => navigate(`/mplanipret/search?q=${encodeURIComponent(r)}`)}
@@ -63,17 +65,17 @@ export default function MSearch() {
 
       {data && !loading && (
         <div className="space-y-4">
-          <Group icon={<Phone className="w-4 h-4" />} title="Appels" count={data.calls?.length ?? 0}>
+          <Group icon={<Phone className="w-4 h-4" />} title={t("searchPage.calls")} count={data.calls?.length ?? 0}>
             {data.calls?.map((c) => (
               <button key={c.id} onClick={() => navigate("/mplanipret/calls")} className="w-full text-left p-3 bg-white rounded-lg text-sm flex items-center gap-3">
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium truncate">{highlight(c.from_name ?? c.to_name ?? c.caller_number ?? c.callee_number ?? "Inconnu", q)}</div>
-                  <div className="text-xs text-slate-400">{c.direction} · {new Date(c.created_at).toLocaleString("fr-CA")}</div>
+                  <div className="font-medium truncate">{highlight(c.from_name ?? c.to_name ?? c.caller_number ?? c.callee_number ?? t("common.unknown"), q)}</div>
+                  <div className="text-xs text-slate-400">{c.direction} · {new Date(c.created_at).toLocaleString(lang === "en" ? "en-CA" : "fr-CA")}</div>
                 </div>
               </button>
             ))}
           </Group>
-          <Group icon={<MessageSquare className="w-4 h-4" />} title="Messages" count={data.messages?.length ?? 0}>
+          <Group icon={<MessageSquare className="w-4 h-4" />} title={t("searchPage.messages")} count={data.messages?.length ?? 0}>
             {data.messages?.map((m) => (
               <button key={m.id} onClick={() => navigate("/mplanipret/messages")} className="w-full text-left p-3 bg-white rounded-lg text-sm">
                 <div className="text-xs text-slate-400">{m.direction === "outbound" ? m.to_number : m.from_number}</div>
@@ -81,7 +83,7 @@ export default function MSearch() {
               </button>
             ))}
           </Group>
-          <Group icon={<Voicemail className="w-4 h-4" />} title="Voicemails" count={data.voicemails?.length ?? 0}>
+          <Group icon={<Voicemail className="w-4 h-4" />} title={t("searchPage.voicemails")} count={data.voicemails?.length ?? 0}>
             {data.voicemails?.map((v) => (
               <button key={v.id} onClick={() => navigate("/mplanipret/voicemail")} className="w-full text-left p-3 bg-white rounded-lg text-sm">
                 <div className="text-xs text-slate-400">{v.from_number} · {v.duration_seconds}s</div>
@@ -89,12 +91,12 @@ export default function MSearch() {
               </button>
             ))}
           </Group>
-          <Group icon={<Sparkles className="w-4 h-4" />} title="Analyses IA" count={data.insights?.length ?? 0}>
+          <Group icon={<Sparkles className="w-4 h-4" />} title={t("searchPage.aiInsights")} count={data.insights?.length ?? 0}>
             {data.insights?.map((i) => (
               <div key={i.id} className="p-3 bg-white rounded-lg text-sm text-slate-600 truncate">{highlight((i.summary ?? "").slice(0, 160), q)}</div>
             ))}
           </Group>
-          <Group icon={<User className="w-4 h-4" />} title="Contacts Maestro" count={data.contacts?.length ?? 0}>
+          <Group icon={<User className="w-4 h-4" />} title={t("searchPage.maestroContacts")} count={data.contacts?.length ?? 0}>
             {data.contacts?.map((c: any, i: number) => (
               <div key={i} className="p-3 bg-white rounded-lg text-sm">
                 <div className="font-medium">{c.name ?? c.full_name ?? "Contact"}</div>
@@ -102,10 +104,10 @@ export default function MSearch() {
               </div>
             ))}
           </Group>
-          <Group icon={<Mail className="w-4 h-4" />} title="Courriels M365" count={data.emails?.length ?? 0}>
+          <Group icon={<Mail className="w-4 h-4" />} title={t("searchPage.emails")} count={data.emails?.length ?? 0}>
             {data.emails?.map((e: any, i: number) => (
               <div key={i} className="p-3 bg-white rounded-lg text-sm">
-                <div className="font-medium truncate">{e.subject ?? "(sans objet)"}</div>
+                <div className="font-medium truncate">{e.subject ?? t("searchPage.noSubject")}</div>
                 <div className="text-xs text-slate-400 truncate">{e.from ?? ""}</div>
               </div>
             ))}
