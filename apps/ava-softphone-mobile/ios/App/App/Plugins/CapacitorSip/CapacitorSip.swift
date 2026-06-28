@@ -904,6 +904,47 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         })
     }
 
+    // MARK: - OPTIONS keepalive (NAT binding refresh on LTE/Wi-Fi)
+    // REGISTER refresh alone (50s) is not enough to hold an NAT pinhole on
+    // many carrier networks; a lightweight OPTIONS ping every 25s keeps the
+    // 5-tuple alive without triggering re-registration churn.
+    private func startOptionsKeepalive() {
+        optionsTimer?.invalidate()
+        optionsTimer = Timer.scheduledTimer(withTimeInterval: 25, repeats: true) { [weak self] _ in
+            self?.sendOptions()
+        }
+        log("OPTIONS keepalive started (25s)")
+    }
+
+    private func stopOptionsKeepalive() {
+        optionsTimer?.invalidate()
+        optionsTimer = nil
+    }
+
+    private func sendOptions() {
+        guard connection != nil, registered, !domain.isEmpty else { return }
+        let localIp = sigLocalIp()
+        let transport = "TCP"
+        let br = branch
+        let cid = UUID().uuidString
+        cseq += 1
+        var msg = ""
+        msg += "OPTIONS sip:\(domain) SIP/2.0\r\n"
+        msg += "Via: SIP/2.0/\(transport) \(localIp);branch=\(br);rport\r\n"
+        msg += "Max-Forwards: 70\r\n"
+        msg += "From: \"\(displayName)\" <sip:\(username)@\(domain)>;tag=\(localTag)\r\n"
+        msg += "To: <sip:\(domain)>\r\n"
+        msg += "Call-ID: \(cid)\r\n"
+        msg += "CSeq: \(cseq) OPTIONS\r\n"
+        msg += "Contact: <sip:\(username)@\(localIp);transport=\(transport.lowercased())>\r\n"
+        msg += "Accept: application/sdp\r\n"
+        msg += "User-Agent: CapacitorPjsip/1.0\r\n"
+        msg += "Content-Length: 0\r\n\r\n"
+        sendRaw(msg)
+        log(">>> OPTIONS keepalive cseq=\(cseq)")
+    }
+
+
     // MARK: - Call signaling helpers
     private func resetCallState() {
         callActiveId = ""; callLocalTag = ""; callRemoteTag = ""
