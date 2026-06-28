@@ -9,7 +9,7 @@ import { getAudioState, onAudioStateChange, setRoute, type AudioRoute, type Audi
 import CallTimeline, { type CallPhase } from './CallTimeline';
 import IncomingCallerPanel from './IncomingCallerPanel';
 import { lookupCaller, type CallerLookup } from '../lib/sip/callerLookup';
-import LiveTranscriptPanel from './LiveTranscriptPanel';
+// LiveTranscriptPanel intentionally not imported — live transcription disabled during calls.
 import { useMobileCredentials } from '../hooks/useMobileCredentials';
 import { useT } from '../lib/i18n';
 
