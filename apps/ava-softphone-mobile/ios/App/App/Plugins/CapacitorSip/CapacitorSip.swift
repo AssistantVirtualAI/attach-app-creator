@@ -106,23 +106,41 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
-    // MARK: - Helpers
-
-    /// Registers the current thread with PJLIB if not already registered.
-    /// Must be called at the start of any sipQueue.async block that invokes PJSUA.
-    // Storage for pj_thread_register — must persist for the lifetime of the thread.
-    // One slot per concurrent thread; sipQueue is serial so one is enough.
-    // pj_thread_desc is a fixed-size C array (char[512]); Swift sees it as an
-    // opaque tuple. We allocate it on the heap so we can take a stable pointer.
-    private let _pjThreadDescPtr: UnsafeMutableRawPointer =
-        UnsafeMutableRawPointer.allocate(byteCount: 512, alignment: 16)
-    private var _pjThread: OpaquePointer? = nil
+        // MARK: - Helpers
+    /// Registers the current pthread with PJLIB if not already registered.
+    /// Each unique pthread gets its own heap-allocated pj_thread_desc (512 bytes)
+    /// stored in a thread-local slot via pthread_key. This avoids the
+    /// "thread->signature" assertion crash that occurs when a single shared buffer
+    /// is reused across different pthreads that GCD assigns to sipQueue over time.
+    private static var _pjTLSKey: pthread_key_t = {
+        var key = pthread_key_t()
+        // Destructor frees the per-thread buffer when the pthread exits.
+        pthread_key_create(&key) { ptr in
+            guard let p = ptr else { return }
+            // The buffer is 512+8 bytes: first 8 bytes hold the OpaquePointer to
+            // pj_thread_t so we can keep it alive alongside the desc buffer.
+            p.deallocate()
+        }
+        return key
+    }()
 
     private func registerThreadIfNeeded() {
-        if pj_thread_is_registered() == 0 {
-            let descPtr = _pjThreadDescPtr.assumingMemoryBound(to: Int.self)
-            _ = pj_thread_register("sipQueue", descPtr, &_pjThread)
+        guard pj_thread_is_registered() == 0 else { return }
+        // Allocate a per-thread block: 8 bytes for OpaquePointer + 512 bytes for desc.
+        let blockSize = 8 + 512
+        let block: UnsafeMutableRawPointer
+        if let existing = pthread_getspecific(CapacitorPjsip._pjTLSKey) {
+            block = existing
+        } else {
+            block = UnsafeMutableRawPointer.allocate(byteCount: blockSize, alignment: 16)
+            block.initializeMemory(as: UInt8.self, repeating: 0, count: blockSize)
+            pthread_setspecific(CapacitorPjsip._pjTLSKey, block)
         }
+        // First 8 bytes: pointer to pj_thread_t (OpaquePointer)
+        let threadPtrPtr = block.assumingMemoryBound(to: OpaquePointer?.self)
+        // Next 512 bytes: pj_thread_desc buffer
+        let descPtr = (block + 8).assumingMemoryBound(to: Int.self)
+        _ = pj_thread_register("sipQueue", descPtr, threadPtrPtr)
     }
 
     /// Build a transient pj_str_t backed by a Swift String. The returned
