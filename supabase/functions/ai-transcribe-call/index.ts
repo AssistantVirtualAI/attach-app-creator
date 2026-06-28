@@ -343,7 +343,7 @@ Deno.serve(async (req) => {
     // STT: Lovable Gateway gpt-4o-mini-transcribe ONLY (no audio fallback).
     // Claude 3.5 Sonnet runs after for TEXT cleanup / speaker labels.
     const audioFormat = audioMime.split("/")[1] || "wav";
-    const sttPrompt = "Transcribe verbatim. Preserve French or English. Include filler words.";
+    const sttPrompt = "Transcription d'un appel téléphonique en français canadien. Préserver les noms propres, montants et numéros. Inclure les hésitations.";
 
     type ProviderResult = { text?: string; provider: string; model: string; error?: string; status?: number };
 
@@ -403,6 +403,8 @@ Deno.serve(async (req) => {
     const attempts: Array<{ provider: string; model: string; status?: number; error?: string }> = [];
 
     // PRIMARY: OpenAI Whisper-1 — best accuracy on 8kHz phone audio.
+    // Whisper accepts 8kHz μ-law WAV from FusionPBX natively (no transcoding).
+    // MP3 and other common containers also pass through unchanged.
     const tryOpenAIWhisper = async (): Promise<ProviderResult> => {
       const openaiKey = Deno.env.get("OPENAI_API_KEY");
       if (!openaiKey) return { error: "no-openai-key", provider: "openai", model: "whisper-1" };
@@ -412,6 +414,7 @@ Deno.serve(async (req) => {
       fd.append("file", new Blob([audioBytes!], { type: audioMime }), `recording.${ext}`);
       fd.append("language", "fr");
       fd.append("response_format", "json");
+      fd.append("temperature", "0");
       fd.append("prompt", sttPrompt);
       const r = await fetch("https://api.openai.com/v1/audio/transcriptions", {
         method: "POST",
