@@ -347,7 +347,7 @@ function ForgotPasswordScreen({ initialEmail, accent, onBack }: { initialEmail: 
         throw new Error(detail?.msg || detail?.error || `HTTP ${res.status}`);
       }
       setCooldown(RESEND_COOLDOWN_SECONDS);
-      if (opts?.resend) setResentInfo('E-mail de réinitialisation renvoyé.');
+      if (opts?.resend) setResentInfo(tx('E-mail de réinitialisation renvoyé.', 'Reset email resent.'));
       setStep('sent');
     } catch (e: any) {
       setError(mapAuthError(e?.message));
