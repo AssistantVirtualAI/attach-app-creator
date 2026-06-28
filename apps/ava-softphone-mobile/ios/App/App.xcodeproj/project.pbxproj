@@ -14,6 +14,7 @@
 		62C0A1152D47000100C0FFEE /* CapacitorSip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62C0A1122D47000100C0FFEE /* CapacitorSip.swift */; };
 		62C0A1162D47000100C0FFEE /* AppBridgeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62C0A1172D47000100C0FFEE /* AppBridgeViewController.swift */; };
 		62C0A1182D47000100C0FFEE /* RTPAudioSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62C0A1192D47000100C0FFEE /* RTPAudioSession.swift */; };
+		62C0A11A2D47000100C0FFEE /* CallKitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62C0A11B2D47000100C0FFEE /* CallKitManager.swift */; };
 
 		504EC30D1FED79650016851F /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30B1FED79650016851F /* Main.storyboard */; };
 		504EC30F1FED79650016851F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30E1FED79650016851F /* Assets.xcassets */; };
@@ -36,6 +37,8 @@
 		62C0A1122D47000100C0FFEE /* CapacitorSip.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CapacitorSip.swift; sourceTree = "<group>"; };
 		62C0A1172D47000100C0FFEE /* AppBridgeViewController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppBridgeViewController.swift; sourceTree = "<group>"; };
 		62C0A1192D47000100C0FFEE /* RTPAudioSession.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RTPAudioSession.swift; sourceTree = "<group>"; };
+		62C0A11B2D47000100C0FFEE /* CallKitManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CallKitManager.swift; sourceTree = "<group>"; };
+		62C0A11C2D47000100C0FFEE /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
 
 		AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_App.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		AF51FD2D460BCFE21FA515B2 /* Pods-App.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.release.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.release.xcconfig"; sourceTree = "<group>"; };
@@ -80,23 +83,24 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		504EC3061FED79650016851F /* App */ = {
-			isa = PBXGroup;
-			children = (
-				50379B222058CBB4000EE86E /* capacitor.config.json */,
-				504EC3071FED79650016851F /* AppDelegate.swift */,
-				62C0A1172D47000100C0FFEE /* AppBridgeViewController.swift */,
-				62C0A1132D47000100C0FFEE /* Plugins */,
-				504EC30B1FED79650016851F /* Main.storyboard */,
-				504EC30E1FED79650016851F /* Assets.xcassets */,
-				504EC3101FED79650016851F /* LaunchScreen.storyboard */,
-				504EC3131FED79650016851F /* Info.plist */,
-				2FAD9762203C412B000D30F8 /* config.xml */,
-				50B271D01FEDC1A000F3C39B /* public */,
-			);
-			path = App;
-			sourceTree = "<group>";
-		};
+			504EC3061FED79650016851F /* App */ = {
+				isa = PBXGroup;
+				children = (
+					50379B222058CBB4000EE86E /* capacitor.config.json */,
+					504EC3071FED79650016851F /* AppDelegate.swift */,
+					62C0A1172D47000100C0FFEE /* AppBridgeViewController.swift */,
+					62C0A11C2D47000100C0FFEE /* App.entitlements */,
+					62C0A1132D47000100C0FFEE /* Plugins */,
+					504EC30B1FED79650016851F /* Main.storyboard */,
+					504EC30E1FED79650016851F /* Assets.xcassets */,
+					504EC3101FED79650016851F /* LaunchScreen.storyboard */,
+					504EC3131FED79650016851F /* Info.plist */,
+					2FAD9762203C412B000D30F8 /* config.xml */,
+					50B271D01FEDC1A000F3C39B /* public */,
+				);
+				path = App;
+				sourceTree = "<group>";
+			};
 		62C0A1132D47000100C0FFEE /* Plugins */ = {
 			isa = PBXGroup;
 			children = (
@@ -105,14 +109,15 @@
 			path = Plugins;
 			sourceTree = "<group>";
 		};
-		62C0A1142D47000100C0FFEE /* CapacitorSip */ = {
-			isa = PBXGroup;
-			children = (
-				62C0A1102D47000100C0FFEE /* CapacitorSip.m */,
-				62C0A1122D47000100C0FFEE /* CapacitorSip.swift */,
-				62C0A1192D47000100C0FFEE /* RTPAudioSession.swift */,
-			);
-			path = CapacitorSip;
+			62C0A1142D47000100C0FFEE /* CapacitorSip */ = {
+				isa = PBXGroup;
+				children = (
+					62C0A1102D47000100C0FFEE /* CapacitorSip.m */,
+					62C0A1122D47000100C0FFEE /* CapacitorSip.swift */,
+					62C0A11B2D47000100C0FFEE /* CallKitManager.swift */,
+					62C0A1192D47000100C0FFEE /* RTPAudioSession.swift */,
+				);
+				path = CapacitorSip;
 
 			sourceTree = "<group>";
 		};
@@ -239,13 +244,14 @@
 		504EC3001FED79650016851F /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
-			files = (
-				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
-				62C0A1112D47000100C0FFEE /* CapacitorSip.m in Sources */,
-				62C0A1152D47000100C0FFEE /* CapacitorSip.swift in Sources */,
-				62C0A1162D47000100C0FFEE /* AppBridgeViewController.swift in Sources */,
-				62C0A1182D47000100C0FFEE /* RTPAudioSession.swift in Sources */,
-			);
+				files = (
+					504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
+					62C0A1112D47000100C0FFEE /* CapacitorSip.m in Sources */,
+					62C0A1152D47000100C0FFEE /* CapacitorSip.swift in Sources */,
+					62C0A11A2D47000100C0FFEE /* CallKitManager.swift in Sources */,
+					62C0A1162D47000100C0FFEE /* AppBridgeViewController.swift in Sources */,
+					62C0A1182D47000100C0FFEE /* RTPAudioSession.swift in Sources */,
+				);
 
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -383,6 +389,7 @@
 			baseConfigurationReference = FC68EB0AF532CFC21C3344DD /* Pods-App.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 64XSWWB49N;
@@ -404,6 +411,7 @@
 			baseConfigurationReference = AF51FD2D460BCFE21FA515B2 /* Pods-App.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 64XSWWB49N;
