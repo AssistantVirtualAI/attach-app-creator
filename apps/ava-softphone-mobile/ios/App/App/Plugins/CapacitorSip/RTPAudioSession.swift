@@ -642,30 +642,50 @@ final class RTPAudioSession {
         let abl = UnsafeMutableAudioBufferListPointer(ioData)
         let needed = Int(inNumberFrames)
 
-        // Integer upsample 8000 → 48000 (sample-and-hold, repeat each x6).
-        // rxPhase carries the remaining repeat count for the held sample
-        // across callbacks so hwFrames boundaries don't cause clicks.
+        // 8000 → 48000 upsample with linear interpolation between consecutive
+        // 8k samples. Requires a primed jitter buffer (3 packets / 60ms) before
+        // draining, otherwise underruns cause audible clicks.
         var out = [Int16](repeating: 0, count: needed)
-        var hold = rxHoldSample
-        var repeatsLeft = Int(rxPhase)
+        var prev = prevRxSample
+        var curr = currRxSample
+        var step = rxInterpStep
         var drained = 0
         audioLock.lock()
         let available = playQueue.count
+        if !bufferPrimed {
+            if playQueue.count >= minBufferSamples {
+                bufferPrimed = true
+            } else {
+                // Stay primed-low: output silence this callback.
+                audioLock.unlock()
+                for buffer in abl {
+                    guard let data = buffer.mData else { continue }
+                    memset(data, 0, Int(buffer.mDataByteSize))
+                }
+                return noErr
+            }
+        }
         for i in 0..<needed {
-            if repeatsLeft == 0 {
+            if step == 0 {
+                prev = curr
                 if !playQueue.isEmpty {
-                    hold = playQueue.removeFirst()
+                    curr = playQueue.removeFirst()
                     drained += 1
                 } else {
-                    hold = 0
+                    // Underrun — re-prime to absorb future jitter.
+                    bufferPrimed = false
+                    curr = 0
                 }
-                repeatsLeft = decimation
             }
-            out[i] = hold
-            repeatsLeft -= 1
+            let alpha = Float(step) / Float(decimation)
+            let interp = Float(prev) + alpha * (Float(curr) - Float(prev))
+            out[i] = Int16(max(-32768.0, min(32767.0, interp)))
+            step += 1
+            if step >= decimation { step = 0 }
         }
-        rxPhase = Double(repeatsLeft)
-        rxHoldSample = hold
+        prevRxSample = prev
+        currRxSample = curr
+        rxInterpStep = step
         let remaining = playQueue.count
         audioLock.unlock()
 
