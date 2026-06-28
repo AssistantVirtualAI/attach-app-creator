@@ -138,8 +138,8 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
     });
     return true;
   };
-  const hangup = () => { stopRingback('hangup'); CapacitorPjsip.hangup().catch(() => {}); };
-  const answer = () => { CapacitorPjsip.answer().catch(() => {}); };
+  const hangup = () => { stopRingback('hangup'); stopIncomingRing(); CapacitorPjsip.hangup().catch(() => {}); };
+  const answer = () => { stopIncomingRing(); CapacitorPjsip.answer().catch(() => {}); };
   const mute   = () => { CapacitorPjsip.setMute({ muted: true }).catch(() => {});  setIsMuted(true); };
   const unmute = () => { CapacitorPjsip.setMute({ muted: false }).catch(() => {}); setIsMuted(false); };
   const hold   = () => { CapacitorPjsip.setHold({ onHold: true }).catch(() => {});  setIsOnHold(true); };
