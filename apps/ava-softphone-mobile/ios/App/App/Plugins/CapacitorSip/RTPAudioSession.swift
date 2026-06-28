@@ -626,7 +626,7 @@ final class RTPAudioSession {
 
         for f in framesToSend { sendRTPFrame(f) }
         if inputCallbackCount == 1 || inputCallbackCount % 50 == 0 {
-            NSLog("[RTP] input cb #\(inputCallbackCount) hwFrames=\(n) decim=\(decimated.count) micPeak=\(String(format: "%.3f", micPeak)) queued=\(queued) txPackets=\(txPackets)")
+            NSLog("[RTP] input cb #\(inputCallbackCount) hwFrames=\(n) micPeak=\(String(format: "%.3f", micPeak)) queued=\(queued) txPackets=\(txPackets)")
         }
         return noErr
     }
