@@ -6,6 +6,7 @@
 // the ringback module — primed once on first user gesture.
 
 import { Capacitor } from '@capacitor/core';
+import { getRingVolume, isVibrationEnabled } from './ringPreferences';
 
 let audioCtx: AudioContext | null = null;
 let ringInterval: ReturnType<typeof setInterval> | null = null;
@@ -21,6 +22,7 @@ function ensureCtx(): AudioContext | null {
 }
 
 async function vibratePulse() {
+  if (!isVibrationEnabled()) return;
   if (!Capacitor.isNativePlatform()) {
     try { (navigator as any)?.vibrate?.([400, 200, 400]); } catch {}
     return;
@@ -35,8 +37,12 @@ async function vibratePulse() {
 }
 
 function playOnce() {
+  // Always honor the vibration toggle even when audio is silent.
+  void vibratePulse();
+  const volume = getRingVolume();
+  if (volume <= 0) return;
   const ctx = ensureCtx();
-  if (!ctx) { void vibratePulse(); return; }
+  if (!ctx) return;
   if (ctx.state === 'suspended') { void ctx.resume(); }
   try {
     const osc1 = ctx.createOscillator();
@@ -44,7 +50,7 @@ function playOnce() {
     const gain = ctx.createGain();
     osc1.frequency.value = 440;
     osc2.frequency.value = 480;
-    gain.gain.value = 0.2;
+    gain.gain.value = Math.min(0.35, 0.35 * volume);
     osc1.connect(gain); osc2.connect(gain); gain.connect(ctx.destination);
     const t0 = ctx.currentTime;
     osc1.start(t0); osc2.start(t0);
@@ -52,7 +58,6 @@ function playOnce() {
   } catch (e) {
     console.warn('[incomingRing] play failed', e);
   }
-  void vibratePulse();
 }
 
 export function startIncomingRing(): void {

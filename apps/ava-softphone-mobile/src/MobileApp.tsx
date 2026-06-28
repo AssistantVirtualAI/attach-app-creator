@@ -29,6 +29,7 @@ import SplashAva from './components/SplashAva';
 import PermissionGate from './components/PermissionGate';
 import SyncIndicator from './components/SyncIndicator';
 import ProfileSheet from './components/ProfileSheet';
+import MicPermissionWarning from './components/MicPermissionWarning';
 import { useRealtimeCDR } from './hooks/useRealtimeCDR';
 import { useDeviceNotifications } from './hooks/useDeviceNotifications';
 import { initBackgroundSync } from './lib/backgroundSync';
@@ -432,6 +433,9 @@ function AuthenticatedShell({
         creds={creds}
         onOpenProfile={() => setProfileOpen(true)}
       />
+
+      <MicPermissionWarning />
+
 
 
 
