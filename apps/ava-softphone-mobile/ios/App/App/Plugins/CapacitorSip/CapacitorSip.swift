@@ -199,7 +199,18 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     // MARK: - Logging
     private func log(_ msg: String) {
         NSLog("[CapacitorPjsip] \(msg)")
-        self.notifyListeners("log", data: ["message": msg])
+        self.notifyBg("log", data: ["message": msg])
+    }
+
+    /// Dispatch `notifyListeners` onto a background queue. The TCP receive
+    /// loop and audio callbacks run on background queues; calling
+    /// `notifyListeners` synchronously from there can hop onto the Capacitor
+    /// bridge main thread and freeze the UI under load. Always go through this
+    /// helper for non-CAPPluginCall events.
+    private func notifyBg(_ name: String, data: [String: Any]) {
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            self?.notifyListeners(name, data: data)
+        }
     }
 
     /// Best-effort local IPv4 to advertise in SIP signaling headers (Via, Contact).
@@ -215,13 +226,13 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         if let stage = stage { data["stage"] = stage }
         if let code = code { data["code"] = code }
         log("CALL_EVENT|callStateChanged|state=\(state)|stage=\(stage ?? "")|code=\(code ?? "")|callState=\(callState)|callId=\(callActiveId)")
-        notifyListeners("callStateChanged", data: data)
+        notifyBg("callStateChanged", data: data)
     }
 
     private func emitCallEnded(_ reason: String, callId id: String? = nil) {
         let endedId = id ?? callActiveId
         log("CALL_EVENT|callEnded|reason=\(reason)|callId=\(endedId)")
-        notifyListeners("callEnded", data: ["callId": endedId, "reason": reason])
+        notifyBg("callEnded", data: ["callId": endedId, "reason": reason])
     }
 
     // MARK: - Plugin methods
