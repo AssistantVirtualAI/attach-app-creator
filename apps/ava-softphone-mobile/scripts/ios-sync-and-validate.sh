@@ -44,14 +44,18 @@ grep -q "CapacitorSip.m in Sources" "$PBX" && green "  ✓ CapacitorSip.m is in 
 grep -q "AppBridgeViewController" "$STORYBOARD" && green "  ✓ Main.storyboard uses AppBridgeViewController" || { red "  ✗ Main.storyboard still uses CAPBridgeViewController"; exit 1; }
 grep -q "registerPluginInstance" ios/App/App/AppBridgeViewController.swift && green "  ✓ Local plugin registered in capacitorDidLoad" || { red "  ✗ Missing registerPluginInstance in AppBridgeViewController.swift"; exit 1; }
 
-echo "==> 1c. Verify RTPAudioSession is RemoteIO-only"
-RTP="ios/App/App/Plugins/CapacitorSip/RTPAudioSession.swift"
-if grep -Eq "AVAudioEngine|AVAudioPlayerNode|installTap|removeTap" "$RTP"; then
-  red "  ✗ RTPAudioSession.swift still references AVAudioEngine/AVAudioPlayerNode/installTap/removeTap"
-  grep -En "AVAudioEngine|AVAudioPlayerNode|installTap|removeTap" "$RTP" || true
+echo "==> 1c. Verify PJSIP wrapper is in place (custom RTPAudioSession removed)"
+if [ -f ios/App/App/Plugins/CapacitorSip/RTPAudioSession.swift ]; then
+  red "  ✗ RTPAudioSession.swift still present — should be deleted (PJSIP owns audio now)"
   exit 1
 fi
-grep -Eq "kAudioUnitSubType_RemoteIO|kAudioUnitSubType_VoiceProcessingIO" "$RTP" && green "  ✓ RTPAudioSession uses RemoteIO/VoiceProcessingIO AudioUnit" || { red "  ✗ RemoteIO/VoiceProcessingIO AudioUnit not found in RTPAudioSession.swift"; exit 1; }
+grep -q "pjsua_create" ios/App/App/Plugins/CapacitorSip/CapacitorSip.swift \
+  && green "  ✓ CapacitorSip.swift wraps PJSIP (pjsua API in use)" \
+  || { red "  ✗ CapacitorSip.swift does not reference pjsua — PJSIP integration missing"; exit 1; }
+grep -q "pod 'pjsip'" ios/App/Podfile \
+  && green "  ✓ Podfile declares pjsip pod" \
+  || { red "  ✗ Podfile missing pjsip pod"; exit 1; }
+
 
 echo "==> 1d. Verify native call-control methods are exposed"
 for method in startRecord stopRecord transfer park addCall requestMicrophonePermission getRtpStats playTestTone; do
