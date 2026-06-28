@@ -87,12 +87,12 @@ Deno.serve(async (req) => {
       if (!r) return json({ error: "not_found" }, 404);
 
       const [{ data: tr }, { data: ins }, { data: audit }] = await Promise.all([
-        admin.from("pbx_call_transcripts").select("transcript_json, transcript_text")
-          .eq("call_record_id", id).maybeSingle(),
+        admin.from("pbx_call_transcripts").select("transcript_json, transcript_text, provider, created_at")
+          .eq("call_record_id", id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
         admin.from("pbx_ai_insights").select("summary, topics, action_items, quality_score, coaching_score, coaching_notes, intent, tags, sentiment, ai_model, created_at")
           .eq("call_record_id", id).maybeSingle(),
-        admin.from("ai_request_audit_log").select("status, error_code, message, created_at")
-          .eq("call_record_id", id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+        admin.from("ai_request_audit_log").select("status, error_code, message, provider, model, created_at")
+          .eq("call_record_id", id).eq("request_type", "transcribe").order("created_at", { ascending: false }).limit(1).maybeSingle(),
       ]);
 
       let transcript: any[] = [];
@@ -106,6 +106,24 @@ Deno.serve(async (req) => {
         transcript = [{ speaker: "agent", text: (tr as any).transcript_text, t: 0 }];
       }
 
+      // Transcription status + provider (used by the mobile badge).
+      const rawProvider = String((tr as any)?.provider || (audit as any)?.provider || "");
+      const auditStatus = String((audit as any)?.status || "");
+      const isStub = rawProvider.startsWith("stub");
+      const hasText = !!(tr as any)?.transcript_text && !isStub;
+      let transcriptionStatus: 'pending' | 'processing' | 'done' | 'failed' | 'missing' = 'missing';
+      if (hasText) transcriptionStatus = 'done';
+      else if (auditStatus === 'error' || auditStatus === 'ai-error' || isStub) transcriptionStatus = 'failed';
+      else if (auditStatus === 'processing') transcriptionStatus = 'processing';
+      // Human-readable provider label
+      const providerLabel = (() => {
+        if (!rawProvider) return null;
+        if (rawProvider.includes('openai') && rawProvider.includes('whisper')) return 'Whisper-1';
+        if (rawProvider.includes('gpt-4o-mini-transcribe') || rawProvider.includes('lovable-ai')) return 'Gemini (fallback)';
+        if (isStub) return `Échec (${rawProvider.replace('stub-', '')})`;
+        return rawProvider;
+      })();
+
       return json({
         ...mapCall(r),
         sentiment: (ins as any)?.sentiment || undefined,
@@ -116,11 +134,15 @@ Deno.serve(async (req) => {
         qualityScore: (ins as any)?.quality_score ?? 0,
         coachingScore: (ins as any)?.coaching_score ?? null,
         coachingNotes: (ins as any)?.coaching_notes || [],
-        aiStatus: (ins as any)?.ai_model && !String((ins as any).ai_model).startsWith("stub") && (tr as any)?.transcript_text ? "cached"
-          : (audit as any)?.status === "error" || (audit as any)?.status === "ai-error" ? "failed"
+        aiStatus: (ins as any)?.ai_model && !String((ins as any).ai_model).startsWith("stub") && hasText ? "cached"
+          : auditStatus === "error" || auditStatus === "ai-error" ? "failed"
           : "missing",
-        aiError: (audit as any)?.status === "error" || (audit as any)?.status === "ai-error" ? ((audit as any)?.message || (audit as any)?.error_code || "AI analysis failed") : null,
-        aiCached: !!((ins as any)?.ai_model && !String((ins as any).ai_model).startsWith("stub") && (tr as any)?.transcript_text),
+        aiError: auditStatus === "error" || auditStatus === "ai-error" ? ((audit as any)?.message || (audit as any)?.error_code || "AI analysis failed") : null,
+        aiCached: !!((ins as any)?.ai_model && !String((ins as any).ai_model).startsWith("stub") && hasText),
+        transcriptionStatus,
+        transcriptionProvider: providerLabel,
+        transcriptionProviderRaw: rawProvider || null,
+        transcriptionError: transcriptionStatus === 'failed' ? ((audit as any)?.message || (audit as any)?.error_code || null) : null,
         intent: (ins as any)?.intent || "",
         tags: (ins as any)?.tags || [],
       });
