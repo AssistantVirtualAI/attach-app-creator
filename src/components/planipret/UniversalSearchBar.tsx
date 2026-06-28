@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useMplanipretLang } from "@/hooks/useMplanipretLang";
 
 export default function UniversalSearchBar() {
+  const { t } = useMplanipretLang();
   const [expanded, setExpanded] = useState(false);
   const [q, setQ] = useState("");
   const navigate = useNavigate();
@@ -24,16 +26,16 @@ export default function UniversalSearchBar() {
           <Search className="w-4 h-4" style={{ color: "var(--pp-text-muted, #94a3b8)" }} />
           <input
             autoFocus value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
-            placeholder="Rechercher partout..."
+            placeholder={t("searchPage.searchEverywhere")}
             className="flex-1 bg-transparent outline-none text-sm"
             style={{ color: "var(--pp-text-primary, #1A1A2E)" }}
           />
-          <button onClick={() => { setExpanded(false); setQ(""); }} className="text-xs text-slate-400">Annuler</button>
+          <button onClick={() => { setExpanded(false); setQ(""); }} className="text-xs text-slate-400">{t("common.cancel")}</button>
         </div>
       ) : (
         <button onClick={() => setExpanded(true)} className="flex items-center gap-2 w-full px-3 py-1.5 rounded-full text-left text-sm"
           style={{ background: "var(--pp-bg-elevated, #f1f5f9)", color: "var(--pp-text-muted, #64748b)" }}>
-          <Search className="w-4 h-4" /> Rechercher partout...
+          <Search className="w-4 h-4" /> {t("searchPage.searchEverywhere")}
         </button>
       )}
     </div>
