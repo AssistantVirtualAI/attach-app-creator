@@ -41,6 +41,34 @@ import AVFoundation
         provider.reportNewIncomingCall(with: uuid, update: update) { _ in }
     }
 
+    /// Called by AppDelegate when a VoIP push notification arrives.
+    /// iOS 13+ requires reporting an incoming call via CallKit within the
+    /// PKPushRegistryDelegate callback — otherwise the app is killed.
+    /// The `completion` block MUST be called to satisfy the PushKit requirement.
+    public func reportIncomingVoipPush(from: String, callId: String, completion: @escaping () -> Void) {
+        let uuid = UUID()
+        activeUUID = uuid
+        let update = CXCallUpdate()
+        // Display the caller ID from the push payload.
+        let displayName = from
+            .replacingOccurrences(of: "sip:", with: "")
+            .components(separatedBy: "@").first ?? from
+        update.remoteHandle = CXHandle(type: .generic, value: displayName)
+        update.localizedCallerName = displayName
+        update.hasVideo = false
+        update.supportsHolding = false
+        update.supportsGrouping = false
+        update.supportsUngrouping = false
+        provider.reportNewIncomingCall(with: uuid, update: update) { error in
+            if let error = error {
+                NSLog("[CallKitManager] ⚠️ reportNewIncomingCall error: \(error)")
+            } else {
+                NSLog("[CallKitManager] 📞 Incoming VoIP push call reported to CallKit: \(displayName)")
+            }
+            completion()
+        }
+    }
+
     @objc public func reportOutgoing(to: String) {
         let uuid = UUID()
         activeUUID = uuid

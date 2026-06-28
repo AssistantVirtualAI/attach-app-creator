@@ -50,9 +50,17 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     private var currentCallId: pjsua_call_id = pjsua_call_id(PJSUA_INVALID_ID.rawValue)
     private var recorderId: pjsua_recorder_id = pjsua_recorder_id(PJSUA_INVALID_ID.rawValue)
     private var recorderPath: String?
+    // VoIP push token received from PushKit (set by AppDelegate).
+    private var voipPushToken: String? = UserDefaults.standard.string(forKey: "ava.voipPushToken")
 
     // C callbacks need a static reference to reach back into the instance.
     fileprivate static weak var shared: CapacitorPjsip?
+
+    /// Called by AppDelegate when PushKit delivers a new VoIP token.
+    public func setVoipPushToken(_ token: String?) {
+        voipPushToken = token
+        NSLog("[CapacitorPjsip] VoIP push token updated: \(token?.prefix(16) ?? "nil")")
+    }
 
     public override func load() {
         CapacitorPjsip.shared = self
@@ -303,7 +311,16 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
             // mediaCfg.enable_ice = 0, car le flag ICE est aussi dans accCfg.
             // Ce paramètre parasite le routage FreeSWITCH et empêche les appels
             // entrants d'être routés vers cette app.
-            accCfg.force_contact = self.pjStrDup("sip:\(username)@\(server);transport=tcp")
+            // Build contact URI — include pn-prid (push token) if available
+            // so FusionPBX mod_sofia can wake the app via APNs VoIP push.
+            if let token = self.voipPushToken, !token.isEmpty {
+                let contact = "sip:\(username)@\(server);transport=tcp;pn-prid=\(token);pn-param=apns.voip;pn-provider=apns"
+                accCfg.force_contact = self.pjStrDup(contact)
+                NSLog("[CapacitorPjsip] REGISTER contact with VoIP push token")
+            } else {
+                accCfg.force_contact = self.pjStrDup("sip:\(username)@\(server);transport=tcp")
+                NSLog("[CapacitorPjsip] REGISTER contact without push token (PushKit not ready yet)")
+            }
 
             accCfg.cred_count = 1
             accCfg.cred_info.0.realm = self.pjStrDup("*")

@@ -2,11 +2,15 @@ import UIKit
 import Capacitor
 import WebKit
 import AVFoundation
+import PushKit
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
     var window: UIWindow?
+
+    // PushKit VoIP registry — kept alive for the app lifetime.
+    private var voipRegistry: PKPushRegistry?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
 
@@ -46,6 +50,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         audioSession.requestRecordPermission { granted in
             NSLog("[AVA] Microphone permission granted: \(granted)")
         }
+
+        // Register for VoIP push notifications via PushKit.
+        // iOS wakes the app (even if terminated) when a VoIP push arrives.
+        let registry = PKPushRegistry(queue: .main)
+        registry.delegate = self
+        registry.desiredPushTypes = [.voIP]
+        voipRegistry = registry
+        NSLog("[VoIP] PushKit registry started")
 
         // Disable mDNS ICE candidate obfuscation in WKWebView
         let webConfig = WKWebViewConfiguration()
@@ -111,3 +123,46 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 }
 
+// MARK: - PKPushRegistryDelegate
+
+extension AppDelegate: PKPushRegistryDelegate {
+
+    /// Called when iOS assigns or refreshes the VoIP push token.
+    func pushRegistry(_ registry: PKPushRegistry, didUpdate pushCredentials: PKPushCredentials, for type: PKPushType) {
+        guard type == .voIP else { return }
+        let token = pushCredentials.token.map { String(format: "%02x", $0) }.joined()
+        NSLog("[VoIP] \u{1F4F2} PushKit token: \(token.prefix(16))\u{2026}")
+        CapacitorPjsip.shared?.setVoipPushToken(token)
+        UserDefaults.standard.set(token, forKey: "ava.voipPushToken")
+    }
+
+    /// Called when a VoIP push notification arrives.
+    /// iOS wakes the app even if terminated — must report via CallKit within ~30s.
+    func pushRegistry(_ registry: PKPushRegistry, didReceiveIncomingPushWith payload: PKPushPayload, for type: PKPushType, completion: @escaping () -> Void) {
+        guard type == .voIP else { completion(); return }
+        let dict = payload.dictionaryPayload
+        NSLog("[VoIP] \u{1F4DE} Incoming VoIP push: \(dict)")
+        let from = (dict["from"] as? String)
+            ?? (dict["caller_id_name"] as? String)
+            ?? (dict["caller_id_number"] as? String)
+            ?? "Unknown"
+        let callId = (dict["call-id"] as? String)
+            ?? (dict["uuid"] as? String)
+            ?? UUID().uuidString
+        // Report to CallKit (mandatory iOS 13+).
+        CallKitManager.shared.reportIncomingVoipPush(from: from, callId: callId) {
+            completion()
+        }
+        // Notify JS layer to show in-app incoming call UI.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            CapacitorPjsip.shared?.notifyBg("callReceived", ["from": from, "callId": callId, "source": "voip-push"])
+        }
+    }
+
+    /// Called when the VoIP push token is invalidated (e.g. app reinstall).
+    func pushRegistry(_ registry: PKPushRegistry, didInvalidatePushTokenFor type: PKPushType) {
+        NSLog("[VoIP] \u26A0\uFE0F PushKit token invalidated")
+        UserDefaults.standard.removeObject(forKey: "ava.voipPushToken")
+        CapacitorPjsip.shared?.setVoipPushToken(nil)
+    }
+}
