@@ -62,14 +62,14 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         // native UI must drive the SDK, not the other way around.
         CallKitManager.shared.onAnswer = { [weak self] in
             self?.sipQueue.async {
-                self.registerThreadIfNeeded()
+                self?.registerThreadIfNeeded()
                 guard let self = self, self.currentCallId != pjsua_call_id(PJSUA_INVALID_ID.rawValue) else { return }
                 pjsua_call_answer(self.currentCallId, 200, nil, nil)
             }
         }
         CallKitManager.shared.onEnd = { [weak self] in
             self?.sipQueue.async {
-                self.registerThreadIfNeeded()
+                self?.registerThreadIfNeeded()
                 guard let self = self, self.currentCallId != pjsua_call_id(PJSUA_INVALID_ID.rawValue) else { return }
                 pjsua_call_hangup(self.currentCallId, 0, nil, nil)
                 self.currentCallId = pjsua_call_id(PJSUA_INVALID_ID.rawValue)
@@ -82,7 +82,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         // Solution: dispatch pjsua_set_snd_dev on sipQueue (a PJLIB-registered thread).
         CallKitManager.shared.onAudioActivated = { [weak self] in
             self?.sipQueue.async {
-                self.registerThreadIfNeeded()
+                self?.registerThreadIfNeeded()
                 guard let self = self else { return }
                 let r = pjsua_set_snd_dev(PJMEDIA_AUD_DEFAULT_CAPTURE_DEV, PJMEDIA_AUD_DEFAULT_PLAYBACK_DEV)
                 print("[CapacitorPjsip] 🔊 pjsua_set_snd_dev via sipQueue: \(r)")
@@ -148,8 +148,9 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
 
     private func notifyBg(_ event: String, _ data: [String: Any]) {
         sipQueue.async { [weak self] in
+            guard let self = self else { return }
             self.registerThreadIfNeeded()
-            self?.notifyListeners(event, data: data)
+            self.notifyListeners(event, data: data)
         }
     }
 
@@ -168,7 +169,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         }
 
         sipQueue.async { [weak self] in
-            self.registerThreadIfNeeded()
+            self?.registerThreadIfNeeded()
             guard let self = self else { return }
 
             if !self.pjsuaStarted {
@@ -321,7 +322,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
 
     @objc func disconnect(_ call: CAPPluginCall) {
         sipQueue.async { [weak self] in
-            self.registerThreadIfNeeded()
+            self?.registerThreadIfNeeded()
             guard let self = self else { return }
             if self.accId != pjsua_acc_id(PJSUA_INVALID_ID.rawValue) {
                 pjsua_acc_del(self.accId)
@@ -339,7 +340,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         guard !number.isEmpty else { call.reject("number required"); return }
 
         sipQueue.async { [weak self] in
-            self.registerThreadIfNeeded()
+            self?.registerThreadIfNeeded()
             guard let self = self, self.accId != pjsua_acc_id(PJSUA_INVALID_ID.rawValue) else {
                 call.reject("not registered"); return
             }
@@ -359,7 +360,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
 
     @objc func hangup(_ call: CAPPluginCall) {
         sipQueue.async { [weak self] in
-            self.registerThreadIfNeeded()
+            self?.registerThreadIfNeeded()
             guard let self = self else { return }
             if self.currentCallId != pjsua_call_id(PJSUA_INVALID_ID.rawValue) {
                 pjsua_call_hangup(self.currentCallId, 0, nil, nil)
@@ -371,7 +372,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
 
     @objc func answer(_ call: CAPPluginCall) {
         sipQueue.async { [weak self] in
-            self.registerThreadIfNeeded()
+            self?.registerThreadIfNeeded()
             guard let self = self else { return }
             if self.currentCallId != pjsua_call_id(PJSUA_INVALID_ID.rawValue) {
                 pjsua_call_answer(self.currentCallId, 200, nil, nil)
@@ -383,7 +384,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     @objc func setMute(_ call: CAPPluginCall) {
         let muted = call.getBool("muted") ?? false
         sipQueue.async { [weak self] in
-            self.registerThreadIfNeeded()
+            self?.registerThreadIfNeeded()
             guard let self = self, self.currentCallId != pjsua_call_id(PJSUA_INVALID_ID.rawValue) else {
                 call.resolve(["ok": true]); return
             }
@@ -402,7 +403,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     @objc func setHold(_ call: CAPPluginCall) {
         let hold = call.getBool("onHold") ?? call.getBool("held") ?? false
         sipQueue.async { [weak self] in
-            self.registerThreadIfNeeded()
+            self?.registerThreadIfNeeded()
             guard let self = self, self.currentCallId != pjsua_call_id(PJSUA_INVALID_ID.rawValue) else {
                 call.resolve(["ok": true]); return
             }
@@ -420,7 +421,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         let digit = call.getString("digit") ?? call.getString("digits") ?? ""
         guard !digit.isEmpty else { call.resolve(); return }
         sipQueue.async { [weak self] in
-            self.registerThreadIfNeeded()
+            self?.registerThreadIfNeeded()
             guard let self = self, self.currentCallId != pjsua_call_id(PJSUA_INVALID_ID.rawValue) else {
                 call.resolve(); return
             }
@@ -434,6 +435,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     @objc func setLogLevel(_ call: CAPPluginCall) {
         let level = call.getInt("level") ?? 3
         sipQueue.async {
+            guard let self = self else { return }
             self.registerThreadIfNeeded()
             // pjsua_set_log_level may not be available in all PJSIP builds;
             // update the logging config via pjsua_reconfigure_logging instead.
@@ -489,7 +491,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
 
     @objc func getRtpStats(_ call: CAPPluginCall) {
         sipQueue.async { [weak self] in
-            self.registerThreadIfNeeded()
+            self?.registerThreadIfNeeded()
             guard let self = self, self.currentCallId != pjsua_call_id(PJSUA_INVALID_ID.rawValue) else {
                 call.resolve(["running": false]); return
             }
@@ -507,7 +509,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
 
     @objc func startRecord(_ call: CAPPluginCall) {
         sipQueue.async { [weak self] in
-            self.registerThreadIfNeeded()
+            self?.registerThreadIfNeeded()
             guard let self = self, self.currentCallId != pjsua_call_id(PJSUA_INVALID_ID.rawValue) else {
                 call.resolve(["ok": false, "recording": false]); return
             }
@@ -532,7 +534,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
 
     @objc func stopRecord(_ call: CAPPluginCall) {
         sipQueue.async { [weak self] in
-            self.registerThreadIfNeeded()
+            self?.registerThreadIfNeeded()
             guard let self = self else { return }
             if self.recorderId != pjsua_recorder_id(PJSUA_INVALID_ID.rawValue) {
                 pjsua_recorder_destroy(self.recorderId)
@@ -550,7 +552,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         let target = call.getString("target") ?? ""
         guard !target.isEmpty else { call.reject("target required"); return }
         sipQueue.async { [weak self] in
-            self.registerThreadIfNeeded()
+            self?.registerThreadIfNeeded()
             guard let self = self, self.currentCallId != pjsua_call_id(PJSUA_INVALID_ID.rawValue) else {
                 call.resolve(["ok": false, "target": target]); return
             }
@@ -565,7 +567,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
     @objc func park(_ call: CAPPluginCall) {
         let code = call.getString("code") ?? "*68"
         sipQueue.async { [weak self] in
-            self.registerThreadIfNeeded()
+            self?.registerThreadIfNeeded()
             guard let self = self, self.currentCallId != pjsua_call_id(PJSUA_INVALID_ID.rawValue) else {
                 call.resolve(["ok": false, "code": code]); return
             }
@@ -582,7 +584,7 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
         guard !target.isEmpty else { call.reject("target required"); return }
         // Place a second call; PJSIP supports multiple concurrent calls natively.
         sipQueue.async { [weak self] in
-            self.registerThreadIfNeeded()
+            self?.registerThreadIfNeeded()
             guard let self = self, self.accId != pjsua_acc_id(PJSUA_INVALID_ID.rawValue) else {
                 call.resolve(["ok": false, "target": target]); return
             }
