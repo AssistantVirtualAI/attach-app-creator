@@ -4,6 +4,7 @@
  */
 import { supabase } from '../mobileSupabase';
 import { normalizePhone, formatDisplay } from '../phoneNormalize';
+import { txStatic } from '../i18n';
 
 export interface CallerLookup {
   found: boolean;
