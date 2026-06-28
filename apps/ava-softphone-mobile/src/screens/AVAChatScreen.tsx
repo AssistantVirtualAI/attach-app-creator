@@ -129,7 +129,7 @@ export default function AVAChatScreen() {
             ref={taRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Message AVA…"
+            placeholder={tx('Message AVA…', 'Message AVA…')}
             rows={1}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
