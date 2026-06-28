@@ -257,6 +257,9 @@ final class RTPAudioSession {
         audioLock.lock()
         sendBuffer.removeAll()
         playQueue.removeAll()
+        downsampleAccum.removeAll()
+        bufferPrimed = false
+        prevRxSample = 0; currRxSample = 0; rxInterpStep = 0
         audioLock.unlock()
         hasRemote = false
         if wasRunning { emitAudio("idle") }
