@@ -33,8 +33,43 @@ type RecMeta = {
   start_at?: string | null;
 };
 
-function safeName(id: string) {
-  return id.replace(/[^a-zA-Z0-9._-]/g, '_') + '.audio';
+function sanitizeId(id: string) {
+  return id.replace(/[^a-zA-Z0-9._-]/g, '_');
+}
+
+// iOS WKWebView's <audio> infers codec from file extension. A generic ".audio"
+// extension causes the player to refuse playback. We always write the file
+// with a real audio extension (.wav by default — FusionPBX's native format).
+const KNOWN_EXTS = ['wav', 'mp3', 'ogg', 'm4a', 'mp4', 'aac', 'opus', 'webm'];
+
+function pickExt(blobType: string | undefined, recordingName: string | undefined): string {
+  const nameLower = (recordingName || '').toLowerCase();
+  for (const ext of KNOWN_EXTS) {
+    if (nameLower.endsWith('.' + ext)) return ext;
+  }
+  const t = (blobType || '').toLowerCase();
+  if (t.includes('mpeg') || t.includes('mp3')) return 'mp3';
+  if (t.includes('ogg')) return 'ogg';
+  if (t.includes('mp4') || t.includes('m4a') || t.includes('aac')) return 'm4a';
+  if (t.includes('webm')) return 'webm';
+  return 'wav';
+}
+
+async function findExistingFile(id: string): Promise<string | null> {
+  if (!Capacitor.isNativePlatform()) return null;
+  try {
+    const { Filesystem, Directory } = await import(/* @vite-ignore */ '@capacitor/filesystem');
+    const base = sanitizeId(id);
+    // Probe known extensions plus the legacy ".audio" name for backward compat.
+    const candidates = [...KNOWN_EXTS.map((e) => `recordings/${base}.${e}`), `recordings/${base}.audio`];
+    for (const path of candidates) {
+      try {
+        const st = await Filesystem.stat({ path, directory: Directory.Data });
+        if (st && (st.size === undefined || st.size > 0)) return path;
+      } catch { /* not this one */ }
+    }
+  } catch { /* filesystem unavailable */ }
+  return null;
 }
 
 /**
@@ -54,18 +89,19 @@ async function getCachedNativePath(id: string): Promise<string | null> {
 
   try {
     const { Filesystem, Directory } = await import(/* @vite-ignore */ '@capacitor/filesystem');
-    const path = `recordings/${safeName(id)}`;
-    const statResult = await Filesystem.stat({ path, directory: Directory.Data });
-    // stat succeeded — file exists. Verify it has non-zero size to guard
-    // against truncated writes from a previous interrupted download.
+    const found = await findExistingFile(id);
+    if (!found) {
+      knownMissingIds.add(id);
+      return null;
+    }
+    const statResult = await Filesystem.stat({ path: found, directory: Directory.Data });
     if (!statResult || (statResult.size !== undefined && statResult.size === 0)) {
       knownMissingIds.add(id);
       return null;
     }
-    const uri = await Filesystem.getUri({ path, directory: Directory.Data });
+    const uri = await Filesystem.getUri({ path: found, directory: Directory.Data });
     return Capacitor.convertFileSrc(uri.uri);
   } catch {
-    // stat threw → file does not exist on disk.
     knownMissingIds.add(id);
     return null;
   }
@@ -133,7 +169,8 @@ export async function downloadRecording(
     if (buf.byteLength === 0) throw new Error('Download failed: empty audio buffer (0 bytes)');
     const b64 = arrayBufferToBase64(buf);
     try { await Filesystem.mkdir({ path: 'recordings', directory: Directory.Data, recursive: true }); } catch {}
-    const path = `recordings/${safeName(id)}`;
+    const ext = pickExt(blob.type, meta.recording_name || undefined);
+    const path = `recordings/${sanitizeId(id)}.${ext}`;
     await Filesystem.writeFile({ path, directory: Directory.Data, data: b64 });
     try { localStorage.setItem(META_KEY_PREFIX + id, JSON.stringify({ at: Date.now(), size: buf.byteLength })); } catch {}
     // Clear the missing flag now that the file is written.
