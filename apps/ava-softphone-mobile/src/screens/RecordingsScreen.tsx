@@ -298,9 +298,16 @@ export default function RecordingsScreen({
           // iOS evicts cached files from the Data directory when storage is
           // low, or after an app update. When the <audio> element fires an
           // error we silently re-download the file and resume playback.
+          //
+          // IMPORTANT: recoveringRef.current must NOT be reset to false in the
+          // finally block. audio.load() fires the error event asynchronously,
+          // AFTER the finally block runs, so resetting the flag there would
+          // allow the handler to re-enter and create an infinite loop.
+          // The flag is only cleared in onEnded or when the user starts a new
+          // playback via play().
           const rec = currentPlaybackRef.current;
           if (!rec || recoveringRef.current) return;
-          recoveringRef.current = true;
+          recoveringRef.current = true;  // permanent lock — never reset in finally
           setLoadingId(rec.id);
           try {
             const freshUrl = await downloadRecording(
@@ -318,10 +325,11 @@ export default function RecordingsScreen({
               audioRef.current.play().catch(() => {});
             }
           } catch (e: any) {
+            recoveringRef.current = false;  // only reset on hard failure so user can retry
             captureError(rec, e, fr ? 'Impossible de recharger l\'enregistrement' : 'Unable to reload recording');
           } finally {
-            recoveringRef.current = false;
             setLoadingId(null);
+            // DO NOT reset recoveringRef.current here — see comment above.
           }
         }}
         style={{ width: '100%', marginBottom: 10 }}
