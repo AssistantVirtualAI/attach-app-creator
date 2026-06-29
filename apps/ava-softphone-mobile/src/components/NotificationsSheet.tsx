@@ -3,6 +3,8 @@ import { Bell, PhoneMissed, Voicemail, MessageSquare, Disc, X } from 'lucide-rea
 import { colors, font, radius } from '../lib/theme';
 import { mobileApi, CallRecord, VoicemailEntry, SmsThread, RecordingEntry } from '../lib/mobileApi';
 import type { Tab } from './BottomTabs';
+import { supabase } from '../lib/mobileSupabase';
+import { navigateTo, AppRoute } from '../lib/appRouter';
 
 type Counts = { missed: number; voicemails: number; recordings: number; sms: number; total: number };
 
