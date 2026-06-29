@@ -210,9 +210,18 @@ export async function requirePlanipretBroker(
     });
   }
   if (!profile.extension || !profile.ns_domain) {
+    // Soft response: profile not yet linked to NS extension.
+    // Returning 200 + needs_link lets the UI render an empty state instead of blanking.
     return new Response(
-      JSON.stringify({ error: "Extension or NS domain missing on profile" }),
-      { status: 412, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      JSON.stringify({
+        ok: true,
+        needs_link: true,
+        items: [],
+        count: 0,
+        data: [],
+        error: "Extension or NS domain missing on profile",
+      }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 
