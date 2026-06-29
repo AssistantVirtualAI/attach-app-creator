@@ -3,6 +3,8 @@ import { Bell, PhoneMissed, Voicemail, MessageSquare, Disc, X } from 'lucide-rea
 import { colors, font, radius } from '../lib/theme';
 import { mobileApi, CallRecord, VoicemailEntry, SmsThread, RecordingEntry } from '../lib/mobileApi';
 import type { Tab } from './BottomTabs';
+import { supabase } from '../lib/mobileSupabase';
+import { navigateTo, AppRoute } from '../lib/appRouter';
 
 type Counts = { missed: number; voicemails: number; recordings: number; sms: number; total: number };
 
@@ -30,7 +32,18 @@ export function useNotificationCounts(): Counts {
     };
     load();
     const id = window.setInterval(load, 60_000);
-    return () => { alive = false; window.clearInterval(id); };
+
+    // Live refresh on new CDR / recording / voicemail / sms inserts.
+    const ch = supabase
+      .channel('notif-counts-live')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pbx_call_records' }, () => load())
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pbx_call_records' }, () => load())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pbx_call_recordings' }, () => load())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pbx_voicemails' }, () => load())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pbx_sms_messages' }, () => load())
+      .subscribe();
+
+    return () => { alive = false; window.clearInterval(id); try { supabase.removeChannel(ch); } catch {} };
   }, []);
   return c;
 }
@@ -40,10 +53,10 @@ export default function NotificationsSheet({
 }: { open: boolean; onClose: () => void; onNavigate: (t: Tab) => void }) {
   const c = useNotificationCounts();
   const items = useMemo(() => ([
-    { tab: 'calls' as Tab, icon: PhoneMissed, label: 'Missed calls (24h)', count: c.missed, tone: '#ff5a5a' },
-    { tab: 'voicemail' as Tab, icon: Voicemail, label: 'New voicemails', count: c.voicemails, tone: colors.signalGold },
-    { tab: 'calls' as Tab, icon: Disc, label: 'New recordings (24h)', count: c.recordings, tone: colors.avaCyan },
-    { tab: 'sms' as Tab, icon: MessageSquare, label: 'Unread messages', count: c.sms, tone: colors.lemtelBlue },
+    { route: { tab: 'calls', sub: 'recents', filter: 'missed' } as AppRoute, tab: 'calls' as Tab, icon: PhoneMissed, label: 'Missed calls (24h)', count: c.missed, tone: '#ff5a5a' },
+    { route: { tab: 'voicemail' } as AppRoute, tab: 'voicemail' as Tab, icon: Voicemail, label: 'New voicemails', count: c.voicemails, tone: colors.signalGold },
+    { route: { tab: 'calls', sub: 'recordings' } as AppRoute, tab: 'calls' as Tab, icon: Disc, label: 'New recordings (24h)', count: c.recordings, tone: colors.avaCyan },
+    { route: { tab: 'sms' } as AppRoute, tab: 'sms' as Tab, icon: MessageSquare, label: 'Unread messages', count: c.sms, tone: colors.lemtelBlue },
   ]), [c]);
 
   if (!open) return null;
@@ -77,10 +90,10 @@ export default function NotificationsSheet({
           </div>
         )}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {items.map(({ tab, icon: Icon, label, count, tone }) => (
+          {items.map(({ route, tab, icon: Icon, label, count, tone }) => (
             <button
               key={label}
-              onClick={() => { onClose(); onNavigate(tab); }}
+              onClick={() => { onClose(); navigateTo(route); onNavigate(tab); }}
               style={{
                 display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px',
                 background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)',

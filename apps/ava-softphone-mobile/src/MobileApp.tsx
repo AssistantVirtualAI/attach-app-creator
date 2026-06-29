@@ -43,6 +43,7 @@ import { registerPush, sendPushTokenToBackend } from './lib/pushNotifications';
 import { syncDeviceContacts } from './lib/contacts';
 import { bootNative, onAppStateChange } from './lib/nativeBoot';
 import { registerDeepLinkHandler, PENDING_CALL_KEY } from './lib/deepLink';
+import { onNavigate as onAppNavigate, navigateTo } from './lib/appRouter';
 import { dialNumber } from './lib/dialNumber';
 import { configureMobileApi, setAuthToken } from './lib/mobileApi';
 
@@ -105,6 +106,10 @@ export default function MobileApp() {
     return 'keypad' as Tab;
   })();
   const [tab, setTab] = useState<Tab>(initialTab);
+  // Deep-link state for sub-routes inside CallsScreen (recordings | recents | voicemail | dial)
+  // and an optional pre-filter applied to the recents list ('missed' on missed-call taps).
+  const [callsSub, setCallsSub] = useState<'recents' | 'recordings' | 'voicemail' | 'dial' | undefined>(undefined);
+  const [callsFilter, setCallsFilter] = useState<'all' | 'missed' | undefined>(undefined);
   const [booting, setBooting] = useState(!isPreviewMode);
   const preferC2C = false;
 
@@ -129,10 +134,26 @@ export default function MobileApp() {
       if (d.type === 'set-tab' && typeof d.tab === 'string') setTab(d.tab as Tab);
     };
     window.addEventListener('message', onMsg);
+
+    // In-app router: notification bell + native push + local notifications
+    // all dispatch ava:navigate; we translate it into (tab, sub-tab) state.
+    const unsubNav = onAppNavigate((r: any) => {
+      if (!r?.tab) return;
+      setTab(r.tab as Tab);
+      if (r.tab === 'calls') {
+        setCallsSub(r.sub || 'recents');
+        setCallsFilter(r.filter);
+      } else {
+        setCallsSub(undefined);
+        setCallsFilter(undefined);
+      }
+    });
+
     return () => {
       cancelled = true;
       window.removeEventListener('message', onMsg);
       unsubDeepLink?.();
+      unsubNav();
     };
   }, []);
 
@@ -405,9 +426,14 @@ function AuthenticatedShell({
           });
         },
         onAction: (p) => {
-          // Deep-link: tap a push to open the right tab.
+          // Deep-link: tap a push to open the right tab + sub-tab.
           const kind = p.data?.kind;
-          if (kind === 'voicemail' || kind === 'missed' || kind === 'call') setTab('calls');
+          const route = p.data?.route;
+          if (kind === 'voicemail' || route === 'voicemail') navigateTo({ tab: 'voicemail' });
+          else if (kind === 'recording' || route === 'recordings') navigateTo({ tab: 'calls', sub: 'recordings' });
+          else if (kind === 'missed_call' || kind === 'missed') navigateTo({ tab: 'calls', sub: 'recents', filter: 'missed' });
+          else if (kind === 'sms' || route === 'chats' || route === 'sms') navigateTo({ tab: 'sms' });
+          else if (kind === 'call') navigateTo({ tab: 'calls', sub: 'recents' });
           else if (kind === 'ava') setTab('ava');
         },
       });
@@ -485,7 +511,7 @@ function AuthenticatedShell({
         <Suspense fallback={<ScreenSkeleton />}>
           {tab === 'contacts'   && <ContactsScreen sp={sp} />}
           {tab === 'chats'      && <MessagesHubScreen accessToken={creds.accessToken || null} userId={creds.userId} sp={sp} haptic={haptic} channelUnread={notif.channelUnread} />}
-          {tab === 'calls'      && <CallsScreen sp={sp} haptic={haptic} creds={creds} />}
+          {tab === 'calls'      && <CallsScreen sp={sp} haptic={haptic} creds={creds} initialSub={callsSub} initialFilter={callsFilter} />}
           {tab === 'keypad'     && <DialerScreen sp={sp} haptic={haptic} />}
           {tab === 'speeddial'  && <SpeedDialScreen sp={sp} preferClickToCall={preferClickToCall} />}
           {/* legacy deep-link routes */}
