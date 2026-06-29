@@ -3,6 +3,7 @@ import Capacitor
 import WebKit
 import AVFoundation
 import PushKit
+import Intents
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -113,6 +114,31 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func application(_ application: UIApplication, continue userActivity: NSUserActivity, restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void) -> Bool {
+        // Intercept INStartCallIntent — fired when user picks "Call via AVA Softphone"
+        // from iOS Contacts. Extract the phone number and trigger auto-dial.
+        if #available(iOS 13.0, *) {
+            if let interaction = userActivity.interaction {
+                // INStartCallIntent (iOS 13+) or INStartAudioCallIntent (iOS 10-12)
+                var rawNumber: String? = nil
+                if let intent = interaction.intent as? INStartCallIntent {
+                    rawNumber = intent.contacts?.first?.personHandle?.value
+                } else if let intent = interaction.intent as? INStartAudioCallIntent {
+                    rawNumber = intent.contacts?.first?.personHandle?.value
+                }
+                if let raw = rawNumber, !raw.isEmpty {
+                    // Keep only digits, +, *, #
+                    let allowed = CharacterSet.decimalDigits.union(CharacterSet(charactersIn: "+*#"))
+                    let number = raw.unicodeScalars.filter { allowed.contains($0) }.map { String($0) }.joined()
+                    if !number.isEmpty {
+                        NSLog("[DeepLink] INStartCallIntent → number=\(number)")
+                        UserDefaults.standard.set(number, forKey: "ava.pendingCallNumber")
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                            CapacitorPjsip.shared?.notifyBg("pendingCall", ["number": number])
+                        }
+                    }
+                }
+            }
+        }
         return ApplicationDelegateProxy.shared.application(application, continue: userActivity, restorationHandler: restorationHandler)
     }
 

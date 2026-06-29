@@ -1,4 +1,4 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 import { Preferences } from '@capacitor/preferences';
 import { Capacitor } from '@capacitor/core';
 
@@ -98,8 +98,8 @@ export async function edgeCall<T = any>(functionName: string, token: string | nu
       const parsed = JSON.parse(text);
       throw new Error(parsed?.error || parsed?.message || `HTTP ${res.status}`);
     } catch (err) {
-      if (err instanceof Error && err.message !== 'Unexpected end of JSON input') throw err;
-      throw new Error(text.slice(0, 220) || `HTTP ${res.status}`);
+      if (err instanceof Error && err.message !== text) throw err;
+      throw new Error(text || `HTTP ${res.status}`);
     }
   }
   return res.json().catch(() => null) as Promise<T>;
@@ -137,6 +137,27 @@ export function getCachedRecordingAudioEntries(): Array<[string, string]> {
   return Array.from(audioBlobCache.entries());
 }
 
+/**
+ * Get a fresh JWT token from the Supabase session.
+ * Refreshes proactively if the token is expired or close to expiry (< 60s).
+ * Falls back to the provided token if session refresh fails.
+ */
+async function getFreshToken(fallbackToken?: string | null): Promise<string | null> {
+  try {
+    const sb = getMobileSupabaseClient();
+    let { data: { session } } = await sb.auth.getSession();
+    const nowSec = Math.floor(Date.now() / 1000);
+    // Refresh if expired or close to expiry
+    if (!session || (session.expires_at && session.expires_at - nowSec < 60)) {
+      const { data: refreshed } = await sb.auth.refreshSession();
+      if (refreshed?.session) session = refreshed.session;
+    }
+    return session?.access_token || fallbackToken || null;
+  } catch {
+    return fallbackToken || null;
+  }
+}
+
 export async function loadPbxRecordingAudioMobile(
   recording: RecordingMeta,
   token?: string | null,
@@ -152,6 +173,9 @@ export async function loadPbxRecordingAudioMobile(
   const cached = audioBlobCache.get(cacheKey);
   if (cached) return cached;
 
+  // Get a fresh token — refresh proactively if close to expiry (mirrors desktop behavior)
+  let freshToken = await getFreshToken(token);
+
   const payload = {
     organization_id: clean(recording.organization_id) || organizationId || undefined,
     params: {
@@ -166,23 +190,24 @@ export async function loadPbxRecordingAudioMobile(
     },
   };
 
-  // Per-attempt correlation id (echoed in edge function logs + error responses)
-  // so user-visible failures can be quoted to support and grepped server-side.
+  // Per-attempt correlation id
   const requestId = (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
     ? (crypto as any).randomUUID()
     : `rec-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-  const signed = await fetch(`${SUPABASE_URL}/functions/v1/fusionpbx-proxy`, {
+  const doFetch = (tok: string | null, action: string) => fetch(`${SUPABASE_URL}/functions/v1/fusionpbx-proxy`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'X-Request-Id': requestId,
       apikey: SUPABASE_ANON,
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(tok ? { Authorization: `Bearer ${tok}` } : {}),
     },
-    body: JSON.stringify({ action: 'get-recording-signed-url', ...payload }),
+    body: JSON.stringify({ action, ...payload }),
   });
 
+  // Try signed URL first (faster, no session cookie needed)
+  const signed = await doFetch(freshToken, 'get-recording-signed-url');
   if (signed.ok) {
     const json = await signed.json().catch(() => null);
     if (json?.ok && json?.url) {
@@ -191,16 +216,23 @@ export async function loadPbxRecordingAudioMobile(
     }
   }
 
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/fusionpbx-proxy`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Request-Id': requestId,
-      apikey: SUPABASE_ANON,
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify({ action: 'get-recording', ...payload }),
-  });
+  // Fall back to direct streaming
+  let res = await doFetch(freshToken, 'get-recording');
+
+  // On 401: force-refresh once and retry — mirrors desktop behavior
+  if (res.status === 401) {
+    try {
+      const sb = getMobileSupabaseClient();
+      const { data: refreshed } = await sb.auth.refreshSession();
+      if (refreshed?.session?.access_token) {
+        freshToken = refreshed.session.access_token;
+        res = await doFetch(freshToken, 'get-recording');
+      }
+    } catch {}
+    if (res.status === 401) {
+      throw new Error('Session expirée. Déconnectez-vous et reconnectez-vous pour écouter les enregistrements.');
+    }
+  }
 
   const contentType = res.headers.get('content-type') || '';
   const isJson = contentType.includes('application/json');
