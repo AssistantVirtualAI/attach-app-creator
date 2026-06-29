@@ -568,6 +568,14 @@ class ScreenErrorBoundary extends Component<
   state = { error: null };
   static getDerivedStateFromError(error: Error) { return { error }; }
   componentDidCatch(error: Error) { console.error('[MobileScreenError]', this.props.screen, error); }
+  componentDidUpdate(prevProps: { screen: Tab }) {
+    // A screen-level crash must not poison the next page. Reset the boundary
+    // whenever the user navigates to another tab so Home/Calls/Settings can
+    // render again after a transient data/API error.
+    if (prevProps.screen !== this.props.screen && this.state.error) {
+      this.setState({ error: null });
+    }
+  }
   render() {
     if (!this.state.error) return this.props.children;
     return (
@@ -575,10 +583,14 @@ class ScreenErrorBoundary extends Component<
         <div style={{ maxWidth: 320, textAlign: 'center', padding: 18, borderRadius: 16, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}>
           <div style={{ fontSize: 26, marginBottom: 8 }}>⚠️</div>
           <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 6 }}>Page indisponible</div>
-          <div style={{ fontSize: 12, color: colors.textSub, marginBottom: 14 }}>Retournez au clavier et réessayez.</div>
+          <div style={{ fontSize: 12, color: colors.textSub, marginBottom: 14 }}>La page a rencontré une donnée inattendue. Réessayez ou retournez au clavier.</div>
+          <button
+            onClick={() => this.setState({ error: null })}
+            style={{ border: 0, borderRadius: 12, padding: '10px 14px', fontSize: 13, fontWeight: 800, color: '#fff', background: colors.lemtelBlue, marginRight: 8 }}
+          >Réessayer</button>
           <button
             onClick={this.props.onRecover}
-            style={{ border: 0, borderRadius: 12, padding: '10px 14px', fontSize: 13, fontWeight: 800, color: '#fff', background: colors.lemtelBlue }}
+            style={{ border: 0, borderRadius: 12, padding: '10px 14px', fontSize: 13, fontWeight: 800, color: colors.textIce, background: 'rgba(255,255,255,0.12)' }}
           >Clavier</button>
         </div>
       </div>

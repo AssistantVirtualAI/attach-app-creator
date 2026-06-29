@@ -9,6 +9,34 @@ const cors = {
 const json = (b: unknown, s = 200) =>
   new Response(JSON.stringify(b), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
 
+const SELECT_VARIANTS = [
+  "id, call_status, missed_call, duration_seconds, voicemail_message, extension, start_at, direction, hangup_cause, caller_number, source_number, destination_number, destination",
+  "id, call_status, missed_call, duration_seconds, voicemail_message, start_at, direction, hangup_cause, caller_number, source_number, destination_number, destination",
+  "id, call_status, missed_call, duration_seconds, voicemail_message, start_at, direction, hangup_cause, caller_number, destination",
+];
+
+function isMissingColumn(error: any) {
+  const msg = String(error?.message || error?.details || error?.hint || "").toLowerCase();
+  return error?.code === "42703"
+    || (msg.includes("column") && msg.includes("does not exist"))
+    || (msg.includes("could not find") && msg.includes("column"))
+    || msg.includes("schema cache");
+}
+
+function text(v: unknown) {
+  return String(v ?? "").trim();
+}
+
+function extensionForRow(row: any, extSet: Set<string>) {
+  const direct = text(row?.extension);
+  if (direct) return direct;
+  const candidates = [row?.caller_number, row?.source_number, row?.destination_number, row?.destination]
+    .map(text)
+    .filter(Boolean);
+  for (const c of candidates) if (extSet.has(c)) return c;
+  return "";
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
   try {
@@ -48,22 +76,36 @@ Deno.serve(async (req) => {
     since.setDate(since.getDate() - (days - 1));
 
     // Page through all rows to bypass the 1000-row PostgREST default cap.
+    // Some legacy Lemtel schemas do not expose pbx_call_records.extension;
+    // retry with compatible projections instead of returning 500 to Home.
     const PAGE = 1000;
-    const list: any[] = [];
-    for (let from = 0; from < 100000; from += PAGE) {
-      let q = sb.from("pbx_call_records")
-        .select("id, call_status, missed_call, duration_seconds, voicemail_message, extension, start_at, direction, hangup_cause")
-        .eq("organization_id", orgId)
-        .gte("start_at", since.toISOString())
-        .order("start_at", { ascending: false })
-        .range(from, from + PAGE - 1);
-      if (sp.domain_uuid) q = q.eq("domain_uuid", sp.domain_uuid);
-      const { data: page, error } = await q;
-      if (error) break;
-      const chunk = page ?? [];
-      list.push(...chunk);
-      if (chunk.length < PAGE) break;
+    let list: any[] = [];
+    let lastError: any = null;
+    for (const selectCols of SELECT_VARIANTS) {
+      const out: any[] = [];
+      let failed = false;
+      for (let from = 0; from < 100000; from += PAGE) {
+        let q = sb.from("pbx_call_records")
+          .select(selectCols)
+          .eq("organization_id", orgId)
+          .gte("start_at", since.toISOString())
+          .order("start_at", { ascending: false })
+          .range(from, from + PAGE - 1);
+        if (sp.domain_uuid) q = q.eq("domain_uuid", sp.domain_uuid);
+        const { data: page, error } = await q;
+        if (error) {
+          lastError = error;
+          failed = true;
+          break;
+        }
+        const chunk = page ?? [];
+        out.push(...chunk);
+        if (chunk.length < PAGE) break;
+      }
+      if (!failed) { list = out; lastError = null; break; }
+      if (!isMissingColumn(lastError)) break;
     }
+    if (lastError) throw lastError;
     const totalCalls = list.length;
     const missed = list.filter((r: any) => r.missed_call || r.call_status === "missed").length;
     const voicemails = list.filter((r: any) => !!r.voicemail_message || r.call_status === "voicemail").length;
@@ -102,24 +144,30 @@ Deno.serve(async (req) => {
       if (idx >= 0 && idx < days) buckets[idx]++;
     }
 
-    // Top extensions
-    const extMap: Record<string, number> = {};
-    for (const r of list) {
-      const k = (r as any).extension; if (!k) continue;
-      extMap[k] = (extMap[k] || 0) + 1;
-    }
-    const topExtNumbers = Object.entries(extMap).sort((a, b) => b[1] - a[1]).slice(0, 5);
     let extNames: Record<string, string> = {};
-    if (topExtNumbers.length) {
+    try {
       const { data: exts } = await sb.from("pbx_extensions_safe")
         .select("extension, effective_cid_name")
         .eq("organization_id", orgId)
-        .in("extension", topExtNumbers.map(([n]) => n));
-      for (const e of exts ?? []) extNames[(e as any).extension] = (e as any).effective_cid_name || "";
+        .limit(1000);
+      for (const e of exts ?? []) {
+        const ext = text((e as any).extension);
+        if (ext) extNames[ext] = text((e as any).effective_cid_name);
+      }
+    } catch (_) {}
+    const extSet = new Set(Object.keys(extNames));
+
+    // Top extensions. Prefer the extension column when present, otherwise
+    // infer it from caller/source/destination fields that match known extensions.
+    const extMap: Record<string, number> = {};
+    for (const r of list) {
+      const k = extensionForRow(r, extSet); if (!k) continue;
+      extMap[k] = (extMap[k] || 0) + 1;
     }
+    const topExtNumbers = Object.entries(extMap).sort((a, b) => b[1] - a[1]).slice(0, 5);
     const topExtensions = topExtNumbers.map(([extension, calls]) => ({ extension, name: extNames[extension], calls }));
 
-    const activeExtensions = new Set(list.map((r: any) => r.extension).filter(Boolean)).size;
+    const activeExtensions = Object.keys(extMap).length;
 
     // Legacy "today" fields for backwards compat with old dashboard
     const todayList = list.filter((r: any) => new Date(r.start_at) >= startOfToday);

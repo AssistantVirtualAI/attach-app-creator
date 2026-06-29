@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { ImpactStyle } from '@capacitor/haptics';
 import { Moon, Sun } from 'lucide-react';
 import { colors, font, gradients, radius } from '../lib/theme';
@@ -26,11 +26,12 @@ export default function DashboardScreen({
   const notifCounts = useNotificationCounts();
   const me = useAutoSync<MeResponse>(() => mobileApi.me(), { intervalMs: 5 * 60_000, cacheKey: 'me', staleTimeMs: 120_000 });
   const stats = useAutoSync<DomainStats>(() => mobileApi.domainStats(range), { intervalMs: 120_000, deps: [range], cacheKey: `domainStats:${range}`, staleTimeMs: 60_000 });
-  const m = me.data; const s = stats.data;
-  const userName = m?.user?.name || m?.user?.email || 'User';
+  const m = isRecord(me.data) ? (me.data as any) : null;
+  const s = isUsableStats(stats.data) ? (stats.data as any) : null;
+  const userName = safeText(m?.user?.name || m?.user?.email, 'User');
   const firstName = userName.split(/[\s@]/).filter(Boolean)[0] || 'User';
-  const orgName = m?.organization?.name || 'Lemtel Télécom';
-  const domainLabel = m?.domain?.sipDomain || m?.organization?.sipDomain || orgName;
+  const orgName = safeText(m?.organization?.name, 'Lemtel Télécom');
+  const domainLabel = safeText(m?.domain?.sipDomain || m?.organization?.sipDomain || orgName, orgName);
 
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
@@ -39,7 +40,7 @@ export default function DashboardScreen({
 
   useEffect(() => {
     if (!s) return;
-    const sig = `${range}|${s.totalCalls ?? s.callsToday ?? 0}|${s.answered ?? 0}|${s.missed ?? 0}|${s.peakHour ?? ''}`;
+    const sig = `${range}|${safeNumber(s.totalCalls ?? s.callsToday)}|${safeNumber(s.answered)}|${safeNumber(s.missed)}|${safeText(s.peakHour, '')}`;
     if (lastKeyRef.current === sig) return;
     lastKeyRef.current = sig;
     try {
@@ -57,13 +58,17 @@ export default function DashboardScreen({
   }, [s, range]);
 
 
-  const total = s?.totalCalls ?? s?.callsToday ?? 0;
-  const answered = s?.answered ?? s?.answeredToday ?? 0;
-  const missed = s?.missed ?? s?.missedToday ?? 0;
-  const voicemails = s?.voicemails ?? s?.voicemailsToday ?? 0;
+  const total = safeNumber(s?.totalCalls ?? s?.callsToday);
+  const answered = safeNumber(s?.answered ?? s?.answeredToday);
+  const missed = safeNumber(s?.missed ?? s?.missedToday);
+  const voicemails = safeNumber(s?.voicemails ?? s?.voicemailsToday);
   const rawBuckets = s?.buckets ?? s?.last7Days ?? [];
-  const buckets = Array.isArray(rawBuckets) ? rawBuckets.map((v) => Number(v) || 0) : [];
-  const topExtensions = Array.isArray(s?.topExtensions) ? s.topExtensions : [];
+  const buckets = Array.isArray(rawBuckets) ? rawBuckets.map((v) => safeNumber(v)) : [];
+  const topExtensions = normalizeTopExtensions(s?.topExtensions);
+  const safeHaptic = useMemo(() => safeAsync(haptic), [haptic]);
+  const safeNavigate = (next: Tab) => {
+    try { onNavigate(next); } catch (e) { console.warn('[Dashboard] navigation failed', e); }
+  };
 
   return (
     <div style={{ height: '100%', overflowY: 'auto', padding: '14px 14px 20px' }}>
@@ -83,7 +88,7 @@ export default function DashboardScreen({
             {s ? <StatusDot state="registered" /> : <Skeleton w={40} h={14} />}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <button
-                onClick={() => { haptic(); toggle(); }}
+                onClick={() => { safeHaptic(); safeRun(toggle, 'theme toggle'); }}
                 aria-label={t('header.toggleTheme')}
                 title={t('header.toggleTheme')}
                 style={{
@@ -97,7 +102,7 @@ export default function DashboardScreen({
                 {mode === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
               </button>
               <button
-                onClick={() => { haptic(); toggleLang(); }}
+                onClick={() => { safeHaptic(); safeRun(toggleLang, 'language toggle'); }}
                 aria-label={t('header.toggleLang')}
                 title={t('header.toggleLang')}
                 style={{
@@ -113,7 +118,7 @@ export default function DashboardScreen({
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
               <button
-                onClick={onOpenProfile}
+                onClick={() => safeRun(onOpenProfile, 'open profile')}
                 aria-label="My profile"
                 style={{
                   width: 38, height: 38, borderRadius: '50%',
@@ -123,7 +128,7 @@ export default function DashboardScreen({
                   boxShadow: '0 8px 18px -8px rgba(7,22,168,0.45)',
                 }}
               >
-                {(m?.user?.name || m?.user?.email || 'U').split(/[\s@]/)[0].slice(0, 2).toUpperCase()}
+                {safeText(m?.user?.name || m?.user?.email, 'U').split(/[\s@]/)[0].slice(0, 2).toUpperCase()}
               </button>
               <NotificationBell onClick={() => setNotifOpen(true)} count={notifCounts.total} />
             </div>
@@ -146,7 +151,7 @@ export default function DashboardScreen({
       {/* Range tabs */}
       <div style={{ display: 'flex', gap: 6, margin: '14px 0 10px', padding: 4, background: 'rgba(255,255,255,0.08)', borderRadius: radius.xl }}>
         {(Object.keys(RANGE_LABELS) as StatsRange[]).map((r) => (
-          <button key={r} onClick={() => { haptic(); setRange(r); }} style={{
+          <button key={r} onClick={() => { safeHaptic(); setRange(r); }} style={{
             flex: 1, padding: '8px 6px', borderRadius: radius.lg, border: 'none', cursor: 'pointer',
             fontSize: 12, fontWeight: 800, letterSpacing: 0.5,
             background: range === r ? `linear-gradient(135deg, ${colors.lemtelBlue}, ${colors.avaCyan})` : 'transparent',
@@ -158,10 +163,11 @@ export default function DashboardScreen({
 
       {(() => {
         const isAdmin = !!m?.permissions?.admin || m?.dataScope === 'domain_admin';
-        const inbound = Math.max(0, total - (s?.outboundCalls ?? 0));
+        const outbound = safeNumber(s?.outboundCalls);
+        const inbound = Math.max(0, total - outbound);
         const scopeLabel = isAdmin
-          ? (m?.domain?.sipDomain || m?.organization?.name || 'Domain')
-          : (m?.extension?.number ? `Ext ${m.extension.number}` : 'My activity');
+          ? safeText(m?.domain?.sipDomain || m?.organization?.name, 'Domain')
+          : (m?.extension?.number ? `Ext ${safeText(m.extension.number)}` : 'My activity');
         const scopeEyebrow = isAdmin ? t('dashboard.domain') : t('dashboard.myActivity');
         return (
           <>
@@ -176,8 +182,8 @@ export default function DashboardScreen({
             />
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
-              <DirectionDonut inbound={s ? inbound : undefined} outbound={s?.outboundCalls} />
-              <TalkTimeGauge totalSec={s?.totalTalkSec} avgSec={s?.avgDurationSec} />
+              <DirectionDonut inbound={s ? inbound : undefined} outbound={s ? outbound : undefined} />
+              <TalkTimeGauge totalSec={s ? safeNumber(s.totalTalkSec) : undefined} avgSec={s ? safeNumber(s.avgDurationSec) : undefined} />
             </div>
 
             <SectionTitle eyebrow={t('dashboard.breakdown')} title={isAdmin ? t('dashboard.domainMetrics') : t('dashboard.myMetrics')} />
@@ -186,20 +192,20 @@ export default function DashboardScreen({
               <Metric label={t('m.answered')} value={s ? answered : undefined} tone="success" icon="↗" pct={total ? (answered / total) * 100 : 0} />
               <Metric label={t('m.missed')} value={s ? missed : undefined} tone="danger" icon="↘" pct={total ? (missed / total) * 100 : 0} />
               <Metric label={t('m.voicemails')} value={s ? voicemails : undefined} tone="gold" icon="✉" pct={total ? (voicemails / total) * 100 : 0} />
-              <Metric label={t('m.answerRate')} value={s?.answerRate != null ? `${s.answerRate}%` : undefined} tone="success" icon="◐" pct={s?.answerRate ?? 0} />
-              <Metric label={t('m.avgDuration')} value={s?.avgDurationSec != null ? `${s.avgDurationSec}s` : undefined} tone="violet" icon="◷" pct={Math.min(100, ((s?.avgDurationSec ?? 0) / 300) * 100)} />
-              <Metric label={t('m.totalTalk')} value={s?.totalTalkSec != null ? fmtTalk(s.totalTalkSec) : undefined} tone="cyan" icon="∿" pct={75} />
-              <Metric label={t('m.peakHour')} value={s?.peakHour != null ? `${s.peakHour}:00` : undefined} tone="gold" icon="◉" pct={((s?.peakHour ?? 0) / 24) * 100} />
-              <Metric label={t('m.outbound')} value={s?.outboundCalls ?? undefined} tone="cyan" icon="↗" pct={total ? ((s?.outboundCalls ?? 0) / total) * 100 : 0} />
-              <Metric label={t('m.failedDials')} value={s?.dialFailedCount ?? undefined} tone="danger" icon="✕" pct={total ? ((s?.dialFailedCount ?? 0) / total) * 100 : 0} />
-              <Metric label={t('m.dialSuccess')} value={s?.dialSuccessRate != null ? `${s.dialSuccessRate}%` : undefined} tone="success" icon="✓" pct={s?.dialSuccessRate ?? 0} />
-              {isAdmin && <Metric label={t('m.activeExt')} value={s?.activeExtensions ?? undefined} tone="violet" icon="◆" pct={Math.min(100, ((s?.activeExtensions ?? 0) / 20) * 100)} />}
+              <Metric label={t('m.answerRate')} value={s?.answerRate != null ? `${safeNumber(s.answerRate)}%` : undefined} tone="success" icon="◐" pct={safeNumber(s?.answerRate)} />
+              <Metric label={t('m.avgDuration')} value={s?.avgDurationSec != null ? `${safeNumber(s.avgDurationSec)}s` : undefined} tone="violet" icon="◷" pct={Math.min(100, (safeNumber(s?.avgDurationSec) / 300) * 100)} />
+              <Metric label={t('m.totalTalk')} value={s?.totalTalkSec != null ? fmtTalk(safeNumber(s.totalTalkSec)) : undefined} tone="cyan" icon="∿" pct={75} />
+              <Metric label={t('m.peakHour')} value={s?.peakHour != null ? `${safeNumber(s.peakHour)}:00` : undefined} tone="gold" icon="◉" pct={(safeNumber(s?.peakHour) / 24) * 100} />
+              <Metric label={t('m.outbound')} value={s ? outbound : undefined} tone="cyan" icon="↗" pct={total ? (outbound / total) * 100 : 0} />
+              <Metric label={t('m.failedDials')} value={s?.dialFailedCount != null ? safeNumber(s.dialFailedCount) : undefined} tone="danger" icon="✕" pct={total ? (safeNumber(s?.dialFailedCount) / total) * 100 : 0} />
+              <Metric label={t('m.dialSuccess')} value={s?.dialSuccessRate != null ? `${safeNumber(s.dialSuccessRate)}%` : undefined} tone="success" icon="✓" pct={safeNumber(s?.dialSuccessRate)} />
+              {isAdmin && <Metric label={t('m.activeExt')} value={s?.activeExtensions != null ? safeNumber(s.activeExtensions) : undefined} tone="violet" icon="◆" pct={Math.min(100, (safeNumber(s?.activeExtensions) / 20) * 100)} />}
             </div>
 
             {isAdmin && m?.extension?.number && (
               <>
                 <SectionTitle eyebrow={t('dashboard.myExtension')} title={`Ext ${m.extension.number} · ${RANGE_LABELS[range]}`} />
-                <MyExtensionStats range={range} extension={m.extension.number} domainUuid={m.domain?.fusionpbxDomainUuid || m.organization?.fusionpbxDomainUuid} />
+                <MyExtensionStats range={range} extension={safeText(m.extension.number)} domainUuid={safeText(m.domain?.fusionpbxDomainUuid || m.organization?.fusionpbxDomainUuid, '') || null} />
               </>
             )}
           </>
@@ -235,12 +241,12 @@ export default function DashboardScreen({
       {s && topExtensions.length === 0 && (
         <Card><div style={{ fontSize: font.sm, color: colors.mutedSilver, textAlign: 'center' }}>{t('dashboard.noActivity')}</div></Card>
       )}
-      {s && topExtensions.map((ext, i) => (
-        <Card key={ext.extension} style={{ marginBottom: 8 }} padded={true}>
+        {s && topExtensions.map((ext, i) => (
+        <Card key={`${ext.extension || 'ext'}-${i}`} style={{ marginBottom: 8 }} padded={true}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 16, fontWeight: 800, color: colors.lemtelBlue, minWidth: 28 }}>#{i+1}</span>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: font.base, fontWeight: 700, color: colors.textIce }}>Ext {ext.extension}</div>
+              <div style={{ fontSize: font.base, fontWeight: 700, color: colors.textIce }}>Ext {ext.extension || '—'}</div>
               <div style={{ fontSize: font.xs, color: colors.mutedSilver }}>{ext.name || '—'}</div>
             </div>
             <Chip tone="cyan">{ext.calls} {t('m.totalCalls').toLowerCase()}</Chip>
@@ -249,7 +255,7 @@ export default function DashboardScreen({
       ))}
 
       <SectionTitle eyebrow={t('dashboard.avaAssistant')} title={`${t('dashboard.avaSummary')} · ${RANGE_LABELS[range]}`} />
-      <AIPanel title={t('dashboard.avaSummary')} accent={colors.avaViolet} right={<GhostButton tone="violet" style={{ padding: '6px 10px' }} onClick={() => onNavigate('ava')}>{t('dashboard.openChat')}</GhostButton>}>
+      <AIPanel title={t('dashboard.avaSummary')} accent={colors.avaViolet} right={<GhostButton tone="violet" style={{ padding: '6px 10px' }} onClick={() => safeNavigate('ava')}>{t('dashboard.openChat')}</GhostButton>}>
         {!s ? (
           <Skeleton w="100%" h={42} />
         ) : (
@@ -273,7 +279,7 @@ export default function DashboardScreen({
             )}
             <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
               {(['today','7d','30d'] as StatsRange[]).map((r) => (
-                <button key={r} onClick={() => { haptic(); setRange(r); }} style={{
+                <button key={r} onClick={() => { safeHaptic(); setRange(r); }} style={{
                   padding: '4px 10px', borderRadius: 999, border: `1px solid ${colors.border}`,
                   background: range === r ? colors.avaViolet : 'transparent',
                   color: range === r ? '#fff' : colors.textSub, fontSize: 10.5, fontWeight: 700,
@@ -289,6 +295,61 @@ export default function DashboardScreen({
       <NotificationsSheet open={notifOpen} onClose={() => setNotifOpen(false)} onNavigate={onNavigate} />
     </div>
   );
+}
+
+function isRecord(v: unknown): v is Record<string, any> {
+  return !!v && typeof v === 'object' && !Array.isArray(v);
+}
+
+function isUsableStats(v: unknown): v is DomainStats {
+  return isRecord(v) && !(typeof (v as any).error === 'string');
+}
+
+function safeText(v: unknown, fallback = ''): string {
+  if (typeof v === 'string') return v;
+  if (v == null) return fallback;
+  try { return String(v); } catch { return fallback; }
+}
+
+function safeNumber(v: unknown, fallback = 0): number {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function safeRun(fn: (() => void) | undefined, label = 'action') {
+  try { fn?.(); } catch (e) { console.warn(`[Dashboard] ${label} failed`, e); }
+}
+
+function safeAsync<T extends (...args: any[]) => any>(fn: T | undefined) {
+  return (...args: Parameters<T>) => {
+    try {
+      const out = fn?.(...args);
+      if (out && typeof (out as Promise<unknown>).catch === 'function') {
+        (out as Promise<unknown>).catch((e) => console.warn('[Dashboard] async action failed', e));
+      }
+    } catch (e) {
+      console.warn('[Dashboard] action failed', e);
+    }
+  };
+}
+
+function normalizeTopExtensions(raw: unknown): { extension: string; name?: string; calls: number }[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => {
+      if (Array.isArray(item)) {
+        return { extension: safeText(item[0]), calls: safeNumber(item[1]), name: safeText(item[2], '') || undefined };
+      }
+      if (isRecord(item)) {
+        return {
+          extension: safeText(item.extension ?? item.ext ?? item.number),
+          name: safeText(item.name ?? item.displayName ?? item.display_name, '') || undefined,
+          calls: safeNumber(item.calls ?? item.count ?? item.total),
+        };
+      }
+      return { extension: safeText(item), calls: 0 };
+    })
+    .filter((item) => item.extension || item.calls > 0);
 }
 
 function dayLabel(i: number, total: number) {
