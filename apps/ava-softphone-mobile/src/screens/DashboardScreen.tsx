@@ -15,9 +15,86 @@ import { useT } from '../lib/i18n';
 
 const AI_CACHE_KEY = (range: string) => `ava.aisummary.${range}`;
 
-export default function DashboardScreen({
+type DashboardProps = { onNavigate: (t: Tab) => void; haptic: (s?: ImpactStyle) => Promise<void>; onOpenProfile?: () => void };
+
+export default function DashboardScreen(props: DashboardProps) {
+  return (
+    <DashboardCrashGuard {...props}>
+      <DashboardScreenInner {...props} />
+    </DashboardCrashGuard>
+  );
+}
+
+class DashboardCrashGuard extends React.Component<DashboardProps & { children: React.ReactNode }, { error: Error | null }> {
+  state = { error: null };
+  static getDerivedStateFromError(error: Error) { return { error }; }
+  componentDidCatch(error: Error) { console.error('[DashboardScreenError]', error); }
+  render() {
+    if (this.state.error) {
+      return <DashboardSafeFallback {...this.props} onRetry={() => this.setState({ error: null })} />;
+    }
+    return this.props.children;
+  }
+}
+
+function DashboardSafeFallback({ onNavigate, haptic, onRetry, onOpenProfile }: DashboardProps & { onRetry: () => void }) {
+  const { t, tx } = useT();
+  const safeHaptic = useMemo(() => safeAsync(haptic), [haptic]);
+  const go = (tab: Tab) => { safeHaptic(); try { onNavigate(tab); } catch {} };
+  return (
+    <div style={{ height: '100%', overflowY: 'auto', padding: '14px 14px 20px' }}>
+      <HeroGradient>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <LemtelMark size={42} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: font.lg, fontWeight: 800, color: colors.textIce }}>AVA Softphone</div>
+            <div style={{ fontSize: 10.5, color: colors.signalGold, fontWeight: 800, letterSpacing: 1.2, textTransform: 'uppercase' }}>
+              {safeTranslate(t, 'tabs.home', 'Home')}
+            </div>
+          </div>
+          <button
+            onClick={() => { safeHaptic(); safeRun(onOpenProfile, 'open profile'); }}
+            aria-label="My profile"
+            style={{ width: 38, height: 38, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.10)', color: colors.textIce, fontWeight: 800 }}
+          >MH</button>
+        </div>
+        <h1 style={{ fontSize: font.xxl, color: colors.textIce, margin: '18px 0 6px', fontWeight: 800 }}>
+          {tx('Accueil disponible', 'Home available')}
+        </h1>
+        <p style={{ fontSize: font.sm, color: colors.textSub, lineHeight: 1.5, margin: 0 }}>
+          {tx("Une donnée du tableau de bord n'a pas pu être affichée, mais l'application reste accessible.", 'One dashboard data field could not be displayed, but the app remains accessible.')}
+        </p>
+      </HeroGradient>
+      <SectionTitle eyebrow="AVA" title={tx('Actions rapides', 'Quick actions')} />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <Card onPress={() => go('contacts')}><QuickTile icon="👤" label={safeTranslate(t, 'tabs.contacts', 'Contacts')} /></Card>
+        <Card onPress={() => go('chats')}><QuickTile icon="💬" label={safeTranslate(t, 'tabs.chats', 'Chats')} /></Card>
+        <Card onPress={() => go('calls')}><QuickTile icon="☎" label={safeTranslate(t, 'tabs.calls', 'Calls')} /></Card>
+        <Card onPress={() => go('keypad')}><QuickTile icon="⌨" label={safeTranslate(t, 'tabs.keypad', 'Keypad')} /></Card>
+      </div>
+      <Card style={{ marginTop: 12 }}>
+        <button
+          onClick={() => { safeHaptic(); onRetry(); }}
+          style={{ width: '100%', minHeight: 46, border: 0, borderRadius: radius.lg, background: colors.lemtelBlue, color: '#fff', fontWeight: 800, fontSize: font.sm }}
+        >{safeTranslate(t, 'common.retry', 'Retry')}</button>
+      </Card>
+      <div style={{ height: 80 }} />
+    </div>
+  );
+}
+
+function QuickTile({ icon, label }: { icon: string; label: string }) {
+  return (
+    <div style={{ minHeight: 58, display: 'flex', alignItems: 'center', gap: 10 }}>
+      <span style={{ width: 34, height: 34, borderRadius: 12, display: 'grid', placeItems: 'center', background: `${colors.avaCyan}18`, color: colors.avaCyan, fontSize: 18 }}>{icon}</span>
+      <span style={{ fontSize: font.sm, fontWeight: 800, color: colors.textIce }}>{label}</span>
+    </div>
+  );
+}
+
+function DashboardScreenInner({
   onNavigate, haptic, onOpenProfile,
-}: { onNavigate: (t: Tab) => void; haptic: (s?: ImpactStyle) => Promise<void>; onOpenProfile?: () => void }) {
+}: DashboardProps) {
   const { mode, toggle } = useTheme();
   const { t, lang, toggle: toggleLang } = useT();
   const RANGE_LABELS: Record<StatsRange, string> = { today: t('common.today'), '7d': t('common.range7d'), '30d': t('common.range30d') };
