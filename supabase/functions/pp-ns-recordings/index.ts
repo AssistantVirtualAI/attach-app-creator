@@ -70,7 +70,7 @@ Deno.serve(async (req) => {
     }
 
     // ── GET liste des enregistrements récents ────────────────────────────────
-    if (req.method === "GET" && action === "list") {
+    if (action === "list") {
       const limit = Math.min(Number(url.searchParams.get("limit") ?? 50), 200);
       const end = url.searchParams.get("end") ?? new Date().toISOString();
       const start = url.searchParams.get("start") ??
