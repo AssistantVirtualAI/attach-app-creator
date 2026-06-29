@@ -8,6 +8,7 @@ import { Capacitor } from '@capacitor/core';
 import { supabase } from '../lib/mobileSupabase';
 import type { Creds } from '../lib/creds';
 import { ensureNotificationPermission, initNotificationChannels, showLocalNotification } from '../lib/localNotifications';
+import { navigateTo } from '../lib/appRouter';
 
 export function useDeviceNotifications(creds: Creds | null) {
   useEffect(() => {
