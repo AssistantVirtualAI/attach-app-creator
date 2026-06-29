@@ -69,16 +69,22 @@ Deno.serve(async (req) => {
     recording_path = recording_path || record_path;
     if (!call_record_id) call_record_id = xml_cdr_uuid;
     if (!call_record_id) call_record_id = body?.callId;
-    if (!organization_id) {
-      const { data: sp } = await admin.from("pbx_softphone_users")
-        .select("organization_id")
-        .eq("portal_user_id", user.id)
-        .maybeSingle();
-      organization_id = sp?.organization_id || null;
-    }
+    const cid = String(call_record_id || xml_cdr_uuid || "no-cid");
+    const vmId = String(body?.vm_id || "");
+    const logTag = `[ai-transcribe-call] cid=${cid}${vmId ? ` vm_id=${vmId}` : ""}`;
+    console.log(`${logTag} action=request-received`, {
+      has_organization_id: !!organization_id,
+      has_recording_path: !!recording_path,
+      has_recording_name: !!recording_name,
+      has_recording_url: !!recording_url,
+      domain_uuid: domain_uuid || null,
+      force: body?.force === true,
+    });
+    // Strict: organization_id must come from the caller. No silent fallback to pbx_softphone_users.
     if (!call_record_id || !organization_id) {
+      console.warn(`${logTag} action=bad-request missing organization_id or call_record_id`);
       await audit("bad-request", { error_code: "missing-fields", http_status: 400 });
-      return json({ error: "call_record_id and organization_id required" }, 400);
+      return json({ error: "call_record_id and organization_id required", cid }, 400);
     }
     auditOrg = organization_id; auditCall = call_record_id;
 
