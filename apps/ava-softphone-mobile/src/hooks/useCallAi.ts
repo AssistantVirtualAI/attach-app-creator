@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { mobileApi, CallDetail } from '../lib/mobileApi';
+import { supabase } from '../integrations/supabase/client';
 
 export type AiStage = 'idle' | 'transcribing' | 'analyzing' | 'done' | 'error';
 
