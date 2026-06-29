@@ -120,6 +120,23 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Strict: if we can't find any call/recording AND caller didn't supply a recording pointer, return explicit 404.
+    const callerSuppliedPointer = !!(recording_url || recording_path || recording_name);
+    if (!call && !callerSuppliedPointer) {
+      console.warn(`${logTag} action=recording-not-found no call row and no caller-supplied recording pointer`);
+      await audit("not-found", { error_code: "recording-not-found", http_status: 404 });
+      return json({
+        error: "recording-not-found",
+        message: "No matching call or recording found for this call_record_id in the provided organization. Provide recording_path/recording_name or ensure the call is synced.",
+        cid,
+      }, 404);
+    }
+    console.log(`${logTag} action=call-resolved`, {
+      has_call_row: !!call,
+      direction: call?.direction || null,
+      domain_uuid: call?.domain_uuid || domain_uuid || null,
+    });
+
     const persistTranscriptOnCall = async (text: string, provider: string) => {
       const { data: existingCall } = await admin.from("pbx_call_records")
         .select("raw_data, ai_summary, sentiment, call_score, coaching_points")
