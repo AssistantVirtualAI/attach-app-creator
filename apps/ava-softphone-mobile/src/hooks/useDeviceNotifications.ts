@@ -55,7 +55,7 @@ export function useDeviceNotifications(creds: Creds | null) {
               title: `Missed call from ${from}`,
               body: r?.caller_number || '',
               dedupeKey: `missed-${r.id}`,
-              extra: { callId: r.id, route: 'calls', number: r?.caller_number },
+              extra: { callId: r.id, route: 'missed', number: r?.caller_number },
             });
           }
         })
