@@ -223,19 +223,19 @@ export default function DashboardScreen({
 
       <SectionTitle eyebrow={RANGE_LABELS[range]} title={t('dashboard.callsPerDay')} />
       <Card padded={true}>
-        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(1, buckets.length)}, 1fr)`, gap: range === '30d' ? 2 : 6, alignItems: 'end', height: 90 }}>
-          {(buckets.length ? buckets : Array(7).fill(0)).map((v, i) => {
-            const max = Math.max(1, ...(buckets.length ? buckets : [1]));
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(1, buckets.length || 7)}, 1fr)`, gap: range === '30d' ? 2 : 6, alignItems: 'end', height: 90 }}>
+          {(buckets.length ? buckets : Array(7).fill(0)).map((v, i, arr) => {
+            const max = arr.reduce((best, n) => Math.max(best, safeNumber(n)), 1);
             const h = Math.max(6, Math.round((v / max) * 84));
             return (
               <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
                 <div style={{
                   width: '100%', height: h, borderRadius: 4,
                   background: `linear-gradient(180deg, ${colors.lemtelBlue}, ${colors.blueGlow})`,
-                  opacity: s ? 1 : 0.25,
+                  opacity: hasStats ? 1 : 0.25,
                 }} />
                 {range !== '30d' && (
-                  <span style={{ fontSize: 9, color: colors.mutedSilver }}>{dayLabel(i, buckets.length || 7)}</span>
+                  <span style={{ fontSize: 9, color: colors.mutedSilver }}>{dayLabel(i, arr.length || 7)}</span>
                 )}
               </div>
             );
@@ -244,11 +244,11 @@ export default function DashboardScreen({
       </Card>
 
       <SectionTitle eyebrow={t('dashboard.insights')} title={`${t('dashboard.topExtensions')} · ${RANGE_LABELS[range]}`} />
-      {!s && [1,2,3].map(i => <Card key={i} style={{ marginBottom: 8 }}><Skeleton w="60%" h={12} /></Card>)}
-      {s && topExtensions.length === 0 && (
+      {!hasStats && [1,2,3].map(i => <Card key={i} style={{ marginBottom: 8 }}><Skeleton w="60%" h={12} /></Card>)}
+      {hasStats && topExtensions.length === 0 && (
         <Card><div style={{ fontSize: font.sm, color: colors.mutedSilver, textAlign: 'center' }}>{t('dashboard.noActivity')}</div></Card>
       )}
-        {s && topExtensions.map((ext, i) => (
+        {hasStats && topExtensions.map((ext, i) => (
         <Card key={`${ext.extension || 'ext'}-${i}`} style={{ marginBottom: 8 }} padded={true}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 16, fontWeight: 800, color: colors.lemtelBlue, minWidth: 28 }}>#{i+1}</span>
@@ -263,7 +263,7 @@ export default function DashboardScreen({
 
       <SectionTitle eyebrow={t('dashboard.avaAssistant')} title={`${t('dashboard.avaSummary')} · ${RANGE_LABELS[range]}`} />
       <AIPanel title={t('dashboard.avaSummary')} accent={colors.avaViolet} right={<GhostButton tone="violet" style={{ padding: '6px 10px' }} onClick={() => safeNavigate('ava')}>{t('dashboard.openChat')}</GhostButton>}>
-        {!s ? (
+        {!hasStats ? (
           <Skeleton w="100%" h={42} />
         ) : (
           <div style={{ fontSize: font.base, lineHeight: 1.55, color: colors.textIce }}>
