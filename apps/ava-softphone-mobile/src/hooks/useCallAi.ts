@@ -104,16 +104,21 @@ export function useCallAi(callId: string | null, meta: CallAiMeta | undefined, o
       }
 
       setStage('analyzing');
-      const a: any = await mobileApi.analyzeCall(callId);
+      const transcriptText = (t as any)?.transcript_text || (t as any)?.transcript || '';
+      const a: any = await mobileApi.analyzeCall(callId, {
+        transcript: transcriptText,
+        organization_id: meta?.organization_id,
+        force: opts?.force,
+      });
       if (a?.ok === false || a?.error) {
         throw new Error(a?.error || a?.reason || 'analysis failed');
       }
       // Merge analyze response directly so the UI updates even if the
       // downstream callDetail roundtrip is slow or eventually consistent.
       const ai = a?.insights || a?.analysis || a || {};
-      const transcriptText: string = a?.transcript_text || a?.transcript || (t as any)?.transcript_text || '';
+      const analyzedTranscriptText: string = a?.transcript_text || a?.transcript || transcriptText;
       const transcriptLines = transcriptText
-        ? transcriptText.split(/\r?\n/).filter(Boolean).map((ln: string, i: number) => {
+        ? analyzedTranscriptText.split(/\r?\n/).filter(Boolean).map((ln: string, i: number) => {
             const m = ln.match(/^\s*(agent|caller|customer|client|user)\s*[:\-]\s*(.+)$/i);
             const speaker = (m?.[1] || '').toLowerCase();
             return {
