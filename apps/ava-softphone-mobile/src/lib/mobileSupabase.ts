@@ -163,6 +163,7 @@ export async function loadPbxRecordingAudioMobile(
   token?: string | null,
   organizationId?: string | null,
   fallbackDomainUuid?: string | null,
+  opts?: { skipCache?: boolean },
 ) {
   const xml_cdr_uuid = clean(recording.xml_cdr_uuid || recording.pbx_uuid || recording.id);
   const record_path = clean(recording.record_path || recording.recording_path);
@@ -170,8 +171,15 @@ export async function loadPbxRecordingAudioMobile(
   if (!xml_cdr_uuid && (!record_path || !record_name)) throw new Error('Missing recording metadata');
 
   const cacheKey = xml_cdr_uuid || `${record_path}/${record_name}`;
-  const cached = audioBlobCache.get(cacheKey);
-  if (cached) return cached;
+  if (!opts?.skipCache) {
+    const cached = audioBlobCache.get(cacheKey);
+    // Only return cached HTTP(S) signed URLs — never cached blob: URLs,
+    // because a fetch() of a blob: URL whose source is gone will fail silently.
+    if (cached && /^https?:\/\//i.test(cached)) return cached;
+    if (cached) audioBlobCache.delete(cacheKey);
+  } else {
+    audioBlobCache.delete(cacheKey);
+  }
 
   // Get a fresh token — refresh proactively if close to expiry (mirrors desktop behavior)
   let freshToken = await getFreshToken(token);
@@ -272,6 +280,7 @@ export async function loadPbxRecordingAudioMobile(
   const blob = await res.blob();
   if (!blob.size) throw new Error('Empty recording');
   const url = URL.createObjectURL(blob);
-  audioBlobCache.set(cacheKey, url);
+  // Do NOT cache blob: URLs — they are short-lived and break fetch() in
+  // downloadRecording. Only HTTP(S) signed URLs are cached (above).
   return url;
 }

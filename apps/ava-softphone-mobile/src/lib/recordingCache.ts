@@ -166,9 +166,15 @@ export async function downloadRecording(
     accessToken,
     organizationId,
     domainUuidFallback,
+    { skipCache: true },
   );
 
   const cid = sanitizeId(id);
+  // Validate it's a real HTTP(S) URL — never a stale blob: URL that fetch() can't read.
+  if (!/^https?:\/\//i.test(signedUrl)) {
+    console.error('[recordingCache] cid=' + cid + ' action=invalid-url', { signedUrl: signedUrl.slice(0, 40) });
+    throw new Error('Invalid recording URL — not an HTTP URL');
+  }
   console.log('[recordingCache] cid=' + cid + ' action=fetch-start', { force: !!opts.force });
   const resp = await fetch(signedUrl);
   if (!resp.ok) {
