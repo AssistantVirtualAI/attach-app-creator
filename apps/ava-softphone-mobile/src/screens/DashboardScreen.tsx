@@ -586,23 +586,44 @@ function AnswerRateHero({ answered, missed, total, voicemails, avgSec, rangeLabe
 }
 
 function MyExtensionStats({ range, extension, domainUuid }: { range: StatsRange; extension: string; domainUuid?: string | null }) {
-  const { t } = useT();
+  const { t, tx } = useT();
   const mobile = useMobileCredentials();
   const [s, setS] = React.useState<{ total: number; answered: number; missed: number; voicemails: number; recordings: number; avgSec: number } | null>(null);
   const [err, setErr] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    if (!mobile.accessToken || !domainUuid) return;
+    if (!mobile.accessToken || !domainUuid || !extension) return;
+    let cancelled = false;
     const now = new Date();
     const since = new Date(now);
     if (range === 'today') since.setHours(0, 0, 0, 0);
     else if (range === '7d') since.setDate(now.getDate() - 7);
     else since.setDate(now.getDate() - 30);
     const sinceIso = since.toISOString();
-    const url = `/rest/v1/pbx_call_records?select=id,call_status,duration_seconds,has_recording,direction&domain_uuid=eq.${encodeURIComponent(domainUuid)}&extension=eq.${encodeURIComponent(extension)}&start_at=gte.${encodeURIComponent(sinceIso)}&limit=1000`;
-    restGet<any[]>(url, mobile.accessToken)
+    setErr(null);
+    const base = `/rest/v1/pbx_call_records?domain_uuid=eq.${encodeURIComponent(domainUuid)}&start_at=gte.${encodeURIComponent(sinceIso)}&order=start_at.desc&limit=1000`;
+    const urls = [
+      `${base}&select=id,call_status,duration_seconds,has_recording,direction,extension&extension=eq.${encodeURIComponent(extension)}`,
+      `${base}&select=id,call_status,duration_seconds,has_recording,direction,caller_number,source_number,destination_number,destination`,
+      `${base}&select=id,call_status,duration_seconds,has_recording,direction,caller_number,destination`,
+    ];
+    (async () => {
+      let rows: any[] = [];
+      let last: any = null;
+      for (const url of urls) {
+        try { rows = await restGet<any[]>(url, mobile.accessToken!); last = null; break; }
+        catch (e) { last = e; }
+      }
+      if (last) throw last;
+      return rows;
+    })()
       .then((rows) => {
-        const r = rows || [];
+        if (cancelled) return;
+        const ext = String(extension);
+        const r = (rows || []).filter((x: any) => {
+          if (x.extension) return String(x.extension) === ext;
+          return [x.caller_number, x.source_number, x.destination_number, x.destination].some((v) => String(v || '') === ext);
+        });
         const total = r.length;
         const answered = r.filter((x) => (x.call_status || '').toLowerCase() === 'answered').length;
         const missed = r.filter((x) => ['missed', 'no_answer', 'noanswer'].includes(String(x.call_status || '').toLowerCase())).length;
@@ -611,10 +632,11 @@ function MyExtensionStats({ range, extension, domainUuid }: { range: StatsRange;
         const dur = r.reduce((a, x) => a + (Number(x.duration_seconds) || 0), 0);
         setS({ total, answered, missed, voicemails, recordings, avgSec: total ? Math.round(dur / total) : 0 });
       })
-      .catch((e) => setErr(e?.message || 'Failed'));
+      .catch((e) => { if (!cancelled) setErr(e?.message || 'Failed'); });
+    return () => { cancelled = true; };
   }, [mobile.accessToken, domainUuid, extension, range]);
 
-  if (err) return <Card accent="gold"><div style={{ fontSize: font.sm, color: colors.danger }}>{err}</div></Card>;
+  if (err) return <Card accent="gold"><div style={{ fontSize: font.sm, color: colors.mutedSilver }}>{tx('Statistiques de mon poste temporairement indisponibles.', 'My extension stats are temporarily unavailable.')}</div></Card>;
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
       <Metric label={t('m.myCalls')} value={s?.total} tone="cyan" />
