@@ -511,7 +511,7 @@ function AuthenticatedShell({
         <Suspense fallback={<ScreenSkeleton />}>
           {tab === 'contacts'   && <ContactsScreen sp={sp} />}
           {tab === 'chats'      && <MessagesHubScreen accessToken={creds.accessToken || null} userId={creds.userId} sp={sp} haptic={haptic} channelUnread={notif.channelUnread} />}
-          {tab === 'calls'      && <CallsScreen sp={sp} haptic={haptic} creds={creds} />}
+          {tab === 'calls'      && <CallsScreen sp={sp} haptic={haptic} creds={creds} initialSub={callsSub} initialFilter={callsFilter} />}
           {tab === 'keypad'     && <DialerScreen sp={sp} haptic={haptic} />}
           {tab === 'speeddial'  && <SpeedDialScreen sp={sp} preferClickToCall={preferClickToCall} />}
           {/* legacy deep-link routes */}
