@@ -208,9 +208,12 @@ export default function RecordingsScreen({
       currentPlaybackRef.current = rec;
       recoveringRef.current = false;
       if (audioRef.current) {
+        console.log('[RecordingsScreen] cid=' + rec.id + ' action=set-src', { url });
         audioRef.current.src = url;
         audioRef.current.load();
-        audioRef.current.play().catch(() => {});
+        audioRef.current.play().catch((err) => {
+          console.warn('[RecordingsScreen] cid=' + rec.id + ' action=play-rejected', { message: err?.message });
+        });
       }
       setPlayingId(rec.id);
     } catch (e: any) {
