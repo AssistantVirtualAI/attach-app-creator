@@ -443,8 +443,12 @@ export const mobileApi = {
     '/ai-analyze-call', { method: 'POST', body: JSON.stringify({ call_record_id: callId }) },
     { jobId: 'job-' + Date.now() },
   ),
-  transcribeCall: (callId: string, meta?: { recording_path?: string | null; recording_name?: string | null; domain_uuid?: string | null; xml_cdr_uuid?: string | null; organization_id?: string | null; force?: boolean; disableClaude?: boolean }) => call<{ transcript_text?: string; stub?: boolean; reason?: string; error?: string; details?: string; fetchErrors?: string[]; provider?: string; attempts?: any[] }>(
-    '/ai-transcribe-call', { method: 'POST', body: JSON.stringify({
+  transcribeCall: async (callId: string, meta?: { recording_path?: string | null; recording_name?: string | null; domain_uuid?: string | null; xml_cdr_uuid?: string | null; organization_id?: string | null; vm_id?: string | null; force?: boolean; disableClaude?: boolean }) => {
+    const cid = String(callId);
+    const vm = meta?.vm_id ? ` vm_id=${meta.vm_id}` : '';
+    const tag = `[mobileApi.transcribeCall] cid=${cid}${vm}`;
+    const startedAt = Date.now();
+    const payload = {
       call_record_id: callId,
       xml_cdr_uuid: meta?.xml_cdr_uuid || callId,
       recording_path: meta?.recording_path || undefined,
@@ -453,11 +457,41 @@ export const mobileApi = {
       record_name: meta?.recording_name || undefined,
       domain_uuid: meta?.domain_uuid || undefined,
       organization_id: meta?.organization_id || '71755d33-ed64-4ad5-a828-61c9d2029eb7',
+      vm_id: meta?.vm_id || undefined,
       force: meta?.force || undefined,
       disable_claude: meta?.disableClaude || undefined,
-    }) },
-    { transcript_text: 'Mock transcript', stub: false },
-  ),
+    };
+    console.log(`${tag} action=invoke`, {
+      has_recording_path: !!payload.recording_path,
+      has_recording_name: !!payload.recording_name,
+      organization_id: payload.organization_id,
+      force: !!payload.force,
+    });
+    try {
+      const res = await call<{ transcript_text?: string; stub?: boolean; reason?: string; error?: string; details?: string; fetchErrors?: string[]; provider?: string; attempts?: any[]; cid?: string }>(
+        '/ai-transcribe-call', { method: 'POST', body: JSON.stringify(payload) },
+        { transcript_text: 'Mock transcript', stub: false },
+      );
+      console.log(`${tag} action=response`, {
+        ms: Date.now() - startedAt,
+        provider: res?.provider || null,
+        stub: !!res?.stub,
+        reason: res?.reason || null,
+        error: res?.error || null,
+        text_len: res?.transcript_text?.length || 0,
+      });
+      return res;
+    } catch (e: any) {
+      console.warn(`${tag} action=error`, {
+        ms: Date.now() - startedAt,
+        status: e?.status,
+        code: e?.code,
+        message: e?.message,
+        detail: e?.detail,
+      });
+      throw e;
+    }
+  },
   generateGreeting: (prompt: string) => call<{ text: string; audioUrl?: string }>(
     '/elevenlabs-generate-greeting', { method: 'POST', body: JSON.stringify({ prompt }) },
     { text: `Thanks for calling Lemtel. Leave a message and we'll call you back. ${prompt ? `(${prompt})` : ''}` },
