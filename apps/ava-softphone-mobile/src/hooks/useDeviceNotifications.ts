@@ -102,6 +102,35 @@ export function useDeviceNotifications(creds: Creds | null) {
           });
         })
         .subscribe();
+      // Live new call recordings — drives recordings tab live updates +
+      // shows an on-device banner so the user can tap straight to recordings.
+      const recFilter = orgId ? `organization_id=eq.${orgId}` : undefined;
+      recCh = supabase.channel(`notif-rec-${ext || orgId || 'all'}`)
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pbx_call_recordings', ...(recFilter ? { filter: recFilter } : {}) } as any, (payload: any) => {
+          const r: any = payload.new;
+          showLocalNotification({
+            kind: 'missed_call',
+            title: 'New call recording',
+            body: r?.caller_id_name || r?.caller_id_number || 'Tap to listen',
+            dedupeKey: `rec-${r?.id}`,
+            extra: { recordingId: r?.id, route: 'recordings' },
+          });
+        })
+        .subscribe();
+
+      // Native tap on a local notification → in-app deep link.
+      try {
+        const { LocalNotifications } = await import(/* @vite-ignore */ '@capacitor/local-notifications');
+        actionSub = await LocalNotifications.addListener('localNotificationActionPerformed', (a: any) => {
+          const extra = a?.notification?.extra || {};
+          const route = extra.route;
+          if (route === 'voicemail') navigateTo({ tab: 'voicemail' });
+          else if (route === 'recordings') navigateTo({ tab: 'calls', sub: 'recordings' });
+          else if (route === 'missed') navigateTo({ tab: 'calls', sub: 'recents', filter: 'missed' });
+          else if (route === 'chats' || route === 'sms') navigateTo({ tab: 'sms' });
+          else if (route === 'calls') navigateTo({ tab: 'calls', sub: 'recents' });
+        });
+      } catch {}
     })();
 
     return () => {
@@ -109,6 +138,8 @@ export function useDeviceNotifications(creds: Creds | null) {
       try { cdrCh && supabase.removeChannel(cdrCh); } catch {}
       try { smsCh && supabase.removeChannel(smsCh); } catch {}
       try { vmCh  && supabase.removeChannel(vmCh ); } catch {}
+      try { recCh && supabase.removeChannel(recCh); } catch {}
+      try { actionSub?.remove?.(); } catch {}
     };
   }, [creds?.accessToken, creds?.extension, creds?.organizationId, creds?.dataScope, creds?.permissions?.admin]);
 }
