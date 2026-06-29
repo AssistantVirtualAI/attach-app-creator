@@ -131,9 +131,13 @@ function ensureNativeCallEventBridge() {
   return nativeCallBridgePromise;
 }
 
-console.log('[Softphone] dispatcher loaded — NATIVE_SIP_ENABLED =', true);
+const _nativeBannerEmitted = { current: false };
 
 export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn {
+  if (!_nativeBannerEmitted.current) {
+    _nativeBannerEmitted.current = true;
+    console.log('[Softphone] dispatcher loaded — NATIVE_SIP_ENABLED =', true);
+  }
   const [sipStatus, setSipStatus] = useState<SIPStatus>('idle');
   const [sipError, setSipError] = useState('');
   const [callState, setCallState] = useState<CallState>('idle');
