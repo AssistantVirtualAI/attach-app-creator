@@ -171,8 +171,15 @@ export async function loadPbxRecordingAudioMobile(
   if (!xml_cdr_uuid && (!record_path || !record_name)) throw new Error('Missing recording metadata');
 
   const cacheKey = xml_cdr_uuid || `${record_path}/${record_name}`;
-  const cached = audioBlobCache.get(cacheKey);
-  if (cached) return cached;
+  if (!opts?.skipCache) {
+    const cached = audioBlobCache.get(cacheKey);
+    // Only return cached HTTP(S) signed URLs — never cached blob: URLs,
+    // because a fetch() of a blob: URL whose source is gone will fail silently.
+    if (cached && /^https?:\/\//i.test(cached)) return cached;
+    if (cached) audioBlobCache.delete(cacheKey);
+  } else {
+    audioBlobCache.delete(cacheKey);
+  }
 
   // Get a fresh token — refresh proactively if close to expiry (mirrors desktop behavior)
   let freshToken = await getFreshToken(token);
