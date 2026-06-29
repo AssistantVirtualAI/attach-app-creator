@@ -312,6 +312,41 @@ function isUsableStats(v: unknown): v is DomainStats {
   return isRecord(v) && !(typeof (v as any).error === 'string');
 }
 
+function sanitizeStats(raw: unknown): any {
+  const r = isRecord(raw) && !(typeof (raw as any).error === 'string') ? (raw as any) : {};
+  const total = safeNumber(r.totalCalls ?? r.callsToday);
+  const answered = safeNumber(r.answered ?? r.answeredToday);
+  const missed = safeNumber(r.missed ?? r.missedToday);
+  const voicemails = safeNumber(r.voicemails ?? r.voicemailsToday);
+  const outbound = safeNumber(r.outboundCalls);
+  const last7Days = Array.isArray(r.last7Days) ? r.last7Days.map((v: unknown) => safeNumber(v)) : undefined;
+  const buckets = Array.isArray(r.buckets)
+    ? r.buckets.map((v: unknown) => safeNumber(v))
+    : last7Days;
+  return {
+    ...r,
+    totalCalls: total,
+    callsToday: safeNumber(r.callsToday, total),
+    answered,
+    answeredToday: safeNumber(r.answeredToday, answered),
+    missed,
+    missedToday: safeNumber(r.missedToday, missed),
+    voicemails,
+    voicemailsToday: safeNumber(r.voicemailsToday, voicemails),
+    outboundCalls: outbound,
+    answerRate: r.answerRate != null ? safeNumber(r.answerRate) : (total ? Math.round((answered / total) * 100) : 0),
+    avgDurationSec: safeNumber(r.avgDurationSec),
+    totalTalkSec: safeNumber(r.totalTalkSec),
+    peakHour: safeNumber(r.peakHour),
+    dialFailedCount: safeNumber(r.dialFailedCount),
+    dialSuccessRate: safeNumber(r.dialSuccessRate),
+    activeExtensions: safeNumber(r.activeExtensions),
+    buckets: buckets || [],
+    last7Days: last7Days || buckets || [],
+    topExtensions: Array.isArray(r.topExtensions) ? r.topExtensions : [],
+  };
+}
+
 function safeText(v: unknown, fallback = ''): string {
   if (typeof v === 'string') return v;
   if (v == null) return fallback;
