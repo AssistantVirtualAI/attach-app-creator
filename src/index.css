@@ -1792,3 +1792,137 @@ All colors MUST be HSL.
   background: #060D1A !important;
   border-color: var(--pp-bg-border) !important;
 }
+
+/* ============================================================
+   PLANIPRÊT MOBILE — LIQUID GLASS AURORA (cyan)
+   Re-skin applied over both light/dark themes for /mplanipret.
+   Adds aurora background, glass surfaces, cyan accent system.
+   ============================================================ */
+.planipret-mobile-scope {
+  --pp-cyan: #22D3EE;
+  --pp-cyan-glow: 0 0 24px rgba(34,211,238,0.45);
+  --pp-glass-bg: rgba(255,255,255,0.06);
+  --pp-glass-bg-strong: rgba(255,255,255,0.10);
+  --pp-glass-border: rgba(255,255,255,0.12);
+  --pp-glass-border-strong: rgba(255,255,255,0.22);
+}
+.planipret-mobile-scope[data-pp-theme="dark"] {
+  --pp-brand-accent: #22D3EE;
+  --pp-brand-accent-2: #67E8F9;
+}
+/* Phone frame: deep midnight + aurora wash */
+.planipret-mobile-scope[data-pp-theme="dark"] .planipret-mobile-phone {
+  background:
+    radial-gradient(ellipse 80% 50% at 0% 0%, rgba(34,211,238,0.12), transparent 60%),
+    radial-gradient(ellipse 70% 50% at 100% 100%, rgba(99,102,241,0.10), transparent 60%),
+    radial-gradient(ellipse 60% 40% at 50% 50%, rgba(168,85,247,0.06), transparent 70%),
+    #030712 !important;
+}
+.planipret-mobile-scope[data-pp-theme="dark"] {
+  --pp-bg-base: transparent;
+}
+/* Aurora animated blobs container (injected in Frame) */
+.pp-aurora-bg {
+  position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0;
+}
+.pp-aurora-bg::before,
+.pp-aurora-bg::after {
+  content: ""; position: absolute; border-radius: 50%;
+  filter: blur(80px); opacity: 0.55; will-change: transform;
+}
+.pp-aurora-bg::before {
+  width: 320px; height: 320px; top: -80px; left: -80px;
+  background: radial-gradient(circle, #22D3EE 0%, transparent 70%);
+  animation: pp-aurora-1 18s ease-in-out infinite alternate;
+}
+.pp-aurora-bg::after {
+  width: 360px; height: 360px; bottom: -100px; right: -120px;
+  background: radial-gradient(circle, #6366F1 0%, transparent 70%);
+  animation: pp-aurora-2 22s ease-in-out infinite alternate;
+}
+@keyframes pp-aurora-1 { from { transform: translate(0,0) scale(1); } to { transform: translate(60px,80px) scale(1.15); } }
+@keyframes pp-aurora-2 { from { transform: translate(0,0) scale(1); } to { transform: translate(-50px,-60px) scale(1.1); } }
+
+/* Glass card re-skin (dark) */
+.planipret-mobile-scope[data-pp-theme="dark"] .pp-card,
+.planipret-mobile-scope[data-pp-theme="dark"] .pp-card-elevated {
+  background: var(--pp-glass-bg) !important;
+  border: 1px solid var(--pp-glass-border) !important;
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border-radius: 20px !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06);
+}
+/* Header + tab-bar + footer as floating glass */
+.planipret-mobile-scope[data-pp-theme="dark"] .pp-mobile-header {
+  background: rgba(3,7,18,0.55) !important;
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  border-bottom: 1px solid var(--pp-glass-border) !important;
+}
+.planipret-mobile-scope[data-pp-theme="dark"] .pp-mobile-tabbar {
+  background: rgba(3,7,18,0.65) !important;
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  border-top: 1px solid var(--pp-glass-border) !important;
+}
+.planipret-mobile-scope[data-pp-theme="dark"] .pp-mobile-footer {
+  background: rgba(3,7,18,0.75) !important;
+  border-top: 1px solid var(--pp-glass-border) !important;
+}
+/* Inputs become glass pills */
+.planipret-mobile-scope[data-pp-theme="dark"] input,
+.planipret-mobile-scope[data-pp-theme="dark"] textarea {
+  background: var(--pp-glass-bg) !important;
+  border: 1px solid var(--pp-glass-border) !important;
+  backdrop-filter: blur(12px);
+}
+.planipret-mobile-scope[data-pp-theme="dark"] input:focus,
+.planipret-mobile-scope[data-pp-theme="dark"] textarea:focus {
+  border-color: rgba(34,211,238,0.55) !important;
+  outline: 2px solid rgba(34,211,238,0.20);
+}
+/* Segmented control = glass pills */
+.planipret-mobile-scope[data-pp-theme="dark"] .pp-segmented {
+  background: var(--pp-glass-bg) !important;
+  border: 1px solid var(--pp-glass-border) !important;
+  backdrop-filter: blur(14px);
+}
+.planipret-mobile-scope[data-pp-theme="dark"] .pp-segmented button.is-active {
+  background: rgba(34,211,238,0.18) !important;
+  color: #67E8F9 !important;
+  box-shadow: inset 0 0 0 1px rgba(34,211,238,0.35);
+}
+/* Pills */
+.planipret-mobile-scope[data-pp-theme="dark"] .pp-pill-accent {
+  background: rgba(34,211,238,0.12) !important;
+  color: #67E8F9 !important;
+  border: 1px solid rgba(34,211,238,0.30) !important;
+}
+/* Primary button glow */
+.planipret-mobile-scope[data-pp-theme="dark"] .pp-btn-primary {
+  background: linear-gradient(135deg, #22D3EE, #0EA5E9) !important;
+  border: 1px solid rgba(34,211,238,0.55) !important;
+  color: #03131A !important;
+  box-shadow: 0 8px 24px rgba(34,211,238,0.35);
+}
+/* Tab active indicator glow */
+.planipret-mobile-scope[data-pp-theme="dark"] .pp-mobile-tabbar a[style*="rgb(34, 211, 238)"],
+.planipret-mobile-scope[data-pp-theme="dark"] nav a[aria-current="page"] {
+  filter: drop-shadow(0 0 6px rgba(34,211,238,0.45));
+}
+/* Reusable utility for new glass surfaces */
+.pp-glass {
+  background: var(--pp-glass-bg);
+  border: 1px solid var(--pp-glass-border);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border-radius: 20px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06);
+}
+.pp-glow-cyan { box-shadow: var(--pp-cyan-glow); }
+
+/* Keep content above aurora */
+.planipret-mobile-scope[data-pp-theme="dark"] .pp-mobile-header,
+.planipret-mobile-scope[data-pp-theme="dark"] .pp-mobile-tabbar,
+.planipret-mobile-scope[data-pp-theme="dark"] .pp-mobile-footer { z-index: 5; }
