@@ -114,14 +114,67 @@ export default function MCalls() {
 
   const load = useCallback(async () => {
     if (!userId) return;
-    const { data } = await supabase
-      .from("planipret_phone_calls")
-      .select("*")
-      .eq("user_id", userId)
-      .order("started_at", { ascending: false })
-      .limit(100);
-    setCalls((data ?? []) as Call[]);
-    setLoading(false);
+    setLoading(true);
+    try {
+      // 1) NS-API live CDRs via pp-ns-cdr (segmenté par extension côté serveur)
+      const { data: ns, error: nsErr } = await supabase.functions.invoke("pp-ns-cdr", {
+        body: { action: "list" },
+      });
+      if (nsErr) throw nsErr;
+      const items: any[] = (ns as any)?.items ?? [];
+
+      // 2) Données enrichies locales (transcripts, AI, lead scoring)
+      const { data: local } = await supabase
+        .from("planipret_phone_calls")
+        .select("*")
+        .eq("user_id", userId)
+        .order("started_at", { ascending: false })
+        .limit(200);
+      const byNsId = new Map<string, any>();
+      (local ?? []).forEach((r: any) => { if (r.ns_call_id) byNsId.set(r.ns_call_id, r); });
+
+      const merged: Call[] = items.map((it, i) => {
+        const nsId = it.id ?? it.call_id ?? it.uuid ?? null;
+        const enriched = nsId ? byNsId.get(nsId) : null;
+        const dirRaw = String(it.direction ?? it.call_direction ?? "").toLowerCase();
+        const direction = dirRaw.includes("in")
+          ? (it.answered === false || it.disposition === "no-answer" ? "missed" : "inbound")
+          : "outbound";
+        return {
+          id: enriched?.id ?? nsId ?? `ns-${i}`,
+          user_id: userId,
+          ns_call_id: nsId,
+          direction,
+          status: it.disposition ?? it.status ?? null,
+          from_number: it.from_number ?? it.caller_id_number ?? null,
+          from_name: it.from_name ?? it.caller_id_name ?? null,
+          to_number: it.to_number ?? it.destination ?? null,
+          to_name: it.to_name ?? null,
+          started_at: (it.start_time ?? it.started_at ?? new Date().toISOString()) as string,
+          duration_seconds: Number(it.duration ?? it.billsec ?? 0) || 0,
+          recording_url: it.recording_url ?? enriched?.recording_url ?? null,
+          transcript: enriched?.transcript ?? null,
+          ai_summary: enriched?.ai_summary ?? null,
+          metadata: it,
+          ...(enriched ?? {}),
+        } as Call;
+      });
+
+      // Fallback : si NS ne renvoie rien, montrer le cache local
+      setCalls(merged.length ? merged : ((local ?? []) as Call[]));
+    } catch (e: any) {
+      console.error("[pp-ns-cdr] list failed", e);
+      toast.error(e?.message ?? "Échec chargement CDR");
+      const { data } = await supabase
+        .from("planipret_phone_calls")
+        .select("*")
+        .eq("user_id", userId)
+        .order("started_at", { ascending: false })
+        .limit(100);
+      setCalls((data ?? []) as Call[]);
+    } finally {
+      setLoading(false);
+    }
   }, [userId]);
 
   useEffect(() => { load(); }, [load]);

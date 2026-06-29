@@ -259,27 +259,29 @@ function RecordingSection({ call, onUpdated }: { call: RecordingCall; onUpdated:
   const fetchRec = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("maestro-recording", {
-        body: { call_id: call.id, ns_call_id: call.ns_call_id },
+      // Préféré : pp-ns-recordings (NS-API v2, segmenté par extension)
+      const targetId = call.ns_call_id ?? call.id;
+      const { data, error } = await supabase.functions.invoke("pp-ns-recordings", {
+        body: { action: "get", call_id: targetId },
       });
       if (error) throw error;
       const url = (data as any)?.recording_url;
       if (!url) throw new Error("URL non disponible");
+      await supabase.from("planipret_phone_calls").update({ recording_url: url }).eq("id", call.id);
       onUpdated({ ...call, recording_url: url });
       toast.success("Enregistrement chargé");
     } catch (e: any) {
-      // fallback to ns-recordings
+      // Fallback : maestro-recording
       try {
-        const { data } = await supabase.functions.invoke("ns-recordings", {
-          body: { call_id: call.ns_call_id ?? call.id },
+        const { data } = await supabase.functions.invoke("maestro-recording", {
+          body: { call_id: call.id, ns_call_id: call.ns_call_id },
         });
         const url = (data as any)?.recording_url;
         if (!url) throw new Error("nope");
-        await supabase.from("planipret_phone_calls").update({ recording_url: url }).eq("id", call.id);
         onUpdated({ ...call, recording_url: url });
         toast.success("Enregistrement chargé");
       } catch {
-        toast.error("Enregistrement indisponible");
+        toast.error("Enregistrement indisponible", { description: e?.message });
       }
     } finally {
       setLoading(false);
