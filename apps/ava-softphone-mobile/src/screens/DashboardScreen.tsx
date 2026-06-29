@@ -15,9 +15,86 @@ import { useT } from '../lib/i18n';
 
 const AI_CACHE_KEY = (range: string) => `ava.aisummary.${range}`;
 
-export default function DashboardScreen({
+type DashboardProps = { onNavigate: (t: Tab) => void; haptic: (s?: ImpactStyle) => Promise<void>; onOpenProfile?: () => void };
+
+export default function DashboardScreen(props: DashboardProps) {
+  return (
+    <DashboardCrashGuard {...props}>
+      <DashboardScreenInner {...props} />
+    </DashboardCrashGuard>
+  );
+}
+
+class DashboardCrashGuard extends React.Component<DashboardProps & { children: React.ReactNode }, { error: Error | null }> {
+  state: { error: Error | null } = { error: null };
+  static getDerivedStateFromError(error: Error) { return { error }; }
+  componentDidCatch(error: Error) { console.error('[DashboardScreenError]', error); }
+  render() {
+    if (this.state.error) {
+      return <DashboardSafeFallback {...this.props} onRetry={() => this.setState({ error: null })} />;
+    }
+    return this.props.children;
+  }
+}
+
+function DashboardSafeFallback({ onNavigate, haptic, onRetry, onOpenProfile }: DashboardProps & { onRetry: () => void }) {
+  const { t, tx } = useT();
+  const safeHaptic = useMemo(() => safeAsync(haptic), [haptic]);
+  const go = (tab: Tab) => { safeHaptic(); try { onNavigate(tab); } catch {} };
+  return (
+    <div style={{ height: '100%', overflowY: 'auto', padding: '14px 14px 20px' }}>
+      <HeroGradient>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <LemtelMark size={42} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: font.lg, fontWeight: 800, color: colors.textIce }}>AVA Softphone</div>
+            <div style={{ fontSize: 10.5, color: colors.signalGold, fontWeight: 800, letterSpacing: 1.2, textTransform: 'uppercase' }}>
+              {safeTranslate(t, 'tabs.home', 'Home')}
+            </div>
+          </div>
+          <button
+            onClick={() => { safeHaptic(); safeRun(onOpenProfile, 'open profile'); }}
+            aria-label="My profile"
+            style={{ width: 38, height: 38, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.10)', color: colors.textIce, fontWeight: 800 }}
+          >MH</button>
+        </div>
+        <h1 style={{ fontSize: font.xxl, color: colors.textIce, margin: '18px 0 6px', fontWeight: 800 }}>
+          {tx('Accueil disponible', 'Home available')}
+        </h1>
+        <p style={{ fontSize: font.sm, color: colors.textSub, lineHeight: 1.5, margin: 0 }}>
+          {tx("Une donnée du tableau de bord n'a pas pu être affichée, mais l'application reste accessible.", 'One dashboard data field could not be displayed, but the app remains accessible.')}
+        </p>
+      </HeroGradient>
+      <SectionTitle eyebrow="AVA" title={tx('Actions rapides', 'Quick actions')} />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <Card onPress={() => go('contacts')}><QuickTile icon="👤" label={safeTranslate(t, 'tabs.contacts', 'Contacts')} /></Card>
+        <Card onPress={() => go('chats')}><QuickTile icon="💬" label={safeTranslate(t, 'tabs.chats', 'Chats')} /></Card>
+        <Card onPress={() => go('calls')}><QuickTile icon="☎" label={safeTranslate(t, 'tabs.calls', 'Calls')} /></Card>
+        <Card onPress={() => go('keypad')}><QuickTile icon="⌨" label={safeTranslate(t, 'tabs.keypad', 'Keypad')} /></Card>
+      </div>
+      <Card style={{ marginTop: 12 }}>
+        <button
+          onClick={() => { safeHaptic(); onRetry(); }}
+          style={{ width: '100%', minHeight: 46, border: 0, borderRadius: radius.lg, background: colors.lemtelBlue, color: '#fff', fontWeight: 800, fontSize: font.sm }}
+        >{safeTranslate(t, 'common.retry', 'Retry')}</button>
+      </Card>
+      <div style={{ height: 80 }} />
+    </div>
+  );
+}
+
+function QuickTile({ icon, label }: { icon: string; label: string }) {
+  return (
+    <div style={{ minHeight: 58, display: 'flex', alignItems: 'center', gap: 10 }}>
+      <span style={{ width: 34, height: 34, borderRadius: 12, display: 'grid', placeItems: 'center', background: `${colors.avaCyan}18`, color: colors.avaCyan, fontSize: 18 }}>{icon}</span>
+      <span style={{ fontSize: font.sm, fontWeight: 800, color: colors.textIce }}>{label}</span>
+    </div>
+  );
+}
+
+function DashboardScreenInner({
   onNavigate, haptic, onOpenProfile,
-}: { onNavigate: (t: Tab) => void; haptic: (s?: ImpactStyle) => Promise<void>; onOpenProfile?: () => void }) {
+}: DashboardProps) {
   const { mode, toggle } = useTheme();
   const { t, lang, toggle: toggleLang } = useT();
   const RANGE_LABELS: Record<StatsRange, string> = { today: t('common.today'), '7d': t('common.range7d'), '30d': t('common.range30d') };
@@ -27,7 +104,8 @@ export default function DashboardScreen({
   const me = useAutoSync<MeResponse>(() => mobileApi.me(), { intervalMs: 5 * 60_000, cacheKey: 'me', staleTimeMs: 120_000 });
   const stats = useAutoSync<DomainStats>(() => mobileApi.domainStats(range), { intervalMs: 120_000, deps: [range], cacheKey: `domainStats:${range}`, staleTimeMs: 60_000 });
   const m = isRecord(me.data) ? (me.data as any) : null;
-  const s = isUsableStats(stats.data) ? (stats.data as any) : null;
+  const hasStats = isUsableStats(stats.data);
+  const s = useMemo(() => sanitizeStats(stats.data), [stats.data]);
   const userName = safeText(m?.user?.name || m?.user?.email, 'User');
   const firstName = userName.split(/[\s@]/).filter(Boolean)[0] || 'User';
   const orgName = safeText(m?.organization?.name, 'Lemtel Télécom');
@@ -39,7 +117,7 @@ export default function DashboardScreen({
   const lastKeyRef = useRef<string>('');
 
   useEffect(() => {
-    if (!s) return;
+    if (!hasStats) return;
     const sig = `${range}|${safeNumber(s.totalCalls ?? s.callsToday)}|${safeNumber(s.answered)}|${safeNumber(s.missed)}|${safeText(s.peakHour, '')}`;
     if (lastKeyRef.current === sig) return;
     lastKeyRef.current = sig;
@@ -48,14 +126,20 @@ export default function DashboardScreen({
       if (cached) { setAiSummary(cached); return; }
     } catch {}
     setAiLoading(true); setAiError(null);
-    mobileApi.aiSummary(range, s, RANGE_LABELS[range])
-      .then((r) => {
-        setAiSummary(r.summary || '');
-        try { localStorage.setItem(AI_CACHE_KEY(sig), r.summary || ''); } catch {}
-      })
-      .catch((e) => setAiError(e?.message || 'AVA summary failed'))
-      .finally(() => setAiLoading(false));
-  }, [s, range]);
+    try {
+      mobileApi.aiSummary(range, s, RANGE_LABELS[range])
+        .then((r) => {
+          const summary = safeText(r?.summary, '');
+          setAiSummary(summary);
+          try { localStorage.setItem(AI_CACHE_KEY(sig), summary); } catch {}
+        })
+        .catch((e) => setAiError(e?.message || 'AVA summary failed'))
+        .finally(() => setAiLoading(false));
+    } catch (e: any) {
+      setAiError(e?.message || 'AVA summary failed');
+      setAiLoading(false);
+    }
+  }, [hasStats, s, range]);
 
 
   const total = safeNumber(s?.totalCalls ?? s?.callsToday);
@@ -63,7 +147,7 @@ export default function DashboardScreen({
   const missed = safeNumber(s?.missed ?? s?.missedToday);
   const voicemails = safeNumber(s?.voicemails ?? s?.voicemailsToday);
   const rawBuckets = s?.buckets ?? s?.last7Days ?? [];
-  const buckets = Array.isArray(rawBuckets) ? rawBuckets.map((v) => safeNumber(v)) : [];
+  const buckets = Array.isArray(rawBuckets) ? rawBuckets.slice(-30).map((v) => safeNumber(v)) : [];
   const topExtensions = normalizeTopExtensions(s?.topExtensions);
   const safeHaptic = useMemo(() => safeAsync(haptic), [haptic]);
   const safeNavigate = (next: Tab) => {
@@ -85,7 +169,7 @@ export default function DashboardScreen({
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-            {s ? <StatusDot state="registered" /> : <Skeleton w={40} h={14} />}
+            {hasStats ? <StatusDot state="registered" /> : <Skeleton w={40} h={14} />}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <button
                 onClick={() => { safeHaptic(); safeRun(toggle, 'theme toggle'); }}
@@ -143,7 +227,7 @@ export default function DashboardScreen({
             {m ? `${t('dashboard.greeting')} ${firstName}` : <Skeleton w="60%" h={26} />}
           </h1>
           <p style={{ fontSize: font.base, color: colors.textSub, margin: 0, lineHeight: 1.5 }}>
-            {s ? t('dashboard.callsLine', { total, answered, missed }) : <Skeleton w="100%" h={14} />}
+            {hasStats ? t('dashboard.callsLine', { total, answered, missed }) : <Skeleton w="100%" h={14} />}
           </p>
         </div>
       </HeroGradient>
@@ -173,33 +257,33 @@ export default function DashboardScreen({
           <>
             <SectionTitle eyebrow={scopeEyebrow} title={`${scopeLabel} · ${RANGE_LABELS[range]}`} />
             <AnswerRateHero
-              answered={s ? answered : undefined}
-              missed={s ? missed : undefined}
-              total={s ? total : undefined}
-              voicemails={s ? voicemails : undefined}
-              avgSec={s?.avgDurationSec}
+              answered={hasStats ? answered : undefined}
+              missed={hasStats ? missed : undefined}
+              total={hasStats ? total : undefined}
+              voicemails={hasStats ? voicemails : undefined}
+              avgSec={hasStats ? safeNumber(s.avgDurationSec) : undefined}
               rangeLabel={RANGE_LABELS[range]}
             />
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
-              <DirectionDonut inbound={s ? inbound : undefined} outbound={s ? outbound : undefined} />
-              <TalkTimeGauge totalSec={s ? safeNumber(s.totalTalkSec) : undefined} avgSec={s ? safeNumber(s.avgDurationSec) : undefined} />
+              <DirectionDonut inbound={hasStats ? inbound : undefined} outbound={hasStats ? outbound : undefined} />
+              <TalkTimeGauge totalSec={hasStats ? safeNumber(s.totalTalkSec) : undefined} avgSec={hasStats ? safeNumber(s.avgDurationSec) : undefined} />
             </div>
 
             <SectionTitle eyebrow={t('dashboard.breakdown')} title={isAdmin ? t('dashboard.domainMetrics') : t('dashboard.myMetrics')} />
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
-              <Metric label={t('m.totalCalls')} value={s ? total : undefined} tone="cyan" icon="☎" pct={100} />
-              <Metric label={t('m.answered')} value={s ? answered : undefined} tone="success" icon="↗" pct={total ? (answered / total) * 100 : 0} />
-              <Metric label={t('m.missed')} value={s ? missed : undefined} tone="danger" icon="↘" pct={total ? (missed / total) * 100 : 0} />
-              <Metric label={t('m.voicemails')} value={s ? voicemails : undefined} tone="gold" icon="✉" pct={total ? (voicemails / total) * 100 : 0} />
-              <Metric label={t('m.answerRate')} value={s?.answerRate != null ? `${safeNumber(s.answerRate)}%` : undefined} tone="success" icon="◐" pct={safeNumber(s?.answerRate)} />
-              <Metric label={t('m.avgDuration')} value={s?.avgDurationSec != null ? `${safeNumber(s.avgDurationSec)}s` : undefined} tone="violet" icon="◷" pct={Math.min(100, (safeNumber(s?.avgDurationSec) / 300) * 100)} />
-              <Metric label={t('m.totalTalk')} value={s?.totalTalkSec != null ? fmtTalk(safeNumber(s.totalTalkSec)) : undefined} tone="cyan" icon="∿" pct={75} />
-              <Metric label={t('m.peakHour')} value={s?.peakHour != null ? `${safeNumber(s.peakHour)}:00` : undefined} tone="gold" icon="◉" pct={(safeNumber(s?.peakHour) / 24) * 100} />
-              <Metric label={t('m.outbound')} value={s ? outbound : undefined} tone="cyan" icon="↗" pct={total ? (outbound / total) * 100 : 0} />
-              <Metric label={t('m.failedDials')} value={s?.dialFailedCount != null ? safeNumber(s.dialFailedCount) : undefined} tone="danger" icon="✕" pct={total ? (safeNumber(s?.dialFailedCount) / total) * 100 : 0} />
-              <Metric label={t('m.dialSuccess')} value={s?.dialSuccessRate != null ? `${safeNumber(s.dialSuccessRate)}%` : undefined} tone="success" icon="✓" pct={safeNumber(s?.dialSuccessRate)} />
-              {isAdmin && <Metric label={t('m.activeExt')} value={s?.activeExtensions != null ? safeNumber(s.activeExtensions) : undefined} tone="violet" icon="◆" pct={Math.min(100, (safeNumber(s?.activeExtensions) / 20) * 100)} />}
+              <Metric label={t('m.totalCalls')} value={hasStats ? total : undefined} tone="cyan" icon="☎" pct={100} />
+              <Metric label={t('m.answered')} value={hasStats ? answered : undefined} tone="success" icon="↗" pct={total ? (answered / total) * 100 : 0} />
+              <Metric label={t('m.missed')} value={hasStats ? missed : undefined} tone="danger" icon="↘" pct={total ? (missed / total) * 100 : 0} />
+              <Metric label={t('m.voicemails')} value={hasStats ? voicemails : undefined} tone="gold" icon="✉" pct={total ? (voicemails / total) * 100 : 0} />
+              <Metric label={t('m.answerRate')} value={hasStats ? `${safeNumber(s.answerRate)}%` : undefined} tone="success" icon="◐" pct={safeNumber(s?.answerRate)} />
+              <Metric label={t('m.avgDuration')} value={hasStats ? `${safeNumber(s.avgDurationSec)}s` : undefined} tone="violet" icon="◷" pct={Math.min(100, (safeNumber(s?.avgDurationSec) / 300) * 100)} />
+              <Metric label={t('m.totalTalk')} value={hasStats ? fmtTalk(safeNumber(s.totalTalkSec)) : undefined} tone="cyan" icon="∿" pct={75} />
+              <Metric label={t('m.peakHour')} value={hasStats ? `${safeNumber(s.peakHour)}:00` : undefined} tone="gold" icon="◉" pct={(safeNumber(s?.peakHour) / 24) * 100} />
+              <Metric label={t('m.outbound')} value={hasStats ? outbound : undefined} tone="cyan" icon="↗" pct={total ? (outbound / total) * 100 : 0} />
+              <Metric label={t('m.failedDials')} value={hasStats ? safeNumber(s.dialFailedCount) : undefined} tone="danger" icon="✕" pct={total ? (safeNumber(s?.dialFailedCount) / total) * 100 : 0} />
+              <Metric label={t('m.dialSuccess')} value={hasStats ? `${safeNumber(s.dialSuccessRate)}%` : undefined} tone="success" icon="✓" pct={safeNumber(s?.dialSuccessRate)} />
+              {isAdmin && <Metric label={t('m.activeExt')} value={hasStats ? safeNumber(s.activeExtensions) : undefined} tone="violet" icon="◆" pct={Math.min(100, (safeNumber(s?.activeExtensions) / 20) * 100)} />}
             </div>
 
             {isAdmin && m?.extension?.number && (
@@ -216,19 +300,19 @@ export default function DashboardScreen({
 
       <SectionTitle eyebrow={RANGE_LABELS[range]} title={t('dashboard.callsPerDay')} />
       <Card padded={true}>
-        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(1, buckets.length)}, 1fr)`, gap: range === '30d' ? 2 : 6, alignItems: 'end', height: 90 }}>
-          {(buckets.length ? buckets : Array(7).fill(0)).map((v, i) => {
-            const max = Math.max(1, ...(buckets.length ? buckets : [1]));
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(1, buckets.length || 7)}, 1fr)`, gap: range === '30d' ? 2 : 6, alignItems: 'end', height: 90 }}>
+          {(buckets.length ? buckets : Array(7).fill(0)).map((v, i, arr) => {
+            const max = arr.reduce((best, n) => Math.max(best, safeNumber(n)), 1);
             const h = Math.max(6, Math.round((v / max) * 84));
             return (
               <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
                 <div style={{
                   width: '100%', height: h, borderRadius: 4,
                   background: `linear-gradient(180deg, ${colors.lemtelBlue}, ${colors.blueGlow})`,
-                  opacity: s ? 1 : 0.25,
+                  opacity: hasStats ? 1 : 0.25,
                 }} />
                 {range !== '30d' && (
-                  <span style={{ fontSize: 9, color: colors.mutedSilver }}>{dayLabel(i, buckets.length || 7)}</span>
+                  <span style={{ fontSize: 9, color: colors.mutedSilver }}>{dayLabel(i, arr.length || 7)}</span>
                 )}
               </div>
             );
@@ -237,11 +321,11 @@ export default function DashboardScreen({
       </Card>
 
       <SectionTitle eyebrow={t('dashboard.insights')} title={`${t('dashboard.topExtensions')} · ${RANGE_LABELS[range]}`} />
-      {!s && [1,2,3].map(i => <Card key={i} style={{ marginBottom: 8 }}><Skeleton w="60%" h={12} /></Card>)}
-      {s && topExtensions.length === 0 && (
-        <Card><div style={{ fontSize: font.sm, color: colors.mutedSilver, textAlign: 'center' }}>{t('dashboard.noActivity')}</div></Card>
+      {!hasStats && [1,2,3].map(i => <Card key={i} style={{ marginBottom: 8 }}><Skeleton w="60%" h={12} /></Card>)}
+      {hasStats && topExtensions.length === 0 && (
+        <Card><div style={{ fontSize: font.sm, color: colors.mutedSilver, textAlign: 'center' }}>{safeTranslate(t, 'dashboard.noActivity', 'No activity yet')}</div></Card>
       )}
-        {s && topExtensions.map((ext, i) => (
+        {hasStats && topExtensions.map((ext, i) => (
         <Card key={`${ext.extension || 'ext'}-${i}`} style={{ marginBottom: 8 }} padded={true}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 16, fontWeight: 800, color: colors.lemtelBlue, minWidth: 28 }}>#{i+1}</span>
@@ -256,7 +340,7 @@ export default function DashboardScreen({
 
       <SectionTitle eyebrow={t('dashboard.avaAssistant')} title={`${t('dashboard.avaSummary')} · ${RANGE_LABELS[range]}`} />
       <AIPanel title={t('dashboard.avaSummary')} accent={colors.avaViolet} right={<GhostButton tone="violet" style={{ padding: '6px 10px' }} onClick={() => safeNavigate('ava')}>{t('dashboard.openChat')}</GhostButton>}>
-        {!s ? (
+        {!hasStats ? (
           <Skeleton w="100%" h={42} />
         ) : (
           <div style={{ fontSize: font.base, lineHeight: 1.55, color: colors.textIce }}>
@@ -305,10 +389,54 @@ function isUsableStats(v: unknown): v is DomainStats {
   return isRecord(v) && !(typeof (v as any).error === 'string');
 }
 
+function sanitizeStats(raw: unknown): any {
+  const r = isRecord(raw) && !(typeof (raw as any).error === 'string') ? (raw as any) : {};
+  const total = safeNumber(r.totalCalls ?? r.callsToday);
+  const answered = safeNumber(r.answered ?? r.answeredToday);
+  const missed = safeNumber(r.missed ?? r.missedToday);
+  const voicemails = safeNumber(r.voicemails ?? r.voicemailsToday);
+  const outbound = safeNumber(r.outboundCalls);
+  const last7Days = Array.isArray(r.last7Days) ? r.last7Days.map((v: unknown) => safeNumber(v)) : undefined;
+  const buckets = Array.isArray(r.buckets)
+    ? r.buckets.map((v: unknown) => safeNumber(v))
+    : last7Days;
+  return {
+    ...r,
+    totalCalls: total,
+    callsToday: safeNumber(r.callsToday, total),
+    answered,
+    answeredToday: safeNumber(r.answeredToday, answered),
+    missed,
+    missedToday: safeNumber(r.missedToday, missed),
+    voicemails,
+    voicemailsToday: safeNumber(r.voicemailsToday, voicemails),
+    outboundCalls: outbound,
+    answerRate: r.answerRate != null ? safeNumber(r.answerRate) : (total ? Math.round((answered / total) * 100) : 0),
+    avgDurationSec: safeNumber(r.avgDurationSec),
+    totalTalkSec: safeNumber(r.totalTalkSec),
+    peakHour: safeNumber(r.peakHour),
+    dialFailedCount: safeNumber(r.dialFailedCount),
+    dialSuccessRate: safeNumber(r.dialSuccessRate),
+    activeExtensions: safeNumber(r.activeExtensions),
+    buckets: buckets || [],
+    last7Days: last7Days || buckets || [],
+    topExtensions: Array.isArray(r.topExtensions) ? r.topExtensions : [],
+  };
+}
+
 function safeText(v: unknown, fallback = ''): string {
   if (typeof v === 'string') return v;
   if (v == null) return fallback;
   try { return String(v); } catch { return fallback; }
+}
+
+function safeTranslate(t: (key: any, params?: any) => string, key: string, fallback: string, params?: any) {
+  try {
+    const value = t(key as any, params);
+    return safeText(value, fallback) || fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 function safeNumber(v: unknown, fallback = 0): number {
@@ -458,23 +586,44 @@ function AnswerRateHero({ answered, missed, total, voicemails, avgSec, rangeLabe
 }
 
 function MyExtensionStats({ range, extension, domainUuid }: { range: StatsRange; extension: string; domainUuid?: string | null }) {
-  const { t } = useT();
+  const { t, tx } = useT();
   const mobile = useMobileCredentials();
   const [s, setS] = React.useState<{ total: number; answered: number; missed: number; voicemails: number; recordings: number; avgSec: number } | null>(null);
   const [err, setErr] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    if (!mobile.accessToken || !domainUuid) return;
+    if (!mobile.accessToken || !domainUuid || !extension) return;
+    let cancelled = false;
     const now = new Date();
     const since = new Date(now);
     if (range === 'today') since.setHours(0, 0, 0, 0);
     else if (range === '7d') since.setDate(now.getDate() - 7);
     else since.setDate(now.getDate() - 30);
     const sinceIso = since.toISOString();
-    const url = `/rest/v1/pbx_call_records?select=id,call_status,duration_seconds,has_recording,direction&domain_uuid=eq.${encodeURIComponent(domainUuid)}&extension=eq.${encodeURIComponent(extension)}&start_at=gte.${encodeURIComponent(sinceIso)}&limit=1000`;
-    restGet<any[]>(url, mobile.accessToken)
+    setErr(null);
+    const base = `/rest/v1/pbx_call_records?domain_uuid=eq.${encodeURIComponent(domainUuid)}&start_at=gte.${encodeURIComponent(sinceIso)}&order=start_at.desc&limit=1000`;
+    const urls = [
+      `${base}&select=id,call_status,duration_seconds,has_recording,direction,extension&extension=eq.${encodeURIComponent(extension)}`,
+      `${base}&select=id,call_status,duration_seconds,has_recording,direction,caller_number,source_number,destination_number,destination`,
+      `${base}&select=id,call_status,duration_seconds,has_recording,direction,caller_number,destination`,
+    ];
+    (async () => {
+      let rows: any[] = [];
+      let last: any = null;
+      for (const url of urls) {
+        try { rows = await restGet<any[]>(url, mobile.accessToken!); last = null; break; }
+        catch (e) { last = e; }
+      }
+      if (last) throw last;
+      return rows;
+    })()
       .then((rows) => {
-        const r = rows || [];
+        if (cancelled) return;
+        const ext = String(extension);
+        const r = (rows || []).filter((x: any) => {
+          if (x.extension) return String(x.extension) === ext;
+          return [x.caller_number, x.source_number, x.destination_number, x.destination].some((v) => String(v || '') === ext);
+        });
         const total = r.length;
         const answered = r.filter((x) => (x.call_status || '').toLowerCase() === 'answered').length;
         const missed = r.filter((x) => ['missed', 'no_answer', 'noanswer'].includes(String(x.call_status || '').toLowerCase())).length;
@@ -483,10 +632,11 @@ function MyExtensionStats({ range, extension, domainUuid }: { range: StatsRange;
         const dur = r.reduce((a, x) => a + (Number(x.duration_seconds) || 0), 0);
         setS({ total, answered, missed, voicemails, recordings, avgSec: total ? Math.round(dur / total) : 0 });
       })
-      .catch((e) => setErr(e?.message || 'Failed'));
+      .catch((e) => { if (!cancelled) setErr(e?.message || 'Failed'); });
+    return () => { cancelled = true; };
   }, [mobile.accessToken, domainUuid, extension, range]);
 
-  if (err) return <Card accent="gold"><div style={{ fontSize: font.sm, color: colors.danger }}>{err}</div></Card>;
+  if (err) return <Card accent="gold"><div style={{ fontSize: font.sm, color: colors.mutedSilver }}>{tx('Statistiques de mon poste temporairement indisponibles.', 'My extension stats are temporarily unavailable.')}</div></Card>;
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
       <Metric label={t('m.myCalls')} value={s?.total} tone="cyan" />

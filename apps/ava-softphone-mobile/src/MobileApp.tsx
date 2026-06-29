@@ -509,7 +509,7 @@ function AuthenticatedShell({
 
 
       <div key={tab} className="lemtel-page-enter" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', paddingBottom: 'calc(96px + env(safe-area-inset-bottom, 0px))' }}>
-        <ScreenErrorBoundary screen={tab} onRecover={() => setTab('keypad')}>
+        <ScreenErrorBoundary screen={tab} onRecover={() => setTab('keypad')} onNavigate={setTab as any} haptic={haptic} onOpenProfile={() => setProfileOpen(true)}>
           <Suspense fallback={<ScreenSkeleton />}>
             {tab === 'contacts'   && <ContactsScreen sp={sp} />}
             {tab === 'chats'      && <MessagesHubScreen accessToken={creds.accessToken || null} userId={creds.userId} sp={sp} haptic={haptic} channelUnread={notif.channelUnread} />}
@@ -562,7 +562,7 @@ function AuthenticatedShell({
 }
 
 class ScreenErrorBoundary extends Component<
-  { children: ReactNode; screen: Tab; onRecover: () => void },
+  { children: ReactNode; screen: Tab; onRecover: () => void; onNavigate?: (t: Tab) => void; haptic?: (s?: ImpactStyle) => Promise<void>; onOpenProfile?: () => void },
   { error: Error | null }
 > {
   state = { error: null };
@@ -578,6 +578,15 @@ class ScreenErrorBoundary extends Component<
   }
   render() {
     if (!this.state.error) return this.props.children;
+    if (this.props.screen === 'home') {
+      return (
+        <DashboardScreen
+          onNavigate={this.props.onNavigate || (() => {})}
+          haptic={this.props.haptic || (async () => {})}
+          onOpenProfile={this.props.onOpenProfile}
+        />
+      );
+    }
     return (
       <div style={{ flex: 1, display: 'grid', placeItems: 'center', padding: 24, color: colors.textIce }}>
         <div style={{ maxWidth: 320, textAlign: 'center', padding: 18, borderRadius: 16, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}>
