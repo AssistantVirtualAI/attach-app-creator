@@ -18,6 +18,8 @@ export function useDeviceNotifications(creds: Creds | null) {
     let cdrCh: any = null;
     let smsCh: any = null;
     let vmCh: any = null;
+    let recCh: any = null;
+    let actionSub: any = null;
 
     (async () => {
       await initNotificationChannels();
