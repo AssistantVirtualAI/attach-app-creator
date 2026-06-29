@@ -246,7 +246,7 @@ export default function DashboardScreen({
       <SectionTitle eyebrow={t('dashboard.insights')} title={`${t('dashboard.topExtensions')} · ${RANGE_LABELS[range]}`} />
       {!hasStats && [1,2,3].map(i => <Card key={i} style={{ marginBottom: 8 }}><Skeleton w="60%" h={12} /></Card>)}
       {hasStats && topExtensions.length === 0 && (
-        <Card><div style={{ fontSize: font.sm, color: colors.mutedSilver, textAlign: 'center' }}>{t('dashboard.noActivity')}</div></Card>
+        <Card><div style={{ fontSize: font.sm, color: colors.mutedSilver, textAlign: 'center' }}>{safeTranslate(t, 'dashboard.noActivity', 'No activity yet')}</div></Card>
       )}
         {hasStats && topExtensions.map((ext, i) => (
         <Card key={`${ext.extension || 'ext'}-${i}`} style={{ marginBottom: 8 }} padded={true}>
@@ -351,6 +351,15 @@ function safeText(v: unknown, fallback = ''): string {
   if (typeof v === 'string') return v;
   if (v == null) return fallback;
   try { return String(v); } catch { return fallback; }
+}
+
+function safeTranslate(t: (key: any, params?: any) => string, key: string, fallback: string, params?: any) {
+  try {
+    const value = t(key as any, params);
+    return safeText(value, fallback) || fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 function safeNumber(v: unknown, fallback = 0): number {
