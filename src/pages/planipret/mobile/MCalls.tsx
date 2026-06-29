@@ -157,7 +157,6 @@ export default function MCalls() {
           ai_summary: enriched?.ai_summary ?? null,
           metadata: it,
           ...(enriched ?? {}),
-          id: enriched?.id ?? nsId ?? `ns-${i}`,
         } as Call;
       });
 
