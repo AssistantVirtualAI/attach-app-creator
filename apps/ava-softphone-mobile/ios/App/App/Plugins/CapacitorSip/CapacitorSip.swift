@@ -321,13 +321,34 @@ public class CapacitorPjsip: CAPPlugin, CAPBridgedPlugin {
             // ka_interval=15 = keep-alive TCP toutes les 15s pour maintenir
             // la connexion active en arrière-plan (workaround avant PushKit).
             accCfg.ka_interval = 15
-            if let token = self.voipPushToken, !token.isEmpty {
-                let contact = "sip:\(username)@\(server);transport=tcp;pn-prid=\(token);pn-param=apns.voip;pn-provider=apns;q=1.0"
-                accCfg.force_contact = self.pjStrDup(contact)
-                NSLog("[CapacitorPjsip] REGISTER contact with VoIP push token q=1.0")
+
+            // +sip.instance (RFC 5626) — unique per-device identifier.
+            // FreeSWITCH/FusionPBX uses this to distinguish contacts from
+            // different apps registered on the same extension. Without it,
+            // a new REGISTER from this app can silently REPLACE the Ringotel
+            // contact in the registrar instead of adding a second binding,
+            // which prevents parallel forking (only Ringotel rings).
+            // We use a stable per-device UUID stored in UserDefaults so the
+            // instance ID survives app restarts and re-registrations.
+            let instanceKey = "pjsip.sip.instance.uuid"
+            let instanceId: String
+            if let stored = UserDefaults.standard.string(forKey: instanceKey), !stored.isEmpty {
+                instanceId = stored
             } else {
-                accCfg.force_contact = self.pjStrDup("sip:\(username)@\(server);transport=tcp;q=1.0")
-                NSLog("[CapacitorPjsip] REGISTER contact without push token q=1.0")
+                let fresh = UUID().uuidString.lowercased()
+                UserDefaults.standard.set(fresh, forKey: instanceKey)
+                instanceId = fresh
+            }
+            let instanceParam = "+sip.instance=\"<urn:uuid:\(instanceId)>\""
+
+            if let token = self.voipPushToken, !token.isEmpty {
+                let contact = "sip:\(username)@\(server);transport=tcp;pn-prid=\(token);pn-param=apns.voip;pn-provider=apns;q=1.0;\(instanceParam)"
+                accCfg.force_contact = self.pjStrDup(contact)
+                NSLog("[CapacitorPjsip] REGISTER contact with VoIP push token q=1.0 instance=%@", instanceId)
+            } else {
+                let contact = "sip:\(username)@\(server);transport=tcp;q=1.0;\(instanceParam)"
+                accCfg.force_contact = self.pjStrDup(contact)
+                NSLog("[CapacitorPjsip] REGISTER contact without push token q=1.0 instance=%@", instanceId)
             }
 
             accCfg.cred_count = 1

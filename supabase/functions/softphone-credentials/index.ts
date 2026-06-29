@@ -160,15 +160,18 @@ Deno.serve(async (req) => {
 
     // Per-domain endpoints. A softphone user can override the SIP/WSS host, otherwise the organization/PBX domain is used.
     const sipDomain = sp.sip_domain || org?.fusionpbx_domain_name || org?.domain || Deno.env.get("FUSIONPBX_SIP_DOMAIN") || "lemtel.lemtel.tel";
-    // Known-working WSS endpoints. Port 7443 is the TLS/WSS profile with DTLS-SRTP enabled.
-    const WORKING_PRIMARY = "sip://pbxnode.lemtel.tel:5060";
-    const WORKING_FALLBACK = "sip://pbxnode.lemtel.tel:5060";
-    const wssUrl = sp.wss_url || Deno.env.get("FUSIONPBX_WSS_URL") || WORKING_PRIMARY;
+    // Known-working WSS endpoints (must be ws:// or wss:// — JsSIP rejects sip://).
+    // Mirrors the mobile app configuration: WSS 7443 primary, alternate node fallback.
+    const WORKING_PRIMARY = "wss://pbxnode.lemtel.tel:7443";
+    const WORKING_FALLBACK = "wss://node.lemtelcloud.net:7443";
+    const rawWss = sp.wss_url || Deno.env.get("FUSIONPBX_WSS_URL") || WORKING_PRIMARY;
+    // Sanitize: if a legacy sip:// value is stored, drop it and use the known-good primary.
+    const wssUrl = /^wss?:\/\//i.test(rawWss) ? rawWss : WORKING_PRIMARY;
     const wssUrls = Array.from(new Set([
+      wssUrl,
       WORKING_PRIMARY,
       WORKING_FALLBACK,
-      wssUrl,
-    ].filter(Boolean)));
+    ].filter((u) => u && /^wss?:\/\//i.test(u))));
 
     let password = "";
     let passwordSource: "encrypted_softphone_user" | "plain_softphone_user" | "extension_password" | "extension_raw_data" | "fusionpbx_proxy" | "none" = "none";
