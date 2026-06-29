@@ -6,11 +6,14 @@ export function useLemtelAiRealtime(orgId?: string | null, onChange?: () => void
   const qc = useQueryClient();
 
   useEffect(() => {
+    if (!orgId) return;
     const orgFilter = orgId ? `organization_id=eq.${orgId}` : undefined;
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
     let retryAttempt = 0;
     let channel: ReturnType<typeof supabase.channel> | null = null;
+    let transcriptBroadcast: ReturnType<typeof supabase.channel> | null = null;
+    let insightBroadcast: ReturnType<typeof supabase.channel> | null = null;
 
     const refresh = () => {
       if (refreshTimer) return;
@@ -36,8 +39,6 @@ export function useLemtelAiRealtime(orgId?: string | null, onChange?: () => void
         .on("postgres_changes", { event: "*", schema: "public", table: "pbx_ai_insights", ...(orgFilter ? { filter: orgFilter } : {}) }, refresh)
         .on("postgres_changes", { event: "*", schema: "public", table: "pbx_call_records", ...(orgFilter ? { filter: orgFilter } : {}) }, refresh)
         .on("postgres_changes", { event: "*", schema: "public", table: "pbx_call_recordings", ...(orgFilter ? { filter: orgFilter } : {}) }, refresh)
-        .on("broadcast", { event: "transcript" }, refresh)
-        .on("broadcast", { event: "insight" }, refresh)
         .subscribe((status) => {
           if (status === "SUBSCRIBED") {
             retryAttempt = 0;
@@ -56,11 +57,15 @@ export function useLemtelAiRealtime(orgId?: string | null, onChange?: () => void
     };
 
     connect();
+    transcriptBroadcast = supabase.channel(`ai-transcripts:${orgId}`).on("broadcast", { event: "transcript" }, refresh).subscribe();
+    insightBroadcast = supabase.channel(`ai-insights:${orgId}`).on("broadcast", { event: "insights" }, refresh).subscribe();
 
     return () => {
       if (refreshTimer) clearTimeout(refreshTimer);
       if (retryTimer) clearTimeout(retryTimer);
       if (channel) supabase.removeChannel(channel);
+      if (transcriptBroadcast) supabase.removeChannel(transcriptBroadcast);
+      if (insightBroadcast) supabase.removeChannel(insightBroadcast);
     };
   }, [orgId, qc, onChange]);
 }
