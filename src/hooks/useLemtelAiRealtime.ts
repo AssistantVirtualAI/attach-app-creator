@@ -18,8 +18,12 @@ export function useLemtelAiRealtime(orgId?: string | null, onChange?: () => void
         refreshTimer = null;
         qc.invalidateQueries({ queryKey: ["pbx"] });
         qc.invalidateQueries({ queryKey: ["media"] });
+        qc.invalidateQueries({ queryKey: ["media", "recordings"] });
+        qc.invalidateQueries({ queryKey: ["media", "cdr"] });
         qc.invalidateQueries({ queryKey: ["my-dashboard-stats"] });
         qc.invalidateQueries({ queryKey: ["pbx_ai_insights"] });
+        qc.invalidateQueries({ queryKey: ["pbx_call_transcripts"] });
+        qc.invalidateQueries({ queryKey: ["admin-dashboard-tiles"] });
         qc.invalidateQueries({ queryKey: ["call-intel"] });
         onChange?.();
       }, 500);
@@ -31,6 +35,9 @@ export function useLemtelAiRealtime(orgId?: string | null, onChange?: () => void
         .on("postgres_changes", { event: "*", schema: "public", table: "pbx_call_transcripts", ...(orgFilter ? { filter: orgFilter } : {}) }, refresh)
         .on("postgres_changes", { event: "*", schema: "public", table: "pbx_ai_insights", ...(orgFilter ? { filter: orgFilter } : {}) }, refresh)
         .on("postgres_changes", { event: "*", schema: "public", table: "pbx_call_records", ...(orgFilter ? { filter: orgFilter } : {}) }, refresh)
+        .on("postgres_changes", { event: "*", schema: "public", table: "pbx_call_recordings", ...(orgFilter ? { filter: orgFilter } : {}) }, refresh)
+        .on("broadcast", { event: "transcript" }, refresh)
+        .on("broadcast", { event: "insight" }, refresh)
         .subscribe((status) => {
           if (status === "SUBSCRIBED") {
             retryAttempt = 0;

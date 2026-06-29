@@ -917,17 +917,17 @@ const App = () => (
 
 
                 {/* v3.0 User Portal (/org/lemtel/my/*) */}
-                <Route path="/org/lemtel/my" element={<Navigate to="/org/lemtel/my/dashboard" replace />} />
-                <Route path="/org/lemtel/my/dashboard" element={<LemtelUserPage><MyDashboard /></LemtelUserPage>} />
-                <Route path="/org/lemtel/my/calls" element={<LemtelUserPage><TelephonyMediaCenter scope="mine" /></LemtelUserPage>} />
-                <Route path="/org/lemtel/my/recordings" element={<LemtelUserPage><AdminRecordings scope="mine" /></LemtelUserPage>} />
-                <Route path="/org/lemtel/my/voicemail" element={<LemtelUserPage><AdminVoicemail scope="mine" /></LemtelUserPage>} />
-                <Route path="/org/lemtel/my/sms" element={<LemtelUserPage><LemtelMessages /></LemtelUserPage>} />
-                <Route path="/org/lemtel/my/settings" element={<LemtelUserPage><MySettings /></LemtelUserPage>} />
-                <Route path="/org/lemtel/my/downloads" element={<LemtelUserPage><DownloadCenter personalize /></LemtelUserPage>} />
-                <Route path="/org/lemtel/my/forwarding" element={<LemtelUserPage><MyForwarding /></LemtelUserPage>} />
-                <Route path="/org/lemtel/my/devices" element={<LemtelUserPage><MyDevices /></LemtelUserPage>} />
-                <Route path="/org/lemtel/my/greetings" element={<LemtelUserPage><MyGreetings /></LemtelUserPage>} />
+                <Route path="/org/lemtel/my" element={<Navigate to="/my" replace />} />
+                <Route path="/org/lemtel/my/dashboard" element={<Navigate to="/my" replace />} />
+                <Route path="/org/lemtel/my/calls" element={<Navigate to="/my/calls" replace />} />
+                <Route path="/org/lemtel/my/recordings" element={<Navigate to="/my/recordings" replace />} />
+                <Route path="/org/lemtel/my/voicemail" element={<Navigate to="/my/voicemail" replace />} />
+                <Route path="/org/lemtel/my/sms" element={<Navigate to="/my/messages" replace />} />
+                <Route path="/org/lemtel/my/settings" element={<Navigate to="/my/settings" replace />} />
+                <Route path="/org/lemtel/my/downloads" element={<Navigate to="/my/downloads" replace />} />
+                <Route path="/org/lemtel/my/forwarding" element={<Navigate to="/my/telecom" replace />} />
+                <Route path="/org/lemtel/my/devices" element={<Navigate to="/my/telecom" replace />} />
+                <Route path="/org/lemtel/my/greetings" element={<Navigate to="/my/greetings" replace />} />
 
                 {/* /org/lemtel/portal/* customer routes (PortalGuard enforces customer scope) */}
                 <Route path="/org/lemtel/portal" element={<Navigate to="/org/lemtel/portal/dashboard" replace />} />

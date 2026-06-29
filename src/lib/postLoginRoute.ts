@@ -14,7 +14,7 @@ export type ResellerRole =
  * Routes to the dashboard for the org they belong to:
  *   - Planipret admin/member          → /planipret/admin/overview
  *   - Lemtel admin                    → /lemtel/dashboard
- *   - Lemtel end-user                 → /org/lemtel/my/dashboard
+ *   - Lemtel end-user                 → /my
  *   - AVA super_admin / master_admin  → /dashboard (AVA platform)
  *   - Org admins of other orgs        → /dashboard
  *   - Fallback                        → /portals
@@ -70,7 +70,7 @@ export async function getPostLoginRoute(userId: string): Promise<string> {
 
     // Lemtel routing
     if (isLemtelAdmin) { setActiveOrg(LEMTEL_ORG_ID); return '/dashboard'; }
-    if (isLemtelMember) { setActiveOrg(LEMTEL_ORG_ID); return '/org/lemtel/my/dashboard'; }
+    if (isLemtelMember) { setActiveOrg(LEMTEL_ORG_ID); return '/my'; }
 
     // Generic org admin → unified dashboard with switcher
     const orgRoles = orgRows.map((r: any) => r.role as string);

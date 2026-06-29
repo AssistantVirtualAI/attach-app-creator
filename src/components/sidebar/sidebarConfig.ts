@@ -183,17 +183,15 @@ const MY_GROUPS: NavGroup[] = [
   {
     id: 'my-workspace', labelKey: '🏠 My Workspace', icon: Home, scope: 'my', lemtelOnly: true,
     items: [
-      { nameKey: 'My Dashboard', href: '/org/lemtel/my/dashboard', icon: Home },
-      { nameKey: 'My Extension', href: '/org/lemtel/my/settings', icon: Phone },
-      { nameKey: 'My Calls', href: '/org/lemtel/my/calls', icon: PhoneCall },
-      { nameKey: 'My Recordings', href: '/org/lemtel/my/recordings', icon: Disc },
-      { nameKey: 'My Voicemail', href: '/org/lemtel/my/voicemail', icon: Voicemail },
-      { nameKey: 'My Messages', href: '/org/lemtel/my/sms', icon: Inbox },
-      { nameKey: 'Call Forwarding', href: '/org/lemtel/my/forwarding', icon: Router },
-      { nameKey: 'Voicemail Greetings', href: '/org/lemtel/my/greetings', icon: Voicemail },
-      { nameKey: 'My Devices', href: '/org/lemtel/my/devices', icon: Smartphone },
-      { nameKey: 'Download Apps', href: '/org/lemtel/my/downloads', icon: Download },
-      { nameKey: 'My Settings', href: '/org/lemtel/my/settings', icon: Settings },
+      { nameKey: 'My Dashboard', href: '/my', icon: Home },
+      { nameKey: 'My Extension', href: '/my/settings', icon: Phone },
+      { nameKey: 'My Calls', href: '/my/calls', icon: PhoneCall },
+      { nameKey: 'My Recordings', href: '/my/recordings', icon: Disc },
+      { nameKey: 'My Voicemail', href: '/my/voicemail', icon: Voicemail },
+      { nameKey: 'My Messages', href: '/my/messages', icon: Inbox },
+      { nameKey: 'Voicemail Greetings', href: '/my/greetings', icon: Voicemail },
+      { nameKey: 'Download Apps', href: '/my/downloads', icon: Download },
+      { nameKey: 'My Settings', href: '/my/settings', icon: Settings },
     ],
   },
 ];
@@ -225,7 +223,7 @@ export const sidebarGroups: NavGroup[] = [...LEGACY_GROUPS, ...PLANIPRET_GROUPS,
 
 export function getSidebarScope(pathname: string): 'org' | 'my' | 'legacy' | 'admin' {
   if (pathname.startsWith('/admin')) return 'admin';
-  // /org/<slug>/my/...
+  if (pathname === '/my' || pathname.startsWith('/my/')) return 'my';
   if (/^\/org\/[^/]+\/my(\/|$)/.test(pathname)) return 'my';
   if (pathname.startsWith('/org/')) return 'org';
   return 'legacy';
