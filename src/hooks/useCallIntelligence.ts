@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -151,6 +152,20 @@ export function useCallIntelligence(callId: string | null | undefined) {
       return await process(callId, false);
     },
   });
+
+  // Live updates: if transcript or AI insight is created/updated for this
+  // call (from any app surface or edge function), invalidate the cache so
+  // every UI listening to this hook refreshes instantly.
+  useEffect(() => {
+    if (!callId) return;
+    const ch = supabase
+      .channel(`call-intel:${callId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pbx_call_transcripts', filter: `call_record_id=eq.${callId}` }, () => { qc.invalidateQueries({ queryKey: key }); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pbx_ai_insights',     filter: `call_record_id=eq.${callId}` }, () => { qc.invalidateQueries({ queryKey: key }); })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [callId]);
 
   const regenerate = useMutation({
     mutationFn: async () => {

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { mobileApi, CallDetail } from '../lib/mobileApi';
+import { supabase } from '../integrations/supabase/client';
 
 export type AiStage = 'idle' | 'transcribing' | 'analyzing' | 'done' | 'error';
 
@@ -67,6 +68,19 @@ export function useCallAi(callId: string | null, meta: CallAiMeta | undefined, o
   useEffect(() => {
     if (autoLoad && callId) { load(); }
   }, [autoLoad, callId, load]);
+
+  // Live broadcast/postgres_changes subscription so a transcript or insight
+  // produced anywhere (mobile, desktop, portal, edge function) instantly
+  // shows up here without re-running transcription.
+  useEffect(() => {
+    if (!callId) return;
+    const ch = supabase
+      .channel(`call-ai:${callId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pbx_call_transcripts', filter: `call_record_id=eq.${callId}` }, () => { load(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pbx_ai_insights',     filter: `call_record_id=eq.${callId}` }, () => { load(); })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [callId, load]);
 
   const run = useCallback(async (opts?: { force?: boolean }) => {
     if (!callId || running) return;
