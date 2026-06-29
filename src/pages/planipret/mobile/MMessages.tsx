@@ -108,76 +108,111 @@ export default function MMessages() {
 }
 
 // ============================================================
-// SMS TAB (original threads)
+// SMS TAB — branché sur Edge Function pp-ns-sms (NS-API v2)
 // ============================================================
+type NsThread = {
+  id?: string;
+  messagesession_id?: string;
+  session_id?: string;
+  destination?: string;
+  remote_party?: string;
+  contact?: string;
+  last_message?: string;
+  preview?: string;
+  unread?: number;
+  unread_count?: number;
+  last_message_at?: string;
+  updated_at?: string;
+  timestamp?: string;
+};
+
+type NsMessage = {
+  id?: string;
+  message_id?: string;
+  direction?: string;
+  from?: string;
+  to?: string;
+  source?: string;
+  destination?: string;
+  message?: string;
+  body?: string;
+  text?: string;
+  timestamp?: string;
+  created_at?: string;
+  sent_at?: string;
+  read_at?: string | null;
+};
+
+const threadId = (t: NsThread) => t.id ?? t.messagesession_id ?? t.session_id ?? t.destination ?? "";
+const threadPeer = (t: NsThread) => t.destination ?? t.remote_party ?? t.contact ?? threadId(t);
+const threadTime = (t: NsThread) => t.last_message_at ?? t.updated_at ?? t.timestamp ?? new Date().toISOString();
+const msgId = (m: NsMessage, i: number) => m.id ?? m.message_id ?? `${m.timestamp ?? m.created_at ?? i}-${i}`;
+const msgBody = (m: NsMessage) => m.body ?? m.message ?? m.text ?? "";
+const msgTime = (m: NsMessage) => m.timestamp ?? m.created_at ?? m.sent_at ?? new Date().toISOString();
+const msgIsOut = (m: NsMessage, myExt: string) => {
+  const dir = (m.direction ?? "").toLowerCase();
+  if (dir === "outbound" || dir === "out" || dir === "sent") return true;
+  if (dir === "inbound" || dir === "in" || dir === "received") return false;
+  return (m.from ?? m.source ?? "") === myExt;
+};
+
 function SmsList({ profile, openDialer, registerRefresh }: any) {
   const { t } = useMplanipretLang();
   const myExt = profile?.extension ?? "";
-  const [messages, setMessages] = useState<Msg[]>([]);
+  const [threads, setThreads] = useState<NsThread[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeThread, setActiveThread] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [activeThread, setActiveThread] = useState<{ id: string; number: string } | null>(null);
   const [newOpen, setNewOpen] = useState(false);
   const [newNumber, setNewNumber] = useState("");
 
   const load = async () => {
     if (!profile?.user_id) return;
     setLoading(true);
-    const { data } = await supabase
-      .from("planipret_phone_messages")
-      .select("*")
-      .eq("user_id", profile.user_id)
-      .order("created_at", { ascending: false })
-      .limit(500);
-    setMessages((data ?? []) as Msg[]);
-    setLoading(false);
+    setError(null);
+    try {
+      const { data, error: err } = await supabase.functions.invoke("pp-ns-sms", {
+        body: { action: "threads" },
+      });
+      if (err) throw err;
+      const list: NsThread[] = (data as any)?.threads ?? [];
+      list.sort((a, b) => +new Date(threadTime(b)) - +new Date(threadTime(a)));
+      setThreads(list);
+    } catch (e: any) {
+      console.error("[pp-ns-sms] threads", e);
+      setError(e?.message ?? t("messages.sendFailed"));
+      toast.error(e?.message ?? t("messages.sendFailed"));
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [profile?.user_id]);
   useEffect(() => { registerRefresh(load); return () => registerRefresh(null); /* eslint-disable-next-line */ }, [profile?.user_id]);
 
-  useEffect(() => {
-    if (!profile?.user_id) return;
-    const ch = supabase
-      .channel("mplanipret-messages")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "planipret_phone_messages", filter: `user_id=eq.${profile.user_id}` }, (payload) => {
-        setMessages((prev) => [payload.new as Msg, ...prev]);
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, [profile?.user_id]);
-
-  const peer = (m: Msg) => (m.direction === "outbound" ? m.to_number : m.from_number) || "";
-
-  const threads = useMemo(() => {
-    const map = new Map<string, { number: string; last: Msg; unread: number; preview: string }>();
-    for (const m of messages) {
-      const k = peer(m);
-      if (!k) continue;
-      const cur = map.get(k);
-      const isUnread = m.direction === "inbound" && !m.read_at;
-      if (!cur) map.set(k, { number: k, last: m, unread: isUnread ? 1 : 0, preview: (m.body ?? "").slice(0, 40) });
-      else if (isUnread) cur.unread += 1;
-    }
-    return Array.from(map.values()).sort((a, b) => +new Date(b.last.created_at) - +new Date(a.last.created_at));
-  }, [messages]);
-
   if (activeThread) {
     return (
       <ThreadView
-        number={activeThread}
+        threadId={activeThread.id}
+        number={activeThread.number}
         myExt={myExt}
         userId={profile.user_id}
-        messages={messages.filter((m) => peer(m) === activeThread)}
-        onBack={() => setActiveThread(null)}
+        onBack={() => { setActiveThread(null); load(); }}
         onCall={(n) => openDialer(n)}
-        onSent={(m) => setMessages((p) => [m, ...p])}
       />
     );
   }
 
   return (
     <div className="h-full overflow-y-auto p-3">
-      <div className="flex justify-end mb-2">
+      <div className="flex justify-end mb-2 gap-2">
+        <button
+          onClick={load}
+          className="px-3 py-1.5 rounded-full flex items-center gap-1.5 text-xs font-semibold"
+          style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+        </button>
         <button
           onClick={() => { setNewNumber(""); setNewOpen(true); }}
           className="px-3 py-1.5 rounded-full flex items-center gap-1.5 text-xs font-semibold text-white"
@@ -196,41 +231,58 @@ function SmsList({ profile, openDialer, registerRefresh }: any) {
             <div key={i} className="rounded-2xl h-16 animate-pulse" style={{ background: "var(--pp-bg-surface)" }} />
           ))}
         </div>
+      ) : error ? (
+        <div className="rounded-2xl p-6 text-center" style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)" }}>
+          <p className="text-sm mb-3" style={{ color: "var(--pp-danger)" }}>{error}</p>
+          <button
+            onClick={load}
+            className="px-4 py-2 rounded-full text-xs font-semibold text-white"
+            style={{ background: "linear-gradient(135deg, var(--pp-brand-accent), var(--pp-brand-accent-2))" }}
+          >
+            {t("common.retry") ?? "Réessayer"}
+          </button>
+        </div>
       ) : threads.length === 0 ? (
         <EmptyState Icon={MessageSquare} title={t("messages.noMessages")} sub={t("messages.startNew")} />
       ) : (
         <ul className="space-y-1.5">
-          {threads.map((thread) => (
-            <li key={thread.number}>
-              <button
-                onClick={() => setActiveThread(thread.number)}
-                className="w-full px-3 py-3 flex items-center gap-3 rounded-2xl text-left active:opacity-80"
-                style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)" }}
-              >
-                <div
-                  className="w-11 h-11 rounded-full flex items-center justify-center text-white text-sm font-semibold flex-shrink-0"
-                  style={{ background: "linear-gradient(135deg, var(--pp-brand-accent), var(--pp-brand-accent-2))" }}
+          {threads.map((th) => {
+            const id = threadId(th);
+            const peer = threadPeer(th);
+            const unread = th.unread ?? th.unread_count ?? 0;
+            const preview = th.last_message ?? th.preview ?? "";
+            return (
+              <li key={id || peer}>
+                <button
+                  onClick={() => setActiveThread({ id, number: peer })}
+                  className="w-full px-3 py-3 flex items-center gap-3 rounded-2xl text-left active:opacity-80"
+                  style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)" }}
                 >
-                  {initials(thread.number)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-sm truncate" style={{ color: "var(--pp-text-primary)" }}>{thread.number}</p>
-                  <p className="text-xs truncate" style={{ color: "var(--pp-text-muted)" }}>{thread.preview || t("messages.noContent")}</p>
-                </div>
-                <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                  <span className="text-[11px]" style={{ color: "var(--pp-text-faint)" }}>{fmtTime(thread.last.created_at)}</span>
-                  {thread.unread > 0 && (
-                    <span
-                      className="min-w-[18px] h-[18px] px-1 rounded-full text-white text-[10px] font-semibold flex items-center justify-center"
-                      style={{ background: "var(--pp-danger)" }}
-                    >
-                      {thread.unread}
-                    </span>
-                  )}
-                </div>
-              </button>
-            </li>
-          ))}
+                  <div
+                    className="w-11 h-11 rounded-full flex items-center justify-center text-white text-sm font-semibold flex-shrink-0"
+                    style={{ background: "linear-gradient(135deg, var(--pp-brand-accent), var(--pp-brand-accent-2))" }}
+                  >
+                    {initials(peer)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-sm truncate" style={{ color: "var(--pp-text-primary)" }}>{peer}</p>
+                    <p className="text-xs truncate" style={{ color: "var(--pp-text-muted)" }}>{preview || t("messages.noContent")}</p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                    <span className="text-[11px]" style={{ color: "var(--pp-text-faint)" }}>{fmtTime(threadTime(th))}</span>
+                    {unread > 0 && (
+                      <span
+                        className="min-w-[18px] h-[18px] px-1 rounded-full text-white text-[10px] font-semibold flex items-center justify-center"
+                        style={{ background: "var(--pp-danger)" }}
+                      >
+                        {unread}
+                      </span>
+                    )}
+                  </div>
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
 
@@ -262,7 +314,7 @@ function SmsList({ profile, openDialer, registerRefresh }: any) {
             />
             <button
               disabled={!newNumber.trim()}
-              onClick={() => { setActiveThread(newNumber.trim()); setNewOpen(false); }}
+              onClick={() => { setActiveThread({ id: "", number: newNumber.trim() }); setNewOpen(false); }}
               className="w-full mt-3 py-2.5 rounded-lg text-white font-medium text-sm disabled:opacity-50"
               style={{ background: "linear-gradient(135deg, var(--pp-brand-accent), var(--pp-brand-accent-2))" }}
             >
@@ -275,42 +327,72 @@ function SmsList({ profile, openDialer, registerRefresh }: any) {
   );
 }
 
-function ThreadView({ number, myExt, userId, messages, onBack, onCall, onSent }: {
-  number: string; myExt: string; userId: string; messages: Msg[];
-  onBack: () => void; onCall: (n: string) => void; onSent: (m: Msg) => void;
+function ThreadView({ threadId: thId, number, myExt, userId, onBack, onCall }: {
+  threadId: string; number: string; myExt: string; userId: string;
+  onBack: () => void; onCall: (n: string) => void;
 }) {
   const { t, lang } = useMplanipretLang();
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [tplOpen, setTplOpen] = useState(false);
   const [sumOpen, setSumOpen] = useState(false);
+  const [messages, setMessages] = useState<NsMessage[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [currentThreadId, setCurrentThreadId] = useState<string>(thId);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const ordered = useMemo(() => [...messages].sort((a, b) => +new Date(a.created_at) - +new Date(b.created_at)), [messages]);
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [ordered.length]);
-
-  useEffect(() => {
-    const unread = ordered.filter((m) => m.direction === "inbound" && !m.read_at).map((m) => m.id);
-    if (unread.length) {
-      supabase.from("planipret_phone_messages").update({ read_at: new Date().toISOString() }).in("id", unread);
+  const loadMessages = async () => {
+    if (!currentThreadId) { setLoading(false); return; }
+    setLoading(true);
+    setError(null);
+    try {
+      const { data, error: err } = await supabase.functions.invoke("pp-ns-sms", {
+        body: { action: "messages", thread_id: currentThreadId },
+      });
+      if (err) throw err;
+      const list: NsMessage[] = (data as any)?.messages ?? [];
+      list.sort((a, b) => +new Date(msgTime(a)) - +new Date(msgTime(b)));
+      setMessages(list);
+    } catch (e: any) {
+      console.error("[pp-ns-sms] messages", e);
+      setError(e?.message ?? t("messages.sendFailed"));
+    } finally {
+      setLoading(false);
     }
-  }, [number, ordered.length]);
+  };
+
+  useEffect(() => { loadMessages(); /* eslint-disable-next-line */ }, [currentThreadId]);
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages.length]);
 
   const send = async () => {
     const body = text.trim();
     if (!body) return;
     setSending(true);
-    const optimistic: Msg = {
-      id: `tmp-${Date.now()}`, user_id: userId, direction: "outbound",
-      from_number: myExt, to_number: number, body, media_urls: null,
-      read_at: null, sent_at: new Date().toISOString(), created_at: new Date().toISOString(), status: "sending",
+    const optimistic: NsMessage = {
+      id: `tmp-${Date.now()}`,
+      direction: "outbound",
+      from: myExt,
+      to: number,
+      body,
+      timestamp: new Date().toISOString(),
     };
-    onSent(optimistic);
+    setMessages((prev) => [...prev, optimistic]);
     setText("");
-    const { data, error } = await supabase.functions.invoke("ns-sms", { body: { to: number, message: body, type: "sms" } });
-    setSending(false);
-    if (error || (data as any)?.success === false) {
-      toast.error((data as any)?.error ?? error?.message ?? t("messages.sendFailed"));
+    try {
+      const { data, error: err } = await supabase.functions.invoke("pp-ns-sms", {
+        body: { action: "send", to: number, message: body, ...(currentThreadId ? { thread_id: currentThreadId } : {}) },
+      });
+      if (err) throw err;
+      const newThreadId = (data as any)?.result?.messagesession_id;
+      if (newThreadId && !currentThreadId) setCurrentThreadId(newThreadId);
+      // Refresh from server to reconcile optimistic message
+      setTimeout(() => loadMessages(), 600);
+    } catch (e: any) {
+      toast.error(e?.message ?? t("messages.sendFailed"));
+      setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
+    } finally {
+      setSending(false);
     }
   };
 
@@ -325,8 +407,11 @@ function ThreadView({ number, myExt, userId, messages, onBack, onCall, onSent }:
         </button>
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-sm truncate" style={{ color: "var(--pp-text-primary)" }}>{number}</p>
-          <p className="text-[11px]" style={{ color: "var(--pp-text-muted)" }}>{ordered.length} {ordered.length > 1 ? t("messages.messages") : t("messages.message")}</p>
+          <p className="text-[11px]" style={{ color: "var(--pp-text-muted)" }}>{messages.length} {messages.length > 1 ? t("messages.messages") : t("messages.message")}</p>
         </div>
+        <button onClick={loadMessages} className="p-1.5 rounded-full" style={{ color: "var(--pp-text-secondary)" }} title="Refresh">
+          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+        </button>
         <button
           onClick={() => setSumOpen(true)}
           className="p-1.5 rounded-full"
@@ -345,27 +430,32 @@ function ThreadView({ number, myExt, userId, messages, onBack, onCall, onSent }:
       </header>
 
       <div className="flex-1 overflow-y-auto px-3 py-4 space-y-2" style={{ background: "var(--pp-bg-base)" }}>
-        {ordered.map((m) => {
-          const out = m.direction === "outbound";
-          const media: string[] = Array.isArray(m.media_urls) ? m.media_urls : [];
-          return (
-            <div key={m.id} className={`flex ${out ? "justify-end" : "justify-start"}`}>
-              <div className="max-w-[78%]">
-                <div className={out ? "pp-bubble-out" : "pp-bubble-in"} style={{ padding: "8px 12px", fontSize: 14 }}>
-                  {media.length > 0 && (
-                    <div className="space-y-1 mb-1">
-                      {media.map((u, i) => <img key={i} src={u} alt="" className="rounded-lg max-w-full" />)}
-                    </div>
-                  )}
-                  {m.body && <p className="whitespace-pre-wrap break-words">{m.body}</p>}
+        {loading && messages.length === 0 ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-6 h-6 animate-spin" style={{ color: "var(--pp-brand-accent)" }} />
+          </div>
+        ) : error ? (
+          <div className="rounded-xl p-4 text-center text-sm" style={{ background: "var(--pp-bg-surface)", color: "var(--pp-danger)" }}>
+            {error}
+          </div>
+        ) : (
+          messages.map((m, i) => {
+            const out = msgIsOut(m, myExt);
+            const body = msgBody(m);
+            return (
+              <div key={msgId(m, i)} className={`flex ${out ? "justify-end" : "justify-start"}`}>
+                <div className="max-w-[78%]">
+                  <div className={out ? "pp-bubble-out" : "pp-bubble-in"} style={{ padding: "8px 12px", fontSize: 14 }}>
+                    {body && <p className="whitespace-pre-wrap break-words">{body}</p>}
+                  </div>
+                  <p className={`text-[10px] mt-1 ${out ? "text-right" : "text-left"}`} style={{ color: "var(--pp-text-faint)" }}>
+                    {fmtTime(msgTime(m), lang, t)}{String(m.id ?? "").startsWith("tmp-") ? ` · ${t("common.sending")}` : ""}
+                  </p>
                 </div>
-                <p className={`text-[10px] mt-1 ${out ? "text-right" : "text-left"}`} style={{ color: "var(--pp-text-faint)" }}>
-                  {fmtTime(m.created_at, lang, t)}{m.status === "sending" ? ` · ${t("common.sending")}` : ""}
-                </p>
               </div>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
         <div ref={bottomRef} />
       </div>
 
@@ -387,7 +477,7 @@ function ThreadView({ number, myExt, userId, messages, onBack, onCall, onSent }:
         open={sumOpen}
         source="sms"
         title={`${t("messages.smsWith")} ${number}`}
-        content={ordered.map((m) => `${m.direction === "outbound" ? t("common.me") : number}: ${m.body ?? ""}`).join("\n")}
+        content={messages.map((m) => `${msgIsOut(m, myExt) ? t("common.me") : number}: ${msgBody(m)}`).join("\n")}
         onClose={() => setSumOpen(false)}
         onInsert={(t) => setText((cur) => cur ? `${cur} ${t}` : t)}
       />
