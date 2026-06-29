@@ -2,16 +2,15 @@
  * bootSipGuard — runs once at app boot.
  *
  * 1. Logs the SIP-related env flags and which provider will be used.
- * 2. Verifies the dispatcher banner ([Softphone] dispatcher loaded …) was
- *    printed after the hook mounts. If not within 15 s, surfaces a loud error.
- * 3. Wraps console.log/info/warn so any JsSIP UA log emitted while the
- *    native flag is active is reported as a fatal misconfiguration.
- * 4. Exposes `getSipBootReport()` for the UI fallback panel.
+ * 2. Wraps console.log/info/warn/error/debug so any JsSIP UA log emitted
+ *    while the native flag is active is reported as a fatal misconfiguration.
+ * 3. Exposes `getSipBootReport()` for the UI fallback panel.
  *
- * IMPORTANT: the banner is now emitted INSIDE the hook body (not at module
- * evaluation time), so the guard console-patch is always installed first.
- * The hooks call notifySipDispatcherLoaded() directly instead of relying on
- * console-sniffing, which eliminates all timing races.
+ * NOTE: The "dispatcher loaded" validation timer has been removed.
+ * useSoftphone mounts only AFTER the full boot sequence (SplashAva →
+ * permission gate → creds loaded), which can take 15–60 s on a cold launch.
+ * A fixed timer always fires a false positive before the hook ever mounts.
+ * The only reliable check is the JsSIP leak detector below.
  */
 import { NATIVE_SIP_ENABLED } from './nativeSipProvider';
 
@@ -30,7 +29,6 @@ const report: SipBootReport = {
 };
 
 let installed = false;
-let validationTimer: ReturnType<typeof setTimeout> | null = null;
 
 /**
  * Called directly by useSoftphoneNative / useSoftphone when the hook first
@@ -40,10 +38,6 @@ let validationTimer: ReturnType<typeof setTimeout> | null = null;
 export function notifySipDispatcherLoaded() {
   if (report.dispatcherLoaded) return;
   report.dispatcherLoaded = true;
-  if (validationTimer !== null) {
-    clearTimeout(validationTimer);
-    validationTimer = null;
-  }
   // eslint-disable-next-line no-console
   console.log('[SipBootGuard] ✓ dispatcher loaded, provider =',
     NATIVE_SIP_ENABLED ? 'native' : 'jssip');
@@ -63,6 +57,10 @@ export function installSipBootGuard() {
   });
 
   // Sniff every console call to catch any JsSIP UA log while native is active.
+  // This is the only check that matters: if JsSIP boots while NATIVE_SIP=true,
+  // two SIP stacks fight over the mic and calls will fail.
+  if (!NATIVE_SIP_ENABLED) return; // no leak possible in JsSIP mode
+
   const channels: Array<'log' | 'info' | 'warn' | 'error' | 'debug'> = [
     'log', 'info', 'warn', 'error', 'debug',
   ];
@@ -70,7 +68,7 @@ export function installSipBootGuard() {
     const original = (console as any)[ch].bind(console);
     (console as any)[ch] = (...args: any[]) => {
       try {
-        if (NATIVE_SIP_ENABLED && !report.jsSipLeak) {
+        if (!report.jsSipLeak) {
           const first = typeof args[0] === 'string' ? args[0] : '';
           // JsSIP prints with the "JsSIP:" prefix on every internal log.
           if (/^JsSIP:/.test(first) || /JsSIP\b.*\bUA\b/.test(first)) {
@@ -88,20 +86,6 @@ export function installSipBootGuard() {
       original(...args);
     };
   });
-
-  // Validation: the hook must call notifySipDispatcherLoaded() within 15 s.
-  // This covers cold launches with slow permission gates or SplashAva screens.
-  // The timer is cancelled as soon as the hook calls notifySipDispatcherLoaded().
-  validationTimer = setTimeout(() => {
-    validationTimer = null;
-    if (!report.dispatcherLoaded) {
-      // eslint-disable-next-line no-console
-      console.error(
-        '[SipBootGuard] ❌ dispatcher banner missing — useSoftphone never loaded.',
-        'The app cannot make calls. Check the bundle for VITE_NATIVE_SIP.',
-      );
-    }
-  }, 15000);
 }
 
 export function getSipBootReport(): Readonly<SipBootReport> {

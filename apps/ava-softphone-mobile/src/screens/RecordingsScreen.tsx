@@ -5,7 +5,7 @@ import { mobileApi, RecordingEntry } from '../lib/mobileApi';
 import { Card, Chip, EmptyState, Skeleton, AIPanel } from '../components/ui/Primitives';
 import type { Creds } from '../lib/creds';
 import { restGet, loadPbxRecordingAudioMobile } from '../lib/mobileSupabase';
-import { downloadRecording, getCachedRecordingUrl, prefetchRecordings } from '../lib/recordingCache';
+import { downloadRecording, getCachedRecordingUrl } from '../lib/recordingCache';
 import { showMobileToast } from '../lib/mobileToast';
 import { useCallAi } from '../hooks/useCallAi';
 import { useT } from '../lib/i18n';
@@ -121,31 +121,11 @@ export default function RecordingsScreen({
       cachedIdsRef.current = next;
       setCachedIds(new Set(next));
 
-      // Step 2: prefetch missing files (requires a valid access token).
-      if (!accessToken) return;
-
-      const missingItems = probeResults
-        .filter(({ u }) => !u)
-        .map(({ id }) => { const r = items.find((x) => x.id === id)!; return { id, meta: makeMeta(r) }; });
-
-      if (missingItems.length === 0) return;
-
-      // Download missing files — limit to 5 most recent to avoid saturating
-      // the JS thread and causing the app to freeze on large recording lists.
-      // Concurrency 2 to stay within iOS WKWebView network limits.
-      await prefetchRecordings(missingItems.slice(0, 5), accessToken, orgId, domainUuid, { concurrency: 2 });
-      if (cancelled) return;
-
-      // Verify which downloads succeeded and update ref + state once.
-      const refreshed = await Promise.all(
-        missingItems.map(async (t) => ({ id: t.id, u: await getCachedRecordingUrl(t.id) }))
-      );
-      if (cancelled) return;
-      const downloaded = refreshed.filter(({ u }) => !!u).map(({ id }) => id);
-      if (downloaded.length === 0) return;
-      downloaded.forEach((id) => cachedIdsRef.current.add(id));
-      // Single setState call after all downloads — no cascading re-renders.
-      setCachedIds(new Set(cachedIdsRef.current));
+      // Step 2: prefetch is intentionally disabled.
+      // Downloading recordings in the background saturates the iOS WKWebView
+      // JS thread (each recording requires 2–3 round-trips to Supabase + PBX)
+      // and causes the app to freeze. Recordings are downloaded on demand
+      // when the user taps the ► play button or the ⬇ download button.
     })();
 
     return () => { cancelled = true; };
