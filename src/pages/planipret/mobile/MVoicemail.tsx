@@ -275,7 +275,7 @@ function AudioPlayer({ vm }: { vm: VM }) {
     (async () => {
       if (src) return;
       const id = vm.ns_vm_id ?? vm.id;
-      const { data } = await supabase.functions.invoke("ns-voicemail", { method: "GET" as any, body: { vm_id: id, action: "fetch" } as any });
+      const { data } = await supabase.functions.invoke("pp-ns-voicemail", { body: { action: "audio", vm_id: id } });
       const url = (data as any)?.url ?? (data as any)?.audio_url;
       if (url) setSrc(url);
     })();
