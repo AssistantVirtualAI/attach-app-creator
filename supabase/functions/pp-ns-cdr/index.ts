@@ -58,11 +58,11 @@ Deno.serve(async (req) => {
     const raw = await res.json();
     const items: any[] = Array.isArray(raw) ? raw : raw?.cdrs ?? raw?.data ?? [];
 
-    if (req.method === "GET" && action === "list") {
+    if (action === "list") {
       return jsonResponse({ ok: true, count: items.length, items });
     }
 
-    if (req.method === "POST" && action === "sync") {
+    if (action === "sync") {
       const rows = items.map((it) => ({
         user_id: ctx.userId,
         organization_id: AVA_ORG_ID,
