@@ -185,6 +185,21 @@ Deno.serve(async (req) => {
     }
 
 
+    // ── transférer un voicemail à un autre utilisateur ───────────────────────
+    if (action === "forward") {
+      const { vm_id, to_user } = body ?? {};
+      if (!vm_id || !to_user) return jsonResponse({ error: "vm_id et to_user requis" }, 400);
+      const res = await nsFetch(
+        `${userBase}/voicemails/inbox/${encodeURIComponent(vm_id)}/forward`,
+        { method: "POST", body: JSON.stringify({ to_user }) }
+      );
+      if (!res.ok) {
+        const txt = await res.text();
+        return jsonResponse({ error: "NS-API forward failed", status: res.status, body: txt }, 502);
+      }
+      return jsonResponse({ ok: true, success: true });
+    }
+
     return jsonResponse({ error: `Action inconnue: ${action}` }, 400);
 
   } catch (e) {
