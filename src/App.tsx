@@ -333,15 +333,15 @@ const PlanipretOrgOnly = ({ children }: { children: React.ReactNode }) => {
 
 
 const LemtelAdminPage = ({ children }: { children: React.ReactNode }) => (
-  <ProtectedRoute><LemtelGuard><ImpersonationProvider><AdminPortalLayout>{children}</AdminPortalLayout></ImpersonationProvider></LemtelGuard></ProtectedRoute>
+  <ProtectedRoute><AppSeparationGuard app="lemtel"><LemtelGuard><ImpersonationProvider><AdminPortalLayout>{children}</AdminPortalLayout></ImpersonationProvider></LemtelGuard></AppSeparationGuard></ProtectedRoute>
 );
 
 const LemtelUserPage = ({ children }: { children: React.ReactNode }) => (
-  <ProtectedRoute><LemtelGuard><UserPortalLayout>{children}</UserPortalLayout></LemtelGuard></ProtectedRoute>
+  <ProtectedRoute><AppSeparationGuard app="lemtel"><LemtelGuard><UserPortalLayout>{children}</UserPortalLayout></LemtelGuard></AppSeparationGuard></ProtectedRoute>
 );
 
 const LemtelTelephonyPage = ({ children }: { children: React.ReactNode }) => (
-  <ProtectedRoute><LemtelGuard><TelephonyLayout>{children}</TelephonyLayout></LemtelGuard></ProtectedRoute>
+  <ProtectedRoute><AppSeparationGuard app="lemtel"><LemtelGuard><TelephonyLayout>{children}</TelephonyLayout></LemtelGuard></AppSeparationGuard></ProtectedRoute>
 );
 
 const App = () => (
