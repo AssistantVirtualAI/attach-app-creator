@@ -12,6 +12,10 @@ export function useNotificationCounts(): Counts {
   const [c, setC] = useState<Counts>({ missed: 0, voicemails: 0, recordings: 0, sms: 0, total: 0 });
   useEffect(() => {
     let alive = true;
+    let backoffMs = 2_000;
+    let reconnectTimer: number | null = null;
+    let ch: ReturnType<typeof supabase.channel> | null = null;
+
     const load = async () => {
       try {
         const [calls, vms, threads, recs] = await Promise.all([
@@ -24,29 +28,69 @@ export function useNotificationCounts(): Counts {
         const missed = (calls as CallRecord[]).filter((x) => x.status === 'missed' && new Date(x.startedAt).getTime() >= cutoff).length;
         const voicemails = (vms as VoicemailEntry[]).filter((x) => x.isNew).length;
         const sms = (threads as SmsThread[]).reduce((s, t) => s + (t.unread || 0), 0);
-        const recordings = (recs as RecordingEntry[]).length;
+        // Only count NEW recordings in the last 24h so the badge doesn't grow forever.
+        const recordings = (recs as RecordingEntry[]).filter((r: any) => {
+          const t = new Date(r.startedAt || r.created_at || r.start_at || 0).getTime();
+          return t >= cutoff;
+        }).length;
         if (!alive) return;
+        // Sort/order driven by recency — most recent activity bubbles up via counts.
         const total = missed + voicemails + sms + recordings;
         setC({ missed, voicemails, recordings, sms, total });
       } catch {}
     };
+
+    const subscribe = () => {
+      try { if (ch) supabase.removeChannel(ch); } catch {}
+      ch = supabase
+        .channel('notif-counts-live')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pbx_call_records' }, () => load())
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pbx_call_records' }, () => load())
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pbx_call_recordings' }, () => load())
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pbx_voicemails' }, () => load())
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pbx_voicemails' }, () => load())
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pbx_sms_messages' }, () => load())
+        .subscribe((status) => {
+          if (!alive) return;
+          if (status === 'SUBSCRIBED') {
+            backoffMs = 2_000;
+            // Backfill on every (re)connect to capture anything missed while offline.
+            load();
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+            if (reconnectTimer) window.clearTimeout(reconnectTimer);
+            reconnectTimer = window.setTimeout(() => {
+              if (!alive) return;
+              backoffMs = Math.min(backoffMs * 2, 60_000);
+              subscribe();
+            }, backoffMs);
+          }
+        });
+    };
+
     load();
+    subscribe();
     const id = window.setInterval(load, 60_000);
 
-    // Live refresh on new CDR / recording / voicemail / sms inserts.
-    const ch = supabase
-      .channel('notif-counts-live')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pbx_call_records' }, () => load())
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pbx_call_records' }, () => load())
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pbx_call_recordings' }, () => load())
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pbx_voicemails' }, () => load())
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pbx_sms_messages' }, () => load())
-      .subscribe();
+    // Backfill on resume / network restore (covers offline → online transitions).
+    const onResume = () => { if (document.visibilityState === 'visible') load(); };
+    const onOnline = () => { load(); };
+    document.addEventListener('visibilitychange', onResume);
+    window.addEventListener('online', onOnline);
+    window.addEventListener('focus', onResume);
 
-    return () => { alive = false; window.clearInterval(id); try { supabase.removeChannel(ch); } catch {} };
+    return () => {
+      alive = false;
+      window.clearInterval(id);
+      if (reconnectTimer) window.clearTimeout(reconnectTimer);
+      try { if (ch) supabase.removeChannel(ch); } catch {}
+      document.removeEventListener('visibilitychange', onResume);
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('focus', onResume);
+    };
   }, []);
   return c;
 }
+
 
 export default function NotificationsSheet({
   open, onClose, onNavigate,
