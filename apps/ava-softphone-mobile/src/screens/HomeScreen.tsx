@@ -283,8 +283,8 @@ function ActivitySpark({ answered, missed }: { answered: number; missed: number 
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 84 }}>
         {buckets.map((b, i) => {
           const total = b.aH + b.mH;
-          const h = (total / max) * 78;
-          const aRatio = b.aH / total;
+          const h = max > 0 ? (total / max) * 78 : 0;
+          const aRatio = total > 0 ? b.aH / total : 0;
           return (
             <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', height: '100%' }}>
               <div style={{
