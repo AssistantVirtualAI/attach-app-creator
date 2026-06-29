@@ -106,6 +106,10 @@ export default function MobileApp() {
     return 'keypad' as Tab;
   })();
   const [tab, setTab] = useState<Tab>(initialTab);
+  // Deep-link state for sub-routes inside CallsScreen (recordings | recents | voicemail | dial)
+  // and an optional pre-filter applied to the recents list ('missed' on missed-call taps).
+  const [callsSub, setCallsSub] = useState<'recents' | 'recordings' | 'voicemail' | 'dial' | undefined>(undefined);
+  const [callsFilter, setCallsFilter] = useState<'all' | 'missed' | undefined>(undefined);
   const [booting, setBooting] = useState(!isPreviewMode);
   const preferC2C = false;
 
