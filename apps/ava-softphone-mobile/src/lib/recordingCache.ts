@@ -168,13 +168,34 @@ export async function downloadRecording(
     domainUuidFallback,
   );
 
+  const cid = sanitizeId(id);
+  console.log('[recordingCache] cid=' + cid + ' action=fetch-start', { force: !!opts.force });
   const resp = await fetch(signedUrl);
-  if (!resp.ok) throw new Error(`Download failed: HTTP ${resp.status}`);
+  if (!resp.ok) {
+    console.error('[recordingCache] cid=' + cid + ' action=fetch-fail', { status: resp.status });
+    throw new Error(`Download failed: HTTP ${resp.status}`);
+  }
+  const contentType = resp.headers.get('content-type') || '';
+  const contentLength = Number(resp.headers.get('content-length') || '0') || 0;
   const blob = await resp.blob();
+  const effectiveType = blob.type || contentType;
 
-  // Guard against empty blobs — a 0-byte write would be detected as missing
-  // by getCachedNativePath on the next call, causing an infinite download loop.
-  if (blob.size === 0) throw new Error('Download failed: empty audio blob (0 bytes)');
+  // Stronger validation: refuse empty / suspiciously small / non-audio payloads.
+  if (blob.size === 0) {
+    console.error('[recordingCache] cid=' + cid + ' action=validate size=0', { contentType, contentLength });
+    throw new Error('Download failed: empty audio blob (0 bytes)');
+  }
+  if (contentLength > 0 && Math.abs(contentLength - blob.size) > 16) {
+    console.warn('[recordingCache] cid=' + cid + ' action=validate size-mismatch', { contentLength, blobSize: blob.size, contentType: effectiveType });
+  }
+  if (blob.size < MIN_AUDIO_BYTES) {
+    console.error('[recordingCache] cid=' + cid + ' action=validate too-small', { size: blob.size, contentType: effectiveType });
+    throw new Error(`Download failed: payload too small (${blob.size} bytes, content-type=${effectiveType || 'unknown'})`);
+  }
+  if (effectiveType && !/audio|octet-stream|mpeg|wav|ogg|mp4|m4a|aac|opus|webm/i.test(effectiveType)) {
+    console.error('[recordingCache] cid=' + cid + ' action=validate non-audio', { contentType: effectiveType, size: blob.size });
+    throw new Error(`Download failed: unexpected content-type "${effectiveType}"`);
+  }
 
   if (Capacitor.isNativePlatform()) {
     const { Filesystem, Directory } = await import(/* @vite-ignore */ '@capacitor/filesystem');
@@ -182,19 +203,21 @@ export async function downloadRecording(
     if (buf.byteLength === 0) throw new Error('Download failed: empty audio buffer (0 bytes)');
     const b64 = arrayBufferToBase64(buf);
     try { await Filesystem.mkdir({ path: 'recordings', directory: Directory.Data, recursive: true }); } catch {}
-    const ext = pickExt(blob.type, meta.recording_name || undefined);
+    let ext = pickExt(effectiveType, meta.recording_name || undefined, cid);
     if (!KNOWN_EXTS.includes(ext)) {
-      console.warn('[recordingCache] derived extension not in known list', { id, ext, contentType: blob.type, recordingName: meta.recording_name });
+      const fallback = extFromContentType(effectiveType) || 'wav';
+      console.warn('[recordingCache] cid=' + cid + ' action=ext-unknown fallback=' + fallback, { derived: ext, contentType: effectiveType });
+      ext = fallback;
     }
-    console.log('[recordingCache] writing recording', { id, ext, contentType: blob.type || '(none)', size: buf.byteLength, recordingName: meta.recording_name || null });
-    const path = `recordings/${sanitizeId(id)}.${ext}`;
+    console.log('[recordingCache] cid=' + cid + ' action=write', { ext, contentType: effectiveType || '(none)', size: buf.byteLength, recordingName: meta.recording_name || null });
+    const path = `recordings/${cid}.${ext}`;
     await Filesystem.writeFile({ path, directory: Directory.Data, data: b64 });
-    try { localStorage.setItem(META_KEY_PREFIX + id, JSON.stringify({ at: Date.now(), size: buf.byteLength, ext, contentType: blob.type || null })); } catch {}
+    try { localStorage.setItem(META_KEY_PREFIX + id, JSON.stringify({ at: Date.now(), size: buf.byteLength, ext, contentType: effectiveType || null })); } catch {}
     // Clear the missing flag now that the file is written.
     markRecordingCached(id);
     const uri = await Filesystem.getUri({ path, directory: Directory.Data });
     const src = Capacitor.convertFileSrc(uri.uri);
-    console.log('[recordingCache] ready', { id, ext, src });
+    console.log('[recordingCache] cid=' + cid + ' action=ready', { ext, src });
     return src;
 
   } else {
@@ -202,9 +225,11 @@ export async function downloadRecording(
     const prev = webBlobCache.get(id);
     if (prev) { try { URL.revokeObjectURL(prev); } catch {} }
     webBlobCache.set(id, url);
+    console.log('[recordingCache] cid=' + cid + ' action=ready-web', { contentType: effectiveType, size: blob.size });
     return url;
   }
 }
+
 
 /**
  * Best-effort warm-up: pre-fetch multiple recordings in the background.
