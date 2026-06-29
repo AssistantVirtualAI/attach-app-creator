@@ -27,18 +27,25 @@ Deno.serve(async (req) => {
 
   const { ctx, supabase } = guard;
   const url = new URL(req.url);
-  const action = url.searchParams.get("action") ?? "list";
+
+  // Lire le body si présent (supabase.functions.invoke envoie toujours POST + body)
+  let body: any = {};
+  if (req.method !== "GET" && req.method !== "DELETE") {
+    body = await req.json().catch(() => ({}));
+  }
+  const action = (body?.action ?? url.searchParams.get("action") ?? "list").toString();
 
   // Base path NS-API segmenté par extension utilisateur
   const userBase = `/domains/${encodeURIComponent(ctx.nsDomain)}/users/${encodeURIComponent(ctx.extension)}`;
 
   try {
-    // ── GET liste des voicemails ─────────────────────────────────────────────
-    if (req.method === "GET" && action === "list") {
-      const folder = (url.searchParams.get("folder") ?? "inbox").toLowerCase();
+    // ── liste des voicemails ─────────────────────────────────────────────────
+    if (action === "list") {
+      const folder = ((body?.folder ?? url.searchParams.get("folder") ?? "inbox") as string).toLowerCase();
       if (!VALID_FOLDERS.has(folder)) {
         return jsonResponse({ error: `Dossier invalide: ${folder}. Valeurs: inbox, saved, deleted` }, 400);
       }
+
 
       const res = await nsFetch(`${userBase}/voicemails/${folder}`, { method: "GET" });
       if (!res.ok) {
