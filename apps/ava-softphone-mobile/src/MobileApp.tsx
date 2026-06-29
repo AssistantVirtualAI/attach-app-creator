@@ -134,10 +134,26 @@ export default function MobileApp() {
       if (d.type === 'set-tab' && typeof d.tab === 'string') setTab(d.tab as Tab);
     };
     window.addEventListener('message', onMsg);
+
+    // In-app router: notification bell + native push + local notifications
+    // all dispatch ava:navigate; we translate it into (tab, sub-tab) state.
+    const unsubNav = onAppNavigate((r: any) => {
+      if (!r?.tab) return;
+      setTab(r.tab as Tab);
+      if (r.tab === 'calls') {
+        setCallsSub(r.sub || 'recents');
+        setCallsFilter(r.filter);
+      } else {
+        setCallsSub(undefined);
+        setCallsFilter(undefined);
+      }
+    });
+
     return () => {
       cancelled = true;
       window.removeEventListener('message', onMsg);
       unsubDeepLink?.();
+      unsubNav();
     };
   }, []);
 
