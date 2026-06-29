@@ -191,11 +191,21 @@ Deno.serve(async (req) => {
     ].filter(Boolean).join("\n");
 
     const writeTranscript = async (text: string, provider: string) => {
-      await admin.from("pbx_call_transcripts").delete().eq("call_record_id", call_record_id);
-      await admin.from("pbx_call_transcripts").insert({
+      // Idempotent: upsert on call_record_id so concurrent runs don't
+      // create a window where readers see "no transcript".
+      await admin.from("pbx_call_transcripts").upsert({
         organization_id, call_record_id, transcript_text: text, provider, language: "fr",
-      });
+      }, { onConflict: "call_record_id" });
       await persistTranscriptOnCall(text, provider);
+      // Broadcast so any client (mobile/desktop/portal) updates instantly
+      // even without postgres_changes subscription.
+      try {
+        await admin.channel(`ai-transcripts:${organization_id}`).send({
+          type: "broadcast",
+          event: "transcript",
+          payload: { call_record_id, transcript_text: text, provider },
+        });
+      } catch (_) {}
     };
 
     // Try to fetch audio. Order: FusionPBX first (recordings live on PBX) → direct URL → Twilio
