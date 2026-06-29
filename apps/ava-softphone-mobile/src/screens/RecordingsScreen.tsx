@@ -286,18 +286,14 @@ export default function RecordingsScreen({
           currentPlaybackRef.current = null;
           setPlayingId(null);
         }}
-        onError={async () => {
-          // iOS evicts cached files from the Data directory when storage is
-          // low, or after an app update. When the <audio> element fires an
-          // error we silently re-download the file and resume playback.
-          //
-          // IMPORTANT: recoveringRef.current must NOT be reset to false in the
-          // finally block. audio.load() fires the error event asynchronously,
-          // AFTER the finally block runs, so resetting the flag there would
-          // allow the handler to re-enter and create an infinite loop.
-          // The flag is only cleared in onEnded or when the user starts a new
-          // playback via play().
+        onError={async (e) => {
           const rec = currentPlaybackRef.current;
+          const mediaErr = (e?.currentTarget as HTMLAudioElement | undefined)?.error;
+          console.warn('[RecordingsScreen] cid=' + (rec?.id || 'none') + ' action=audio-error', {
+            code: mediaErr?.code ?? null,
+            message: mediaErr?.message ?? null,
+            src: audioRef.current?.currentSrc || null,
+          });
           if (!rec || recoveringRef.current) return;
           recoveringRef.current = true;  // permanent lock — never reset in finally
           setLoadingId(rec.id);
@@ -312,9 +308,12 @@ export default function RecordingsScreen({
             setPlaybackErrors((prev) => { const n = { ...prev }; delete n[rec.id]; return n; });
             setCachedIds((prev) => new Set(prev).add(rec.id));
             if (audioRef.current) {
+              console.log('[RecordingsScreen] cid=' + rec.id + ' action=recover-set-src', { url: freshUrl });
               audioRef.current.src = freshUrl;
               audioRef.current.load();
-              audioRef.current.play().catch(() => {});
+              audioRef.current.play().catch((err) => {
+                console.warn('[RecordingsScreen] cid=' + rec.id + ' action=recover-play-rejected', { message: err?.message });
+              });
             }
           } catch (e: any) {
             recoveringRef.current = false;  // only reset on hard failure so user can retry
