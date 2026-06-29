@@ -280,6 +280,7 @@ export async function loadPbxRecordingAudioMobile(
   const blob = await res.blob();
   if (!blob.size) throw new Error('Empty recording');
   const url = URL.createObjectURL(blob);
-  audioBlobCache.set(cacheKey, url);
+  // Do NOT cache blob: URLs — they are short-lived and break fetch() in
+  // downloadRecording. Only HTTP(S) signed URLs are cached (above).
   return url;
 }
