@@ -22,8 +22,12 @@ Deno.serve(async (req) => {
 
   const { ctx, supabase } = guard;
   const url = new URL(req.url);
-  const callId = url.searchParams.get("call_id");
-  const action = url.searchParams.get("action") ?? (callId ? "get" : "list");
+  let body: any = {};
+  if (req.method === "POST") {
+    try { body = await req.json(); } catch { body = {}; }
+  }
+  const callId = body.call_id ?? url.searchParams.get("call_id");
+  const action = body.action ?? url.searchParams.get("action") ?? (callId ? "get" : "list");
 
   try {
     // ── GET enregistrement d'un appel spécifique ─────────────────────────────
