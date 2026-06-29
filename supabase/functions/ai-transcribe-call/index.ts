@@ -504,10 +504,10 @@ Deno.serve(async (req) => {
         providerLabel = `${final.provider}/${final.model}+claude-3-5-sonnet-cleanup`;
       }
     }
-    console.log("ai-transcribe-call ai result", { provider: providerLabel, length: finalText.length, audioSource, attempts, cleanup: cleanupInfo });
+    console.log(`${logTag} action=ai-success`, { provider: providerLabel, length: finalText.length, audioSource, cleanup: cleanupInfo });
     await writeTranscript(finalText, providerLabel);
     await audit("ok", { provider: final.provider, model: final.model, metadata: { audioSource, length: finalText.length, attempts, claude_cleanup: cleanupInfo } });
-    return json({ transcript_text: finalText, audioSource, provider: providerLabel, attempts, claude_cleanup: cleanupInfo });
+    return json({ transcript_text: finalText, audioSource, provider: providerLabel, attempts, claude_cleanup: cleanupInfo, cid });
 
   } catch (e: any) {
     console.error("ai-transcribe-call error", e);
