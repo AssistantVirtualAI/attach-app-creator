@@ -253,6 +253,42 @@ function DashboardScreenInner({
         ))}
       </div>
 
+      {/* Inline status / error banner so the dashboard never silently shows nothing. */}
+      {(() => {
+        const noSoftphone = isRecord(stats.data) && (stats.data as any).noSoftphone === true;
+        const errMsg = stats.error?.message;
+        if (!errMsg && !noSoftphone) return null;
+        return (
+          <Card padded={true} style={{
+            marginBottom: 10,
+            background: noSoftphone ? 'rgba(255,200,40,0.10)' : 'rgba(255,80,80,0.10)',
+            border: `1px solid ${noSoftphone ? 'rgba(255,200,40,0.35)' : 'rgba(255,80,80,0.35)'}`,
+          }}>
+            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1.2, textTransform: 'uppercase', color: noSoftphone ? colors.signalGold : colors.danger, marginBottom: 4 }}>
+              {noSoftphone
+                ? (lang === 'fr' ? 'Compte non lié à un poste' : 'Account not linked to an extension')
+                : (lang === 'fr' ? 'Statistiques indisponibles' : 'Stats unavailable')}
+            </div>
+            <div style={{ fontSize: font.sm, color: colors.textIce, lineHeight: 1.4 }}>
+              {noSoftphone
+                ? (lang === 'fr'
+                    ? "Votre compte n'est pas associé à un poste softphone. Demandez à un admin de lier votre extension."
+                    : "Your account isn't linked to a softphone extension yet. Ask an admin to link your extension.")
+                : (errMsg || (lang === 'fr' ? 'Erreur inconnue.' : 'Unknown error.'))}
+            </div>
+            <button
+              onClick={() => { safeHaptic(); stats.refresh(); }}
+              style={{
+                marginTop: 8, padding: '8px 14px', border: 0, borderRadius: radius.lg,
+                background: colors.lemtelBlue, color: '#fff', fontWeight: 800, fontSize: 12, cursor: 'pointer',
+              }}
+            >{lang === 'fr' ? 'Réessayer' : 'Retry'}</button>
+          </Card>
+        );
+      })()}
+
+
+
       {(() => {
         const isAdmin = !!m?.permissions?.admin || m?.dataScope === 'domain_admin';
         const outbound = safeNumber(s?.outboundCalls);
