@@ -440,8 +440,17 @@ export const mobileApi = {
       { ok: true, url: '', expiresInSec: 0, contentType: 'audio/wav' },
     ),
 
-  analyzeCall: (callId: string) => call<{ jobId?: string; transcript?: string; transcript_text?: string; summary?: string; sentiment?: string; topics?: string[]; action_items?: string[]; analysis?: any }>(
-    '/ai-analyze-call', { method: 'POST', body: JSON.stringify({ call_record_id: callId }) },
+  analyzeCall: (callId: string, meta?: { transcript?: string | null; transcript_text?: string | null; organization_id?: string | null; force?: boolean }) => call<{ jobId?: string; transcript?: string; transcript_text?: string; summary?: string; sentiment?: string; topics?: string[]; action_items?: string[]; analysis?: any; insights?: any }>(
+    '/ai-analyze-call', {
+      method: 'POST',
+      body: JSON.stringify({
+        call_id: callId,
+        call_record_id: callId,
+        transcript: meta?.transcript || meta?.transcript_text || undefined,
+        organization_id: meta?.organization_id || undefined,
+        force: meta?.force || undefined,
+      }),
+    },
     { jobId: 'job-' + Date.now() },
   ),
   transcribeCall: async (callId: string, meta?: { recording_path?: string | null; recording_name?: string | null; domain_uuid?: string | null; xml_cdr_uuid?: string | null; organization_id?: string | null; vm_id?: string | null; force?: boolean; disableClaude?: boolean }) => {

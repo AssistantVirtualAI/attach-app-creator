@@ -1,7 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 
-const SYSTEM_PROMPT = `Tu es un assistant IA spécialisé pour les courtiers hypothécaires de Planiprêt.
+const SYSTEM_PROMPT = `Tu es un analyste IA spécialisé en appels téléphoniques et coaching d'agents.
 Analyse cette transcription d'appel et retourne UNIQUEMENT un JSON valide, sans texte avant ou après, avec cette structure exacte:
 {
   "summary": string,
@@ -22,12 +22,7 @@ Analyse cette transcription d'appel et retourne UNIQUEMENT un JSON valide, sans 
   "callback_reason": string
 }
 
-CRITÈRES DE SCORING DU LEAD (lead_score 1-10) :
-- 9-10 (hot / 🔥 Chaud) : Client prêt à avancer, mentionne budget, urgence, accord verbal.
-- 6-8 (warm / 🌡️ Tiède) : Intéressé mais hésitant, questions sur les taux, demande de suivi.
-- 1-5 (cold / ❄️ Froid) : Pas de budget, juste info, long délai, refus implicite.
-lead_temperature DOIT correspondre au score. lead_score_reason : 1 phrase justifiant le score.
-suggested_callback_delay : choisir intelligemment selon l'urgence. callback_reason : 1 phrase.`;
+Ajoute du coaching concret pour l'agent, les prochaines actions et les métriques de qualité. Réponds dans la langue dominante de l'appel.`;
 
 async function getSecret(admin: any, provider: string, key: string): Promise<string | null> {
   const { data } = await admin.from("planipret_integration_secrets").select("config").eq("provider", provider).maybeSingle();
@@ -38,12 +33,132 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const authHeader = req.headers.get("Authorization") || "";
+    const userClient = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: { user } } = await userClient.auth.getUser();
     const body = await req.json().catch(() => ({}));
-    const { call_id, transcript, action } = body ?? {};
+    let { call_id, call_record_id, transcript, transcript_text, action, organization_id, force } = body ?? {};
+    call_id = call_id || call_record_id || body?.callId;
+    transcript = transcript || transcript_text;
     if (action === "test" || call_id === "test") {
       return new Response(JSON.stringify({ success: true, test: true }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
-    if (!call_id || !transcript) {
+    if (!call_id) {
+      return new Response(JSON.stringify({ success: false, error: "missing call_id" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const { data: pbxCall } = await admin.from("pbx_call_records")
+      .select("id, organization_id, caller_number, caller_name, destination, destination_number, direction, duration_seconds, raw_data")
+      .eq("id", call_id)
+      .maybeSingle();
+
+    if (pbxCall) {
+      organization_id = organization_id || (pbxCall as any).organization_id;
+      const isServiceCall = authHeader === `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`;
+      if (!user && !isServiceCall) {
+        return new Response(JSON.stringify({ success: false, error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      if (user) {
+        const [m1, m2, m3, m4] = await Promise.all([
+          admin.from("organization_members").select("organization_id").eq("user_id", user.id).eq("organization_id", organization_id).maybeSingle(),
+          admin.from("org_members").select("org_id").eq("user_id", user.id).eq("org_id", organization_id).maybeSingle(),
+          admin.from("pbx_softphone_users").select("organization_id").eq("portal_user_id", user.id).eq("organization_id", organization_id).maybeSingle(),
+          admin.from("user_roles").select("organization_id").eq("user_id", user.id).eq("organization_id", organization_id).maybeSingle(),
+        ]);
+        if (![m1, m2, m3, m4].some((r) => r.data)) {
+          return new Response(JSON.stringify({ success: false, error: "Forbidden" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+      }
+
+      if (!transcript) {
+        const { data: tr } = await admin.from("pbx_call_transcripts")
+          .select("transcript_text, provider, created_at")
+          .eq("call_record_id", call_id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        transcript = (tr as any)?.transcript_text || (pbxCall as any)?.raw_data?.transcript_text || "";
+      }
+
+      if (!transcript || !String(transcript).trim()) {
+        return new Response(JSON.stringify({ success: false, error: "missing transcript", message: "Transcription audio absente: lancez d'abord la transcription voice-to-text." }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      if (!force) {
+        const { data: cached } = await admin.from("pbx_ai_insights").select("*").eq("call_record_id", call_id).maybeSingle();
+        if (cached) return new Response(JSON.stringify({ success: true, cached: true, insights: cached, transcript_text: transcript }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      const apiKey = (await getSecret(admin, "anthropic", "api_key")) ?? Deno.env.get("ANTHROPIC_API_KEY");
+      if (!apiKey) {
+        return new Response(JSON.stringify({ success: false, error: "ANTHROPIC_API_KEY non configuré" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-5-20250929",
+          max_tokens: 2000,
+          system: SYSTEM_PROMPT,
+          messages: [{ role: "user", content: `Appel: ${(pbxCall as any).caller_name || (pbxCall as any).caller_number || "inconnu"} → ${(pbxCall as any).destination_number || (pbxCall as any).destination || "inconnu"}\nDirection: ${(pbxCall as any).direction}\nDurée: ${(pbxCall as any).duration_seconds || 0}s\n\nTranscription:\n${String(transcript).slice(0, 18000)}` }],
+        }),
+      });
+
+      if (!claudeRes.ok) {
+        const errText = await claudeRes.text();
+        console.error("Claude error", claudeRes.status, errText);
+        return new Response(JSON.stringify({ success: false, error: "Claude API error", details: errText }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      const claudeData = await claudeRes.json();
+      const text = claudeData.content?.[0]?.text ?? "{}";
+      let insights: any;
+      try { insights = JSON.parse(text); } catch { insights = JSON.parse(text.match(/\{[\s\S]*\}/)?.[0] ?? "{}"); }
+
+      const row = {
+        organization_id,
+        call_record_id: call_id,
+        summary: insights.summary ?? null,
+        sentiment: ["positive", "neutral", "negative"].includes(insights.sentiment) ? insights.sentiment : "neutral",
+        satisfaction_score: insights.lead_score ?? null,
+        quality_score: insights.quality_score ?? (insights.lead_score ? Math.round(Number(insights.lead_score || 0) * 10) : null),
+        intent: insights.customer_intent ?? null,
+        topics: insights.objections ?? insights.topics ?? [],
+        action_items: (insights.tasks || []).map((t: any) => typeof t === "string" ? t : t?.title).filter(Boolean),
+        coaching_notes: [insights.coaching, insights.next_action, insights.lead_score_reason].filter(Boolean),
+        coaching_score: insights.lead_score ?? null,
+        risks: insights.risks ?? [],
+        sales_opportunities: insights.buying_signals ?? [],
+        escalation_needed: false,
+        key_phrases: insights.key_phrases ?? [],
+        prompt_version: "claude-mobile-v1",
+        ai_model: "claude-sonnet-4-5-20250929",
+      };
+
+      await admin.from("pbx_ai_insights").delete().eq("call_record_id", call_id);
+      const { data: inserted, error: insertError } = await admin.from("pbx_ai_insights").insert(row).select().single();
+      if (insertError) throw insertError;
+
+      await admin.from("pbx_call_records").update({
+        analyzed: true,
+        ai_processing: false,
+        ai_summary: row.summary,
+        raw_data: {
+          ...(((pbxCall as any)?.raw_data as Record<string, unknown>) || {}),
+          transcript_text: transcript,
+          ai: inserted,
+          ai_model: row.ai_model,
+          ai_updated_at: new Date().toISOString(),
+        },
+      }).eq("id", call_id);
+
+      return new Response(JSON.stringify({ success: true, insights: inserted, analysis: inserted, transcript_text: transcript }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    if (!transcript || !String(transcript).trim()) {
       return new Response(JSON.stringify({ success: false, error: "missing call_id or transcript" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
