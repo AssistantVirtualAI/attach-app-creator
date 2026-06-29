@@ -487,7 +487,7 @@ function Frame({ children }: { children: React.ReactNode }) {
       style={{ background: theme === "dark"
         ? "linear-gradient(160deg, #060D1A 0%, #0A1425 100%)"
         : "linear-gradient(160deg, #EEF2F8 0%, #DCE3EC 100%)" }}>
-      <div className="planipret-mobile-phone overflow-hidden w-full md:w-[390px] md:h-[844px] h-screen md:rounded-[44px] relative"
+      <div id="pp-mobile-frame" className="planipret-mobile-phone overflow-hidden w-full md:w-[390px] md:h-[844px] h-screen md:rounded-[44px] relative"
         style={{
           background: "var(--pp-bg-base)",
           border: "1px solid var(--pp-bg-border-2)",
