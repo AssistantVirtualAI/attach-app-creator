@@ -495,7 +495,8 @@ function Frame({ children }: { children: React.ReactNode }) {
             ? "0 0 0 6px #08111F, 0 40px 120px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.04)"
             : "0 0 0 6px #FFFFFF, 0 40px 120px rgba(15,27,61,0.18), inset 0 1px 0 rgba(255,255,255,0.6)",
         }}>
-        {children}
+        <div className="pp-aurora-bg" aria-hidden="true" />
+        <div className="relative z-[1] h-full w-full">{children}</div>
       </div>
     </div>
   );
