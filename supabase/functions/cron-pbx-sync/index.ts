@@ -14,8 +14,8 @@ Deno.serve(async (req) => {
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-  // AuthZ: accept either a shared cron secret, or a service-role bearer token.
-  const cronSecret = Deno.env.get("CRON_SECRET");
+  // AuthZ: require shared cron secret OR service-role bearer.
+  const cronSecret = Deno.env.get("CRON_PBX_SECRET") ?? Deno.env.get("CRON_SECRET");
   const providedSecret = req.headers.get("x-cron-secret");
   const authHeader = req.headers.get("authorization") ?? "";
   const isServiceRole = authHeader === `Bearer ${SERVICE_ROLE}`;
@@ -26,9 +26,8 @@ Deno.serve(async (req) => {
     });
   }
 
-  let body: any = {};
-  try { body = await req.json(); } catch { /* tolerate empty */ }
-  const orgId: string = body.organization_id || LEMTEL_ORG;
+  // Lock org to Lemtel — ignore client-supplied organization_id to prevent abuse.
+  const orgId: string = LEMTEL_ORG;
 
   const t0 = Date.now();
   try {
