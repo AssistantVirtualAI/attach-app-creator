@@ -43,6 +43,7 @@ import { registerPush, sendPushTokenToBackend } from './lib/pushNotifications';
 import { syncDeviceContacts } from './lib/contacts';
 import { bootNative, onAppStateChange } from './lib/nativeBoot';
 import { registerDeepLinkHandler, PENDING_CALL_KEY } from './lib/deepLink';
+import { onNavigate as onAppNavigate, navigateTo } from './lib/appRouter';
 import { dialNumber } from './lib/dialNumber';
 import { configureMobileApi, setAuthToken } from './lib/mobileApi';
 
