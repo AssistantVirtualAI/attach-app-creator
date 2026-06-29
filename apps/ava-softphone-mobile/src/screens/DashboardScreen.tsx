@@ -28,10 +28,13 @@ export default function DashboardScreen(props: DashboardProps) {
 class DashboardCrashGuard extends React.Component<DashboardProps & { children: React.ReactNode }, { error: Error | null }> {
   state: { error: Error | null } = { error: null };
   static getDerivedStateFromError(error: Error) { return { error }; }
-  componentDidCatch(error: Error) { console.error('[DashboardScreenError]', error); }
+  componentDidCatch(error: Error) {
+    console.error('[DashboardScreenError]', error);
+    try { localStorage.setItem('ava.dashboard.lastError', `${error?.name || 'Error'}: ${error?.message || ''}\n${error?.stack || ''}`); } catch {}
+  }
   render() {
     if (this.state.error) {
-      return <DashboardSafeFallback {...this.props} onRetry={() => this.setState({ error: null })} />;
+      return <DashboardSafeFallback {...this.props} error={this.state.error} onRetry={() => this.setState({ error: null })} />;
     }
     return this.props.children;
   }
