@@ -74,16 +74,30 @@ export default function RecordingsScreen({
   // re-renders, so background probes and prefetches can update it safely.
   const cachedIdsRef = useRef<Set<string>>(new Set());
 
-  // Guard ref: tracks the items+creds key for which a prefetch has already run.
+  // Guard ref: tracks the items-ids+token key for which a probe+prefetch has
+  // already run. Keyed on IDs only (not the array reference) so that the
+  // 30-second polling reload() — which creates a new array with the same IDs
+  // — does NOT re-trigger the expensive disk probe.
   const prefetchKeyRef = useRef<string | null>(null);
 
-  // Probe + prefetch in a single effect, driven by items only.
-  // Uses refs to avoid triggering re-renders from background work.
+  // Stable key derived from the sorted list of recording IDs.
+  // Changes only when the actual set of recordings changes, not on every poll.
+  const itemsIdsKey = useMemo(
+    () => (items ? items.slice(0, 50).map((r) => r.id).join(',') : ''),
+    [items],
+  );
+
+  // Probe + prefetch — runs only when the set of recording IDs changes.
   useEffect(() => {
-    if (!items || items.length === 0) return;
+    if (!items || items.length === 0 || !itemsIdsKey) return;
     const accessToken = creds?.accessToken || null;
     const domainUuid = creds?.domainUuid || creds?.fusionpbxDomainUuid || fallbackDomainUuid || null;
     const orgId = creds?.organizationId || null;
+
+    // Full guard key: IDs + token. If neither changed, skip entirely.
+    const key = `${itemsIdsKey}-${accessToken ?? ''}`;
+    if (prefetchKeyRef.current === key) return;
+    prefetchKeyRef.current = key;
 
     let cancelled = false;
 
@@ -95,7 +109,7 @@ export default function RecordingsScreen({
     });
 
     (async () => {
-      // Step 1: probe disk for all 50 items.
+      // Step 1: probe disk for all items in the current set.
       const probeResults = await Promise.all(
         items.slice(0, 50).map(async (r) => ({ id: r.id, u: await getCachedRecordingUrl(r.id) }))
       );
@@ -107,12 +121,8 @@ export default function RecordingsScreen({
       cachedIdsRef.current = next;
       setCachedIds(new Set(next));
 
-      // Step 2: prefetch missing files — guarded by key so it runs at most once
-      // per unique (items list + token) combination, regardless of re-renders.
+      // Step 2: prefetch missing files (requires a valid access token).
       if (!accessToken) return;
-      const key = `${items.map((r) => r.id).join(',')}-${accessToken}`;
-      if (prefetchKeyRef.current === key) return;
-      prefetchKeyRef.current = key;
 
       const missingItems = probeResults
         .filter(({ u }) => !u)
@@ -120,7 +130,7 @@ export default function RecordingsScreen({
 
       if (missingItems.length === 0) return;
 
-      // Download missing files (concurrency 3) — update ref only, no setState.
+      // Download missing files (concurrency 3) — no setState during downloads.
       await prefetchRecordings(missingItems, accessToken, orgId, domainUuid, { concurrency: 3 });
       if (cancelled) return;
 
@@ -137,8 +147,9 @@ export default function RecordingsScreen({
     })();
 
     return () => { cancelled = true; };
+  // itemsIdsKey is a stable memo derived from items — safe to use as dep.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items]);
+  }, [itemsIdsKey, creds?.accessToken]);
 
 
   // Fallback: derive domain_uuid from /mobile-me when creds lack it.

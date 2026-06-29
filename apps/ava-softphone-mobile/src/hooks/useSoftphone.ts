@@ -717,14 +717,25 @@ export function useSoftphoneJsSip(
 import { NATIVE_SIP_ENABLED } from '../lib/sip/nativeSipProvider';
 import { useSoftphoneNative } from './useSoftphoneNative';
 
-// Boot-time log so we can confirm in the Xcode console which path is live.
-// eslint-disable-next-line no-console
-console.log('[Softphone] dispatcher loaded — NATIVE_SIP_ENABLED =', NATIVE_SIP_ENABLED);
+// NOTE: the boot-time banner MUST be emitted inside useSoftphone() on first
+// render, NOT at module evaluation time. installSipBootGuard() patches
+// console.log in index.tsx before React mounts, but ES module side-effects
+// (module-level statements) run during the import phase — before the guard
+// is installed. Moving the log inside the hook ensures the guard intercepts it.
+const _dispatcherBannerEmitted = { current: false };
 
 export function useSoftphone(
   config: SIPConfig | null,
   opts: { jsSipTimeoutMs?: number } = {},
 ): UseSoftphoneReturn {
+  // Emit the boot-time banner exactly once, on first render, so that
+  // installSipBootGuard() (which patches console.log before React mounts)
+  // can intercept it and set report.dispatcherLoaded = true.
+  if (!_dispatcherBannerEmitted.current) {
+    _dispatcherBannerEmitted.current = true;
+    // eslint-disable-next-line no-console
+    console.log('[Softphone] dispatcher loaded — NATIVE_SIP_ENABLED =', NATIVE_SIP_ENABLED);
+  }
   if (NATIVE_SIP_ENABLED) {
     // eslint-disable-next-line react-hooks/rules-of-hooks
     return useSoftphoneNative(config);
