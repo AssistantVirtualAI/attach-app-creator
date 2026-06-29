@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, Suspense, lazy } from 'react';
+import { Component, useEffect, useMemo, useRef, useState, Suspense, lazy, type ReactNode } from 'react';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { Capacitor } from '@capacitor/core';
 // Re-use battle-tested SIP hook from the desktop app
@@ -509,23 +509,25 @@ function AuthenticatedShell({
 
 
       <div key={tab} className="lemtel-page-enter" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', paddingBottom: 'calc(96px + env(safe-area-inset-bottom, 0px))' }}>
-        <Suspense fallback={<ScreenSkeleton />}>
-          {tab === 'contacts'   && <ContactsScreen sp={sp} />}
-          {tab === 'chats'      && <MessagesHubScreen accessToken={creds.accessToken || null} userId={creds.userId} sp={sp} haptic={haptic} channelUnread={notif.channelUnread} />}
-          {tab === 'calls'      && <CallsScreen sp={sp} haptic={haptic} creds={creds} initialSub={callsSub} initialFilter={callsFilter} />}
-          {tab === 'keypad'     && <DialerScreen sp={sp} haptic={haptic} />}
-          {tab === 'speeddial'  && <SpeedDialScreen sp={sp} preferClickToCall={preferClickToCall} />}
-          {/* legacy deep-link routes */}
-          {tab === 'home'       && <DashboardScreen onNavigate={setTab as any} haptic={haptic} onOpenProfile={() => setProfileOpen(true)} />}
-          {tab === 'ava'        && <AVAChatScreen />}
-          {tab === 'messages'   && <MessagesHubScreen accessToken={creds.accessToken || null} userId={creds.userId} sp={sp} haptic={haptic} channelUnread={notif.channelUnread} />}
-          {tab === 'settings'   && <SettingsScreen creds={creds} sp={sp} onSignOut={onSignOut} onNavigate={setTab as any} preferClickToCall={preferClickToCall} togglePreferC2C={onTogglePreferC2C} />}
-          {tab === 'more'       && <MoreScreen creds={creds} sp={sp} onSignOut={onSignOut} haptic={haptic} />}
-          {tab === 'voicemail'  && <VoicemailScreen haptic={haptic} />}
-          {tab === 'sms'        && <MessagesScreen haptic={haptic} />}
-          {tab === 'queues'     && <QueuesScreen />}
-          {tab === 'audiodiag'  && <AudioDiagnosticsScreen />}
-        </Suspense>
+        <ScreenErrorBoundary screen={tab} onRecover={() => setTab('keypad')}>
+          <Suspense fallback={<ScreenSkeleton />}>
+            {tab === 'contacts'   && <ContactsScreen sp={sp} />}
+            {tab === 'chats'      && <MessagesHubScreen accessToken={creds.accessToken || null} userId={creds.userId} sp={sp} haptic={haptic} channelUnread={notif.channelUnread} />}
+            {tab === 'calls'      && <CallsScreen sp={sp} haptic={haptic} creds={creds} initialSub={callsSub} initialFilter={callsFilter} />}
+            {tab === 'keypad'     && <DialerScreen sp={sp} haptic={haptic} />}
+            {tab === 'speeddial'  && <SpeedDialScreen sp={sp} preferClickToCall={preferClickToCall} />}
+            {/* legacy deep-link routes */}
+            {tab === 'home'       && <DashboardScreen onNavigate={setTab as any} haptic={haptic} onOpenProfile={() => setProfileOpen(true)} />}
+            {tab === 'ava'        && <AVAChatScreen />}
+            {tab === 'messages'   && <MessagesHubScreen accessToken={creds.accessToken || null} userId={creds.userId} sp={sp} haptic={haptic} channelUnread={notif.channelUnread} />}
+            {tab === 'settings'   && <SettingsScreen creds={creds} sp={sp} onSignOut={onSignOut} onNavigate={setTab as any} preferClickToCall={preferClickToCall} togglePreferC2C={onTogglePreferC2C} />}
+            {tab === 'more'       && <MoreScreen creds={creds} sp={sp} onSignOut={onSignOut} haptic={haptic} />}
+            {tab === 'voicemail'  && <VoicemailScreen haptic={haptic} />}
+            {tab === 'sms'        && <MessagesScreen haptic={haptic} />}
+            {tab === 'queues'     && <QueuesScreen />}
+            {tab === 'audiodiag'  && <AudioDiagnosticsScreen />}
+          </Suspense>
+        </ScreenErrorBoundary>
       </div>
 
 
@@ -557,6 +559,31 @@ function AuthenticatedShell({
       )}
     </div>
   );
+}
+
+class ScreenErrorBoundary extends Component<
+  { children: ReactNode; screen: Tab; onRecover: () => void },
+  { error: Error | null }
+> {
+  state = { error: null };
+  static getDerivedStateFromError(error: Error) { return { error }; }
+  componentDidCatch(error: Error) { console.error('[MobileScreenError]', this.props.screen, error); }
+  render() {
+    if (!this.state.error) return this.props.children;
+    return (
+      <div style={{ flex: 1, display: 'grid', placeItems: 'center', padding: 24, color: colors.textIce }}>
+        <div style={{ maxWidth: 320, textAlign: 'center', padding: 18, borderRadius: 16, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}>
+          <div style={{ fontSize: 26, marginBottom: 8 }}>⚠️</div>
+          <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 6 }}>Page indisponible</div>
+          <div style={{ fontSize: 12, color: colors.textSub, marginBottom: 14 }}>Retournez au clavier et réessayez.</div>
+          <button
+            onClick={this.props.onRecover}
+            style={{ border: 0, borderRadius: 12, padding: '10px 14px', fontSize: 13, fontWeight: 800, color: '#fff', background: colors.lemtelBlue }}
+          >Clavier</button>
+        </div>
+      </div>
+    );
+  }
 }
 
 /* ─── Top header with hamburger dropdown + actions ─────────────────────── */
