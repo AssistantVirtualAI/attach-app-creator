@@ -120,7 +120,7 @@ Deno.serve(async (req) => {
         summary: insights.summary ?? null,
         sentiment: ["positive", "neutral", "negative"].includes(insights.sentiment) ? insights.sentiment : "neutral",
         satisfaction_score: insights.lead_score ?? null,
-        quality_score: insights.quality_score ?? insights.lead_score ? Math.round(Number(insights.lead_score || 0) * 10) : null,
+        quality_score: insights.quality_score ?? (insights.lead_score ? Math.round(Number(insights.lead_score || 0) * 10) : null),
         intent: insights.customer_intent ?? null,
         topics: insights.objections ?? insights.topics ?? [],
         action_items: (insights.tasks || []).map((t: any) => typeof t === "string" ? t : t?.title).filter(Boolean),
@@ -152,6 +152,10 @@ Deno.serve(async (req) => {
       }).eq("id", call_id);
 
       return new Response(JSON.stringify({ success: true, insights: inserted, analysis: inserted, transcript_text: transcript }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    if (!transcript || !String(transcript).trim()) {
+      return new Response(JSON.stringify({ success: false, error: "missing call_id or transcript" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const apiKey = (await getSecret(admin, "anthropic", "api_key")) ?? Deno.env.get("ANTHROPIC_API_KEY");

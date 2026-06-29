@@ -117,7 +117,7 @@ export function useCallAi(callId: string | null, meta: CallAiMeta | undefined, o
       // downstream callDetail roundtrip is slow or eventually consistent.
       const ai = a?.insights || a?.analysis || a || {};
       const analyzedTranscriptText: string = a?.transcript_text || a?.transcript || transcriptText;
-      const transcriptLines = transcriptText
+      const transcriptLines = analyzedTranscriptText
         ? analyzedTranscriptText.split(/\r?\n/).filter(Boolean).map((ln: string, i: number) => {
             const m = ln.match(/^\s*(agent|caller|customer|client|user)\s*[:\-]\s*(.+)$/i);
             const speaker = (m?.[1] || '').toLowerCase();
