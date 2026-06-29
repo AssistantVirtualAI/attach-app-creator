@@ -452,7 +452,7 @@ export const mobileApi = {
       record_path: meta?.recording_path || undefined,
       record_name: meta?.recording_name || undefined,
       domain_uuid: meta?.domain_uuid || undefined,
-      organization_id: meta?.organization_id || undefined,
+      organization_id: meta?.organization_id || '71755d33-ed64-4ad5-a828-61c9d2029eb7',
       force: meta?.force || undefined,
       disable_claude: meta?.disableClaude || undefined,
     }) },

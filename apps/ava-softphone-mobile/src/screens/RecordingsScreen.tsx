@@ -166,7 +166,8 @@ export default function RecordingsScreen({
   const recMeta = (rec: RecordingEntry) => ({
     recording_path: rec.record_path, recording_name: rec.record_name,
     xml_cdr_uuid: rec.xml_cdr_uuid || rec.id, domain_uuid: rec.domain_uuid,
-    domain_name: rec.domain_name, organization_id: rec.organization_id,
+    domain_name: rec.domain_name,
+    organization_id: rec.organization_id || creds?.organizationId || undefined,
     start_at: rec.startedAt,
   });
 
