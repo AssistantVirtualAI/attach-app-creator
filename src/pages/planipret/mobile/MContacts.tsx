@@ -1,13 +1,13 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useOutletContext } from "react-router-dom";
-import { Search, Phone, MessageSquare, Mail, Users, Smartphone, Clock, X, Calendar, ListChecks, Loader2, ExternalLink, Sparkles } from "lucide-react";
+import { Search, Phone, MessageSquare, Mail, Users, UserCog, BookUser, X, Calendar, ListChecks, Loader2, ExternalLink, Sparkles, Plus } from "lucide-react";
 import AvaSummarizeSheet from "@/components/planipret/ava/AvaSummarizeSheet";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { PlanipretMobileContext } from "../PlanipretMobile";
 import { useMplanipretLang } from "@/hooks/useMplanipretLang";
 
-type Tab = "maestro" | "phone" | "recents";
+type Tab = "personal" | "shared" | "directory";
 
 function Avatar({ name }: { name: string }) {
   const initials = name.split(" ").map((s) => s[0]).slice(0, 2).join("").toUpperCase() || "?";
@@ -24,68 +24,79 @@ function Avatar({ name }: { name: string }) {
   );
 }
 
+function normalizeContact(c: any) {
+  return {
+    id: c.id ?? c.contact_id ?? c.uid ?? crypto.randomUUID(),
+    first_name: c.first_name ?? c.firstname ?? "",
+    last_name: c.last_name ?? c.lastname ?? "",
+    phone: c.phone ?? c.cell_phone ?? c.work_phone ?? c.home_phone ?? "",
+    email: c.email ?? "",
+    company: c.company ?? c.organization ?? "",
+    raw: c,
+  };
+}
+
 export default function MContacts() {
   const { t } = useMplanipretLang();
   const { openDialer } = useOutletContext<PlanipretMobileContext>();
-  const [tab, setTab] = useState<Tab>("maestro");
+  const [tab, setTab] = useState<Tab>("personal");
   const [q, setQ] = useState("");
-  const [maestroContacts, setMaestroContacts] = useState<any[]>([]);
-  const [recents, setRecents] = useState<any[]>([]);
+  const [personal, setPersonal] = useState<any[]>([]);
+  const [shared, setShared] = useState<any[]>([]);
+  const [directory, setDirectory] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<any | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
 
-  useEffect(() => {
-    let cancel = false;
-    (async () => {
-      setLoading(true);
-      try {
-        if (tab === "maestro") {
-          const { data } = await supabase
-            .from("planipret_contacts")
-            .select("*")
-            .order("updated_at", { ascending: false })
-            .limit(50);
-          if (!cancel) setMaestroContacts(data ?? []);
-        } else if (tab === "recents") {
-          const { data } = await supabase
-            .from("planipret_phone_calls")
-            .select("id, from_number, to_number, direction, started_at, contact_name")
-            .order("started_at", { ascending: false })
-            .limit(30);
-          if (!cancel) setRecents(data ?? []);
-        }
-      } finally { if (!cancel) setLoading(false); }
-    })();
-    return () => { cancel = true; };
-  }, [tab]);
+  const load = useCallback(async (which: Tab) => {
+    setLoading(true);
+    try {
+      const action = which === "personal" ? "list" : which === "shared" ? "shared" : "directory";
+      const { data, error } = await supabase.functions.invoke("pp-ns-contacts", { body: { action } });
+      if (error) throw error;
+      if (which === "directory") {
+        setDirectory(((data as any)?.directory ?? []));
+      } else {
+        const list = ((data as any)?.contacts ?? []).map(normalizeContact);
+        if (which === "personal") setPersonal(list);
+        else setShared(list);
+      }
+    } catch (e: any) {
+      console.error("[pp-ns-contacts]", which, e);
+      toast.error(t("contacts.loadFailed") || "Échec chargement contacts", { description: e?.message });
+    } finally {
+      setLoading(false);
+    }
+  }, [t]);
+
+  useEffect(() => { load(tab); }, [tab, load]);
 
   const list = useMemo(() => {
-    if (tab === "maestro") {
-      return maestroContacts.filter((c) => {
-        if (!q) return true;
-        const hay = `${c.first_name ?? ""} ${c.last_name ?? ""} ${c.phone ?? ""} ${c.email ?? ""}`.toLowerCase();
-        return hay.includes(q.toLowerCase());
-      });
-    }
-    if (tab === "recents") {
-      const seen = new Set<string>();
-      const dedup: any[] = [];
-      for (const r of recents) {
-        const key = r.direction === "inbound" ? r.from_number : r.to_number;
-        if (!key || seen.has(key)) continue;
-        seen.add(key);
-        dedup.push({ id: r.id, name: r.contact_name ?? key, number: key, time: r.started_at });
-      }
-      return dedup;
-    }
-    return [];
-  }, [tab, maestroContacts, recents, q]);
+    const src = tab === "personal" ? personal : tab === "shared" ? shared : directory;
+    const ql = q.trim().toLowerCase();
+    if (!ql) return src;
+    return src.filter((c: any) => {
+      const hay = tab === "directory"
+        ? `${c.name ?? ""} ${c.extension ?? ""} ${c.email ?? ""} ${c.department ?? ""}`
+        : `${c.first_name ?? ""} ${c.last_name ?? ""} ${c.phone ?? ""} ${c.email ?? ""} ${c.company ?? ""}`;
+      return hay.toLowerCase().includes(ql);
+    });
+  }, [tab, personal, shared, directory, q]);
 
   return (
     <div className="p-4 pb-2">
-      <h1 style={{ fontFamily: "Inter,sans-serif", fontWeight: 700, fontSize: 22, color: "var(--pp-text-primary)", marginBottom: 12 }}>
-        {t("contacts.title")}
-      </h1>
+      <div className="flex items-center justify-between mb-3">
+        <h1 style={{ fontFamily: "Inter,sans-serif", fontWeight: 700, fontSize: 22, color: "var(--pp-text-primary)" }}>
+          {t("contacts.title")}
+        </h1>
+        {tab === "personal" && (
+          <button onClick={() => setCreateOpen(true)}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold active:scale-95 transition"
+            style={{ background: "var(--pp-brand-accent-2)", border: "1px solid var(--pp-brand-accent)", color: "#fff" }}>
+            <Plus className="w-3.5 h-3.5" /> {t("common.new") || "Nouveau"}
+          </button>
+        )}
+      </div>
 
       {/* Search */}
       <div className="flex items-center gap-2 px-3 mb-4"
@@ -103,9 +114,9 @@ export default function MContacts() {
       {/* Pill tabs */}
       <div className="flex gap-1 p-1 mb-4" style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)", borderRadius: 12 }}>
         {([
-          { id: "maestro", label: t("contacts.maestro"), Icon: Users },
-          { id: "phone", label: t("contacts.phone"), Icon: Smartphone },
-          { id: "recents", label: t("contacts.recents"), Icon: Clock },
+          { id: "personal", label: t("contacts.personal") || "Personnels", Icon: Users },
+          { id: "shared", label: t("contacts.shared") || "Partagés", Icon: UserCog },
+          { id: "directory", label: t("contacts.directory") || "Annuaire", Icon: BookUser },
         ] as const).map((p) => {
           const active = tab === p.id;
           return (
@@ -125,38 +136,28 @@ export default function MContacts() {
         })}
       </div>
 
-      {/* Content */}
       {loading && <div className="text-center py-8 text-sm" style={{ color: "var(--pp-text-muted)" }}>{t("common.loading")}</div>}
 
-      {!loading && tab === "maestro" && list.length === 0 && (
+      {!loading && list.length === 0 && (
         <div className="text-center py-8 pp-card" style={{ padding: 32 }}>
           <Users className="w-10 h-10 mx-auto mb-3" style={{ color: "var(--pp-text-faint)" }} />
-          <div style={{ color: "var(--pp-text-secondary)", fontSize: 13 }}>{t("contacts.noMaestro")}</div>
-        </div>
-      )}
-
-      {!loading && tab === "phone" && (
-        <div className="text-center py-8 pp-card" style={{ padding: 32 }}>
-          <Smartphone className="w-10 h-10 mx-auto mb-3" style={{ color: "var(--pp-text-faint)" }} />
-          <div style={{ color: "var(--pp-text-secondary)", fontSize: 13, marginBottom: 12 }}>
-            {t("contacts.phoneAccess")}
-          </div>
-          <div style={{ color: "var(--pp-text-muted)", fontSize: 11 }}>
-            {t("contacts.nativeOnly")}
+          <div style={{ color: "var(--pp-text-secondary)", fontSize: 13 }}>
+            {tab === "directory" ? (t("contacts.noDirectory") || "Aucune extension") : (t("contacts.noContacts") || "Aucun contact")}
           </div>
         </div>
       )}
 
-      {!loading && (tab === "maestro" || tab === "recents") && list.length > 0 && (
+      {!loading && list.length > 0 && (
         <div className="space-y-2">
           {list.map((c: any) => {
-            const name = tab === "maestro" ? `${c.first_name ?? ""} ${c.last_name ?? ""}`.trim() || c.phone : c.name;
-            const sub = tab === "maestro" ? (c.phone ?? c.email ?? "") : c.number;
-            const phone = tab === "maestro" ? c.phone : c.number;
+            const isDir = tab === "directory";
+            const name = isDir ? (c.name || c.extension) : (`${c.first_name ?? ""} ${c.last_name ?? ""}`.trim() || c.phone || c.email);
+            const sub = isDir ? `Ext. ${c.extension}${c.department ? " • " + c.department : ""}` : (c.phone || c.email || c.company);
+            const phone = isDir ? c.extension : c.phone;
             return (
               <div
-                key={c.id}
-                onClick={() => tab === "maestro" && setSelected(c)}
+                key={c.id ?? c.extension}
+                onClick={() => !isDir && setSelected(c)}
                 className="pp-card flex items-center gap-3 cursor-pointer"
                 style={{ padding: 12 }}
               >
@@ -173,7 +174,7 @@ export default function MContacts() {
                   aria-label={t("common.call")}>
                   <Phone className="w-3.5 h-3.5" />
                 </button>
-                {tab === "maestro" && (
+                {!isDir && (
                   <>
                     <button onClick={(e) => e.stopPropagation()} className="flex items-center justify-center" style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>
                       <MessageSquare className="w-3.5 h-3.5" />
@@ -196,9 +197,80 @@ export default function MContacts() {
           onCall={(p) => { setSelected(null); openDialer(p); }}
         />
       )}
+
+      {createOpen && (
+        <CreateContactSheet
+          onClose={() => setCreateOpen(false)}
+          onCreated={() => { setCreateOpen(false); load("personal"); }}
+        />
+      )}
     </div>
   );
 }
+
+function CreateContactSheet({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const { t } = useMplanipretLang();
+  const [form, setForm] = useState({ first_name: "", last_name: "", phone: "", email: "", company: "" });
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    if (!form.first_name && !form.last_name && !form.phone) {
+      toast.error(t("contacts.requiredFields") || "Prénom, nom ou téléphone requis");
+      return;
+    }
+    setSaving(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("pp-ns-contacts", {
+        body: { action: "create", ...form },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      toast.success(t("contacts.created") || "Contact créé");
+      onCreated();
+    } catch (e: any) {
+      toast.error(t("contacts.createFailed") || "Échec création", { description: e?.message });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="absolute inset-0 z-40 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div className="w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-4"
+        style={{ background: "var(--pp-bg-base)", border: "1px solid var(--pp-bg-border-2)" }}
+        onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-lg font-bold" style={{ color: "var(--pp-text-primary)" }}>
+            {t("contacts.newContact") || "Nouveau contact"}
+          </div>
+          <button onClick={onClose} style={{ color: "var(--pp-text-muted)" }}><X className="w-5 h-5" /></button>
+        </div>
+        <div className="space-y-2">
+          {([
+            ["first_name", t("contacts.firstName") || "Prénom"],
+            ["last_name", t("contacts.lastName") || "Nom"],
+            ["phone", t("contacts.phoneLabel") || "Téléphone"],
+            ["email", "Email"],
+            ["company", t("contacts.company") || "Société"],
+          ] as const).map(([k, label]) => (
+            <input key={k}
+              value={(form as any)[k]}
+              onChange={(e) => setForm((f) => ({ ...f, [k]: e.target.value }))}
+              placeholder={label}
+              className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+              style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }} />
+          ))}
+        </div>
+        <button onClick={save} disabled={saving}
+          className="w-full mt-4 py-2.5 rounded-lg text-white font-semibold text-sm disabled:opacity-50"
+          style={{ background: "var(--pp-brand-accent)" }}>
+          {saving ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : (t("common.save") || "Enregistrer")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 
 function ContactDetailSheet({
   contact, onClose, onCall,
