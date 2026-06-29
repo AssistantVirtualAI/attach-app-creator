@@ -90,6 +90,7 @@ Deno.serve(async (req) => {
       durationSec: Number(r.duration_seconds || 0),
       hasTranscript: !!r.transcribed,
       summary: r.ai_summary || undefined,
+      pbx_uuid: r.pbx_uuid || undefined,
       xml_cdr_uuid: r.pbx_uuid || r.id,
       record_path: r.recording_path || undefined,
       record_name: r.recording_name || undefined,
