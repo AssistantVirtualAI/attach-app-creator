@@ -317,7 +317,7 @@ function ForwardModal({ vm, onClose }: { vm: VM; onClose: () => void }) {
   const submit = async () => {
     if (!ext.trim()) return;
     setBusy(true);
-    const { data, error } = await supabase.functions.invoke("ns-voicemail/forward", { body: { vm_id: vm.ns_vm_id ?? vm.id, to_user: ext.trim() } });
+    const { data, error } = await supabase.functions.invoke("pp-ns-voicemail", { body: { action: "forward", vm_id: vm.ns_vm_id ?? vm.id, to_user: ext.trim() } });
     setBusy(false);
     if (error || (data as any)?.success === false) { toast.error(t("voicemail.forwardFailed")); return; }
     toast.success(t("voicemail.forwarded"));
