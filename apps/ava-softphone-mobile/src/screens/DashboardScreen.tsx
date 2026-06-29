@@ -67,6 +67,11 @@ function DashboardSafeFallback({ onNavigate, haptic, onRetry, onOpenProfile, err
         <p style={{ fontSize: font.sm, color: colors.textSub, lineHeight: 1.5, margin: 0 }}>
           {tx("Une donnée du tableau de bord n'a pas pu être affichée, mais l'application reste accessible.", 'One dashboard data field could not be displayed, but the app remains accessible.')}
         </p>
+        {error?.message && (
+          <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(255,80,80,0.12)', border: '1px solid rgba(255,80,80,0.3)', fontSize: 11, color: '#ffd5d5', fontFamily: 'JetBrains Mono, monospace', wordBreak: 'break-word' }}>
+            {String(error.message).slice(0, 280)}
+          </div>
+        )}
       </HeroGradient>
       <SectionTitle eyebrow="AVA" title={tx('Actions rapides', 'Quick actions')} />
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
