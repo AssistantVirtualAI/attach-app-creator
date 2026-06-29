@@ -13,7 +13,6 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANON = Deno.env.get("SUPABASE_ANON_KEY")!;
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
-const ELEVENLABS_KEY = Deno.env.get("ELEVENLABS_API_KEY");
 
 const json = (b: unknown, s = 200) =>
   new Response(JSON.stringify(b), { status: s, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -68,7 +67,7 @@ Deno.serve(async (req) => {
 
     const { data: call, error: callErr } = await admin
       .from("pbx_call_records")
-      .select("id, organization_id, caller_number, caller_name, destination, destination_number, direction, duration_seconds, recording_url, has_recording")
+      .select("id, organization_id, caller_number, caller_name, destination, destination_number, direction, duration_seconds, recording_url, recording_path, recording_name, pbx_uuid, domain_uuid, domain_name, has_recording")
       .eq("id", callId)
       .single();
     if (callErr || !call) return json({ error: "Call not found" }, 404);
@@ -138,7 +137,7 @@ Deno.serve(async (req) => {
       .maybeSingle();
     const { data: existingTr } = await admin
       .from("pbx_call_transcripts")
-      .select("transcript_text, created_at")
+      .select("transcript_text, provider, created_at")
       .eq("call_record_id", callId)
       .order("created_at", { ascending: false })
       .limit(1)
@@ -191,48 +190,36 @@ Deno.serve(async (req) => {
       await audit("queued", "queued", { pipeline: "full" });
 
       // Step 1: ensure transcript
-      let transcript = existingTr?.transcript_text ?? "";
+      const existingProvider = String((existingTr as any)?.provider || "").toLowerCase();
+      let transcript = existingProvider.startsWith("stub") ? "" : existingTr?.transcript_text ?? "";
       if (!transcript) {
-        if (!call.recording_url) {
-          await audit("failed", "failed", { pipeline: "transcribe", error: "recording_not_available" });
-          return json({ status: "pending_sync", message: "Recording not yet available from PBX" }, 202);
-        }
-        if (!ELEVENLABS_KEY) {
-          await audit("failed", "failed", { pipeline: "transcribe", error: "stt_provider_missing" });
-          return json({ error: "Transcription provider not configured" }, 500);
-        }
         try {
-          const audioRes = await fetch(call.recording_url);
-          if (!audioRes.ok) {
-            await audit("failed", "failed", { pipeline: "transcribe", error: `audio_fetch_${audioRes.status}` });
-            return json({ status: "pending_sync", message: "Recording not yet retrievable", retry_after_ms: 5000 }, 202);
-          }
-          const audioBlob = await audioRes.blob();
-          const fd = new FormData();
-          fd.append("file", audioBlob, "recording.mp3");
-          fd.append("model_id", "scribe_v2");
-          fd.append("diarize", "true");
-          const sttRes = await fetch("https://api.elevenlabs.io/v1/speech-to-text", {
+          const sttRes = await fetch(`${SUPABASE_URL}/functions/v1/ai-transcribe-call`, {
             method: "POST",
-            headers: { "xi-api-key": ELEVENLABS_KEY },
-            body: fd,
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_ROLE}`, apikey: SERVICE_ROLE },
+            body: JSON.stringify({
+              call_record_id: call.id,
+              organization_id: call.organization_id,
+              recording_url: call.recording_url,
+              recording_path: (call as any).recording_path,
+              recording_name: (call as any).recording_name,
+              xml_cdr_uuid: (call as any).pbx_uuid,
+              domain_uuid: (call as any).domain_uuid,
+            }),
           });
           if (!sttRes.ok) {
             const t = await sttRes.text();
             console.error("STT failed", sttRes.status, t);
             await audit("failed", "failed", { pipeline: "transcribe", error: t.slice(0, 500) });
-            return json({ error: "Transcription failed", details: t }, 502);
+            return json({ status: "pending_sync", message: "Transcription temporarily unavailable", details: t.slice(0, 500), retry_after_ms: 5000 }, 202);
           }
           const sttJson = await sttRes.json();
-          transcript = sttJson.text ?? "";
+          transcript = sttJson.transcript_text ?? sttJson.text ?? "";
+          if (sttJson.stub) {
+            await audit("failed", "failed", { pipeline: "transcribe", error: sttJson.reason || "stub_transcript", metadata: { reason: sttJson.reason, pending_sync: sttJson.pending_sync } });
+            return json({ status: sttJson.pending_sync ? "pending_sync" : "missing", message: sttJson.reason || "Transcript unavailable", retry_after_ms: sttJson.retry_after_ms ?? 5000 }, 202);
+          }
           if (transcript) {
-            await admin.from("pbx_call_transcripts").insert({
-              organization_id: call.organization_id,
-              call_record_id: call.id,
-              transcript_text: transcript,
-              provider: "elevenlabs",
-              language: sttJson.language_code ?? "fr",
-            });
             const { data: existingCall } = await admin.from("pbx_call_records")
               .select("raw_data")
               .eq("id", call.id)
@@ -242,11 +229,11 @@ Deno.serve(async (req) => {
               raw_data: {
                 ...((existingCall?.raw_data as Record<string, unknown>) || {}),
                 transcript_text: transcript,
-                transcript_provider: "elevenlabs",
+                transcript_provider: sttJson.provider || "ai-transcribe-call",
                 transcript_updated_at: new Date().toISOString(),
               },
             }).eq("id", call.id);
-            await audit("transcribed", "processing", { pipeline: "transcribe", metadata: { chars: transcript.length } });
+            await audit("transcribed", "processing", { pipeline: "transcribe", metadata: { chars: transcript.length, provider: sttJson.provider || null } });
           }
         } catch (e) {
           console.error("STT error", e);

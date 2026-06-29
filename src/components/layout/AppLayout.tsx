@@ -45,6 +45,7 @@ import { useApplyBranding } from '@/hooks/useApplyBranding';
 import { SoftphoneWidget } from '@/components/softphone/SoftphoneWidget';
 import { AppAccessGate } from '@/components/auth/AppAccessGate';
 import { VersionBadge } from '@/components/shared/VersionBadge';
+import { useLemtelAiRealtime } from '@/hooks/useLemtelAiRealtime';
 
 const SIDEBAR_ORDER_KEY = 'sidebar-group-order';
 
@@ -100,7 +101,11 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
   // Filter groups based on route scope, role and Lemtel org membership
   const isLemtelOrgSelected = selectedOrgId === '71755d33-ed64-4ad5-a828-61c9d2029eb7';
   const isPlanipretOrgSelected = selectedOrgId === '17d6507f-a9ca-409d-8e49-371d50332615';
+  useLemtelAiRealtime(isLemtelOrgSelected ? selectedOrgId : null);
   const currentScope = getSidebarScope(location.pathname);
+  const homeHref = isLemtelOrgSelected
+    ? (currentScope === 'my' ? '/my' : '/org/lemtel/admin/dashboard')
+    : '/dashboard';
   const visibleGroups = useMemo(() => sidebarGroups.filter(g => {
     const groupScope = g.scope ?? 'legacy';
     if (currentScope === 'admin') return false; // admin portal uses its own layout
@@ -189,7 +194,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
         >
           <Menu className="w-6 h-6 text-foreground" />
         </button>
-        <Link to="/" className="ml-3">
+        <Link to={homeHref} className="ml-3">
           <AvaLogo size="sm" animated={false} showText={false} className="[&_div:first-child]:w-10 [&_div:first-child]:h-10 [&_img]:w-10 [&_img]:h-10" />
         </Link>
       </header>
@@ -210,7 +215,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
         <div className="flex flex-col h-full relative">
           {/* Header: Logo + Org name */}
           <div className="px-4 py-4 border-b border-cockpit-border/40 flex items-center gap-3 bg-gradient-to-r from-cockpit-cyan/[0.06] via-transparent to-cockpit-violet/[0.06]">
-            <Link to="/" onClick={() => setIsSidebarOpen(false)} className="shrink-0 relative">
+            <Link to={homeHref} onClick={() => setIsSidebarOpen(false)} className="shrink-0 relative">
               <span className="absolute inset-0 -m-1 rounded-full bg-cockpit-cyan/20 blur-md opacity-60 animate-cockpit-pulse" aria-hidden />
               <AvaLogo size="md" animated={true} showText={false} className="relative [&_div:first-child]:w-11 [&_div:first-child]:h-11 [&_img]:w-11 [&_img]:h-11" />
             </Link>
@@ -282,7 +287,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
             {/* Portal switcher (Lemtel only) */}
             {isLemtelOrgSelected && currentScope === 'org' && (
               <Link
-                to="/org/lemtel/my/dashboard"
+                to="/my"
                 onClick={() => setIsSidebarOpen(false)}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 mt-3 text-muted-foreground hover:text-foreground hover:bg-muted border border-dashed border-border/60"
               >

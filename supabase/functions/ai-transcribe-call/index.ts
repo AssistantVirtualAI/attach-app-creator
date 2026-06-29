@@ -53,13 +53,14 @@ Deno.serve(async (req) => {
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) { await audit("forbidden", { error_code: "no-auth", http_status: 401 }); return json({ error: "Unauthorized" }, 401); }
+    const isServiceCall = authHeader === `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`;
 
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
       global: { headers: { Authorization: authHeader } },
     });
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { await audit("forbidden", { error_code: "no-user", http_status: 401 }); return json({ error: "Unauthorized" }, 401); }
-    auditUser = user.id;
+    if (!user && !isServiceCall) { await audit("forbidden", { error_code: "no-user", http_status: 401 }); return json({ error: "Unauthorized" }, 401); }
+    auditUser = user?.id ?? null;
 
     const admin = admin0;
     const body = await req.json().catch(() => ({}));
@@ -89,13 +90,15 @@ Deno.serve(async (req) => {
     auditOrg = organization_id; auditCall = call_record_id;
 
     // Membership check
-    const checks = await Promise.all([
-      admin.from("organization_members").select("organization_id").eq("user_id", user.id).eq("organization_id", organization_id).maybeSingle(),
-      admin.from("org_members").select("org_id").eq("user_id", user.id).eq("org_id", organization_id).maybeSingle(),
-      admin.from("pbx_softphone_users").select("organization_id").eq("portal_user_id", user.id).eq("organization_id", organization_id).maybeSingle(),
-      admin.from("user_roles").select("organization_id").eq("user_id", user.id).eq("organization_id", organization_id).maybeSingle(),
-    ]);
-    if (!checks.some((c) => c.data)) return json({ error: "Forbidden" }, 403);
+    if (!isServiceCall && user) {
+      const checks = await Promise.all([
+        admin.from("organization_members").select("organization_id").eq("user_id", user.id).eq("organization_id", organization_id).maybeSingle(),
+        admin.from("org_members").select("org_id").eq("user_id", user.id).eq("org_id", organization_id).maybeSingle(),
+        admin.from("pbx_softphone_users").select("organization_id").eq("portal_user_id", user.id).eq("organization_id", organization_id).maybeSingle(),
+        admin.from("user_roles").select("organization_id").eq("user_id", user.id).eq("organization_id", organization_id).maybeSingle(),
+      ]);
+      if (!checks.some((c) => c.data)) return json({ error: "Forbidden" }, 403);
+    }
 
     // Resolve call: callId may be a recording id, not a call record id
     let call: any = null;

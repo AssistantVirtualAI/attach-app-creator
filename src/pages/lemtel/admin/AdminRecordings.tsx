@@ -17,6 +17,7 @@ import { Download, RefreshCw, ChevronDown, Trash2, FileDown, FileText, Sparkles,
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { loadPbxRecordingAudio } from '@/lib/pbxRecordingAudio';
+import { useLemtelAiRealtime } from '@/hooks/useLemtelAiRealtime';
 
 const LEMTEL_ORG_ID = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
 const PAGE_SIZE = 100;
@@ -61,7 +62,6 @@ export default function AdminRecordings({ scope = 'org' }: { scope?: 'org' | 'mi
   const [total, setTotal] = useState<number | null>(null);
   const [metaById, setMetaById] = useState<Record<string, RecMeta>>({});
   const [aiBusy, setAiBusy] = useState<string | null>(null);
-
   const loadPage = useCallback(async (pageNum: number, reset = false) => {
     setLoading(true);
     try {
@@ -102,6 +102,9 @@ export default function AdminRecordings({ scope = 'org' }: { scope?: 'org' | 'mi
       setLoading(false);
     }
   }, [scope, direction, fromDate, toDate]);
+
+  const reloadCurrentPage = useCallback(() => { loadPage(0, true); }, [loadPage]);
+  useLemtelAiRealtime(LEMTEL_ORG_ID, reloadCurrentPage);
 
   useEffect(() => { loadPage(0, true); }, [loadPage]);
 
@@ -189,17 +192,19 @@ export default function AdminRecordings({ scope = 'org' }: { scope?: 'org' | 'mi
   const loadMeta = async (r: Rec) => {
     const recId = await ensureRecordingRow(r);
     if (!recId) return;
-    const [{ data: rec }, { data: tr }] = await Promise.all([
+    const [{ data: rec }, { data: tr }, { data: insight }] = await Promise.all([
       (supabase as any).from('pbx_call_recordings')
         .select('summary,sentiment,language,transcript_status,summary_status').eq('id', recId).maybeSingle(),
       (supabase as any).from('pbx_call_transcripts')
-        .select('content,language').eq('call_record_id', r.id).maybeSingle(),
+        .select('transcript_text,language').eq('call_record_id', r.id).maybeSingle(),
+      (supabase as any).from('pbx_ai_insights')
+        .select('summary,sentiment').eq('call_record_id', r.id).maybeSingle(),
     ]);
     setMetaById(s => ({ ...s, [r.id]: {
       recording_id: recId,
-      transcript: tr?.content ?? null,
-      summary: rec?.summary ?? null,
-      sentiment: rec?.sentiment ?? null,
+      transcript: tr?.transcript_text ?? null,
+      summary: insight?.summary ?? rec?.summary ?? null,
+      sentiment: insight?.sentiment ?? rec?.sentiment ?? null,
       language: rec?.language ?? tr?.language ?? null,
       transcript_status: rec?.transcript_status ?? null,
       summary_status: rec?.summary_status ?? null,
@@ -211,8 +216,16 @@ export default function AdminRecordings({ scope = 'org' }: { scope?: 'org' | 'mi
     if (!recId) return;
     setAiBusy(r.id);
     try {
-      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
-        body: { action: 'transcribe-recording', organization_id: LEMTEL_ORG_ID, recording_id: recId },
+      const { data: existing } = await (supabase as any).from('pbx_call_transcripts')
+        .select('transcript_text,provider').eq('call_record_id', r.id).maybeSingle();
+      if (existing?.transcript_text && !String(existing.provider || '').startsWith('stub')) {
+        toast.success('Transcript already exists — reused cached voice-to-text');
+        await loadMeta(r);
+        setRows(prev => prev.map(x => x.id === r.id ? { ...x, transcribed: true } : x));
+        return;
+      }
+      const { data, error } = await supabase.functions.invoke('ai-transcribe-call', {
+        body: { organization_id: LEMTEL_ORG_ID, call_record_id: r.id },
       });
       if (error || (data as any)?.error) throw new Error((data as any)?.message || error?.message || 'failed');
       toast.success('Transcript ready');
@@ -228,8 +241,16 @@ export default function AdminRecordings({ scope = 'org' }: { scope?: 'org' | 'mi
     if (!recId) return;
     setAiBusy(r.id);
     try {
-      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
-        body: { action: 'summarize-recording', organization_id: LEMTEL_ORG_ID, recording_id: recId },
+      const { data: existing } = await (supabase as any).from('pbx_ai_insights')
+        .select('summary,sentiment').eq('call_record_id', r.id).maybeSingle();
+      if (existing?.summary) {
+        toast.success('AI insights already exist — reused cached analysis');
+        await loadMeta(r);
+        setRows(prev => prev.map(x => x.id === r.id ? { ...x, analyzed: true, sentiment: existing.sentiment ?? x.sentiment, summary: existing.summary ?? x.summary } : x));
+        return;
+      }
+      const { data, error } = await supabase.functions.invoke('process-call-recording', {
+        body: { callId: r.id, force: false },
       });
       if (error || (data as any)?.error) throw new Error((data as any)?.message || error?.message || 'failed');
       toast.success('AI insights ready');

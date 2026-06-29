@@ -81,36 +81,36 @@ async function loadCached(callId: string): Promise<CallIntelligence | null> {
     supabase.from("pbx_ai_insights").select("*").eq("call_record_id", callId).maybeSingle(),
     supabase
       .from("pbx_call_transcripts")
-      .select("transcript_text")
+      .select("transcript_text, created_at")
       .eq("call_record_id", callId)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
     fetchAudit(callId),
   ]);
-  if (!insight || !tr?.transcript_text) return null;
+  if (!tr?.transcript_text) return null;
   const i = insight as any;
   return {
     ...EMPTY,
     status: "cached",
-    analysisStatus: "analyzed",
+    analysisStatus: insight ? "analyzed" : "missing",
     transcript: tr.transcript_text,
-    summary: i.summary ?? null,
-    sentiment: i.sentiment ?? null,
-    satisfaction_score: i.satisfaction_score ?? null,
-    quality_score: i.quality_score ?? null,
-    coaching_score: i.coaching_score ?? null,
-    coaching_notes: i.coaching_notes ?? [],
-    action_items: i.action_items ?? [],
-    topics: i.topics ?? [],
-    key_phrases: i.key_phrases ?? [],
-    intent: i.intent ?? null,
-    risks: i.risks ?? [],
-    sales_opportunities: i.sales_opportunities ?? [],
-    escalation_needed: i.escalation_needed ?? false,
-    outputs_present: { transcript: true, insight: true },
-    last_processed_at: i.created_at ?? null,
-    skipped_reason: "Cached — transcript and AI insight already exist for this recording.",
+    summary: i?.summary ?? null,
+    sentiment: i?.sentiment ?? null,
+    satisfaction_score: i?.satisfaction_score ?? null,
+    quality_score: i?.quality_score ?? null,
+    coaching_score: i?.coaching_score ?? null,
+    coaching_notes: i?.coaching_notes ?? [],
+    action_items: i?.action_items ?? [],
+    topics: i?.topics ?? [],
+    key_phrases: i?.key_phrases ?? [],
+    intent: i?.intent ?? null,
+    risks: i?.risks ?? [],
+    sales_opportunities: i?.sales_opportunities ?? [],
+    escalation_needed: i?.escalation_needed ?? false,
+    outputs_present: { transcript: true, insight: !!insight },
+    last_processed_at: i?.created_at ?? tr.created_at ?? null,
+    skipped_reason: insight ? "Cached — transcript and AI insight already exist for this recording." : "Cached — transcript already exists; analysis can run without re-transcribing.",
     audit,
   };
 }
@@ -148,7 +148,7 @@ export function useCallIntelligence(callId: string | null | undefined) {
     queryFn: async () => {
       if (!callId) return EMPTY;
       const cached = await loadCached(callId);
-      if (cached) return cached;
+      if (cached?.outputs_present.transcript && cached.outputs_present.insight) return cached;
       return await process(callId, false);
     },
   });
@@ -160,8 +160,8 @@ export function useCallIntelligence(callId: string | null | undefined) {
     if (!callId) return;
     const ch = supabase
       .channel(`call-intel:${callId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pbx_call_transcripts', filter: `call_record_id=eq.${callId}` }, () => { qc.invalidateQueries({ queryKey: key }); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pbx_ai_insights',     filter: `call_record_id=eq.${callId}` }, () => { qc.invalidateQueries({ queryKey: key }); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pbx_call_transcripts', filter: `call_record_id=eq.${callId}` }, () => { qc.invalidateQueries({ queryKey: key }); qc.invalidateQueries({ queryKey: ["call-intel"] }); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pbx_ai_insights',     filter: `call_record_id=eq.${callId}` }, () => { qc.invalidateQueries({ queryKey: key }); qc.invalidateQueries({ queryKey: ["call-intel"] }); })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
