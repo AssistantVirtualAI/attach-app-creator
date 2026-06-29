@@ -165,7 +165,7 @@ export default function RecordingsScreen({
 
   const recMeta = (rec: RecordingEntry) => ({
     recording_path: rec.record_path, recording_name: rec.record_name,
-    xml_cdr_uuid: rec.xml_cdr_uuid || rec.id, domain_uuid: rec.domain_uuid,
+    xml_cdr_uuid: rec.xml_cdr_uuid || rec.pbx_uuid || (rec.record_name ? rec.record_name.replace(/\.(mp3|wav|ogg|m4a|webm)$/i, '') : rec.id), domain_uuid: rec.domain_uuid,
     domain_name: rec.domain_name,
     organization_id: rec.organization_id || creds?.organizationId || undefined,
     start_at: rec.startedAt,
@@ -436,7 +436,7 @@ function RecordingAiPanel({ rec }: { rec: RecordingEntry }) {
     recording_path: rec.record_path,
     recording_name: rec.record_name,
     domain_uuid: rec.domain_uuid,
-    xml_cdr_uuid: rec.xml_cdr_uuid || rec.id,
+    xml_cdr_uuid: rec.xml_cdr_uuid || rec.pbx_uuid || (rec.record_name ? rec.record_name.replace(/\.(mp3|wav|ogg|m4a|webm)$/i, '') : rec.id),
     organization_id: rec.organization_id,
   }), [rec]);
   const { data, loading, running, stage, error, run } = useCallAi(rec.id, meta);
