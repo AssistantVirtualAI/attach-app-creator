@@ -17,8 +17,9 @@ type Task = { key: string; run: () => Promise<unknown> };
 // SIP credentials, dashboard stats, and a tiny page of recent calls — all in
 // parallel via Promise.all so the first paint has data ready.
 const STARTUP_TASKS: Task[] = [
-  { key: 'mobile.me',          run: () => mobileApi.me() },
-  { key: 'mobile.dashboard',   run: () => mobileApi.dashboard() },
+  // Keep these cache keys aligned with the screens that consume them.
+  { key: 'me',                 run: () => mobileApi.me() },
+  { key: 'domainStats:today',  run: () => mobileApi.domainStats('today') },
   { key: 'mobile.calls.7',     run: () => mobileApi.calls({ rangeDays: 7, limit: 10 }) },
   { key: 'mobile.sipCreds',    run: () => mobileApi.webphoneToken() },
 ];
@@ -48,7 +49,10 @@ export function startPrefetch() {
  * la transition instantanée (stale-while-revalidate).
  */
 const NAV_TASKS: Record<string, Task[]> = {
-  home:     [{ key: 'mobile.dashboard',  run: () => mobileApi.dashboard() }],
+  home:     [
+    { key: 'me',                run: () => mobileApi.me() },
+    { key: 'domainStats:today', run: () => mobileApi.domainStats('today') },
+  ],
   calls:    [{ key: 'mobile.calls.7',    run: () => mobileApi.calls({ rangeDays: 7, limit: 20 }) }],
   messages: [{ key: 'mobile.threads',    run: () => mobileApi.threads() }],
   voicemail:[{ key: 'mobile.voicemails', run: () => mobileApi.voicemails() }],
