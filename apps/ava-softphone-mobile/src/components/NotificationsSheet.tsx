@@ -32,7 +32,18 @@ export function useNotificationCounts(): Counts {
     };
     load();
     const id = window.setInterval(load, 60_000);
-    return () => { alive = false; window.clearInterval(id); };
+
+    // Live refresh on new CDR / recording / voicemail / sms inserts.
+    const ch = supabase
+      .channel('notif-counts-live')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pbx_call_records' }, () => load())
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pbx_call_records' }, () => load())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pbx_call_recordings' }, () => load())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pbx_voicemails' }, () => load())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pbx_sms_messages' }, () => load())
+      .subscribe();
+
+    return () => { alive = false; window.clearInterval(id); try { supabase.removeChannel(ch); } catch {} };
   }, []);
   return c;
 }
