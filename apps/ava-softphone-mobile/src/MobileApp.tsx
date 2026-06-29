@@ -426,9 +426,14 @@ function AuthenticatedShell({
           });
         },
         onAction: (p) => {
-          // Deep-link: tap a push to open the right tab.
+          // Deep-link: tap a push to open the right tab + sub-tab.
           const kind = p.data?.kind;
-          if (kind === 'voicemail' || kind === 'missed' || kind === 'call') setTab('calls');
+          const route = p.data?.route;
+          if (kind === 'voicemail' || route === 'voicemail') navigateTo({ tab: 'voicemail' });
+          else if (kind === 'recording' || route === 'recordings') navigateTo({ tab: 'calls', sub: 'recordings' });
+          else if (kind === 'missed_call' || kind === 'missed') navigateTo({ tab: 'calls', sub: 'recents', filter: 'missed' });
+          else if (kind === 'sms' || route === 'chats' || route === 'sms') navigateTo({ tab: 'sms' });
+          else if (kind === 'call') navigateTo({ tab: 'calls', sub: 'recents' });
           else if (kind === 'ava') setTab('ava');
         },
       });
