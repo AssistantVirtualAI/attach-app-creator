@@ -28,16 +28,19 @@ export default function DashboardScreen(props: DashboardProps) {
 class DashboardCrashGuard extends React.Component<DashboardProps & { children: React.ReactNode }, { error: Error | null }> {
   state: { error: Error | null } = { error: null };
   static getDerivedStateFromError(error: Error) { return { error }; }
-  componentDidCatch(error: Error) { console.error('[DashboardScreenError]', error); }
+  componentDidCatch(error: Error) {
+    console.error('[DashboardScreenError]', error);
+    try { localStorage.setItem('ava.dashboard.lastError', `${error?.name || 'Error'}: ${error?.message || ''}\n${error?.stack || ''}`); } catch {}
+  }
   render() {
     if (this.state.error) {
-      return <DashboardSafeFallback {...this.props} onRetry={() => this.setState({ error: null })} />;
+      return <DashboardSafeFallback {...this.props} error={this.state.error} onRetry={() => this.setState({ error: null })} />;
     }
     return this.props.children;
   }
 }
 
-function DashboardSafeFallback({ onNavigate, haptic, onRetry, onOpenProfile }: DashboardProps & { onRetry: () => void }) {
+function DashboardSafeFallback({ onNavigate, haptic, onRetry, onOpenProfile, error }: DashboardProps & { onRetry: () => void; error?: Error | null }) {
   const { t, tx } = useT();
   const safeHaptic = useMemo(() => safeAsync(haptic), [haptic]);
   const go = (tab: Tab) => { safeHaptic(); try { onNavigate(tab); } catch {} };
@@ -64,6 +67,11 @@ function DashboardSafeFallback({ onNavigate, haptic, onRetry, onOpenProfile }: D
         <p style={{ fontSize: font.sm, color: colors.textSub, lineHeight: 1.5, margin: 0 }}>
           {tx("Une donnée du tableau de bord n'a pas pu être affichée, mais l'application reste accessible.", 'One dashboard data field could not be displayed, but the app remains accessible.')}
         </p>
+        {error?.message && (
+          <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(255,80,80,0.12)', border: '1px solid rgba(255,80,80,0.3)', fontSize: 11, color: '#ffd5d5', fontFamily: 'JetBrains Mono, monospace', wordBreak: 'break-word' }}>
+            {String(error.message).slice(0, 280)}
+          </div>
+        )}
       </HeroGradient>
       <SectionTitle eyebrow="AVA" title={tx('Actions rapides', 'Quick actions')} />
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
@@ -244,6 +252,42 @@ function DashboardScreenInner({
           }}>{RANGE_LABELS[r]}</button>
         ))}
       </div>
+
+      {/* Inline status / error banner so the dashboard never silently shows nothing. */}
+      {(() => {
+        const noSoftphone = isRecord(stats.data) && (stats.data as any).noSoftphone === true;
+        const errMsg = stats.error?.message;
+        if (!errMsg && !noSoftphone) return null;
+        return (
+          <Card padded={true} style={{
+            marginBottom: 10,
+            background: noSoftphone ? 'rgba(255,200,40,0.10)' : 'rgba(255,80,80,0.10)',
+            border: `1px solid ${noSoftphone ? 'rgba(255,200,40,0.35)' : 'rgba(255,80,80,0.35)'}`,
+          }}>
+            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1.2, textTransform: 'uppercase', color: noSoftphone ? colors.signalGold : colors.danger, marginBottom: 4 }}>
+              {noSoftphone
+                ? (lang === 'fr' ? 'Compte non lié à un poste' : 'Account not linked to an extension')
+                : (lang === 'fr' ? 'Statistiques indisponibles' : 'Stats unavailable')}
+            </div>
+            <div style={{ fontSize: font.sm, color: colors.textIce, lineHeight: 1.4 }}>
+              {noSoftphone
+                ? (lang === 'fr'
+                    ? "Votre compte n'est pas associé à un poste softphone. Demandez à un admin de lier votre extension."
+                    : "Your account isn't linked to a softphone extension yet. Ask an admin to link your extension.")
+                : (errMsg || (lang === 'fr' ? 'Erreur inconnue.' : 'Unknown error.'))}
+            </div>
+            <button
+              onClick={() => { safeHaptic(); stats.refresh(); }}
+              style={{
+                marginTop: 8, padding: '8px 14px', border: 0, borderRadius: radius.lg,
+                background: colors.lemtelBlue, color: '#fff', fontWeight: 800, fontSize: 12, cursor: 'pointer',
+              }}
+            >{lang === 'fr' ? 'Réessayer' : 'Retry'}</button>
+          </Card>
+        );
+      })()}
+
+
 
       {(() => {
         const isAdmin = !!m?.permissions?.admin || m?.dataScope === 'domain_admin';
