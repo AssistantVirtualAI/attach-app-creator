@@ -141,6 +141,13 @@ Deno.serve(async (req) => {
       await admin.from("pbx_ai_insights").delete().eq("call_record_id", call_id);
       const { data: inserted, error: insertError } = await admin.from("pbx_ai_insights").insert(row).select().single();
       if (insertError) throw insertError;
+      try {
+        await admin.channel(`ai-insights:${organization_id}`).send({
+          type: "broadcast",
+          event: "insights",
+          payload: { call_record_id: call_id, insights: inserted },
+        });
+      } catch (_) {}
 
       await admin.from("pbx_call_records").update({
         analyzed: true,
