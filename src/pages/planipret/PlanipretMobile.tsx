@@ -375,7 +375,9 @@ export default function PlanipretMobile() {
         <UniversalSearchBar />
         <div ref={scrollRef} className="flex-1 overflow-y-auto pb-[110px]">
           <PullIndicator pullDist={pullDist} refreshing={refreshing} threshold={threshold} color={ACCENT} />
-          <Outlet context={{ profile, reloadProfile: loadProfile, openDialer, openAva, registerRefresh } satisfies PlanipretMobileContext} />
+          <PlanipretErrorBoundary key={location.pathname}>
+            <Outlet context={{ profile, reloadProfile: loadProfile, openDialer, openAva, registerRefresh } satisfies PlanipretMobileContext} />
+          </PlanipretErrorBoundary>
         </div>
         <SessionTimeoutModal />
         {profile && <PrivacyConsentGate profile={profile} onAccepted={loadProfile} />}
