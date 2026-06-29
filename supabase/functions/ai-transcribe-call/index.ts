@@ -101,7 +101,7 @@ Deno.serve(async (req) => {
     let call: any = null;
     {
       const r = await admin.from("pbx_call_records")
-        .select("id, caller_number, caller_name, destination_number, destination, direction, start_at, duration_seconds, billsec, hangup_cause, recording_url, recording_path, recording_name, voicemail_message, domain_uuid, domain_name")
+        .select("id, pbx_uuid, raw_data, caller_number, caller_name, destination_number, destination, direction, start_at, duration_seconds, billsec, hangup_cause, recording_url, recording_path, recording_name, voicemail_message, domain_uuid, domain_name")
         .eq("id", call_record_id).eq("organization_id", organization_id).maybeSingle();
       call = r.data;
     }
@@ -112,7 +112,7 @@ Deno.serve(async (req) => {
       if (r.data?.call_record_id) {
         call_record_id = r.data.call_record_id;
         const r2 = await admin.from("pbx_call_records")
-          .select("id, caller_number, caller_name, destination_number, destination, direction, start_at, duration_seconds, billsec, hangup_cause, recording_url, recording_path, recording_name, voicemail_message, domain_uuid, domain_name")
+          .select("id, pbx_uuid, raw_data, caller_number, caller_name, destination_number, destination, direction, start_at, duration_seconds, billsec, hangup_cause, recording_url, recording_path, recording_name, voicemail_message, domain_uuid, domain_name")
           .eq("id", call_record_id).maybeSingle();
         call = r2.data || { ...r.data, start_at: r.data.recorded_at };
       } else if (r.data) {
@@ -131,10 +131,19 @@ Deno.serve(async (req) => {
         cid,
       }, 404);
     }
+    const effectiveXmlCdrUuid = String(
+      xml_cdr_uuid ||
+      call?.pbx_uuid ||
+      call?.raw_data?.xml_cdr_uuid ||
+      call_record_id ||
+      ""
+    ).trim();
     console.log(`${logTag} action=call-resolved`, {
       has_call_row: !!call,
       direction: call?.direction || null,
       domain_uuid: call?.domain_uuid || domain_uuid || null,
+      call_record_id,
+      effective_xml_cdr_uuid: effectiveXmlCdrUuid || null,
     });
 
     const persistTranscriptOnCall = async (text: string, provider: string) => {
@@ -208,13 +217,16 @@ Deno.serve(async (req) => {
       if (!isTwilio && (effectiveRecName || effectiveRecPath || call_record_id)) {
         const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
         const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-        const recName = effectiveRecName
+          const recName = effectiveRecName
           ? (/\.(mp3|wav|ogg|m4a|webm)$/i.test(effectiveRecName) ? effectiveRecName : `${effectiveRecName}.mp3`)
           : "";
         const proxyPayload = {
           organization_id,
           params: {
-            xml_cdr_uuid: call_record_id,
+              // FusionPBX download endpoints require the PBX XML CDR UUID,
+              // not our database row id. The mobile UI passes both; keep the
+              // DB id for persistence, but use this value for audio fetches.
+              xml_cdr_uuid: effectiveXmlCdrUuid,
             record_path: effectiveRecPath || "",
             record_name: recName,
             domain_uuid: domain_uuid || call?.domain_uuid || undefined,
