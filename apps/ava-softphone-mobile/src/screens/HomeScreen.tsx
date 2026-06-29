@@ -89,18 +89,18 @@ export default function HomeScreen({ onNavigate, haptic }: Props) {
         <Metric label="Répondus" value={data?.metrics.answeredCalls} tone="success" icon="↗" trend={+18} />
         <Metric label="SMS non lus" value={data?.metrics.unreadSms} tone="cyan" icon="✉" trend={+4} />
         <Metric label="Messagerie" value={data?.metrics.voicemails} tone="gold" icon="◉" trend={-2} />
-        {me?.permissions.admin && <Metric label="Utilisateurs actifs" value={data?.metrics.activeUsers} tone="success" icon="◆" trend={+6} />}
-        <Metric label="Tâches" value={data?.metrics.actionItems} tone="violet" icon="✦" trend={+1} />
+        {me?.permissions?.admin && <Metric label="Utilisateurs actifs" value={data?.metrics?.activeUsers} tone="success" icon="◆" trend={+6} />}
+        <Metric label="Tâches" value={data?.metrics?.actionItems} tone="violet" icon="✦" trend={+1} />
       </div>
 
       {/* Activity sparkline */}
       <SectionTitle eyebrow="12 dernières heures" title="Activité d'appels" />
-      <ActivitySpark answered={data?.metrics.answeredCalls ?? 0} missed={data?.metrics.missedCalls ?? 0} />
+      <ActivitySpark answered={data?.metrics?.answeredCalls ?? 0} missed={data?.metrics?.missedCalls ?? 0} />
 
       {/* Needs attention */}
       <SectionTitle eyebrow="Priorisé par AVA" title="À traiter" />
       {!data && <Card><Skeleton w="80%" h={12} /><div style={{ height: 8 }} /><Skeleton w="50%" h={10} /></Card>}
-      {data?.needsAttention.map((n) => (
+      {data?.needsAttention?.map?.((n) => (
         <Card key={n.id} accent={n.accent === 'danger' ? 'gold' : (n.accent as any)} style={{ marginBottom: 10 }} onPress={() => haptic()}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{
