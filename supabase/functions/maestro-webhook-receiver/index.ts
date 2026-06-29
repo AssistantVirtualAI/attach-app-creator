@@ -39,18 +39,20 @@ Deno.serve(async (req) => {
   const cfg = await getMaestroConfig(admin);
   const sig = req.headers.get("x-maestro-signature") ?? "";
 
-  if (cfg.webhookSecret) {
-    try {
-      const expected = await hmacSha256Hex(cfg.webhookSecret, raw);
-      // Allow either raw hex or "sha256=..." prefix
-      const given = sig.replace(/^sha256=/i, "").trim().toLowerCase();
-      if (given !== expected.toLowerCase()) {
-        await maestroAudit(admin, "webhook_bad_signature", { event: "unknown" });
-        return json({ ok: true }); // always 200 to avoid retries
-      }
-    } catch (e) {
-      console.warn("signature verify error", e);
+  if (!cfg.webhookSecret) {
+    await maestroAudit(admin, "webhook_not_configured", {});
+    return json({ error: "webhook_not_configured" }, 503);
+  }
+  try {
+    const expected = await hmacSha256Hex(cfg.webhookSecret, raw);
+    const given = sig.replace(/^sha256=/i, "").trim().toLowerCase();
+    if (given !== expected.toLowerCase()) {
+      await maestroAudit(admin, "webhook_bad_signature", { event: "unknown" });
+      return json({ error: "invalid_signature" }, 401);
     }
+  } catch (e) {
+    console.warn("signature verify error", e);
+    return json({ error: "signature_verify_failed" }, 401);
   }
 
   let payload: any = {};

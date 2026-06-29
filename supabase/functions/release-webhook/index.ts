@@ -23,6 +23,19 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {
+    const expected = Deno.env.get('RELEASE_WEBHOOK_SECRET');
+    if (!expected) {
+      return new Response(JSON.stringify({ error: 'not_configured' }), {
+        status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const provided = req.headers.get('x-webhook-secret')
+      ?? req.headers.get('authorization')?.replace('Bearer ', '');
+    if (provided !== expected) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
     const body = await req.json();
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,

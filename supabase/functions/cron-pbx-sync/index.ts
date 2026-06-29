@@ -14,6 +14,18 @@ Deno.serve(async (req) => {
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+  // AuthZ: accept either a shared cron secret, or a service-role bearer token.
+  const cronSecret = Deno.env.get("CRON_SECRET");
+  const providedSecret = req.headers.get("x-cron-secret");
+  const authHeader = req.headers.get("authorization") ?? "";
+  const isServiceRole = authHeader === `Bearer ${SERVICE_ROLE}`;
+  const isValidCron = !!cronSecret && providedSecret === cronSecret;
+  if (!isServiceRole && !isValidCron) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   let body: any = {};
   try { body = await req.json(); } catch { /* tolerate empty */ }
   const orgId: string = body.organization_id || LEMTEL_ORG;
