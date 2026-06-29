@@ -170,13 +170,20 @@ export async function downloadRecording(
     const b64 = arrayBufferToBase64(buf);
     try { await Filesystem.mkdir({ path: 'recordings', directory: Directory.Data, recursive: true }); } catch {}
     const ext = pickExt(blob.type, meta.recording_name || undefined);
+    if (!KNOWN_EXTS.includes(ext)) {
+      console.warn('[recordingCache] derived extension not in known list', { id, ext, contentType: blob.type, recordingName: meta.recording_name });
+    }
+    console.log('[recordingCache] writing recording', { id, ext, contentType: blob.type || '(none)', size: buf.byteLength, recordingName: meta.recording_name || null });
     const path = `recordings/${sanitizeId(id)}.${ext}`;
     await Filesystem.writeFile({ path, directory: Directory.Data, data: b64 });
-    try { localStorage.setItem(META_KEY_PREFIX + id, JSON.stringify({ at: Date.now(), size: buf.byteLength })); } catch {}
+    try { localStorage.setItem(META_KEY_PREFIX + id, JSON.stringify({ at: Date.now(), size: buf.byteLength, ext, contentType: blob.type || null })); } catch {}
     // Clear the missing flag now that the file is written.
     markRecordingCached(id);
     const uri = await Filesystem.getUri({ path, directory: Directory.Data });
-    return Capacitor.convertFileSrc(uri.uri);
+    const src = Capacitor.convertFileSrc(uri.uri);
+    console.log('[recordingCache] ready', { id, ext, src });
+    return src;
+
   } else {
     const url = URL.createObjectURL(blob);
     const prev = webBlobCache.get(id);
