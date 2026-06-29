@@ -28,7 +28,7 @@ export default function DashboardScreen({
   const stats = useAutoSync<DomainStats>(() => mobileApi.domainStats(range), { intervalMs: 120_000, deps: [range], cacheKey: `domainStats:${range}`, staleTimeMs: 60_000 });
   const m = isRecord(me.data) ? (me.data as any) : null;
   const hasStats = isUsableStats(stats.data);
-  const s = sanitizeStats(stats.data);
+  const s = useMemo(() => sanitizeStats(stats.data), [stats.data]);
   const userName = safeText(m?.user?.name || m?.user?.email, 'User');
   const firstName = userName.split(/[\s@]/).filter(Boolean)[0] || 'User';
   const orgName = safeText(m?.organization?.name, 'Lemtel Télécom');
