@@ -114,14 +114,67 @@ export default function MCalls() {
 
   const load = useCallback(async () => {
     if (!userId) return;
-    const { data } = await supabase
-      .from("planipret_phone_calls")
-      .select("*")
-      .eq("user_id", userId)
-      .order("started_at", { ascending: false })
-      .limit(100);
-    setCalls((data ?? []) as Call[]);
-    setLoading(false);
+    setLoading(true);
+    try {
+      // 1) NS-API live CDRs via pp-ns-cdr (segmenté par extension côté serveur)
+      const { data: ns, error: nsErr } = await supabase.functions.invoke("pp-ns-cdr", {
+        body: { action: "list" },
+      });
+      if (nsErr) throw nsErr;
+      const items: any[] = (ns as any)?.items ?? [];
+
+      // 2) Données enrichies locales (transcripts, AI, lead scoring)
+      const { data: local } = await supabase
+        .from("planipret_phone_calls")
+        .select("*")
+        .eq("user_id", userId)
+        .order("started_at", { ascending: false })
+        .limit(200);
+      const byNsId = new Map<string, any>();
+      (local ?? []).forEach((r: any) => { if (r.ns_call_id) byNsId.set(r.ns_call_id, r); });
+
+      const merged: Call[] = items.map((it, i) => {
+        const nsId = it.id ?? it.call_id ?? it.uuid ?? null;
+        const enriched = nsId ? byNsId.get(nsId) : null;
+        const dirRaw = String(it.direction ?? it.call_direction ?? "").toLowerCase();
+        const direction = dirRaw.includes("in")
+          ? (it.answered === false || it.disposition === "no-answer" ? "missed" : "inbound")
+          : "outbound";
+        return {
+          id: enriched?.id ?? nsId ?? `ns-${i}`,
+          user_id: userId,
+          ns_call_id: nsId,
+          direction,
+          status: it.disposition ?? it.status ?? null,
+          from_number: it.from_number ?? it.caller_id_number ?? null,
+          from_name: it.from_name ?? it.caller_id_name ?? null,
+          to_number: it.to_number ?? it.destination ?? null,
+          to_name: it.to_name ?? null,
+          started_at: (it.start_time ?? it.started_at ?? new Date().toISOString()) as string,
+          duration_seconds: Number(it.duration ?? it.billsec ?? 0) || 0,
+          recording_url: it.recording_url ?? enriched?.recording_url ?? null,
+          transcript: enriched?.transcript ?? null,
+          ai_summary: enriched?.ai_summary ?? null,
+          metadata: it,
+          ...(enriched ?? {}),
+        } as Call;
+      });
+
+      // Fallback : si NS ne renvoie rien, montrer le cache local
+      setCalls(merged.length ? merged : ((local ?? []) as Call[]));
+    } catch (e: any) {
+      console.error("[pp-ns-cdr] list failed", e);
+      toast.error(e?.message ?? "Échec chargement CDR");
+      const { data } = await supabase
+        .from("planipret_phone_calls")
+        .select("*")
+        .eq("user_id", userId)
+        .order("started_at", { ascending: false })
+        .limit(100);
+      setCalls((data ?? []) as Call[]);
+    } finally {
+      setLoading(false);
+    }
   }, [userId]);
 
   useEffect(() => { load(); }, [load]);
@@ -460,7 +513,7 @@ function CallDetailSheet({
 
   const fetchRecording = async () => {
     setRecLoading(true);
-    const { data, error } = await supabase.functions.invoke("ns-recordings", { body: { call_id: call.ns_call_id ?? call.id } });
+    const { data, error } = await supabase.functions.invoke("pp-ns-recordings", { body: { action: "get", call_id: call.ns_call_id ?? call.id } });
     setRecLoading(false);
     if (error || !(data as any)?.recording_url) { toast.error(t("calls.recordingUnavailable")); return; }
     await supabase.from("planipret_phone_calls").update({ recording_url: (data as any).recording_url }).eq("id", call.id);
@@ -937,7 +990,7 @@ function ActiveCallsTab({ userId, openDialer }: { userId: string; openDialer: (n
 
 
   const fetchActive = async () => {
-    const { data, error } = await supabase.functions.invoke("ns-calls", { body: { action: "list" } });
+    const { data, error } = await supabase.functions.invoke("pp-ns-calls", { body: { action: "list" } });
     if (error) return;
     const list = ((data as any)?.calls ?? []) as any[];
     setActive(list.map((c: any) => ({
@@ -976,7 +1029,7 @@ function ActiveCallsTab({ userId, openDialer }: { userId: string; openDialer: (n
   }, [userId]);
 
   const action = async (act: string, callId: string, extra: any = {}) => {
-    const { error } = await supabase.functions.invoke("ns-calls", { body: { action: act, call_id: callId, ...extra } });
+    const { error } = await supabase.functions.invoke("pp-ns-calls", { body: { action: act, call_id: callId, ...extra } });
     if (error) toast.error(error.message);
     else fetchActive();
   };
@@ -1215,7 +1268,7 @@ function VoicemailsTab({
   const removeVm = async (vm: VM) => {
     if (!confirm("Supprimer ce voicemail ?")) return;
     if (vm.ns_vm_id) {
-      await supabase.functions.invoke("ns-voicemail", { method: "DELETE" as any, body: { vm_id: vm.ns_vm_id } }).catch(() => null);
+      await supabase.functions.invoke("pp-ns-voicemail", { body: { action: "delete", vm_id: vm.ns_vm_id } }).catch(() => null);
     }
     const sb: any = supabase;
     await sb.from("planipret_voicemails").delete().eq("id", vm.id);
@@ -1364,7 +1417,7 @@ function VmAudio({ vm }: { vm: VM }) {
     (async () => {
       if (src) return;
       const id = vm.ns_vm_id ?? vm.id;
-      const { data } = await supabase.functions.invoke("ns-voicemail", { method: "GET" as any, body: { vm_id: id, action: "fetch" } as any });
+      const { data } = await supabase.functions.invoke("pp-ns-voicemail", { body: { action: "audio", vm_id: id } });
       const url = (data as any)?.url ?? (data as any)?.audio_url;
       if (url) setSrc(url);
     })();

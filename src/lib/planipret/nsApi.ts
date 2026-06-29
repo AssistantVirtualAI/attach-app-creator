@@ -129,32 +129,33 @@ export type VmFolder = "inbox" | "saved" | "deleted";
 
 export const voicemailApi = {
   list: (folder: VmFolder = "inbox") =>
-    invokeJson<{ success: boolean; data: any[] }>("ns-voicemail", {
+    invokeJson<{ success: boolean; data: any[] }>("pp-ns-voicemail", {
       method: "GET",
-      query: { folder },
+      query: { action: "list", folder },
     }),
   delete: (vmId: string) =>
-    invokeJson<{ success: boolean }>("ns-voicemail", {
+    invokeJson<{ success: boolean }>("pp-ns-voicemail", {
       method: "DELETE",
       query: { vm_id: vmId },
     }),
   forward: (vmId: string, toUser: string) =>
-    invokeJson<{ success: boolean }>("ns-voicemail/forward", {
+    invokeJson<{ success: boolean }>("pp-ns-voicemail", {
       method: "POST",
+      query: { action: "forward" },
       body: { vm_id: vmId, to_user: toUser },
     }),
 };
 
 /* ============================================================
- * SMS — ns-sms (extension-scoped on the server)
+ * SMS — pp-ns-sms (extension-scoped on the server)
  * ============================================================ */
 export const smsApi = {
   listThreads: () =>
-    invokeJson<{ threads: any[] }>("ns-sms", { method: "GET", query: { action: "threads" } }),
+    invokeJson<{ threads: any[] }>("pp-ns-sms", { method: "GET", query: { action: "threads" } }),
   listMessages: (threadId: string) =>
-    invokeJson<{ messages: any[] }>("ns-sms", { method: "GET", query: { action: "messages", thread_id: threadId } }),
+    invokeJson<{ messages: any[] }>("pp-ns-sms", { method: "GET", query: { action: "messages", thread_id: threadId } }),
   send: (toNumber: string, text: string) =>
-    invokeJson("ns-sms", { method: "POST", query: { action: "send" }, body: { to_number: toNumber, text } }),
+    invokeJson("pp-ns-sms", { method: "POST", query: { action: "send" }, body: { to: toNumber, message: text } }),
 };
 
 /* ============================================================

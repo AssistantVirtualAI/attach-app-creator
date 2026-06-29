@@ -54,16 +54,63 @@ export default function MVoicemail() {
   const load = async () => {
     if (!profile?.user_id) return;
     setLoading(true);
-    const { data } = await supabase
-      .from("planipret_voicemails")
-      .select("*")
-      .eq("user_id", profile.user_id)
-      .order("created_at", { ascending: false });
-    setItems((data ?? []) as VM[]);
-    setLoading(false);
+    try {
+      // 1) NS-API live via pp-ns-voicemail (segmenté par extension côté serveur)
+      const folder = tab === "saved" ? "saved" : "inbox";
+      const { data, error } = await supabase.functions.invoke("pp-ns-voicemail", {
+        body: { action: "list", folder },
+      });
+      if (error) throw error;
+      const nsItems: any[] = ((data as any)?.items ?? []);
+
+      // 2) Fallback / enrichissement cache local
+      const { data: local } = await supabase
+        .from("planipret_voicemails")
+        .select("*")
+        .eq("user_id", profile.user_id)
+        .order("created_at", { ascending: false });
+
+      const byVmId = new Map<string, VM>();
+      (local ?? []).forEach((r: any) => { if (r.vm_id || r.ns_vm_id) byVmId.set(r.vm_id ?? r.ns_vm_id, r); });
+
+      const merged: VM[] = nsItems.length
+        ? nsItems.map((v: any, i: number) => {
+            const id = v.vm_id ?? v.id ?? `ns-${i}`;
+            const enriched = byVmId.get(id);
+            return {
+              id: enriched?.id ?? id,
+              user_id: profile.user_id,
+              ns_vm_id: id,
+              folder,
+              from_number: v.from_number ?? v.caller ?? null,
+              from_name: v.from_name ?? v.caller_name ?? null,
+              duration_seconds: v.duration ?? v.duration_seconds ?? null,
+              audio_url: enriched?.audio_url ?? null,
+              transcript: enriched?.transcript ?? null,
+              is_read: v.is_read ?? v.read ?? enriched?.is_read ?? false,
+              received_at: v.created_at ?? v.timestamp ?? null,
+              created_at: v.created_at ?? new Date().toISOString(),
+              ...(enriched ?? {}),
+            } as VM;
+          })
+        : (local ?? []) as VM[];
+
+      setItems(merged);
+    } catch (e: any) {
+      console.error("[pp-ns-voicemail] list failed", e);
+      toast.error(t("voicemail.loadFailed") || "Échec chargement voicemails", { description: e?.message });
+      const { data } = await supabase
+        .from("planipret_voicemails")
+        .select("*")
+        .eq("user_id", profile.user_id)
+        .order("created_at", { ascending: false });
+      setItems((data ?? []) as VM[]);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  useEffect(() => { load(); }, [profile?.user_id]);
+  useEffect(() => { load(); }, [profile?.user_id, tab]);
   useEffect(() => { registerRefresh(load); return () => registerRefresh(null); }, [profile?.user_id]);
 
   useEffect(() => {
@@ -84,16 +131,20 @@ export default function MVoicemail() {
 
   const markRead = async (vm: VM) => {
     if (vm.is_read) return;
-    await supabase.from("planipret_voicemails").update({ is_read: true }).eq("id", vm.id);
     setItems((p) => p.map((x) => x.id === vm.id ? { ...x, is_read: true } : x));
+    await supabase.from("planipret_voicemails").update({ is_read: true }).eq("id", vm.id);
+    if (vm.ns_vm_id) {
+      supabase.functions.invoke("pp-ns-voicemail", {
+        body: { action: "mark-read", vm_id: vm.ns_vm_id },
+      }).catch(() => null);
+    }
   };
 
   const removeVm = async (vm: VM) => {
     if (!confirm(t("voicemail.deleteConfirm"))) return;
     if (vm.ns_vm_id) {
-      await supabase.functions.invoke("ns-voicemail", {
-        method: "DELETE" as any,
-        body: { vm_id: vm.ns_vm_id },
+      await supabase.functions.invoke("pp-ns-voicemail", {
+        body: { action: "delete", vm_id: vm.ns_vm_id },
       }).catch(() => null);
     }
     await supabase.from("planipret_voicemails").delete().eq("id", vm.id);
@@ -102,6 +153,11 @@ export default function MVoicemail() {
   };
 
   const saveVm = async (vm: VM) => {
+    if (vm.ns_vm_id) {
+      await supabase.functions.invoke("pp-ns-voicemail", {
+        body: { action: "move", vm_id: vm.ns_vm_id, folder: "saved" },
+      }).catch(() => null);
+    }
     await supabase.from("planipret_voicemails").update({ folder: "saved" }).eq("id", vm.id);
     setItems((p) => p.map((x) => x.id === vm.id ? { ...x, folder: "saved" } : x));
     toast.success(t("voicemail.saved"));
@@ -116,6 +172,7 @@ export default function MVoicemail() {
       setItems((p) => p.map((x) => x.id === vm.id ? { ...x, transcript: txt } : x));
     }
   };
+
 
   return (
     <div className="p-4">
@@ -218,7 +275,7 @@ function AudioPlayer({ vm }: { vm: VM }) {
     (async () => {
       if (src) return;
       const id = vm.ns_vm_id ?? vm.id;
-      const { data } = await supabase.functions.invoke("ns-voicemail", { method: "GET" as any, body: { vm_id: id, action: "fetch" } as any });
+      const { data } = await supabase.functions.invoke("pp-ns-voicemail", { body: { action: "audio", vm_id: id } });
       const url = (data as any)?.url ?? (data as any)?.audio_url;
       if (url) setSrc(url);
     })();
@@ -260,7 +317,7 @@ function ForwardModal({ vm, onClose }: { vm: VM; onClose: () => void }) {
   const submit = async () => {
     if (!ext.trim()) return;
     setBusy(true);
-    const { data, error } = await supabase.functions.invoke("ns-voicemail/forward", { body: { vm_id: vm.ns_vm_id ?? vm.id, to_user: ext.trim() } });
+    const { data, error } = await supabase.functions.invoke("pp-ns-voicemail", { body: { action: "forward", vm_id: vm.ns_vm_id ?? vm.id, to_user: ext.trim() } });
     setBusy(false);
     if (error || (data as any)?.success === false) { toast.error(t("voicemail.forwardFailed")); return; }
     toast.success(t("voicemail.forwarded"));

@@ -22,12 +22,16 @@ Deno.serve(async (req) => {
 
   const { ctx, supabase } = guard;
   const url = new URL(req.url);
-  const callId = url.searchParams.get("call_id");
-  const action = url.searchParams.get("action") ?? (callId ? "get" : "list");
+  let body: any = {};
+  if (req.method === "POST") {
+    try { body = await req.json(); } catch { body = {}; }
+  }
+  const callId = body.call_id ?? url.searchParams.get("call_id");
+  const action = body.action ?? url.searchParams.get("action") ?? (callId ? "get" : "list");
 
   try {
     // ── GET enregistrement d'un appel spécifique ─────────────────────────────
-    if (req.method === "GET" && action === "get" && callId) {
+    if (action === "get" && callId) {
       // NS-API v2: GET /domains/{domain}/users/{user}/recordings/{call_id}
       const res = await nsFetch(
         `/domains/${encodeURIComponent(ctx.nsDomain)}/users/${encodeURIComponent(ctx.extension)}/recordings/${encodeURIComponent(callId)}`,
@@ -66,7 +70,7 @@ Deno.serve(async (req) => {
     }
 
     // ── GET liste des enregistrements récents ────────────────────────────────
-    if (req.method === "GET" && action === "list") {
+    if (action === "list") {
       const limit = Math.min(Number(url.searchParams.get("limit") ?? 50), 200);
       const end = url.searchParams.get("end") ?? new Date().toISOString();
       const start = url.searchParams.get("start") ??

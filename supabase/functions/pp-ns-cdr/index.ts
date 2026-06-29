@@ -34,13 +34,16 @@ Deno.serve(async (req) => {
   const { ctx, supabase } = guard;
 
   const url = new URL(req.url);
-  const action = url.searchParams.get("action") ?? "list";
+  let body: any = {};
+  if (req.method === "POST") {
+    try { body = await req.json(); } catch { body = {}; }
+  }
+  const action = body.action ?? url.searchParams.get("action") ?? "list";
 
-  const end = url.searchParams.get("end") ?? new Date().toISOString();
-  const start =
-    url.searchParams.get("start") ??
+  const end = body.end ?? url.searchParams.get("end") ?? new Date().toISOString();
+  const start = body.start ?? url.searchParams.get("start") ??
     new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const limit = Math.min(Number(url.searchParams.get("limit") ?? 200), 1000);
+  const limit = Math.min(Number(body.limit ?? url.searchParams.get("limit") ?? 200), 1000);
 
   const nsPath =
     `/domains/${encodeURIComponent(ctx.nsDomain)}/users/${encodeURIComponent(ctx.extension)}/cdrs` +
@@ -55,11 +58,11 @@ Deno.serve(async (req) => {
     const raw = await res.json();
     const items: any[] = Array.isArray(raw) ? raw : raw?.cdrs ?? raw?.data ?? [];
 
-    if (req.method === "GET" && action === "list") {
+    if (action === "list") {
       return jsonResponse({ ok: true, count: items.length, items });
     }
 
-    if (req.method === "POST" && action === "sync") {
+    if (action === "sync") {
       const rows = items.map((it) => ({
         user_id: ctx.userId,
         organization_id: AVA_ORG_ID,
