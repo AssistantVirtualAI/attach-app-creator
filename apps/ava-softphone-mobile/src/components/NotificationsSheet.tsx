@@ -90,10 +90,10 @@ export default function NotificationsSheet({
           </div>
         )}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {items.map(({ tab, icon: Icon, label, count, tone }) => (
+          {items.map(({ route, tab, icon: Icon, label, count, tone }) => (
             <button
               key={label}
-              onClick={() => { onClose(); onNavigate(tab); }}
+              onClick={() => { onClose(); navigateTo(route); onNavigate(tab); }}
               style={{
                 display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px',
                 background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)',
