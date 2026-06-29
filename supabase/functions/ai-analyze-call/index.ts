@@ -56,6 +56,10 @@ Deno.serve(async (req) => {
 
     if (pbxCall) {
       organization_id = organization_id || (pbxCall as any).organization_id;
+      const isServiceCall = authHeader === `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`;
+      if (!user && !isServiceCall) {
+        return new Response(JSON.stringify({ success: false, error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
       if (user) {
         const [m1, m2, m3, m4] = await Promise.all([
           admin.from("organization_members").select("organization_id").eq("user_id", user.id).eq("organization_id", organization_id).maybeSingle(),
