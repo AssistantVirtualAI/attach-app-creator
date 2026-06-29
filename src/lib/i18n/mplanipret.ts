@@ -891,6 +891,12 @@ export const MP_DICT = {
       busy: "Busy",
       break: "Break",
       offline: "Offline",
+      meeting: "In a meeting",
+      lunch: "Lunch",
+      away: "Away",
+      dnd: "Do not disturb",
+      training: "Training",
+      remote: "Remote",
     },
     theme: { light: "Light", dark: "Dark" },
     access: {
