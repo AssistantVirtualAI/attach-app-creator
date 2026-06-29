@@ -41,19 +41,32 @@ function sanitizeId(id: string) {
 // extension causes the player to refuse playback. We always write the file
 // with a real audio extension (.wav by default — FusionPBX's native format).
 const KNOWN_EXTS = ['wav', 'mp3', 'ogg', 'm4a', 'mp4', 'aac', 'opus', 'webm'];
+const MIN_AUDIO_BYTES = 256; // anything smaller is almost certainly an error page
 
-function pickExt(blobType: string | undefined, recordingName: string | undefined): string {
+// Map a Content-Type to a known audio extension. Returns null when unknown.
+function extFromContentType(blobType: string | undefined): string | null {
+  const t = (blobType || '').toLowerCase();
+  if (!t) return null;
+  if (t.includes('wav') || t.includes('wave') || t.includes('x-wav')) return 'wav';
+  if (t.includes('mpeg') || t.includes('mp3')) return 'mp3';
+  if (t.includes('ogg')) return 'ogg';
+  if (t.includes('mp4') || t.includes('m4a') || t.includes('aac')) return 'm4a';
+  if (t.includes('opus')) return 'opus';
+  if (t.includes('webm')) return 'webm';
+  return null;
+}
+
+function pickExt(blobType: string | undefined, recordingName: string | undefined, cid: string): string {
   const nameLower = (recordingName || '').toLowerCase();
   for (const ext of KNOWN_EXTS) {
     if (nameLower.endsWith('.' + ext)) return ext;
   }
-  const t = (blobType || '').toLowerCase();
-  if (t.includes('mpeg') || t.includes('mp3')) return 'mp3';
-  if (t.includes('ogg')) return 'ogg';
-  if (t.includes('mp4') || t.includes('m4a') || t.includes('aac')) return 'm4a';
-  if (t.includes('webm')) return 'webm';
+  const fromType = extFromContentType(blobType);
+  if (fromType) return fromType;
+  console.warn('[recordingCache] cid=' + cid + ' action=pick-ext fallback=wav', { contentType: blobType || null, recordingName: recordingName || null });
   return 'wav';
 }
+
 
 async function findExistingFile(id: string): Promise<string | null> {
   if (!Capacitor.isNativePlatform()) return null;
