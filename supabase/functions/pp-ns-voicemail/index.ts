@@ -79,9 +79,9 @@ Deno.serve(async (req) => {
       return jsonResponse({ ok: true, count: items.length, folder, items });
     }
 
-    // ── GET URL audio d'un voicemail ─────────────────────────────────────────
-    if (req.method === "GET" && action === "audio") {
-      const vmId = url.searchParams.get("vm_id");
+    // ── URL audio d'un voicemail ─────────────────────────────────────────────
+    if (action === "audio") {
+      const vmId = body?.vm_id ?? url.searchParams.get("vm_id");
       if (!vmId) return jsonResponse({ error: "vm_id requis" }, 400);
 
       const res = await nsFetch(
@@ -94,14 +94,12 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: "NS-API audio fetch failed", status: res.status, body: txt }, 502);
       }
 
-      // Retourner l'URL audio ou le contenu binaire
       const contentType = res.headers.get("content-type") ?? "";
       if (contentType.includes("application/json")) {
         const data = await res.json();
         return jsonResponse({ ok: true, audio_url: data.url ?? data.audio_url ?? null });
       }
 
-      // Proxy du contenu audio directement
       const audioBuffer = await res.arrayBuffer();
       return new Response(audioBuffer, {
         status: 200,
@@ -113,10 +111,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ── PATCH marquer comme lu ───────────────────────────────────────────────
-    if (req.method === "PATCH" && action === "mark-read") {
-      const payload = await req.json().catch(() => ({}));
-      const vmId = payload?.vm_id;
+    // ── marquer comme lu ─────────────────────────────────────────────────────
+    if (action === "mark-read") {
+      const vmId = body?.vm_id;
       if (!vmId) return jsonResponse({ error: "vm_id requis" }, 400);
 
       const res = await nsFetch(
@@ -129,7 +126,6 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: "NS-API mark-read failed", status: res.status, body: txt }, 502);
       }
 
-      // Sync local
       await supabase
         .from("planipret_voicemails")
         .update({ is_read: true })
@@ -139,10 +135,9 @@ Deno.serve(async (req) => {
       return jsonResponse({ ok: true });
     }
 
-    // ── PATCH déplacer vers un dossier ───────────────────────────────────────
-    if (req.method === "PATCH" && action === "move") {
-      const payload = await req.json().catch(() => ({}));
-      const { vm_id, folder } = payload ?? {};
+    // ── déplacer vers un dossier ─────────────────────────────────────────────
+    if (action === "move") {
+      const { vm_id, folder } = body ?? {};
       if (!vm_id || !folder) return jsonResponse({ error: "vm_id et folder requis" }, 400);
       if (!VALID_FOLDERS.has(folder)) return jsonResponse({ error: "Dossier invalide" }, 400);
 
@@ -165,9 +160,9 @@ Deno.serve(async (req) => {
       return jsonResponse({ ok: true });
     }
 
-    // ── DELETE supprimer un voicemail ────────────────────────────────────────
-    if (req.method === "DELETE") {
-      const vmId = url.searchParams.get("vm_id");
+    // ── supprimer un voicemail ───────────────────────────────────────────────
+    if (action === "delete" || req.method === "DELETE") {
+      const vmId = body?.vm_id ?? url.searchParams.get("vm_id");
       if (!vmId) return jsonResponse({ error: "vm_id requis" }, 400);
 
       const res = await nsFetch(
@@ -188,6 +183,7 @@ Deno.serve(async (req) => {
 
       return jsonResponse({ ok: true });
     }
+
 
     return jsonResponse({ error: `Action inconnue: ${action}` }, 400);
 
