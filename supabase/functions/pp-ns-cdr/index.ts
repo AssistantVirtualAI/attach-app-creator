@@ -30,7 +30,17 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   const guard = await requirePlanipretBroker(req);
-  if (guard instanceof Response) return guard;
+  if (guard instanceof Response) {
+    // If the only problem is a profile not yet linked to an NS extension,
+    // return an empty list instead of an error so the UI doesn't blank out.
+    if (guard.status === 412) {
+      return new Response(
+        JSON.stringify({ ok: true, count: 0, items: [], needs_link: true }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+    return guard;
+  }
   const { ctx, supabase } = guard;
 
   const url = new URL(req.url);
