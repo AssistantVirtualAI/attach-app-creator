@@ -31,7 +31,7 @@ Deno.serve(async (req) => {
 
   try {
     // ── GET enregistrement d'un appel spécifique ─────────────────────────────
-    if (req.method === "GET" && action === "get" && callId) {
+    if (action === "get" && callId) {
       // NS-API v2: GET /domains/{domain}/users/{user}/recordings/{call_id}
       const res = await nsFetch(
         `/domains/${encodeURIComponent(ctx.nsDomain)}/users/${encodeURIComponent(ctx.extension)}/recordings/${encodeURIComponent(callId)}`,
