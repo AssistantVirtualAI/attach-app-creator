@@ -27,6 +27,10 @@ export default function DashboardScreen({
   const me = useAutoSync<MeResponse>(() => mobileApi.me(), { intervalMs: 5 * 60_000, cacheKey: 'me', staleTimeMs: 120_000 });
   const stats = useAutoSync<DomainStats>(() => mobileApi.domainStats(range), { intervalMs: 120_000, deps: [range], cacheKey: `domainStats:${range}`, staleTimeMs: 60_000 });
   const m = me.data; const s = stats.data;
+  const userName = m?.user?.name || m?.user?.email || 'User';
+  const firstName = userName.split(/[\s@]/).filter(Boolean)[0] || 'User';
+  const orgName = m?.organization?.name || 'Lemtel Télécom';
+  const domainLabel = m?.domain?.sipDomain || m?.organization?.sipDomain || orgName;
 
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
@@ -57,7 +61,9 @@ export default function DashboardScreen({
   const answered = s?.answered ?? s?.answeredToday ?? 0;
   const missed = s?.missed ?? s?.missedToday ?? 0;
   const voicemails = s?.voicemails ?? s?.voicemailsToday ?? 0;
-  const buckets = s?.buckets ?? s?.last7Days ?? [];
+  const rawBuckets = s?.buckets ?? s?.last7Days ?? [];
+  const buckets = Array.isArray(rawBuckets) ? rawBuckets.map((v) => Number(v) || 0) : [];
+  const topExtensions = Array.isArray(s?.topExtensions) ? s.topExtensions : [];
 
   return (
     <div style={{ height: '100%', overflowY: 'auto', padding: '14px 14px 20px' }}>
@@ -126,10 +132,10 @@ export default function DashboardScreen({
 
         <div style={{ marginTop: 16 }}>
           <div style={{ fontSize: font.sm, color: colors.mutedSilver }}>
-            {m ? `${m.domain.sipDomain || m.organization.name}` : <Skeleton w="60%" h={10} />}
+            {m ? domainLabel : <Skeleton w="60%" h={10} />}
           </div>
           <h1 style={{ fontSize: font.xxl, color: colors.textIce, margin: '6px 0 4px', fontWeight: 800, letterSpacing: -0.5 }}>
-            {m ? `${t('dashboard.greeting')} ${m.user.name.split(' ')[0]}` : <Skeleton w="60%" h={26} />}
+            {m ? `${t('dashboard.greeting')} ${firstName}` : <Skeleton w="60%" h={26} />}
           </h1>
           <p style={{ fontSize: font.base, color: colors.textSub, margin: 0, lineHeight: 1.5 }}>
             {s ? t('dashboard.callsLine', { total, answered, missed }) : <Skeleton w="100%" h={14} />}
@@ -193,7 +199,7 @@ export default function DashboardScreen({
             {isAdmin && m?.extension?.number && (
               <>
                 <SectionTitle eyebrow={t('dashboard.myExtension')} title={`Ext ${m.extension.number} · ${RANGE_LABELS[range]}`} />
-                <MyExtensionStats range={range} extension={m.extension.number} domainUuid={m.domain.fusionpbxDomainUuid} />
+                <MyExtensionStats range={range} extension={m.extension.number} domainUuid={m.domain?.fusionpbxDomainUuid || m.organization?.fusionpbxDomainUuid} />
               </>
             )}
           </>
@@ -226,10 +232,10 @@ export default function DashboardScreen({
 
       <SectionTitle eyebrow={t('dashboard.insights')} title={`${t('dashboard.topExtensions')} · ${RANGE_LABELS[range]}`} />
       {!s && [1,2,3].map(i => <Card key={i} style={{ marginBottom: 8 }}><Skeleton w="60%" h={12} /></Card>)}
-      {s && s.topExtensions.length === 0 && (
+      {s && topExtensions.length === 0 && (
         <Card><div style={{ fontSize: font.sm, color: colors.mutedSilver, textAlign: 'center' }}>{t('dashboard.noActivity')}</div></Card>
       )}
-      {s && s.topExtensions.map((ext, i) => (
+      {s && topExtensions.map((ext, i) => (
         <Card key={ext.extension} style={{ marginBottom: 8 }} padded={true}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 16, fontWeight: 800, color: colors.lemtelBlue, minWidth: 28 }}>#{i+1}</span>
