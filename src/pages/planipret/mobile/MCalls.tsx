@@ -513,7 +513,7 @@ function CallDetailSheet({
 
   const fetchRecording = async () => {
     setRecLoading(true);
-    const { data, error } = await supabase.functions.invoke("ns-recordings", { body: { call_id: call.ns_call_id ?? call.id } });
+    const { data, error } = await supabase.functions.invoke("pp-ns-recordings", { body: { action: "get", call_id: call.ns_call_id ?? call.id } });
     setRecLoading(false);
     if (error || !(data as any)?.recording_url) { toast.error(t("calls.recordingUnavailable")); return; }
     await supabase.from("planipret_phone_calls").update({ recording_url: (data as any).recording_url }).eq("id", call.id);
@@ -990,7 +990,7 @@ function ActiveCallsTab({ userId, openDialer }: { userId: string; openDialer: (n
 
 
   const fetchActive = async () => {
-    const { data, error } = await supabase.functions.invoke("ns-calls", { body: { action: "list" } });
+    const { data, error } = await supabase.functions.invoke("pp-ns-calls", { body: { action: "list" } });
     if (error) return;
     const list = ((data as any)?.calls ?? []) as any[];
     setActive(list.map((c: any) => ({
@@ -1029,7 +1029,7 @@ function ActiveCallsTab({ userId, openDialer }: { userId: string; openDialer: (n
   }, [userId]);
 
   const action = async (act: string, callId: string, extra: any = {}) => {
-    const { error } = await supabase.functions.invoke("ns-calls", { body: { action: act, call_id: callId, ...extra } });
+    const { error } = await supabase.functions.invoke("pp-ns-calls", { body: { action: act, call_id: callId, ...extra } });
     if (error) toast.error(error.message);
     else fetchActive();
   };
@@ -1268,7 +1268,7 @@ function VoicemailsTab({
   const removeVm = async (vm: VM) => {
     if (!confirm("Supprimer ce voicemail ?")) return;
     if (vm.ns_vm_id) {
-      await supabase.functions.invoke("ns-voicemail", { method: "DELETE" as any, body: { vm_id: vm.ns_vm_id } }).catch(() => null);
+      await supabase.functions.invoke("pp-ns-voicemail", { body: { action: "delete", vm_id: vm.ns_vm_id } }).catch(() => null);
     }
     const sb: any = supabase;
     await sb.from("planipret_voicemails").delete().eq("id", vm.id);
@@ -1417,7 +1417,7 @@ function VmAudio({ vm }: { vm: VM }) {
     (async () => {
       if (src) return;
       const id = vm.ns_vm_id ?? vm.id;
-      const { data } = await supabase.functions.invoke("ns-voicemail", { method: "GET" as any, body: { vm_id: id, action: "fetch" } as any });
+      const { data } = await supabase.functions.invoke("pp-ns-voicemail", { body: { action: "audio", vm_id: id } });
       const url = (data as any)?.url ?? (data as any)?.audio_url;
       if (url) setSrc(url);
     })();
