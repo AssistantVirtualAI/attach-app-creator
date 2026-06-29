@@ -207,6 +207,7 @@ export interface RecordingEntry {
   hasTranscript: boolean;
   summary?: string;
   xml_cdr_uuid?: string;
+  pbx_uuid?: string;
   record_path?: string;
   record_name?: string;
   domain_uuid?: string;
@@ -445,12 +446,13 @@ export const mobileApi = {
   ),
   transcribeCall: async (callId: string, meta?: { recording_path?: string | null; recording_name?: string | null; domain_uuid?: string | null; xml_cdr_uuid?: string | null; organization_id?: string | null; vm_id?: string | null; force?: boolean; disableClaude?: boolean }) => {
     const cid = String(callId);
+    const xmlCdrUuid = meta?.xml_cdr_uuid || (meta?.recording_name ? String(meta.recording_name).replace(/\.(mp3|wav|ogg|m4a|webm)$/i, '') : '') || callId;
     const vm = meta?.vm_id ? ` vm_id=${meta.vm_id}` : '';
     const tag = `[mobileApi.transcribeCall] cid=${cid}${vm}`;
     const startedAt = Date.now();
     const payload = {
       call_record_id: callId,
-      xml_cdr_uuid: meta?.xml_cdr_uuid || callId,
+      xml_cdr_uuid: xmlCdrUuid,
       recording_path: meta?.recording_path || undefined,
       recording_name: meta?.recording_name || undefined,
       record_path: meta?.recording_path || undefined,
