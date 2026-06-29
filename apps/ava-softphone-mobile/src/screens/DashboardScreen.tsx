@@ -92,7 +92,7 @@ export default function DashboardScreen({
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-            {s ? <StatusDot state="registered" /> : <Skeleton w={40} h={14} />}
+            {hasStats ? <StatusDot state="registered" /> : <Skeleton w={40} h={14} />}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <button
                 onClick={() => { safeHaptic(); safeRun(toggle, 'theme toggle'); }}
@@ -150,7 +150,7 @@ export default function DashboardScreen({
             {m ? `${t('dashboard.greeting')} ${firstName}` : <Skeleton w="60%" h={26} />}
           </h1>
           <p style={{ fontSize: font.base, color: colors.textSub, margin: 0, lineHeight: 1.5 }}>
-            {s ? t('dashboard.callsLine', { total, answered, missed }) : <Skeleton w="100%" h={14} />}
+            {hasStats ? t('dashboard.callsLine', { total, answered, missed }) : <Skeleton w="100%" h={14} />}
           </p>
         </div>
       </HeroGradient>
@@ -180,33 +180,33 @@ export default function DashboardScreen({
           <>
             <SectionTitle eyebrow={scopeEyebrow} title={`${scopeLabel} · ${RANGE_LABELS[range]}`} />
             <AnswerRateHero
-              answered={s ? answered : undefined}
-              missed={s ? missed : undefined}
-              total={s ? total : undefined}
-              voicemails={s ? voicemails : undefined}
-              avgSec={s?.avgDurationSec}
+              answered={hasStats ? answered : undefined}
+              missed={hasStats ? missed : undefined}
+              total={hasStats ? total : undefined}
+              voicemails={hasStats ? voicemails : undefined}
+              avgSec={hasStats ? safeNumber(s.avgDurationSec) : undefined}
               rangeLabel={RANGE_LABELS[range]}
             />
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
-              <DirectionDonut inbound={s ? inbound : undefined} outbound={s ? outbound : undefined} />
-              <TalkTimeGauge totalSec={s ? safeNumber(s.totalTalkSec) : undefined} avgSec={s ? safeNumber(s.avgDurationSec) : undefined} />
+              <DirectionDonut inbound={hasStats ? inbound : undefined} outbound={hasStats ? outbound : undefined} />
+              <TalkTimeGauge totalSec={hasStats ? safeNumber(s.totalTalkSec) : undefined} avgSec={hasStats ? safeNumber(s.avgDurationSec) : undefined} />
             </div>
 
             <SectionTitle eyebrow={t('dashboard.breakdown')} title={isAdmin ? t('dashboard.domainMetrics') : t('dashboard.myMetrics')} />
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
-              <Metric label={t('m.totalCalls')} value={s ? total : undefined} tone="cyan" icon="☎" pct={100} />
-              <Metric label={t('m.answered')} value={s ? answered : undefined} tone="success" icon="↗" pct={total ? (answered / total) * 100 : 0} />
-              <Metric label={t('m.missed')} value={s ? missed : undefined} tone="danger" icon="↘" pct={total ? (missed / total) * 100 : 0} />
-              <Metric label={t('m.voicemails')} value={s ? voicemails : undefined} tone="gold" icon="✉" pct={total ? (voicemails / total) * 100 : 0} />
-              <Metric label={t('m.answerRate')} value={s?.answerRate != null ? `${safeNumber(s.answerRate)}%` : undefined} tone="success" icon="◐" pct={safeNumber(s?.answerRate)} />
-              <Metric label={t('m.avgDuration')} value={s?.avgDurationSec != null ? `${safeNumber(s.avgDurationSec)}s` : undefined} tone="violet" icon="◷" pct={Math.min(100, (safeNumber(s?.avgDurationSec) / 300) * 100)} />
-              <Metric label={t('m.totalTalk')} value={s?.totalTalkSec != null ? fmtTalk(safeNumber(s.totalTalkSec)) : undefined} tone="cyan" icon="∿" pct={75} />
-              <Metric label={t('m.peakHour')} value={s?.peakHour != null ? `${safeNumber(s.peakHour)}:00` : undefined} tone="gold" icon="◉" pct={(safeNumber(s?.peakHour) / 24) * 100} />
-              <Metric label={t('m.outbound')} value={s ? outbound : undefined} tone="cyan" icon="↗" pct={total ? (outbound / total) * 100 : 0} />
-              <Metric label={t('m.failedDials')} value={s?.dialFailedCount != null ? safeNumber(s.dialFailedCount) : undefined} tone="danger" icon="✕" pct={total ? (safeNumber(s?.dialFailedCount) / total) * 100 : 0} />
-              <Metric label={t('m.dialSuccess')} value={s?.dialSuccessRate != null ? `${safeNumber(s.dialSuccessRate)}%` : undefined} tone="success" icon="✓" pct={safeNumber(s?.dialSuccessRate)} />
-              {isAdmin && <Metric label={t('m.activeExt')} value={s?.activeExtensions != null ? safeNumber(s.activeExtensions) : undefined} tone="violet" icon="◆" pct={Math.min(100, (safeNumber(s?.activeExtensions) / 20) * 100)} />}
+              <Metric label={t('m.totalCalls')} value={hasStats ? total : undefined} tone="cyan" icon="☎" pct={100} />
+              <Metric label={t('m.answered')} value={hasStats ? answered : undefined} tone="success" icon="↗" pct={total ? (answered / total) * 100 : 0} />
+              <Metric label={t('m.missed')} value={hasStats ? missed : undefined} tone="danger" icon="↘" pct={total ? (missed / total) * 100 : 0} />
+              <Metric label={t('m.voicemails')} value={hasStats ? voicemails : undefined} tone="gold" icon="✉" pct={total ? (voicemails / total) * 100 : 0} />
+              <Metric label={t('m.answerRate')} value={hasStats ? `${safeNumber(s.answerRate)}%` : undefined} tone="success" icon="◐" pct={safeNumber(s?.answerRate)} />
+              <Metric label={t('m.avgDuration')} value={hasStats ? `${safeNumber(s.avgDurationSec)}s` : undefined} tone="violet" icon="◷" pct={Math.min(100, (safeNumber(s?.avgDurationSec) / 300) * 100)} />
+              <Metric label={t('m.totalTalk')} value={hasStats ? fmtTalk(safeNumber(s.totalTalkSec)) : undefined} tone="cyan" icon="∿" pct={75} />
+              <Metric label={t('m.peakHour')} value={hasStats ? `${safeNumber(s.peakHour)}:00` : undefined} tone="gold" icon="◉" pct={(safeNumber(s?.peakHour) / 24) * 100} />
+              <Metric label={t('m.outbound')} value={hasStats ? outbound : undefined} tone="cyan" icon="↗" pct={total ? (outbound / total) * 100 : 0} />
+              <Metric label={t('m.failedDials')} value={hasStats ? safeNumber(s.dialFailedCount) : undefined} tone="danger" icon="✕" pct={total ? (safeNumber(s?.dialFailedCount) / total) * 100 : 0} />
+              <Metric label={t('m.dialSuccess')} value={hasStats ? `${safeNumber(s.dialSuccessRate)}%` : undefined} tone="success" icon="✓" pct={safeNumber(s?.dialSuccessRate)} />
+              {isAdmin && <Metric label={t('m.activeExt')} value={hasStats ? safeNumber(s.activeExtensions) : undefined} tone="violet" icon="◆" pct={Math.min(100, (safeNumber(s?.activeExtensions) / 20) * 100)} />}
             </div>
 
             {isAdmin && m?.extension?.number && (
