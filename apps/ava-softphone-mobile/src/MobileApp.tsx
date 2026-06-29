@@ -161,12 +161,13 @@ export default function MobileApp() {
   if (loading || booting) return <SplashAva />;
   if (!creds) return <MobileI18nProvider><ThemeProvider><AuthScreen onAuthenticated={setCreds} /><PerfOverlay /><IceDiagnosticsOverlay /></ThemeProvider></MobileI18nProvider>;
 
-  return <MobileI18nProvider><ThemeProvider><AuthenticatedShell creds={creds} setCreds={setCreds} tab={tab} setTab={setTab} onSignOut={clearCreds} preferClickToCall={preferC2C} onTogglePreferC2C={() => {}} /><PerfOverlay /><IceDiagnosticsOverlay /></ThemeProvider></MobileI18nProvider>;
+  return <MobileI18nProvider><ThemeProvider><AuthenticatedShell creds={creds} setCreds={setCreds} tab={tab} setTab={setTab} callsSub={callsSub} callsFilter={callsFilter} onSignOut={clearCreds} preferClickToCall={preferC2C} onTogglePreferC2C={() => {}} /><PerfOverlay /><IceDiagnosticsOverlay /></ThemeProvider></MobileI18nProvider>;
 }
 
 function AuthenticatedShell({
-  creds, setCreds, tab, setTab, onSignOut, preferClickToCall, onTogglePreferC2C,
-}: { creds: Creds; setCreds: (c: Creds) => void; tab: Tab; setTab: (t: Tab) => void; onSignOut: () => void; preferClickToCall: boolean; onTogglePreferC2C: () => void }) {
+  creds, setCreds, tab, setTab, callsSub, callsFilter, onSignOut, preferClickToCall, onTogglePreferC2C,
+}: { creds: Creds; setCreds: (c: Creds) => void; tab: Tab; setTab: (t: Tab) => void; callsSub?: 'recents' | 'recordings' | 'voicemail' | 'dial'; callsFilter?: 'all' | 'missed'; onSignOut: () => void; preferClickToCall: boolean; onTogglePreferC2C: () => void }) {
+
 
   const [permsGateDone, setPermsGateDone] = useState<boolean | null>(isPreviewMode ? true : null);
   const [profileOpen, setProfileOpen] = useState(false);
