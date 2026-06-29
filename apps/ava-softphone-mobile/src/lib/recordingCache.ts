@@ -89,18 +89,19 @@ async function getCachedNativePath(id: string): Promise<string | null> {
 
   try {
     const { Filesystem, Directory } = await import(/* @vite-ignore */ '@capacitor/filesystem');
-    const path = `recordings/${safeName(id)}`;
-    const statResult = await Filesystem.stat({ path, directory: Directory.Data });
-    // stat succeeded — file exists. Verify it has non-zero size to guard
-    // against truncated writes from a previous interrupted download.
+    const found = await findExistingFile(id);
+    if (!found) {
+      knownMissingIds.add(id);
+      return null;
+    }
+    const statResult = await Filesystem.stat({ path: found, directory: Directory.Data });
     if (!statResult || (statResult.size !== undefined && statResult.size === 0)) {
       knownMissingIds.add(id);
       return null;
     }
-    const uri = await Filesystem.getUri({ path, directory: Directory.Data });
+    const uri = await Filesystem.getUri({ path: found, directory: Directory.Data });
     return Capacitor.convertFileSrc(uri.uri);
   } catch {
-    // stat threw → file does not exist on disk.
     knownMissingIds.add(id);
     return null;
   }
