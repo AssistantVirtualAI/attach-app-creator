@@ -8,51 +8,41 @@ import { useMplanipretLang } from "@/hooks/useMplanipretLang";
 import { useMplanipretTheme } from "@/hooks/useMplanipretTheme";
 
 /**
- * Runtime overlay assertion — verifies the profile sheet renders ABOVE the app
- * on iOS/Android (and web). Checks: portaled to <body>, position:fixed, full
- * viewport coverage, z-index >= 99999, and no DOM ancestor with a higher
- * z-index in the same stacking context. Logs a console.error in dev/preview if
- * any invariant fails so regressions surface immediately.
+ * Runtime assertion: the sheet must render INSIDE the mobile phone frame
+ * (so it looks like a native tab/modal), positioned absolutely, covering
+ * just the frame — not the whole browser window.
  */
-function assertOverlayOnTop(el: HTMLElement | null) {
+function assertOverlayInFrame(el: HTMLElement | null) {
   if (!el || typeof window === "undefined") return;
   try {
     const issues: string[] = [];
-    if (el.parentElement !== document.body) issues.push("not portaled to <body>");
+    const frame = document.getElementById("pp-mobile-frame");
+    if (!frame) issues.push("mobile frame (#pp-mobile-frame) not found");
+    else if (!frame.contains(el)) issues.push("sheet rendered outside #pp-mobile-frame");
     const cs = window.getComputedStyle(el);
-    if (cs.position !== "fixed") issues.push(`position is ${cs.position} (expected fixed)`);
-    const z = parseInt(cs.zIndex || "0", 10);
-    if (!Number.isFinite(z) || z < 99999) issues.push(`z-index ${cs.zIndex} < 99999`);
-    const r = el.getBoundingClientRect();
-    if (r.width < window.innerWidth - 1 || r.height < window.innerHeight - 1) {
-      issues.push(`overlay ${Math.round(r.width)}x${Math.round(r.height)} smaller than viewport ${window.innerWidth}x${window.innerHeight}`);
-    }
-    // Scan siblings under <body> for any element with a higher z-index that
-    // could occlude us. (Portals from other libs land here too.)
-    Array.from(document.body.children).forEach((sib) => {
-      if (sib === el || !(sib instanceof HTMLElement)) return;
-      const sz = parseInt(window.getComputedStyle(sib).zIndex || "0", 10);
-      if (Number.isFinite(sz) && sz > z) {
-        issues.push(`sibling <${sib.tagName.toLowerCase()}> has higher z-index ${sz}`);
-      }
-    });
+    if (cs.position !== "absolute") issues.push(`position is ${cs.position} (expected absolute)`);
     if (issues.length) {
       // eslint-disable-next-line no-console
-      console.error("[MobileProfileSheet] overlay assertion failed:", issues.join("; "));
-    } else if (import.meta.env?.DEV) {
-      // eslint-disable-next-line no-console
-      console.debug("[MobileProfileSheet] overlay OK (fixed, z=" + z + ", portal=body)");
+      console.error("[MobileProfileSheet] frame assertion failed:", issues.join("; "));
     }
-  } catch {
-    /* ignore */
-  }
+  } catch { /* ignore */ }
 }
 
-const STATUSES: Array<{ key: "available" | "busy" | "break" | "offline"; color: string }> = [
+type StatusKey =
+  | "available" | "busy" | "break" | "offline"
+  | "meeting" | "lunch" | "away" | "dnd" | "training" | "remote";
+
+const STATUSES: Array<{ key: StatusKey; color: string }> = [
   { key: "available", color: "#10B981" },
-  { key: "busy", color: "#EF4444" },
-  { key: "break", color: "#F59E0B" },
-  { key: "offline", color: "#94A3B8" },
+  { key: "busy",      color: "#EF4444" },
+  { key: "meeting",   color: "#8B5CF6" },
+  { key: "dnd",       color: "#DC2626" },
+  { key: "break",     color: "#F59E0B" },
+  { key: "lunch",     color: "#F97316" },
+  { key: "away",      color: "#64748B" },
+  { key: "training",  color: "#0EA5E9" },
+  { key: "remote",    color: "#14B8A6" },
+  { key: "offline",   color: "#94A3B8" },
 ];
 
 export default function MobileProfileSheet({
@@ -70,6 +60,21 @@ export default function MobileProfileSheet({
   const [pwd1, setPwd1] = useState("");
   const [pwd2, setPwd2] = useState("");
   const [pwdLoading, setPwdLoading] = useState(false);
+  const [host, setHost] = useState<HTMLElement | null>(null);
+
+  // Find the mobile frame to portal inside. Retry briefly in case the sheet
+  // is opened before the frame mounts.
+  useEffect(() => {
+    let cancelled = false;
+    const tryFind = (attempt = 0) => {
+      const el = document.getElementById("pp-mobile-frame");
+      if (el) { if (!cancelled) setHost(el); return; }
+      if (attempt < 10) window.setTimeout(() => tryFind(attempt + 1), 30);
+      else if (!cancelled) setHost(document.body); // fallback
+    };
+    tryFind();
+    return () => { cancelled = true; };
+  }, []);
 
   const setStatus = async (s: string) => {
     if (!profile?.user_id) return;
@@ -101,26 +106,31 @@ export default function MobileProfileSheet({
 
   const overlayRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
-    const id = window.setTimeout(() => assertOverlayOnTop(overlayRef.current), 50);
+    if (!host) return;
+    const id = window.setTimeout(() => assertOverlayInFrame(overlayRef.current), 50);
     return () => window.clearTimeout(id);
-  }, []);
+  }, [host]);
 
   const current = profile?.status ?? "available";
   const initials = (profile?.full_name || profile?.email || "?")
     .split(/\s+/).map((s: string) => s[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
 
+  if (!host) return null;
+
   return createPortal(
     <AnimatePresence>
-      <motion.div ref={overlayRef} data-testid="mobile-profile-sheet-overlay" className="fixed inset-0 flex items-end"
-        style={{ background: "rgba(0,0,0,0.45)", zIndex: 99999 }}
+      <motion.div ref={overlayRef} data-testid="mobile-profile-sheet-overlay"
+        className="absolute inset-0 flex items-end"
+        style={{ background: "rgba(0,0,0,0.45)", zIndex: 9000 }}
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}>
         <motion.div onClick={(e) => e.stopPropagation()}
-          className="w-full max-h-[88%] overflow-y-auto"
+          className="w-full max-h-[92%] overflow-y-auto"
           style={{
             background: "var(--pp-bg-surface)",
             borderTopLeftRadius: 28, borderTopRightRadius: 28,
             color: "var(--pp-text-primary)",
             paddingBottom: 28,
+            boxShadow: "0 -8px 32px rgba(0,0,0,0.25)",
           }}
           initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
           transition={{ type: "spring", damping: 28, stiffness: 280 }}>
@@ -163,8 +173,8 @@ export default function MobileProfileSheet({
                       border: `1px solid ${active ? "var(--pp-brand-accent)" : "var(--pp-bg-border-2)"}`,
                       color: "var(--pp-text-primary)",
                     }}>
-                    <span className="rounded-full" style={{ width: 10, height: 10, background: s.color }} />
-                    <span style={{ fontSize: 13, fontWeight: 600 }}>{t(`status.${s.key}`)}</span>
+                    <span className="rounded-full" style={{ width: 10, height: 10, background: s.color, flexShrink: 0 }} />
+                    <span style={{ fontSize: 12.5, fontWeight: 600 }}>{t(`status.${s.key}`)}</span>
                     {active && <CheckCircle2 className="w-4 h-4 ml-auto" style={{ color: "var(--pp-brand-accent)" }} />}
                   </button>
                 );
@@ -246,6 +256,6 @@ export default function MobileProfileSheet({
         </motion.div>
       </motion.div>
     </AnimatePresence>,
-    document.body
+    host
   );
 }

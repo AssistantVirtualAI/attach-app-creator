@@ -58,7 +58,9 @@ export default function MobileAuthScreen({ onLoggedIn }: { onLoggedIn: () => Pro
   return (
     <div className="h-full w-full flex flex-col" style={{ background: "var(--pp-bg-base)" }}>
       {/* Top control row: lang + theme */}
-      <div className="flex items-center justify-end gap-2 px-4 pt-3">
+      <div className="flex items-center justify-end gap-2 px-4"
+        style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 56px)" }}>
+
         <button onClick={toggleLang}
           className="flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[11px] font-bold"
           style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border)", color: "var(--pp-text-secondary)" }}
