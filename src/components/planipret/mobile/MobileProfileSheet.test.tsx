@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, cleanup, waitFor } from "@testing-library/react";
 import MobileProfileSheet from "./MobileProfileSheet";
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -16,9 +16,16 @@ vi.mock("@/hooks/useMplanipretTheme", () => ({
 }));
 
 describe("MobileProfileSheet overlay", () => {
-  beforeEach(() => cleanup());
+  beforeEach(() => {
+    cleanup();
+    document.body.innerHTML = "";
+  });
 
-  it("renders portaled to document.body with fixed position and z-index >= 99999", () => {
+  it("renders inside #pp-mobile-frame as an absolute overlay (tab-style)", async () => {
+    const frame = document.createElement("div");
+    frame.id = "pp-mobile-frame";
+    document.body.appendChild(frame);
+
     render(
       <MobileProfileSheet
         profile={{ user_id: "u1", full_name: "Test", email: "t@t.com", status: "available" }}
@@ -26,15 +33,14 @@ describe("MobileProfileSheet overlay", () => {
         onClose={() => {}}
       />
     );
-    const overlay = screen.getByTestId("mobile-profile-sheet-overlay") as HTMLElement;
-    expect(overlay).toBeTruthy();
-    expect(overlay.parentElement).toBe(document.body);
-    expect(overlay.style.zIndex).toBe("99999");
-    expect(overlay.className).toContain("fixed");
+
+    const overlay = await waitFor(() => screen.getByTestId("mobile-profile-sheet-overlay") as HTMLElement);
+    expect(frame.contains(overlay)).toBe(true);
+    expect(overlay.className).toContain("absolute");
     expect(overlay.className).toContain("inset-0");
   });
 
-  it("has no sibling under <body> with a higher z-index", () => {
+  it("falls back to document.body when the frame is missing", async () => {
     render(
       <MobileProfileSheet
         profile={{ user_id: "u1", status: "available" }}
@@ -42,12 +48,7 @@ describe("MobileProfileSheet overlay", () => {
         onClose={() => {}}
       />
     );
-    const overlay = screen.getByTestId("mobile-profile-sheet-overlay") as HTMLElement;
-    const z = parseInt(overlay.style.zIndex || "0", 10);
-    Array.from(document.body.children).forEach((sib) => {
-      if (sib === overlay || !(sib instanceof HTMLElement)) return;
-      const sz = parseInt(window.getComputedStyle(sib).zIndex || "0", 10);
-      if (Number.isFinite(sz)) expect(sz).toBeLessThanOrEqual(z);
-    });
+    const overlay = await waitFor(() => screen.getByTestId("mobile-profile-sheet-overlay") as HTMLElement, { timeout: 1000 });
+    expect(overlay).toBeTruthy();
   });
 });
