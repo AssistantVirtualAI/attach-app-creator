@@ -92,6 +92,23 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func applicationWillTerminate(_ application: UIApplication) {}
 
     func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
+        // Intercept tel: URLs from iOS Recents / Contacts tap.
+        // Extract the phone number, store it in UserDefaults, then let the
+        // JS layer pick it up via the ava:pendingCall event in deepLink.ts.
+        if url.scheme?.lowercased() == "tel" {
+            let raw = url.absoluteString
+            // tel:+15141234567  →  +15141234567
+            let number = raw.replacingOccurrences(of: "tel:", with: "", options: .caseInsensitive)
+                           .removingPercentEncoding ?? raw
+            NSLog("[DeepLink] tel: URL intercepted → number=\(number)")
+            UserDefaults.standard.set(number, forKey: "ava.pendingCallNumber")
+            // Post a JS-visible notification once the WebView is ready.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                CapacitorPjsip.shared?.notifyBg("pendingCall", ["number": number])
+            }
+            // Also open the app normally via Capacitor so the WebView loads.
+            return ApplicationDelegateProxy.shared.application(app, open: url, options: options)
+        }
         return ApplicationDelegateProxy.shared.application(app, open: url, options: options)
     }
 

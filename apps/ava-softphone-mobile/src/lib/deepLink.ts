@@ -59,6 +59,20 @@ export async function registerDeepLinkHandler(): Promise<() => void> {
       }
     } catch {}
 
+    // Fallback: AppDelegate stores the number in Capacitor Preferences
+    // (UserDefaults) under 'ava.pendingCallNumber' and fires a native
+    // 'pendingCall' event via CapacitorPjsip.notifyBg.
+    // This covers the case where Capacitor's appUrlOpen doesn't fire
+    // (e.g. app launched from terminated state via iOS Recents).
+    try {
+      const { Preferences } = await import('@capacitor/preferences');
+      const stored = await Preferences.get({ key: 'ava.pendingCallNumber' });
+      if (stored?.value) {
+        await Preferences.remove({ key: 'ava.pendingCallNumber' });
+        dispatchPendingCall(stored.value);
+      }
+    } catch {}
+
     return () => sub.remove();
   } catch {
     return () => {};
