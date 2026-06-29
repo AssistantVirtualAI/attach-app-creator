@@ -12,6 +12,7 @@ import { CapacitorPjsip, onNativeSipEvent } from '../lib/sip/nativeSipProvider';
 import { EMPTY_QUALITY, type CallQuality } from '../lib/sip/callQuality';
 import { loadAudioProfile, saveAudioProfile, type AudioProfile } from '../lib/sip/audioProfile';
 import { startNativeSipTracking, setNativeRegStatus } from '../lib/sip/nativeSipState';
+import { notifySipDispatcherLoaded } from '../lib/sip/bootSipGuard';
 import { attachNativeAutoReconnect } from '../lib/sip/nativeAutoReconnect';
 import { startRingback, stopRingback, describeEndReason } from '../lib/sip/ringback';
 import type { UseSoftphoneReturn, SIPStatus, CallState } from './useSoftphone';
@@ -131,13 +132,8 @@ function ensureNativeCallEventBridge() {
   return nativeCallBridgePromise;
 }
 
-const _nativeBannerEmitted = { current: false };
-
 export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn {
-  if (!_nativeBannerEmitted.current) {
-    _nativeBannerEmitted.current = true;
-    console.log('[Softphone] dispatcher loaded — NATIVE_SIP_ENABLED =', true);
-  }
+  notifySipDispatcherLoaded();
   const [sipStatus, setSipStatus] = useState<SIPStatus>('idle');
   const [sipError, setSipError] = useState('');
   const [callState, setCallState] = useState<CallState>('idle');

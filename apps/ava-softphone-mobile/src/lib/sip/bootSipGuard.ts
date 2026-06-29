@@ -3,10 +3,15 @@
  *
  * 1. Logs the SIP-related env flags and which provider will be used.
  * 2. Verifies the dispatcher banner ([Softphone] dispatcher loaded …) was
- *    printed during module evaluation. If not, surfaces a loud error.
+ *    printed after the hook mounts. If not within 15 s, surfaces a loud error.
  * 3. Wraps console.log/info/warn so any JsSIP UA log emitted while the
  *    native flag is active is reported as a fatal misconfiguration.
  * 4. Exposes `getSipBootReport()` for the UI fallback panel.
+ *
+ * IMPORTANT: the banner is now emitted INSIDE the hook body (not at module
+ * evaluation time), so the guard console-patch is always installed first.
+ * The hooks call notifySipDispatcherLoaded() directly instead of relying on
+ * console-sniffing, which eliminates all timing races.
  */
 import { NATIVE_SIP_ENABLED } from './nativeSipProvider';
 
@@ -25,6 +30,24 @@ const report: SipBootReport = {
 };
 
 let installed = false;
+let validationTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * Called directly by useSoftphoneNative / useSoftphone when the hook first
+ * renders. This replaces the fragile console-sniffing approach and eliminates
+ * all timing races between module evaluation and guard installation.
+ */
+export function notifySipDispatcherLoaded() {
+  if (report.dispatcherLoaded) return;
+  report.dispatcherLoaded = true;
+  if (validationTimer !== null) {
+    clearTimeout(validationTimer);
+    validationTimer = null;
+  }
+  // eslint-disable-next-line no-console
+  console.log('[SipBootGuard] ✓ dispatcher loaded, provider =',
+    NATIVE_SIP_ENABLED ? 'native' : 'jssip');
+}
 
 export function installSipBootGuard() {
   if (installed) return;
@@ -39,8 +62,7 @@ export function installSipBootGuard() {
     chosenProvider: NATIVE_SIP_ENABLED ? 'native (CapacitorPjsip)' : 'jssip (WebRTC)',
   });
 
-  // Sniff every console call until the dispatcher banner shows up, and to
-  // catch any JsSIP UA log while native is active.
+  // Sniff every console call to catch any JsSIP UA log while native is active.
   const channels: Array<'log' | 'info' | 'warn' | 'error' | 'debug'> = [
     'log', 'info', 'warn', 'error', 'debug',
   ];
@@ -48,11 +70,8 @@ export function installSipBootGuard() {
     const original = (console as any)[ch].bind(console);
     (console as any)[ch] = (...args: any[]) => {
       try {
-        const first = typeof args[0] === 'string' ? args[0] : '';
-        if (!report.dispatcherLoaded && first.startsWith('[Softphone] dispatcher loaded')) {
-          report.dispatcherLoaded = true;
-        }
         if (NATIVE_SIP_ENABLED && !report.jsSipLeak) {
+          const first = typeof args[0] === 'string' ? args[0] : '';
           // JsSIP prints with the "JsSIP:" prefix on every internal log.
           if (/^JsSIP:/.test(first) || /JsSIP\b.*\bUA\b/.test(first)) {
             report.jsSipLeak = first;
@@ -70,24 +89,19 @@ export function installSipBootGuard() {
     };
   });
 
-  // Validation: dispatcher must have loaded by the time AuthenticatedShell
-  // finishes mounting (which requires: creds loaded + permsGateDone resolved +
-  // SIP credentials hydrated). On a cold launch this takes 3-6 s on device.
-  // We give 10 s before raising the alarm so we never fire a false-positive
-  // while the permission gate or the SplashAva screen is still showing.
-  setTimeout(() => {
+  // Validation: the hook must call notifySipDispatcherLoaded() within 15 s.
+  // This covers cold launches with slow permission gates or SplashAva screens.
+  // The timer is cancelled as soon as the hook calls notifySipDispatcherLoaded().
+  validationTimer = setTimeout(() => {
+    validationTimer = null;
     if (!report.dispatcherLoaded) {
       // eslint-disable-next-line no-console
       console.error(
         '[SipBootGuard] ❌ dispatcher banner missing — useSoftphone never loaded.',
         'The app cannot make calls. Check the bundle for VITE_NATIVE_SIP.',
       );
-    } else {
-      // eslint-disable-next-line no-console
-      console.log('[SipBootGuard] ✓ dispatcher loaded, provider =',
-        NATIVE_SIP_ENABLED ? 'native' : 'jssip');
     }
-  }, 10000);
+  }, 15000);
 }
 
 export function getSipBootReport(): Readonly<SipBootReport> {

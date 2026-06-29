@@ -130,8 +130,10 @@ export default function RecordingsScreen({
 
       if (missingItems.length === 0) return;
 
-      // Download missing files (concurrency 3) — no setState during downloads.
-      await prefetchRecordings(missingItems, accessToken, orgId, domainUuid, { concurrency: 3 });
+      // Download missing files — limit to 5 most recent to avoid saturating
+      // the JS thread and causing the app to freeze on large recording lists.
+      // Concurrency 2 to stay within iOS WKWebView network limits.
+      await prefetchRecordings(missingItems.slice(0, 5), accessToken, orgId, domainUuid, { concurrency: 2 });
       if (cancelled) return;
 
       // Verify which downloads succeeded and update ref + state once.
