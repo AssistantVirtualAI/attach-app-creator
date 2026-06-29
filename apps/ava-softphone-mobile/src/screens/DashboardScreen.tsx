@@ -40,7 +40,7 @@ class DashboardCrashGuard extends React.Component<DashboardProps & { children: R
   }
 }
 
-function DashboardSafeFallback({ onNavigate, haptic, onRetry, onOpenProfile }: DashboardProps & { onRetry: () => void }) {
+function DashboardSafeFallback({ onNavigate, haptic, onRetry, onOpenProfile, error }: DashboardProps & { onRetry: () => void; error?: Error | null }) {
   const { t, tx } = useT();
   const safeHaptic = useMemo(() => safeAsync(haptic), [haptic]);
   const go = (tab: Tab) => { safeHaptic(); try { onNavigate(tab); } catch {} };
