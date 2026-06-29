@@ -62,13 +62,31 @@ export default function RecordingsScreen({
     const onCallEnded = () => { setTimeout(reload, 1500); setTimeout(reload, 8000); };
     window.addEventListener('focus', onFocus);
     window.addEventListener('ava:callEnded', onCallEnded as any);
+
+    // Live realtime: any new call recording row for this org/extension triggers
+    // an immediate reload so users see brand-new recordings without polling.
+    let ch: any = null;
+    (async () => {
+      try {
+        const { supabase } = await import('../lib/mobileSupabase');
+        if (creds?.accessToken) { try { supabase.realtime.setAuth(creds.accessToken); } catch {} }
+        const orgId = creds?.organizationId;
+        const filter = orgId ? `organization_id=eq.${orgId}` : undefined;
+        ch = supabase.channel(`recordings-live-${orgId || 'all'}`)
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pbx_call_recordings', ...(filter ? { filter } : {}) } as any, () => reload())
+          .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pbx_call_recordings', ...(filter ? { filter } : {}) } as any, () => reload())
+          .subscribe();
+      } catch {}
+    })();
+
     return () => {
       cancel();
       clearInterval(poll);
       window.removeEventListener('focus', onFocus);
       window.removeEventListener('ava:callEnded', onCallEnded as any);
+      (async () => { try { const { supabase } = await import('../lib/mobileSupabase'); ch && supabase.removeChannel(ch); } catch {} })();
     };
-  }, [reload, creds?.accessToken]);
+  }, [reload, creds?.accessToken, creds?.organizationId]);
 
   // cachedIdsRef mirrors cachedIds state but is updated without triggering
   // re-renders, so background probes and prefetches can update it safely.
