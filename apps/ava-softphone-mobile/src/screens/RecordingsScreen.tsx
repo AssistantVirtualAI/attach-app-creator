@@ -38,6 +38,10 @@ export default function RecordingsScreen({
   const { lang } = useT();
   const fr = lang === 'fr';
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  // Track which recording is currently loaded in the <audio> element so the
+  // onError handler can re-download it without needing closure state.
+  const currentPlaybackRef = useRef<RecordingEntry | null>(null);
+  const recoveringRef = useRef(false);
 
   // Load recordings (real-time: refresh on focus + every 30s + after a call ends).
   const reload = React.useCallback(() => {
@@ -66,42 +70,77 @@ export default function RecordingsScreen({
     };
   }, [reload, creds?.accessToken]);
 
-  // Probe which items are already cached on disk + prefetch the most recent ones.
+  // Guard ref: tracks the items+creds key for which a prefetch is already running
+  // so that setCachedIds updates don't re-trigger the expensive download loop.
+  const prefetchKeyRef = useRef<string | null>(null);
+
+  // Probe which items are already cached on disk.
+  // Runs whenever items changes — only reads disk, never writes.
   useEffect(() => {
     if (!items || items.length === 0) return;
     let cancelled = false;
     (async () => {
+      const results = await Promise.all(
+        items.slice(0, 50).map(async (r) => ({ id: r.id, u: await getCachedRecordingUrl(r.id) }))
+      );
+      if (cancelled) return;
       const next = new Set<string>();
-      await Promise.all(items.slice(0, 50).map(async (r) => {
-        const u = await getCachedRecordingUrl(r.id);
-        if (u) next.add(r.id);
-      }));
-      if (!cancelled) setCachedIds(next);
+      results.forEach(({ id, u }) => { if (u) next.add(id); });
+      setCachedIds(next);
     })();
-    // Background prefetch: top 5 most recent that aren't cached yet.
-    const top = items.slice(0, 5).map((r) => ({
-      id: r.id,
-      meta: {
-        recording_path: r.record_path, recording_name: r.record_name,
-        xml_cdr_uuid: r.xml_cdr_uuid || r.id, domain_uuid: r.domain_uuid,
-        domain_name: r.domain_name, organization_id: r.organization_id,
-        start_at: r.startedAt,
-      },
-    }));
-    prefetchRecordings(top, creds?.accessToken || null, creds?.organizationId || null,
-      creds?.domainUuid || creds?.fusionpbxDomainUuid || fallbackDomainUuid || null)
-      .then(() => {
-        if (cancelled) return;
-        Promise.all(top.map(async (t) => ({ id: t.id, u: await getCachedRecordingUrl(t.id) })))
-          .then((res) => {
-            if (cancelled) return;
-            setCachedIds((prev) => {
-              const n = new Set(prev);
-              res.forEach((r) => { if (r.u) n.add(r.id); });
-              return n;
-            });
-          });
+    return () => { cancelled = true; };
+  }, [items]);
+
+  // Background prefetch: download all missing files.
+  // Runs once per (items + creds) combination — guarded by prefetchKeyRef.
+  useEffect(() => {
+    if (!items || items.length === 0) return;
+    const accessToken = creds?.accessToken || null;
+    if (!accessToken) return;
+    const domainUuid = creds?.domainUuid || creds?.fusionpbxDomainUuid || fallbackDomainUuid || null;
+    const orgId = creds?.organizationId || null;
+    // Build a stable key so we don't re-run for the same dataset.
+    const key = `${items.map((r) => r.id).join(',')}-${accessToken}`;
+    if (prefetchKeyRef.current === key) return;
+    prefetchKeyRef.current = key;
+
+    let cancelled = false;
+    const makeMeta = (r: RecordingEntry) => ({
+      recording_path: r.record_path, recording_name: r.record_name,
+      xml_cdr_uuid: r.xml_cdr_uuid || r.id, domain_uuid: r.domain_uuid,
+      domain_name: r.domain_name, organization_id: r.organization_id,
+      start_at: r.startedAt,
+    });
+
+    (async () => {
+      // Probe to find which files are missing.
+      const probeResults = await Promise.all(
+        items.slice(0, 50).map(async (r) => ({ r, u: await getCachedRecordingUrl(r.id) }))
+      );
+      if (cancelled) return;
+
+      const missingItems = probeResults
+        .filter(({ u }) => !u)
+        .map(({ r }) => ({ id: r.id, meta: makeMeta(r) }));
+
+      if (missingItems.length === 0) return;
+
+      // Download all missing files (concurrency 3).
+      await prefetchRecordings(missingItems, accessToken, orgId, domainUuid, { concurrency: 3 });
+      if (cancelled) return;
+
+      // After downloads, refresh cachedIds once.
+      const refreshed = await Promise.all(
+        missingItems.map(async (t) => ({ id: t.id, u: await getCachedRecordingUrl(t.id) }))
+      );
+      if (cancelled) return;
+      setCachedIds((prev) => {
+        const n = new Set(prev);
+        refreshed.forEach(({ id, u }) => { if (u) n.add(id); });
+        return n;
       });
+    })();
+
     return () => { cancelled = true; };
   }, [items, creds?.accessToken, creds?.organizationId, creds?.domainUuid, creds?.fusionpbxDomainUuid, fallbackDomainUuid]);
 
@@ -177,8 +216,11 @@ export default function RecordingsScreen({
         );
         setCachedIds((prev) => new Set(prev).add(rec.id));
       }
+      currentPlaybackRef.current = rec;
+      recoveringRef.current = false;
       if (audioRef.current) {
         audioRef.current.src = url;
+        audioRef.current.load();
         audioRef.current.play().catch(() => {});
       }
       setPlayingId(rec.id);
@@ -245,7 +287,46 @@ export default function RecordingsScreen({
         {([7, 30] as const).map((d) => <button key={d} onClick={() => onRangeDaysChange(d)} style={{ padding: '7px 9px', borderRadius: 10, border: `1px solid ${rangeDays === d ? colors.borderGold : colors.border}`, background: rangeDays === d ? colors.signalGold + '1a' : 'rgba(255,255,255,0.04)', color: rangeDays === d ? colors.signalGold : colors.mutedSilver, fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>{d}{fr ? 'j' : 'd'}</button>)}
       </div>
 
-      <audio ref={audioRef} onEnded={() => setPlayingId(null)} style={{ width: '100%', marginBottom: 10 }} controls />
+      <audio
+        ref={audioRef}
+        onEnded={() => {
+          recoveringRef.current = false;
+          currentPlaybackRef.current = null;
+          setPlayingId(null);
+        }}
+        onError={async () => {
+          // iOS evicts cached files from the Data directory when storage is
+          // low, or after an app update. When the <audio> element fires an
+          // error we silently re-download the file and resume playback.
+          const rec = currentPlaybackRef.current;
+          if (!rec || recoveringRef.current) return;
+          recoveringRef.current = true;
+          setLoadingId(rec.id);
+          try {
+            const freshUrl = await downloadRecording(
+              rec.id, recMeta(rec),
+              creds?.accessToken || null,
+              creds?.organizationId || null,
+              creds?.domainUuid || creds?.fusionpbxDomainUuid || fallbackDomainUuid || null,
+              { force: true },
+            );
+            setPlaybackErrors((prev) => { const n = { ...prev }; delete n[rec.id]; return n; });
+            setCachedIds((prev) => new Set(prev).add(rec.id));
+            if (audioRef.current) {
+              audioRef.current.src = freshUrl;
+              audioRef.current.load();
+              audioRef.current.play().catch(() => {});
+            }
+          } catch (e: any) {
+            captureError(rec, e, fr ? 'Impossible de recharger l\'enregistrement' : 'Unable to reload recording');
+          } finally {
+            recoveringRef.current = false;
+            setLoadingId(null);
+          }
+        }}
+        style={{ width: '100%', marginBottom: 10 }}
+        controls
+      />
 
       {error && (
         <Card accent="gold" style={{ marginBottom: 10 }}>

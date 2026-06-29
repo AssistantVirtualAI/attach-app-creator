@@ -70,8 +70,11 @@ export function installSipBootGuard() {
     };
   });
 
-  // Validation: dispatcher must have loaded by the time the first render
-  // tick happens. If not, the bundle is broken.
+  // Validation: dispatcher must have loaded by the time AuthenticatedShell
+  // finishes mounting (which requires: creds loaded + permsGateDone resolved +
+  // SIP credentials hydrated). On a cold launch this takes 3-6 s on device.
+  // We give 10 s before raising the alarm so we never fire a false-positive
+  // while the permission gate or the SplashAva screen is still showing.
   setTimeout(() => {
     if (!report.dispatcherLoaded) {
       // eslint-disable-next-line no-console
@@ -84,7 +87,7 @@ export function installSipBootGuard() {
       console.log('[SipBootGuard] ✓ dispatcher loaded, provider =',
         NATIVE_SIP_ENABLED ? 'native' : 'jssip');
     }
-  }, 2000);
+  }, 10000);
 }
 
 export function getSipBootReport(): Readonly<SipBootReport> {
