@@ -53,10 +53,10 @@ export default function NotificationsSheet({
 }: { open: boolean; onClose: () => void; onNavigate: (t: Tab) => void }) {
   const c = useNotificationCounts();
   const items = useMemo(() => ([
-    { tab: 'calls' as Tab, icon: PhoneMissed, label: 'Missed calls (24h)', count: c.missed, tone: '#ff5a5a' },
-    { tab: 'voicemail' as Tab, icon: Voicemail, label: 'New voicemails', count: c.voicemails, tone: colors.signalGold },
-    { tab: 'calls' as Tab, icon: Disc, label: 'New recordings (24h)', count: c.recordings, tone: colors.avaCyan },
-    { tab: 'sms' as Tab, icon: MessageSquare, label: 'Unread messages', count: c.sms, tone: colors.lemtelBlue },
+    { route: { tab: 'calls', sub: 'recents', filter: 'missed' } as AppRoute, tab: 'calls' as Tab, icon: PhoneMissed, label: 'Missed calls (24h)', count: c.missed, tone: '#ff5a5a' },
+    { route: { tab: 'voicemail' } as AppRoute, tab: 'voicemail' as Tab, icon: Voicemail, label: 'New voicemails', count: c.voicemails, tone: colors.signalGold },
+    { route: { tab: 'calls', sub: 'recordings' } as AppRoute, tab: 'calls' as Tab, icon: Disc, label: 'New recordings (24h)', count: c.recordings, tone: colors.avaCyan },
+    { route: { tab: 'sms' } as AppRoute, tab: 'sms' as Tab, icon: MessageSquare, label: 'Unread messages', count: c.sms, tone: colors.lemtelBlue },
   ]), [c]);
 
   if (!open) return null;
