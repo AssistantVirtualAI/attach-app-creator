@@ -70,41 +70,23 @@ export default function RecordingsScreen({
     };
   }, [reload, creds?.accessToken]);
 
-  // Guard ref: tracks the items+creds key for which a prefetch is already running
-  // so that setCachedIds updates don't re-trigger the expensive download loop.
+  // cachedIdsRef mirrors cachedIds state but is updated without triggering
+  // re-renders, so background probes and prefetches can update it safely.
+  const cachedIdsRef = useRef<Set<string>>(new Set());
+
+  // Guard ref: tracks the items+creds key for which a prefetch has already run.
   const prefetchKeyRef = useRef<string | null>(null);
 
-  // Probe which items are already cached on disk.
-  // Runs whenever items changes — only reads disk, never writes.
-  useEffect(() => {
-    if (!items || items.length === 0) return;
-    let cancelled = false;
-    (async () => {
-      const results = await Promise.all(
-        items.slice(0, 50).map(async (r) => ({ id: r.id, u: await getCachedRecordingUrl(r.id) }))
-      );
-      if (cancelled) return;
-      const next = new Set<string>();
-      results.forEach(({ id, u }) => { if (u) next.add(id); });
-      setCachedIds(next);
-    })();
-    return () => { cancelled = true; };
-  }, [items]);
-
-  // Background prefetch: download all missing files.
-  // Runs once per (items + creds) combination — guarded by prefetchKeyRef.
+  // Probe + prefetch in a single effect, driven by items only.
+  // Uses refs to avoid triggering re-renders from background work.
   useEffect(() => {
     if (!items || items.length === 0) return;
     const accessToken = creds?.accessToken || null;
-    if (!accessToken) return;
     const domainUuid = creds?.domainUuid || creds?.fusionpbxDomainUuid || fallbackDomainUuid || null;
     const orgId = creds?.organizationId || null;
-    // Build a stable key so we don't re-run for the same dataset.
-    const key = `${items.map((r) => r.id).join(',')}-${accessToken}`;
-    if (prefetchKeyRef.current === key) return;
-    prefetchKeyRef.current = key;
 
     let cancelled = false;
+
     const makeMeta = (r: RecordingEntry) => ({
       recording_path: r.record_path, recording_name: r.record_name,
       xml_cdr_uuid: r.xml_cdr_uuid || r.id, domain_uuid: r.domain_uuid,
@@ -113,36 +95,50 @@ export default function RecordingsScreen({
     });
 
     (async () => {
-      // Probe to find which files are missing.
+      // Step 1: probe disk for all 50 items.
       const probeResults = await Promise.all(
-        items.slice(0, 50).map(async (r) => ({ r, u: await getCachedRecordingUrl(r.id) }))
+        items.slice(0, 50).map(async (r) => ({ id: r.id, u: await getCachedRecordingUrl(r.id) }))
       );
       if (cancelled) return;
 
+      // Update cachedIds state ONCE from probe results (single re-render).
+      const next = new Set<string>();
+      probeResults.forEach(({ id, u }) => { if (u) next.add(id); });
+      cachedIdsRef.current = next;
+      setCachedIds(new Set(next));
+
+      // Step 2: prefetch missing files — guarded by key so it runs at most once
+      // per unique (items list + token) combination, regardless of re-renders.
+      if (!accessToken) return;
+      const key = `${items.map((r) => r.id).join(',')}-${accessToken}`;
+      if (prefetchKeyRef.current === key) return;
+      prefetchKeyRef.current = key;
+
       const missingItems = probeResults
         .filter(({ u }) => !u)
-        .map(({ r }) => ({ id: r.id, meta: makeMeta(r) }));
+        .map(({ id }) => { const r = items.find((x) => x.id === id)!; return { id, meta: makeMeta(r) }; });
 
       if (missingItems.length === 0) return;
 
-      // Download all missing files (concurrency 3).
+      // Download missing files (concurrency 3) — update ref only, no setState.
       await prefetchRecordings(missingItems, accessToken, orgId, domainUuid, { concurrency: 3 });
       if (cancelled) return;
 
-      // After downloads, refresh cachedIds once.
+      // Verify which downloads succeeded and update ref + state once.
       const refreshed = await Promise.all(
         missingItems.map(async (t) => ({ id: t.id, u: await getCachedRecordingUrl(t.id) }))
       );
       if (cancelled) return;
-      setCachedIds((prev) => {
-        const n = new Set(prev);
-        refreshed.forEach(({ id, u }) => { if (u) n.add(id); });
-        return n;
-      });
+      const downloaded = refreshed.filter(({ u }) => !!u).map(({ id }) => id);
+      if (downloaded.length === 0) return;
+      downloaded.forEach((id) => cachedIdsRef.current.add(id));
+      // Single setState call after all downloads — no cascading re-renders.
+      setCachedIds(new Set(cachedIdsRef.current));
     })();
 
     return () => { cancelled = true; };
-  }, [items, creds?.accessToken, creds?.organizationId, creds?.domainUuid, creds?.fusionpbxDomainUuid, fallbackDomainUuid]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items]);
 
 
   // Fallback: derive domain_uuid from /mobile-me when creds lack it.
