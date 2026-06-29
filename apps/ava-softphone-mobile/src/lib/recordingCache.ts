@@ -33,8 +33,43 @@ type RecMeta = {
   start_at?: string | null;
 };
 
-function safeName(id: string) {
-  return id.replace(/[^a-zA-Z0-9._-]/g, '_') + '.audio';
+function sanitizeId(id: string) {
+  return id.replace(/[^a-zA-Z0-9._-]/g, '_');
+}
+
+// iOS WKWebView's <audio> infers codec from file extension. A generic ".audio"
+// extension causes the player to refuse playback. We always write the file
+// with a real audio extension (.wav by default — FusionPBX's native format).
+const KNOWN_EXTS = ['wav', 'mp3', 'ogg', 'm4a', 'mp4', 'aac', 'opus', 'webm'];
+
+function pickExt(blobType: string | undefined, recordingName: string | undefined): string {
+  const nameLower = (recordingName || '').toLowerCase();
+  for (const ext of KNOWN_EXTS) {
+    if (nameLower.endsWith('.' + ext)) return ext;
+  }
+  const t = (blobType || '').toLowerCase();
+  if (t.includes('mpeg') || t.includes('mp3')) return 'mp3';
+  if (t.includes('ogg')) return 'ogg';
+  if (t.includes('mp4') || t.includes('m4a') || t.includes('aac')) return 'm4a';
+  if (t.includes('webm')) return 'webm';
+  return 'wav';
+}
+
+async function findExistingFile(id: string): Promise<string | null> {
+  if (!Capacitor.isNativePlatform()) return null;
+  try {
+    const { Filesystem, Directory } = await import(/* @vite-ignore */ '@capacitor/filesystem');
+    const base = sanitizeId(id);
+    // Probe known extensions plus the legacy ".audio" name for backward compat.
+    const candidates = [...KNOWN_EXTS.map((e) => `recordings/${base}.${e}`), `recordings/${base}.audio`];
+    for (const path of candidates) {
+      try {
+        const st = await Filesystem.stat({ path, directory: Directory.Data });
+        if (st && (st.size === undefined || st.size > 0)) return path;
+      } catch { /* not this one */ }
+    }
+  } catch { /* filesystem unavailable */ }
+  return null;
 }
 
 /**
