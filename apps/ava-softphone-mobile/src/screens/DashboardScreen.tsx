@@ -27,7 +27,8 @@ export default function DashboardScreen({
   const me = useAutoSync<MeResponse>(() => mobileApi.me(), { intervalMs: 5 * 60_000, cacheKey: 'me', staleTimeMs: 120_000 });
   const stats = useAutoSync<DomainStats>(() => mobileApi.domainStats(range), { intervalMs: 120_000, deps: [range], cacheKey: `domainStats:${range}`, staleTimeMs: 60_000 });
   const m = isRecord(me.data) ? (me.data as any) : null;
-  const s = isUsableStats(stats.data) ? (stats.data as any) : null;
+  const hasStats = isUsableStats(stats.data);
+  const s = sanitizeStats(stats.data);
   const userName = safeText(m?.user?.name || m?.user?.email, 'User');
   const firstName = userName.split(/[\s@]/).filter(Boolean)[0] || 'User';
   const orgName = safeText(m?.organization?.name, 'Lemtel Télécom');
@@ -39,7 +40,7 @@ export default function DashboardScreen({
   const lastKeyRef = useRef<string>('');
 
   useEffect(() => {
-    if (!s) return;
+    if (!hasStats) return;
     const sig = `${range}|${safeNumber(s.totalCalls ?? s.callsToday)}|${safeNumber(s.answered)}|${safeNumber(s.missed)}|${safeText(s.peakHour, '')}`;
     if (lastKeyRef.current === sig) return;
     lastKeyRef.current = sig;
@@ -48,14 +49,20 @@ export default function DashboardScreen({
       if (cached) { setAiSummary(cached); return; }
     } catch {}
     setAiLoading(true); setAiError(null);
-    mobileApi.aiSummary(range, s, RANGE_LABELS[range])
-      .then((r) => {
-        setAiSummary(r.summary || '');
-        try { localStorage.setItem(AI_CACHE_KEY(sig), r.summary || ''); } catch {}
-      })
-      .catch((e) => setAiError(e?.message || 'AVA summary failed'))
-      .finally(() => setAiLoading(false));
-  }, [s, range]);
+    try {
+      mobileApi.aiSummary(range, s, RANGE_LABELS[range])
+        .then((r) => {
+          const summary = safeText(r?.summary, '');
+          setAiSummary(summary);
+          try { localStorage.setItem(AI_CACHE_KEY(sig), summary); } catch {}
+        })
+        .catch((e) => setAiError(e?.message || 'AVA summary failed'))
+        .finally(() => setAiLoading(false));
+    } catch (e: any) {
+      setAiError(e?.message || 'AVA summary failed');
+      setAiLoading(false);
+    }
+  }, [hasStats, s, range]);
 
 
   const total = safeNumber(s?.totalCalls ?? s?.callsToday);
@@ -63,7 +70,7 @@ export default function DashboardScreen({
   const missed = safeNumber(s?.missed ?? s?.missedToday);
   const voicemails = safeNumber(s?.voicemails ?? s?.voicemailsToday);
   const rawBuckets = s?.buckets ?? s?.last7Days ?? [];
-  const buckets = Array.isArray(rawBuckets) ? rawBuckets.map((v) => safeNumber(v)) : [];
+  const buckets = Array.isArray(rawBuckets) ? rawBuckets.slice(-30).map((v) => safeNumber(v)) : [];
   const topExtensions = normalizeTopExtensions(s?.topExtensions);
   const safeHaptic = useMemo(() => safeAsync(haptic), [haptic]);
   const safeNavigate = (next: Tab) => {
