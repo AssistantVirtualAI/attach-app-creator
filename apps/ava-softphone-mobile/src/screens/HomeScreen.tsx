@@ -111,7 +111,7 @@ export default function HomeScreen({ onNavigate, haptic }: Props) {
               <div style={{ fontSize: font.base, fontWeight: 700, color: colors.textIce }}>{n.title}</div>
               <div style={{ fontSize: font.sm, color: colors.mutedSilver }}>{n.subtitle}</div>
             </div>
-            <Chip tone={n.accent === 'gold' ? 'gold' : n.accent === 'cyan' ? 'cyan' : 'violet'}>{n.kind.replace('_', ' ')}</Chip>
+            <Chip tone={n.accent === 'gold' ? 'gold' : n.accent === 'cyan' ? 'cyan' : 'violet'}>{(n.kind || '').replace('_', ' ')}</Chip>
           </div>
         </Card>
       ))}
@@ -123,8 +123,8 @@ export default function HomeScreen({ onNavigate, haptic }: Props) {
           {data?.brief || "Génération du résumé du jour…"}
         </p>
         <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
-          <Chip tone="gold">{data?.metrics.actionItems ?? '·'} tâches</Chip>
-          <Chip tone="cyan">{data?.metrics.unreadSms ?? '·'} non lus</Chip>
+          <Chip tone="gold">{data?.metrics?.actionItems ?? '·'} tâches</Chip>
+          <Chip tone="cyan">{data?.metrics?.unreadSms ?? '·'} non lus</Chip>
           <Chip tone="violet">Agents AVA en ligne</Chip>
         </div>
       </AIPanel>
