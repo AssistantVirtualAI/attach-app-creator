@@ -163,6 +163,7 @@ export async function loadPbxRecordingAudioMobile(
   token?: string | null,
   organizationId?: string | null,
   fallbackDomainUuid?: string | null,
+  opts?: { skipCache?: boolean },
 ) {
   const xml_cdr_uuid = clean(recording.xml_cdr_uuid || recording.pbx_uuid || recording.id);
   const record_path = clean(recording.record_path || recording.recording_path);
