@@ -1,3 +1,5 @@
+import { supabase } from '@/integrations/supabase/client';
+
 /**
  * Shared logic for detecting a "stub" transcript and computing a
  * content-presence quality score. Mirrored in apps/ava-softphone-desktop
@@ -183,9 +185,26 @@ export async function runTranscribeAndAnalyze(opts: {
     onStage('downloading', 'Connexion à la source audio');
     onStage('transcribing');
 
-    let t: { data: any; error: any } | null = null;
+    const { data: existingTranscript } = await supabase
+      .from('pbx_call_transcripts')
+      .select('transcript_text, provider, created_at')
+      .eq('call_record_id', callRecordId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
     let tData: any = {};
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    if (existingTranscript?.transcript_text && !isStubTranscript(existingTranscript)) {
+      tData = {
+        transcript_text: existingTranscript.transcript_text,
+        provider: existingTranscript.provider || 'cached',
+        cached: true,
+        skipped_reason: 'Transcript already exists — no new voice-to-text run was started.',
+      };
+    }
+
+    let t: { data: any; error: any } | null = null;
+    for (let attempt = 0; !tData.cached && attempt <= maxRetries; attempt++) {
       t = await invoke('ai-transcribe-call', {
         call_record_id: callRecordId,
         organization_id: organizationId,
@@ -234,6 +253,25 @@ export async function runTranscribeAndAnalyze(opts: {
     if (transcriptStub) {
       const stage: TranscriptStage = PENDING_REASONS.has(tData.reason) ? 'pending_sync' : 'unavailable';
       onStage(stage, tData.reason || 'no-audio');
+    }
+
+    if (!transcriptStub) {
+      const { data: existingInsight } = await supabase
+        .from('pbx_ai_insights')
+        .select('id, summary, sentiment, created_at')
+        .eq('call_record_id', callRecordId)
+        .maybeSingle();
+      if (existingInsight?.summary) {
+        onStage('complete', 'Transcript and insights already exist — no duplicate AI run was started.');
+        return {
+          stage: 'complete',
+          transcriptStub: false,
+          insightStub: false,
+          reason: 'cached',
+          data: { cached: true, transcript: tData, insights: existingInsight },
+          pendingSyncAttempts: pendingAttempts,
+        };
+      }
     }
 
     onStage('analyzing');

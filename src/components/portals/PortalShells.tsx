@@ -11,6 +11,7 @@ import { WorkspaceHeaderExtras } from "@/components/portals/WorkspaceHeaderExtra
 import { useOrganization } from "@/context/OrganizationContext";
 import { useAuth } from "@/hooks/useAuth";
 import { AVA_OWNER_USER_ID } from "@/lib/avaOwner";
+import { useLemtelAiRealtime } from "@/hooks/useLemtelAiRealtime";
 
 type NavItem = { label: string; to: string; icon: React.ComponentType<{ className?: string }> };
 
@@ -21,6 +22,8 @@ function Shell({ title, badge, accent, items }: {
   items: NavItem[];
 }) {
   const { pathname } = useLocation();
+  const { selectedOrgId } = useOrganization();
+  useLemtelAiRealtime(selectedOrgId);
   return (
     <div className="flex flex-col min-h-full bg-background">
       <div className="px-6 py-3 border-b border-cockpit-border/50 flex items-center gap-3 flex-wrap bg-cockpit-surface/60 sticky top-0 z-30 backdrop-blur-xl">

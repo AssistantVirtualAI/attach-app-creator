@@ -26,7 +26,10 @@ export function useMyDashboardStats() {
     enabled: !!user?.id,
     refetchInterval: 30_000,
     queryFn: async (): Promise<MyDashboardStats> => {
-      const { data: summary } = await (supabase.rpc as any)("get_my_extension_summary");
+      const { data: summary, error: summaryError } = await (supabase.rpc as any)("get_my_extension_summary");
+      if (summaryError) {
+        console.warn("get_my_extension_summary failed", summaryError);
+      }
       const s = summary ?? {};
       if (!s?.has_extension) {
         return {
@@ -49,29 +52,46 @@ export function useMyDashboardStats() {
 
       const orgId = spu?.organization_id;
       const ext = spu?.extension;
+      if (!orgId || !ext) {
+        return {
+          has_extension: false,
+          recordings_count: 0,
+          week_calls: 0,
+          missed_calls_today: 0,
+          total_talk_seconds_today: 0,
+          recent_calls: [],
+          recent_recordings: [],
+          recent_voicemails: [],
+          recent_insights: [],
+        };
+      }
       const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
       const startToday = new Date(); startToday.setHours(0, 0, 0, 0);
 
       const [calls7d, callsToday, recCalls, recRecordings, recVms, insights, recCount] = await Promise.all([
         supabase.from("pbx_call_records").select("id", { count: "exact", head: true })
-          .eq("organization_id", orgId!).eq("extension", ext!).gte("start_at", weekAgo.toISOString()),
+          .eq("organization_id", orgId).eq("extension", ext).gte("start_at", weekAgo.toISOString()),
         supabase.from("pbx_call_records").select("duration_seconds, missed_call, call_status")
-          .eq("organization_id", orgId!).eq("extension", ext!).gte("start_at", startToday.toISOString()).limit(500),
+          .eq("organization_id", orgId).eq("extension", ext).gte("start_at", startToday.toISOString()).limit(500),
         supabase.from("pbx_call_records")
           .select("id, direction, caller_number, destination_number, start_at, duration_seconds, call_status, missed_call, sentiment, ai_summary")
-          .eq("organization_id", orgId!).eq("extension", ext!).order("start_at", { ascending: false }).limit(10),
-        supabase.from("pbx_call_recordings")
-          .select("id, recorded_at, duration_seconds, direction, recording_name, transcribed, analyzed, sentiment")
-          .eq("organization_id", orgId!).order("recorded_at", { ascending: false }).limit(8),
+          .eq("organization_id", orgId).eq("extension", ext).order("start_at", { ascending: false }).limit(10),
+        supabase.from("pbx_call_records")
+          .select("id, start_at, duration_seconds, direction, recording_name, transcribed, analyzed, sentiment, ai_summary")
+          .eq("organization_id", orgId).eq("extension", ext).eq("has_recording", true).order("start_at", { ascending: false }).limit(8),
         supabase.from("pbx_voicemails")
           .select("id, caller_number, caller_name, received_at, duration_seconds, read_at, ai_summary")
-          .eq("organization_id", orgId!).eq("extension", ext!).is("deleted_at", null).order("received_at", { ascending: false }).limit(8),
+          .eq("organization_id", orgId).eq("extension", ext).is("deleted_at", null).order("received_at", { ascending: false }).limit(8),
         supabase.from("pbx_ai_insights")
-          .select("id, created_at, insight_type, summary, sentiment, priority, topics")
-          .eq("organization_id", orgId!).order("created_at", { ascending: false }).limit(6),
-        supabase.from("pbx_call_recordings").select("id", { count: "exact", head: true })
-          .eq("organization_id", orgId!),
+          .select("id, created_at, summary, sentiment, topics, call_record_id")
+          .eq("organization_id", orgId).order("created_at", { ascending: false }).limit(6),
+        supabase.from("pbx_call_records").select("id", { count: "exact", head: true })
+          .eq("organization_id", orgId).eq("extension", ext).eq("has_recording", true),
       ]);
+
+      [calls7d, callsToday, recCalls, recRecordings, recVms, insights, recCount].forEach((res: any) => {
+        if (res?.error) console.warn("my-dashboard query warning", res.error);
+      });
 
       const todayRows = callsToday.data ?? [];
       const missed_today = todayRows.filter((r: any) => r.missed_call || r.call_status === "missed").length;

@@ -4,10 +4,14 @@ import { WorkspaceSidebar } from "@/components/portals/WorkspaceSidebar";
 import { WorkspaceHeaderExtras } from "@/components/portals/WorkspaceHeaderExtras";
 import NotificationCenter from "@/components/notifications/NotificationCenter";
 import { MyAIChatLauncher } from "@/components/ai/MyAIChat";
+import { useLemtelAiRealtime } from "@/hooks/useLemtelAiRealtime";
+import { useOrganization } from "@/context/OrganizationContext";
 
 const STORAGE_KEY = "ava.sidebar.workspace.open";
 
 export function MyWorkspaceShellSidebar() {
+  const { selectedOrgId } = useOrganization();
+  useLemtelAiRealtime(selectedOrgId);
   const initialOpen = (() => {
     if (typeof window === "undefined") return true;
     const v = window.localStorage.getItem(STORAGE_KEY);

@@ -28,6 +28,12 @@ function fmtDuration(sec: number) {
   return m > 0 ? `${m}m ${s}s` : `${s}s`;
 }
 
+function timeAgoSafe(value?: string | null) {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "—" : formatDistanceToNow(date, { addSuffix: true });
+}
+
 function StatCard({ icon: Icon, label, value, hint, accent = "primary" }: { icon: any; label: string; value: string | number; hint?: string; accent?: string }) {
   return (
     <Card>
@@ -105,8 +111,8 @@ export default function MyDashboardLanding() {
                     {c.direction === "inbound" ? c.caller_number : c.destination_number}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    {formatDistanceToNow(new Date(c.start_at), { addSuffix: true })} · {fmtDuration(c.duration_seconds ?? 0)}
-                    {c.ai_summary && <> · <span className="italic">{String(c.ai_summary).slice(0, 60)}{c.ai_summary.length > 60 ? "…" : ""}</span></>}
+                    {timeAgoSafe(c.start_at)} · {fmtDuration(c.duration_seconds ?? 0)}
+                    {c.ai_summary && <> · <span className="italic">{String(c.ai_summary).slice(0, 60)}{String(c.ai_summary).length > 60 ? "…" : ""}</span></>}
                   </div>
                 </div>
                 {(c.missed_call || c.call_status === "missed") && <Badge variant="destructive" className="text-[10px]">Missed</Badge>}
@@ -130,7 +136,7 @@ export default function MyDashboardLanding() {
               <div key={v.id} className={`p-2 rounded border ${!v.read_at ? "border-l-4 border-l-primary" : ""}`}>
                 <div className="text-sm font-medium truncate">{v.caller_name || v.caller_number || "Unknown"}</div>
                 <div className="text-xs text-muted-foreground">
-                  {formatDistanceToNow(new Date(v.received_at), { addSuffix: true })} · {fmtDuration(v.duration_seconds ?? 0)}
+                  {timeAgoSafe(v.received_at)} · {fmtDuration(v.duration_seconds ?? 0)}
                 </div>
                 {v.ai_summary && <div className="text-xs italic mt-1 line-clamp-2">{v.ai_summary}</div>}
               </div>
@@ -156,7 +162,7 @@ export default function MyDashboardLanding() {
                 <div className="flex-1 min-w-0">
                   <div className="text-sm truncate">{r.recording_name ?? r.id}</div>
                   <div className="text-xs text-muted-foreground">
-                    {r.recorded_at ? formatDistanceToNow(new Date(r.recorded_at), { addSuffix: true }) : "—"} · {fmtDuration(r.duration_seconds ?? 0)}
+                    {timeAgoSafe(r.recorded_at || r.start_at)} · {fmtDuration(r.duration_seconds ?? 0)}
                   </div>
                 </div>
                 <div className="flex gap-1">
@@ -180,9 +186,8 @@ export default function MyDashboardLanding() {
             {(data?.recent_insights ?? []).map((i: any) => (
               <div key={i.id} className="p-2 rounded border bg-primary/5">
                 <div className="flex items-center gap-2 mb-1">
-                  <Badge variant="outline" className="text-[10px]">{i.insight_type}</Badge>
+                  <Badge variant="outline" className="text-[10px]">AI</Badge>
                   {i.sentiment && <Badge variant="secondary" className="text-[10px]">{i.sentiment}</Badge>}
-                  {i.priority && <Badge variant="outline" className="text-[10px]">{i.priority}</Badge>}
                 </div>
                 <div className="text-xs">{i.summary}</div>
               </div>

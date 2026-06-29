@@ -45,6 +45,7 @@ import { useApplyBranding } from '@/hooks/useApplyBranding';
 import { SoftphoneWidget } from '@/components/softphone/SoftphoneWidget';
 import { AppAccessGate } from '@/components/auth/AppAccessGate';
 import { VersionBadge } from '@/components/shared/VersionBadge';
+import { useLemtelAiRealtime } from '@/hooks/useLemtelAiRealtime';
 
 const SIDEBAR_ORDER_KEY = 'sidebar-group-order';
 
@@ -100,6 +101,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
   // Filter groups based on route scope, role and Lemtel org membership
   const isLemtelOrgSelected = selectedOrgId === '71755d33-ed64-4ad5-a828-61c9d2029eb7';
   const isPlanipretOrgSelected = selectedOrgId === '17d6507f-a9ca-409d-8e49-371d50332615';
+  useLemtelAiRealtime(isLemtelOrgSelected ? selectedOrgId : null);
   const currentScope = getSidebarScope(location.pathname);
   const visibleGroups = useMemo(() => sidebarGroups.filter(g => {
     const groupScope = g.scope ?? 'legacy';
@@ -282,7 +284,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
             {/* Portal switcher (Lemtel only) */}
             {isLemtelOrgSelected && currentScope === 'org' && (
               <Link
-                to="/org/lemtel/my/dashboard"
+                to="/my"
                 onClick={() => setIsSidebarOpen(false)}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 mt-3 text-muted-foreground hover:text-foreground hover:bg-muted border border-dashed border-border/60"
               >
