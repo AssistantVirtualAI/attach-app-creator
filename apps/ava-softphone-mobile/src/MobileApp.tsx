@@ -42,7 +42,8 @@ import { requestAllPermissions, checkAllPermissions } from './lib/permissions';
 import { registerPush, sendPushTokenToBackend } from './lib/pushNotifications';
 import { syncDeviceContacts } from './lib/contacts';
 import { bootNative, onAppStateChange } from './lib/nativeBoot';
-import { registerDeepLinkHandler } from './lib/deepLink';
+import { registerDeepLinkHandler, PENDING_CALL_KEY } from './lib/deepLink';
+import { dialNumber } from './lib/dialNumber';
 import { configureMobileApi, setAuthToken } from './lib/mobileApi';
 
 
@@ -316,6 +317,42 @@ function AuthenticatedShell({
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   useEffect(() => { sp.setAudioEl(audioRef.current); }, [sp]);
+
+  // Handle tel: deep links from iOS Recents / Contacts.
+  // deepLink.ts dispatches 'ava:pendingCall' and stores the number in
+  // sessionStorage. We listen here (where sp is available) and auto-dial
+  // as soon as the SIP stack is registered.
+  const spRef = useRef(sp);
+  useEffect(() => { spRef.current = sp; }, [sp]);
+  useEffect(() => {
+    function tryDial(number: string) {
+      if (spRef.current.snap.status === 'registered') {
+        dialNumber(spRef.current, number);
+        return;
+      }
+      // Wait up to 15 s for registration then dial.
+      const start = Date.now();
+      const iv = setInterval(() => {
+        if (spRef.current.snap.status === 'registered') {
+          clearInterval(iv);
+          dialNumber(spRef.current, number);
+        } else if (Date.now() - start > 15000) {
+          clearInterval(iv);
+        }
+      }, 400);
+    }
+    // Check for a number stored before this component mounted (cold launch).
+    const stored = sessionStorage.getItem(PENDING_CALL_KEY);
+    if (stored) { sessionStorage.removeItem(PENDING_CALL_KEY); tryDial(stored); }
+    // Listen for future tel: deep links while app is running.
+    const handler = (e: Event) => {
+      const number = (e as CustomEvent<{ number: string }>).detail?.number;
+      if (number) { sessionStorage.removeItem(PENDING_CALL_KEY); tryDial(number); }
+    };
+    window.addEventListener('ava:pendingCall', handler);
+    return () => window.removeEventListener('ava:pendingCall', handler);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Configure the mobile API client with the Supabase Edge Functions host
   // (NOT the marketing portal URL — edge functions live on supabase.co).

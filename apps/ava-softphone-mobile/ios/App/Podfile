@@ -1,7 +1,7 @@
 require_relative '../../node_modules/@capacitor/ios/scripts/pods_helpers'
 
 platform :ios, '13.0'
-use_frameworks!
+use_frameworks! :linkage => :static
 
 # workaround to avoid Xcode caching of Pods that requires
 # Product -> Clean Build Folder after new Cordova plugins installed
@@ -15,6 +15,7 @@ def capacitor_pods
   pod 'CapacitorApp', :path => '../../node_modules/@capacitor/app'
   pod 'CapacitorCamera', :path => '../../node_modules/@capacitor/camera'
   pod 'CapacitorDevice', :path => '../../node_modules/@capacitor/device'
+  pod 'CapacitorFilesystem', :path => '../../node_modules/@capacitor/filesystem'
   pod 'CapacitorHaptics', :path => '../../node_modules/@capacitor/haptics'
   pod 'CapacitorLocalNotifications', :path => '../../node_modules/@capacitor/local-notifications'
   pod 'CapacitorNetwork', :path => '../../node_modules/@capacitor/network'
@@ -30,7 +31,7 @@ target 'App' do
   # Replaces the previous hand-rolled NWConnection/RTPAudioSession stack.
   # If '~> 2.13' is not in your spec repo, fall back to the community pod:
   #   pod 'pjsip', :git => 'https://github.com/chebur/pjsip.git'
-  pod 'pjsip', '~> 2.13'
+  pod 'pjsip', :git => 'https://github.com/chebur/pjsip.git', :branch => 'master'
 end
 
 

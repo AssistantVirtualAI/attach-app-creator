@@ -75,6 +75,10 @@ function ensureNativeCallEventBridge() {
       const dir: NativeCallDirection = d?.direction === 'in' ? 'in' : d?.direction === 'out' ? 'out' : nativeCallSnapshot.direction;
       const stage: string = d?.stage || '';
       const code: string | null = d?.code ?? null;
+      if (d?.state === 'ended' || d?.state === 'disconnected') {
+        stopRingback();
+        emitNativeCallSnapshot({ callState: 'idle', activeCallNumber: '', isMuted: false, isOnHold: false, isRecording: false, direction: null, endReason: null, callPhase: 'ended', lastSipCode: d?.code ?? null });
+      }
       if (d?.state === 'active') {
         stopRingback();
         emitNativeCallSnapshot({ callState: 'active', activeCallNumber: d?.number || nativeCallSnapshot.activeCallNumber, direction: dir, endReason: null, callPhase: 'active', lastSipCode: code });
@@ -126,6 +130,8 @@ function ensureNativeCallEventBridge() {
   })();
   return nativeCallBridgePromise;
 }
+
+console.log('[Softphone] dispatcher loaded — NATIVE_SIP_ENABLED =', true);
 
 export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn {
   const [sipStatus, setSipStatus] = useState<SIPStatus>('idle');
@@ -316,9 +322,12 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
     // the ringback here (synchronous to the tap) and let it run until 180/183
     // arrives. It is stopped on 'active', 'early-media' or 'ended'.
     try { startRingback(); } catch (e) { console.warn('[NativeSIP] startRingback failed', e); }
-    CapacitorPjsip.makeCall({ number }).catch((e) => {
+    CapacitorPjsip.makeCall({ number }).then((res) => {
+      console.log('[NativeSIP] makeCall resolved', JSON.stringify(res));
+    }).catch((e) => {
+      console.error('[NativeSIP] makeCall REJECTED:', e?.message || String(e));
       stopRingback();
-      emitNativeCallSnapshot({ callState: 'idle', activeCallNumber: '', isMuted: false, isOnHold: false, direction: null, endReason: 'Échec de l’appel', callPhase: 'ended', lastSipCode: null });
+      emitNativeCallSnapshot({ callState: 'idle', activeCallNumber: '', isMuted: false, isOnHold: false, direction: null, endReason: e?.message || 'makeCall failed', callPhase: 'ended', lastSipCode: null });
       setSipError(e?.message || 'makeCall failed');
     });
     return true;
