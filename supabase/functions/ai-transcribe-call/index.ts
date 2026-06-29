@@ -69,16 +69,22 @@ Deno.serve(async (req) => {
     recording_path = recording_path || record_path;
     if (!call_record_id) call_record_id = xml_cdr_uuid;
     if (!call_record_id) call_record_id = body?.callId;
-    if (!organization_id) {
-      const { data: sp } = await admin.from("pbx_softphone_users")
-        .select("organization_id")
-        .eq("portal_user_id", user.id)
-        .maybeSingle();
-      organization_id = sp?.organization_id || null;
-    }
+    const cid = String(call_record_id || xml_cdr_uuid || "no-cid");
+    const vmId = String(body?.vm_id || "");
+    const logTag = `[ai-transcribe-call] cid=${cid}${vmId ? ` vm_id=${vmId}` : ""}`;
+    console.log(`${logTag} action=request-received`, {
+      has_organization_id: !!organization_id,
+      has_recording_path: !!recording_path,
+      has_recording_name: !!recording_name,
+      has_recording_url: !!recording_url,
+      domain_uuid: domain_uuid || null,
+      force: body?.force === true,
+    });
+    // Strict: organization_id must come from the caller. No silent fallback to pbx_softphone_users.
     if (!call_record_id || !organization_id) {
+      console.warn(`${logTag} action=bad-request missing organization_id or call_record_id`);
       await audit("bad-request", { error_code: "missing-fields", http_status: 400 });
-      return json({ error: "call_record_id and organization_id required" }, 400);
+      return json({ error: "call_record_id and organization_id required", cid }, 400);
     }
     auditOrg = organization_id; auditCall = call_record_id;
 
@@ -113,6 +119,23 @@ Deno.serve(async (req) => {
         call = { ...r.data, start_at: r.data.recorded_at };
       }
     }
+
+    // Strict: if we can't find any call/recording AND caller didn't supply a recording pointer, return explicit 404.
+    const callerSuppliedPointer = !!(recording_url || recording_path || recording_name);
+    if (!call && !callerSuppliedPointer) {
+      console.warn(`${logTag} action=recording-not-found no call row and no caller-supplied recording pointer`);
+      await audit("not-found", { error_code: "recording-not-found", http_status: 404 });
+      return json({
+        error: "recording-not-found",
+        message: "No matching call or recording found for this call_record_id in the provided organization. Provide recording_path/recording_name or ensure the call is synced.",
+        cid,
+      }, 404);
+    }
+    console.log(`${logTag} action=call-resolved`, {
+      has_call_row: !!call,
+      direction: call?.direction || null,
+      domain_uuid: call?.domain_uuid || domain_uuid || null,
+    });
 
     const persistTranscriptOnCall = async (text: string, provider: string) => {
       const { data: existingCall } = await admin.from("pbx_call_records")
@@ -325,10 +348,10 @@ Deno.serve(async (req) => {
         reason = hasAnyPath ? "no-audio" : "recording-not-synced";
         if (reason === "recording-not-synced") retryAfterMs = 20000;
       }
-      console.error("ai-transcribe-call NO_AUDIO", { call_record_id, reason, fetchErrors });
+      console.error(`${logTag} action=no-audio`, { reason, fetchErrors });
       await writeTranscript(fallbackTranscript, `stub-${reason}`);
       await audit(reason, { error_code: reason, message: `fetch errors: ${errBlob || "none"}`, metadata: { fetchErrors, retryAfterMs } });
-      return json({ transcript_text: fallbackTranscript, stub: true, reason, fetchErrors, retry_after_ms: retryAfterMs, pending_sync: storagePendingSync || reason === "recording-not-synced" }, 200);
+      return json({ transcript_text: fallbackTranscript, stub: true, reason, fetchErrors, retry_after_ms: retryAfterMs, pending_sync: storagePendingSync || reason === "recording-not-synced", cid }, 200);
     }
 
     // Gemini supports inline audio up to ~20MB
@@ -481,10 +504,10 @@ Deno.serve(async (req) => {
         providerLabel = `${final.provider}/${final.model}+claude-3-5-sonnet-cleanup`;
       }
     }
-    console.log("ai-transcribe-call ai result", { provider: providerLabel, length: finalText.length, audioSource, attempts, cleanup: cleanupInfo });
+    console.log(`${logTag} action=ai-success`, { provider: providerLabel, length: finalText.length, audioSource, cleanup: cleanupInfo });
     await writeTranscript(finalText, providerLabel);
     await audit("ok", { provider: final.provider, model: final.model, metadata: { audioSource, length: finalText.length, attempts, claude_cleanup: cleanupInfo } });
-    return json({ transcript_text: finalText, audioSource, provider: providerLabel, attempts, claude_cleanup: cleanupInfo });
+    return json({ transcript_text: finalText, audioSource, provider: providerLabel, attempts, claude_cleanup: cleanupInfo, cid });
 
   } catch (e: any) {
     console.error("ai-transcribe-call error", e);
