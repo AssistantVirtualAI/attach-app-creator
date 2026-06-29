@@ -169,7 +169,8 @@ export async function downloadRecording(
     if (buf.byteLength === 0) throw new Error('Download failed: empty audio buffer (0 bytes)');
     const b64 = arrayBufferToBase64(buf);
     try { await Filesystem.mkdir({ path: 'recordings', directory: Directory.Data, recursive: true }); } catch {}
-    const path = `recordings/${safeName(id)}`;
+    const ext = pickExt(blob.type, meta.recording_name || undefined);
+    const path = `recordings/${sanitizeId(id)}.${ext}`;
     await Filesystem.writeFile({ path, directory: Directory.Data, data: b64 });
     try { localStorage.setItem(META_KEY_PREFIX + id, JSON.stringify({ at: Date.now(), size: buf.byteLength })); } catch {}
     // Clear the missing flag now that the file is written.
