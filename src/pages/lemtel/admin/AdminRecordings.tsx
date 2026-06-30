@@ -181,8 +181,16 @@ export default function AdminRecordings({ scope = 'org' }: { scope?: 'org' | 'mi
   // Ensure a pbx_call_recordings row exists for this CDR; returns its id.
   const ensureRecordingRow = async (r: Rec): Promise<string | null> => {
     if (r.recording_id) return r.recording_id;
-    const { data: existing } = await (supabase as any).from('pbx_call_recordings')
-      .select('id').eq('organization_id', LEMTEL_ORG_ID).eq('pbx_uuid', r.pbx_uuid).maybeSingle();
+    if (!r.pbx_uuid && !(r.recording_path && r.recording_name)) {
+      toast.error('Missing recording UUID — this CDR has no recording metadata on the PBX.');
+      return null;
+    }
+    let existing: any = null;
+    if (r.pbx_uuid) {
+      const res = await (supabase as any).from('pbx_call_recordings')
+        .select('id').eq('organization_id', LEMTEL_ORG_ID).eq('pbx_uuid', r.pbx_uuid).maybeSingle();
+      existing = res.data;
+    }
     if (existing?.id) return existing.id;
     const { data: ins, error } = await (supabase as any).from('pbx_call_recordings').insert({
       organization_id: LEMTEL_ORG_ID, pbx_uuid: r.pbx_uuid, call_record_id: r.id,
