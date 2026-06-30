@@ -138,20 +138,17 @@ export default function PAOverview() {
     ]);
 
     const nsBrokerList = directory.brokers;
+    // Brokers total = NS-API directory size (single source via adminDirectory).
+    // Active brokers = those with App Mobile toggle ON in planipret_profiles.
     const brokerTotal = directory.count;
-    const brokerActive = directory.count;
 
     setStats({
       calls: c1 ?? 0, callsYest: c2 ?? 0,
-      brokers: brokerActive, brokersTotal: brokerTotal,
+      brokers: brokerStats.app_mobile_active, brokersTotal: brokerTotal,
       sms: sms.count ?? 0, smsYest: smsY.count ?? 0,
       ava: ava.count ?? 0, voicemailsUnread: vm.count ?? 0,
     });
-    setServiceCounts({
-      mobile: brokerTotal,
-      widget: svcWidget.count ?? 0,
-      ai: svcAi.count ?? 0,
-    });
+    setWidgetCount(svcWidget.count ?? 0);
     setRecent(rec.data ?? []);
     setBrokers(nsBrokerList.slice(0, 10));
 
