@@ -108,7 +108,7 @@ export default function PAOverview() {
     const yestIso = yest.toISOString();
     const periodIso = periodAgo.toISOString();
 
-    const [c1, c2, bAct, bAll, sms, smsY, ava, vm, rec, bList, callsP, smsP, callsByDir, topCalls, svcMobile, svcWidget, svcAi] = await Promise.all([
+    const [c1, c2, bAct, bAll, sms, smsY, ava, vm, rec, bList, callsP, smsP, callsByDir, topCalls, svcMobile, svcWidget, svcAi, nsUsers] = await Promise.all([
       supabase.from("planipret_phone_calls").select("id", { count: "exact", head: true }).gte("started_at", todayIso),
       supabase.from("planipret_phone_calls").select("id", { count: "exact", head: true }).gte("started_at", yestIso).lt("started_at", todayIso),
       supabase.from("planipret_profiles").select("id", { count: "exact", head: true }).eq("mobile_app_enabled", true),
@@ -126,15 +126,21 @@ export default function PAOverview() {
       supabase.from("planipret_profiles").select("id", { count: "exact", head: true }).eq("mobile_app_enabled", true),
       supabase.from("planipret_profiles").select("id", { count: "exact", head: true }).eq("widget_enabled", true),
       supabase.from("planipret_profiles").select("id", { count: "exact", head: true }).eq("voice_agent_enabled", true),
+      supabase.functions.invoke("pp-ns-users", { body: {} }).catch((error) => ({ data: null, error })),
     ]);
 
+    const nsBrokerList = (((nsUsers as any)?.data?.brokers ?? []) as any[]);
+    const nsBrokerCount = Number((nsUsers as any)?.data?.count ?? nsBrokerList.length ?? 0);
     const nsBrokerExt = new Set<string>();
+    nsBrokerList.forEach((b: any) => b.extension && nsBrokerExt.add(String(b.extension)));
     (rec.data ?? []).forEach((c: any) => c.extension && nsBrokerExt.add(String(c.extension)));
     (topCalls.data ?? []).forEach((c: any) => c.extension && nsBrokerExt.add(String(c.extension)));
+    const brokerTotal = Math.max(bAll.count ?? 0, nsBrokerCount, nsBrokerExt.size);
+    const brokerActive = Math.max(bAct.count ?? 0, nsBrokerCount, nsBrokerExt.size);
 
     setStats({
       calls: c1.count ?? 0, callsYest: c2.count ?? 0,
-      brokers: Math.max(bAct.count ?? 0, nsBrokerExt.size), brokersTotal: Math.max(bAll.count ?? 0, nsBrokerExt.size),
+      brokers: brokerActive, brokersTotal: brokerTotal,
       sms: sms.count ?? 0, smsYest: smsY.count ?? 0,
       ava: ava.count ?? 0, voicemailsUnread: vm.count ?? 0,
     });
@@ -144,7 +150,7 @@ export default function PAOverview() {
       ai: svcAi.count ?? 0,
     });
     setRecent(rec.data ?? []);
-    setBrokers((bList.data ?? []).slice(0, 10));
+    setBrokers((nsBrokerList.length ? nsBrokerList : (bList.data ?? [])).slice(0, 10));
 
     // period series
     const days: Array<{ day: string; appels: number; sms: number }> = [];
