@@ -122,20 +122,14 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Store in Vault if available
+    // Store in Vault
     const secretName = `pp_sip_${profile.id}`;
     try {
-      await admin.rpc("vault" as any, {});
-    } catch { /* noop */ }
-
-    try {
-      // Use vault.create_secret(text, text) via SQL
-      await admin.rpc("create_planipret_sip_secret" as any, {
+      await admin.rpc("create_planipret_sip_secret", {
         _name: secretName, _value: sipPassword, _broker_id: profile.id,
       });
-    } catch {
-      // Fallback: store hashed reference in column (not the plaintext)
-      // We won't persist plaintext; just remember the name attempt
+    } catch (e) {
+      console.error("vault_store_failed", (e as Error).message);
     }
 
     await admin.from("planipret_profiles")
