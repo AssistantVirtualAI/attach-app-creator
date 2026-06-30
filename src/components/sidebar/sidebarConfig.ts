@@ -67,7 +67,7 @@ const LEGACY_GROUPS: NavGroup[] = [
     id: 'campaigns', labelKey: 'sidebar.groups.campaigns', icon: Phone, adminOnly: true, scope: 'legacy',
     items: [
       { nameKey: 'sidebar.campaignsList', href: '/campaigns', icon: Phone },
-      { nameKey: 'sidebar.phoneNumbers', href: '/phone-numbers', icon: Phone },
+      
       { nameKey: 'sidebar.smsTemplates', href: '/sms-templates', icon: MessageCircle },
     ],
   },
