@@ -30,16 +30,31 @@ async function nsFetch(path: string) {
 
 async function fetchAll(basePath: string, pageSize = 200, maxPages = 30) {
   const all: any[] = [];
+  const seen = new Set<string>();
   let warning: string | null = null;
   for (let i = 0; i < maxPages; i++) {
     const sep = basePath.includes("?") ? "&" : "?";
-    const r = await nsFetch(`${basePath}${sep}limit=${pageSize}&offset=${i * pageSize}`);
+    const r = await nsFetch(`${basePath}${sep}limit=${pageSize}&start=${i * pageSize + 1}`);
     if (!r.ok) {
       warning = `HTTP ${r.status}: ${String(r.text ?? "").slice(0, 180)}`;
       break;
     }
     const arr = Array.isArray(r.data) ? r.data : (r.data?.data ?? r.data?.users ?? r.data?.cdrs ?? r.data?.messages ?? r.data?.items ?? []);
-    all.push(...arr);
+    let added = 0;
+    for (const item of arr) {
+      const key = String(
+        val(item, [
+          "call_id", "call-id", "cdr_id", "cdr-id", "orig-callid", "orig_callid",
+          "message_id", "message-id", "recording_id", "recording-id",
+          "id", "uuid", "user", "extension", "subscriber_login", "user_id",
+        ], JSON.stringify(item).slice(0, 300)),
+      );
+      if (seen.has(key)) continue;
+      seen.add(key);
+      all.push(item);
+      added++;
+    }
+    if (added === 0) break;
     if (arr.length < pageSize) break;
   }
   return { data: all, warning };
@@ -85,7 +100,14 @@ function recordingUrl(c: any): string | null {
 }
 
 function nsCallId(c: any): string | null {
-  return String(val(c, ["id", "call_id", "call-id", "cdr_id", "cdr-id", "uuid", "orig-callid", "orig_callid", "session_id", "session-id"], "")).trim() || null;
+  const explicit = String(val(c, ["id", "call_id", "call-id", "callid", "cdr_id", "cdr-id", "uuid", "orig-callid", "orig-call-id", "orig_callid", "session_id", "session-id"], "")).trim();
+  if (explicit) return explicit;
+  const ext = String(val(c, ["user", "orig-user", "term-user", "extension", "subscriber"], "")).trim();
+  const started = String(val(c, ["time-start", "start-time", "start_time", "started_at", "date", "created_at"], "")).trim();
+  const from = String(val(c, ["orig-from-uri", "from", "from_number", "from-user", "caller_id_number"], "")).trim();
+  const to = String(val(c, ["term-to-uri", "to", "to_number", "to-user", "destination"], "")).trim();
+  const duration = String(val(c, ["duration", "time-talking", "billsec", "talk_time"], "0")).trim();
+  return ext || started || from || to ? `${ext}:${started}:${from}:${to}:${duration}` : null;
 }
 
 function userExt(u: any): string {
@@ -100,6 +122,20 @@ function userName(u: any, ext: string) {
   const first = val(u, ["name-first-name", "first_name", "firstName"], "");
   const last = val(u, ["name-last-name", "last_name", "lastName"], "");
   return String(val(u, ["display_name", "display-name", "name"], `${first} ${last}`.trim()) || ext);
+}
+
+function isPlanipretBrokerUser(u: any) {
+  const ext = userExt(u);
+  const email = userEmail(u);
+  const name = userName(u, ext).toLowerCase();
+  const status = String(val(u, ["status", "presence"], "")).toLowerCase();
+  const scope = String(val(u, ["scope", "user_scope", "user-scope"], "")).toLowerCase();
+  return !!ext
+    && !/^\d{7,}$/.test(ext)
+    && !/@lemtel\.com$/i.test(email)
+    && !["disabled", "suspended", "deleted", "inactive"].includes(status)
+    && !["system", "system user", "anonymous", "conference", "voicemail", "operator"].includes(name)
+    && !scope.includes("domain");
 }
 
 async function tryPaths(paths: string[]) {
@@ -387,17 +423,18 @@ Deno.serve(async (req) => {
     if (!domain) return json({ error: "NS domain not configured" }, 412);
     const usersRes = await fetchAll(`/domains/${encodeURIComponent(domain)}/users`, 200, 30);
     if (!usersRes.data.length) return json({ error: "NS users fetch failed", warning: usersRes.warning }, 502);
+    const brokerUsers = usersRes.data.filter(isPlanipretBrokerUser);
 
-    const profileSync = await upsertProfiles(admin, domain, usersRes.data);
+    const profileSync = await upsertProfiles(admin, domain, brokerUsers);
 
     const bg = (async () => {
       try {
-        const calls = await syncCalls(admin, domain, usersRes.data, start, end);
+        const calls = await syncCalls(admin, domain, brokerUsers, start, end);
         const [recordings, messages] = await Promise.all([
-          syncRecordings(admin, domain, usersRes.data, start, end),
+          syncRecordings(admin, domain, brokerUsers, start, end),
           syncMessages(admin, domain, start, end),
         ]);
-        console.log("[pp-admin-ns-sync] completed", JSON.stringify({ domain, users: usersRes.data.length, calls, recordings, messages }));
+        console.log("[pp-admin-ns-sync] completed", JSON.stringify({ domain, users: brokerUsers.length, raw_users: usersRes.data.length, calls, recordings, messages }));
       } catch (e) {
         console.error("[pp-admin-ns-sync] background error", (e as Error).message);
       }
@@ -412,8 +449,9 @@ Deno.serve(async (req) => {
       ok: true,
       status: "queued",
       domain,
-      users_total: usersRes.data.length,
-      extensions: usersRes.data.map(userExt).filter(Boolean).length,
+      users_total: brokerUsers.length,
+      raw_users_total: usersRes.data.length,
+      extensions: brokerUsers.map(userExt).filter(Boolean).length,
       profiles_matched: profileSync.matched,
       cdr: { status: "queued_in_background", start, end },
       recordings: { status: "queued_in_background" },

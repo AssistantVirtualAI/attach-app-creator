@@ -1,29 +1,49 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { ArrowDownLeft, ArrowUpRight, X, Mic, Sparkles, Download, Eye, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import Pagination from "@/components/planipret/admin/Pagination";
 import DebugPanel, { type DebugEntry } from "@/components/planipret/admin/DebugPanel";
 import { TableErrorState, TableEmptyState } from "@/components/planipret/admin/TableStates";
+import { getPlanipretBrokerDirectory } from "@/lib/planipret/adminDirectory";
+import { applyPlanipretCallFilters } from "@/lib/planipret/adminCounts";
 
 const ACCENT = "#2E9BDC";
 const SUCCESS = "#00D4AA";
 const DANGER = "#E84C4C";
 const AGENT = "#9B7FE8";
 
-const EMPTY_FILTERS = { broker: "", from: "", to: "", direction: "", status: "", ai: "", search: "" };
-
 export default function PACalls() {
+  const [params, setParams] = useSearchParams();
+  const page = Math.max(1, parseInt(params.get("page") ?? "1", 10) || 1);
+  const pageSizeRaw = parseInt(params.get("pageSize") ?? params.get("ps") ?? "25", 10);
+  const pageSize = [25, 50, 100].includes(pageSizeRaw) ? pageSizeRaw : 25;
+  const filters = {
+    broker: params.get("broker") ?? "",
+    from: params.get("from") ?? "",
+    to: params.get("to") ?? "",
+    direction: params.get("direction") ?? "",
+    status: params.get("status") ?? "",
+    ai: params.get("ai") ?? "",
+    search: params.get("search") ?? "",
+  };
+  const updateParams = (patch: Record<string, string | null>, resetPage = false) => {
+    const next = new URLSearchParams(params);
+    Object.entries(patch).forEach(([k, v]) => { if (v == null || v === "") next.delete(k); else next.set(k, v); });
+    if (resetPage) next.set("page", "1");
+    setParams(next, { replace: true });
+  };
+  const setPage = (p: number) => updateParams({ page: String(p) });
+  const setPageSize = (s: number) => updateParams({ pageSize: String(s), ps: null }, true);
+  const setFilterValue = (key: keyof typeof filters, value: string) => updateParams({ [key]: value }, true);
+  const resetFilters = () => updateParams({ broker: null, from: null, to: null, direction: null, status: null, ai: null, search: null }, true);
   const [rows, setRows] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [brokers, setBrokers] = useState<any[]>([]);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [debug, setDebug] = useState<DebugEntry[]>([]);
-  const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [detail, setDetail] = useState<any | null>(null);
 
   const hasFilters = Object.values(filters).some((v) => v);
@@ -31,30 +51,17 @@ export default function PACalls() {
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.functions.invoke("pp-ns-users", { body: {} });
-      if ((data as any)?.ok) setBrokers(((data as any).brokers ?? []).map((b: any) => ({ user_id: b.user_id, full_name: b.full_name, extension: b.extension, ns_only: b.ns_only })));
-      else {
-        const { data: local } = await supabase.from("planipret_profiles").select("user_id, full_name, extension").order("full_name");
-        setBrokers(local ?? []);
-      }
+      const directory = await getPlanipretBrokerDirectory();
+      setBrokers(directory.brokers.map((b: any) => ({ user_id: b.user_id, full_name: b.full_name, extension: b.extension ?? b.ns_extension, ns_only: b.ns_only })));
     })();
   }, []);
 
   const brokerName = (r: any) => r.planipret_profiles?.full_name ?? r.metadata?.ns_user?.name ?? r.metadata?.user_name ?? r.metadata?.extension_name ?? (r.extension ? `Ext. ${r.extension}` : "—");
 
   const buildQuery = (forCount = false) => {
-    let q = supabase.from("planipret_phone_calls")
+    const q = supabase.from("planipret_phone_calls")
       .select(forCount ? "id" : "*, planipret_profiles(full_name)", { count: "exact", head: forCount });
-    if (filters.broker?.startsWith("ext:")) q = q.eq("extension", filters.broker.slice(4));
-    else if (filters.broker?.startsWith("user:")) q = q.eq("user_id", filters.broker.slice(5));
-    if (filters.from) q = q.gte("started_at", filters.from);
-    if (filters.to) q = q.lte("started_at", filters.to);
-    if (filters.direction) q = q.eq("direction", filters.direction);
-    if (filters.status) q = q.eq("status", filters.status);
-    if (filters.ai === "yes") q = q.not("ai_summary", "is", null);
-    if (filters.ai === "no") q = q.is("ai_summary", null);
-    if (filters.search) q = q.or(`from_number.ilike.%${filters.search}%,to_number.ilike.%${filters.search}%`);
-    return q;
+    return applyPlanipretCallFilters(q, filters);
   };
 
   const load = async (p = page, ps = pageSize) => {
@@ -88,16 +95,13 @@ export default function PACalls() {
   };
 
   useEffect(() => {
-    setPage(1);
-    load(1, pageSize);
+    load(page, pageSize);
     const ch = supabase.channel("admin-calls")
-      .on("postgres_changes", { event: "*", schema: "public", table: "planipret_phone_calls" }, () => load(1, pageSize))
+      .on("postgres_changes", { event: "*", schema: "public", table: "planipret_phone_calls" }, () => load(page, pageSize))
       .subscribe();
     return () => { supabase.removeChannel(ch); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.broker, filters.from, filters.to, filters.direction, filters.status, filters.ai, filters.search]);
-
-  useEffect(() => { load(page, pageSize); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [page, pageSize]);
+  }, [page, pageSize, filters.broker, filters.from, filters.to, filters.direction, filters.status, filters.ai, filters.search]);
 
   const paged = rows;
 
@@ -119,19 +123,19 @@ export default function PACalls() {
       <DebugPanel entries={debug} />
 
       <div className="pp-card p-4 flex flex-wrap items-end gap-2">
-        <Select label="Courtier" value={filters.broker} onChange={(v) => setFilters({ ...filters, broker: v })}
+        <Select label="Courtier" value={filters.broker} onChange={(v) => setFilterValue("broker", v)}
           options={[{ v: "", l: "Tous" }, ...brokers.map((b) => ({ v: b.ns_only ? `ext:${b.extension}` : `user:${b.user_id}`, l: `${b.full_name}${b.extension ? ` · ${b.extension}` : ""}` }))]} />
-        <Input label="Date début" type="date" value={filters.from} onChange={(v) => setFilters({ ...filters, from: v })} />
-        <Input label="Date fin" type="date" value={filters.to} onChange={(v) => setFilters({ ...filters, to: v })} />
-        <Select label="Direction" value={filters.direction} onChange={(v) => setFilters({ ...filters, direction: v })}
+        <Input label="Date début" type="date" value={filters.from} onChange={(v) => setFilterValue("from", v)} />
+        <Input label="Date fin" type="date" value={filters.to} onChange={(v) => setFilterValue("to", v)} />
+        <Select label="Direction" value={filters.direction} onChange={(v) => setFilterValue("direction", v)}
           options={[{ v: "", l: "Toutes" }, { v: "inbound", l: "Entrant" }, { v: "outbound", l: "Sortant" }, { v: "missed", l: "Manqué" }]} />
-        <Select label="Statut" value={filters.status} onChange={(v) => setFilters({ ...filters, status: v })}
+        <Select label="Statut" value={filters.status} onChange={(v) => setFilterValue("status", v)}
           options={[{ v: "", l: "Tous" }, { v: "completed", l: "Complété" }, { v: "active", l: "En cours" }, { v: "missed", l: "Manqué" }]} />
-        <Select label="Analyse IA" value={filters.ai} onChange={(v) => setFilters({ ...filters, ai: v })}
+        <Select label="Analyse IA" value={filters.ai} onChange={(v) => setFilterValue("ai", v)}
           options={[{ v: "", l: "Tous" }, { v: "yes", l: "Analysé" }, { v: "no", l: "Non analysé" }]} />
-        <Input label="Recherche" placeholder="Numéro..." value={filters.search} onChange={(v) => setFilters({ ...filters, search: v })} />
+        <Input label="Recherche" placeholder="Numéro..." value={filters.search} onChange={(v) => setFilterValue("search", v)} />
         {hasFilters && (
-          <button onClick={() => setFilters(EMPTY_FILTERS)} className="px-2 py-1.5 text-xs underline" style={{ color: "var(--pp-text-muted)" }}>
+          <button onClick={resetFilters} className="px-2 py-1.5 text-xs underline" style={{ color: "var(--pp-text-muted)" }}>
             ✕ Réinitialiser ({activeFilterCount})
           </button>
         )}
@@ -183,7 +187,7 @@ export default function PACalls() {
                     ? "Essayez d'élargir vos critères de recherche."
                     : "Aucun appel enregistré. Vérifiez que le webhook NS-API est configuré dans Intégrations, puis lancez « Synchroniser NS-API »."}
                   action={hasFilters ? (
-                    <button onClick={() => setFilters(EMPTY_FILTERS)} className="px-3 py-1.5 rounded-lg text-xs font-medium text-white" style={{ background: ACCENT }}>
+                    <button onClick={resetFilters} className="px-3 py-1.5 rounded-lg text-xs font-medium text-white" style={{ background: ACCENT }}>
                       Réinitialiser les filtres
                     </button>
                   ) : (
@@ -221,7 +225,7 @@ export default function PACalls() {
           total={total}
           loading={loading}
           onPageChange={setPage}
-          onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
+          onPageSizeChange={setPageSize}
           unit="appels"
         />
       </div>

@@ -66,7 +66,7 @@ async function nsFetchWithFallback(paths: string[]) {
   return last;
 }
 
-/** Paginate by offset until result < limit. Returns flat array + meta. */
+/** Paginate by NetSapiens START/LIMIT until result < limit. Returns flat array + meta. */
 async function nsFetchAllPaginated(
   basePath: string,
   pageSize = 200,
@@ -78,7 +78,7 @@ async function nsFetchAllPaginated(
   let lastStatus = 0;
   for (let i = 0; i < maxPages; i++) {
     const sep = basePath.includes("?") ? "&" : "?";
-    const r = await nsFetch(`${basePath}${sep}limit=${pageSize}&offset=${i * pageSize}`);
+    const r = await nsFetch(`${basePath}${sep}limit=${pageSize}&start=${i * pageSize + 1}`);
     lastStatus = r.status;
     if (!r.success) {
       return {

@@ -32,7 +32,8 @@ async function fetchAllUsers(domain: string): Promise<{ ok: boolean; data: any[]
   const pageSize = 200;
   let prevSize = -1;
   for (let i = 0; i < 25; i++) {
-    const r = await nsFetch(`/domains/${encodeURIComponent(domain)}/users?limit=${pageSize}&offset=${i * pageSize}`);
+    const start = i * pageSize + 1;
+    const r = await nsFetch(`/domains/${encodeURIComponent(domain)}/users?limit=${pageSize}&start=${start}`);
     if (!r.ok) {
       return { ok: all.length > 0, data: all, warning: `NS-API users fetch failed: ${r.status} ${r.text.slice(0, 200)}` };
     }
@@ -47,13 +48,27 @@ async function fetchAllUsers(domain: string): Promise<{ ok: boolean; data: any[]
       all.push(u);
       added++;
     }
-    // NS-API ignores offset → returns same page repeatedly. Stop when no new uniques.
+    // NS-API v2 paginates with START/LIMIT. Stop if an install still repeats a page.
     if (added === 0) break;
     if (arr.length < pageSize) break;
     if (all.length === prevSize) break;
     prevSize = all.length;
   }
   return { ok: true, data: all };
+}
+
+function isPlanipretBrokerCandidate(b: any) {
+  const ext = String(b.extension ?? "").trim();
+  const email = String(b.email ?? "").trim();
+  const status = String(b.status ?? "").toLowerCase();
+  const name = String(b.full_name ?? "").trim();
+  const scope = String(b.scope ?? "").toLowerCase();
+  return !!ext
+    && !/@lemtel\.com$/i.test(email)
+    && !["disabled", "suspended", "deleted", "inactive"].includes(status)
+    && !/^\d{7,}$/.test(ext)
+    && !["system", "system user", "anonymous", "conference", "voicemail", "operator"].includes(name.toLowerCase())
+    && !scope.includes("domain");
 }
 
 Deno.serve(async (req) => {
@@ -100,7 +115,7 @@ Deno.serve(async (req) => {
           "name-last-name": (p.full_name || "").split(" ").slice(1).join(" "),
         }));
 
-    const brokers = sourceList.map((u: any) => {
+    const rawBrokers = sourceList.map((u: any) => {
       const ext = String(u.user ?? u.extension ?? u.subscriber_login ?? u.user_id ?? u.id ?? "");
       const email = String(u.email ?? u.email_address ?? u["email-address"] ?? "").toLowerCase();
       const local = byExt.get(ext) ?? (email ? byEmail.get(email) : undefined);
@@ -123,9 +138,13 @@ Deno.serve(async (req) => {
         updated_at: local?.updated_at ?? u.last_modified ?? null,
         created_at: local?.created_at ?? u.creation_date ?? null,
       };
-    }).filter((b: any) => b.extension && !/@lemtel\.com$/i.test(String(b.email || "").trim()));
+    }).filter(isPlanipretBrokerCandidate);
 
-    return json({ ok: true, count: brokers.length, domain, brokers, ns_warning: nsWarning, degraded: !!nsWarning });
+    const brokerByExt = new Map<string, any>();
+    for (const b of rawBrokers) if (!brokerByExt.has(b.extension)) brokerByExt.set(b.extension, b);
+    const brokers = Array.from(brokerByExt.values());
+
+    return json({ ok: true, count: brokers.length, domain, brokers, ns_warning: nsWarning, degraded: !!nsWarning, strategy: "start_limit_dedupe_by_extension" });
   } catch (e) {
     return json({ error: (e as Error).message }, 500);
   }

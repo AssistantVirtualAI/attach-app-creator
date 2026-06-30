@@ -10,6 +10,8 @@ import { useAdminRealtime } from "@/hooks/useAdminRealtime";
 import NotificationsBell from "@/components/planipret/admin/NotificationsBell";
 import CommandPalette from "@/components/planipret/admin/CommandPalette";
 import { WorkspaceHeaderExtras } from "@/components/portals/WorkspaceHeaderExtras";
+import { getPlanipretBrokerDirectoryCount } from "@/lib/planipret/adminDirectory";
+import { getPlanipretCallCount } from "@/lib/planipret/adminCounts";
 
 type NavBadge = "brokers" | "missed" | "integrations" | "audit";
 type NavItem = { to: string; label: string; Icon: any; badge?: NavBadge };
@@ -115,15 +117,14 @@ export default function PlanipretAdminLayout() {
       setLoading(false);
 
       try {
-        const { count: bc } = await supabase.from("planipret_profiles").select("*", { count: "exact", head: true });
-        if (!cancelled) setBrokerCount(bc ?? 0);
+        const bc = await getPlanipretBrokerDirectoryCount();
+        if (!cancelled) setBrokerCount(bc);
       } catch { /* ignore */ }
       try {
         const since = new Date(); since.setHours(0, 0, 0, 0);
-        const { count: mc } = await supabase
-          .from("planipret_phone_calls").select("*", { count: "exact", head: true })
-          .eq("direction", "inbound").eq("status", "missed").gte("created_at", since.toISOString());
-        if (!cancelled) setMissedCalls(mc ?? 0);
+        // Same definition/query helper as /admin/calls when filtering Direction = Manqué.
+        const mc = await getPlanipretCallCount({ direction: "missed", from: since.toISOString() });
+        if (!cancelled) setMissedCalls(mc);
       } catch { /* ignore */ }
       try {
         const { data: sec } = await supabase.functions.invoke("pp-integration-secrets");

@@ -6,12 +6,13 @@ import { Search, Plus, Edit3, Trash2, ExternalLink, X, AlertTriangle, Eye, EyeOf
 import Pagination from "@/components/planipret/admin/Pagination";
 import DebugPanel, { type DebugEntry } from "@/components/planipret/admin/DebugPanel";
 import { TableErrorState, TableEmptyState } from "@/components/planipret/admin/TableStates";
+import { getPlanipretBrokerDirectory, type PlanipretBrokerRow } from "@/lib/planipret/adminDirectory";
 
 const ACCENT = "#2E9BDC";
 const SUCCESS = "#00D4AA";
 const DANGER = "#E84C4C";
 
-type Profile = {
+type Profile = PlanipretBrokerRow & {
   user_id: string; email: string; full_name: string; extension: string;
   ns_extension?: string | null;
   mobile_app_enabled: boolean; voice_agent_enabled: boolean;
@@ -29,7 +30,7 @@ export default function PAUsers() {
   const filter = (params.get("filter") as "all" | "app" | "agent" | "offline") ?? "all";
   const maestroFilter = (params.get("maestro") as "all" | "yes" | "no") ?? "all";
   const page = Math.max(1, parseInt(params.get("page") ?? "1", 10) || 1);
-  const pageSizeRaw = parseInt(params.get("ps") ?? "25", 10);
+  const pageSizeRaw = parseInt(params.get("pageSize") ?? params.get("ps") ?? "25", 10);
   const pageSize = [25, 50, 100].includes(pageSizeRaw) ? pageSizeRaw : 25;
   const updateParams = (patch: Record<string, string | null>) => {
     const next = new URLSearchParams(params);
@@ -40,7 +41,7 @@ export default function PAUsers() {
   const setFilter = (f: string) => updateParams({ filter: f, page: "1" });
   const setMaestroFilter = (m: string) => updateParams({ maestro: m, page: "1" });
   const setPage = (p: number) => updateParams({ page: String(p) });
-  const setPageSize = (s: number) => updateParams({ ps: String(s), page: "1" });
+  const setPageSize = (s: number) => updateParams({ pageSize: String(s), ps: null, page: "1" });
 
   const [rows, setRows] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,56 +62,10 @@ export default function PAUsers() {
     setLoading(true);
     setNsError(null);
     setLoadError(null);
-    const dbg: DebugEntry[] = [];
-
-    // 1) Local profiles (admins + provisioned brokers with app/agent toggles)
-    const t1 = performance.now();
-    const { data: localProfiles, error: lpErr, count: lpCount } = await supabase
-      .from("planipret_profiles").select("*", { count: "exact" }).order("full_name", { ascending: true });
-    dbg.push({
-      label: "planipret_profiles",
-      query: "SELECT * FROM planipret_profiles ORDER BY full_name",
-      count: lpCount,
-      ms: Math.round(performance.now() - t1),
-      error: lpErr?.message ?? null,
-      sample: (localProfiles ?? []).slice(0, 3),
-    });
-    const localList = (localProfiles ?? []) as Profile[];
-
-    // 2) Live brokers from NetSapiens (full directory, ~355)
-    let merged: Profile[] = localList;
-    try {
-      const t2 = performance.now();
-      const { data: nsRes, error: nsErr } = await supabase.functions.invoke("pp-ns-users", { body: {} });
-      if (nsErr) throw new Error(nsErr.message);
-      if ((nsRes as any)?.ok) {
-        const nsBrokers = ((nsRes as any).brokers ?? []) as Profile[];
-        setNsDomain((nsRes as any).domain ?? null);
-        dbg.push({
-          label: "pp-ns-users (NS-API live directory)",
-          query: "invoke pp-ns-users",
-          count: nsBrokers.length,
-          ms: Math.round(performance.now() - t2),
-          meta: { domain: (nsRes as any).domain, warning: (nsRes as any).warning },
-          sample: nsBrokers.slice(0, 3),
-        });
-        const byExt = new Map<string, Profile>();
-        nsBrokers.forEach((b) => byExt.set(b.extension, b));
-        localList.forEach((p) => { if (p.extension) byExt.set(p.extension, { ...byExt.get(p.extension), ...p }); });
-        const extKeys = new Set(byExt.keys());
-        const adminsOnly = localList.filter((p) => !p.extension || !extKeys.has(p.extension));
-        merged = [...adminsOnly, ...Array.from(byExt.values())]
-          .sort((a, b) => (a.full_name || "").localeCompare(b.full_name || ""));
-      } else if ((nsRes as any)?.error) {
-        setNsError((nsRes as any).error);
-        dbg.push({ label: "pp-ns-users", error: (nsRes as any).error, ms: Math.round(performance.now() - t2) });
-      }
-    } catch (e: any) {
-      setNsError(e?.message ?? "NS-API indisponible");
-      dbg.push({ label: "pp-ns-users", error: e?.message ?? "unknown" });
-    }
-    setRows(merged);
-    if (lpErr && merged.length === 0) setLoadError(lpErr.message);
+    const directory = await getPlanipretBrokerDirectory();
+    setRows(directory.brokers as Profile[]);
+    setNsDomain(directory.nsDomain);
+    setNsError(directory.nsError);
 
     const start = new Date(); start.setDate(1); start.setHours(0, 0, 0, 0);
     const { data: calls } = await supabase.from("planipret_phone_calls")
@@ -121,7 +76,7 @@ export default function PAUsers() {
       if (c.extension) map[`ext:${c.extension}`] = (map[`ext:${c.extension}`] ?? 0) + 1;
     });
     setCallsByUser(map);
-    setDebug(dbg);
+    setDebug(directory.debug as DebugEntry[]);
     setLoading(false);
   };
 
@@ -241,7 +196,7 @@ export default function PAUsers() {
           </button>
           <div className="relative">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--pp-text-muted)" }} />
-            <input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            <input value={search} onChange={(e) => setSearch(e.target.value)}
               placeholder="Rechercher un courtier..."
               className="pl-9 pr-3 py-2 rounded-lg text-sm w-72"
               style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }} />
@@ -257,7 +212,7 @@ export default function PAUsers() {
         {([
           ["all", "Tous"], ["app", "App activée"], ["agent", "Agent IA activé"], ["offline", "Hors ligne"],
         ] as const).map(([k, l]) => (
-          <button key={k} onClick={() => { setFilter(k); setPage(1); }}
+          <button key={k} onClick={() => setFilter(k)}
             className="px-3 py-1.5 rounded-full text-xs font-medium transition"
             style={filter === k
               ? { background: ACCENT, color: "#fff", border: `1px solid ${ACCENT}` }

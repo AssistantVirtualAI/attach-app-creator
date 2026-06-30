@@ -6,6 +6,8 @@ import { TEMP_COLORS, TEMP_EMOJI } from "@/components/planipret/leadHelpers";
 import { computeServiceFinance, computeTotals, fmtMoney, type ServiceFinance } from "@/lib/planipret/pricing";
 import { FinancialKpiCard } from "@/components/planipret/admin/FinancialKpiCard";
 import { RevenueBreakdown } from "@/components/planipret/admin/RevenueBreakdown";
+import { getPlanipretBrokerDirectory } from "@/lib/planipret/adminDirectory";
+import { getPlanipretCallCount } from "@/lib/planipret/adminCounts";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
   PieChart, Pie, Cell, BarChart, Bar, Legend,
@@ -108,49 +110,40 @@ export default function PAOverview() {
     const yestIso = yest.toISOString();
     const periodIso = periodAgo.toISOString();
 
-    const [c1, c2, bAct, bAll, sms, smsY, ava, vm, rec, bList, callsP, smsP, callsByDir, topCalls, svcMobile, svcWidget, svcAi, nsUsers] = await Promise.all([
-      supabase.from("planipret_phone_calls").select("id", { count: "exact", head: true }).gte("started_at", todayIso),
-      supabase.from("planipret_phone_calls").select("id", { count: "exact", head: true }).gte("started_at", yestIso).lt("started_at", todayIso),
-      supabase.from("planipret_profiles").select("id", { count: "exact", head: true }).eq("mobile_app_enabled", true),
-      supabase.from("planipret_profiles").select("id", { count: "exact", head: true }),
+    const [c1, c2, sms, smsY, ava, vm, rec, callsP, smsP, callsByDir, topCalls, svcWidget, svcAi, directory] = await Promise.all([
+      getPlanipretCallCount({ from: todayIso }),
+      getPlanipretCallCount({ from: yestIso, to: todayIso }),
       supabase.from("planipret_phone_messages").select("id", { count: "exact", head: true }).gte("created_at", todayIso),
       supabase.from("planipret_phone_messages").select("id", { count: "exact", head: true }).gte("created_at", yestIso).lt("created_at", todayIso),
       supabase.from("ai_request_audit_log").select("id", { count: "exact", head: true }).gte("created_at", todayIso).like("action", "elevenlabs_tool:%"),
       supabase.from("planipret_voicemails").select("id", { count: "exact", head: true }).eq("is_read", false),
       supabase.from("planipret_phone_calls").select("id, user_id, extension, direction, from_number, to_number, duration_seconds, started_at, ai_summary, metadata, planipret_profiles(full_name)").order("started_at", { ascending: false }).limit(20),
-      supabase.from("planipret_profiles").select("user_id, full_name, extension, ns_extension, mobile_app_enabled, updated_at").order("updated_at", { ascending: false }),
       supabase.from("planipret_phone_calls").select("started_at").gte("started_at", periodIso),
       supabase.from("planipret_phone_messages").select("created_at").gte("created_at", periodIso),
       supabase.from("planipret_phone_calls").select("direction").gte("started_at", periodIso),
       supabase.from("planipret_phone_calls").select("user_id, extension, metadata, planipret_profiles(full_name)").gte("started_at", periodIso),
-      supabase.from("planipret_profiles").select("id", { count: "exact", head: true }).eq("mobile_app_enabled", true),
       supabase.from("planipret_profiles").select("id", { count: "exact", head: true }).eq("widget_enabled", true),
       supabase.from("planipret_profiles").select("id", { count: "exact", head: true }).eq("voice_agent_enabled", true),
-      supabase.functions.invoke("pp-ns-users", { body: {} }).catch((error) => ({ data: null, error })),
+      getPlanipretBrokerDirectory(),
     ]);
 
-    const nsBrokerList = (((nsUsers as any)?.data?.brokers ?? []) as any[]);
-    const nsBrokerCount = Number((nsUsers as any)?.data?.count ?? nsBrokerList.length ?? 0);
-    const nsBrokerExt = new Set<string>();
-    nsBrokerList.forEach((b: any) => b.extension && nsBrokerExt.add(String(b.extension)));
-    (rec.data ?? []).forEach((c: any) => c.extension && nsBrokerExt.add(String(c.extension)));
-    (topCalls.data ?? []).forEach((c: any) => c.extension && nsBrokerExt.add(String(c.extension)));
-    const brokerTotal = Math.max(bAll.count ?? 0, nsBrokerCount, nsBrokerExt.size);
-    const brokerActive = Math.max(bAct.count ?? 0, nsBrokerCount, nsBrokerExt.size);
+    const nsBrokerList = directory.brokers;
+    const brokerTotal = directory.count;
+    const brokerActive = directory.count;
 
     setStats({
-      calls: c1.count ?? 0, callsYest: c2.count ?? 0,
+      calls: c1 ?? 0, callsYest: c2 ?? 0,
       brokers: brokerActive, brokersTotal: brokerTotal,
       sms: sms.count ?? 0, smsYest: smsY.count ?? 0,
       ava: ava.count ?? 0, voicemailsUnread: vm.count ?? 0,
     });
     setServiceCounts({
-      mobile: Math.max(svcMobile.count ?? 0, brokerTotal),
+      mobile: brokerTotal,
       widget: svcWidget.count ?? 0,
       ai: svcAi.count ?? 0,
     });
     setRecent(rec.data ?? []);
-    setBrokers((nsBrokerList.length ? nsBrokerList : (bList.data ?? [])).slice(0, 10));
+    setBrokers(nsBrokerList.slice(0, 10));
 
     // period series
     const days: Array<{ day: string; appels: number; sms: number }> = [];
