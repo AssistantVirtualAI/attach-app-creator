@@ -12226,6 +12226,17 @@ export type Database = {
           },
         ]
       }
+      planipret_broker_stats: {
+        Row: {
+          agent_ia_active: number | null
+          app_mobile_active: number | null
+          maestro_connected: number | null
+          ms365_connected: number | null
+          ns_linked: number | null
+          total_courtiers: number | null
+        }
+        Relationships: []
+      }
       telecom_cdr_v: {
         Row: {
           ai_processing: boolean | null
