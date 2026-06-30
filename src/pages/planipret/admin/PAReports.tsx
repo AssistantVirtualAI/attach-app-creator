@@ -38,6 +38,9 @@ export default function PAReports() {
   const [exporting, setExporting] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
+  const { stats: brokerStats } = usePlanipretBrokerStats();
+
+  const periodLabel = range === "week" ? "7 derniers jours" : range === "month" ? "30 derniers jours" : "3 derniers mois";
 
   useEffect(() => {
     const start = new Date();
