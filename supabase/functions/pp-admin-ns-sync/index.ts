@@ -526,6 +526,19 @@ Deno.serve(async (req) => {
 
     const profileSync = await upsertProfiles(admin, domain, brokerUsers);
 
+    // Record run start (background completion updates it)
+    const { data: runRow } = await admin
+      .from("planipret_edge_function_runs")
+      .insert({
+        function_name: "pp-admin-ns-sync",
+        status: "running",
+        triggered_by: userData.user.id,
+        summary: { domain, users_total: brokerUsers.length, profiles_matched: profileSync.matched, profiles_created: profileSync.created, start, end },
+      })
+      .select("id")
+      .maybeSingle();
+    const runId = runRow?.id as string | undefined;
+
     const bg = (async () => {
       try {
         const calls = await syncCalls(admin, domain, brokerUsers, start, end);
@@ -533,9 +546,13 @@ Deno.serve(async (req) => {
           syncRecordings(admin, domain, brokerUsers, start, end),
           syncMessages(admin, domain, start, end, brokerUsers),
         ]);
-        console.log("[pp-admin-ns-sync] completed", JSON.stringify({ domain, users: brokerUsers.length, raw_users: usersRes.data.length, calls, recordings, messages }));
+        const summary = { domain, users: brokerUsers.length, raw_users: usersRes.data.length, profiles: profileSync, calls, recordings, messages, start, end };
+        console.log("[pp-admin-ns-sync] completed", JSON.stringify(summary));
+        if (runId) await admin.from("planipret_edge_function_runs").update({ status: "success", finished_at: new Date().toISOString(), summary }).eq("id", runId);
       } catch (e) {
-        console.error("[pp-admin-ns-sync] background error", (e as Error).message);
+        const msg = (e as Error).message;
+        console.error("[pp-admin-ns-sync] background error", msg);
+        if (runId) await admin.from("planipret_edge_function_runs").update({ status: "error", finished_at: new Date().toISOString(), error: msg }).eq("id", runId);
       }
     })();
     // @ts-ignore EdgeRuntime global exists in deployed edge runtime.
@@ -547,11 +564,13 @@ Deno.serve(async (req) => {
     return json({
       ok: true,
       status: "queued",
+      run_id: runId,
       domain,
       users_total: brokerUsers.length,
       raw_users_total: usersRes.data.length,
       extensions: brokerUsers.map(userExt).filter(Boolean).length,
       profiles_matched: profileSync.matched,
+      profiles_created: profileSync.created,
       cdr: { status: "queued_in_background", start, end },
       recordings: { status: "queued_in_background" },
       messages: { status: "queued_in_background" },
