@@ -65,6 +65,8 @@ Deno.serve(async (req) => {
     const admin = admin0;
     const body = await req.json().catch(() => ({}));
     let { call_record_id, recording_url, organization_id, recording_path, recording_name, xml_cdr_uuid, record_name, record_path, domain_uuid } = body || {};
+    const rawLang = String(body?.language ?? "fr").toLowerCase().slice(0, 2);
+    const transcriptLanguage = rawLang === "en" ? "en" : "fr";
     // Accept aliases from UI
     recording_name = recording_name || record_name;
     recording_path = recording_path || record_path;
