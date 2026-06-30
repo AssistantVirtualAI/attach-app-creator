@@ -705,14 +705,8 @@ const App = () => (
                     </ProtectedRoute>
                   }
                 />
-                <Route
-                  path="/phone-numbers"
-                  element={
-                    <ProtectedRoute>
-                      <PhoneNumbers />
-                    </ProtectedRoute>
-                  }
-                />
+                {/* /phone-numbers removed — use Domain → Destinations */}
+                <Route path="/phone-numbers" element={<Navigate to="/lemtel/dids" replace />} />
                 <Route
                   path="/handoffs"
                   element={
