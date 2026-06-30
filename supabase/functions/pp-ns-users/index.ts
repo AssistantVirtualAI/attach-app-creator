@@ -140,9 +140,9 @@ Deno.serve(async (req) => {
       };
     }).filter(isPlanipretBrokerCandidate);
 
-    const byExt = new Map<string, any>();
-    for (const b of rawBrokers) if (!byExt.has(b.extension)) byExt.set(b.extension, b);
-    const brokers = Array.from(byExt.values());
+    const brokerByExt = new Map<string, any>();
+    for (const b of rawBrokers) if (!brokerByExt.has(b.extension)) brokerByExt.set(b.extension, b);
+    const brokers = Array.from(brokerByExt.values());
 
     return json({ ok: true, count: brokers.length, domain, brokers, ns_warning: nsWarning, degraded: !!nsWarning, strategy: "start_limit_dedupe_by_extension" });
   } catch (e) {
