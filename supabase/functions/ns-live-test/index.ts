@@ -133,88 +133,97 @@ Deno.serve(async (req) => {
       const usersRes = await nsFetchAllPaginated(`/domains/${D}/users`);
       if (!usersRes.success) return json({ error: "Cannot fetch users from NS-API", ns: usersRes }, 502);
 
+      // Bulk-fetch all profiles once (avoid N round-trips)
+      const { data: allProfs } = await admin
+        .from("planipret_profiles")
+        .select("id,email");
+      const emailToProfId = new Map<string, string>();
+      for (const p of (allProfs ?? []) as any[]) {
+        if (p.email) emailToProfId.set(String(p.email).toLowerCase().trim(), p.id);
+      }
+
       const matched: any[] = [];
       const unmatched: any[] = [];
+      const updates: { id: string; ns_extension: string; ns_domain: string; ns_sip_username: string; ns_linked: boolean; ns_linked_at: string; email?: string }[] = [];
+      const nowIso = new Date().toISOString();
+
       for (const u of usersRes.data) {
         const email = (u.email ?? "").toLowerCase().trim();
         const ext = String(u.user ?? "").trim();
         if (!ext) continue;
         const display = `${u["name-first-name"] ?? ""} ${u["name-last-name"] ?? ""}`.trim();
         if (!email) { unmatched.push({ extension: ext, name: display, reason: "no_email" }); continue; }
-        const { data: prof } = await admin
-          .from("planipret_profiles").select("id,email").ilike("email", email).maybeSingle();
-        if (!prof) { unmatched.push({ extension: ext, name: display, email, reason: "no_profile" }); continue; }
-        const { error: upErr } = await admin
-          .from("planipret_profiles")
-          .update({
-            ns_extension: ext,
-            ns_domain: domain,
-            ns_sip_username: u["login-username"] ?? ext,
-            ns_linked: true,
-            ns_linked_at: new Date().toISOString(),
-          })
-          .eq("id", prof.id);
-        if (upErr) unmatched.push({ extension: ext, email, reason: `update_failed: ${upErr.message}` });
-        else matched.push({ extension: ext, email, profile_id: prof.id });
+        const profId = emailToProfId.get(email);
+        if (!profId) { unmatched.push({ extension: ext, name: display, email, reason: "no_profile" }); continue; }
+        updates.push({
+          id: profId,
+          ns_extension: ext,
+          ns_domain: domain,
+          ns_sip_username: u["login-username"] ?? ext,
+          ns_linked: true,
+          ns_linked_at: nowIso,
+          email,
+        });
+        matched.push({ extension: ext, email, profile_id: profId });
       }
 
-      // ─── If sync_all → also pull CDRs and upsert into planipret_phone_calls ───
-      let cdr_inserted = 0, cdr_skipped = 0, cdr_total = 0, cdr_error: string | null = null;
-      if (action === "sync_all") {
-        const cdrsRes = await nsFetchAllPaginated(`/domains/${D}/cdrs`, 200, 30);
-        cdr_total = cdrsRes.data.length;
-        if (!cdrsRes.success && !cdrsRes.data.length) {
-          cdr_error = cdrsRes.error ?? "fetch_failed";
-        } else {
-          // Build ext→user_id map
-          const { data: profs } = await admin
-            .from("planipret_profiles")
-            .select("id,ns_extension")
-            .not("ns_extension", "is", null);
-          const extToUser = new Map<string, string>();
-          for (const p of (profs ?? []) as any[]) {
-            if (p.ns_extension) extToUser.set(String(p.ns_extension), p.id);
-          }
+      // Run updates in parallel batches of 25
+      for (let i = 0; i < updates.length; i += 25) {
+        const chunk = updates.slice(i, i + 25);
+        await Promise.all(chunk.map(({ id, email: _e, ...patch }) =>
+          admin.from("planipret_profiles").update(patch).eq("id", id)
+        ));
+      }
 
-          const rows: any[] = [];
-          for (const c of cdrsRes.data) {
-            const ns_call_id = String(c?.id ?? c?.["call-id"] ?? c?.cdr_id ?? c?.["orig-callid"] ?? "").trim();
-            if (!ns_call_id) { cdr_skipped++; continue; }
-            const ext = String(c?.user ?? c?.["orig-user"] ?? c?.["term-user"] ?? "").trim();
-            const user_id = extToUser.get(ext);
-            if (!user_id) { cdr_skipped++; continue; }
-            const started = c?.["time-start"] ?? c?.["start-time"] ?? c?.started_at ?? null;
-            const answered = c?.["time-answer"] ?? c?.["answer-time"] ?? null;
-            const ended = c?.["time-release"] ?? c?.["end-time"] ?? null;
-            const dur = Number(c?.duration ?? c?.["time-talking"] ?? 0) || 0;
-            rows.push({
-              user_id,
-              organization_id: PLANIPRET_ORG_ID,
-              ns_call_id,
-              ns_domain: domain,
-              extension: ext,
-              direction: pickDirection(c),
-              status: String(c?.["release-text"] ?? c?.disposition ?? "completed").toLowerCase(),
-              from_number: c?.["orig-from-uri"] ?? c?.from ?? c?.["from-user"] ?? null,
-              from_name: c?.["orig-from-name"] ?? c?.from_name ?? null,
-              to_number: c?.["term-to-uri"] ?? c?.to ?? c?.["to-user"] ?? null,
-              to_name: c?.["term-to-name"] ?? c?.to_name ?? null,
-              started_at: started ? new Date(started).toISOString() : null,
-              answered_at: answered ? new Date(answered).toISOString() : null,
-              ended_at: ended ? new Date(ended).toISOString() : null,
-              duration_seconds: dur,
-              metadata: c,
-            });
+      // ─── sync_all: kick off CDR backfill in background, respond immediately ───
+      if (action === "sync_all") {
+        const bg = (async () => {
+          try {
+            const cdrsRes = await nsFetchAllPaginated(`/domains/${D}/cdrs`, 200, 30);
+            const { data: profs } = await admin
+              .from("planipret_profiles").select("id,ns_extension").not("ns_extension", "is", null);
+            const extToUser = new Map<string, string>();
+            for (const p of (profs ?? []) as any[]) {
+              if (p.ns_extension) extToUser.set(String(p.ns_extension), p.id);
+            }
+            const rows: any[] = [];
+            for (const c of cdrsRes.data) {
+              const ns_call_id = String(c?.id ?? c?.["call-id"] ?? c?.cdr_id ?? c?.["orig-callid"] ?? "").trim();
+              if (!ns_call_id) continue;
+              const ext = String(c?.user ?? c?.["orig-user"] ?? c?.["term-user"] ?? "").trim();
+              const user_id = extToUser.get(ext);
+              if (!user_id) continue;
+              const started = c?.["time-start"] ?? c?.["start-time"] ?? c?.started_at ?? null;
+              const answered = c?.["time-answer"] ?? c?.["answer-time"] ?? null;
+              const ended = c?.["time-release"] ?? c?.["end-time"] ?? null;
+              const dur = Number(c?.duration ?? c?.["time-talking"] ?? 0) || 0;
+              rows.push({
+                user_id, organization_id: PLANIPRET_ORG_ID, ns_call_id, ns_domain: domain, extension: ext,
+                direction: pickDirection(c),
+                status: String(c?.["release-text"] ?? c?.disposition ?? "completed").toLowerCase(),
+                from_number: c?.["orig-from-uri"] ?? c?.from ?? c?.["from-user"] ?? null,
+                from_name: c?.["orig-from-name"] ?? c?.from_name ?? null,
+                to_number: c?.["term-to-uri"] ?? c?.to ?? c?.["to-user"] ?? null,
+                to_name: c?.["term-to-name"] ?? c?.to_name ?? null,
+                started_at: started ? new Date(started).toISOString() : null,
+                answered_at: answered ? new Date(answered).toISOString() : null,
+                ended_at: ended ? new Date(ended).toISOString() : null,
+                duration_seconds: dur, metadata: c,
+              });
+            }
+            for (let i = 0; i < rows.length; i += 200) {
+              const chunk = rows.slice(i, i + 200);
+              await admin.from("planipret_phone_calls").upsert(chunk, { onConflict: "ns_call_id", ignoreDuplicates: false });
+            }
+            console.log(`[ns-live-test] CDR backfill done: ${rows.length} rows`);
+          } catch (e) {
+            console.error(`[ns-live-test] CDR backfill error:`, (e as Error).message);
           }
-          // Upsert in chunks of 200
-          for (let i = 0; i < rows.length; i += 200) {
-            const chunk = rows.slice(i, i + 200);
-            const { error: insErr, count } = await admin
-              .from("planipret_phone_calls")
-              .upsert(chunk, { onConflict: "ns_call_id", ignoreDuplicates: false, count: "exact" });
-            if (insErr) { cdr_error = insErr.message; break; }
-            cdr_inserted += count ?? chunk.length;
-          }
+        })();
+        // @ts-ignore EdgeRuntime is a Deno Deploy global
+        if (typeof EdgeRuntime !== "undefined" && (EdgeRuntime as any).waitUntil) {
+          // @ts-ignore
+          (EdgeRuntime as any).waitUntil(bg);
         }
       }
 
@@ -225,7 +234,7 @@ Deno.serve(async (req) => {
         users_total: usersRes.data.length,
         users_pages: usersRes.pages,
         matched, unmatched,
-        cdr: action === "sync_all" ? { total: cdr_total, inserted: cdr_inserted, skipped: cdr_skipped, error: cdr_error } : undefined,
+        cdr: action === "sync_all" ? { status: "queued_in_background" } : undefined,
       });
     }
 
