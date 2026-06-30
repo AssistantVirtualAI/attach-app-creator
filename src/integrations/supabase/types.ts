@@ -8767,7 +8767,7 @@ export type Database = {
           sip_username: string | null
           status: string
           updated_at: string
-          user_id: string
+          user_id: string | null
           voice_agent_enabled: boolean
           voicemail_greeting_active: boolean
           voicemail_greeting_audio_url: string | null
@@ -8850,7 +8850,7 @@ export type Database = {
           sip_username?: string | null
           status?: string
           updated_at?: string
-          user_id: string
+          user_id?: string | null
           voice_agent_enabled?: boolean
           voicemail_greeting_active?: boolean
           voicemail_greeting_audio_url?: string | null
@@ -8933,7 +8933,7 @@ export type Database = {
           sip_username?: string | null
           status?: string
           updated_at?: string
-          user_id?: string
+          user_id?: string | null
           voice_agent_enabled?: boolean
           voicemail_greeting_active?: boolean
           voicemail_greeting_audio_url?: string | null
