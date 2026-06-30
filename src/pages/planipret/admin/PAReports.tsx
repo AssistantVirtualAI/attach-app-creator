@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, CartesianGrid } from "recharts";
-import { Download, Trophy, FileText } from "lucide-react";
+import { Download, Trophy, FileText, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
@@ -35,6 +35,7 @@ export default function PAReports() {
   const [calls, setCalls] = useState<any[]>([]);
   const [brokers, setBrokers] = useState<Record<string, string>>({});
   const [exporting, setExporting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -44,16 +45,39 @@ export default function PAReports() {
     else start.setMonth(start.getMonth() - 3);
     start.setHours(0, 0, 0, 0);
     (async () => {
-      const [{ data: c }, { data: p }] = await Promise.all([
+      const [{ data: c }, { data: p }, nsUsers] = await Promise.all([
         supabase.from("planipret_phone_calls").select("*").gte("started_at", start.toISOString()),
-        supabase.from("planipret_profiles").select("user_id, full_name"),
+        supabase.from("planipret_profiles").select("user_id, full_name, extension, ns_extension"),
+        supabase.functions.invoke("pp-ns-users", { body: {} }).catch((error) => ({ data: null, error })),
       ]);
       setCalls(c ?? []);
       const map: Record<string, string> = {};
-      (p ?? []).forEach((x: any) => map[x.user_id] = x.full_name);
+      (p ?? []).forEach((x: any) => {
+        map[x.user_id] = x.full_name;
+        if (x.extension) map[`ext:${x.extension}`] = x.full_name;
+        if (x.ns_extension) map[`ext:${x.ns_extension}`] = x.full_name;
+      });
+      (((nsUsers as any)?.data?.brokers ?? []) as any[]).forEach((x: any) => {
+        if (x.extension) map[`ext:${x.extension}`] = x.full_name || `Ext. ${x.extension}`;
+        if (x.user_id && !String(x.user_id).startsWith("ns:")) map[x.user_id] = x.full_name || map[x.user_id];
+      });
       setBrokers(map);
     })();
   }, [range]);
+
+  const syncAll = async () => {
+    setSyncing(true);
+    const id = toast.loading("Synchronisation NS-API complète…");
+    try {
+      const { data, error } = await supabase.functions.invoke("pp-admin-ns-sync", { body: {} });
+      if (error) throw error;
+      toast.success(`${(data as any)?.extensions ?? (data as any)?.users_total ?? 0} extensions synchronisées · rapports mis à jour sous peu`, { id });
+    } catch (e: any) {
+      toast.error(`Échec: ${e.message ?? e}`, { id });
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const byDay = useMemo(() => {
     const map: Record<string, number> = {};
@@ -97,8 +121,8 @@ export default function PAReports() {
   const byBroker = useMemo(() => {
     const m: Record<string, any> = {};
     calls.forEach((c) => {
-      const k = c.user_id;
-      if (!m[k]) m[k] = { name: brokers[k] ?? "—", total: 0, in: 0, out: 0, missed: 0, totalDur: 0, durCount: 0 };
+      const k = c.user_id ?? `ext:${c.extension ?? c.metadata?.extension ?? "unknown"}`;
+      if (!m[k]) m[k] = { name: brokers[k] ?? (c.extension ? `Ext. ${c.extension}` : "—"), total: 0, in: 0, out: 0, missed: 0, totalDur: 0, durCount: 0 };
       m[k].total++;
       if (c.direction === "inbound") m[k].in++;
       else if (c.direction === "outbound") m[k].out++;
@@ -181,6 +205,11 @@ export default function PAReports() {
         <button onClick={exportPdf} disabled={exporting}
           className="pp-btn-primary flex items-center gap-2 text-sm disabled:opacity-50">
           <FileText className="w-4 h-4" /> {exporting ? "Génération…" : "Exporter PDF"}
+        </button>
+        <button onClick={syncAll} disabled={syncing}
+          className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg disabled:opacity-50"
+          style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>
+          <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} /> Synchroniser NS-API
         </button>
       </div>
       <div ref={reportRef} className="space-y-4">

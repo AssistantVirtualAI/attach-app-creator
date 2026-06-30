@@ -20,10 +20,16 @@ export default function PACalls() {
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.from("planipret_profiles").select("user_id, full_name").order("full_name");
-      setBrokers(data ?? []);
+      const { data } = await supabase.functions.invoke("pp-ns-users", { body: {} });
+      if ((data as any)?.ok) setBrokers(((data as any).brokers ?? []).map((b: any) => ({ user_id: b.user_id, full_name: b.full_name, extension: b.extension, ns_only: b.ns_only })));
+      else {
+        const { data: local } = await supabase.from("planipret_profiles").select("user_id, full_name, extension").order("full_name");
+        setBrokers(local ?? []);
+      }
     })();
   }, []);
+
+  const brokerName = (r: any) => r.planipret_profiles?.full_name ?? r.metadata?.ns_user?.name ?? r.metadata?.user_name ?? r.metadata?.extension_name ?? (r.extension ? `Ext. ${r.extension}` : "—");
 
   const load = async (p = page) => {
     setLoading(true);
@@ -33,7 +39,8 @@ export default function PACalls() {
       .select("*, planipret_profiles(full_name)", { count: "exact" })
       .order("started_at", { ascending: false })
       .range(fromIdx, toIdx);
-    if (filters.broker) q = q.eq("user_id", filters.broker);
+    if (filters.broker?.startsWith("ext:")) q = q.eq("extension", filters.broker.slice(4));
+    else if (filters.broker?.startsWith("user:")) q = q.eq("user_id", filters.broker.slice(5));
     if (filters.from) q = q.gte("started_at", filters.from);
     if (filters.to) q = q.lte("started_at", filters.to);
     if (filters.direction) q = q.eq("direction", filters.direction);
@@ -63,7 +70,8 @@ export default function PACalls() {
 
   const exportCsv = async () => {
     let q = supabase.from("planipret_phone_calls").select("*, planipret_profiles(full_name)").order("started_at", { ascending: false }).limit(5000);
-    if (filters.broker) q = q.eq("user_id", filters.broker);
+    if (filters.broker?.startsWith("ext:")) q = q.eq("extension", filters.broker.slice(4));
+    else if (filters.broker?.startsWith("user:")) q = q.eq("user_id", filters.broker.slice(5));
     if (filters.from) q = q.gte("started_at", filters.from);
     if (filters.to) q = q.lte("started_at", filters.to);
     if (filters.direction) q = q.eq("direction", filters.direction);
@@ -72,7 +80,7 @@ export default function PACalls() {
     const { data: all } = await q;
     const headers = ["Courtier", "Direction", "De", "Vers", "Durée", "Date"];
     const lines = [headers.join(",")].concat((all ?? []).map((r: any) =>
-      [r.planipret_profiles?.full_name, r.direction, r.from_number, r.to_number, r.duration_seconds, r.started_at].map((v) => `"${v ?? ""}"`).join(",")
+      [brokerName(r), r.direction, r.from_number, r.to_number, r.duration_seconds, r.started_at].map((v) => `"${v ?? ""}"`).join(",")
     ));
     const blob = new Blob([lines.join("\n")], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -85,7 +93,7 @@ export default function PACalls() {
     <div className="space-y-4">
       <div className="pp-card p-4 flex flex-wrap items-end gap-2">
         <Select label="Courtier" value={filters.broker} onChange={(v) => setFilters({ ...filters, broker: v })}
-          options={[{ v: "", l: "Tous" }, ...brokers.map((b) => ({ v: b.user_id, l: b.full_name }))]} />
+          options={[{ v: "", l: "Tous" }, ...brokers.map((b) => ({ v: b.ns_only ? `ext:${b.extension}` : `user:${b.user_id}`, l: `${b.full_name}${b.extension ? ` · ${b.extension}` : ""}` }))]} />
         <Input label="Date début" type="date" value={filters.from} onChange={(v) => setFilters({ ...filters, from: v })} />
         <Input label="Date fin" type="date" value={filters.to} onChange={(v) => setFilters({ ...filters, to: v })} />
         <Select label="Direction" value={filters.direction} onChange={(v) => setFilters({ ...filters, direction: v })}
@@ -100,7 +108,7 @@ export default function PACalls() {
               const { data, error } = await supabase.functions.invoke("pp-admin-ns-sync", { body: {} });
               if (error) throw error;
               const d = data as any;
-              toast.success(`${d.extensions} ext · ${d.upserted} appels · ${d.recordings} enreg.`, { id });
+              toast.success(`${d.extensions ?? d.users_total ?? 0} ext synchronisées · appels/enregistrements en arrière-plan`, { id });
               await load(1);
             } catch (e: any) { toast.error(`Échec: ${e.message ?? e}`, { id }); }
           }}
@@ -132,7 +140,7 @@ export default function PACalls() {
                 <tr key={c.id} className="cursor-pointer hover:bg-white/[0.02]"
                   style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}
                   onClick={() => setDetail(c)}>
-                  <td className="p-3" style={{ color: "var(--pp-text-primary)" }}>{c.planipret_profiles?.full_name ?? "—"}</td>
+                  <td className="p-3" style={{ color: "var(--pp-text-primary)" }}>{brokerName(c)}</td>
                   <td><Icon className="w-4 h-4" style={{ color: col }} /></td>
                   <td style={{ color: "var(--pp-text-secondary)" }}>{c.from_number ?? "—"}</td>
                   <td style={{ color: "var(--pp-text-secondary)" }}>{c.to_number ?? "—"}</td>
@@ -164,7 +172,8 @@ export default function PACalls() {
               <button onClick={() => setDetail(null)}><X className="w-4 h-4" style={{ color: "var(--pp-text-muted)" }} /></button>
             </div>
             <div className="space-y-3 text-sm">
-              <Row k="Courtier" v={detail.planipret_profiles?.full_name} />
+              <Row k="Courtier" v={brokerName(detail)} />
+              <Row k="Extension" v={detail.extension} />
               <Row k="Direction" v={detail.direction} />
               <Row k="De" v={detail.from_number} />
               <Row k="Vers" v={detail.to_number} />

@@ -17,6 +17,8 @@ export default function PARecordings() {
   const [detail, setDetail] = useState<any | null>(null);
   const [transcribing, setTranscribing] = useState<string | null>(null);
 
+  const brokerName = (r: any) => r.planipret_profiles?.full_name ?? r.metadata?.ns_user?.name ?? r.metadata?.user_name ?? r.metadata?.extension_name ?? (r.extension ? `Ext. ${r.extension}` : "—");
+
   const load = async (p = page) => {
     setLoading(true);
     const fromIdx = (p - 1) * PAGE;
@@ -50,7 +52,7 @@ export default function PARecordings() {
       const { data, error } = await supabase.functions.invoke("pp-admin-ns-sync", { body: {} });
       if (error) throw error;
       const d = data as any;
-      toast.success(`Synchro: ${d.extensions} ext · ${d.upserted} appels · ${d.recordings} enreg.`);
+      toast.success(`Synchro lancée: ${d.extensions ?? d.users_total ?? 0} ext · appels/enregistrements en arrière-plan`);
       await load(1);
     } catch (e: any) {
       toast.error(`Synchro échouée: ${e.message ?? e}`);
@@ -115,7 +117,7 @@ export default function PARecordings() {
               <tr key={c.id} className="cursor-pointer hover:bg-white/[0.02]"
                 style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}
                 onClick={() => setDetail(c)}>
-                <td className="p-3" style={{ color: "var(--pp-text-primary)" }}>{c.planipret_profiles?.full_name ?? "—"}</td>
+                <td className="p-3" style={{ color: "var(--pp-text-primary)" }}>{brokerName(c)}</td>
                 <td style={{ color: "var(--pp-text-secondary)" }}>{c.extension ?? c.planipret_profiles?.extension ?? "—"}</td>
                 <td style={{ color: "var(--pp-text-secondary)" }}>{c.from_number ?? "—"}</td>
                 <td style={{ color: "var(--pp-text-secondary)" }}>{c.to_number ?? "—"}</td>
@@ -161,7 +163,7 @@ export default function PARecordings() {
               <button onClick={() => setDetail(null)}><X className="w-4 h-4" style={{ color: "var(--pp-text-muted)" }} /></button>
             </div>
             <div className="space-y-3 text-sm" style={{ color: "var(--pp-text-secondary)" }}>
-              <div>Courtier: <span style={{ color: "var(--pp-text-primary)" }}>{detail.planipret_profiles?.full_name ?? "—"}</span></div>
+              <div>Courtier: <span style={{ color: "var(--pp-text-primary)" }}>{brokerName(detail)}</span></div>
               <div>Ext: {detail.extension ?? "—"}</div>
               <div>De: {detail.from_number ?? "—"} → Vers: {detail.to_number ?? "—"}</div>
               <div>Date: {detail.started_at ? new Date(detail.started_at).toLocaleString("fr-CA") : "—"}</div>

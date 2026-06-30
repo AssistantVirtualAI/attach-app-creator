@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { X, ArrowDownLeft, ArrowUpRight } from "lucide-react";
+import { X, ArrowDownLeft, ArrowUpRight, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
 
 const ACCENT = "#2E9BDC";
 const SUCCESS = "#00D4AA";
@@ -15,6 +16,9 @@ export default function PAMessages() {
   const [threadKey, setThreadKey] = useState<string | null>(null);
   const [direction, setDirection] = useState("");
   const [from, setFrom] = useState(""); const [to, setTo] = useState("");
+  const [syncing, setSyncing] = useState(false);
+
+  const brokerName = (m: any) => m.planipret_profiles?.full_name ?? m.metadata?.user_name ?? m.metadata?.extension_name ?? (m.metadata?.extension ? `Ext. ${m.metadata.extension}` : "—");
 
   const load = async (p = page) => {
     const fromIdx = (p - 1) * PAGE;
@@ -46,8 +50,20 @@ export default function PAMessages() {
     const peer = m.direction === "outbound" ? m.to_number : m.from_number;
     setThreadKey(peer);
     const { data } = await supabase.from("planipret_phone_messages")
-      .select("*").eq("user_id", m.user_id).or(`from_number.eq.${peer},to_number.eq.${peer}`).order("created_at", { ascending: true });
+      .select("*").or(`from_number.eq.${peer},to_number.eq.${peer}`).order("created_at", { ascending: true });
     setThread(data ?? []);
+  };
+
+  const syncAll = async () => {
+    setSyncing(true);
+    const id = toast.loading("Synchronisation NS-API messages/appels…");
+    try {
+      const { data, error } = await supabase.functions.invoke("pp-admin-ns-sync", { body: {} });
+      if (error) throw error;
+      toast.success(`${(data as any)?.extensions ?? (data as any)?.users_total ?? 0} extensions synchronisées · messages en arrière-plan`, { id });
+      await load(1);
+    } catch (e: any) { toast.error(`Échec: ${e.message ?? e}`, { id }); }
+    finally { setSyncing(false); }
   };
 
   const inputStyle = { background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" };
@@ -62,6 +78,9 @@ export default function PAMessages() {
         </select>
         <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="px-3 py-1.5 rounded-lg text-sm" style={inputStyle} />
         <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="px-3 py-1.5 rounded-lg text-sm" style={inputStyle} />
+        <button onClick={syncAll} disabled={syncing} className="ml-auto flex items-center gap-1.5 px-3 py-2 rounded-lg text-white text-sm font-medium disabled:opacity-50" style={{ background: ACCENT }}>
+          <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} /> Synchroniser NS-API
+        </button>
       </div>
       <div className="pp-card overflow-hidden">
         <table className="w-full text-sm">
@@ -71,13 +90,13 @@ export default function PAMessages() {
             </tr>
           </thead>
           <tbody>
-            {rows.length === 0 ? <tr><td colSpan={6} className="p-8 text-center" style={{ color: "var(--pp-text-faint)" }}>Aucun message</td></tr> :
+            {rows.length === 0 ? <tr><td colSpan={6} className="p-8 text-center" style={{ color: "var(--pp-text-faint)" }}>Aucun message synchronisé. Lancez la synchronisation NS-API.</td></tr> :
               rows.map((m) => {
                 const out = m.direction === "outbound";
                 const Icon = out ? ArrowUpRight : ArrowDownLeft;
                 return (
                   <tr key={m.id} className="cursor-pointer hover:bg-white/[0.02]" style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }} onClick={() => openThread(m)}>
-                    <td className="p-3" style={{ color: "var(--pp-text-primary)" }}>{m.planipret_profiles?.full_name ?? "—"}</td>
+                    <td className="p-3" style={{ color: "var(--pp-text-primary)" }}>{brokerName(m)}</td>
                     <td><Icon className="w-3.5 h-3.5" style={{ color: out ? SUCCESS : ACCENT }} /></td>
                     <td style={{ color: "var(--pp-text-secondary)" }}>{m.from_number}</td>
                     <td style={{ color: "var(--pp-text-secondary)" }}>{m.to_number}</td>

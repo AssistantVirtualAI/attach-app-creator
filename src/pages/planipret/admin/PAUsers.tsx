@@ -9,6 +9,7 @@ const DANGER = "#E84C4C";
 
 type Profile = {
   user_id: string; email: string; full_name: string; extension: string;
+  ns_extension?: string | null;
   mobile_app_enabled: boolean; voice_agent_enabled: boolean;
   ns_domain: string; elevenlabs_agent_id: string | null;
   updated_at: string; created_at: string;
@@ -72,9 +73,12 @@ export default function PAUsers() {
 
     const start = new Date(); start.setDate(1); start.setHours(0, 0, 0, 0);
     const { data: calls } = await supabase.from("planipret_phone_calls")
-      .select("user_id").gte("started_at", start.toISOString());
+      .select("user_id, extension").gte("started_at", start.toISOString());
     const map: Record<string, number> = {};
-    (calls ?? []).forEach((c: any) => { map[c.user_id] = (map[c.user_id] ?? 0) + 1; });
+    (calls ?? []).forEach((c: any) => {
+      if (c.user_id) map[c.user_id] = (map[c.user_id] ?? 0) + 1;
+      if (c.extension) map[`ext:${c.extension}`] = (map[`ext:${c.extension}`] ?? 0) + 1;
+    });
     setCallsByUser(map);
     setLoading(false);
   };
@@ -179,6 +183,20 @@ export default function PAUsers() {
           )}
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={async () => {
+              const id = toast.loading("Synchronisation NS-API…");
+              try {
+                const { data, error } = await supabase.functions.invoke("pp-admin-ns-sync", { body: {} });
+                if (error) throw error;
+                toast.success(`${(data as any)?.extensions ?? (data as any)?.users_total ?? 0} extensions synchronisées · données en arrière-plan`, { id });
+                await load();
+              } catch (e: any) { toast.error(`Échec: ${e.message ?? e}`, { id }); }
+            }}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium"
+            style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>
+            <RefreshCw className="w-4 h-4" /> Synchroniser NS-API
+          </button>
           <div className="relative">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--pp-text-muted)" }} />
             <input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
@@ -266,11 +284,14 @@ export default function PAUsers() {
                     e.target.checked ? ns.add(u.user_id) : ns.delete(u.user_id);
                     setSelected(ns);
                   }} /></td>
-                  <td className="p-3" style={{ fontWeight: 500, color: "var(--pp-text-primary)" }}>{u.full_name}</td>
+                  <td className="p-3" style={{ fontWeight: 500, color: "var(--pp-text-primary)" }}>
+                    {u.full_name}
+                    {u.ns_only && <span className="ml-2 px-1.5 py-0.5 rounded" style={{ fontSize: 9, background: `${ACCENT}18`, color: ACCENT, border: `1px solid ${ACCENT}33` }}>NS</span>}
+                  </td>
                   <td className="p-3" style={{ color: "var(--pp-text-secondary)" }}>{u.email}</td>
                   <td className="p-3 tabular-nums" style={{ color: "var(--pp-text-secondary)" }}>{u.extension}</td>
-                  <td className="p-3"><Toggle on={u.mobile_app_enabled} loading={savingId === u.user_id} onChange={() => toggleField(u, "mobile_app_enabled")} /></td>
-                  <td className="p-3"><Toggle on={u.voice_agent_enabled} loading={savingId === u.user_id} onChange={() => toggleField(u, "voice_agent_enabled")} /></td>
+                  <td className="p-3"><Toggle on={u.mobile_app_enabled} disabled={u.ns_only} loading={savingId === u.user_id} onChange={() => !u.ns_only && toggleField(u, "mobile_app_enabled")} /></td>
+                  <td className="p-3"><Toggle on={u.voice_agent_enabled} disabled={u.ns_only} loading={savingId === u.user_id} onChange={() => !u.ns_only && toggleField(u, "voice_agent_enabled")} /></td>
                   <td className="p-3">
                     {u.dnd_enabled ? (
                       <button
@@ -289,12 +310,12 @@ export default function PAUsers() {
                       <span style={{ fontSize: 11, color: "var(--pp-text-faint)" }}>—</span>
                     )}
                   </td>
-                  <td className="p-3 tabular-nums" style={{ color: "var(--pp-text-primary)" }}>{callsByUser[u.user_id] ?? 0}</td>
+                  <td className="p-3 tabular-nums" style={{ color: "var(--pp-text-primary)" }}>{callsByUser[u.user_id] ?? callsByUser[`ext:${u.extension}`] ?? 0}</td>
                   <td className="p-3" style={{ fontSize: 11, color: "var(--pp-text-faint)" }}>{u.updated_at ? new Date(u.updated_at).toLocaleString("fr-CA", { dateStyle: "short", timeStyle: "short" }) : "—"}</td>
                   <td className="p-3 flex items-center gap-1">
-                    <button onClick={() => setEditUser(u)} className="p-1.5 rounded hover:bg-white/[0.05]" title="Modifier"><Edit3 className="w-3.5 h-3.5" style={{ color: "var(--pp-text-muted)" }} /></button>
+                    <button disabled={u.ns_only} onClick={() => setEditUser(u)} className="p-1.5 rounded hover:bg-white/[0.05] disabled:opacity-30" title={u.ns_only ? "Courtier NS non lié" : "Modifier"}><Edit3 className="w-3.5 h-3.5" style={{ color: "var(--pp-text-muted)" }} /></button>
                     <a href="/mplanipret" target="_blank" rel="noopener" className="p-1.5 rounded hover:bg-white/[0.05]" title="Prévisualiser"><ExternalLink className="w-3.5 h-3.5" style={{ color: "var(--pp-text-muted)" }} /></a>
-                    <button onClick={() => setDelUser(u)} className="p-1.5 rounded hover:bg-red-500/10" title="Supprimer"><Trash2 className="w-3.5 h-3.5" style={{ color: DANGER }} /></button>
+                    <button disabled={u.ns_only} onClick={() => setDelUser(u)} className="p-1.5 rounded hover:bg-red-500/10 disabled:opacity-30" title={u.ns_only ? "Courtier NS non lié" : "Supprimer"}><Trash2 className="w-3.5 h-3.5" style={{ color: DANGER }} /></button>
                   </td>
                 </tr>
               ))}
@@ -318,10 +339,10 @@ export default function PAUsers() {
   );
 }
 
-function Toggle({ on, loading, onChange }: { on: boolean; loading?: boolean; onChange: () => void }) {
+function Toggle({ on, loading, disabled, onChange }: { on: boolean; loading?: boolean; disabled?: boolean; onChange: () => void }) {
   return (
-    <button onClick={onChange} disabled={loading}
-      className={`w-10 h-6 rounded-full p-0.5 transition ${loading ? "opacity-60" : ""}`}
+    <button onClick={onChange} disabled={loading || disabled}
+      className={`w-10 h-6 rounded-full p-0.5 transition ${loading || disabled ? "opacity-60" : ""}`}
       style={{ background: on ? ACCENT : "var(--pp-bg-elevated)", border: `1px solid ${on ? ACCENT : "var(--pp-bg-border-2)"}` }}>
       <span className={`block w-4 h-4 rounded-full bg-white shadow transition-transform ${on ? "translate-x-4" : ""}`} />
     </button>
