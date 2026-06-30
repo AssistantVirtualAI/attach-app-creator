@@ -199,7 +199,7 @@ Deno.serve(async (req) => {
       // Idempotent: upsert on call_record_id so concurrent runs don't
       // create a window where readers see "no transcript".
       await admin.from("pbx_call_transcripts").upsert({
-        organization_id, call_record_id, transcript_text: text, provider, language: "fr",
+        organization_id, call_record_id, transcript_text: text, provider, language: transcriptLanguage,
       }, { onConflict: "call_record_id" });
       await persistTranscriptOnCall(text, provider);
       // Broadcast so any client (mobile/desktop/portal) updates instantly
