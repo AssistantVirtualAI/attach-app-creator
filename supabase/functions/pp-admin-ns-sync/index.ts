@@ -151,7 +151,7 @@ async function tryPaths(paths: string[]) {
 async function upsertProfiles(admin: ReturnType<typeof createClient>, domain: string, users: any[]) {
   const { data: profiles } = await admin
     .from("planipret_profiles")
-    .select("user_id,email,extension,ns_extension,full_name,metadata")
+    .select("id,user_id,email,extension,ns_extension,full_name,metadata")
     .eq("organization_id", AVA_ORG_ID);
 
   const byExt = new Map<string, any>();
@@ -163,33 +163,63 @@ async function upsertProfiles(admin: ReturnType<typeof createClient>, domain: st
   }
 
   let matched = 0;
-  const patches: Array<{ user_id: string; patch: any }> = [];
+  let created = 0;
+  const patches: Array<{ id: string; patch: any }> = [];
+  const inserts: any[] = [];
   for (const u of users) {
     const ext = userExt(u);
     if (!ext) continue;
     const email = userEmail(u);
+    const name = userName(u, ext);
+    const sipUser = String(val(u, ["login-username", "login_username", "sip_username"], ext));
     const existing = byExt.get(ext) ?? (email ? byEmail.get(email) : null);
-    if (!existing?.user_id) continue;
-    matched++;
-    patches.push({
-      user_id: existing.user_id,
-      patch: {
-        extension: existing.extension ?? ext,
+    if (existing) {
+      matched++;
+      patches.push({
+        id: existing.id,
+        patch: {
+          extension: existing.extension ?? ext,
+          ns_extension: ext,
+          ns_domain: domain,
+          ns_sip_username: sipUser,
+          ns_linked: existing.user_id ? true : false,
+          ns_linked_at: existing.user_id ? new Date().toISOString() : null,
+          full_name: existing.full_name ?? name,
+          email: existing.email ?? (email || null),
+          metadata: { ...(existing.metadata ?? {}), ns_user: u },
+        },
+      });
+    } else {
+      created++;
+      inserts.push({
+        organization_id: AVA_ORG_ID,
+        user_id: null,
+        full_name: name,
+        email: email || null,
+        extension: ext,
         ns_extension: ext,
         ns_domain: domain,
-        ns_sip_username: val(u, ["login-username", "login_username", "sip_username"], ext),
-        ns_linked: true,
-        ns_linked_at: new Date().toISOString(),
-        metadata: { ...(existing.metadata ?? {}), ns_user: u },
-      },
-    });
+        ns_sip_username: sipUser,
+        ns_linked: false,
+        metadata: { ns_user: u, source: "pp-admin-ns-sync" },
+      });
+    }
   }
 
   for (let i = 0; i < patches.length; i += 25) {
     const chunk = patches.slice(i, i + 25);
-    await Promise.all(chunk.map(({ user_id, patch }) => admin.from("planipret_profiles").update(patch).eq("user_id", user_id)));
+    await Promise.all(chunk.map(({ id, patch }) =>
+      admin.from("planipret_profiles").update(patch).eq("id", id)
+    ));
   }
-  return { matched };
+  for (let i = 0; i < inserts.length; i += 50) {
+    const chunk = inserts.slice(i, i + 50);
+    const { error } = await admin
+      .from("planipret_profiles")
+      .upsert(chunk, { onConflict: "organization_id,ns_extension", ignoreDuplicates: false });
+    if (error) console.error("[upsertProfiles] insert error:", error.message);
+  }
+  return { matched, created };
 }
 
 async function syncCalls(admin: ReturnType<typeof createClient>, domain: string, users: any[], start: string, end: string) {
