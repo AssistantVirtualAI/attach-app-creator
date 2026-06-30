@@ -8323,6 +8323,48 @@ export type Database = {
           },
         ]
       }
+      planipret_ns_server_capabilities: {
+        Row: {
+          created_at: string
+          detail: string | null
+          domain: string
+          endpoint: string | null
+          feature: string
+          id: string
+          last_probed_at: string
+          metadata: Json
+          sample_count: number | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          detail?: string | null
+          domain: string
+          endpoint?: string | null
+          feature: string
+          id?: string
+          last_probed_at?: string
+          metadata?: Json
+          sample_count?: number | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          detail?: string | null
+          domain?: string
+          endpoint?: string | null
+          feature?: string
+          id?: string
+          last_probed_at?: string
+          metadata?: Json
+          sample_count?: number | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       planipret_phone_calls: {
         Row: {
           ai_client_insights: Json | null
@@ -9140,6 +9182,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      planipret_sync_progress: {
+        Row: {
+          created_at: string
+          finished_at: string | null
+          id: string
+          job_id: string
+          kind: string
+          message: string | null
+          metadata: Json
+          processed: number
+          started_at: string
+          status: string
+          step: string | null
+          total: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          finished_at?: string | null
+          id?: string
+          job_id: string
+          kind: string
+          message?: string | null
+          metadata?: Json
+          processed?: number
+          started_at?: string
+          status?: string
+          step?: string | null
+          total?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          finished_at?: string | null
+          id?: string
+          job_id?: string
+          kind?: string
+          message?: string | null
+          metadata?: Json
+          processed?: number
+          started_at?: string
+          status?: string
+          step?: string | null
+          total?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       planipret_team_messages: {
         Row: {
