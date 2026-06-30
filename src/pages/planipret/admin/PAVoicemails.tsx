@@ -1,33 +1,73 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Play, X, Check } from "lucide-react";
 import { toast } from "sonner";
+import Pagination from "@/components/planipret/admin/Pagination";
+import DebugPanel, { type DebugEntry } from "@/components/planipret/admin/DebugPanel";
+import { TableEmptyState, TableErrorState } from "@/components/planipret/admin/TableStates";
 
 const ACCENT = "#2E9BDC";
 
-const PAGE = 50;
-
 export default function PAVoicemails() {
+  const [params, setParams] = useSearchParams();
+  const page = Math.max(1, parseInt(params.get("page") ?? "1", 10) || 1);
+  const pageSizeRaw = parseInt(params.get("pageSize") ?? params.get("ps") ?? "25", 10);
+  const pageSize = [25, 50, 100].includes(pageSizeRaw) ? pageSizeRaw : 25;
+  const status = params.get("status") ?? "";
+  const search = params.get("search") ?? "";
+  const from = params.get("from") ?? "";
+  const to = params.get("to") ?? "";
+  const updateParams = (patch: Record<string, string | null>, resetPage = false) => {
+    const next = new URLSearchParams(params);
+    Object.entries(patch).forEach(([k, v]) => { if (v == null || v === "") next.delete(k); else next.set(k, v); });
+    if (resetPage) next.set("page", "1");
+    setParams(next, { replace: true });
+  };
+  const setPage = (p: number) => updateParams({ page: String(p) });
+  const setPageSize = (s: number) => updateParams({ pageSize: String(s), ps: null }, true);
+  const setFilterValue = (key: "status" | "search" | "from" | "to", value: string) => updateParams({ [key]: value }, true);
+  const resetFilters = () => updateParams({ status: null, search: null, from: null, to: null }, true);
   const [rows, setRows] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [debug, setDebug] = useState<DebugEntry[]>([]);
   const [detail, setDetail] = useState<any | null>(null);
+  const hasFilters = !!(status || search || from || to);
 
-  const load = async (p = page) => {
-    const fromIdx = (p - 1) * PAGE;
-    const { data, count } = await supabase.from("planipret_voicemails")
-      .select("*, planipret_profiles!inner(full_name)", { count: "exact" })
+  const load = async (p = page, ps = pageSize) => {
+    setLoading(true);
+    setLoadError(null);
+    const fromIdx = (p - 1) * ps;
+    const t0 = performance.now();
+    let q = supabase.from("planipret_voicemails")
+      .select("*, planipret_profiles(full_name)", { count: "exact" })
       .order("created_at", { ascending: false })
-      .range(fromIdx, fromIdx + PAGE - 1);
-    setRows(data ?? []);
-    setTotal(count ?? 0);
+      .range(fromIdx, fromIdx + ps - 1);
+    if (status === "read") q = q.eq("is_read", true);
+    if (status === "unread") q = q.eq("is_read", false);
+    if (from) q = q.gte("created_at", from);
+    if (to) q = q.lte("created_at", to);
+    if (search) q = q.or(`from_number.ilike.%${search}%,transcript.ilike.%${search}%`);
+    const { data, count, error } = await q;
+    setDebug([{ label: "planipret_voicemails (page)", query: `SELECT * FROM planipret_voicemails ORDER BY created_at DESC LIMIT ${ps} OFFSET ${fromIdx}`, count, ms: Math.round(performance.now() - t0), error: error?.message ?? null, meta: { status, search, from, to }, sample: (data ?? []).slice(0, 3) }]);
+    if (error) {
+      setLoadError(error.message);
+      setRows([]);
+      setTotal(0);
+    } else {
+      setRows(data ?? []);
+      setTotal(count ?? 0);
+    }
+    setLoading(false);
   };
 
-  useEffect(() => { load(page); /* eslint-disable-next-line */ }, [page]);
+  useEffect(() => { load(page, pageSize); /* eslint-disable-next-line */ }, [page, pageSize, status, search, from, to]);
 
   useEffect(() => {
     const ch = supabase.channel("admin-voicemails")
-      .on("postgres_changes", { event: "*", schema: "public", table: "planipret_voicemails" }, () => load(1))
+      .on("postgres_changes", { event: "*", schema: "public", table: "planipret_voicemails" }, () => load(page, pageSize))
       .subscribe();
     return () => { supabase.removeChannel(ch); };
     // eslint-disable-next-line
@@ -43,7 +83,20 @@ export default function PAVoicemails() {
 
   return (
     <div className="space-y-4">
+      <DebugPanel entries={debug} />
+      <div className="pp-card p-4 flex items-center gap-2 flex-wrap">
+        <input value={search} onChange={(e) => setFilterValue("search", e.target.value)} placeholder="Rechercher numéro/transcription…" className="px-3 py-2 rounded-lg text-sm w-64" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }} />
+        <select value={status} onChange={(e) => setFilterValue("status", e.target.value)} className="px-3 py-2 rounded-lg text-sm" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }}>
+          <option value="">Tous statuts</option>
+          <option value="unread">Non lus</option>
+          <option value="read">Lus</option>
+        </select>
+        <input type="date" value={from} onChange={(e) => setFilterValue("from", e.target.value)} className="px-3 py-2 rounded-lg text-sm" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }} />
+        <input type="date" value={to} onChange={(e) => setFilterValue("to", e.target.value)} className="px-3 py-2 rounded-lg text-sm" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }} />
+        {hasFilters && <button onClick={resetFilters} className="px-2 py-1.5 text-xs underline" style={{ color: "var(--pp-text-muted)" }}>✕ Réinitialiser</button>}
+      </div>
       <div className="pp-card overflow-hidden">
+        {loadError && <TableErrorState message={loadError} onRetry={() => load(page, pageSize)} />}
         <table className="w-full text-sm">
           <thead style={{ background: "var(--pp-bg-elevated)" }}>
             <tr style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--pp-text-faint)" }} className="text-left">
@@ -51,7 +104,9 @@ export default function PAVoicemails() {
             </tr>
           </thead>
           <tbody>
-            {rows.length === 0 ? <tr><td colSpan={7} className="p-8 text-center" style={{ color: "var(--pp-text-faint)" }}>Aucun voicemail</td></tr> :
+            {loading ? Array.from({ length: 6 }).map((_, i) => (
+              <tr key={i} style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}>{Array.from({ length: 7 }).map((_, j) => <td key={j} className="p-3"><div className="h-3 w-3/4 animate-pulse rounded" style={{ background: "var(--pp-bg-elevated)" }} /></td>)}</tr>
+            )) : rows.length === 0 ? <tr><td colSpan={7}><TableEmptyState icon="📬" title="Aucun message vocal" hint={hasFilters ? "Essayez d'élargir vos critères de recherche." : "Aucun voicemail synchronisé pour le moment."} action={hasFilters ? <button onClick={resetFilters} className="px-3 py-1.5 rounded-lg text-xs font-medium text-white" style={{ background: ACCENT }}>Réinitialiser les filtres</button> : undefined} /></td></tr> :
               rows.map((v) => (
                 <tr key={v.id} className="hover:bg-white/[0.02]" style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}>
                   <td className="p-3" style={{ color: "var(--pp-text-primary)" }}>{v.planipret_profiles?.full_name ?? "—"}</td>
@@ -78,14 +133,7 @@ export default function PAVoicemails() {
               ))}
           </tbody>
         </table>
-        <div className="flex items-center justify-between px-4 py-3" style={{ borderTop: "1px solid var(--pp-bg-border-2)", fontSize: 11, color: "var(--pp-text-muted)" }}>
-          <span>{total === 0 ? 0 : (page - 1) * PAGE + 1}–{Math.min(page * PAGE, total)} sur {total}</span>
-          <div className="flex gap-1">
-            <button disabled={page === 1} onClick={() => setPage(page - 1)} className="px-2 py-1 rounded disabled:opacity-40" style={{ border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>←</button>
-            <span className="px-3 py-1">{page} / {Math.max(1, Math.ceil(total / PAGE))}</span>
-            <button disabled={page >= Math.ceil(total / PAGE)} onClick={() => setPage(page + 1)} className="px-2 py-1 rounded disabled:opacity-40" style={{ border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>→</button>
-          </div>
-        </div>
+        <Pagination page={page} pageSize={pageSize} total={total} loading={loading} onPageChange={setPage} onPageSizeChange={setPageSize} unit="voicemails" />
 
       </div>
       {detail && (
