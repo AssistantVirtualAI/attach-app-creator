@@ -1088,7 +1088,7 @@ const App = () => (
                   <Route path="extensions" element={<LemtelOrgOnly fallback="/customer"><LemtelExtensions /></LemtelOrgOnly>} />
                   <Route path="queues" element={<LemtelOrgOnly fallback="/customer"><LemtelQueues /></LemtelOrgOnly>} />
                   <Route path="ivr" element={<LemtelOrgOnly fallback="/customer"><LemtelIVR /></LemtelOrgOnly>} />
-                  <Route path="numbers" element={<LemtelOrgOnly fallback="/customer"><PhoneNumbers /></LemtelOrgOnly>} />
+                  <Route path="numbers" element={<Navigate to="/lemtel/dids" replace />} />
                   <Route path="calls" element={<LemtelOrgOnly fallback="/customer"><TelephonyMediaCenter scope="org" /></LemtelOrgOnly>} />
                   <Route path="cdrs" element={<LemtelOrgOnly fallback="/customer"><LemtelPortalCalls /></LemtelOrgOnly>} />
                   <Route path="recordings" element={<LemtelOrgOnly fallback="/customer"><AdminRecordings /></LemtelOrgOnly>} />
