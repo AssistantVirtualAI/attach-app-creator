@@ -43,6 +43,7 @@ const PAUsers = lazyWithRetry(() => import("./pages/planipret/admin/PAUsers"));
 const PACalls = lazyWithRetry(() => import("./pages/planipret/admin/PACalls"));
 const PAMessages = lazyWithRetry(() => import("./pages/planipret/admin/PAMessages"));
 const PAVoicemails = lazyWithRetry(() => import("./pages/planipret/admin/PAVoicemails"));
+const PARecordings = lazyWithRetry(() => import("./pages/planipret/admin/PARecordings"));
 const PAReports = lazyWithRetry(() => import("./pages/planipret/admin/PAReports"));
 const PAAuditLog = lazyWithRetry(() => import("./pages/planipret/admin/PAAuditLog"));
 const PAAuditChecklist = lazyWithRetry(() => import("./pages/planipret/admin/PAAuditChecklist"));
@@ -434,7 +435,8 @@ const App = () => (
                   <Route path="users" element={<Suspense fallback={<AdminPageSkeleton />}><PAUsers /></Suspense>} />
                   <Route path="calls" element={<Suspense fallback={<AdminPageSkeleton />}><PACalls /></Suspense>} />
                   <Route path="messages" element={<Suspense fallback={<AdminPageSkeleton />}><PAMessages /></Suspense>} />
-                  <Route path="voicemails" element={<Suspense fallback={<AdminPageSkeleton />}><PAVoicemails /></Suspense>} />
+                  <Route path="voicemails" element={<Navigate to="/planipret/admin/recordings" replace />} />
+                  <Route path="recordings" element={<Suspense fallback={<AdminPageSkeleton />}><PARecordings /></Suspense>} />
                   <Route path="reports" element={<Suspense fallback={<AdminPageSkeleton />}><PAReports /></Suspense>} />
                   <Route path="audit" element={<Suspense fallback={<AdminPageSkeleton />}><PAAuditLog /></Suspense>} />
                   <Route path="audit-checklist" element={<Suspense fallback={<AdminPageSkeleton />}><PAAuditChecklist /></Suspense>} />
