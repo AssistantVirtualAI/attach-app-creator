@@ -324,6 +324,15 @@ export default function AdminRecordings({ scope = 'org' }: { scope?: 'org' | 'mi
           </Select>
           <Input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className="w-[150px]" />
           <Input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className="w-[150px]" />
+          <Select value={transcribeLang} onValueChange={(v) => setTranscribeLang(v as 'fr' | 'en')}>
+            <SelectTrigger className="w-[140px]" title="Transcription language for coaching/transcripts">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="fr">🇫🇷 Français</SelectItem>
+              <SelectItem value="en">🇬🇧 English</SelectItem>
+            </SelectContent>
+          </Select>
           <Button variant="outline" size="sm" onClick={exportCsv} disabled={filtered.length === 0}>
             <FileDown className="h-4 w-4 mr-2" />CSV
           </Button>
