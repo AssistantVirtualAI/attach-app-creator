@@ -72,14 +72,16 @@ async function processOne(row: QueueRow) {
   const password = row.sip_password || randomPassword();
 
 
-  // Find existing auth user by email.
+  // Find existing auth user by email (paginated).
   let userId: string | null = null;
-  const { data: existing } = await admin.auth.admin.listUsers({
-    page: 1, perPage: 200,
-  });
-  const match = existing?.users?.find(
-    (u: any) => (u.email || "").toLowerCase() === email,
-  );
+  let match: any = null;
+  for (let page = 1; page <= 20; page++) {
+    const { data: existing } = await admin.auth.admin.listUsers({ page, perPage: 200 });
+    const users = existing?.users ?? [];
+    match = users.find((u: any) => (u.email || "").toLowerCase() === email);
+    if (match || users.length < 200) break;
+  }
+
 
   if (match) {
     userId = match.id;
