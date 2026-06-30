@@ -30,6 +30,7 @@ async function nsFetch(path: string) {
 
 async function fetchAll(basePath: string, pageSize = 200, maxPages = 30) {
   const all: any[] = [];
+  const seen = new Set<string>();
   let warning: string | null = null;
   for (let i = 0; i < maxPages; i++) {
     const sep = basePath.includes("?") ? "&" : "?";
@@ -39,7 +40,21 @@ async function fetchAll(basePath: string, pageSize = 200, maxPages = 30) {
       break;
     }
     const arr = Array.isArray(r.data) ? r.data : (r.data?.data ?? r.data?.users ?? r.data?.cdrs ?? r.data?.messages ?? r.data?.items ?? []);
-    all.push(...arr);
+    let added = 0;
+    for (const item of arr) {
+      const key = String(
+        val(item, [
+          "user", "extension", "subscriber_login", "user_id", "id", "uuid",
+          "call_id", "call-id", "cdr_id", "cdr-id", "orig-callid", "orig_callid",
+          "message_id", "message-id", "recording_id", "recording-id",
+        ], JSON.stringify(item).slice(0, 300)),
+      );
+      if (seen.has(key)) continue;
+      seen.add(key);
+      all.push(item);
+      added++;
+    }
+    if (added === 0) break;
     if (arr.length < pageSize) break;
   }
   return { data: all, warning };
