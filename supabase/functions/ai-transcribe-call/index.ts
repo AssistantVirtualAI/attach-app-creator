@@ -461,7 +461,7 @@ Deno.serve(async (req) => {
       const fd = new FormData();
       fd.append("model", "whisper-1");
       fd.append("file", new Blob([audioBytes!], { type: audioMime }), `recording.${ext}`);
-      fd.append("language", "fr");
+      fd.append("language", transcriptLanguage);
       fd.append("response_format", "json");
       fd.append("temperature", "0");
       fd.append("prompt", sttPrompt);
