@@ -151,7 +151,7 @@ async function tryPaths(paths: string[]) {
 async function upsertProfiles(admin: ReturnType<typeof createClient>, domain: string, users: any[]) {
   const { data: profiles } = await admin
     .from("planipret_profiles")
-    .select("user_id,email,extension,ns_extension,full_name,metadata")
+    .select("id,user_id,email,extension,ns_extension,full_name,metadata")
     .eq("organization_id", AVA_ORG_ID);
 
   const byExt = new Map<string, any>();
@@ -163,48 +163,86 @@ async function upsertProfiles(admin: ReturnType<typeof createClient>, domain: st
   }
 
   let matched = 0;
-  const patches: Array<{ user_id: string; patch: any }> = [];
+  let created = 0;
+  const patches: Array<{ id: string; patch: any }> = [];
+  const inserts: any[] = [];
   for (const u of users) {
     const ext = userExt(u);
     if (!ext) continue;
     const email = userEmail(u);
+    const name = userName(u, ext);
+    const sipUser = String(val(u, ["login-username", "login_username", "sip_username"], ext));
     const existing = byExt.get(ext) ?? (email ? byEmail.get(email) : null);
-    if (!existing?.user_id) continue;
-    matched++;
-    patches.push({
-      user_id: existing.user_id,
-      patch: {
-        extension: existing.extension ?? ext,
+    if (existing) {
+      matched++;
+      patches.push({
+        id: existing.id,
+        patch: {
+          extension: existing.extension ?? ext,
+          ns_extension: ext,
+          ns_domain: domain,
+          ns_sip_username: sipUser,
+          ns_linked: existing.user_id ? true : false,
+          ns_linked_at: existing.user_id ? new Date().toISOString() : null,
+          full_name: existing.full_name ?? name,
+          email: existing.email ?? (email || null),
+          metadata: { ...(existing.metadata ?? {}), ns_user: u },
+        },
+      });
+    } else {
+      created++;
+      inserts.push({
+        organization_id: AVA_ORG_ID,
+        user_id: null,
+        full_name: name,
+        email: email || null,
+        extension: ext,
         ns_extension: ext,
         ns_domain: domain,
-        ns_sip_username: val(u, ["login-username", "login_username", "sip_username"], ext),
-        ns_linked: true,
-        ns_linked_at: new Date().toISOString(),
-        metadata: { ...(existing.metadata ?? {}), ns_user: u },
-      },
-    });
+        ns_sip_username: sipUser,
+        ns_linked: false,
+        metadata: { ns_user: u, source: "pp-admin-ns-sync" },
+      });
+    }
   }
 
   for (let i = 0; i < patches.length; i += 25) {
     const chunk = patches.slice(i, i + 25);
-    await Promise.all(chunk.map(({ user_id, patch }) => admin.from("planipret_profiles").update(patch).eq("user_id", user_id)));
+    await Promise.all(chunk.map(({ id, patch }) =>
+      admin.from("planipret_profiles").update(patch).eq("id", id)
+    ));
   }
-  return { matched };
+  for (let i = 0; i < inserts.length; i += 50) {
+    const chunk = inserts.slice(i, i + 50);
+    const { error } = await admin
+      .from("planipret_profiles")
+      .upsert(chunk, { onConflict: "organization_id,ns_extension", ignoreDuplicates: false });
+    if (error) console.error("[upsertProfiles] insert error:", error.message);
+  }
+  return { matched, created };
 }
 
 async function syncCalls(admin: ReturnType<typeof createClient>, domain: string, users: any[], start: string, end: string) {
   const { data: profiles } = await admin
     .from("planipret_profiles")
-    .select("user_id,extension,ns_extension,full_name,email")
+    .select("id,extension,ns_extension")
     .eq("organization_id", AVA_ORG_ID);
-  const extToUser = new Map<string, string>();
+  const extToProfile = new Map<string, string>();
   for (const p of profiles ?? []) {
     const ext = String(p.extension ?? p.ns_extension ?? "").trim();
-    if (ext && p.user_id) extToUser.set(ext, p.user_id);
+    if (ext && p.id) extToProfile.set(ext, p.id as string);
   }
 
+
   const D = encodeURIComponent(domain);
-  const domainCdrs = await fetchAll(`/domains/${D}/cdrs?start_time=${encodeURIComponent(start)}&end_time=${encodeURIComponent(end)}`, 200, 50);
+  // NS-API v2 (docs.ns-api.com) uses hyphenated query parameter names: start-time, end-time.
+  // Canonical path is /cdrs (root) with domain filter; /domains/{D}/cdrs is supported on most
+  // installs and /domains/{D}/users/{ext}/cdrs is the per-user fallback documented in the spec.
+  const qs = `start-time=${encodeURIComponent(start)}&end-time=${encodeURIComponent(end)}`;
+  let domainCdrs = await fetchAll(`/cdrs?domain=${D}&${qs}`, 200, 50);
+  if (!domainCdrs.data.length) {
+    domainCdrs = await fetchAll(`/domains/${D}/cdrs?${qs}`, 200, 50);
+  }
   const rawItems: Array<{ item: any; ext?: string }> = [];
   for (const c of domainCdrs.data) rawItems.push({ item: c, ext: String(val(c, ["user", "orig-user", "term-user", "extension"], "")) || undefined });
 
@@ -213,12 +251,13 @@ async function syncCalls(admin: ReturnType<typeof createClient>, domain: string,
     for (let i = 0; i < extensions.length; i += 12) {
       const chunk = extensions.slice(i, i + 12);
       const results = await Promise.all(chunk.map(async (ext) => {
-        const r = await fetchAll(`/domains/${D}/users/${encodeURIComponent(ext)}/cdrs?start_time=${encodeURIComponent(start)}&end_time=${encodeURIComponent(end)}`, 200, 10);
+        const r = await fetchAll(`/domains/${D}/users/${encodeURIComponent(ext)}/cdrs?${qs}`, 200, 10);
         return { ext, data: r.data, warning: r.warning };
       }));
       for (const r of results) for (const item of r.data) rawItems.push({ item, ext: r.ext });
     }
   }
+
 
   const rows: any[] = [];
   for (const { item: c, ext: fallbackExt } of rawItems) {
@@ -227,7 +266,7 @@ async function syncCalls(admin: ReturnType<typeof createClient>, domain: string,
     const ext = String(val(c, ["user", "orig-user", "term-user", "extension", "subscriber"], fallbackExt ?? "")).trim();
     const started = toIso(val(c, ["time-start", "start-time", "start_time", "started_at", "date", "created_at"]));
     rows.push({
-      user_id: extToUser.get(ext) ?? null,
+      user_id: extToProfile.get(ext) ?? null,
       organization_id: AVA_ORG_ID,
       ns_call_id: id,
       ns_domain: domain,
@@ -267,8 +306,8 @@ async function syncMessages(admin: ReturnType<typeof createClient>, domain: stri
   // first as a fast-path, then fall back to per-user session enumeration.
   // curl equivalent: GET https://{server}/ns-api/v2/domains/{D}/users/{ext}/messagesessions
   let r = await tryPaths([
-    `/domains/${D}/messages?start_time=${encodeURIComponent(start)}&end_time=${encodeURIComponent(end)}`,
-    `/domains/${D}/sms?start_time=${encodeURIComponent(start)}&end_time=${encodeURIComponent(end)}`,
+    `/domains/${D}/messages?start-time=${encodeURIComponent(start)}&end-time=${encodeURIComponent(end)}`,
+    `/domains/${D}/sms?start-time=${encodeURIComponent(start)}&end-time=${encodeURIComponent(end)}`,
   ]);
   if (!r.data.length && users.length) {
     const collected: any[] = [];
@@ -291,11 +330,11 @@ async function syncMessages(admin: ReturnType<typeof createClient>, domain: stri
   if (!r.data.length) return { fetched: 0, upserted: 0, warning: r.warning ?? "messages_endpoint_empty" };
 
 
-  const { data: profiles } = await admin.from("planipret_profiles").select("user_id,extension,ns_extension").eq("organization_id", AVA_ORG_ID);
-  const extToUser = new Map<string, string>();
+  const { data: profiles } = await admin.from("planipret_profiles").select("id,extension,ns_extension").eq("organization_id", AVA_ORG_ID);
+  const extToProfile = new Map<string, string>();
   for (const p of profiles ?? []) {
     const ext = String(p.extension ?? p.ns_extension ?? "").trim();
-    if (ext && p.user_id) extToUser.set(ext, p.user_id);
+    if (ext && p.id) extToProfile.set(ext, p.id as string);
   }
 
   const rows = r.data.map((m: any) => {
@@ -304,7 +343,7 @@ async function syncMessages(admin: ReturnType<typeof createClient>, domain: stri
     const dir = String(val(m, ["direction", "type"], "inbound")).toLowerCase().includes("out") ? "outbound" : "inbound";
     const peer = dir === "outbound" ? normalizePhone(val(m, ["to", "to_number", "to-number"])) : normalizePhone(val(m, ["from", "from_number", "from-number"]));
     return {
-      user_id: extToUser.get(ext) ?? null,
+      user_id: extToProfile.get(ext) ?? null,
       organization_id: AVA_ORG_ID,
       ns_message_id: mid,
       thread_id: String(val(m, ["thread_id", "thread-id"], `${ext}:${peer ?? mid}`)),
@@ -331,20 +370,20 @@ async function syncMessages(admin: ReturnType<typeof createClient>, domain: stri
 async function syncRecordings(admin: ReturnType<typeof createClient>, domain: string, users: any[], start: string, end: string) {
   const { data: profiles } = await admin
     .from("planipret_profiles")
-    .select("user_id,extension,ns_extension")
+    .select("id,extension,ns_extension")
     .eq("organization_id", AVA_ORG_ID);
-  const extToUser = new Map<string, string>();
+  const extToProfile = new Map<string, string>();
   for (const p of profiles ?? []) {
     const ext = String(p.extension ?? p.ns_extension ?? "").trim();
-    if (ext && p.user_id) extToUser.set(ext, p.user_id);
+    if (ext && p.id) extToProfile.set(ext, p.id as string);
   }
 
   const D = encodeURIComponent(domain);
   const rawItems: Array<{ item: any; ext?: string }> = [];
   const domainRecordings = await tryPaths([
-    `/domains/${D}/recordings?start_time=${encodeURIComponent(start)}&end_time=${encodeURIComponent(end)}`,
-    `/domains/${D}/call-recordings?start_time=${encodeURIComponent(start)}&end_time=${encodeURIComponent(end)}`,
-    `/domains/${D}/recorded-calls?start_time=${encodeURIComponent(start)}&end_time=${encodeURIComponent(end)}`,
+    `/domains/${D}/recordings?start-time=${encodeURIComponent(start)}&end-time=${encodeURIComponent(end)}`,
+    `/domains/${D}/call-recordings?start-time=${encodeURIComponent(start)}&end-time=${encodeURIComponent(end)}`,
+    `/domains/${D}/recorded-calls?start-time=${encodeURIComponent(start)}&end-time=${encodeURIComponent(end)}`,
   ]);
   for (const r of domainRecordings.data ?? []) rawItems.push({ item: r, ext: String(val(r, ["user", "extension", "orig-user", "term-user"], "")) || undefined });
 
@@ -354,9 +393,9 @@ async function syncRecordings(admin: ReturnType<typeof createClient>, domain: st
       const chunk = extensions.slice(i, i + 16);
       const results = await Promise.all(chunk.map(async (ext) => {
         const r = await tryPaths([
-          `/domains/${D}/users/${encodeURIComponent(ext)}/recordings?start_time=${encodeURIComponent(start)}&end_time=${encodeURIComponent(end)}`,
-          `/domains/${D}/users/${encodeURIComponent(ext)}/call-recordings?start_time=${encodeURIComponent(start)}&end_time=${encodeURIComponent(end)}`,
-          `/domains/${D}/users/${encodeURIComponent(ext)}/recorded-calls?start_time=${encodeURIComponent(start)}&end_time=${encodeURIComponent(end)}`,
+          `/domains/${D}/users/${encodeURIComponent(ext)}/recordings?start-time=${encodeURIComponent(start)}&end-time=${encodeURIComponent(end)}`,
+          `/domains/${D}/users/${encodeURIComponent(ext)}/call-recordings?start-time=${encodeURIComponent(start)}&end-time=${encodeURIComponent(end)}`,
+          `/domains/${D}/users/${encodeURIComponent(ext)}/recorded-calls?start-time=${encodeURIComponent(start)}&end-time=${encodeURIComponent(end)}`,
         ]);
         return { ext, data: r.data ?? [], warning: r.warning };
       }));
@@ -372,7 +411,7 @@ async function syncRecordings(admin: ReturnType<typeof createClient>, domain: st
     const ext = String(val(rec, ["user", "extension", "orig-user", "term-user", "subscriber"], fallbackExt ?? "")).trim();
     const started = toIso(val(rec, ["time-start", "start-time", "start_time", "started_at", "date", "created_at", "recorded_at", "recorded-at"]));
     rows.push({
-      user_id: extToUser.get(ext) ?? null,
+      user_id: extToProfile.get(ext) ?? null,
       organization_id: AVA_ORG_ID,
       ns_call_id: id,
       ns_domain: domain,
