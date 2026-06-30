@@ -353,3 +353,18 @@ function Stat({ label, value }: any) {
     </div>
   );
 }
+
+function StatTile({ icon, label, value, sub, color }: { icon: any; label: string; value: number | string; sub?: string; color: string }) {
+  return (
+    <div className="rounded-lg p-3 flex flex-col gap-1"
+      style={{ background: "var(--pp-bg-deep)", border: "1px solid var(--pp-bg-border-2)" }}>
+      <div className="flex items-center gap-1.5" style={{ color }}>
+        {icon}
+        <span style={{ fontSize: 10, color: "var(--pp-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>{label}</span>
+      </div>
+      <div className="tabular-nums" style={{ fontSize: 22, fontWeight: 700, color: "var(--pp-text-primary)", lineHeight: 1 }}>{value}</div>
+      {sub && <div style={{ fontSize: 10, color: "var(--pp-text-faint)" }}>{sub}</div>}
+    </div>
+  );
+}
+
