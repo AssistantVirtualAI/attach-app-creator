@@ -92,19 +92,20 @@ export async function getNsJwt(): Promise<string> {
   throw new Error(`NS-API auth failed: ${errors.join(" | ")}`);
 }
 
-export async function nsFetch(path: string, init: RequestInit = {}) {
+export async function nsFetch(path: string, init: RequestInit = {}, opts: { functionName?: string } = {}) {
   let token: string;
   try {
     token = await getNsJwt();
   } catch (e) {
-    // Degrade gracefully: return a synthetic 503 instead of throwing so callers
-    // can fall back to local data and avoid blank-screen 500s on the admin UI.
     return new Response(
       JSON.stringify({ error: (e as Error).message, degraded: true }),
       { status: 503, headers: { "Content-Type": "application/json" } },
     );
   }
   const url = `${nsBase()}/ns-api/v2${path}`;
+  const method = (init.method ?? "GET").toUpperCase();
+  const t0 = Date.now();
+  console.log(`[${opts.functionName ?? "nsFetch"}][NS] ${method} ${path}`);
   let res = await fetch(url, {
     ...init,
     headers: {
@@ -134,6 +135,26 @@ export async function nsFetch(path: string, init: RequestInit = {}) {
       );
     }
   }
+  // Fire & forget log to planipret_ns_request_log
+  try {
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const [pathOnly, qs] = path.split("?");
+    const query_params: Record<string, string> = {};
+    if (qs) for (const [k, v] of new URLSearchParams(qs)) query_params[k] = v;
+    admin.from("planipret_ns_request_log").insert({
+      function_name: opts.functionName ?? "shared",
+      method,
+      path: pathOnly,
+      query_params: qs ? query_params : null,
+      full_url: url,
+      status: res.status,
+      duration_ms: Date.now() - t0,
+      ok: res.ok,
+      error: res.ok ? null : `HTTP ${res.status}`,
+    }).then(() => {}, () => {});
+  } catch { /* ignore */ }
   return res;
 }
 

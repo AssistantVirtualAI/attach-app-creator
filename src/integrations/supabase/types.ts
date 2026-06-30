@@ -8084,6 +8084,42 @@ export type Database = {
         }
         Relationships: []
       }
+      planipret_edge_function_runs: {
+        Row: {
+          created_at: string
+          error: string | null
+          finished_at: string | null
+          function_name: string
+          id: string
+          started_at: string
+          status: string
+          summary: Json | null
+          triggered_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          error?: string | null
+          finished_at?: string | null
+          function_name: string
+          id?: string
+          started_at?: string
+          status?: string
+          summary?: Json | null
+          triggered_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          error?: string | null
+          finished_at?: string | null
+          function_name?: string
+          id?: string
+          started_at?: string
+          status?: string
+          summary?: Json | null
+          triggered_by?: string | null
+        }
+        Relationships: []
+      }
       planipret_elevenlabs_config: {
         Row: {
           id: string
@@ -8322,6 +8358,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      planipret_ns_request_log: {
+        Row: {
+          created_at: string
+          duration_ms: number | null
+          error: string | null
+          full_url: string | null
+          function_name: string
+          id: string
+          method: string
+          ok: boolean | null
+          path: string
+          query_params: Json | null
+          status: number | null
+        }
+        Insert: {
+          created_at?: string
+          duration_ms?: number | null
+          error?: string | null
+          full_url?: string | null
+          function_name: string
+          id?: string
+          method?: string
+          ok?: boolean | null
+          path: string
+          query_params?: Json | null
+          status?: number | null
+        }
+        Update: {
+          created_at?: string
+          duration_ms?: number | null
+          error?: string | null
+          full_url?: string | null
+          function_name?: string
+          id?: string
+          method?: string
+          ok?: boolean | null
+          path?: string
+          query_params?: Json | null
+          status?: number | null
+        }
+        Relationships: []
       }
       planipret_ns_server_capabilities: {
         Row: {

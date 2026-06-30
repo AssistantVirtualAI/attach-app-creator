@@ -18,14 +18,50 @@ function json(body: unknown, status = 200) {
   });
 }
 
+let _logClient: ReturnType<typeof createClient> | null = null;
+function logClient() {
+  if (!_logClient) _logClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  return _logClient;
+}
+function logNsRequest(entry: {
+  method: string; path: string; full_url: string; status: number; duration_ms: number; ok: boolean; error?: string | null;
+}) {
+  try {
+    const [pathOnly, qs] = entry.path.split("?");
+    const query_params: Record<string, string> = {};
+    if (qs) for (const [k, v] of new URLSearchParams(qs)) query_params[k] = v;
+    // fire & forget
+    logClient().from("planipret_ns_request_log").insert({
+      function_name: "pp-admin-ns-sync",
+      method: entry.method,
+      path: pathOnly,
+      query_params: qs ? query_params : null,
+      full_url: entry.full_url,
+      status: entry.status,
+      duration_ms: entry.duration_ms,
+      ok: entry.ok,
+      error: entry.error ?? null,
+    }).then(() => {}, () => {});
+  } catch { /* ignore */ }
+}
+
 async function nsFetch(path: string) {
-  const res = await fetch(`${NS_API_BASE_URL}${path}`, {
-    headers: { Authorization: `Bearer ${NS_API_KEY}`, Accept: "application/json" },
-  });
-  const text = await res.text();
-  let data: any = null;
-  try { data = text ? JSON.parse(text) : null; } catch { data = text; }
-  return { ok: res.ok, status: res.status, data, text };
+  const fullUrl = `${NS_API_BASE_URL}${path}`;
+  const t0 = Date.now();
+  console.log(`[pp-admin-ns-sync][NS] GET ${path}`);
+  try {
+    const res = await fetch(fullUrl, {
+      headers: { Authorization: `Bearer ${NS_API_KEY}`, Accept: "application/json" },
+    });
+    const text = await res.text();
+    let data: any = null;
+    try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+    logNsRequest({ method: "GET", path, full_url: fullUrl, status: res.status, duration_ms: Date.now() - t0, ok: res.ok, error: res.ok ? null : String(text).slice(0, 300) });
+    return { ok: res.ok, status: res.status, data, text };
+  } catch (e) {
+    logNsRequest({ method: "GET", path, full_url: fullUrl, status: 0, duration_ms: Date.now() - t0, ok: false, error: (e as Error).message });
+    throw e;
+  }
 }
 
 async function fetchAll(basePath: string, pageSize = 200, maxPages = 30) {
@@ -490,6 +526,19 @@ Deno.serve(async (req) => {
 
     const profileSync = await upsertProfiles(admin, domain, brokerUsers);
 
+    // Record run start (background completion updates it)
+    const { data: runRow } = await admin
+      .from("planipret_edge_function_runs")
+      .insert({
+        function_name: "pp-admin-ns-sync",
+        status: "running",
+        triggered_by: userData.user.id,
+        summary: { domain, users_total: brokerUsers.length, profiles_matched: profileSync.matched, profiles_created: profileSync.created, start, end },
+      })
+      .select("id")
+      .maybeSingle();
+    const runId = runRow?.id as string | undefined;
+
     const bg = (async () => {
       try {
         const calls = await syncCalls(admin, domain, brokerUsers, start, end);
@@ -497,9 +546,13 @@ Deno.serve(async (req) => {
           syncRecordings(admin, domain, brokerUsers, start, end),
           syncMessages(admin, domain, start, end, brokerUsers),
         ]);
-        console.log("[pp-admin-ns-sync] completed", JSON.stringify({ domain, users: brokerUsers.length, raw_users: usersRes.data.length, calls, recordings, messages }));
+        const summary = { domain, users: brokerUsers.length, raw_users: usersRes.data.length, profiles: profileSync, calls, recordings, messages, start, end };
+        console.log("[pp-admin-ns-sync] completed", JSON.stringify(summary));
+        if (runId) await admin.from("planipret_edge_function_runs").update({ status: "success", finished_at: new Date().toISOString(), summary }).eq("id", runId);
       } catch (e) {
-        console.error("[pp-admin-ns-sync] background error", (e as Error).message);
+        const msg = (e as Error).message;
+        console.error("[pp-admin-ns-sync] background error", msg);
+        if (runId) await admin.from("planipret_edge_function_runs").update({ status: "error", finished_at: new Date().toISOString(), error: msg }).eq("id", runId);
       }
     })();
     // @ts-ignore EdgeRuntime global exists in deployed edge runtime.
@@ -511,11 +564,13 @@ Deno.serve(async (req) => {
     return json({
       ok: true,
       status: "queued",
+      run_id: runId,
       domain,
       users_total: brokerUsers.length,
       raw_users_total: usersRes.data.length,
       extensions: brokerUsers.map(userExt).filter(Boolean).length,
       profiles_matched: profileSync.matched,
+      profiles_created: profileSync.created,
       cdr: { status: "queued_in_background", start, end },
       recordings: { status: "queued_in_background" },
       messages: { status: "queued_in_background" },

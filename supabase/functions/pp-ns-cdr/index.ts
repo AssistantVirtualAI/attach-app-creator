@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
     `?start-time=${encodeURIComponent(start)}&end-time=${encodeURIComponent(end)}&limit=${limit}`;
 
   try {
-    const res = await nsFetch(nsPath, { method: "GET" });
+    const res = await nsFetch(nsPath, { method: "GET" }, { functionName: "pp-ns-cdr" });
     if (!res.ok) {
       const txt = await res.text();
       return jsonResponse({ error: "NS-API CDR fetch failed", status: res.status, body: txt }, 502);
@@ -73,6 +73,18 @@ Deno.serve(async (req) => {
     }
 
     if (action === "sync") {
+      const { data: runRow } = await supabase
+        .from("planipret_edge_function_runs")
+        .insert({
+          function_name: "pp-ns-cdr",
+          status: "running",
+          triggered_by: ctx.userId,
+          summary: { extension: ctx.extension, domain: ctx.nsDomain, start, end, fetched: items.length },
+        })
+        .select("id")
+        .maybeSingle();
+      const runId = runRow?.id as string | undefined;
+
       const rows = items.map((it) => ({
         user_id: ctx.userId,
         organization_id: AVA_ORG_ID,
@@ -93,29 +105,32 @@ Deno.serve(async (req) => {
         metadata: it,
       }));
 
-      // Upsert by ns_call_id when available (fallback insert when null)
       const withId = rows.filter((r) => r.ns_call_id);
       const withoutId = rows.filter((r) => !r.ns_call_id);
 
       let upserted = 0;
-      if (withId.length) {
-        const { error, count } = await supabase
-          .from("planipret_phone_calls")
-          .upsert(withId, { onConflict: "ns_call_id", count: "exact", ignoreDuplicates: false });
-        if (error) return jsonResponse({ error: error.message }, 500);
-        upserted = count ?? withId.length;
-      }
-      if (withoutId.length) {
-        const { error } = await supabase.from("planipret_phone_calls").insert(withoutId);
-        if (error) return jsonResponse({ error: error.message }, 500);
+      try {
+        if (withId.length) {
+          const { error, count } = await supabase
+            .from("planipret_phone_calls")
+            .upsert(withId, { onConflict: "ns_call_id", count: "exact", ignoreDuplicates: false });
+          if (error) throw new Error(error.message);
+          upserted = count ?? withId.length;
+        }
+        if (withoutId.length) {
+          const { error } = await supabase.from("planipret_phone_calls").insert(withoutId);
+          if (error) throw new Error(error.message);
+        }
+      } catch (e) {
+        const msg = (e as Error).message;
+        if (runId) await supabase.from("planipret_edge_function_runs").update({ status: "error", finished_at: new Date().toISOString(), error: msg }).eq("id", runId);
+        return jsonResponse({ error: msg }, 500);
       }
 
-      return jsonResponse({
-        ok: true,
-        fetched: items.length,
-        upserted,
-        inserted_no_id: withoutId.length,
-      });
+      const summary = { extension: ctx.extension, domain: ctx.nsDomain, start, end, fetched: items.length, upserted, inserted_no_id: withoutId.length };
+      if (runId) await supabase.from("planipret_edge_function_runs").update({ status: "success", finished_at: new Date().toISOString(), summary }).eq("id", runId);
+
+      return jsonResponse({ ok: true, ...summary });
     }
 
     return jsonResponse({ error: "unsupported action/method" }, 400);
