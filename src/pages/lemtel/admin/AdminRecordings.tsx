@@ -62,6 +62,10 @@ export default function AdminRecordings({ scope = 'org' }: { scope?: 'org' | 'mi
   const [total, setTotal] = useState<number | null>(null);
   const [metaById, setMetaById] = useState<Record<string, RecMeta>>({});
   const [aiBusy, setAiBusy] = useState<string | null>(null);
+  const [transcribeLang, setTranscribeLang] = useState<'fr' | 'en'>(() => {
+    try { return (localStorage.getItem('lemtel.transcribe.lang') as 'fr' | 'en') || 'fr'; } catch { return 'fr'; }
+  });
+  useEffect(() => { try { localStorage.setItem('lemtel.transcribe.lang', transcribeLang); } catch {} }, [transcribeLang]);
   const loadPage = useCallback(async (pageNum: number, reset = false) => {
     setLoading(true);
     try {
