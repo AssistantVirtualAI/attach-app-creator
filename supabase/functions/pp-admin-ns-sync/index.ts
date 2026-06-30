@@ -330,11 +330,11 @@ async function syncMessages(admin: ReturnType<typeof createClient>, domain: stri
   if (!r.data.length) return { fetched: 0, upserted: 0, warning: r.warning ?? "messages_endpoint_empty" };
 
 
-  const { data: profiles } = await admin.from("planipret_profiles").select("user_id,extension,ns_extension").eq("organization_id", AVA_ORG_ID);
+  const { data: profiles } = await admin.from("planipret_profiles").select("id,extension,ns_extension").eq("organization_id", AVA_ORG_ID);
   const extToProfile = new Map<string, string>();
   for (const p of profiles ?? []) {
     const ext = String(p.extension ?? p.ns_extension ?? "").trim();
-    if (ext && p.id) extToProfile.set(ext, p.user_id);
+    if (ext && p.id) extToProfile.set(ext, p.id as string);
   }
 
   const rows = r.data.map((m: any) => {
@@ -370,12 +370,12 @@ async function syncMessages(admin: ReturnType<typeof createClient>, domain: stri
 async function syncRecordings(admin: ReturnType<typeof createClient>, domain: string, users: any[], start: string, end: string) {
   const { data: profiles } = await admin
     .from("planipret_profiles")
-    .select("user_id,extension,ns_extension")
+    .select("id,extension,ns_extension")
     .eq("organization_id", AVA_ORG_ID);
   const extToProfile = new Map<string, string>();
   for (const p of profiles ?? []) {
     const ext = String(p.extension ?? p.ns_extension ?? "").trim();
-    if (ext && p.id) extToProfile.set(ext, p.user_id);
+    if (ext && p.id) extToProfile.set(ext, p.id as string);
   }
 
   const D = encodeURIComponent(domain);
