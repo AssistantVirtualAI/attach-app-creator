@@ -145,7 +145,7 @@ export default function PAOverview() {
       ava: ava.count ?? 0, voicemailsUnread: vm.count ?? 0,
     });
     setServiceCounts({
-      mobile: svcMobile.count ?? 0,
+      mobile: Math.max(svcMobile.count ?? 0, brokerTotal),
       widget: svcWidget.count ?? 0,
       ai: svcAi.count ?? 0,
     });
