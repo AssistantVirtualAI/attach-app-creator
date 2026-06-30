@@ -1,91 +1,74 @@
-## Goal
+# Lemtel Portal — 9 Critical Fixes (5-Phase Plan)
 
-Stop guessing why the broker count is 201 instead of 355, then wire every Planiprêt admin page to the correct, fully paginated NetSapiens v2 endpoint, with a clear server-capability panel that exposes what is and isn't actually available on the current SNAPsolution version.
+Scope: Lemtel org only. Do NOT touch `apps/ava-softphone-mobile/ios/App/App/Plugins/CapacitorSip/*`, `CallKitManager.swift`, `Main.storyboard`, or `project.pbxproj`. Reuse existing patterns (`fusionpbx-proxy`, `ai-transcribe-call`, mobile `recMeta()` org_id fallback).
 
-## Step 1 — Build a real diagnostic page at `/planipret/admin/debug`
+---
 
-New page that calls a new edge function `ns-debug-audit` and displays four side-by-side numbers in plain French. Visible only to Planiprêt admins. No background jobs — this is a pure live audit.
+## Phase 1 — Security & Isolation Foundation (Issue 8 + RLS for 2/9)
 
-- **Query A** — `SELECT count(*) FROM planipret_profiles WHERE organization_id = '<AVA>'`.
-- **Query B** — call `GET /domains/planipret.ca/users` with a paginated loop. Try both pagination conventions and surface which one the server actually uses:
-  - 1-based pages: `?start=1&limit=200`, `?start=2&limit=200`, …
-  - offset/limit: `?limit=100&offset=0`, `?limit=100&offset=100`, …
-  - inspect response headers `X-Total-Count`, `Content-Range`, `Link` and show their raw values.
-- **Query C** — diff Query A vs Query B:
-  - extensions in NS-API not present in `planipret_profiles` (by email + by extension).
-  - profiles with no matching NS-API extension.
-- **Query D** — dump the exact query/edge function currently driving the Overview KPI, `/admin/users` total, and the sidebar badge, and show their values next to A & B so the failing path is obvious.
+Must come first; every later phase depends on correct scoping.
 
-The debug page is intentionally temporary; remove once the discrepancy is reconciled, but keep `ns-debug-audit` around because the diagnostic panel in Step 6 reuses it.
+- **Post-login routing**: in the auth redirect resolver (likely `Auth.tsx` / `AuthenticatedShell` for Lemtel), force any user with `org_admin` / `domain_admin` role to `/lemtel/dashboard`; end-users to `/my`. Drop "last visited" memory for Lemtel admins.
+- **Route guards** (`LemtelGuard.tsx` + a new `MyOnlyGuard`):
+  - org admin → all `/lemtel/*` for their `organization_id` only
+  - domain admin → `/lemtel/*` filtered to their `domain_uuid` (sidebar + page-level)
+  - end-user → only `/my/*`; any other path → redirect `/my`
+- **RLS audit + migration** on: `pbx_call_recordings`, `pbx_call_transcripts`, `pbx_voicemails`, `pbx_voicemail_settings`, `pbx_call_queues`, `pbx_queue_agents`, `pbx_extensions`, `pbx_domain_users`, `pbx_domains`. Add `domain_uuid` predicates (not just `organization_id`). Use a `has_domain_access(_user, _domain_uuid)` SECURITY DEFINER helper to avoid recursion.
+- **Edge-function authorization**: every Lemtel-facing function (`fusionpbx-proxy`, `mobile-recordings`, `ai-transcribe-call`, `voicemail-sync`, etc.) must verify `domain_uuid` belongs to caller's allowed set before returning data.
+- Manual test matrix: org admin, single-domain admin, end-user → confirm UI + direct API both deny cross-tenant access.
 
-## Step 2 — Fix the broker count everywhere
+---
 
-Once Step 1 names the cause, apply one fix and route every consumer through it:
+## Phase 2 — Recordings, Transcripts & Cross-Platform Sync (Issues 2, 9, 4)
 
-- If NS-API pagination is the bug, rewrite the loop in `pp-admin-ns-sync` and `ns-email-migration-match` to use whichever pagination signal the server actually returns (header total when present, otherwise loop until a short page).
-- If `planipret_profiles` itself only has ~200 rows, do NOT silently inflate the count. Show the actual portal count as the primary number, plus a secondary stat "X extensions NS-API sans compte portail" with a CTA to the manual-review queue.
+- **Issue 2 — "missing UUID" on portal Recordings**: align portal `Recordings` page (`src/pages/my/Recordings.tsx` + Lemtel admin recordings view) to the mobile resolution chain `creds?.domainUuid || creds?.fusionpbxDomainUuid || fallbackDomainUuid`. Pull domain_uuid from session/`OrganizationContext` and pass it into the `fusionpbx-proxy` / `mobile-recordings` calls.
+- **Issue 9 — portal transcription errors**: portal's "Transcrire" call to `ai-transcribe-call` must include `{ call_record_id, organization_id, xml_cdr_uuid }` exactly like the mobile fix. Add the same fallback chain (`pbx_softphone_users` → `org_members` → hardcoded org).
+- **Issue 4 — language follows UI**:
+  - Schema migration: add `transcript_text_fr`, `transcript_text_en`, `coaching_summary_fr`, `coaching_summary_en` on `pbx_call_transcripts` (keep `transcript_text` as canonical).
+  - `ai-transcribe-call` accepts `target_language`; generates canonical + translates on first request; caches in the language-specific columns.
+  - All three UIs (portal `Recordings`, Lemtel admin call detail, mobile `RecordingsScreen.tsx`) resolve display via `i18n.language` and request translation if missing (then cache).
+- **Realtime**: standardize a `useRecordingsRealtime(domainUuid)` hook used by portal + desktop + mobile, subscribing to `pbx_call_recordings` and `pbx_call_transcripts` filtered by `domain_uuid`. Mirror mobile's `ava:callEnded` + 30s poll + focus refresh on portal/desktop.
+- Verify identical query shape across the 3 clients (same select columns, same join to `pbx_extensions`).
 
-Make `/admin/overview` "Courtiers actifs", `/admin/users` total, and the sidebar badge all call the same `adminCounts` helper, hitting the same query. No more parallel sources of truth.
+---
 
-## Step 3 — Fix `/admin/calls` (CDRs)
+## Phase 3 — User & Voicemail Provisioning (Issues 1, 6)
 
-- Update `ns-cdrs` (broker-scoped, mobile) and `pp-admin-ns-sync` (admin-scoped) to call `GET /domains/{domain}/cdrs` with the same paginated loop as Step 1 and accept `start_time` / `end_time` query params.
-- Map NS fields → `planipret_phone_calls` (direction, from/to numbers, started/answered/ended, duration, disposition).
-- Architecture: keep `/admin/calls` reading from `planipret_phone_calls` (Option B) so AI scoring stays attached; add a "🔄 Importer l'historique CDR" button on the Appels page that calls `pp-admin-ns-sync` for a date range and shows progress (`Import en cours… 1 240 / 3 500 appels`). Idempotency key = NS call id.
+- **Issue 1 — Sync FusionPBX user emails**:
+  - Extend `fusionpbx-proxy` with action `list_domain_users` returning `{ extension, email, username, user_uuid }` per `domain_uuid` (only domains the caller administers).
+  - New admin UI tab in `LemtelPbxUsers.tsx` (or domain detail): table of users + per-row "Sync & Assign" button.
+  - Button calls the **existing** end-user provisioning mutation (the same one triggered when a user self-enters extension+domain+SIP password) — just feed it the email pulled from FusionPBX and an admin-side flag. Same write target (`pbx_softphone_users`), no parallel schema.
+- **Issue 6 — `/my` voicemail + ElevenLabs greeting**:
+  - Wire `src/pages/my/Voicemail.tsx` to `user-voicemail` (list/play) scoped to caller's extension via RLS.
+  - Greeting generator section: text → `elevenlabs-generate-greeting` (or `voicemail-greeting-tts`) → preview → "Set as my greeting" calls `user-voicemail-greeting` which uploads/overwrites via `fusionpbx-proxy` (voicemail greeting API) for that extension only.
+  - Server-side guard: extension must match the caller (no write to other users' greetings).
 
-## Step 4 — Fix `/admin/messages` (SMS)
+---
 
-- Replace the current single endpoint guess with the confirmed pattern:
-  1. `GET /domains/{domain}/users/{user}/messagesessions` (paginated, per broker).
-  2. For each session, `GET /domains/{domain}/users/{user}/messagesessions/{id}/messages`.
-- Map to `planipret_phone_messages` and upsert by `ns_message_id`.
-- Run this as a batched background job (10 brokers at a time, small delay between batches) since it requires 355+ session-list calls. The Edge Function returns immediately and the UI polls progress: `Synchronisation SMS: 45/355 courtiers traités`.
-- Add a manual "🔄 Importer l'historique SMS" button and a scheduled refresh (every 15 min via `pg_cron`).
+## Phase 4 — Removals & Cleanup (Issues 3, 5)
 
-## Step 5 — Fix `/admin/voicemails` (recordings + transcriptions)
+- **Issue 3 — Remove softphone from portal**: delete portal-only softphone/dialer/WebRTC components (`LemtelSoftphoneUsers.tsx` keep; remove the embedded dialer/WebRTC widget if any in portal), routes, nav entries, and portal-only edge calls. Touch **nothing** under `apps/ava-softphone-mobile/`. Inventory pass first; list files in PR description.
+- **Issue 5 — Remove "Phone Numbers" page**:
+  - Diff `src/pages/PhoneNumbers.tsx` features vs Domain → Destinations (`LemtelDIDs.tsx` / domain detail Destinations tab). Port any missing piece (DID assignment, routing) into Destinations.
+  - Remove the route, nav item, and redirect old `/phone-numbers` URLs to `/lemtel/domains/:id/destinations`.
 
-Treat as three distinct concerns:
+---
 
-1. **Voicemails** — `GET /domains/{domain}/users/{user}/voicemails/inbox`, looped per broker in the same batched job, audio file fetched via the file URL on the record. Map to `planipret_voicemails`.
-2. **Call recordings** — first check if the CDR record carries a `recording_url`/`recording_file`. If not, try `GET /domains/{domain}/users/{user}/recordings`. If the server is < v45 and that endpoint truly 404s, do NOT keep hammering it — surface "⚠️ Les enregistrements d'appels via API nécessitent NetSapiens v45+. Le serveur actuel est en v44.4.1." on the page itself.
-3. **Transcriptions** — check (a) if CDR/voicemail records include `transcription_text`, (b) the existing `ns-transcription` function path, and (c) the `PORTAL_VOICE_TRANSCRIPTION_SENTIMENT` domain config. If transcripts come back empty, show "⚠️ La transcription vocale n'est peut-être pas activée pour ce domaine. Vérifiez auprès de Clinton." instead of silently empty rows.
+## Phase 5 — Queue Membership Fix & QA (Issue 7)
 
-## Step 6 — Permanent NS-API feature panel on `/planipret/admin/integrations`
+- **Issue 7 — Add members to queue errors**:
+  - Inspect `fusionpbx-proxy` queue-related actions for the same kind of regression as the CDR `extension` column strip; verify `domain_uuid`, `queue_uuid`, extension format (`100@domain.tld` vs bare `100`).
+  - Fix payload, surface explicit error toast on partial failure (no silent catch).
+  - Test on ≥2 Lemtel domains.
+- **Cross-cutting QA**: run the 3-role × 2-domain matrix, confirm no leakage, recordings/transcripts/voicemails appear live on portal+desktop+mobile, language toggle flips transcripts, queue add works on all domains.
+- **Deliverable note** in PR: list every Supabase table + RLS policy touched per issue.
 
-New section "🔍 Fonctionnalités disponibles sur ce serveur" powered by `ns-debug-audit`:
+---
 
-```text
-Version serveur : 44.4.1-beta.64
-✅ CDRs                    — GET /domains/{d}/cdrs            (n résultats sur la dernière sonde)
-✅ Messages (sessions)     — GET /domains/{d}/users/{u}/messagesessions
-✅ Voicemails              — GET /domains/{d}/users/{u}/voicemails/inbox
-❌ Enregistrements         — nécessite v45+ (v44.4.1 détectée)
-❌ Transcriptions          — non activé pour planipret.ca (PORTAL_VOICE_TRANSCRIPTION_SENTIMENT off)
-```
+## Technical Notes
 
-Each row stores its last-probe result + timestamp so future "why isn't X working" questions get answered by this panel before any code is touched.
-
-## Step 7 — Verification checklist (done in-app, not from memory)
-
-1. Debug page shows portal count vs paginated NS-API count, with the gap explained.
-2. Overview KPI, `/admin/users` total, and sidebar badge all show the same number.
-3. After running CDR backfill, `/admin/calls` shows real rows with correct direction/duration/disposition.
-4. After SMS batch sync runs against a few test brokers, `/admin/messages` shows their real threads.
-5. After voicemail sync, `/admin/voicemails` shows real inbox entries with audio playback.
-6. Recordings + transcriptions either work or display the precise server-side limitation message from Step 6 — never silently empty.
-
-## Technical details
-
-- All admin endpoints stay behind `is_planipret_admin`; broker endpoints behind `is_planipret_member`.
-- Shared paginator goes in `supabase/functions/_shared/ns-pagination.ts`: returns `{ items, totalFromHeader, pages, paginationSignal }` so callers can log how the server answered.
-- Idempotency keys: `ns_call_id` for CDRs/recordings, `ns_message_id` for SMS, `ns_voicemail_id` for voicemails.
-- Background work uses `EdgeRuntime.waitUntil`; progress is written to a new `planipret_sync_progress` row (job_id, step, processed, total, finished_at) that the UI polls.
-- Schema additions limited to `planipret_sync_progress` and a small `planipret_ns_server_capabilities` row keyed by `domain` + `feature` for the Step 6 panel.
-- No frontend hardcoded counts; everything reads from `adminCounts.getBrokerCounts()`.
-- The debug page and its edge function are gated by `is_planipret_admin` and never expose raw NS tokens.
-
-## What I won't touch
-
-- Mobile broker app screens (already wired and working post-prior phase).
-- ElevenLabs / Claude / Maestro integrations on the same Integrations page.
-- The shipped email-based login + identity migration work from the prior turn.
+- Reuse `has_role` / add `has_domain_access` SECURITY DEFINER helpers for RLS.
+- Translation cache columns avoid repeat Claude/Gemini calls; only translate on first request per language per call.
+- All edge functions: keep current `verify_jwt` config, add Zod validation of `domain_uuid` / `organization_id` inputs.
+- Realtime channels: one per domain (`recordings:${domain_uuid}`) to keep payloads scoped and RLS-aligned.
+- Migrations grouped per phase so each can ship/rollback independently.
