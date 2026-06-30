@@ -306,8 +306,8 @@ async function syncMessages(admin: ReturnType<typeof createClient>, domain: stri
   // first as a fast-path, then fall back to per-user session enumeration.
   // curl equivalent: GET https://{server}/ns-api/v2/domains/{D}/users/{ext}/messagesessions
   let r = await tryPaths([
-    `/domains/${D}/messages?start_time=${encodeURIComponent(start)}&end_time=${encodeURIComponent(end)}`,
-    `/domains/${D}/sms?start_time=${encodeURIComponent(start)}&end_time=${encodeURIComponent(end)}`,
+    `/domains/${D}/messages?start-time=${encodeURIComponent(start)}&end-time=${encodeURIComponent(end)}`,
+    `/domains/${D}/sms?start-time=${encodeURIComponent(start)}&end-time=${encodeURIComponent(end)}`,
   ]);
   if (!r.data.length && users.length) {
     const collected: any[] = [];
@@ -381,9 +381,9 @@ async function syncRecordings(admin: ReturnType<typeof createClient>, domain: st
   const D = encodeURIComponent(domain);
   const rawItems: Array<{ item: any; ext?: string }> = [];
   const domainRecordings = await tryPaths([
-    `/domains/${D}/recordings?start_time=${encodeURIComponent(start)}&end_time=${encodeURIComponent(end)}`,
-    `/domains/${D}/call-recordings?start_time=${encodeURIComponent(start)}&end_time=${encodeURIComponent(end)}`,
-    `/domains/${D}/recorded-calls?start_time=${encodeURIComponent(start)}&end_time=${encodeURIComponent(end)}`,
+    `/domains/${D}/recordings?start-time=${encodeURIComponent(start)}&end-time=${encodeURIComponent(end)}`,
+    `/domains/${D}/call-recordings?start-time=${encodeURIComponent(start)}&end-time=${encodeURIComponent(end)}`,
+    `/domains/${D}/recorded-calls?start-time=${encodeURIComponent(start)}&end-time=${encodeURIComponent(end)}`,
   ]);
   for (const r of domainRecordings.data ?? []) rawItems.push({ item: r, ext: String(val(r, ["user", "extension", "orig-user", "term-user"], "")) || undefined });
 
@@ -393,9 +393,9 @@ async function syncRecordings(admin: ReturnType<typeof createClient>, domain: st
       const chunk = extensions.slice(i, i + 16);
       const results = await Promise.all(chunk.map(async (ext) => {
         const r = await tryPaths([
-          `/domains/${D}/users/${encodeURIComponent(ext)}/recordings?start_time=${encodeURIComponent(start)}&end_time=${encodeURIComponent(end)}`,
-          `/domains/${D}/users/${encodeURIComponent(ext)}/call-recordings?start_time=${encodeURIComponent(start)}&end_time=${encodeURIComponent(end)}`,
-          `/domains/${D}/users/${encodeURIComponent(ext)}/recorded-calls?start_time=${encodeURIComponent(start)}&end_time=${encodeURIComponent(end)}`,
+          `/domains/${D}/users/${encodeURIComponent(ext)}/recordings?start-time=${encodeURIComponent(start)}&end-time=${encodeURIComponent(end)}`,
+          `/domains/${D}/users/${encodeURIComponent(ext)}/call-recordings?start-time=${encodeURIComponent(start)}&end-time=${encodeURIComponent(end)}`,
+          `/domains/${D}/users/${encodeURIComponent(ext)}/recorded-calls?start-time=${encodeURIComponent(start)}&end-time=${encodeURIComponent(end)}`,
         ]);
         return { ext, data: r.data ?? [], warning: r.warning };
       }));
