@@ -40,11 +40,10 @@ async function fetchAllUsers(domain: string): Promise<{ ok: boolean; data: any[]
     if (!arr.length) break;
     let added = 0;
     for (const u of arr) {
-      const ext = String(u.user ?? u.extension ?? u.subscriber_login ?? u.user_id ?? u.id ?? "");
+      const ext = String(u.user ?? u.extension ?? u.subscriber_login ?? u.user_id ?? u.id ?? "").trim();
       if (!ext) continue;
-      const key = `${ext}|${String(u.email ?? u.email_address ?? "").toLowerCase()}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
+      if (seen.has(ext)) continue;
+      seen.add(ext);
       all.push(u);
       added++;
     }
