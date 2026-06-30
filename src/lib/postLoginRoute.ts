@@ -68,8 +68,8 @@ export async function getPostLoginRoute(userId: string): Promise<string> {
       return '/dashboard';
     }
 
-    // Lemtel routing
-    if (isLemtelAdmin) { setActiveOrg(LEMTEL_ORG_ID); return '/dashboard'; }
+    // Lemtel routing — admins go straight to the Lemtel portal, end users to /my
+    if (isLemtelAdmin) { setActiveOrg(LEMTEL_ORG_ID); return '/lemtel/dashboard'; }
     if (isLemtelMember) { setActiveOrg(LEMTEL_ORG_ID); return '/my'; }
 
     // Generic org admin → unified dashboard with switcher
