@@ -3,10 +3,9 @@
 // which is the working method for this NetSapiens deployment.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { nsFetchAll, NS_API_KEY } from "../_shared/ns-pagination.ts";
 
 const AVA_ORG_ID = "17d6507f-a9ca-409d-8e49-371d50332615";
-const NS_API_KEY = Deno.env.get("NS_API_KEY") ?? "";
-const NS_API_BASE_URL = Deno.env.get("NS_API_BASE_URL") ?? "https://voice.ava-telecom.ca/ns-api/v2";
 const NS_DEFAULT_DOMAIN = Deno.env.get("NS_DEFAULT_DOMAIN") ?? "planipret.ca";
 
 function json(body: unknown, status = 200) {
@@ -16,45 +15,12 @@ function json(body: unknown, status = 200) {
   });
 }
 
-async function nsFetch(path: string) {
-  const res = await fetch(`${NS_API_BASE_URL}${path}`, {
-    headers: { Authorization: `Bearer ${NS_API_KEY}`, Accept: "application/json" },
+async function fetchAllUsers(domain: string): Promise<{ ok: boolean; data: any[]; warning?: string; signal?: string; total?: number | null }> {
+  const r = await nsFetchAll<any>(`/domains/${encodeURIComponent(domain)}/users`, {
+    pageSize: 200, maxPages: 50,
+    keyOf: (u: any) => String(u?.user ?? u?.extension ?? u?.subscriber_login ?? u?.user_id ?? u?.id ?? ""),
   });
-  const text = await res.text();
-  let data: any = null;
-  try { data = text ? JSON.parse(text) : null; } catch { data = null; }
-  return { ok: res.ok, status: res.status, data, text };
-}
-
-async function fetchAllUsers(domain: string): Promise<{ ok: boolean; data: any[]; warning?: string }> {
-  const seen = new Set<string>();
-  const all: any[] = [];
-  const pageSize = 200;
-  let prevSize = -1;
-  for (let i = 0; i < 25; i++) {
-    const start = i * pageSize + 1;
-    const r = await nsFetch(`/domains/${encodeURIComponent(domain)}/users?limit=${pageSize}&start=${start}`);
-    if (!r.ok) {
-      return { ok: all.length > 0, data: all, warning: `NS-API users fetch failed: ${r.status} ${r.text.slice(0, 200)}` };
-    }
-    const arr = Array.isArray(r.data) ? r.data : (r.data?.users ?? r.data?.data ?? []);
-    if (!arr.length) break;
-    let added = 0;
-    for (const u of arr) {
-      const ext = String(u.user ?? u.extension ?? u.subscriber_login ?? u.user_id ?? u.id ?? "").trim();
-      if (!ext) continue;
-      if (seen.has(ext)) continue;
-      seen.add(ext);
-      all.push(u);
-      added++;
-    }
-    // NS-API v2 paginates with START/LIMIT. Stop if an install still repeats a page.
-    if (added === 0) break;
-    if (arr.length < pageSize) break;
-    if (all.length === prevSize) break;
-    prevSize = all.length;
-  }
-  return { ok: true, data: all };
+  return { ok: r.ok, data: r.items, warning: r.warning, signal: r.paginationSignal, total: r.totalFromHeader };
 }
 
 function isPlanipretBrokerCandidate(b: any) {
