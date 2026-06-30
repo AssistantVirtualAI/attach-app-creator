@@ -194,18 +194,20 @@ export default function NsLiveTestPanel({ domain = "planipret.ca" }: { domain?: 
     });
   }, [users, search, filter, regsByExt]);
 
-  async function syncToProfiles() {
-    toast.info("🔄 Synchronisation en cours...");
+  async function syncToProfiles(includeCdrs = false) {
+    toast.info(includeCdrs ? "🔄 Synchro complète (utilisateurs + CDRs)..." : "🔄 Synchronisation des utilisateurs...");
     const { data: res, error: err } = await supabase.functions.invoke("ns-live-test", {
-      body: { action: "sync", domain },
+      body: { action: includeCdrs ? "sync_all" : "sync", domain },
     });
     if (err || (res as any)?.error) {
       toast.error(`❌ ${(res as any)?.error ?? err?.message}`);
       return;
     }
     const r = res as any;
-    toast.success(`🔄 ${r.matched_count} courtiers mis à jour — ${r.unmatched_count} sans correspondance`);
+    const cdr = r.cdr ? ` — CDRs: ${r.cdr.inserted}/${r.cdr.total}${r.cdr.error ? ` (err: ${r.cdr.error})` : ""}` : "";
+    toast.success(`🔄 ${r.matched_count}/${r.users_total} courtiers liés — ${r.unmatched_count} sans corresp.${cdr}`);
   }
+
 
   async function linkExtension() {
     if (!selected || !linkTarget) return;
