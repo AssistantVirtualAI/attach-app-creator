@@ -44,9 +44,9 @@ async function fetchAll(basePath: string, pageSize = 200, maxPages = 30) {
     for (const item of arr) {
       const key = String(
         val(item, [
-          "user", "extension", "subscriber_login", "user_id", "id", "uuid",
           "call_id", "call-id", "cdr_id", "cdr-id", "orig-callid", "orig_callid",
           "message_id", "message-id", "recording_id", "recording-id",
+          "id", "uuid", "user", "extension", "subscriber_login", "user_id",
         ], JSON.stringify(item).slice(0, 300)),
       );
       if (seen.has(key)) continue;
