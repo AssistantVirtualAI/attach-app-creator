@@ -1,47 +1,25 @@
 // pp-ns-users — Lists all NetSapiens subscribers (brokers) for the Planiprêt domain.
-// Admin-only. Used by /planipret/admin/users to show ALL brokers from the phone system,
-// not just the local planipret_profiles rows.
-import {
-  corsHeaders,
-  jsonResponse,
-  nsFetch,
-  getEnv,
-  AVA_ORG_ID,
-} from "../_shared/planipret-ns.ts";
-import { createClient } from "npm:@supabase/supabase-js@2";
+// Admin-only. Uses per-broker JWT (the calling admin's NS-API token) which works
+// reliably against this NetSapiens deployment, unlike the system oauth2/token path.
+import { corsHeaders, jsonResponse, nsBrokerFetch, nsEnv, requirePlanipretAdmin } from "../_shared/ns-broker.ts";
+
+const AVA_ORG_ID = "17d6507f-a9ca-409d-8e49-371d50332615";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return jsonResponse({ error: "Unauthorized" }, 401);
-    }
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    const { data: userData, error: userErr } = await admin.auth.getUser(
-      authHeader.replace(/^Bearer\s+/i, ""),
-    );
-    if (userErr || !userData?.user) return jsonResponse({ error: "Unauthorized" }, 401);
-    const userId = userData.user.id;
+    const auth = await requirePlanipretAdmin(req);
+    if ("error" in auth) return auth.error;
+    const { admin, profile } = auth;
 
-    // Must be Planipret member (admins / super_admins included)
-    const { data: isMember } = await admin.rpc("is_planipret_member", { _user_id: userId });
-    if (isMember !== true) return jsonResponse({ error: "Forbidden" }, 403);
+    const domain = new URL(req.url).searchParams.get("domain") ?? nsEnv().domain ?? "planipret.ca";
 
-    const env = getEnv();
-    const domain = new URL(req.url).searchParams.get("domain") ?? env.NS_DEFAULT_DOMAIN;
-    if (!domain) return jsonResponse({ error: "NS domain not configured" }, 412);
-
-    // Fetch all users from NS-API for this domain — degrade gracefully on auth/network failure
+    // Fetch all users from NS-API for this domain via the admin broker JWT
     let raw: any = null;
     let nsWarning: string | null = null;
     try {
-      const res = await nsFetch(`/domains/${encodeURIComponent(domain)}/users?limit=2000`, {
-        method: "GET",
-      });
+      const res = await nsBrokerFetch(admin, profile, `/domains/${encodeURIComponent(domain)}/users?limit=2000`);
       if (!res.ok) {
         const txt = await res.text();
         nsWarning = `NS-API users fetch failed: ${res.status} ${txt.slice(0, 200)}`;
@@ -56,28 +34,32 @@ Deno.serve(async (req) => {
     // Merge with local planipret_profiles for app/agent flags
     const { data: profiles } = await admin
       .from("planipret_profiles")
-      .select("user_id, email, full_name, extension, mobile_app_enabled, voice_agent_enabled, ns_domain, elevenlabs_agent_id, dnd_enabled, updated_at, created_at")
+      .select("user_id, email, full_name, extension, ns_extension, mobile_app_enabled, voice_agent_enabled, ns_domain, elevenlabs_agent_id, dnd_enabled, updated_at, created_at")
       .eq("organization_id", AVA_ORG_ID);
     const byExt = new Map<string, any>();
-    (profiles ?? []).forEach((p: any) => { if (p.extension) byExt.set(String(p.extension), p); });
+    (profiles ?? []).forEach((p: any) => {
+      const k = p.extension ?? p.ns_extension;
+      if (k) byExt.set(String(k), p);
+    });
 
-    // If NS-API is down, fall back to local profiles only so the admin page still renders.
     const sourceList: any[] = list.length > 0
       ? list
       : (profiles ?? []).map((p: any) => ({
-          user: p.extension,
+          user: p.extension ?? p.ns_extension,
           email: p.email,
           first_name: (p.full_name || "").split(" ")[0] ?? "",
           last_name: (p.full_name || "").split(" ").slice(1).join(" "),
         }));
 
     const brokers = sourceList.map((u: any) => {
-      const ext = String(u.user ?? u.extension ?? u.subscriber_login ?? u.user_id ?? "");
+      const ext = String(
+        u.user ?? u.extension ?? u.subscriber_login ?? u.user_id ?? u.id ?? "",
+      );
       const local = byExt.get(ext);
-      const first = u.first_name ?? u.firstName ?? "";
-      const last = u.last_name ?? u.lastName ?? "";
+      const first = u.first_name ?? u.firstName ?? u["name-first-name"] ?? "";
+      const last = u.last_name ?? u.lastName ?? u["name-last-name"] ?? "";
       const fullName = local?.full_name || `${first} ${last}`.trim() || u.display_name || u.name || ext;
-      const email = local?.email ?? u.email ?? u.email_address ?? "";
+      const email = local?.email ?? u.email ?? u.email_address ?? u["email-address"] ?? "";
       return {
         user_id: local?.user_id ?? `ns:${domain}:${ext}`,
         ns_only: !local,
@@ -94,7 +76,7 @@ Deno.serve(async (req) => {
         updated_at: local?.updated_at ?? u.last_modified ?? null,
         created_at: local?.created_at ?? u.creation_date ?? null,
       };
-    }).filter((b: any) => !/@lemtel\.com$/i.test(String(b.email || "").trim()));
+    }).filter((b: any) => !/@lemtel\.com$/i.test(String(b.email || "").trim()) && b.extension);
 
     return jsonResponse({ ok: true, count: brokers.length, domain, brokers, ns_warning: nsWarning, degraded: !!nsWarning });
   } catch (e) {
