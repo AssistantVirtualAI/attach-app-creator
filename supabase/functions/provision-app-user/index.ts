@@ -33,11 +33,32 @@ interface QueueRow {
   display_name: string | null;
 }
 
-function resolveEmail(row: QueueRow): string {
-  const fromName = row.display_name?.match(
-    /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/,
-  )?.[0];
-  if (fromName) return fromName.toLowerCase();
+function extractEmail(s: string | null | undefined): string | null {
+  if (!s) return null;
+  const m = s.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/);
+  return m ? m[0].toLowerCase() : null;
+}
+
+async function resolveEmail(row: QueueRow): Promise<string> {
+  // 1) Email embedded in display_name
+  const fromName = extractEmail(row.display_name);
+  if (fromName) return fromName;
+
+  // 2) Pull voicemail_mail_to / user_email from pbx_extensions (FusionPBX-synced)
+  try {
+    const { data: ext } = await admin
+      .from("pbx_extensions")
+      .select("voicemail_mail_to, user_email, effective_caller_id_name")
+      .eq("organization_id", row.organization_id)
+      .eq("extension", row.extension)
+      .maybeSingle();
+    const fromVm = extractEmail(ext?.voicemail_mail_to)
+      ?? extractEmail(ext?.user_email)
+      ?? extractEmail(ext?.effective_caller_id_name);
+    if (fromVm) return fromVm;
+  } catch { /* ignore */ }
+
+  // 3) Fallback synthetic
   const dom = (row.sip_domain || "pbx.local").toLowerCase();
   return `${row.extension}@${dom}`;
 }
@@ -47,17 +68,20 @@ function randomPassword(): string {
 }
 
 async function processOne(row: QueueRow) {
-  const email = resolveEmail(row);
+  const email = await resolveEmail(row);
   const password = row.sip_password || randomPassword();
 
-  // Find existing auth user by email.
+
+  // Find existing auth user by email (paginated).
   let userId: string | null = null;
-  const { data: existing } = await admin.auth.admin.listUsers({
-    page: 1, perPage: 200,
-  });
-  const match = existing?.users?.find(
-    (u: any) => (u.email || "").toLowerCase() === email,
-  );
+  let match: any = null;
+  for (let page = 1; page <= 20; page++) {
+    const { data: existing } = await admin.auth.admin.listUsers({ page, perPage: 200 });
+    const users = existing?.users ?? [];
+    match = users.find((u: any) => (u.email || "").toLowerCase() === email);
+    if (match || users.length < 200) break;
+  }
+
 
   if (match) {
     userId = match.id;
