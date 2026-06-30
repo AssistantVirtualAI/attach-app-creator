@@ -65,6 +65,8 @@ Deno.serve(async (req) => {
     const admin = admin0;
     const body = await req.json().catch(() => ({}));
     let { call_record_id, recording_url, organization_id, recording_path, recording_name, xml_cdr_uuid, record_name, record_path, domain_uuid } = body || {};
+    const rawLang = String(body?.language ?? "fr").toLowerCase().slice(0, 2);
+    const transcriptLanguage = rawLang === "en" ? "en" : "fr";
     // Accept aliases from UI
     recording_name = recording_name || record_name;
     recording_path = recording_path || record_path;
@@ -197,7 +199,7 @@ Deno.serve(async (req) => {
       // Idempotent: upsert on call_record_id so concurrent runs don't
       // create a window where readers see "no transcript".
       await admin.from("pbx_call_transcripts").upsert({
-        organization_id, call_record_id, transcript_text: text, provider, language: "fr",
+        organization_id, call_record_id, transcript_text: text, provider, language: transcriptLanguage,
       }, { onConflict: "call_record_id" });
       await persistTranscriptOnCall(text, provider);
       // Broadcast so any client (mobile/desktop/portal) updates instantly
@@ -459,7 +461,7 @@ Deno.serve(async (req) => {
       const fd = new FormData();
       fd.append("model", "whisper-1");
       fd.append("file", new Blob([audioBytes!], { type: audioMime }), `recording.${ext}`);
-      fd.append("language", "fr");
+      fd.append("language", transcriptLanguage);
       fd.append("response_format", "json");
       fd.append("temperature", "0");
       fd.append("prompt", sttPrompt);

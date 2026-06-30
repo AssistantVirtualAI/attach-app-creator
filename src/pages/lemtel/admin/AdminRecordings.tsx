@@ -62,6 +62,10 @@ export default function AdminRecordings({ scope = 'org' }: { scope?: 'org' | 'mi
   const [total, setTotal] = useState<number | null>(null);
   const [metaById, setMetaById] = useState<Record<string, RecMeta>>({});
   const [aiBusy, setAiBusy] = useState<string | null>(null);
+  const [transcribeLang, setTranscribeLang] = useState<'fr' | 'en'>(() => {
+    try { return (localStorage.getItem('lemtel.transcribe.lang') as 'fr' | 'en') || 'fr'; } catch { return 'fr'; }
+  });
+  useEffect(() => { try { localStorage.setItem('lemtel.transcribe.lang', transcribeLang); } catch {} }, [transcribeLang]);
   const loadPage = useCallback(async (pageNum: number, reset = false) => {
     setLoading(true);
     try {
@@ -177,8 +181,16 @@ export default function AdminRecordings({ scope = 'org' }: { scope?: 'org' | 'mi
   // Ensure a pbx_call_recordings row exists for this CDR; returns its id.
   const ensureRecordingRow = async (r: Rec): Promise<string | null> => {
     if (r.recording_id) return r.recording_id;
-    const { data: existing } = await (supabase as any).from('pbx_call_recordings')
-      .select('id').eq('organization_id', LEMTEL_ORG_ID).eq('pbx_uuid', r.pbx_uuid).maybeSingle();
+    if (!r.pbx_uuid && !(r.recording_path && r.recording_name)) {
+      toast.error('Missing recording UUID — this CDR has no recording metadata on the PBX.');
+      return null;
+    }
+    let existing: any = null;
+    if (r.pbx_uuid) {
+      const res = await (supabase as any).from('pbx_call_recordings')
+        .select('id').eq('organization_id', LEMTEL_ORG_ID).eq('pbx_uuid', r.pbx_uuid).maybeSingle();
+      existing = res.data;
+    }
     if (existing?.id) return existing.id;
     const { data: ins, error } = await (supabase as any).from('pbx_call_recordings').insert({
       organization_id: LEMTEL_ORG_ID, pbx_uuid: r.pbx_uuid, call_record_id: r.id,
@@ -225,7 +237,7 @@ export default function AdminRecordings({ scope = 'org' }: { scope?: 'org' | 'mi
         return;
       }
       const { data, error } = await supabase.functions.invoke('ai-transcribe-call', {
-        body: { organization_id: LEMTEL_ORG_ID, call_record_id: r.id },
+        body: { organization_id: LEMTEL_ORG_ID, call_record_id: r.id, language: transcribeLang },
       });
       if (error || (data as any)?.error) throw new Error((data as any)?.message || error?.message || 'failed');
       toast.success('Transcript ready');
@@ -312,6 +324,15 @@ export default function AdminRecordings({ scope = 'org' }: { scope?: 'org' | 'mi
           </Select>
           <Input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className="w-[150px]" />
           <Input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className="w-[150px]" />
+          <Select value={transcribeLang} onValueChange={(v) => setTranscribeLang(v as 'fr' | 'en')}>
+            <SelectTrigger className="w-[140px]" title="Transcription language for coaching/transcripts">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="fr">🇫🇷 Français</SelectItem>
+              <SelectItem value="en">🇬🇧 English</SelectItem>
+            </SelectContent>
+          </Select>
           <Button variant="outline" size="sm" onClick={exportCsv} disabled={filtered.length === 0}>
             <FileDown className="h-4 w-4 mr-2" />CSV
           </Button>
