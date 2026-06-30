@@ -423,17 +423,18 @@ Deno.serve(async (req) => {
     if (!domain) return json({ error: "NS domain not configured" }, 412);
     const usersRes = await fetchAll(`/domains/${encodeURIComponent(domain)}/users`, 200, 30);
     if (!usersRes.data.length) return json({ error: "NS users fetch failed", warning: usersRes.warning }, 502);
+    const brokerUsers = usersRes.data.filter(isPlanipretBrokerUser);
 
-    const profileSync = await upsertProfiles(admin, domain, usersRes.data);
+    const profileSync = await upsertProfiles(admin, domain, brokerUsers);
 
     const bg = (async () => {
       try {
-        const calls = await syncCalls(admin, domain, usersRes.data, start, end);
+        const calls = await syncCalls(admin, domain, brokerUsers, start, end);
         const [recordings, messages] = await Promise.all([
-          syncRecordings(admin, domain, usersRes.data, start, end),
+          syncRecordings(admin, domain, brokerUsers, start, end),
           syncMessages(admin, domain, start, end),
         ]);
-        console.log("[pp-admin-ns-sync] completed", JSON.stringify({ domain, users: usersRes.data.length, calls, recordings, messages }));
+        console.log("[pp-admin-ns-sync] completed", JSON.stringify({ domain, users: brokerUsers.length, raw_users: usersRes.data.length, calls, recordings, messages }));
       } catch (e) {
         console.error("[pp-admin-ns-sync] background error", (e as Error).message);
       }
@@ -448,8 +449,9 @@ Deno.serve(async (req) => {
       ok: true,
       status: "queued",
       domain,
-      users_total: usersRes.data.length,
-      extensions: usersRes.data.map(userExt).filter(Boolean).length,
+      users_total: brokerUsers.length,
+      raw_users_total: usersRes.data.length,
+      extensions: brokerUsers.map(userExt).filter(Boolean).length,
       profiles_matched: profileSync.matched,
       cdr: { status: "queued_in_background", start, end },
       recordings: { status: "queued_in_background" },
