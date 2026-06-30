@@ -51,7 +51,7 @@ export default function PARecordings() {
     const dbg: DebugEntry[] = [];
     const t0 = performance.now();
     const fromIdx = (p - 1) * ps;
-    let q = supabase
+    let q: any = supabase
       .from("planipret_phone_calls")
       .select("*, planipret_profiles(full_name, extension)", { count: "exact" })
       .not("recording_url", "is", null)
