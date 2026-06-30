@@ -181,7 +181,10 @@ export default function NsLiveTestPanel({ domain = "planipret.ca" }: { domain?: 
       const online = regsByExt.has(String(u.extension));
       if (filter === "online" && !online) return false;
       if (filter === "offline" && online) return false;
-      if (filter === "vm" && String(u.voicemail).toLowerCase() !== "yes" && u.voicemail !== true && u.voicemail !== "1") return false;
+      if (filter === "vm") {
+        const vm = String(u.voicemail).toLowerCase();
+        if (vm !== "yes" && vm !== "true" && vm !== "1") return false;
+      }
       return true;
     });
   }, [users, search, filter, regsByExt]);
