@@ -8,6 +8,7 @@ import { FinancialKpiCard } from "@/components/planipret/admin/FinancialKpiCard"
 import { RevenueBreakdown } from "@/components/planipret/admin/RevenueBreakdown";
 import { getPlanipretBrokerDirectory } from "@/lib/planipret/adminDirectory";
 import { getPlanipretCallCount } from "@/lib/planipret/adminCounts";
+import { usePlanipretBrokerStats } from "@/lib/planipret/brokerStats";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
   PieChart, Pie, Cell, BarChart, Bar, Legend,
@@ -99,7 +100,16 @@ export default function PAOverview() {
   const [seriesData, setSeriesData] = useState<Array<{ day: string; appels: number; sms: number }>>([]);
   const [directionDist, setDirectionDist] = useState<Array<{ name: string; value: number; color: string }>>([]);
   const [topBrokers, setTopBrokers] = useState<Array<{ name: string; calls: number }>>([]);
-  const [serviceCounts, setServiceCounts] = useState({ mobile: 0, widget: 0, ai: 0 });
+
+  // Single source of truth for broker activation counts (matches the toggles
+  // on /admin/users via the planipret_broker_stats view, with Realtime sync).
+  const { stats: brokerStats } = usePlanipretBrokerStats();
+  const [widgetCount, setWidgetCount] = useState(0);
+  const serviceCounts = {
+    mobile: brokerStats.app_mobile_active,
+    widget: widgetCount,
+    ai: brokerStats.agent_ia_active,
+  };
 
   const load = async () => {
     setRefreshing(true);
@@ -128,20 +138,17 @@ export default function PAOverview() {
     ]);
 
     const nsBrokerList = directory.brokers;
+    // Brokers total = NS-API directory size (single source via adminDirectory).
+    // Active brokers = those with App Mobile toggle ON in planipret_profiles.
     const brokerTotal = directory.count;
-    const brokerActive = directory.count;
 
     setStats({
       calls: c1 ?? 0, callsYest: c2 ?? 0,
-      brokers: brokerActive, brokersTotal: brokerTotal,
+      brokers: brokerStats.app_mobile_active, brokersTotal: brokerTotal,
       sms: sms.count ?? 0, smsYest: smsY.count ?? 0,
       ava: ava.count ?? 0, voicemailsUnread: vm.count ?? 0,
     });
-    setServiceCounts({
-      mobile: brokerTotal,
-      widget: svcWidget.count ?? 0,
-      ai: svcAi.count ?? 0,
-    });
+    setWidgetCount(svcWidget.count ?? 0);
     setRecent(rec.data ?? []);
     setBrokers(nsBrokerList.slice(0, 10));
 
