@@ -111,7 +111,12 @@ export default function NsLiveTestPanel({ domain = "planipret.ca" }: { domain?: 
   const [linkBrokers, setLinkBrokers] = useState<Array<{ id: string; email: string; first_name?: string; last_name?: string }>>([]);
   const [linkTarget, setLinkTarget] = useState<string>("");
   const [linkBusy, setLinkBusy] = useState(false);
+  const [, setTick] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  useEffect(() => {
+    const t = setInterval(() => setTick((n) => n + 1), 5000);
+    return () => clearInterval(t);
+  }, []);
 
   const run = useCallback(async (silent = false) => {
     if (!silent) {
