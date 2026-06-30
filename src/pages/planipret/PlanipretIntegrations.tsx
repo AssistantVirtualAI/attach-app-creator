@@ -19,6 +19,7 @@ import {
 } from "@/components/planipret/admin/integrations/IntegrationCard";
 import NsLiveTestPanel from "@/components/planipret/admin/integrations/NsLiveTestPanel";
 import NsMigrationPanel from "@/components/planipret/admin/integrations/NsMigrationPanel";
+import NsCapabilitiesPanel from "@/components/planipret/admin/integrations/NsCapabilitiesPanel";
 
 type Row = {
   integration_key: string;
