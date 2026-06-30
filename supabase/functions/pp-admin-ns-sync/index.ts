@@ -334,9 +334,31 @@ async function syncRecordings(admin: ReturnType<typeof createClient>, domain: st
   const errors: string[] = [];
   for (let i = 0; i < rows.length; i += 200) {
     const chunk = rows.slice(i, i + 200);
-    const { error } = await admin.from("planipret_phone_calls").upsert(chunk, { onConflict: "ns_call_id" });
-    if (error) errors.push(error.message);
-    else upserted += chunk.length;
+    const ids = chunk.map((r) => r.ns_call_id).filter(Boolean);
+    const { data: existing, error: exErr } = await admin
+      .from("planipret_phone_calls")
+      .select("id, ns_call_id, metadata")
+      .in("ns_call_id", ids);
+    if (exErr) {
+      errors.push(exErr.message);
+      continue;
+    }
+    const byNs = new Map((existing ?? []).map((r: any) => [r.ns_call_id, r]));
+    const inserts = chunk.filter((r) => !byNs.has(r.ns_call_id));
+    const updates = chunk.filter((r) => byNs.has(r.ns_call_id));
+    if (inserts.length) {
+      const { error } = await admin.from("planipret_phone_calls").insert(inserts);
+      if (error) errors.push(error.message);
+      else upserted += inserts.length;
+    }
+    await Promise.all(updates.map((r) => {
+      const old = byNs.get(r.ns_call_id) as any;
+      return admin.from("planipret_phone_calls").update({
+        recording_url: r.recording_url,
+        metadata: { ...(old?.metadata ?? {}), ...(r.metadata ?? {}) },
+      }).eq("id", old.id);
+    }));
+    upserted += updates.length;
   }
   return { fetched: rawItems.length, upserted, recordings: rows.length, warning: domainRecordings.warning, errors };
 }
