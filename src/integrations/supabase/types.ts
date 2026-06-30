@@ -12714,6 +12714,10 @@ export type Database = {
         Args: { _name: string; _slug: string }
         Returns: string
       }
+      create_planipret_sip_secret: {
+        Args: { _broker_id: string; _name: string; _value: string }
+        Returns: string
+      }
       current_user_internal_org_ids: { Args: never; Returns: string[] }
       current_user_org_ids: { Args: never; Returns: string[] }
       current_user_softphone_domain_uuids: {
@@ -12880,6 +12884,7 @@ export type Database = {
       pin_chat_message: { Args: { _message_id: string }; Returns: undefined }
       planipret_ava_org_id: { Args: never; Returns: string }
       pp_audit_realtime_check: { Args: never; Returns: Json }
+      read_planipret_sip_secret: { Args: { _name: string }; Returns: string }
       reconcile_pbx_call_records: { Args: { _org_id: string }; Returns: Json }
       relink_my_softphone_user: { Args: never; Returns: Json }
       resolve_org_by_domain_name: {
