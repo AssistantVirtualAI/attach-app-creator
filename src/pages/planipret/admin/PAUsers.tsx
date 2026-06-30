@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Search, Plus, Edit3, Trash2, ExternalLink, X, AlertTriangle, Eye, EyeOff, RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
+import Pagination from "@/components/planipret/admin/Pagination";
+import DebugPanel, { type DebugEntry } from "@/components/planipret/admin/DebugPanel";
+import { TableErrorState, TableEmptyState } from "@/components/planipret/admin/TableStates";
 
 const ACCENT = "#2E9BDC";
 const SUCCESS = "#00D4AA";
@@ -16,16 +20,32 @@ type Profile = {
   dnd_enabled?: boolean;
   ns_only?: boolean;
   status?: string | null;
+  maestro_connected?: boolean | null;
 };
 
-const PAGE = 25;
-
 export default function PAUsers() {
+  const [params, setParams] = useSearchParams();
+  const search = params.get("search") ?? "";
+  const filter = (params.get("filter") as "all" | "app" | "agent" | "offline") ?? "all";
+  const maestroFilter = (params.get("maestro") as "all" | "yes" | "no") ?? "all";
+  const page = Math.max(1, parseInt(params.get("page") ?? "1", 10) || 1);
+  const pageSizeRaw = parseInt(params.get("ps") ?? "25", 10);
+  const pageSize = [25, 50, 100].includes(pageSizeRaw) ? pageSizeRaw : 25;
+  const updateParams = (patch: Record<string, string | null>) => {
+    const next = new URLSearchParams(params);
+    Object.entries(patch).forEach(([k, v]) => { if (v == null || v === "") next.delete(k); else next.set(k, v); });
+    setParams(next, { replace: true });
+  };
+  const setSearch = (s: string) => updateParams({ search: s, page: "1" });
+  const setFilter = (f: string) => updateParams({ filter: f, page: "1" });
+  const setMaestroFilter = (m: string) => updateParams({ maestro: m, page: "1" });
+  const setPage = (p: number) => updateParams({ page: String(p) });
+  const setPageSize = (s: number) => updateParams({ ps: String(s), page: "1" });
+
   const [rows, setRows] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<"all" | "app" | "agent" | "offline">("all");
-  const [page, setPage] = useState(1);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [debug, setDebug] = useState<DebugEntry[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editUser, setEditUser] = useState<Profile | null>(null);
   const [delUser, setDelUser] = useState<Profile | null>(null);
