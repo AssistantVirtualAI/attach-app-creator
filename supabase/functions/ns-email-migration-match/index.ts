@@ -102,12 +102,15 @@ Deno.serve(async (req) => {
   const nsUsers = await fetchAllUsers(domain);
   const { data: profiles } = await admin
     .from("planipret_profiles")
-    .select("id,email,ms365_email,login_email,ns_extension,ns_linked,full_name");
+    .select("id,user_id,email,ms365_email,login_email,extension,ns_extension,ns_linked,full_name");
 
   // Build profile lookup tables
   const byEmail = new Map<string, any>();
+  const byExt = new Map<string, any>();
   const byLocalNorm = new Map<string, any[]>();
   for (const p of profiles ?? []) {
+    const ext = String(p.extension ?? p.ns_extension ?? "").trim();
+    if (ext) byExt.set(ext, p);
     const emails = [p.email, p.ms365_email, p.login_email].filter(Boolean).map(normEmail);
     for (const e of emails) {
       if (!byEmail.has(e)) byEmail.set(e, p);
@@ -126,6 +129,7 @@ Deno.serve(async (req) => {
     total_portal_brokers: profiles?.length ?? 0,
     exact_matches_applied: 0,
     fuzzy_matches_pending_review: 0,
+    profiles_created: 0,
     no_match_ns_side: 0,
     no_match_portal_side: 0,
     skipped_non_broker: 0,
@@ -133,9 +137,8 @@ Deno.serve(async (req) => {
 
   const logs: any[] = [];
   const matchedProfileIds = new Set<string>();
-  const profilesAlreadyLinked = new Set<string>(
-    (profiles ?? []).filter((p: any) => p.ns_linked && p.ns_extension).map((p: any) => p.id),
-  );
+  const inserts: any[] = [];
+  const patches: Array<{ id: string; patch: any }> = [];
 
   for (const u of nsUsers) {
     if (!isBrokerExtension(u)) {
@@ -145,95 +148,95 @@ Deno.serve(async (req) => {
     const ext = String(u.user ?? u.extension ?? "");
     const nsEmail = normEmail(u.email ?? u["email-address"] ?? u["email_address"]);
     const sipUsername = String(u["login-username"] ?? u.user ?? ext);
+    const first = String(u["name-first-name"] ?? u.first_name ?? "").trim();
+    const last = String(u["name-last-name"] ?? u.last_name ?? "").trim();
+    const fullName = `${first} ${last}`.trim() || nsEmail || ext;
 
-    // Exact match
-    let match = nsEmail ? byEmail.get(nsEmail) : null;
+    // Match priority: ext -> exact email -> fuzzy local-part
+    let match = byExt.get(ext) ?? (nsEmail ? byEmail.get(nsEmail) : null);
     let confidence: "exact" | "fuzzy" | null = match ? "exact" : null;
 
     if (!match && nsEmail) {
       const ln = normLocal(localPart(nsEmail));
       const cands = ln ? (byLocalNorm.get(ln) ?? []) : [];
-      if (cands.length >= 1) {
-        match = cands[0];
-        confidence = "fuzzy";
-      }
+      if (cands.length >= 1) { match = cands[0]; confidence = "fuzzy"; }
     }
 
     if (match && confidence === "exact" && !matchedProfileIds.has(match.id)) {
       matchedProfileIds.add(match.id);
       if (!dryRun) {
-        await admin
-          .from("planipret_profiles")
-          .update({
+        patches.push({
+          id: match.id,
+          patch: {
+            extension: match.extension ?? ext,
             ns_extension: ext,
             ns_domain: domain,
             ns_sip_username: sipUsername,
-            ns_linked: true,
-            ns_linked_at: new Date().toISOString(),
+            ns_linked: !!match.user_id,
+            ns_linked_at: match.user_id ? new Date().toISOString() : null,
             ns_link_method: "auto_email_match",
-            login_email: match.login_email || match.email || nsEmail,
-          })
-          .eq("id", match.id);
+            login_email: match.login_email || match.email || nsEmail || null,
+            email: match.email || nsEmail || null,
+            full_name: match.full_name || fullName,
+          },
+        });
       }
       summary.exact_matches_applied++;
-      logs.push({
-        broker_id: match.id,
-        ns_extension: ext,
-        ns_email_from_api: nsEmail || null,
-        portal_email: match.email || null,
-        match_status: "matched",
-        match_confidence: "exact",
-        reviewed: true,
-      });
+      logs.push({ broker_id: match.id, ns_extension: ext, ns_email_from_api: nsEmail || null, portal_email: match.email || null, match_status: "matched", match_confidence: "exact", reviewed: true });
     } else if (match && confidence === "fuzzy") {
       summary.fuzzy_matches_pending_review++;
-      logs.push({
-        broker_id: match.id,
-        ns_extension: ext,
-        ns_email_from_api: nsEmail || null,
-        portal_email: match.email || null,
-        match_status: "multiple_matches",
-        match_confidence: "fuzzy",
-        reviewed: false,
-      });
+      logs.push({ broker_id: match.id, ns_extension: ext, ns_email_from_api: nsEmail || null, portal_email: match.email || null, match_status: "multiple_matches", match_confidence: "fuzzy", reviewed: false });
     } else {
-      summary.no_match_ns_side++;
-      logs.push({
-        broker_id: null,
-        ns_extension: ext,
-        ns_email_from_api: nsEmail || null,
-        portal_email: null,
-        match_status: "no_match",
-        match_confidence: null,
-        reviewed: false,
-        notes: `NS user ${u["name-first-name"] ?? ""} ${u["name-last-name"] ?? ""}`.trim(),
-      });
+      // No portal profile yet → create one so the broker can log in via email later
+      if (!dryRun) {
+        inserts.push({
+          organization_id: PLANIPRET_ORG_ID,
+          user_id: null,
+          full_name: fullName,
+          email: nsEmail || null,
+          login_email: nsEmail || null,
+          extension: ext,
+          ns_extension: ext,
+          ns_domain: domain,
+          ns_sip_username: sipUsername,
+          ns_linked: false,
+          ns_link_method: "auto_email_match_create",
+          metadata: { ns_user: u, source: "ns-email-migration-match" },
+        });
+      }
+      summary.profiles_created++;
+      logs.push({ broker_id: null, ns_extension: ext, ns_email_from_api: nsEmail || null, portal_email: null, match_status: "created", match_confidence: nsEmail ? "exact" : null, reviewed: !!nsEmail, notes: fullName });
     }
+  }
+
+  // Apply patches
+  for (let i = 0; i < patches.length; i += 25) {
+    const chunk = patches.slice(i, i + 25);
+    await Promise.all(chunk.map(({ id, patch }) =>
+      admin.from("planipret_profiles").update(patch).eq("id", id)
+    ));
+  }
+  // Insert new broker profiles, dedup by (org, ns_extension)
+  for (let i = 0; i < inserts.length; i += 100) {
+    const chunk = inserts.slice(i, i + 100);
+    const { error } = await admin
+      .from("planipret_profiles")
+      .upsert(chunk, { onConflict: "organization_id,ns_extension", ignoreDuplicates: false });
+    if (error) console.error("[ns-email-migration-match] insert error:", error.message);
   }
 
   // Portal brokers with no NS extension
   const nsExtSet = new Set((nsUsers ?? []).map((u: any) => String(u.user ?? u.extension ?? "")));
   for (const p of profiles ?? []) {
     if (matchedProfileIds.has(p.id)) continue;
-    if (profilesAlreadyLinked.has(p.id) && nsExtSet.has(p.ns_extension)) continue;
+    if (p.ns_linked && p.ns_extension && nsExtSet.has(p.ns_extension)) continue;
     if (!p.email && !p.ms365_email) continue;
     summary.no_match_portal_side++;
-    logs.push({
-      broker_id: p.id,
-      ns_extension: null,
-      ns_email_from_api: null,
-      portal_email: p.email || p.ms365_email || null,
-      match_status: "no_match",
-      match_confidence: null,
-      reviewed: false,
-      notes: `Portal broker ${p.full_name ?? ""}`.trim(),
-    });
+    logs.push({ broker_id: p.id, ns_extension: null, ns_email_from_api: null, portal_email: p.email || p.ms365_email || null, match_status: "no_match", match_confidence: null, reviewed: false, notes: `Portal broker ${p.full_name ?? ""}`.trim() });
   }
 
   if (!dryRun && logs.length) {
-    // Wipe previous unreviewed rows for a clean re-run; keep history of reviewed=true
     await admin.from("planipret_ns_migration_log").delete().eq("reviewed", false);
-    // chunk insert
     for (let i = 0; i < logs.length; i += 200) {
       await admin.from("planipret_ns_migration_log").insert(logs.slice(i, i + 200));
     }
@@ -241,3 +244,4 @@ Deno.serve(async (req) => {
 
   return json({ ok: true, summary, dry_run: dryRun });
 });
+

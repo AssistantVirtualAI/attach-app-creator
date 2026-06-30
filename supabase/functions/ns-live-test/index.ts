@@ -179,26 +179,34 @@ Deno.serve(async (req) => {
       if (action === "sync_all") {
         const bg = (async () => {
           try {
-            const cdrsRes = await nsFetchAllPaginated(`/domains/${D}/cdrs`, 200, 30);
+            const end = new Date().toISOString();
+            const start = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+            const qs = `start-time=${encodeURIComponent(start)}&end-time=${encodeURIComponent(end)}`;
+            // Try canonical /cdrs?domain= first, then /domains/{D}/cdrs
+            let cdrsRes = await nsFetchAllPaginated(`/cdrs?domain=${D}&${qs}`, 200, 50);
+            if (!cdrsRes.data?.length) {
+              cdrsRes = await nsFetchAllPaginated(`/domains/${D}/cdrs?${qs}`, 200, 50);
+            }
             const { data: profs } = await admin
-              .from("planipret_profiles").select("id,ns_extension").not("ns_extension", "is", null);
+              .from("planipret_profiles").select("id,ns_extension,extension").eq("organization_id", PLANIPRET_ORG_ID);
             const extToUser = new Map<string, string>();
             for (const p of (profs ?? []) as any[]) {
-              if (p.ns_extension) extToUser.set(String(p.ns_extension), p.id);
+              const ext = String(p.ns_extension ?? p.extension ?? "").trim();
+              if (ext) extToUser.set(ext, p.id);
             }
             const rows: any[] = [];
             for (const c of cdrsRes.data) {
               const ns_call_id = String(c?.id ?? c?.["call-id"] ?? c?.cdr_id ?? c?.["orig-callid"] ?? "").trim();
               if (!ns_call_id) continue;
-              const ext = String(c?.user ?? c?.["orig-user"] ?? c?.["term-user"] ?? "").trim();
-              const user_id = extToUser.get(ext);
-              if (!user_id) continue;
+              const ext = String(c?.user ?? c?.["orig-user"] ?? c?.["term-user"] ?? c?.extension ?? "").trim();
               const started = c?.["time-start"] ?? c?.["start-time"] ?? c?.started_at ?? null;
               const answered = c?.["time-answer"] ?? c?.["answer-time"] ?? null;
               const ended = c?.["time-release"] ?? c?.["end-time"] ?? null;
               const dur = Number(c?.duration ?? c?.["time-talking"] ?? 0) || 0;
               rows.push({
-                user_id, organization_id: PLANIPRET_ORG_ID, ns_call_id, ns_domain: domain, extension: ext,
+                user_id: extToUser.get(ext) ?? null,
+                organization_id: PLANIPRET_ORG_ID,
+                ns_call_id, ns_domain: domain, extension: ext || null,
                 direction: pickDirection(c),
                 status: String(c?.["release-text"] ?? c?.disposition ?? "completed").toLowerCase(),
                 from_number: c?.["orig-from-uri"] ?? c?.from ?? c?.["from-user"] ?? null,
@@ -211,13 +219,18 @@ Deno.serve(async (req) => {
                 duration_seconds: dur, metadata: c,
               });
             }
+            let upserted = 0;
+            const errs: string[] = [];
             for (let i = 0; i < rows.length; i += 200) {
               const chunk = rows.slice(i, i + 200);
-              await admin.from("planipret_phone_calls").upsert(chunk, { onConflict: "ns_call_id", ignoreDuplicates: false });
+              const { error } = await admin.from("planipret_phone_calls").upsert(chunk, { onConflict: "ns_call_id", ignoreDuplicates: false });
+              if (error) errs.push(error.message);
+              else upserted += chunk.length;
             }
-            console.log(`[ns-live-test] CDR backfill done: ${rows.length} rows`);
+            console.log(`[ns-live-test] CDR backfill done: fetched=${cdrsRes.data.length} rows=${rows.length} upserted=${upserted} errors=${JSON.stringify(errs)}`);
           } catch (e) {
             console.error(`[ns-live-test] CDR backfill error:`, (e as Error).message);
+
           }
         })();
         // @ts-ignore EdgeRuntime is a Deno Deploy global
