@@ -216,6 +216,9 @@ export default function PlanipretIntegrations() {
             <NsMigrationPanel />
           </div>
           <NsCapabilitiesPanel domain={getField("ns_api", "domain", "planipret.ca") || "planipret.ca"} />
+          <div className="mt-4">
+            <NsSyncDashboardPanel />
+          </div>
         </IntegrationCard>
 
         {/* ───────── CARD 5 — CLAUDE IA ───────── */}
