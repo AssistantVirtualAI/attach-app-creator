@@ -268,6 +268,79 @@ async function syncMessages(admin: ReturnType<typeof createClient>, domain: stri
   return { fetched: rows.length, upserted, warning: null };
 }
 
+async function syncRecordings(admin: ReturnType<typeof createClient>, domain: string, users: any[], start: string, end: string) {
+  const { data: profiles } = await admin
+    .from("planipret_profiles")
+    .select("user_id,extension,ns_extension")
+    .eq("organization_id", AVA_ORG_ID);
+  const extToUser = new Map<string, string>();
+  for (const p of profiles ?? []) {
+    const ext = String(p.extension ?? p.ns_extension ?? "").trim();
+    if (ext && p.user_id) extToUser.set(ext, p.user_id);
+  }
+
+  const D = encodeURIComponent(domain);
+  const rawItems: Array<{ item: any; ext?: string }> = [];
+  const domainRecordings = await tryPaths([
+    `/domains/${D}/recordings?start_time=${encodeURIComponent(start)}&end_time=${encodeURIComponent(end)}`,
+    `/domains/${D}/call-recordings?start_time=${encodeURIComponent(start)}&end_time=${encodeURIComponent(end)}`,
+    `/domains/${D}/recorded-calls?start_time=${encodeURIComponent(start)}&end_time=${encodeURIComponent(end)}`,
+  ]);
+  for (const r of domainRecordings.data ?? []) rawItems.push({ item: r, ext: String(val(r, ["user", "extension", "orig-user", "term-user"], "")) || undefined });
+
+  if (rawItems.length === 0) {
+    const extensions = Array.from(new Set(users.map(userExt).filter(Boolean)));
+    for (let i = 0; i < extensions.length; i += 16) {
+      const chunk = extensions.slice(i, i + 16);
+      const results = await Promise.all(chunk.map(async (ext) => {
+        const r = await tryPaths([
+          `/domains/${D}/users/${encodeURIComponent(ext)}/recordings?start_time=${encodeURIComponent(start)}&end_time=${encodeURIComponent(end)}`,
+          `/domains/${D}/users/${encodeURIComponent(ext)}/call-recordings?start_time=${encodeURIComponent(start)}&end_time=${encodeURIComponent(end)}`,
+          `/domains/${D}/users/${encodeURIComponent(ext)}/recorded-calls?start_time=${encodeURIComponent(start)}&end_time=${encodeURIComponent(end)}`,
+        ]);
+        return { ext, data: r.data ?? [], warning: r.warning };
+      }));
+      for (const r of results) for (const item of r.data) rawItems.push({ item, ext: r.ext });
+    }
+  }
+
+  const rows: any[] = [];
+  for (const { item: rec, ext: fallbackExt } of rawItems) {
+    const url = recordingUrl(rec);
+    const id = String(val(rec, ["call_id", "call-id", "cdr_id", "cdr-id", "orig-callid", "orig_callid", "session_id", "session-id", "id", "uuid", "recording_id", "recording-id"], "")).trim();
+    if (!id || !url) continue;
+    const ext = String(val(rec, ["user", "extension", "orig-user", "term-user", "subscriber"], fallbackExt ?? "")).trim();
+    const started = toIso(val(rec, ["time-start", "start-time", "start_time", "started_at", "date", "created_at", "recorded_at", "recorded-at"]));
+    rows.push({
+      user_id: extToUser.get(ext) ?? null,
+      organization_id: AVA_ORG_ID,
+      ns_call_id: id,
+      ns_domain: domain,
+      extension: ext || null,
+      direction: pickDirection(rec, ext),
+      status: String(val(rec, ["release-text", "disposition", "status"], "completed")).toLowerCase(),
+      from_number: normalizePhone(val(rec, ["orig-from-uri", "from", "from_number", "from-user", "caller_id_number"])),
+      from_name: val(rec, ["orig-from-name", "from_name", "caller_id_name"]),
+      to_number: normalizePhone(val(rec, ["term-to-uri", "to", "to_number", "to-user", "destination"])),
+      to_name: val(rec, ["term-to-name", "to_name"]),
+      started_at: started,
+      duration_seconds: Number(val(rec, ["duration", "time-talking", "billsec", "talk_time", "recording_seconds"], 0)) || 0,
+      recording_url: url,
+      metadata: { ns_recording: rec },
+    });
+  }
+
+  let upserted = 0;
+  const errors: string[] = [];
+  for (let i = 0; i < rows.length; i += 200) {
+    const chunk = rows.slice(i, i + 200);
+    const { error } = await admin.from("planipret_phone_calls").upsert(chunk, { onConflict: "ns_call_id" });
+    if (error) errors.push(error.message);
+    else upserted += chunk.length;
+  }
+  return { fetched: rawItems.length, upserted, recordings: rows.length, warning: domainRecordings.warning, errors };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -298,8 +371,11 @@ Deno.serve(async (req) => {
     const bg = (async () => {
       try {
         const calls = await syncCalls(admin, domain, usersRes.data, start, end);
-        const messages = await syncMessages(admin, domain, start, end);
-        console.log("[pp-admin-ns-sync] completed", JSON.stringify({ domain, users: usersRes.data.length, calls, messages }));
+        const [recordings, messages] = await Promise.all([
+          syncRecordings(admin, domain, usersRes.data, start, end),
+          syncMessages(admin, domain, start, end),
+        ]);
+        console.log("[pp-admin-ns-sync] completed", JSON.stringify({ domain, users: usersRes.data.length, calls, recordings, messages }));
       } catch (e) {
         console.error("[pp-admin-ns-sync] background error", (e as Error).message);
       }
@@ -318,6 +394,7 @@ Deno.serve(async (req) => {
       extensions: usersRes.data.map(userExt).filter(Boolean).length,
       profiles_matched: profileSync.matched,
       cdr: { status: "queued_in_background", start, end },
+      recordings: { status: "queued_in_background" },
       messages: { status: "queued_in_background" },
       warning: usersRes.warning,
     });
