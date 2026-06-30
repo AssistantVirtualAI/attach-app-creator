@@ -124,8 +124,8 @@ export default function PAUsers() {
     });
   }, [rows, filter, search]);
 
-  const paged = filtered.slice((page - 1) * PAGE, page * PAGE);
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE));
+  const paged = filtered.slice((page - 1) * pageSize, page * pageSize);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
 
   const toggleField = async (u: Profile, field: "mobile_app_enabled" | "voice_agent_enabled") => {
     setSavingId(u.user_id);
