@@ -7,6 +7,7 @@ import { computeServiceFinance, computeTotals, fmtMoney, type ServiceFinance } f
 import { FinancialKpiCard } from "@/components/planipret/admin/FinancialKpiCard";
 import { RevenueBreakdown } from "@/components/planipret/admin/RevenueBreakdown";
 import { getPlanipretBrokerDirectory } from "@/lib/planipret/adminDirectory";
+import { getPlanipretCallCount } from "@/lib/planipret/adminCounts";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
   PieChart, Pie, Cell, BarChart, Bar, Legend,
@@ -110,8 +111,8 @@ export default function PAOverview() {
     const periodIso = periodAgo.toISOString();
 
     const [c1, c2, sms, smsY, ava, vm, rec, callsP, smsP, callsByDir, topCalls, svcWidget, svcAi, directory] = await Promise.all([
-      supabase.from("planipret_phone_calls").select("id", { count: "exact", head: true }).gte("started_at", todayIso),
-      supabase.from("planipret_phone_calls").select("id", { count: "exact", head: true }).gte("started_at", yestIso).lt("started_at", todayIso),
+      getPlanipretCallCount({ from: todayIso }),
+      getPlanipretCallCount({ from: yestIso, to: todayIso }),
       supabase.from("planipret_phone_messages").select("id", { count: "exact", head: true }).gte("created_at", todayIso),
       supabase.from("planipret_phone_messages").select("id", { count: "exact", head: true }).gte("created_at", yestIso).lt("created_at", todayIso),
       supabase.from("ai_request_audit_log").select("id", { count: "exact", head: true }).gte("created_at", todayIso).like("action", "elevenlabs_tool:%"),
@@ -131,7 +132,7 @@ export default function PAOverview() {
     const brokerActive = directory.count;
 
     setStats({
-      calls: c1.count ?? 0, callsYest: c2.count ?? 0,
+      calls: c1 ?? 0, callsYest: c2 ?? 0,
       brokers: brokerActive, brokersTotal: brokerTotal,
       sms: sms.count ?? 0, smsYest: smsY.count ?? 0,
       ava: ava.count ?? 0, voicemailsUnread: vm.count ?? 0,
