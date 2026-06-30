@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowDownLeft, ArrowUpRight, X, Mic, Sparkles, Download, Eye } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, X, Mic, Sparkles, Download, Eye, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
 
 const PAGE = 50;
 const ACCENT = "#2E9BDC";
@@ -92,7 +93,22 @@ export default function PACalls() {
         <Select label="Statut" value={filters.status} onChange={(v) => setFilters({ ...filters, status: v })}
           options={[{ v: "", l: "Tous" }, { v: "completed", l: "Complété" }, { v: "active", l: "Actif" }, { v: "missed", l: "Manqué" }]} />
         <Input label="Recherche" placeholder="Numéro..." value={filters.search} onChange={(v) => setFilters({ ...filters, search: v })} />
-        <button onClick={exportCsv} className="ml-auto flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm"
+        <button
+          onClick={async () => {
+            const id = toast.loading("Synchronisation NS-API…");
+            try {
+              const { data, error } = await supabase.functions.invoke("pp-admin-ns-sync", { body: {} });
+              if (error) throw error;
+              const d = data as any;
+              toast.success(`${d.extensions} ext · ${d.upserted} appels · ${d.recordings} enreg.`, { id });
+              await load(1);
+            } catch (e: any) { toast.error(`Échec: ${e.message ?? e}`, { id }); }
+          }}
+          className="ml-auto flex items-center gap-1.5 px-3 py-2 rounded-lg text-white text-sm font-medium"
+          style={{ background: "#2E9BDC" }}>
+          <RefreshCw className="w-4 h-4" /> Synchroniser NS-API
+        </button>
+        <button onClick={exportCsv} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm"
           style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>
           <Download className="w-4 h-4" /> Exporter CSV
         </button>
