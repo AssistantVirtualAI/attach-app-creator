@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  LayoutDashboard, Users, Phone, MessageSquare, Voicemail, Plug,
+  LayoutDashboard, Users, Phone, MessageSquare, Mic, Plug,
   BarChart3, LogOut, ShieldCheck, CheckSquare, Search, ChevronRight,
 } from "lucide-react";
 import SessionTimeoutModal from "@/components/planipret/SessionTimeoutModal";
@@ -32,9 +32,9 @@ const NAV: NavGroup[] = [
   {
     title: "Communications",
     items: [
-      { to: "/planipret/admin/calls",      label: "Appels",     Icon: Phone,         badge: "missed" },
-      { to: "/planipret/admin/messages",   label: "Messages",   Icon: MessageSquare },
-      { to: "/planipret/admin/voicemails", label: "Voicemails", Icon: Voicemail },
+      { to: "/planipret/admin/calls",      label: "Appels",        Icon: Phone,         badge: "missed" },
+      { to: "/planipret/admin/messages",   label: "Messages",      Icon: MessageSquare },
+      { to: "/planipret/admin/recordings", label: "Enregistrements", Icon: Mic },
     ],
   },
   {
@@ -52,7 +52,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/planipret/admin/users": "Gestion des courtiers",
   "/planipret/admin/calls": "Historique des appels",
   "/planipret/admin/messages": "Messages",
-  "/planipret/admin/voicemails": "Boîtes vocales",
+  "/planipret/admin/recordings": "Enregistrements d'appels",
   "/planipret/admin/integrations": "Intégrations",
   "/planipret/admin/reports": "Rapports & Analytics",
   "/planipret/admin/audit-checklist": "Audit système",
@@ -81,7 +81,7 @@ export default function PlanipretAdminLayout() {
     const MAP: Record<string, string> = {
       o: "/planipret/admin/overview", u: "/planipret/admin/users",
       c: "/planipret/admin/calls", m: "/planipret/admin/messages",
-      v: "/planipret/admin/voicemails", r: "/planipret/admin/reports",
+      v: "/planipret/admin/recordings", r: "/planipret/admin/reports",
       i: "/planipret/admin/integrations",
     };
     const isTyping = (e: KeyboardEvent) => {
