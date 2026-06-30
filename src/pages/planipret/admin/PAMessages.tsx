@@ -1,50 +1,96 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { X, ArrowDownLeft, ArrowUpRight, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+import Pagination from "@/components/planipret/admin/Pagination";
+import DebugPanel, { type DebugEntry } from "@/components/planipret/admin/DebugPanel";
+import { TableErrorState, TableEmptyState } from "@/components/planipret/admin/TableStates";
 
 const ACCENT = "#2E9BDC";
 const SUCCESS = "#00D4AA";
 
-const PAGE = 50;
-
 export default function PAMessages() {
   const [rows, setRows] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
+  const [brokers, setBrokers] = useState<any[]>([]);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [thread, setThread] = useState<any[] | null>(null);
   const [threadKey, setThreadKey] = useState<string | null>(null);
+  const [broker, setBroker] = useState("");
   const [direction, setDirection] = useState("");
+  const [status, setStatus] = useState("");
   const [from, setFrom] = useState(""); const [to, setTo] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [debug, setDebug] = useState<DebugEntry[]>([]);
   const [syncing, setSyncing] = useState(false);
+
+  const hasFilters = !!(broker || direction || status || from || to);
+  const activeFilterCount = [broker, direction, status, from, to].filter(Boolean).length;
+  const resetFilters = () => { setBroker(""); setDirection(""); setStatus(""); setFrom(""); setTo(""); };
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.functions.invoke("pp-ns-users", { body: {} });
+      if ((data as any)?.ok) setBrokers((data as any).brokers ?? []);
+      else {
+        const { data: local } = await supabase.from("planipret_profiles").select("user_id, full_name, extension").order("full_name");
+        setBrokers(local ?? []);
+      }
+    })();
+  }, []);
 
   const brokerName = (m: any) => m.planipret_profiles?.full_name ?? m.metadata?.user_name ?? m.metadata?.extension_name ?? (m.metadata?.extension ? `Ext. ${m.metadata.extension}` : "—");
 
-  const load = async (p = page) => {
-    const fromIdx = (p - 1) * PAGE;
+  const load = async (p = page, ps = pageSize) => {
+    setLoading(true);
+    setLoadError(null);
+    const dbg: DebugEntry[] = [];
+    const t0 = performance.now();
+    const fromIdx = (p - 1) * ps;
     let q = supabase.from("planipret_phone_messages")
       .select("*, planipret_profiles(full_name)", { count: "exact" })
       .order("created_at", { ascending: false })
-      .range(fromIdx, fromIdx + PAGE - 1);
+      .range(fromIdx, fromIdx + ps - 1);
+    if (broker?.startsWith("ext:")) q = q.eq("metadata->>extension", broker.slice(4));
+    else if (broker?.startsWith("user:")) q = q.eq("user_id", broker.slice(5));
     if (direction) q = q.eq("direction", direction);
+    if (status) q = q.eq("status", status);
     if (from) q = q.gte("created_at", from);
     if (to) q = q.lte("created_at", to);
-    const { data, count } = await q;
-    setRows(data ?? []);
-    setTotal(count ?? 0);
+    const { data, count, error } = await q;
+    dbg.push({
+      label: "planipret_phone_messages (page)",
+      query: `SELECT * FROM planipret_phone_messages ORDER BY created_at DESC LIMIT ${ps} OFFSET ${fromIdx}`,
+      count,
+      ms: Math.round(performance.now() - t0),
+      error: error?.message ?? null,
+      meta: { broker, direction, status, from, to },
+      sample: (data ?? []).slice(0, 3),
+    });
+    if (error) {
+      setLoadError(error.message);
+      setRows([]); setTotal(0);
+    } else {
+      setRows(data ?? []);
+      setTotal(count ?? 0);
+    }
+    setDebug(dbg);
+    setLoading(false);
   };
 
-  useEffect(() => { setPage(1); load(1); /* eslint-disable-next-line */ }, [direction, from, to]);
-  useEffect(() => { load(page); /* eslint-disable-next-line */ }, [page]);
+  useEffect(() => { setPage(1); load(1, pageSize); /* eslint-disable-next-line */ }, [broker, direction, status, from, to]);
+  useEffect(() => { load(page, pageSize); /* eslint-disable-next-line */ }, [page, pageSize]);
 
   useEffect(() => {
     const ch = supabase.channel("admin-messages")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "planipret_phone_messages" }, () => load(1))
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "planipret_phone_messages" }, () => load(1, pageSize))
       .subscribe();
     return () => { supabase.removeChannel(ch); };
     // eslint-disable-next-line
   }, []);
-
 
   const openThread = async (m: any) => {
     const peer = m.direction === "outbound" ? m.to_number : m.from_number;
@@ -61,7 +107,7 @@ export default function PAMessages() {
       const { data, error } = await supabase.functions.invoke("pp-admin-ns-sync", { body: {} });
       if (error) throw error;
       toast.success(`${(data as any)?.extensions ?? (data as any)?.users_total ?? 0} extensions synchronisées · messages en arrière-plan`, { id });
-      await load(1);
+      await load(1, pageSize);
     } catch (e: any) { toast.error(`Échec: ${e.message ?? e}`, { id }); }
     finally { setSyncing(false); }
   };
@@ -70,19 +116,40 @@ export default function PAMessages() {
 
   return (
     <div className="space-y-4">
+      <DebugPanel entries={debug} />
+
       <div className="pp-card p-4 flex flex-wrap items-end gap-2">
+        <select value={broker} onChange={(e) => setBroker(e.target.value)} className="px-3 py-1.5 rounded-lg text-sm" style={inputStyle}>
+          <option value="">Tous courtiers</option>
+          {brokers.map((b: any) => (
+            <option key={b.user_id} value={b.ns_only ? `ext:${b.extension}` : `user:${b.user_id}`}>{b.full_name}{b.extension ? ` · ${b.extension}` : ""}</option>
+          ))}
+        </select>
         <select value={direction} onChange={(e) => setDirection(e.target.value)} className="px-3 py-1.5 rounded-lg text-sm" style={inputStyle}>
-          <option value="" style={{ background: "var(--pp-bg-deep)" }}>Toutes directions</option>
-          <option value="inbound" style={{ background: "var(--pp-bg-deep)" }}>Entrant</option>
-          <option value="outbound" style={{ background: "var(--pp-bg-deep)" }}>Sortant</option>
+          <option value="">Toutes directions</option>
+          <option value="inbound">Reçu</option>
+          <option value="outbound">Envoyé</option>
+        </select>
+        <select value={status} onChange={(e) => setStatus(e.target.value)} className="px-3 py-1.5 rounded-lg text-sm" style={inputStyle}>
+          <option value="">Tous statuts</option>
+          <option value="delivered">Livré</option>
+          <option value="failed">Échoué</option>
+          <option value="pending">En attente</option>
         </select>
         <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="px-3 py-1.5 rounded-lg text-sm" style={inputStyle} />
         <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="px-3 py-1.5 rounded-lg text-sm" style={inputStyle} />
+        {hasFilters && (
+          <button onClick={resetFilters} className="px-2 py-1.5 text-xs underline" style={{ color: "var(--pp-text-muted)" }}>
+            ✕ Réinitialiser ({activeFilterCount})
+          </button>
+        )}
         <button onClick={syncAll} disabled={syncing} className="ml-auto flex items-center gap-1.5 px-3 py-2 rounded-lg text-white text-sm font-medium disabled:opacity-50" style={{ background: ACCENT }}>
           <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} /> Synchroniser NS-API
         </button>
       </div>
+
       <div className="pp-card overflow-hidden">
+        {loadError && <TableErrorState message={loadError} onRetry={() => load(page, pageSize)} />}
         <table className="w-full text-sm">
           <thead style={{ background: "var(--pp-bg-elevated)" }}>
             <tr style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--pp-text-faint)" }} className="text-left">
@@ -90,31 +157,56 @@ export default function PAMessages() {
             </tr>
           </thead>
           <tbody>
-            {rows.length === 0 ? <tr><td colSpan={6} className="p-8 text-center" style={{ color: "var(--pp-text-faint)" }}>Aucun message synchronisé. Lancez la synchronisation NS-API.</td></tr> :
-              rows.map((m) => {
-                const out = m.direction === "outbound";
-                const Icon = out ? ArrowUpRight : ArrowDownLeft;
-                return (
-                  <tr key={m.id} className="cursor-pointer hover:bg-white/[0.02]" style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }} onClick={() => openThread(m)}>
-                    <td className="p-3" style={{ color: "var(--pp-text-primary)" }}>{brokerName(m)}</td>
-                    <td><Icon className="w-3.5 h-3.5" style={{ color: out ? SUCCESS : ACCENT }} /></td>
-                    <td style={{ color: "var(--pp-text-secondary)" }}>{m.from_number}</td>
-                    <td style={{ color: "var(--pp-text-secondary)" }}>{m.to_number}</td>
-                    <td className="truncate max-w-[300px]" style={{ color: "var(--pp-text-muted)" }}>{(m.body ?? "").slice(0, 60)}</td>
-                    <td style={{ fontSize: 11, color: "var(--pp-text-faint)" }}>{new Date(m.created_at).toLocaleString("fr-CA")}</td>
-                  </tr>
-                );
-              })}
+            {loading ? (
+              Array.from({ length: 6 }).map((_, i) => (
+                <tr key={i} style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}>
+                  {Array.from({ length: 6 }).map((_, j) => (
+                    <td key={j} className="p-3"><div className="h-3 w-3/4 animate-pulse rounded" style={{ background: "var(--pp-bg-elevated)" }} /></td>
+                  ))}
+                </tr>
+              ))
+            ) : rows.length === 0 ? (
+              <tr><td colSpan={6}>
+                <TableEmptyState
+                  icon="💬"
+                  title="Aucun message trouvé"
+                  hint={hasFilters
+                    ? "Essayez d'élargir vos critères de recherche."
+                    : "Aucun message synchronisé. Vérifiez que le webhook NS-API est configuré dans Intégrations, puis lancez « Synchroniser NS-API »."}
+                  action={hasFilters ? (
+                    <button onClick={resetFilters} className="px-3 py-1.5 rounded-lg text-xs font-medium text-white" style={{ background: ACCENT }}>Réinitialiser les filtres</button>
+                  ) : (
+                    <Link to="/planipret/admin/integrations" className="px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>
+                      Aller aux intégrations →
+                    </Link>
+                  )}
+                />
+              </td></tr>
+            ) : rows.map((m) => {
+              const out = m.direction === "outbound";
+              const Icon = out ? ArrowUpRight : ArrowDownLeft;
+              return (
+                <tr key={m.id} className="cursor-pointer hover:bg-white/[0.02]" style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }} onClick={() => openThread(m)}>
+                  <td className="p-3" style={{ color: "var(--pp-text-primary)" }}>{brokerName(m)}</td>
+                  <td><Icon className="w-3.5 h-3.5" style={{ color: out ? SUCCESS : ACCENT }} /></td>
+                  <td style={{ color: "var(--pp-text-secondary)" }}>{m.from_number}</td>
+                  <td style={{ color: "var(--pp-text-secondary)" }}>{m.to_number}</td>
+                  <td className="truncate max-w-[300px]" style={{ color: "var(--pp-text-muted)" }}>{(m.body ?? "").slice(0, 60)}</td>
+                  <td style={{ fontSize: 11, color: "var(--pp-text-faint)" }}>{new Date(m.created_at).toLocaleString("fr-CA")}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
-        <div className="flex items-center justify-between px-4 py-3" style={{ borderTop: "1px solid var(--pp-bg-border-2)", fontSize: 11, color: "var(--pp-text-muted)" }}>
-          <span>{total === 0 ? 0 : (page - 1) * PAGE + 1}–{Math.min(page * PAGE, total)} sur {total}</span>
-          <div className="flex gap-1">
-            <button disabled={page === 1} onClick={() => setPage(page - 1)} className="px-2 py-1 rounded disabled:opacity-40" style={{ border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>←</button>
-            <span className="px-3 py-1">{page} / {Math.max(1, Math.ceil(total / PAGE))}</span>
-            <button disabled={page >= Math.ceil(total / PAGE)} onClick={() => setPage(page + 1)} className="px-2 py-1 rounded disabled:opacity-40" style={{ border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>→</button>
-          </div>
-        </div>
+        <Pagination
+          page={page}
+          pageSize={pageSize}
+          total={total}
+          loading={loading}
+          onPageChange={setPage}
+          onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
+          unit="messages"
+        />
       </div>
 
       {thread && (
