@@ -7,6 +7,7 @@ import Pagination from "@/components/planipret/admin/Pagination";
 import DebugPanel, { type DebugEntry } from "@/components/planipret/admin/DebugPanel";
 import { TableErrorState, TableEmptyState } from "@/components/planipret/admin/TableStates";
 import { getPlanipretBrokerDirectory } from "@/lib/planipret/adminDirectory";
+import { applyPlanipretCallFilters } from "@/lib/planipret/adminCounts";
 
 const ACCENT = "#2E9BDC";
 const SUCCESS = "#00D4AA";
@@ -58,18 +59,9 @@ export default function PACalls() {
   const brokerName = (r: any) => r.planipret_profiles?.full_name ?? r.metadata?.ns_user?.name ?? r.metadata?.user_name ?? r.metadata?.extension_name ?? (r.extension ? `Ext. ${r.extension}` : "—");
 
   const buildQuery = (forCount = false) => {
-    let q = supabase.from("planipret_phone_calls")
+    const q = supabase.from("planipret_phone_calls")
       .select(forCount ? "id" : "*, planipret_profiles(full_name)", { count: "exact", head: forCount });
-    if (filters.broker?.startsWith("ext:")) q = q.eq("extension", filters.broker.slice(4));
-    else if (filters.broker?.startsWith("user:")) q = q.eq("user_id", filters.broker.slice(5));
-    if (filters.from) q = q.gte("started_at", filters.from);
-    if (filters.to) q = q.lte("started_at", filters.to);
-    if (filters.direction) q = q.eq("direction", filters.direction);
-    if (filters.status) q = q.eq("status", filters.status);
-    if (filters.ai === "yes") q = q.not("ai_summary", "is", null);
-    if (filters.ai === "no") q = q.is("ai_summary", null);
-    if (filters.search) q = q.or(`from_number.ilike.%${filters.search}%,to_number.ilike.%${filters.search}%`);
-    return q;
+    return applyPlanipretCallFilters(q, filters);
   };
 
   const load = async (p = page, ps = pageSize) => {
