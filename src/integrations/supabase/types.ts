@@ -8513,7 +8513,15 @@ export type Database = {
           updated_at?: string
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_phone_calls_profile"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "planipret_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       planipret_phone_messages: {
         Row: {
@@ -8570,7 +8578,15 @@ export type Database = {
           updated_at?: string
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_phone_messages_profile"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "planipret_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       planipret_pipeline: {
         Row: {
@@ -9337,7 +9353,15 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_voicemails_profile"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "planipret_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       platform_branding: {
         Row: {
