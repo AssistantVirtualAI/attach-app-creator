@@ -1,5 +1,6 @@
 // supabase/functions/ns-live-test/index.ts
-// Live NS-API v2 integration test — exercises all read endpoints + supports sync.
+// Live NS-API v2 integration — exercises endpoints, paginates fully,
+// syncs extensions + CDRs.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -13,6 +14,7 @@ const NS_API_KEY = Deno.env.get("NS_API_KEY") ?? "";
 const NS_API_BASE_URL =
   Deno.env.get("NS_API_BASE_URL") ?? "https://voice.ava-telecom.ca/ns-api/v2";
 const NS_DEFAULT_DOMAIN = Deno.env.get("NS_DEFAULT_DOMAIN") ?? "planipret.ca";
+const PLANIPRET_ORG_ID = "17d6507f-a9ca-409d-8e49-371d50332615";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -53,11 +55,62 @@ async function nsFetch(path: string) {
   }
 }
 
+/** Try first path; if it fails, fall back to alternates. Returns first success or last failure. */
+async function nsFetchWithFallback(paths: string[]) {
+  let last: any = null;
+  for (const p of paths) {
+    const r = await nsFetch(p);
+    if (r.success) return { ...r, _path: p };
+    last = { ...r, _path: p };
+  }
+  return last;
+}
+
+/** Paginate by offset until result < limit. Returns flat array + meta. */
+async function nsFetchAllPaginated(
+  basePath: string,
+  pageSize = 200,
+  maxPages = 25,
+): Promise<{ success: boolean; status: number; data: any[]; pages: number; latency_ms: number; error?: string }> {
+  const t0 = performance.now();
+  const all: any[] = [];
+  let pages = 0;
+  let lastStatus = 0;
+  for (let i = 0; i < maxPages; i++) {
+    const sep = basePath.includes("?") ? "&" : "?";
+    const r = await nsFetch(`${basePath}${sep}limit=${pageSize}&offset=${i * pageSize}`);
+    lastStatus = r.status;
+    if (!r.success) {
+      return {
+        success: all.length > 0,
+        status: lastStatus,
+        data: all,
+        pages,
+        latency_ms: Math.round(performance.now() - t0),
+        error: r.error ?? `HTTP ${r.status}`,
+      };
+    }
+    pages++;
+    const arr = Array.isArray(r.data) ? r.data : [];
+    all.push(...arr);
+    if (arr.length < pageSize) break;
+  }
+  return { success: true, status: lastStatus || 200, data: all, pages, latency_ms: Math.round(performance.now() - t0) };
+}
+
+function pickDirection(c: any): "inbound" | "outbound" | "missed" {
+  const d = String(c?.direction ?? c?.["call-direction"] ?? "").toLowerCase();
+  if (d.includes("out")) return "outbound";
+  const disp = String(c?.["release-text"] ?? c?.disposition ?? "").toLowerCase();
+  const answered = c?.["time-answer"] ?? c?.answered_at ?? c?.["answered-at"];
+  if (!answered && disp.includes("miss")) return "missed";
+  return "inbound";
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    // Auth — require an authenticated Supabase user.
     const authHeader = req.headers.get("Authorization") ?? "";
     const supa = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       global: { headers: { Authorization: authHeader } },
@@ -68,39 +121,29 @@ Deno.serve(async (req) => {
     if (!NS_API_KEY) return json({ error: "NS_API_KEY missing in secrets" }, 500);
 
     let body: any = {};
-    if (req.method === "POST") {
-      try { body = await req.json(); } catch { body = {}; }
-    }
+    if (req.method === "POST") { try { body = await req.json(); } catch { body = {}; } }
     const action = body?.action ?? "test";
     const domain = (body?.domain ?? NS_DEFAULT_DOMAIN).trim();
+    const D = encodeURIComponent(domain);
 
-    // ─── ACTION: sync ──────────────────────────────────────────────
-    // Matches NS users to planipret_profiles by email & updates extensions.
-    if (action === "sync") {
-      const usersRes = await nsFetch(`/domains/${encodeURIComponent(domain)}/users`);
-      if (!usersRes.success || !Array.isArray(usersRes.data)) {
-        return json({ error: "Cannot fetch users from NS-API", ns: usersRes }, 502);
-      }
-      const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // ─── ACTION: sync (users → planipret_profiles) ─────────────────
+    if (action === "sync" || action === "sync_all") {
+      const usersRes = await nsFetchAllPaginated(`/domains/${D}/users`);
+      if (!usersRes.success) return json({ error: "Cannot fetch users from NS-API", ns: usersRes }, 502);
+
       const matched: any[] = [];
       const unmatched: any[] = [];
       for (const u of usersRes.data) {
         const email = (u.email ?? "").toLowerCase().trim();
         const ext = String(u.user ?? "").trim();
         if (!ext) continue;
-        if (!email) {
-          unmatched.push({ extension: ext, name: `${u["name-first-name"] ?? ""} ${u["name-last-name"] ?? ""}`.trim(), reason: "no_email" });
-          continue;
-        }
+        const display = `${u["name-first-name"] ?? ""} ${u["name-last-name"] ?? ""}`.trim();
+        if (!email) { unmatched.push({ extension: ext, name: display, reason: "no_email" }); continue; }
         const { data: prof } = await admin
-          .from("planipret_profiles")
-          .select("id,email")
-          .ilike("email", email)
-          .maybeSingle();
-        if (!prof) {
-          unmatched.push({ extension: ext, name: `${u["name-first-name"] ?? ""} ${u["name-last-name"] ?? ""}`.trim(), email, reason: "no_profile" });
-          continue;
-        }
+          .from("planipret_profiles").select("id,email").ilike("email", email).maybeSingle();
+        if (!prof) { unmatched.push({ extension: ext, name: display, email, reason: "no_profile" }); continue; }
         const { error: upErr } = await admin
           .from("planipret_profiles")
           .update({
@@ -111,20 +154,85 @@ Deno.serve(async (req) => {
             ns_linked_at: new Date().toISOString(),
           })
           .eq("id", prof.id);
-        if (upErr) {
-          unmatched.push({ extension: ext, email, reason: `update_failed: ${upErr.message}` });
+        if (upErr) unmatched.push({ extension: ext, email, reason: `update_failed: ${upErr.message}` });
+        else matched.push({ extension: ext, email, profile_id: prof.id });
+      }
+
+      // ─── If sync_all → also pull CDRs and upsert into planipret_phone_calls ───
+      let cdr_inserted = 0, cdr_skipped = 0, cdr_total = 0, cdr_error: string | null = null;
+      if (action === "sync_all") {
+        const cdrsRes = await nsFetchAllPaginated(`/domains/${D}/cdrs`, 200, 30);
+        cdr_total = cdrsRes.data.length;
+        if (!cdrsRes.success && !cdrsRes.data.length) {
+          cdr_error = cdrsRes.error ?? "fetch_failed";
         } else {
-          matched.push({ extension: ext, email, profile_id: prof.id });
+          // Build ext→user_id map
+          const { data: profs } = await admin
+            .from("planipret_profiles")
+            .select("id,ns_extension")
+            .not("ns_extension", "is", null);
+          const extToUser = new Map<string, string>();
+          for (const p of (profs ?? []) as any[]) {
+            if (p.ns_extension) extToUser.set(String(p.ns_extension), p.id);
+          }
+
+          const rows: any[] = [];
+          for (const c of cdrsRes.data) {
+            const ns_call_id = String(c?.id ?? c?.["call-id"] ?? c?.cdr_id ?? c?.["orig-callid"] ?? "").trim();
+            if (!ns_call_id) { cdr_skipped++; continue; }
+            const ext = String(c?.user ?? c?.["orig-user"] ?? c?.["term-user"] ?? "").trim();
+            const user_id = extToUser.get(ext);
+            if (!user_id) { cdr_skipped++; continue; }
+            const started = c?.["time-start"] ?? c?.["start-time"] ?? c?.started_at ?? null;
+            const answered = c?.["time-answer"] ?? c?.["answer-time"] ?? null;
+            const ended = c?.["time-release"] ?? c?.["end-time"] ?? null;
+            const dur = Number(c?.duration ?? c?.["time-talking"] ?? 0) || 0;
+            rows.push({
+              user_id,
+              organization_id: PLANIPRET_ORG_ID,
+              ns_call_id,
+              ns_domain: domain,
+              extension: ext,
+              direction: pickDirection(c),
+              status: String(c?.["release-text"] ?? c?.disposition ?? "completed").toLowerCase(),
+              from_number: c?.["orig-from-uri"] ?? c?.from ?? c?.["from-user"] ?? null,
+              from_name: c?.["orig-from-name"] ?? c?.from_name ?? null,
+              to_number: c?.["term-to-uri"] ?? c?.to ?? c?.["to-user"] ?? null,
+              to_name: c?.["term-to-name"] ?? c?.to_name ?? null,
+              started_at: started ? new Date(started).toISOString() : null,
+              answered_at: answered ? new Date(answered).toISOString() : null,
+              ended_at: ended ? new Date(ended).toISOString() : null,
+              duration_seconds: dur,
+              metadata: c,
+            });
+          }
+          // Upsert in chunks of 200
+          for (let i = 0; i < rows.length; i += 200) {
+            const chunk = rows.slice(i, i + 200);
+            const { error: insErr, count } = await admin
+              .from("planipret_phone_calls")
+              .upsert(chunk, { onConflict: "ns_call_id", ignoreDuplicates: false, count: "exact" });
+            if (insErr) { cdr_error = insErr.message; break; }
+            cdr_inserted += count ?? chunk.length;
+          }
         }
       }
-      return json({ ok: true, matched_count: matched.length, unmatched_count: unmatched.length, matched, unmatched });
+
+      return json({
+        ok: true,
+        matched_count: matched.length,
+        unmatched_count: unmatched.length,
+        users_total: usersRes.data.length,
+        users_pages: usersRes.pages,
+        matched, unmatched,
+        cdr: action === "sync_all" ? { total: cdr_total, inserted: cdr_inserted, skipped: cdr_skipped, error: cdr_error } : undefined,
+      });
     }
 
-    // ─── ACTION: link (manual single broker link) ──────────────────
+    // ─── ACTION: link ──────────────────────────────────────────────
     if (action === "link") {
       const { profile_id, extension, sip_username } = body ?? {};
       if (!profile_id || !extension) return json({ error: "profile_id and extension required" }, 400);
-      const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
       const { error: upErr } = await admin
         .from("planipret_profiles")
         .update({
@@ -139,48 +247,57 @@ Deno.serve(async (req) => {
       return json({ ok: true });
     }
 
-    // ─── ACTION: test (default — exercise all endpoints) ────────────
+    // ─── ACTION: test ──────────────────────────────────────────────
     const tStart = performance.now();
-    const [version, dom, users, active_calls, cdrs, devices, phone_numbers, registrations, call_queues] =
+    const [version, dom, usersAll, active_calls, cdrsAll, devicesAll, phone_numbers, registrationsAll, call_queues] =
       await Promise.all([
         nsFetch(`/version`),
-        nsFetch(`/domains/${encodeURIComponent(domain)}`),
-        nsFetch(`/domains/${encodeURIComponent(domain)}/users`),
-        nsFetch(`/domains/${encodeURIComponent(domain)}/calls`),
-        nsFetch(`/domains/${encodeURIComponent(domain)}/cdrs?limit=10`),
-        nsFetch(`/domains/${encodeURIComponent(domain)}/devices`),
-        nsFetch(`/domains/${encodeURIComponent(domain)}/phonenumbers`),
-        nsFetch(`/domains/${encodeURIComponent(domain)}/registrations`),
-        nsFetch(`/domains/${encodeURIComponent(domain)}/callqueues`),
+        nsFetch(`/domains/${D}`),
+        nsFetchAllPaginated(`/domains/${D}/users`),
+        nsFetch(`/domains/${D}/calls`),
+        nsFetchAllPaginated(`/domains/${D}/cdrs`, 200, 5), // sample up to 1000 for test
+        nsFetchAllPaginated(`/domains/${D}/devices`),
+        nsFetchWithFallback([
+          `/domains/${D}/phonenumbers?limit=500`,
+          `/domains/${D}/phone-numbers?limit=500`,
+          `/domains/${D}/numbers?limit=500`,
+        ]),
+        nsFetchAllPaginated(`/domains/${D}/registrations`),
+        nsFetchWithFallback([
+          `/domains/${D}/callqueues?limit=500`,
+          `/domains/${D}/call-queues?limit=500`,
+          `/domains/${D}/queues?limit=500`,
+        ]),
       ]);
 
+    const usersData = usersAll.data;
     const results: Record<string, any> = {
       version,
       domain: { ...dom, data: Array.isArray(dom.data) ? dom.data[0] : dom.data },
       users: {
-        ...users,
-        count: Array.isArray(users.data) ? users.data.length : 0,
-        data: Array.isArray(users.data)
-          ? users.data.map((u: any) => ({
-              extension: u.user,
-              name: `${u["name-first-name"] ?? ""} ${u["name-last-name"] ?? ""}`.trim() || u["display-name"] || u.user,
-              email: u.email ?? "",
-              scope: u["user-scope"] ?? "",
-              status: u["account-status"] ?? "",
-              active_calls: u["active-calls-total-current"] ?? 0,
-              presence: u["user-presence-status"] ?? "",
-              voicemail: u["voicemail-enabled"] ?? "",
-              timezone: u["time-zone"] ?? "",
-              login: u["login-username"] ?? "",
-              raw: u,
-            }))
-          : [],
+        success: usersAll.success,
+        status: usersAll.status,
+        latency_ms: usersAll.latency_ms,
+        pages: usersAll.pages,
+        count: usersData.length,
+        data: usersData.map((u: any) => ({
+          extension: u.user,
+          name: `${u["name-first-name"] ?? ""} ${u["name-last-name"] ?? ""}`.trim() || u["display-name"] || u.user,
+          email: u.email ?? "",
+          scope: u["user-scope"] ?? "",
+          status: u["account-status"] ?? "",
+          active_calls: u["active-calls-total-current"] ?? 0,
+          presence: u["user-presence-status"] ?? "",
+          voicemail: u["voicemail-enabled"] ?? "",
+          timezone: u["time-zone"] ?? "",
+          login: u["login-username"] ?? "",
+        })),
       },
       active_calls: { ...active_calls, count: Array.isArray(active_calls.data) ? active_calls.data.length : 0 },
-      cdrs: { ...cdrs, count: Array.isArray(cdrs.data) ? cdrs.data.length : 0 },
-      devices: { ...devices, count: Array.isArray(devices.data) ? devices.data.length : 0 },
+      cdrs: { success: cdrsAll.success, status: cdrsAll.status, latency_ms: cdrsAll.latency_ms, count: cdrsAll.data.length, pages: cdrsAll.pages },
+      devices: { success: devicesAll.success, status: devicesAll.status, latency_ms: devicesAll.latency_ms, count: devicesAll.data.length, pages: devicesAll.pages },
       phone_numbers: { ...phone_numbers, count: Array.isArray(phone_numbers.data) ? phone_numbers.data.length : 0 },
-      registrations: { ...registrations, count: Array.isArray(registrations.data) ? registrations.data.length : 0 },
+      registrations: { success: registrationsAll.success, status: registrationsAll.status, latency_ms: registrationsAll.latency_ms, count: registrationsAll.data.length, data: registrationsAll.data, pages: registrationsAll.pages },
       call_queues: { ...call_queues, count: Array.isArray(call_queues.data) ? call_queues.data.length : 0 },
     };
 
@@ -191,10 +308,8 @@ Deno.serve(async (req) => {
     return json({
       summary: {
         total_tests: Object.keys(results).length,
-        passed,
-        failed,
-        domain,
-        base_url: NS_API_BASE_URL,
+        passed, failed,
+        domain, base_url: NS_API_BASE_URL,
         total_latency_ms,
         tested_at: new Date().toISOString(),
       },
