@@ -33,7 +33,7 @@ async function fetchAll(basePath: string, pageSize = 200, maxPages = 30) {
   let warning: string | null = null;
   for (let i = 0; i < maxPages; i++) {
     const sep = basePath.includes("?") ? "&" : "?";
-    const r = await nsFetch(`${basePath}${sep}limit=${pageSize}&offset=${i * pageSize}`);
+    const r = await nsFetch(`${basePath}${sep}limit=${pageSize}&start=${i * pageSize + 1}`);
     if (!r.ok) {
       warning = `HTTP ${r.status}: ${String(r.text ?? "").slice(0, 180)}`;
       break;

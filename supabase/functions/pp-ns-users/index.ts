@@ -32,7 +32,8 @@ async function fetchAllUsers(domain: string): Promise<{ ok: boolean; data: any[]
   const pageSize = 200;
   let prevSize = -1;
   for (let i = 0; i < 25; i++) {
-    const r = await nsFetch(`/domains/${encodeURIComponent(domain)}/users?limit=${pageSize}&offset=${i * pageSize}`);
+    const start = i * pageSize + 1;
+    const r = await nsFetch(`/domains/${encodeURIComponent(domain)}/users?limit=${pageSize}&start=${start}`);
     if (!r.ok) {
       return { ok: all.length > 0, data: all, warning: `NS-API users fetch failed: ${r.status} ${r.text.slice(0, 200)}` };
     }
@@ -47,7 +48,7 @@ async function fetchAllUsers(domain: string): Promise<{ ok: boolean; data: any[]
       all.push(u);
       added++;
     }
-    // NS-API ignores offset → returns same page repeatedly. Stop when no new uniques.
+    // NS-API v2 paginates with START/LIMIT. Stop if an install still repeats a page.
     if (added === 0) break;
     if (arr.length < pageSize) break;
     if (all.length === prevSize) break;
@@ -125,7 +126,7 @@ Deno.serve(async (req) => {
       };
     }).filter((b: any) => b.extension && !/@lemtel\.com$/i.test(String(b.email || "").trim()));
 
-    return json({ ok: true, count: brokers.length, domain, brokers, ns_warning: nsWarning, degraded: !!nsWarning });
+    return json({ ok: true, count: brokers.length, domain, brokers, ns_warning: nsWarning, degraded: !!nsWarning, strategy: "start_limit_dedupe_by_extension" });
   } catch (e) {
     return json({ error: (e as Error).message }, 500);
   }

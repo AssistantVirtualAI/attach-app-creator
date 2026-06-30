@@ -1,28 +1,41 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Mic, Sparkles, RefreshCw, X, Download, Play } from "lucide-react";
 import Pagination from "@/components/planipret/admin/Pagination";
 import DebugPanel, { type DebugEntry } from "@/components/planipret/admin/DebugPanel";
 import { TableErrorState, TableEmptyState } from "@/components/planipret/admin/TableStates";
+import { getPlanipretBrokerDirectory } from "@/lib/planipret/adminDirectory";
 
 const ACCENT = "#2E9BDC";
 const AGENT = "#9B7FE8";
 
 export default function PARecordings() {
+  const [params, setParams] = useSearchParams();
+  const page = Math.max(1, parseInt(params.get("page") ?? "1", 10) || 1);
+  const pageSizeRaw = parseInt(params.get("pageSize") ?? params.get("ps") ?? "25", 10);
+  const pageSize = [25, 50, 100].includes(pageSizeRaw) ? pageSizeRaw : 25;
+  const search = params.get("search") ?? "";
+  const broker = params.get("broker") ?? "";
+  const from = params.get("from") ?? "";
+  const to = params.get("to") ?? "";
+  const withTranscript = (params.get("transcript") ?? "") as "" | "yes" | "no";
+  const updateParams = (patch: Record<string, string | null>, resetPage = false) => {
+    const next = new URLSearchParams(params);
+    Object.entries(patch).forEach(([k, v]) => { if (v == null || v === "") next.delete(k); else next.set(k, v); });
+    if (resetPage) next.set("page", "1");
+    setParams(next, { replace: true });
+  };
+  const setPage = (p: number) => updateParams({ page: String(p) });
+  const setPageSize = (s: number) => updateParams({ pageSize: String(s), ps: null }, true);
+  const setFilterValue = (key: "search" | "broker" | "from" | "to" | "transcript", value: string) => updateParams({ [key]: value }, true);
+  const resetFilters = () => updateParams({ search: null, broker: null, from: null, to: null, transcript: null }, true);
   const [rows, setRows] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [brokers, setBrokers] = useState<any[]>([]);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  const [search, setSearch] = useState("");
-  const [broker, setBroker] = useState("");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
-  const [withTranscript, setWithTranscript] = useState<"" | "yes" | "no">("");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [debug, setDebug] = useState<DebugEntry[]>([]);
   const [detail, setDetail] = useState<any | null>(null);
@@ -30,16 +43,11 @@ export default function PARecordings() {
 
   const hasFilters = !!(search || broker || from || to || withTranscript);
   const activeFilterCount = [search, broker, from, to, withTranscript].filter(Boolean).length;
-  const resetFilters = () => { setSearch(""); setBroker(""); setFrom(""); setTo(""); setWithTranscript(""); };
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.functions.invoke("pp-ns-users", { body: {} });
-      if ((data as any)?.ok) setBrokers((data as any).brokers ?? []);
-      else {
-        const { data: local } = await supabase.from("planipret_profiles").select("user_id, full_name, extension").order("full_name");
-        setBrokers(local ?? []);
-      }
+      const directory = await getPlanipretBrokerDirectory();
+      setBrokers(directory.brokers);
     })();
   }, []);
 
@@ -85,8 +93,7 @@ export default function PARecordings() {
     setLoading(false);
   };
 
-  useEffect(() => { setPage(1); load(1, pageSize); /* eslint-disable-next-line */ }, [search, broker, from, to, withTranscript]);
-  useEffect(() => { load(page, pageSize); /* eslint-disable-next-line */ }, [page, pageSize]);
+  useEffect(() => { load(page, pageSize); /* eslint-disable-next-line */ }, [page, pageSize, search, broker, from, to, withTranscript]);
 
   useEffect(() => {
     const ch = supabase.channel("admin-recordings")
@@ -134,12 +141,12 @@ export default function PARecordings() {
       <div className="pp-card p-4 flex items-center gap-2 flex-wrap">
         <input
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => setFilterValue("search", e.target.value)}
           placeholder="Rechercher numéro ou extension…"
           className="px-3 py-2 rounded-lg text-sm w-64"
           style={inputStyle as any}
         />
-        <select value={broker} onChange={(e) => setBroker(e.target.value)} className="px-3 py-2 rounded-lg text-sm" style={inputStyle as any}>
+        <select value={broker} onChange={(e) => setFilterValue("broker", e.target.value)} className="px-3 py-2 rounded-lg text-sm" style={inputStyle as any}>
           <option value="">Tous courtiers</option>
           {brokers.map((b: any) => (
             <option key={b.user_id} value={b.ns_only ? `ext:${b.extension}` : `user:${b.user_id}`}>
@@ -147,9 +154,9 @@ export default function PARecordings() {
             </option>
           ))}
         </select>
-        <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="px-3 py-2 rounded-lg text-sm" style={inputStyle as any} />
-        <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="px-3 py-2 rounded-lg text-sm" style={inputStyle as any} />
-        <select value={withTranscript} onChange={(e) => setWithTranscript(e.target.value as any)} className="px-3 py-2 rounded-lg text-sm" style={inputStyle as any}>
+        <input type="date" value={from} onChange={(e) => setFilterValue("from", e.target.value)} className="px-3 py-2 rounded-lg text-sm" style={inputStyle as any} />
+        <input type="date" value={to} onChange={(e) => setFilterValue("to", e.target.value)} className="px-3 py-2 rounded-lg text-sm" style={inputStyle as any} />
+        <select value={withTranscript} onChange={(e) => setFilterValue("transcript", e.target.value)} className="px-3 py-2 rounded-lg text-sm" style={inputStyle as any}>
           <option value="">Transcription : tous</option>
           <option value="yes">Avec transcription</option>
           <option value="no">Sans transcription</option>
@@ -240,7 +247,7 @@ export default function PARecordings() {
           total={total}
           loading={loading}
           onPageChange={setPage}
-          onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
+          onPageSizeChange={setPageSize}
           unit="enregistrements"
         />
       </div>

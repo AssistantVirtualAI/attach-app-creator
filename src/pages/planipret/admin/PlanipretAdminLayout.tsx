@@ -10,6 +10,7 @@ import { useAdminRealtime } from "@/hooks/useAdminRealtime";
 import NotificationsBell from "@/components/planipret/admin/NotificationsBell";
 import CommandPalette from "@/components/planipret/admin/CommandPalette";
 import { WorkspaceHeaderExtras } from "@/components/portals/WorkspaceHeaderExtras";
+import { getPlanipretBrokerDirectoryCount } from "@/lib/planipret/adminDirectory";
 
 type NavBadge = "brokers" | "missed" | "integrations" | "audit";
 type NavItem = { to: string; label: string; Icon: any; badge?: NavBadge };
@@ -115,8 +116,8 @@ export default function PlanipretAdminLayout() {
       setLoading(false);
 
       try {
-        const { count: bc } = await supabase.from("planipret_profiles").select("*", { count: "exact", head: true });
-        if (!cancelled) setBrokerCount(bc ?? 0);
+        const bc = await getPlanipretBrokerDirectoryCount();
+        if (!cancelled) setBrokerCount(bc);
       } catch { /* ignore */ }
       try {
         const since = new Date(); since.setHours(0, 0, 0, 0);
