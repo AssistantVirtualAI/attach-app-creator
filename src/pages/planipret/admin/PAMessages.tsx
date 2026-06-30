@@ -19,7 +19,7 @@ export default function PAMessages() {
   const load = async (p = page) => {
     const fromIdx = (p - 1) * PAGE;
     let q = supabase.from("planipret_phone_messages")
-      .select("*, planipret_profiles!inner(full_name)", { count: "exact" })
+      .select("*, planipret_profiles(full_name)", { count: "exact" })
       .order("created_at", { ascending: false })
       .range(fromIdx, fromIdx + PAGE - 1);
     if (direction) q = q.eq("direction", direction);

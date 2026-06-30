@@ -29,7 +29,7 @@ export default function PACalls() {
     const fromIdx = (p - 1) * PAGE;
     const toIdx = fromIdx + PAGE - 1;
     let q = supabase.from("planipret_phone_calls")
-      .select("*, planipret_profiles!inner(full_name)", { count: "exact" })
+      .select("*, planipret_profiles(full_name)", { count: "exact" })
       .order("started_at", { ascending: false })
       .range(fromIdx, toIdx);
     if (filters.broker) q = q.eq("user_id", filters.broker);
@@ -61,7 +61,7 @@ export default function PACalls() {
 
 
   const exportCsv = async () => {
-    let q = supabase.from("planipret_phone_calls").select("*, planipret_profiles!inner(full_name)").order("started_at", { ascending: false }).limit(5000);
+    let q = supabase.from("planipret_phone_calls").select("*, planipret_profiles(full_name)").order("started_at", { ascending: false }).limit(5000);
     if (filters.broker) q = q.eq("user_id", filters.broker);
     if (filters.from) q = q.gte("started_at", filters.from);
     if (filters.to) q = q.lte("started_at", filters.to);
