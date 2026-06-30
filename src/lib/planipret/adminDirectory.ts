@@ -23,7 +23,13 @@ const extOf = (row: Partial<PlanipretBrokerRow>) => String(row.extension ?? row.
 export const isPlanipretActiveBroker = (row: Partial<PlanipretBrokerRow>) => {
   const email = String(row.email ?? "").trim();
   const status = String(row.status ?? "").toLowerCase();
-  return !!extOf(row) && !/@lemtel\.com$/i.test(email) && !["disabled", "suspended", "deleted", "inactive"].includes(status);
+  const ext = extOf(row);
+  const name = String(row.full_name ?? "").trim().toLowerCase();
+  return !!ext
+    && !/^\d{7,}$/.test(ext)
+    && !/@lemtel\.com$/i.test(email)
+    && !["disabled", "suspended", "deleted", "inactive"].includes(status)
+    && !["system", "system user", "anonymous", "conference", "voicemail", "operator"].includes(name);
 };
 
 export async function getPlanipretBrokerDirectory() {
