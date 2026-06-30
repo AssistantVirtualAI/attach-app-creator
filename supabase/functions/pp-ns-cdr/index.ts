@@ -57,7 +57,7 @@ Deno.serve(async (req) => {
 
   const nsPath =
     `/domains/${encodeURIComponent(ctx.nsDomain)}/users/${encodeURIComponent(ctx.extension)}/cdrs` +
-    `?start_time=${encodeURIComponent(start)}&end_time=${encodeURIComponent(end)}&limit=${limit}`;
+    `?start-time=${encodeURIComponent(start)}&end-time=${encodeURIComponent(end)}&limit=${limit}`;
 
   try {
     const res = await nsFetch(nsPath, { method: "GET" });
