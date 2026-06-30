@@ -225,13 +225,14 @@ async function upsertProfiles(admin: ReturnType<typeof createClient>, domain: st
 async function syncCalls(admin: ReturnType<typeof createClient>, domain: string, users: any[], start: string, end: string) {
   const { data: profiles } = await admin
     .from("planipret_profiles")
-    .select("user_id,extension,ns_extension,full_name,email")
+    .select("id,extension,ns_extension")
     .eq("organization_id", AVA_ORG_ID);
-  const extToUser = new Map<string, string>();
+  const extToProfile = new Map<string, string>();
   for (const p of profiles ?? []) {
     const ext = String(p.extension ?? p.ns_extension ?? "").trim();
-    if (ext && p.user_id) extToUser.set(ext, p.user_id);
+    if (ext && p.id) extToProfile.set(ext, p.id as string);
   }
+
 
   const D = encodeURIComponent(domain);
   // NS-API v2 (docs.ns-api.com) uses hyphenated query parameter names: start-time, end-time.
