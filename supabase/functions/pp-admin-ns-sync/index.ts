@@ -266,7 +266,7 @@ async function syncCalls(admin: ReturnType<typeof createClient>, domain: string,
     const ext = String(val(c, ["user", "orig-user", "term-user", "extension", "subscriber"], fallbackExt ?? "")).trim();
     const started = toIso(val(c, ["time-start", "start-time", "start_time", "started_at", "date", "created_at"]));
     rows.push({
-      user_id: extToUser.get(ext) ?? null,
+      user_id: extToProfile.get(ext) ?? null,
       organization_id: AVA_ORG_ID,
       ns_call_id: id,
       ns_domain: domain,
@@ -331,10 +331,10 @@ async function syncMessages(admin: ReturnType<typeof createClient>, domain: stri
 
 
   const { data: profiles } = await admin.from("planipret_profiles").select("user_id,extension,ns_extension").eq("organization_id", AVA_ORG_ID);
-  const extToUser = new Map<string, string>();
+  const extToProfile = new Map<string, string>();
   for (const p of profiles ?? []) {
     const ext = String(p.extension ?? p.ns_extension ?? "").trim();
-    if (ext && p.user_id) extToUser.set(ext, p.user_id);
+    if (ext && p.id) extToProfile.set(ext, p.user_id);
   }
 
   const rows = r.data.map((m: any) => {
@@ -343,7 +343,7 @@ async function syncMessages(admin: ReturnType<typeof createClient>, domain: stri
     const dir = String(val(m, ["direction", "type"], "inbound")).toLowerCase().includes("out") ? "outbound" : "inbound";
     const peer = dir === "outbound" ? normalizePhone(val(m, ["to", "to_number", "to-number"])) : normalizePhone(val(m, ["from", "from_number", "from-number"]));
     return {
-      user_id: extToUser.get(ext) ?? null,
+      user_id: extToProfile.get(ext) ?? null,
       organization_id: AVA_ORG_ID,
       ns_message_id: mid,
       thread_id: String(val(m, ["thread_id", "thread-id"], `${ext}:${peer ?? mid}`)),
@@ -372,10 +372,10 @@ async function syncRecordings(admin: ReturnType<typeof createClient>, domain: st
     .from("planipret_profiles")
     .select("user_id,extension,ns_extension")
     .eq("organization_id", AVA_ORG_ID);
-  const extToUser = new Map<string, string>();
+  const extToProfile = new Map<string, string>();
   for (const p of profiles ?? []) {
     const ext = String(p.extension ?? p.ns_extension ?? "").trim();
-    if (ext && p.user_id) extToUser.set(ext, p.user_id);
+    if (ext && p.id) extToProfile.set(ext, p.user_id);
   }
 
   const D = encodeURIComponent(domain);
@@ -411,7 +411,7 @@ async function syncRecordings(admin: ReturnType<typeof createClient>, domain: st
     const ext = String(val(rec, ["user", "extension", "orig-user", "term-user", "subscriber"], fallbackExt ?? "")).trim();
     const started = toIso(val(rec, ["time-start", "start-time", "start_time", "started_at", "date", "created_at", "recorded_at", "recorded-at"]));
     rows.push({
-      user_id: extToUser.get(ext) ?? null,
+      user_id: extToProfile.get(ext) ?? null,
       organization_id: AVA_ORG_ID,
       ns_call_id: id,
       ns_domain: domain,
