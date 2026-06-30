@@ -17,6 +17,7 @@ import {
   IntegrationCard, IntegrationStatus, Field, TextInput, SecretInput,
   InfoBanner, CopyButton,
 } from "@/components/planipret/admin/integrations/IntegrationCard";
+import NsLiveTestPanel from "@/components/planipret/admin/integrations/NsLiveTestPanel";
 
 type Row = {
   integration_key: string;
@@ -195,6 +196,8 @@ export default function PlanipretIntegrations() {
                 placeholder="mhassoun.assistantvirtualai.com" />
             </Field>
           </div>
+
+          <NsLiveTestPanel domain={getField("ns_api", "domain", "planipret.ca") || "planipret.ca"} />
         </IntegrationCard>
 
         {/* ───────── CARD 5 — CLAUDE IA ───────── */}
