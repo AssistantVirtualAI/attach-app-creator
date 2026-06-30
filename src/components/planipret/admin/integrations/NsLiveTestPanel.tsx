@@ -303,11 +303,19 @@ export default function NsLiveTestPanel({ domain = "planipret.ca" }: { domain?: 
             <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>
               👥 Extensions {domain} — {users.length} utilisateurs
             </div>
-            <button onClick={syncToProfiles}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-[12px] font-bold"
-              style={{ background: "linear-gradient(135deg,#1A3D2A,#00D4AA)", color: "#060D1A", border: "none" }}>
-              🔄 Synchroniser avec les courtiers
-            </button>
+            <div className="flex items-center gap-2">
+              <button onClick={() => syncToProfiles(false)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-[12px] font-bold"
+                style={{ background: "linear-gradient(135deg,#1A3D2A,#00D4AA)", color: "#060D1A", border: "none" }}>
+                🔄 Synchroniser les courtiers
+              </button>
+              <button onClick={() => syncToProfiles(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-[12px] font-bold"
+                style={{ background: "linear-gradient(135deg,#1A4A8A,#2E9BDC)", color: "#fff", border: "none" }}>
+                ⚡ Synchro complète (CDRs)
+              </button>
+            </div>
+
           </div>
 
           <div className="flex items-center gap-2 flex-wrap mb-3">
