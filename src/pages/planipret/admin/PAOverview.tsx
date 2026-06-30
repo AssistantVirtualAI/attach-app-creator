@@ -8,6 +8,7 @@ import { FinancialKpiCard } from "@/components/planipret/admin/FinancialKpiCard"
 import { RevenueBreakdown } from "@/components/planipret/admin/RevenueBreakdown";
 import { getPlanipretBrokerDirectory } from "@/lib/planipret/adminDirectory";
 import { getPlanipretCallCount } from "@/lib/planipret/adminCounts";
+import { usePlanipretBrokerStats } from "@/lib/planipret/brokerStats";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
   PieChart, Pie, Cell, BarChart, Bar, Legend,
