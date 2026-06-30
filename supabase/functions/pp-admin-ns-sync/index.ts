@@ -456,7 +456,7 @@ Deno.serve(async (req) => {
         const calls = await syncCalls(admin, domain, brokerUsers, start, end);
         const [recordings, messages] = await Promise.all([
           syncRecordings(admin, domain, brokerUsers, start, end),
-          syncMessages(admin, domain, start, end),
+          syncMessages(admin, domain, start, end, brokerUsers),
         ]);
         console.log("[pp-admin-ns-sync] completed", JSON.stringify({ domain, users: brokerUsers.length, raw_users: usersRes.data.length, calls, recordings, messages }));
       } catch (e) {
