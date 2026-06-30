@@ -354,7 +354,7 @@ export default function PAUsers() {
       </div>
 
       <DebugPanel entries={debug} />
-      </div>
+
 
       {addOpen && <UserModal mode="add" onClose={() => setAddOpen(false)} onSaved={async (id) => { setAddOpen(false); await load(); if (id) { setHighlightId(id); setTimeout(() => setHighlightId(null), 3000); } }} />}
       {editUser && <UserModal mode="edit" user={editUser} onClose={() => setEditUser(null)} onSaved={async () => { setEditUser(null); await load(); }} />}
