@@ -1,75 +1,91 @@
-# Email Login + NS-API Identity Migration
+## Goal
 
-Migrate 355 Planiprêt brokers from extension@domain SIP login to email+password / Microsoft SSO, with NS extensions auto-resolved behind the scenes.
+Stop guessing why the broker count is 201 instead of 355, then wire every Planiprêt admin page to the correct, fully paginated NetSapiens v2 endpoint, with a clear server-capability panel that exposes what is and isn't actually available on the current SNAPsolution version.
 
-## 1. Database (migration)
+## Step 1 — Build a real diagnostic page at `/planipret/admin/debug`
 
-Add to `planipret_profiles`:
-- `ns_extension`, `ns_domain` (default `planipret.ca`), `ns_sip_username`
-- `ns_sip_password_ref` (Vault secret name, not plaintext)
-- `ns_linked`, `ns_linked_at`, `ns_link_method`
-- `auth_method`, `login_email`
+New page that calls a new edge function `ns-debug-audit` and displays four side-by-side numbers in plain French. Visible only to Planiprêt admins. No background jobs — this is a pure live audit.
 
-New table `planipret_ns_migration_log` (broker_id, ns_extension, ns_email_from_api, portal_email, match_status, match_confidence, reviewed). GRANTs + RLS (admin-only via `has_role`).
+- **Query A** — `SELECT count(*) FROM planipret_profiles WHERE organization_id = '<AVA>'`.
+- **Query B** — call `GET /domains/planipret.ca/users` with a paginated loop. Try both pagination conventions and surface which one the server actually uses:
+  - 1-based pages: `?start=1&limit=200`, `?start=2&limit=200`, …
+  - offset/limit: `?limit=100&offset=0`, `?limit=100&offset=100`, …
+  - inspect response headers `X-Total-Count`, `Content-Range`, `Link` and show their raw values.
+- **Query C** — diff Query A vs Query B:
+  - extensions in NS-API not present in `planipret_profiles` (by email + by extension).
+  - profiles with no matching NS-API extension.
+- **Query D** — dump the exact query/edge function currently driving the Overview KPI, `/admin/users` total, and the sidebar badge, and show their values next to A & B so the failing path is obvious.
 
-**SIP password storage**: use Supabase Vault — store secret name in column, decrypt only inside `ns-resolve-sip-credentials` Edge Function. Never returned to admin UI.
+The debug page is intentionally temporary; remove once the discrepancy is reconciled, but keep `ns-debug-audit` around because the diagnostic panel in Step 6 reuses it.
 
-## 2. Edge Functions (new)
+## Step 2 — Fix the broker count everywhere
 
-- **`ns-email-migration-match`** — paginates `/domains/planipret.ca/users` (all ~355), matches against `planipret_profiles.email` (exact case-insensitive trimmed → auto-link; local-part fuzzy → review queue; else no_match). Writes log rows. Returns summary counts.
-- **`ns-resolve-sip-credentials`** — input `broker_id`; reads `ns_extension`/`ns_sip_username`; ensures softphone device exists on NS-API (GET then POST device if missing); stores password in Vault on first generation; returns `{ sip_username, sip_domain, sip_proxy, sip_password }` once over TLS, no logging.
-- **`ns-manual-link`** — admin endpoint to confirm/reject fuzzy matches, link by extension lookup, or create new broker from NS data.
-- **`pp-broker-onboarding-email`** — sends Resend email per broker with their email + extension; tracks send status in migration log.
+Once Step 1 names the cause, apply one fix and route every consumer through it:
 
-Auth-guard all with `has_role(auth.uid(),'admin')` via service-role client.
+- If NS-API pagination is the bug, rewrite the loop in `pp-admin-ns-sync` and `ns-email-migration-match` to use whichever pagination signal the server actually returns (header total when present, otherwise loop until a short page).
+- If `planipret_profiles` itself only has ~200 rows, do NOT silently inflate the count. Show the actual portal count as the primary number, plus a secondary stat "X extensions NS-API sans compte portail" with a CTA to the manual-review queue.
 
-## 3. Admin UI — `/planipret/admin/integrations` (NS-API card) + column in `/planipret/admin/users`
+Make `/admin/overview` "Courtiers actifs", `/admin/users` total, and the sidebar badge all call the same `adminCounts` helper, hitting the same query. No more parallel sources of truth.
 
-New section **"Migration — Lier courriels aux extensions"**:
+## Step 3 — Fix `/admin/calls` (CDRs)
 
-- **Panel A**: `[▶ Lancer la correspondance automatique]` button → calls match function, shows progress.
-- **Panel B**: 4 stat cards (auto-linked / fuzzy pending / no_match NS / no_match portal).
-- **Panel C**: Manual review table from `planipret_ns_migration_log` with per-row actions:
-  - Fuzzy → side-by-side emails, Confirm/Reject.
-  - NS-only → link to existing broker dropdown OR create new broker (reuse existing modal pre-filled).
-  - Portal-only → extension input + validate-and-link.
-- **Panel D**: `[📧 Envoyer les instructions de connexion]` bulk email button (after migration complete).
-- **PAUsers column** `🔗 NS lié`: ✅ Lié (ext XXXX) or ⚠️ Non lié (opens manual link modal).
+- Update `ns-cdrs` (broker-scoped, mobile) and `pp-admin-ns-sync` (admin-scoped) to call `GET /domains/{domain}/cdrs` with the same paginated loop as Step 1 and accept `start_time` / `end_time` query params.
+- Map NS fields → `planipret_phone_calls` (direction, from/to numbers, started/answered/ended, duration, disposition).
+- Architecture: keep `/admin/calls` reading from `planipret_phone_calls` (Option B) so AI scoring stays attached; add a "🔄 Importer l'historique CDR" button on the Appels page that calls `pp-admin-ns-sync` for a date range and shows progress (`Import en cours… 1 240 / 3 500 appels`). Idempotency key = NS call id.
 
-## 4. Mobile login redesign (`/mplanipret`)
+## Step 4 — Fix `/admin/messages` (SMS)
 
-Replace current screen. Equal-weight options:
-1. `🔵 Se connecter avec Microsoft` (existing MS SSO).
-2. `── ou ──`
-3. Email + password form (placeholder `prenom.nom@planipret.ca`, show/hide toggle, `Mot de passe oublié?`).
+- Replace the current single endpoint guess with the confirmed pattern:
+  1. `GET /domains/{domain}/users/{user}/messagesessions` (paginated, per broker).
+  2. For each session, `GET /domains/{domain}/users/{user}/messagesessions/{id}/messages`.
+- Map to `planipret_phone_messages` and upsert by `ns_message_id`.
+- Run this as a batched background job (10 brokers at a time, small delay between batches) since it requires 355+ session-list calls. The Edge Function returns immediately and the UI polls progress: `Synchronisation SMS: 45/355 courtiers traités`.
+- Add a manual "🔄 Importer l'historique SMS" button and a scheduled refresh (every 15 min via `pg_cron`).
 
-**Remove**: any extension@domain field, any SIP password field.
+## Step 5 — Fix `/admin/voicemails` (recordings + transcriptions)
 
-## 5. Post-login resolver flow
+Treat as three distinct concerns:
 
-After `supabase.auth.signInWithPassword` OR Microsoft SSO succeeds:
-1. Fetch profile `ns_linked` + extension.
-2. If `ns_linked=false` → one-time "Configuration requise" screen: extension input → calls `ns-manual-link` self-service.
-3. If linked → call `ns-resolve-sip-credentials`, configure PJSIP silently, show `🟢 En ligne — Extension XXXX` pill on Home.
+1. **Voicemails** — `GET /domains/{domain}/users/{user}/voicemails/inbox`, looped per broker in the same batched job, audio file fetched via the file URL on the record. Map to `planipret_voicemails`.
+2. **Call recordings** — first check if the CDR record carries a `recording_url`/`recording_file`. If not, try `GET /domains/{domain}/users/{user}/recordings`. If the server is < v45 and that endpoint truly 404s, do NOT keep hammering it — surface "⚠️ Les enregistrements d'appels via API nécessitent NetSapiens v45+. Le serveur actuel est en v44.4.1." on the page itself.
+3. **Transcriptions** — check (a) if CDR/voicemail records include `transcription_text`, (b) the existing `ns-transcription` function path, and (c) the `PORTAL_VOICE_TRANSCRIPTION_SENTIMENT` domain config. If transcripts come back empty, show "⚠️ La transcription vocale n'est peut-être pas activée pour ce domaine. Vérifiez auprès de Clinton." instead of silently empty rows.
 
-## 6. Password management
+## Step 6 — Permanent NS-API feature panel on `/planipret/admin/integrations`
 
-- Add/Edit broker modal: confirm `Mot de passe initial` calls `supabase.auth.admin.createUser({email, password, email_confirm:true})` then upserts profile linked to that auth uid.
-- Row action **Réinitialiser le mot de passe** (admin trigger reset email or set temp password).
-- Mobile **forgot password**: `resetPasswordForEmail` with `redirectTo: ${origin}/mplanipret/reset-password`; build that page.
+New section "🔍 Fonctionnalités disponibles sur ce serveur" powered by `ns-debug-audit`:
 
-## 7. Onboarding email (Step 6)
+```text
+Version serveur : 44.4.1-beta.64
+✅ CDRs                    — GET /domains/{d}/cdrs            (n résultats sur la dernière sonde)
+✅ Messages (sessions)     — GET /domains/{d}/users/{u}/messagesessions
+✅ Voicemails              — GET /domains/{d}/users/{u}/voicemails/inbox
+❌ Enregistrements         — nécessite v45+ (v44.4.1 détectée)
+❌ Transcriptions          — non activé pour planipret.ca (PORTAL_VOICE_TRANSCRIPTION_SENTIMENT off)
+```
 
-French template per spec, sent via Resend connector (already configured) — broker first name, login email, extension. Status tracked in migration log (`onboarding_email_sent_at`).
+Each row stores its last-probe result + timestamp so future "why isn't X working" questions get answered by this panel before any code is touched.
 
-## 8. Verification
+## Step 7 — Verification checklist (done in-app, not from memory)
 
-Document QA steps in admin UI: run match → resolve queue → confirm 355 ✅ → test 2-3 brokers end-to-end (email/pwd + MS SSO) → confirm SIP auto-registers → only then trigger bulk email.
+1. Debug page shows portal count vs paginated NS-API count, with the gap explained.
+2. Overview KPI, `/admin/users` total, and sidebar badge all show the same number.
+3. After running CDR backfill, `/admin/calls` shows real rows with correct direction/duration/disposition.
+4. After SMS batch sync runs against a few test brokers, `/admin/messages` shows their real threads.
+5. After voicemail sync, `/admin/voicemails` shows real inbox entries with audio playback.
+6. Recordings + transcriptions either work or display the precise server-side limitation message from Step 6 — never silently empty.
 
-## Technical notes
+## Technical details
 
-- NS-API pagination: use `start`/`limit` (1-based) per existing `pp-ns-users` convention; loop until `< limit`.
-- All NS-API calls reuse existing `pp-ns-*` helpers / static key auth.
-- Vault encryption: `vault.create_secret(value, name)` → store name in `ns_sip_password_ref`; decrypt via `vault.decrypted_secrets` view inside edge function only.
-- Idempotent: re-running auto-match skips already-linked rows; new brokers picked up automatically.
-- No changes to landing page or Lemtel paths.
+- All admin endpoints stay behind `is_planipret_admin`; broker endpoints behind `is_planipret_member`.
+- Shared paginator goes in `supabase/functions/_shared/ns-pagination.ts`: returns `{ items, totalFromHeader, pages, paginationSignal }` so callers can log how the server answered.
+- Idempotency keys: `ns_call_id` for CDRs/recordings, `ns_message_id` for SMS, `ns_voicemail_id` for voicemails.
+- Background work uses `EdgeRuntime.waitUntil`; progress is written to a new `planipret_sync_progress` row (job_id, step, processed, total, finished_at) that the UI polls.
+- Schema additions limited to `planipret_sync_progress` and a small `planipret_ns_server_capabilities` row keyed by `domain` + `feature` for the Step 6 panel.
+- No frontend hardcoded counts; everything reads from `adminCounts.getBrokerCounts()`.
+- The debug page and its edge function are gated by `is_planipret_admin` and never expose raw NS tokens.
+
+## What I won't touch
+
+- Mobile broker app screens (already wired and working post-prior phase).
+- ElevenLabs / Claude / Maestro integrations on the same Integrations page.
+- The shipped email-based login + identity migration work from the prior turn.

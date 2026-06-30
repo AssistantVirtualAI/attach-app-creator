@@ -50,6 +50,7 @@ const PAAuditChecklist = lazyWithRetry(() => import("./pages/planipret/admin/PAA
 const PACompliance = lazyWithRetry(() => import("./pages/planipret/admin/PACompliance"));
 const PALeads = lazyWithRetry(() => import("./pages/planipret/admin/PALeads"));
 const PATemplates = lazyWithRetry(() => import("./pages/planipret/admin/PATemplates"));
+const PADebug = lazyWithRetry(() => import("./pages/planipret/admin/PADebug"));
 const PlanipretPrivacy = lazyWithRetry(() => import("./pages/planipret/PlanipretPrivacy"));
 const PlanipretIntegrationsLazy = lazyWithRetry(() => import("./pages/planipret/PlanipretIntegrations"));
 import { AdminPageSkeleton } from "./components/planipret/Skeletons";
@@ -444,6 +445,7 @@ const App = () => (
                   <Route path="leads" element={<Suspense fallback={<AdminPageSkeleton />}><PALeads /></Suspense>} />
                   <Route path="templates" element={<Suspense fallback={<AdminPageSkeleton />}><PATemplates /></Suspense>} />
                   <Route path="integrations" element={<Suspense fallback={<AdminPageSkeleton />}><PlanipretIntegrationsLazy /></Suspense>} />
+                  <Route path="debug" element={<Suspense fallback={<AdminPageSkeleton />}><PADebug /></Suspense>} />
                 </Route>
                 <Route path="/planipret/privacy" element={<Suspense fallback={<AdminPageSkeleton />}><PlanipretPrivacy /></Suspense>} />
 
