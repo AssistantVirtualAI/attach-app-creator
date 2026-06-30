@@ -1,35 +1,67 @@
 // pp-ns-users — Lists all NetSapiens subscribers (brokers) for the Planiprêt domain.
-// Admin-only. Uses per-broker JWT (the calling admin's NS-API token) which works
-// reliably against this NetSapiens deployment, unlike the system oauth2/token path.
-import { corsHeaders, jsonResponse, nsBrokerFetch, nsEnv, requirePlanipretAdmin } from "../_shared/ns-broker.ts";
+// Admin-only. Uses NS_API_KEY (static API key) — same auth path as ns-live-test,
+// which is the working method for this NetSapiens deployment.
+import { createClient } from "npm:@supabase/supabase-js@2";
+import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 
 const AVA_ORG_ID = "17d6507f-a9ca-409d-8e49-371d50332615";
+const NS_API_KEY = Deno.env.get("NS_API_KEY") ?? "";
+const NS_API_BASE_URL = Deno.env.get("NS_API_BASE_URL") ?? "https://voice.ava-telecom.ca/ns-api/v2";
+const NS_DEFAULT_DOMAIN = Deno.env.get("NS_DEFAULT_DOMAIN") ?? "planipret.ca";
+
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+async function nsFetch(path: string) {
+  const res = await fetch(`${NS_API_BASE_URL}${path}`, {
+    headers: { Authorization: `Bearer ${NS_API_KEY}`, Accept: "application/json" },
+  });
+  const text = await res.text();
+  let data: any = null;
+  try { data = text ? JSON.parse(text) : null; } catch { data = null; }
+  return { ok: res.ok, status: res.status, data, text };
+}
+
+async function fetchAllUsers(domain: string): Promise<{ ok: boolean; data: any[]; warning?: string }> {
+  const all: any[] = [];
+  const pageSize = 200;
+  for (let i = 0; i < 25; i++) {
+    const r = await nsFetch(`/domains/${encodeURIComponent(domain)}/users?limit=${pageSize}&offset=${i * pageSize}`);
+    if (!r.ok) {
+      return { ok: all.length > 0, data: all, warning: `NS-API users fetch failed: ${r.status} ${r.text.slice(0, 200)}` };
+    }
+    const arr = Array.isArray(r.data) ? r.data : (r.data?.users ?? r.data?.data ?? []);
+    all.push(...arr);
+    if (arr.length < pageSize) break;
+  }
+  return { ok: true, data: all };
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    const auth = await requirePlanipretAdmin(req);
-    if ("error" in auth) return auth.error;
-    const { admin, profile } = auth;
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) return json({ error: "Unauthorized" }, 401);
 
-    const domain = new URL(req.url).searchParams.get("domain") ?? nsEnv().domain ?? "planipret.ca";
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const { data: userData } = await admin.auth.getUser(authHeader.replace(/^Bearer\s+/i, ""));
+    if (!userData?.user) return json({ error: "Unauthorized" }, 401);
+    const { data: isMember } = await admin.rpc("is_planipret_member", { _user_id: userData.user.id });
+    if (isMember !== true) return json({ error: "Forbidden" }, 403);
 
-    // Fetch all users from NS-API for this domain via the admin broker JWT
-    let raw: any = null;
-    let nsWarning: string | null = null;
-    try {
-      const res = await nsBrokerFetch(admin, profile, `/domains/${encodeURIComponent(domain)}/users?limit=2000`);
-      if (!res.ok) {
-        const txt = await res.text();
-        nsWarning = `NS-API users fetch failed: ${res.status} ${txt.slice(0, 200)}`;
-      } else {
-        raw = await res.json();
-      }
-    } catch (e) {
-      nsWarning = `NS-API unreachable: ${(e as Error).message}`;
-    }
-    const list: any[] = Array.isArray(raw) ? raw : (raw?.users ?? raw?.data ?? raw?.items ?? []);
+    if (!NS_API_KEY) return json({ error: "NS_API_KEY missing in secrets" }, 500);
+
+    const domain = new URL(req.url).searchParams.get("domain") ?? NS_DEFAULT_DOMAIN;
+    const fetched = await fetchAllUsers(domain);
+    const list = fetched.data;
+    const nsWarning = fetched.warning ?? null;
 
     // Merge with local planipret_profiles for app/agent flags
     const { data: profiles } = await admin
@@ -37,9 +69,11 @@ Deno.serve(async (req) => {
       .select("user_id, email, full_name, extension, ns_extension, mobile_app_enabled, voice_agent_enabled, ns_domain, elevenlabs_agent_id, dnd_enabled, updated_at, created_at")
       .eq("organization_id", AVA_ORG_ID);
     const byExt = new Map<string, any>();
+    const byEmail = new Map<string, any>();
     (profiles ?? []).forEach((p: any) => {
       const k = p.extension ?? p.ns_extension;
       if (k) byExt.set(String(k), p);
+      if (p.email) byEmail.set(String(p.email).toLowerCase(), p);
     });
 
     const sourceList: any[] = list.length > 0
@@ -47,25 +81,23 @@ Deno.serve(async (req) => {
       : (profiles ?? []).map((p: any) => ({
           user: p.extension ?? p.ns_extension,
           email: p.email,
-          first_name: (p.full_name || "").split(" ")[0] ?? "",
-          last_name: (p.full_name || "").split(" ").slice(1).join(" "),
+          "name-first-name": (p.full_name || "").split(" ")[0] ?? "",
+          "name-last-name": (p.full_name || "").split(" ").slice(1).join(" "),
         }));
 
     const brokers = sourceList.map((u: any) => {
-      const ext = String(
-        u.user ?? u.extension ?? u.subscriber_login ?? u.user_id ?? u.id ?? "",
-      );
-      const local = byExt.get(ext);
-      const first = u.first_name ?? u.firstName ?? u["name-first-name"] ?? "";
-      const last = u.last_name ?? u.lastName ?? u["name-last-name"] ?? "";
+      const ext = String(u.user ?? u.extension ?? u.subscriber_login ?? u.user_id ?? u.id ?? "");
+      const email = String(u.email ?? u.email_address ?? u["email-address"] ?? "").toLowerCase();
+      const local = byExt.get(ext) ?? (email ? byEmail.get(email) : undefined);
+      const first = u["name-first-name"] ?? u.first_name ?? u.firstName ?? "";
+      const last = u["name-last-name"] ?? u.last_name ?? u.lastName ?? "";
       const fullName = local?.full_name || `${first} ${last}`.trim() || u.display_name || u.name || ext;
-      const email = local?.email ?? u.email ?? u.email_address ?? u["email-address"] ?? "";
       return {
         user_id: local?.user_id ?? `ns:${domain}:${ext}`,
         ns_only: !local,
         extension: ext,
         full_name: fullName,
-        email,
+        email: local?.email ?? email ?? "",
         ns_domain: domain,
         mobile_app_enabled: local?.mobile_app_enabled ?? false,
         voice_agent_enabled: local?.voice_agent_enabled ?? false,
@@ -76,10 +108,10 @@ Deno.serve(async (req) => {
         updated_at: local?.updated_at ?? u.last_modified ?? null,
         created_at: local?.created_at ?? u.creation_date ?? null,
       };
-    }).filter((b: any) => !/@lemtel\.com$/i.test(String(b.email || "").trim()) && b.extension);
+    }).filter((b: any) => b.extension && !/@lemtel\.com$/i.test(String(b.email || "").trim()));
 
-    return jsonResponse({ ok: true, count: brokers.length, domain, brokers, ns_warning: nsWarning, degraded: !!nsWarning });
+    return json({ ok: true, count: brokers.length, domain, brokers, ns_warning: nsWarning, degraded: !!nsWarning });
   } catch (e) {
-    return jsonResponse({ error: (e as Error).message }, 500);
+    return json({ error: (e as Error).message }, 500);
   }
 });
