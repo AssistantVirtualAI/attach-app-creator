@@ -124,6 +124,29 @@ export interface IntegrationCardProps {
   onSave: () => Promise<void> | void;
   onTest: () => Promise<void> | void;
   saveDisabled?: boolean;
+  /** Backend secrets detected for this integration (e.g. ["NS_API_KEY"]). */
+  backendSecrets?: { present: string[]; missing: string[] };
+}
+
+export function BackendSecretBadge({ present, missing }: { present: string[]; missing: string[] }) {
+  if (!present.length && !missing.length) return null;
+  const ok = present.length > 0;
+  return (
+    <span
+      title={
+        (ok ? `Backend: ${present.join(", ")}` : "") +
+        (missing.length ? `${ok ? " · " : ""}Manquant: ${missing.join(", ")}` : "")
+      }
+      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap"
+      style={{
+        background: ok ? "rgba(0,212,170,0.08)" : "rgba(245,166,35,0.08)",
+        border: `1px solid ${ok ? "#1A5A3F" : "#4A3000"}`,
+        color: ok ? "#00D4AA" : "#F5A623",
+      }}
+    >
+      🔐 {ok ? `${present.length} clé${present.length > 1 ? "s" : ""} backend` : "Aucune clé backend"}
+    </span>
+  );
 }
 
 export function IntegrationCard(props: IntegrationCardProps) {
@@ -142,12 +165,14 @@ export function IntegrationCard(props: IntegrationCardProps) {
           <div style={{ fontFamily: "Inter, sans-serif", fontWeight: 700, fontSize: 15, color: "#E8EDF5" }}>{props.name}</div>
           <div style={{ fontSize: 12, color: "#4A7FA5", marginTop: 2 }}>{props.description}</div>
         </div>
+        {props.backendSecrets && <BackendSecretBadge {...props.backendSecrets} />}
         <StatusPill status={props.status} />
         <div onClick={(e) => e.stopPropagation()}>
           <Toggle on={props.enabled} onChange={(v) => props.onToggleEnabled(v)} />
         </div>
         {expanded ? <ChevronUp className="w-4 h-4" style={{ color: "#4A7FA5" }} /> : <ChevronDown className="w-4 h-4" style={{ color: "#4A7FA5" }} />}
       </button>
+
 
       {expanded && (
         <>
