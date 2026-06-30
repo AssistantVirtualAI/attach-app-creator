@@ -11,6 +11,7 @@ import NotificationsBell from "@/components/planipret/admin/NotificationsBell";
 import CommandPalette from "@/components/planipret/admin/CommandPalette";
 import { WorkspaceHeaderExtras } from "@/components/portals/WorkspaceHeaderExtras";
 import { getPlanipretBrokerDirectoryCount } from "@/lib/planipret/adminDirectory";
+import { getPlanipretCallCount } from "@/lib/planipret/adminCounts";
 
 type NavBadge = "brokers" | "missed" | "integrations" | "audit";
 type NavItem = { to: string; label: string; Icon: any; badge?: NavBadge };
@@ -121,10 +122,8 @@ export default function PlanipretAdminLayout() {
       } catch { /* ignore */ }
       try {
         const since = new Date(); since.setHours(0, 0, 0, 0);
-        const { count: mc } = await supabase
-          .from("planipret_phone_calls").select("*", { count: "exact", head: true })
-          .eq("direction", "inbound").eq("status", "missed").gte("created_at", since.toISOString());
-        if (!cancelled) setMissedCalls(mc ?? 0);
+        const mc = await getPlanipretCallCount({ direction: "inbound", status: "missed", from: since.toISOString() });
+        if (!cancelled) setMissedCalls(mc);
       } catch { /* ignore */ }
       try {
         const { data: sec } = await supabase.functions.invoke("pp-integration-secrets");
