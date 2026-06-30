@@ -1,46 +1,96 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Mic, Sparkles, RefreshCw, X, Download, Play } from "lucide-react";
+import Pagination from "@/components/planipret/admin/Pagination";
+import DebugPanel, { type DebugEntry } from "@/components/planipret/admin/DebugPanel";
+import { TableErrorState, TableEmptyState } from "@/components/planipret/admin/TableStates";
 
 const ACCENT = "#2E9BDC";
 const AGENT = "#9B7FE8";
-const PAGE = 50;
 
 export default function PARecordings() {
   const [rows, setRows] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
+  const [brokers, setBrokers] = useState<any[]>([]);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [search, setSearch] = useState("");
+  const [broker, setBroker] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [withTranscript, setWithTranscript] = useState<"" | "yes" | "no">("");
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [debug, setDebug] = useState<DebugEntry[]>([]);
   const [detail, setDetail] = useState<any | null>(null);
   const [transcribing, setTranscribing] = useState<string | null>(null);
 
+  const hasFilters = !!(search || broker || from || to || withTranscript);
+  const activeFilterCount = [search, broker, from, to, withTranscript].filter(Boolean).length;
+  const resetFilters = () => { setSearch(""); setBroker(""); setFrom(""); setTo(""); setWithTranscript(""); };
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.functions.invoke("pp-ns-users", { body: {} });
+      if ((data as any)?.ok) setBrokers((data as any).brokers ?? []);
+      else {
+        const { data: local } = await supabase.from("planipret_profiles").select("user_id, full_name, extension").order("full_name");
+        setBrokers(local ?? []);
+      }
+    })();
+  }, []);
+
   const brokerName = (r: any) => r.planipret_profiles?.full_name ?? r.metadata?.ns_user?.name ?? r.metadata?.user_name ?? r.metadata?.extension_name ?? (r.extension ? `Ext. ${r.extension}` : "—");
 
-  const load = async (p = page) => {
+  const load = async (p = page, ps = pageSize) => {
     setLoading(true);
-    const fromIdx = (p - 1) * PAGE;
+    setLoadError(null);
+    const dbg: DebugEntry[] = [];
+    const t0 = performance.now();
+    const fromIdx = (p - 1) * ps;
     let q = supabase
       .from("planipret_phone_calls")
       .select("*, planipret_profiles(full_name, extension)", { count: "exact" })
       .not("recording_url", "is", null)
       .order("started_at", { ascending: false })
-      .range(fromIdx, fromIdx + PAGE - 1);
+      .range(fromIdx, fromIdx + ps - 1);
     if (search) q = q.or(`from_number.ilike.%${search}%,to_number.ilike.%${search}%,extension.ilike.%${search}%`);
-    const { data, count } = await q;
-    setRows(data ?? []);
-    setTotal(count ?? 0);
+    if (broker?.startsWith("ext:")) q = q.eq("extension", broker.slice(4));
+    else if (broker?.startsWith("user:")) q = q.eq("user_id", broker.slice(5));
+    if (from) q = q.gte("started_at", from);
+    if (to) q = q.lte("started_at", to);
+    if (withTranscript === "yes") q = q.not("transcript", "is", null);
+    if (withTranscript === "no") q = q.is("transcript", null);
+    const { data, count, error } = await q;
+    dbg.push({
+      label: "planipret_phone_calls WHERE recording_url IS NOT NULL",
+      query: `SELECT * FROM planipret_phone_calls WHERE recording_url IS NOT NULL ORDER BY started_at DESC LIMIT ${ps} OFFSET ${fromIdx}`,
+      count,
+      ms: Math.round(performance.now() - t0),
+      error: error?.message ?? null,
+      meta: { search, broker, from, to, withTranscript },
+      sample: (data ?? []).slice(0, 3),
+    });
+    if (error) {
+      setLoadError(error.message);
+      setRows([]); setTotal(0);
+    } else {
+      setRows(data ?? []);
+      setTotal(count ?? 0);
+    }
+    setDebug(dbg);
     setLoading(false);
   };
 
-  useEffect(() => { setPage(1); load(1); /* eslint-disable-next-line */ }, [search]);
-  useEffect(() => { load(page); /* eslint-disable-next-line */ }, [page]);
+  useEffect(() => { setPage(1); load(1, pageSize); /* eslint-disable-next-line */ }, [search, broker, from, to, withTranscript]);
+  useEffect(() => { load(page, pageSize); /* eslint-disable-next-line */ }, [page, pageSize]);
 
   useEffect(() => {
     const ch = supabase.channel("admin-recordings")
-      .on("postgres_changes", { event: "*", schema: "public", table: "planipret_phone_calls" }, () => load(page))
+      .on("postgres_changes", { event: "*", schema: "public", table: "planipret_phone_calls" }, () => load(page, pageSize))
       .subscribe();
     return () => { supabase.removeChannel(ch); };
     // eslint-disable-next-line
@@ -53,7 +103,7 @@ export default function PARecordings() {
       if (error) throw error;
       const d = data as any;
       toast.success(`Synchro lancée: ${d.extensions ?? d.users_total ?? 0} ext · appels/enregistrements en arrière-plan`);
-      await load(1);
+      await load(1, pageSize);
     } catch (e: any) {
       toast.error(`Synchro échouée: ${e.message ?? e}`);
     } finally {
@@ -67,7 +117,7 @@ export default function PARecordings() {
       const { error } = await supabase.functions.invoke("ai-transcribe-call", { body: { call_id: callId } });
       if (error) throw error;
       toast.success("Transcription lancée");
-      await load(page);
+      await load(page, pageSize);
     } catch (e: any) {
       toast.error(`Transcription échouée: ${e.message ?? e}`);
     } finally {
@@ -75,19 +125,40 @@ export default function PARecordings() {
     }
   };
 
-  const totalPages = Math.max(1, Math.ceil(total / PAGE));
   const inputStyle = { background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" };
 
   return (
     <div className="space-y-4">
-      <div className="pp-card p-4 flex items-center gap-3 flex-wrap">
+      <DebugPanel entries={debug} />
+
+      <div className="pp-card p-4 flex items-center gap-2 flex-wrap">
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Rechercher numéro ou extension…"
-          className="px-3 py-2 rounded-lg text-sm w-72"
+          className="px-3 py-2 rounded-lg text-sm w-64"
           style={inputStyle as any}
         />
+        <select value={broker} onChange={(e) => setBroker(e.target.value)} className="px-3 py-2 rounded-lg text-sm" style={inputStyle as any}>
+          <option value="">Tous courtiers</option>
+          {brokers.map((b: any) => (
+            <option key={b.user_id} value={b.ns_only ? `ext:${b.extension}` : `user:${b.user_id}`}>
+              {b.full_name}{b.extension ? ` · ${b.extension}` : ""}
+            </option>
+          ))}
+        </select>
+        <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="px-3 py-2 rounded-lg text-sm" style={inputStyle as any} />
+        <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="px-3 py-2 rounded-lg text-sm" style={inputStyle as any} />
+        <select value={withTranscript} onChange={(e) => setWithTranscript(e.target.value as any)} className="px-3 py-2 rounded-lg text-sm" style={inputStyle as any}>
+          <option value="">Transcription : tous</option>
+          <option value="yes">Avec transcription</option>
+          <option value="no">Sans transcription</option>
+        </select>
+        {hasFilters && (
+          <button onClick={resetFilters} className="px-2 py-1.5 text-xs underline" style={{ color: "var(--pp-text-muted)" }}>
+            ✕ Réinitialiser ({activeFilterCount})
+          </button>
+        )}
         <button
           onClick={syncAll}
           disabled={syncing}
@@ -95,11 +166,12 @@ export default function PARecordings() {
           style={{ background: ACCENT }}
         >
           <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} />
-          {syncing ? "Synchronisation…" : "Synchroniser NS-API (tous courtiers)"}
+          {syncing ? "Synchronisation…" : "Synchroniser NS-API"}
         </button>
       </div>
 
       <div className="pp-card overflow-hidden">
+        {loadError && <TableErrorState message={loadError} onRetry={() => load(page, pageSize)} />}
         <table className="w-full text-sm">
           <thead style={{ background: "var(--pp-bg-elevated)" }}>
             <tr style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--pp-text-faint)" }} className="text-left">
@@ -108,10 +180,29 @@ export default function PARecordings() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={9} className="p-8 text-center" style={{ color: "var(--pp-text-faint)" }}>Chargement…</td></tr>
+              Array.from({ length: 6 }).map((_, i) => (
+                <tr key={i} style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}>
+                  {Array.from({ length: 9 }).map((_, j) => (
+                    <td key={j} className="p-3"><div className="h-3 w-3/4 animate-pulse rounded" style={{ background: "var(--pp-bg-elevated)" }} /></td>
+                  ))}
+                </tr>
+              ))
             ) : rows.length === 0 ? (
-              <tr><td colSpan={9} className="p-8 text-center" style={{ color: "var(--pp-text-faint)" }}>
-                Aucun enregistrement. Cliquez sur « Synchroniser NS-API » pour récupérer les enregistrements de tous les courtiers.
+              <tr><td colSpan={9}>
+                <TableEmptyState
+                  icon="📬"
+                  title="Aucun enregistrement trouvé"
+                  hint={hasFilters
+                    ? "Essayez d'élargir vos critères de recherche."
+                    : "Aucun enregistrement n'est encore synchronisé. Lancez « Synchroniser NS-API » ou vérifiez que les enregistrements sont activés dans la config NetSapiens."}
+                  action={hasFilters ? (
+                    <button onClick={resetFilters} className="px-3 py-1.5 rounded-lg text-xs font-medium text-white" style={{ background: ACCENT }}>Réinitialiser les filtres</button>
+                  ) : (
+                    <Link to="/planipret/admin/integrations" className="px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>
+                      Aller aux intégrations →
+                    </Link>
+                  )}
+                />
               </td></tr>
             ) : rows.map((c) => (
               <tr key={c.id} className="cursor-pointer hover:bg-white/[0.02]"
@@ -143,14 +234,15 @@ export default function PARecordings() {
             ))}
           </tbody>
         </table>
-        <div className="flex items-center justify-between px-4 py-3" style={{ borderTop: "1px solid var(--pp-bg-border-2)", fontSize: 11, color: "var(--pp-text-muted)" }}>
-          <span>{total === 0 ? 0 : (page - 1) * PAGE + 1}–{Math.min(page * PAGE, total)} sur {total} enregistrement(s)</span>
-          <div className="flex gap-1">
-            <button disabled={page === 1} onClick={() => setPage(page - 1)} className="px-2 py-1 rounded disabled:opacity-40" style={{ border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>←</button>
-            <span className="px-3 py-1">{page} / {totalPages}</span>
-            <button disabled={page === totalPages} onClick={() => setPage(page + 1)} className="px-2 py-1 rounded disabled:opacity-40" style={{ border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>→</button>
-          </div>
-        </div>
+        <Pagination
+          page={page}
+          pageSize={pageSize}
+          total={total}
+          loading={loading}
+          onPageChange={setPage}
+          onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
+          unit="enregistrements"
+        />
       </div>
 
       {detail && (
