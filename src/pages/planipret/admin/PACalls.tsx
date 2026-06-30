@@ -1,22 +1,33 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { ArrowDownLeft, ArrowUpRight, X, Mic, Sparkles, Download, Eye, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+import Pagination from "@/components/planipret/admin/Pagination";
+import DebugPanel, { type DebugEntry } from "@/components/planipret/admin/DebugPanel";
+import { TableErrorState, TableEmptyState } from "@/components/planipret/admin/TableStates";
 
-const PAGE = 50;
 const ACCENT = "#2E9BDC";
 const SUCCESS = "#00D4AA";
 const DANGER = "#E84C4C";
 const AGENT = "#9B7FE8";
+
+const EMPTY_FILTERS = { broker: "", from: "", to: "", direction: "", status: "", ai: "", search: "" };
 
 export default function PACalls() {
   const [rows, setRows] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [brokers, setBrokers] = useState<any[]>([]);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [loading, setLoading] = useState(false);
-  const [filters, setFilters] = useState({ broker: "", from: "", to: "", direction: "", status: "", search: "" });
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [debug, setDebug] = useState<DebugEntry[]>([]);
+  const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [detail, setDetail] = useState<any | null>(null);
+
+  const hasFilters = Object.values(filters).some((v) => v);
+  const activeFilterCount = Object.values(filters).filter(Boolean).length;
 
   useEffect(() => {
     (async () => {
@@ -31,52 +42,67 @@ export default function PACalls() {
 
   const brokerName = (r: any) => r.planipret_profiles?.full_name ?? r.metadata?.ns_user?.name ?? r.metadata?.user_name ?? r.metadata?.extension_name ?? (r.extension ? `Ext. ${r.extension}` : "—");
 
-  const load = async (p = page) => {
-    setLoading(true);
-    const fromIdx = (p - 1) * PAGE;
-    const toIdx = fromIdx + PAGE - 1;
+  const buildQuery = (forCount = false) => {
     let q = supabase.from("planipret_phone_calls")
-      .select("*, planipret_profiles(full_name)", { count: "exact" })
-      .order("started_at", { ascending: false })
-      .range(fromIdx, toIdx);
+      .select(forCount ? "id" : "*, planipret_profiles(full_name)", { count: "exact", head: forCount });
     if (filters.broker?.startsWith("ext:")) q = q.eq("extension", filters.broker.slice(4));
     else if (filters.broker?.startsWith("user:")) q = q.eq("user_id", filters.broker.slice(5));
     if (filters.from) q = q.gte("started_at", filters.from);
     if (filters.to) q = q.lte("started_at", filters.to);
     if (filters.direction) q = q.eq("direction", filters.direction);
     if (filters.status) q = q.eq("status", filters.status);
+    if (filters.ai === "yes") q = q.not("ai_summary", "is", null);
+    if (filters.ai === "no") q = q.is("ai_summary", null);
     if (filters.search) q = q.or(`from_number.ilike.%${filters.search}%,to_number.ilike.%${filters.search}%`);
-    const { data, count } = await q;
-    setRows(data ?? []);
-    setTotal(count ?? 0);
+    return q;
+  };
+
+  const load = async (p = page, ps = pageSize) => {
+    setLoading(true);
+    setLoadError(null);
+    const dbg: DebugEntry[] = [];
+    const t0 = performance.now();
+    const fromIdx = (p - 1) * ps;
+    const toIdx = fromIdx + ps - 1;
+    const q = buildQuery().order("started_at", { ascending: false }).range(fromIdx, toIdx);
+    const { data, count, error } = await q;
+    dbg.push({
+      label: "planipret_phone_calls (page)",
+      query: `SELECT * FROM planipret_phone_calls ORDER BY started_at DESC LIMIT ${ps} OFFSET ${fromIdx}`,
+      count,
+      ms: Math.round(performance.now() - t0),
+      error: error?.message ?? null,
+      meta: { filters },
+      sample: (data ?? []).slice(0, 3),
+    });
+    if (error) {
+      setLoadError(error.message);
+      setRows([]);
+      setTotal(0);
+    } else {
+      setRows(data ?? []);
+      setTotal(count ?? 0);
+    }
+    setDebug(dbg);
     setLoading(false);
   };
 
   useEffect(() => {
     setPage(1);
-    load(1);
+    load(1, pageSize);
     const ch = supabase.channel("admin-calls")
-      .on("postgres_changes", { event: "*", schema: "public", table: "planipret_phone_calls" }, () => load(1))
+      .on("postgres_changes", { event: "*", schema: "public", table: "planipret_phone_calls" }, () => load(1, pageSize))
       .subscribe();
     return () => { supabase.removeChannel(ch); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.broker, filters.from, filters.to, filters.direction, filters.status, filters.search]);
+  }, [filters.broker, filters.from, filters.to, filters.direction, filters.status, filters.ai, filters.search]);
 
-  useEffect(() => { load(page); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [page]);
+  useEffect(() => { load(page, pageSize); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [page, pageSize]);
 
   const paged = rows;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE));
-
 
   const exportCsv = async () => {
-    let q = supabase.from("planipret_phone_calls").select("*, planipret_profiles(full_name)").order("started_at", { ascending: false }).limit(5000);
-    if (filters.broker?.startsWith("ext:")) q = q.eq("extension", filters.broker.slice(4));
-    else if (filters.broker?.startsWith("user:")) q = q.eq("user_id", filters.broker.slice(5));
-    if (filters.from) q = q.gte("started_at", filters.from);
-    if (filters.to) q = q.lte("started_at", filters.to);
-    if (filters.direction) q = q.eq("direction", filters.direction);
-    if (filters.status) q = q.eq("status", filters.status);
-    if (filters.search) q = q.or(`from_number.ilike.%${filters.search}%,to_number.ilike.%${filters.search}%`);
+    const q = buildQuery().order("started_at", { ascending: false }).limit(5000);
     const { data: all } = await q;
     const headers = ["Courtier", "Direction", "De", "Vers", "Durée", "Date"];
     const lines = [headers.join(",")].concat((all ?? []).map((r: any) =>
@@ -88,9 +114,10 @@ export default function PACalls() {
     URL.revokeObjectURL(url);
   };
 
-
   return (
     <div className="space-y-4">
+      <DebugPanel entries={debug} />
+
       <div className="pp-card p-4 flex flex-wrap items-end gap-2">
         <Select label="Courtier" value={filters.broker} onChange={(v) => setFilters({ ...filters, broker: v })}
           options={[{ v: "", l: "Tous" }, ...brokers.map((b) => ({ v: b.ns_only ? `ext:${b.extension}` : `user:${b.user_id}`, l: `${b.full_name}${b.extension ? ` · ${b.extension}` : ""}` }))]} />
@@ -99,8 +126,15 @@ export default function PACalls() {
         <Select label="Direction" value={filters.direction} onChange={(v) => setFilters({ ...filters, direction: v })}
           options={[{ v: "", l: "Toutes" }, { v: "inbound", l: "Entrant" }, { v: "outbound", l: "Sortant" }, { v: "missed", l: "Manqué" }]} />
         <Select label="Statut" value={filters.status} onChange={(v) => setFilters({ ...filters, status: v })}
-          options={[{ v: "", l: "Tous" }, { v: "completed", l: "Complété" }, { v: "active", l: "Actif" }, { v: "missed", l: "Manqué" }]} />
+          options={[{ v: "", l: "Tous" }, { v: "completed", l: "Complété" }, { v: "active", l: "En cours" }, { v: "missed", l: "Manqué" }]} />
+        <Select label="Analyse IA" value={filters.ai} onChange={(v) => setFilters({ ...filters, ai: v })}
+          options={[{ v: "", l: "Tous" }, { v: "yes", l: "Analysé" }, { v: "no", l: "Non analysé" }]} />
         <Input label="Recherche" placeholder="Numéro..." value={filters.search} onChange={(v) => setFilters({ ...filters, search: v })} />
+        {hasFilters && (
+          <button onClick={() => setFilters(EMPTY_FILTERS)} className="px-2 py-1.5 text-xs underline" style={{ color: "var(--pp-text-muted)" }}>
+            ✕ Réinitialiser ({activeFilterCount})
+          </button>
+        )}
         <button
           onClick={async () => {
             const id = toast.loading("Synchronisation NS-API…");
@@ -109,7 +143,7 @@ export default function PACalls() {
               if (error) throw error;
               const d = data as any;
               toast.success(`${d.extensions ?? d.users_total ?? 0} ext synchronisées · appels/enregistrements en arrière-plan`, { id });
-              await load(1);
+              await load(1, pageSize);
             } catch (e: any) { toast.error(`Échec: ${e.message ?? e}`, { id }); }
           }}
           className="ml-auto flex items-center gap-1.5 px-3 py-2 rounded-lg text-white text-sm font-medium"
@@ -123,6 +157,8 @@ export default function PACalls() {
       </div>
 
       <div className="pp-card overflow-hidden">
+        {loadError && <TableErrorState message={loadError} onRetry={() => load(page, pageSize)} />}
+
         <table className="w-full text-sm">
           <thead style={{ background: "var(--pp-bg-elevated)" }}>
             <tr style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--pp-text-faint)" }} className="text-left">
@@ -130,8 +166,33 @@ export default function PACalls() {
             </tr>
           </thead>
           <tbody>
-            {paged.length === 0 ? (
-              <tr><td colSpan={9} className="p-8 text-center" style={{ color: "var(--pp-text-faint)" }}>Aucun appel</td></tr>
+            {loading ? (
+              Array.from({ length: 6 }).map((_, i) => (
+                <tr key={i} style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}>
+                  {Array.from({ length: 9 }).map((_, j) => (
+                    <td key={j} className="p-3"><div className="h-3 w-3/4 animate-pulse rounded" style={{ background: "var(--pp-bg-elevated)" }} /></td>
+                  ))}
+                </tr>
+              ))
+            ) : paged.length === 0 ? (
+              <tr><td colSpan={9}>
+                <TableEmptyState
+                  icon="📞"
+                  title="Aucun appel trouvé"
+                  hint={hasFilters
+                    ? "Essayez d'élargir vos critères de recherche."
+                    : "Aucun appel enregistré. Vérifiez que le webhook NS-API est configuré dans Intégrations, puis lancez « Synchroniser NS-API »."}
+                  action={hasFilters ? (
+                    <button onClick={() => setFilters(EMPTY_FILTERS)} className="px-3 py-1.5 rounded-lg text-xs font-medium text-white" style={{ background: ACCENT }}>
+                      Réinitialiser les filtres
+                    </button>
+                  ) : (
+                    <Link to="/planipret/admin/integrations" className="px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>
+                      Aller aux intégrations →
+                    </Link>
+                  )}
+                />
+              </td></tr>
             ) : paged.map((c) => {
               const inb = c.direction === "inbound", missed = c.direction === "missed";
               const Icon = missed ? X : inb ? ArrowDownLeft : ArrowUpRight;
@@ -154,14 +215,15 @@ export default function PACalls() {
             })}
           </tbody>
         </table>
-        <div className="flex items-center justify-between px-4 py-3" style={{ borderTop: "1px solid var(--pp-bg-border-2)", fontSize: 11, color: "var(--pp-text-muted)" }}>
-          <span>{loading ? "Chargement…" : `Affichage ${total === 0 ? 0 : (page - 1) * PAGE + 1}–${Math.min(page * PAGE, total)} sur ${total} appels`}</span>
-          <div className="flex gap-1">
-            <button disabled={page === 1} onClick={() => setPage(page - 1)} className="px-2 py-1 rounded disabled:opacity-40" style={{ border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>←</button>
-            <span className="px-3 py-1">{page} / {totalPages}</span>
-            <button disabled={page === totalPages} onClick={() => setPage(page + 1)} className="px-2 py-1 rounded disabled:opacity-40" style={{ border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>→</button>
-          </div>
-        </div>
+        <Pagination
+          page={page}
+          pageSize={pageSize}
+          total={total}
+          loading={loading}
+          onPageChange={setPage}
+          onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
+          unit="appels"
+        />
       </div>
 
       {detail && (

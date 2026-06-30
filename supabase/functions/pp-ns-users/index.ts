@@ -27,16 +27,31 @@ async function nsFetch(path: string) {
 }
 
 async function fetchAllUsers(domain: string): Promise<{ ok: boolean; data: any[]; warning?: string }> {
+  const seen = new Set<string>();
   const all: any[] = [];
   const pageSize = 200;
+  let prevSize = -1;
   for (let i = 0; i < 25; i++) {
     const r = await nsFetch(`/domains/${encodeURIComponent(domain)}/users?limit=${pageSize}&offset=${i * pageSize}`);
     if (!r.ok) {
       return { ok: all.length > 0, data: all, warning: `NS-API users fetch failed: ${r.status} ${r.text.slice(0, 200)}` };
     }
     const arr = Array.isArray(r.data) ? r.data : (r.data?.users ?? r.data?.data ?? []);
-    all.push(...arr);
+    if (!arr.length) break;
+    let added = 0;
+    for (const u of arr) {
+      const ext = String(u.user ?? u.extension ?? u.subscriber_login ?? u.user_id ?? u.id ?? "").trim();
+      if (!ext) continue;
+      if (seen.has(ext)) continue;
+      seen.add(ext);
+      all.push(u);
+      added++;
+    }
+    // NS-API ignores offset → returns same page repeatedly. Stop when no new uniques.
+    if (added === 0) break;
     if (arr.length < pageSize) break;
+    if (all.length === prevSize) break;
+    prevSize = all.length;
   }
   return { ok: true, data: all };
 }

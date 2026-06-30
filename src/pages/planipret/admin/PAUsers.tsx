@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Search, Plus, Edit3, Trash2, ExternalLink, X, AlertTriangle, Eye, EyeOff, RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
+import Pagination from "@/components/planipret/admin/Pagination";
+import DebugPanel, { type DebugEntry } from "@/components/planipret/admin/DebugPanel";
+import { TableErrorState, TableEmptyState } from "@/components/planipret/admin/TableStates";
 
 const ACCENT = "#2E9BDC";
 const SUCCESS = "#00D4AA";
@@ -16,16 +20,32 @@ type Profile = {
   dnd_enabled?: boolean;
   ns_only?: boolean;
   status?: string | null;
+  maestro_connected?: boolean | null;
 };
 
-const PAGE = 25;
-
 export default function PAUsers() {
+  const [params, setParams] = useSearchParams();
+  const search = params.get("search") ?? "";
+  const filter = (params.get("filter") as "all" | "app" | "agent" | "offline") ?? "all";
+  const maestroFilter = (params.get("maestro") as "all" | "yes" | "no") ?? "all";
+  const page = Math.max(1, parseInt(params.get("page") ?? "1", 10) || 1);
+  const pageSizeRaw = parseInt(params.get("ps") ?? "25", 10);
+  const pageSize = [25, 50, 100].includes(pageSizeRaw) ? pageSizeRaw : 25;
+  const updateParams = (patch: Record<string, string | null>) => {
+    const next = new URLSearchParams(params);
+    Object.entries(patch).forEach(([k, v]) => { if (v == null || v === "") next.delete(k); else next.set(k, v); });
+    setParams(next, { replace: true });
+  };
+  const setSearch = (s: string) => updateParams({ search: s, page: "1" });
+  const setFilter = (f: string) => updateParams({ filter: f, page: "1" });
+  const setMaestroFilter = (m: string) => updateParams({ maestro: m, page: "1" });
+  const setPage = (p: number) => updateParams({ page: String(p) });
+  const setPageSize = (s: number) => updateParams({ ps: String(s), page: "1" });
+
   const [rows, setRows] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<"all" | "app" | "agent" | "offline">("all");
-  const [page, setPage] = useState(1);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [debug, setDebug] = useState<DebugEntry[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editUser, setEditUser] = useState<Profile | null>(null);
   const [delUser, setDelUser] = useState<Profile | null>(null);
@@ -40,36 +60,57 @@ export default function PAUsers() {
   const load = async () => {
     setLoading(true);
     setNsError(null);
+    setLoadError(null);
+    const dbg: DebugEntry[] = [];
 
     // 1) Local profiles (admins + provisioned brokers with app/agent toggles)
-    const { data: localProfiles } = await supabase
-      .from("planipret_profiles").select("*").order("full_name", { ascending: true });
+    const t1 = performance.now();
+    const { data: localProfiles, error: lpErr, count: lpCount } = await supabase
+      .from("planipret_profiles").select("*", { count: "exact" }).order("full_name", { ascending: true });
+    dbg.push({
+      label: "planipret_profiles",
+      query: "SELECT * FROM planipret_profiles ORDER BY full_name",
+      count: lpCount,
+      ms: Math.round(performance.now() - t1),
+      error: lpErr?.message ?? null,
+      sample: (localProfiles ?? []).slice(0, 3),
+    });
     const localList = (localProfiles ?? []) as Profile[];
 
-    // 2) Live brokers from NetSapiens (full directory, 350+)
+    // 2) Live brokers from NetSapiens (full directory, ~355)
     let merged: Profile[] = localList;
     try {
+      const t2 = performance.now();
       const { data: nsRes, error: nsErr } = await supabase.functions.invoke("pp-ns-users", { body: {} });
       if (nsErr) throw new Error(nsErr.message);
       if ((nsRes as any)?.ok) {
         const nsBrokers = ((nsRes as any).brokers ?? []) as Profile[];
         setNsDomain((nsRes as any).domain ?? null);
-        // dedupe: keep local profile when it shares the same extension
+        dbg.push({
+          label: "pp-ns-users (NS-API live directory)",
+          query: "invoke pp-ns-users",
+          count: nsBrokers.length,
+          ms: Math.round(performance.now() - t2),
+          meta: { domain: (nsRes as any).domain, warning: (nsRes as any).warning },
+          sample: nsBrokers.slice(0, 3),
+        });
         const byExt = new Map<string, Profile>();
         nsBrokers.forEach((b) => byExt.set(b.extension, b));
         localList.forEach((p) => { if (p.extension) byExt.set(p.extension, { ...byExt.get(p.extension), ...p }); });
-        // local-only rows without extension (e.g. admins) keep their place
         const extKeys = new Set(byExt.keys());
         const adminsOnly = localList.filter((p) => !p.extension || !extKeys.has(p.extension));
         merged = [...adminsOnly, ...Array.from(byExt.values())]
           .sort((a, b) => (a.full_name || "").localeCompare(b.full_name || ""));
       } else if ((nsRes as any)?.error) {
         setNsError((nsRes as any).error);
+        dbg.push({ label: "pp-ns-users", error: (nsRes as any).error, ms: Math.round(performance.now() - t2) });
       }
     } catch (e: any) {
       setNsError(e?.message ?? "NS-API indisponible");
+      dbg.push({ label: "pp-ns-users", error: e?.message ?? "unknown" });
     }
     setRows(merged);
+    if (lpErr && merged.length === 0) setLoadError(lpErr.message);
 
     const start = new Date(); start.setDate(1); start.setHours(0, 0, 0, 0);
     const { data: calls } = await supabase.from("planipret_phone_calls")
@@ -80,6 +121,7 @@ export default function PAUsers() {
       if (c.extension) map[`ext:${c.extension}`] = (map[`ext:${c.extension}`] ?? 0) + 1;
     });
     setCallsByUser(map);
+    setDebug(dbg);
     setLoading(false);
   };
 
@@ -104,8 +146,8 @@ export default function PAUsers() {
     });
   }, [rows, filter, search]);
 
-  const paged = filtered.slice((page - 1) * PAGE, page * PAGE);
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE));
+  const paged = filtered.slice((page - 1) * pageSize, page * pageSize);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
 
   const toggleField = async (u: Profile, field: "mobile_app_enabled" | "voice_agent_enabled") => {
     setSavingId(u.user_id);
@@ -322,15 +364,19 @@ export default function PAUsers() {
             </tbody>
           </table>
         </div>
-        <div className="flex items-center justify-between px-4 py-3" style={{ borderTop: "1px solid var(--pp-bg-border-2)", fontSize: 11, color: "var(--pp-text-muted)" }}>
-          <span>Affichage de {(page - 1) * PAGE + 1} à {Math.min(page * PAGE, filtered.length)} sur {filtered.length}</span>
-          <div className="flex gap-1">
-            <button disabled={page === 1} onClick={() => setPage(page - 1)} className="px-2 py-1 rounded disabled:opacity-40" style={{ border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>← Précédent</button>
-            <span className="px-3 py-1">{page} / {totalPages}</span>
-            <button disabled={page === totalPages} onClick={() => setPage(page + 1)} className="px-2 py-1 rounded disabled:opacity-40" style={{ border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>Suivant →</button>
-          </div>
-        </div>
+        <Pagination
+          page={page}
+          pageSize={pageSize}
+          total={filtered.length}
+          loading={loading}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+          unit="courtiers"
+        />
       </div>
+
+      <DebugPanel entries={debug} />
+
 
       {addOpen && <UserModal mode="add" onClose={() => setAddOpen(false)} onSaved={async (id) => { setAddOpen(false); await load(); if (id) { setHighlightId(id); setTimeout(() => setHighlightId(null), 3000); } }} />}
       {editUser && <UserModal mode="edit" user={editUser} onClose={() => setEditUser(null)} onSaved={async () => { setEditUser(null); await load(); }} />}
