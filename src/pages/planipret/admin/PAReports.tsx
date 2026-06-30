@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, CartesianGrid } from "recharts";
-import { Download, Trophy, FileText, RefreshCw } from "lucide-react";
+import { Download, Trophy, FileText, RefreshCw, Smartphone, Bot, Plug, Mail, Link2, Users } from "lucide-react";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
+import { usePlanipretBrokerStats } from "@/lib/planipret/brokerStats";
 
 type Range = "week" | "month" | "quarter";
 
