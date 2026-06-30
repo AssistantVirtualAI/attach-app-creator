@@ -237,7 +237,7 @@ export default function AdminRecordings({ scope = 'org' }: { scope?: 'org' | 'mi
         return;
       }
       const { data, error } = await supabase.functions.invoke('ai-transcribe-call', {
-        body: { organization_id: LEMTEL_ORG_ID, call_record_id: r.id },
+        body: { organization_id: LEMTEL_ORG_ID, call_record_id: r.id, language: transcribeLang },
       });
       if (error || (data as any)?.error) throw new Error((data as any)?.message || error?.message || 'failed');
       toast.success('Transcript ready');
