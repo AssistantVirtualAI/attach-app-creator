@@ -42,6 +42,9 @@ function deriveStatus(row?: Row): IntegrationStatus {
 export default function PlanipretIntegrations() {
   const [rows, setRows] = useState<Record<string, Row>>({});
   const [loading, setLoading] = useState(true);
+  const [backendSecrets, setBackendSecrets] = useState<
+    Record<string, { configured: boolean; present: string[]; missing: string[] }>
+  >({});
 
   // Per-card editable state (uncommitted form values)
   const [draft, setDraft] = useState<Record<string, Record<string, string>>>({});
@@ -57,8 +60,14 @@ export default function PlanipretIntegrations() {
     setLoading(false);
   }
 
+  async function refreshBackendSecrets() {
+    const { data, error } = await supabase.functions.invoke("pp-backend-secrets-status", { body: {} });
+    if (!error && (data as any)?.secrets) setBackendSecrets((data as any).secrets);
+  }
+
   useEffect(() => {
     refresh();
+    refreshBackendSecrets();
     const channel = supabase
       .channel("pp-integration-config")
       .on("postgres_changes",
@@ -67,6 +76,7 @@ export default function PlanipretIntegrations() {
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, []);
+
 
   // Health pills
   const health = useMemo(() => {
