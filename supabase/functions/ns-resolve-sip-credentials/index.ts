@@ -82,14 +82,8 @@ Deno.serve(async (req) => {
   const ref = profile.ns_sip_password_ref;
   if (ref) {
     try {
-      const { data: secrets } = await admin
-        .from("vault.decrypted_secrets" as any)
-        .select("decrypted_secret,name")
-        .eq("name", ref)
-        .limit(1);
-      if (secrets && (secrets as any[])[0]?.decrypted_secret) {
-        sipPassword = (secrets as any[])[0].decrypted_secret;
-      }
+      const { data: v } = await admin.rpc("read_planipret_sip_secret", { _name: ref });
+      if (typeof v === "string" && v.length) sipPassword = v;
     } catch { /* vault not accessible */ }
   }
 
