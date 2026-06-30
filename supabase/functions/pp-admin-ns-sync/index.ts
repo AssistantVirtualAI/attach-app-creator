@@ -100,7 +100,14 @@ function recordingUrl(c: any): string | null {
 }
 
 function nsCallId(c: any): string | null {
-  return String(val(c, ["id", "call_id", "call-id", "cdr_id", "cdr-id", "uuid", "orig-callid", "orig_callid", "session_id", "session-id"], "")).trim() || null;
+  const explicit = String(val(c, ["id", "call_id", "call-id", "callid", "cdr_id", "cdr-id", "uuid", "orig-callid", "orig-call-id", "orig_callid", "session_id", "session-id"], "")).trim();
+  if (explicit) return explicit;
+  const ext = String(val(c, ["user", "orig-user", "term-user", "extension", "subscriber"], "")).trim();
+  const started = String(val(c, ["time-start", "start-time", "start_time", "started_at", "date", "created_at"], "")).trim();
+  const from = String(val(c, ["orig-from-uri", "from", "from_number", "from-user", "caller_id_number"], "")).trim();
+  const to = String(val(c, ["term-to-uri", "to", "to_number", "to-user", "destination"], "")).trim();
+  const duration = String(val(c, ["duration", "time-talking", "billsec", "talk_time"], "0")).trim();
+  return ext || started || from || to ? `${ext}:${started}:${from}:${to}:${duration}` : null;
 }
 
 function userExt(u: any): string {
@@ -115,6 +122,20 @@ function userName(u: any, ext: string) {
   const first = val(u, ["name-first-name", "first_name", "firstName"], "");
   const last = val(u, ["name-last-name", "last_name", "lastName"], "");
   return String(val(u, ["display_name", "display-name", "name"], `${first} ${last}`.trim()) || ext);
+}
+
+function isPlanipretBrokerUser(u: any) {
+  const ext = userExt(u);
+  const email = userEmail(u);
+  const name = userName(u, ext).toLowerCase();
+  const status = String(val(u, ["status", "presence"], "")).toLowerCase();
+  const scope = String(val(u, ["scope", "user_scope", "user-scope"], "")).toLowerCase();
+  return !!ext
+    && !/^\d{7,}$/.test(ext)
+    && !/@lemtel\.com$/i.test(email)
+    && !["disabled", "suspended", "deleted", "inactive"].includes(status)
+    && !["system", "system user", "anonymous", "conference", "voicemail", "operator"].includes(name)
+    && !scope.includes("domain");
 }
 
 async function tryPaths(paths: string[]) {
