@@ -63,10 +63,14 @@ async function resolveEmail(row: QueueRow): Promise<string> {
   return `${row.extension}@${dom}`;
 }
 
+function randomPassword(): string {
+  return crypto.randomUUID().replace(/-/g, "") + "Aa!1";
+}
+
 async function processOne(row: QueueRow) {
   const email = await resolveEmail(row);
-
   const password = row.sip_password || randomPassword();
+
 
   // Find existing auth user by email.
   let userId: string | null = null;
