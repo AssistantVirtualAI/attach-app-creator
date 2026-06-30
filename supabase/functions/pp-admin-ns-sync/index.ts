@@ -234,7 +234,14 @@ async function syncCalls(admin: ReturnType<typeof createClient>, domain: string,
   }
 
   const D = encodeURIComponent(domain);
-  const domainCdrs = await fetchAll(`/domains/${D}/cdrs?start_time=${encodeURIComponent(start)}&end_time=${encodeURIComponent(end)}`, 200, 50);
+  // NS-API v2 (docs.ns-api.com) uses hyphenated query parameter names: start-time, end-time.
+  // Canonical path is /cdrs (root) with domain filter; /domains/{D}/cdrs is supported on most
+  // installs and /domains/{D}/users/{ext}/cdrs is the per-user fallback documented in the spec.
+  const qs = `start-time=${encodeURIComponent(start)}&end-time=${encodeURIComponent(end)}`;
+  let domainCdrs = await fetchAll(`/cdrs?domain=${D}&${qs}`, 200, 50);
+  if (!domainCdrs.data.length) {
+    domainCdrs = await fetchAll(`/domains/${D}/cdrs?${qs}`, 200, 50);
+  }
   const rawItems: Array<{ item: any; ext?: string }> = [];
   for (const c of domainCdrs.data) rawItems.push({ item: c, ext: String(val(c, ["user", "orig-user", "term-user", "extension"], "")) || undefined });
 
@@ -243,12 +250,13 @@ async function syncCalls(admin: ReturnType<typeof createClient>, domain: string,
     for (let i = 0; i < extensions.length; i += 12) {
       const chunk = extensions.slice(i, i + 12);
       const results = await Promise.all(chunk.map(async (ext) => {
-        const r = await fetchAll(`/domains/${D}/users/${encodeURIComponent(ext)}/cdrs?start_time=${encodeURIComponent(start)}&end_time=${encodeURIComponent(end)}`, 200, 10);
+        const r = await fetchAll(`/domains/${D}/users/${encodeURIComponent(ext)}/cdrs?${qs}`, 200, 10);
         return { ext, data: r.data, warning: r.warning };
       }));
       for (const r of results) for (const item of r.data) rawItems.push({ item, ext: r.ext });
     }
   }
+
 
   const rows: any[] = [];
   for (const { item: c, ext: fallbackExt } of rawItems) {
