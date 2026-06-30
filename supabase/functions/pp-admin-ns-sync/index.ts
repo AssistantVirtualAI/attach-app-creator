@@ -258,14 +258,38 @@ async function syncCalls(admin: ReturnType<typeof createClient>, domain: string,
   return { fetched: rawItems.length, upserted, recordings: rows.filter((r) => r.recording_url).length, warnings: domainCdrs.warning ? [domainCdrs.warning] : [], errors };
 }
 
-async function syncMessages(admin: ReturnType<typeof createClient>, domain: string, start: string, end: string) {
+async function syncMessages(admin: ReturnType<typeof createClient>, domain: string, start: string, end: string, users: any[] = []) {
   const D = encodeURIComponent(domain);
-  const r = await tryPaths([
+  // Per NS-API docs (docs.ns-api.com/reference), SMS lives under:
+  //   GET /ns-api/v2/domains/{domain}/users/{user}/messagesessions
+  //   GET /ns-api/v2/domains/{domain}/users/{user}/messagesessions/{session}/messages
+  // Some servers also expose a flat /domains/{domain}/messages aggregator; we try that
+  // first as a fast-path, then fall back to per-user session enumeration.
+  // curl equivalent: GET https://{server}/ns-api/v2/domains/{D}/users/{ext}/messagesessions
+  let r = await tryPaths([
     `/domains/${D}/messages?start_time=${encodeURIComponent(start)}&end_time=${encodeURIComponent(end)}`,
     `/domains/${D}/sms?start_time=${encodeURIComponent(start)}&end_time=${encodeURIComponent(end)}`,
-    `/domains/${D}/texts?start_time=${encodeURIComponent(start)}&end_time=${encodeURIComponent(end)}`,
   ]);
+  if (!r.data.length && users.length) {
+    const collected: any[] = [];
+    const sampleUsers = users.slice(0, 50); // bound work; background job retries the rest
+    for (const u of sampleUsers) {
+      const ext = String(u?.user ?? u?.extension ?? "").trim();
+      if (!ext) continue;
+      const E = encodeURIComponent(ext);
+      const sessions = await tryPaths([`/domains/${D}/users/${E}/messagesessions`]);
+      for (const s of sessions.data.slice(0, 25)) {
+        const sid = String(s?.session_id ?? s?.id ?? s?.["session-id"] ?? "").trim();
+        if (!sid) continue;
+        const S = encodeURIComponent(sid);
+        const msgs = await tryPaths([`/domains/${D}/users/${E}/messagesessions/${S}/messages`]);
+        for (const m of msgs.data) collected.push({ ...m, user: ext });
+      }
+    }
+    r = { data: collected, warning: collected.length ? null : "messages_per_session_empty" };
+  }
   if (!r.data.length) return { fetched: 0, upserted: 0, warning: r.warning ?? "messages_endpoint_empty" };
+
 
   const { data: profiles } = await admin.from("planipret_profiles").select("user_id,extension,ns_extension").eq("organization_id", AVA_ORG_ID);
   const extToUser = new Map<string, string>();
