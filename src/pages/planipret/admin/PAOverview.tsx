@@ -100,7 +100,16 @@ export default function PAOverview() {
   const [seriesData, setSeriesData] = useState<Array<{ day: string; appels: number; sms: number }>>([]);
   const [directionDist, setDirectionDist] = useState<Array<{ name: string; value: number; color: string }>>([]);
   const [topBrokers, setTopBrokers] = useState<Array<{ name: string; calls: number }>>([]);
-  const [serviceCounts, setServiceCounts] = useState({ mobile: 0, widget: 0, ai: 0 });
+
+  // Single source of truth for broker activation counts (matches the toggles
+  // on /admin/users via the planipret_broker_stats view, with Realtime sync).
+  const { stats: brokerStats } = usePlanipretBrokerStats();
+  const serviceCounts = {
+    mobile: brokerStats.app_mobile_active,
+    widget: 0, // overwritten below from query
+    ai: brokerStats.agent_ia_active,
+  };
+  const [widgetCount, setWidgetCount] = useState(0);
 
   const load = async () => {
     setRefreshing(true);
