@@ -42,8 +42,8 @@ import {
 import { NotificationsBell } from '@/components/notifications/NotificationsBell';
 import { OrgSwitcher } from '@/components/layout/OrgSwitcher';
 import { useApplyBranding } from '@/hooks/useApplyBranding';
-import { SoftphoneWidget } from '@/components/softphone/SoftphoneWidget';
-import { AppAccessGate } from '@/components/auth/AppAccessGate';
+// Portal softphone removed; calls happen via mobile app.
+
 import { VersionBadge } from '@/components/shared/VersionBadge';
 import { useLemtelAiRealtime } from '@/hooks/useLemtelAiRealtime';
 
