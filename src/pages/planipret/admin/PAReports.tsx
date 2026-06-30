@@ -218,6 +218,35 @@ export default function PAReports() {
       </div>
       <div ref={reportRef} className="space-y-4">
 
+      {/* ───────── SECTION A — État actuel (non filtré par période) ───────── */}
+      <div className="pp-card p-5">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="flex items-center gap-2" style={{ fontWeight: 600, color: "var(--pp-text-primary)" }}>
+            <Users className="w-4 h-4" style={{ color: ACCENT }} /> Activité des courtiers — État actuel
+          </h3>
+          <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full"
+            style={{ background: "rgba(46,155,220,0.12)", color: ACCENT, border: "1px solid rgba(46,155,220,0.25)" }}>
+            Snapshot temps réel
+          </span>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          <StatTile icon={<Users className="w-3.5 h-3.5" />} label="Courtiers" value={brokerStats.total_courtiers} color={ACCENT} />
+          <StatTile icon={<Smartphone className="w-3.5 h-3.5" />} label="App Mobile active" value={brokerStats.app_mobile_active} color={SUCCESS} sub={`sur ${brokerStats.total_courtiers}`} />
+          <StatTile icon={<Bot className="w-3.5 h-3.5" />} label="Agent IA actif" value={brokerStats.agent_ia_active} color="#9B7FE8" sub={`sur ${brokerStats.total_courtiers}`} />
+          <StatTile icon={<Plug className="w-3.5 h-3.5" />} label="Maestro lié" value={brokerStats.maestro_connected} color="#F5A623" />
+          <StatTile icon={<Mail className="w-3.5 h-3.5" />} label="M365 connecté" value={brokerStats.ms365_connected} color="#2E9BDC" />
+          <StatTile icon={<Link2 className="w-3.5 h-3.5" />} label="NS lié" value={brokerStats.ns_linked} color={GOLD} />
+        </div>
+      </div>
+
+      {/* ───────── Sections B+ — Filtrées par période ───────── */}
+      <div className="flex items-center gap-2 mt-2">
+        <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full"
+          style={{ background: "rgba(245,200,66,0.12)", color: GOLD, border: "1px solid rgba(245,200,66,0.25)" }}>
+          Période sélectionnée · {periodLabel}
+        </span>
+      </div>
+
       {/* Podium */}
       {podium.length > 0 && (
         <div className="pp-card p-5">
