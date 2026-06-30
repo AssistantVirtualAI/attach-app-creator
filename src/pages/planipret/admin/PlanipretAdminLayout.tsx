@@ -122,7 +122,8 @@ export default function PlanipretAdminLayout() {
       } catch { /* ignore */ }
       try {
         const since = new Date(); since.setHours(0, 0, 0, 0);
-        const mc = await getPlanipretCallCount({ direction: "inbound", status: "missed", from: since.toISOString() });
+        // Same definition/query helper as /admin/calls when filtering Direction = Manqué.
+        const mc = await getPlanipretCallCount({ direction: "missed", from: since.toISOString() });
         if (!cancelled) setMissedCalls(mc);
       } catch { /* ignore */ }
       try {
