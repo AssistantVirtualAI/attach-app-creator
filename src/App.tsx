@@ -435,7 +435,6 @@ const App = () => (
                   <Route path="users" element={<Suspense fallback={<AdminPageSkeleton />}><PAUsers /></Suspense>} />
                   <Route path="calls" element={<Suspense fallback={<AdminPageSkeleton />}><PACalls /></Suspense>} />
                   <Route path="messages" element={<Suspense fallback={<AdminPageSkeleton />}><PAMessages /></Suspense>} />
-                  <Route path="voicemails" element={<Suspense fallback={<AdminPageSkeleton />}><PAVoicemails /></Suspense>} />
                   <Route path="voicemails" element={<Navigate to="/planipret/admin/recordings" replace />} />
                   <Route path="recordings" element={<Suspense fallback={<AdminPageSkeleton />}><PARecordings /></Suspense>} />
                   <Route path="reports" element={<Suspense fallback={<AdminPageSkeleton />}><PAReports /></Suspense>} />
