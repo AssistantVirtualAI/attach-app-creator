@@ -60,36 +60,57 @@ export default function PAUsers() {
   const load = async () => {
     setLoading(true);
     setNsError(null);
+    setLoadError(null);
+    const dbg: DebugEntry[] = [];
 
     // 1) Local profiles (admins + provisioned brokers with app/agent toggles)
-    const { data: localProfiles } = await supabase
-      .from("planipret_profiles").select("*").order("full_name", { ascending: true });
+    const t1 = performance.now();
+    const { data: localProfiles, error: lpErr, count: lpCount } = await supabase
+      .from("planipret_profiles").select("*", { count: "exact" }).order("full_name", { ascending: true });
+    dbg.push({
+      label: "planipret_profiles",
+      query: "SELECT * FROM planipret_profiles ORDER BY full_name",
+      count: lpCount,
+      ms: Math.round(performance.now() - t1),
+      error: lpErr?.message ?? null,
+      sample: (localProfiles ?? []).slice(0, 3),
+    });
     const localList = (localProfiles ?? []) as Profile[];
 
-    // 2) Live brokers from NetSapiens (full directory, 350+)
+    // 2) Live brokers from NetSapiens (full directory, ~355)
     let merged: Profile[] = localList;
     try {
+      const t2 = performance.now();
       const { data: nsRes, error: nsErr } = await supabase.functions.invoke("pp-ns-users", { body: {} });
       if (nsErr) throw new Error(nsErr.message);
       if ((nsRes as any)?.ok) {
         const nsBrokers = ((nsRes as any).brokers ?? []) as Profile[];
         setNsDomain((nsRes as any).domain ?? null);
-        // dedupe: keep local profile when it shares the same extension
+        dbg.push({
+          label: "pp-ns-users (NS-API live directory)",
+          query: "invoke pp-ns-users",
+          count: nsBrokers.length,
+          ms: Math.round(performance.now() - t2),
+          meta: { domain: (nsRes as any).domain, warning: (nsRes as any).warning },
+          sample: nsBrokers.slice(0, 3),
+        });
         const byExt = new Map<string, Profile>();
         nsBrokers.forEach((b) => byExt.set(b.extension, b));
         localList.forEach((p) => { if (p.extension) byExt.set(p.extension, { ...byExt.get(p.extension), ...p }); });
-        // local-only rows without extension (e.g. admins) keep their place
         const extKeys = new Set(byExt.keys());
         const adminsOnly = localList.filter((p) => !p.extension || !extKeys.has(p.extension));
         merged = [...adminsOnly, ...Array.from(byExt.values())]
           .sort((a, b) => (a.full_name || "").localeCompare(b.full_name || ""));
       } else if ((nsRes as any)?.error) {
         setNsError((nsRes as any).error);
+        dbg.push({ label: "pp-ns-users", error: (nsRes as any).error, ms: Math.round(performance.now() - t2) });
       }
     } catch (e: any) {
       setNsError(e?.message ?? "NS-API indisponible");
+      dbg.push({ label: "pp-ns-users", error: e?.message ?? "unknown" });
     }
     setRows(merged);
+    if (lpErr && merged.length === 0) setLoadError(lpErr.message);
 
     const start = new Date(); start.setDate(1); start.setHours(0, 0, 0, 0);
     const { data: calls } = await supabase.from("planipret_phone_calls")
@@ -100,6 +121,7 @@ export default function PAUsers() {
       if (c.extension) map[`ext:${c.extension}`] = (map[`ext:${c.extension}`] ?? 0) + 1;
     });
     setCallsByUser(map);
+    setDebug(dbg);
     setLoading(false);
   };
 
