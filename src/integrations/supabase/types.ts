@@ -8321,7 +8321,7 @@ export type Database = {
           transcript_segments: Json | null
           transcript_source: string | null
           updated_at: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           ai_client_insights?: Json | null
@@ -8370,7 +8370,7 @@ export type Database = {
           transcript_segments?: Json | null
           transcript_source?: string | null
           updated_at?: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           ai_client_insights?: Json | null
@@ -8419,7 +8419,7 @@ export type Database = {
           transcript_segments?: Json | null
           transcript_source?: string | null
           updated_at?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -8440,7 +8440,7 @@ export type Database = {
           thread_id: string | null
           to_number: string | null
           updated_at: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           body?: string | null
@@ -8458,7 +8458,7 @@ export type Database = {
           thread_id?: string | null
           to_number?: string | null
           updated_at?: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           body?: string | null
@@ -8476,7 +8476,7 @@ export type Database = {
           thread_id?: string | null
           to_number?: string | null
           updated_at?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: []
       }

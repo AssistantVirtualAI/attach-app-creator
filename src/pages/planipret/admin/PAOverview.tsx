@@ -117,20 +117,24 @@ export default function PAOverview() {
       supabase.from("planipret_phone_messages").select("id", { count: "exact", head: true }).gte("created_at", yestIso).lt("created_at", todayIso),
       supabase.from("ai_request_audit_log").select("id", { count: "exact", head: true }).gte("created_at", todayIso).like("action", "elevenlabs_tool:%"),
       supabase.from("planipret_voicemails").select("id", { count: "exact", head: true }).eq("is_read", false),
-      supabase.from("planipret_phone_calls").select("id, user_id, direction, from_number, to_number, duration_seconds, started_at, ai_summary, planipret_profiles!inner(full_name)").order("started_at", { ascending: false }).limit(20),
-      supabase.from("planipret_profiles").select("user_id, full_name, mobile_app_enabled, updated_at").order("updated_at", { ascending: false }),
+      supabase.from("planipret_phone_calls").select("id, user_id, extension, direction, from_number, to_number, duration_seconds, started_at, ai_summary, metadata, planipret_profiles(full_name)").order("started_at", { ascending: false }).limit(20),
+      supabase.from("planipret_profiles").select("user_id, full_name, extension, ns_extension, mobile_app_enabled, updated_at").order("updated_at", { ascending: false }),
       supabase.from("planipret_phone_calls").select("started_at").gte("started_at", periodIso),
       supabase.from("planipret_phone_messages").select("created_at").gte("created_at", periodIso),
       supabase.from("planipret_phone_calls").select("direction").gte("started_at", periodIso),
-      supabase.from("planipret_phone_calls").select("user_id, planipret_profiles!inner(full_name)").gte("started_at", periodIso),
+      supabase.from("planipret_phone_calls").select("user_id, extension, metadata, planipret_profiles(full_name)").gte("started_at", periodIso),
       supabase.from("planipret_profiles").select("id", { count: "exact", head: true }).eq("mobile_app_enabled", true),
       supabase.from("planipret_profiles").select("id", { count: "exact", head: true }).eq("widget_enabled", true),
       supabase.from("planipret_profiles").select("id", { count: "exact", head: true }).eq("voice_agent_enabled", true),
     ]);
 
+    const nsBrokerExt = new Set<string>();
+    (rec.data ?? []).forEach((c: any) => c.extension && nsBrokerExt.add(String(c.extension)));
+    (topCalls.data ?? []).forEach((c: any) => c.extension && nsBrokerExt.add(String(c.extension)));
+
     setStats({
       calls: c1.count ?? 0, callsYest: c2.count ?? 0,
-      brokers: bAct.count ?? 0, brokersTotal: bAll.count ?? 0,
+      brokers: Math.max(bAct.count ?? 0, nsBrokerExt.size), brokersTotal: Math.max(bAll.count ?? 0, nsBrokerExt.size),
       sms: sms.count ?? 0, smsYest: smsY.count ?? 0,
       ava: ava.count ?? 0, voicemailsUnread: vm.count ?? 0,
     });
@@ -169,8 +173,8 @@ export default function PAOverview() {
     // Top 5 brokers
     const topMap: Record<string, { name: string; calls: number }> = {};
     (topCalls.data ?? []).forEach((c: any) => {
-      const name = c.planipret_profiles?.full_name ?? "—";
-      const key = c.user_id;
+      const name = c.planipret_profiles?.full_name ?? (c.extension ? `Ext. ${c.extension}` : "—");
+      const key = c.user_id ?? `ext:${c.extension ?? "unknown"}`;
       if (!topMap[key]) topMap[key] = { name, calls: 0 };
       topMap[key].calls += 1;
     });
@@ -179,7 +183,7 @@ export default function PAOverview() {
     // Hot leads
     const { data: hot } = await supabase
       .from("planipret_phone_calls")
-      .select("id, user_id, from_number, from_name, to_number, to_name, lead_score, started_at, planipret_profiles!inner(full_name)")
+      .select("id, user_id, extension, from_number, from_name, to_number, to_name, lead_score, started_at, planipret_profiles(full_name)")
       .gte("started_at", todayIso)
       .gte("lead_score", 8)
       .order("lead_score", { ascending: false })
@@ -375,7 +379,7 @@ export default function PAOverview() {
                   <li key={l.id} className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: "rgba(232,76,76,0.06)", borderLeft: `3px solid ${TEMP_COLORS.hot}` }}>
                     <Flame className="w-3.5 h-3.5 flex-shrink-0" style={{ color: TEMP_COLORS.hot }} />
                     <div className="flex-1 min-w-0">
-                      <p className="truncate" style={{ fontSize: 12, color: "var(--pp-text-primary)" }}>{l.planipret_profiles?.full_name ?? "—"}</p>
+                      <p className="truncate" style={{ fontSize: 12, color: "var(--pp-text-primary)" }}>{l.planipret_profiles?.full_name ?? (l.extension ? `Ext. ${l.extension}` : "—")}</p>
                       <p className="truncate" style={{ fontSize: 11, color: "var(--pp-text-muted)" }}>{contact}</p>
                     </div>
                     <span style={{ fontSize: 11, fontWeight: 700, color: TEMP_COLORS.hot }}>{TEMP_EMOJI.hot} {l.lead_score}/10</span>
@@ -409,7 +413,7 @@ export default function PAOverview() {
                   const num = inb || missed ? c.from_number : c.to_number;
                   return (
                     <tr key={c.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.03)" }} className="hover:bg-white/[0.02]">
-                      <td className="py-2.5 truncate max-w-[140px]" style={{ fontSize: 12, color: "var(--pp-text-primary)" }}>{(c as any).planipret_profiles?.full_name ?? "—"}</td>
+                      <td className="py-2.5 truncate max-w-[140px]" style={{ fontSize: 12, color: "var(--pp-text-primary)" }}>{(c as any).planipret_profiles?.full_name ?? ((c as any).extension ? `Ext. ${(c as any).extension}` : "—")}</td>
                       <td><Icon className="w-3.5 h-3.5" style={{ color: col }} /></td>
                       <td style={{ fontSize: 12, color: "var(--pp-text-secondary)" }}>{num ?? "—"}</td>
                       <td style={{ fontSize: 12, color: "var(--pp-text-muted)" }}>{c.duration_seconds ? `${Math.floor(c.duration_seconds / 60)}m${c.duration_seconds % 60}s` : "—"}</td>

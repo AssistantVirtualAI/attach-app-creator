@@ -46,11 +46,15 @@ export default function PAReports() {
     (async () => {
       const [{ data: c }, { data: p }] = await Promise.all([
         supabase.from("planipret_phone_calls").select("*").gte("started_at", start.toISOString()),
-        supabase.from("planipret_profiles").select("user_id, full_name"),
+        supabase.from("planipret_profiles").select("user_id, full_name, extension, ns_extension"),
       ]);
       setCalls(c ?? []);
       const map: Record<string, string> = {};
-      (p ?? []).forEach((x: any) => map[x.user_id] = x.full_name);
+      (p ?? []).forEach((x: any) => {
+        map[x.user_id] = x.full_name;
+        if (x.extension) map[`ext:${x.extension}`] = x.full_name;
+        if (x.ns_extension) map[`ext:${x.ns_extension}`] = x.full_name;
+      });
       setBrokers(map);
     })();
   }, [range]);
@@ -97,8 +101,8 @@ export default function PAReports() {
   const byBroker = useMemo(() => {
     const m: Record<string, any> = {};
     calls.forEach((c) => {
-      const k = c.user_id;
-      if (!m[k]) m[k] = { name: brokers[k] ?? "—", total: 0, in: 0, out: 0, missed: 0, totalDur: 0, durCount: 0 };
+      const k = c.user_id ?? `ext:${c.extension ?? c.metadata?.extension ?? "unknown"}`;
+      if (!m[k]) m[k] = { name: brokers[k] ?? (c.extension ? `Ext. ${c.extension}` : "—"), total: 0, in: 0, out: 0, missed: 0, totalDur: 0, durCount: 0 };
       m[k].total++;
       if (c.direction === "inbound") m[k].in++;
       else if (c.direction === "outbound") m[k].out++;
