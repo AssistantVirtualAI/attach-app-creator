@@ -57,6 +57,20 @@ async function fetchAllUsers(domain: string): Promise<{ ok: boolean; data: any[]
   return { ok: true, data: all };
 }
 
+function isPlanipretBrokerCandidate(b: any) {
+  const ext = String(b.extension ?? "").trim();
+  const email = String(b.email ?? "").trim();
+  const status = String(b.status ?? "").toLowerCase();
+  const name = String(b.full_name ?? "").trim();
+  const scope = String(b.scope ?? "").toLowerCase();
+  return !!ext
+    && !/@lemtel\.com$/i.test(email)
+    && !["disabled", "suspended", "deleted", "inactive"].includes(status)
+    && !/^\d{7,}$/.test(ext)
+    && !["system", "system user", "anonymous", "conference", "voicemail", "operator"].includes(name.toLowerCase())
+    && !scope.includes("domain");
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -101,7 +115,7 @@ Deno.serve(async (req) => {
           "name-last-name": (p.full_name || "").split(" ").slice(1).join(" "),
         }));
 
-    const brokers = sourceList.map((u: any) => {
+    const rawBrokers = sourceList.map((u: any) => {
       const ext = String(u.user ?? u.extension ?? u.subscriber_login ?? u.user_id ?? u.id ?? "");
       const email = String(u.email ?? u.email_address ?? u["email-address"] ?? "").toLowerCase();
       const local = byExt.get(ext) ?? (email ? byEmail.get(email) : undefined);
@@ -124,7 +138,11 @@ Deno.serve(async (req) => {
         updated_at: local?.updated_at ?? u.last_modified ?? null,
         created_at: local?.created_at ?? u.creation_date ?? null,
       };
-    }).filter((b: any) => b.extension && !/@lemtel\.com$/i.test(String(b.email || "").trim()));
+    }).filter(isPlanipretBrokerCandidate);
+
+    const byExt = new Map<string, any>();
+    for (const b of rawBrokers) if (!byExt.has(b.extension)) byExt.set(b.extension, b);
+    const brokers = Array.from(byExt.values());
 
     return json({ ok: true, count: brokers.length, domain, brokers, ns_warning: nsWarning, degraded: !!nsWarning, strategy: "start_limit_dedupe_by_extension" });
   } catch (e) {
