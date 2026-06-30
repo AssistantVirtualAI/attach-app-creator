@@ -268,6 +268,19 @@ export default function PlanipretMobile() {
     setAccessError(null);
     setProfile(data);
     setLoading(false);
+    // Silently resolve SIP credentials for the softphone (fire-and-forget).
+    if (data?.ns_linked) {
+      try {
+        const { data: sip } = await supabase.functions.invoke("ns-resolve-sip-credentials", { body: {} });
+        if (sip?.ok) {
+          sessionStorage.setItem("pp_sip_config", JSON.stringify({
+            username: sip.sip_username, password: sip.sip_password,
+            domain: sip.sip_domain, proxy: sip.sip_proxy, extension: sip.sip_extension,
+          }));
+          (window as any).dispatchEvent(new CustomEvent("pp:sip-ready", { detail: { extension: sip.sip_extension } }));
+        }
+      } catch (_) { /* non-blocking */ }
+    }
   };
 
   const submitMobileLogin = async (event: FormEvent) => {

@@ -8273,6 +8273,56 @@ export type Database = {
         }
         Relationships: []
       }
+      planipret_ns_migration_log: {
+        Row: {
+          broker_id: string | null
+          created_at: string
+          id: string
+          match_confidence: string | null
+          match_status: string
+          notes: string | null
+          ns_email_from_api: string | null
+          ns_extension: string | null
+          portal_email: string | null
+          reviewed: boolean
+          updated_at: string
+        }
+        Insert: {
+          broker_id?: string | null
+          created_at?: string
+          id?: string
+          match_confidence?: string | null
+          match_status: string
+          notes?: string | null
+          ns_email_from_api?: string | null
+          ns_extension?: string | null
+          portal_email?: string | null
+          reviewed?: boolean
+          updated_at?: string
+        }
+        Update: {
+          broker_id?: string | null
+          created_at?: string
+          id?: string
+          match_confidence?: string | null
+          match_status?: string
+          notes?: string | null
+          ns_email_from_api?: string | null
+          ns_extension?: string | null
+          portal_email?: string | null
+          reviewed?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planipret_ns_migration_log_broker_id_fkey"
+            columns: ["broker_id"]
+            isOneToOne: false
+            referencedRelation: "planipret_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       planipret_phone_calls: {
         Row: {
           ai_client_insights: Json | null
@@ -8586,6 +8636,7 @@ export type Database = {
       }
       planipret_profiles: {
         Row: {
+          auth_method: string | null
           ava_autonomy_mode: string
           ava_last_session_at: string | null
           ava_preferred_lang: string
@@ -8609,6 +8660,7 @@ export type Database = {
           language: string
           last_eod_summary_at: string | null
           last_morning_brief_at: string | null
+          login_email: string | null
           maestro_broker_id: string | null
           maestro_broker_token: string | null
           maestro_connected: boolean
@@ -8635,12 +8687,15 @@ export type Database = {
           ns_extension: string | null
           ns_jwt: string | null
           ns_jwt_expires_at: string | null
+          ns_link_method: string | null
           ns_linked: boolean
           ns_linked_at: string | null
           ns_refresh_token: string | null
+          ns_sip_password_ref: string | null
           ns_sip_username: string | null
           ns_user_id: string | null
           onboarding_completed: boolean
+          onboarding_email_sent_at: string | null
           onboarding_step: number
           organization_id: string
           phone: string | null
@@ -8664,6 +8719,7 @@ export type Database = {
           widget_enabled: boolean
         }
         Insert: {
+          auth_method?: string | null
           ava_autonomy_mode?: string
           ava_last_session_at?: string | null
           ava_preferred_lang?: string
@@ -8687,6 +8743,7 @@ export type Database = {
           language?: string
           last_eod_summary_at?: string | null
           last_morning_brief_at?: string | null
+          login_email?: string | null
           maestro_broker_id?: string | null
           maestro_broker_token?: string | null
           maestro_connected?: boolean
@@ -8713,12 +8770,15 @@ export type Database = {
           ns_extension?: string | null
           ns_jwt?: string | null
           ns_jwt_expires_at?: string | null
+          ns_link_method?: string | null
           ns_linked?: boolean
           ns_linked_at?: string | null
           ns_refresh_token?: string | null
+          ns_sip_password_ref?: string | null
           ns_sip_username?: string | null
           ns_user_id?: string | null
           onboarding_completed?: boolean
+          onboarding_email_sent_at?: string | null
           onboarding_step?: number
           organization_id?: string
           phone?: string | null
@@ -8742,6 +8802,7 @@ export type Database = {
           widget_enabled?: boolean
         }
         Update: {
+          auth_method?: string | null
           ava_autonomy_mode?: string
           ava_last_session_at?: string | null
           ava_preferred_lang?: string
@@ -8765,6 +8826,7 @@ export type Database = {
           language?: string
           last_eod_summary_at?: string | null
           last_morning_brief_at?: string | null
+          login_email?: string | null
           maestro_broker_id?: string | null
           maestro_broker_token?: string | null
           maestro_connected?: boolean
@@ -8791,12 +8853,15 @@ export type Database = {
           ns_extension?: string | null
           ns_jwt?: string | null
           ns_jwt_expires_at?: string | null
+          ns_link_method?: string | null
           ns_linked?: boolean
           ns_linked_at?: string | null
           ns_refresh_token?: string | null
+          ns_sip_password_ref?: string | null
           ns_sip_username?: string | null
           ns_user_id?: string | null
           onboarding_completed?: boolean
+          onboarding_email_sent_at?: string | null
           onboarding_step?: number
           organization_id?: string
           phone?: string | null
@@ -12649,6 +12714,10 @@ export type Database = {
         Args: { _name: string; _slug: string }
         Returns: string
       }
+      create_planipret_sip_secret: {
+        Args: { _broker_id: string; _name: string; _value: string }
+        Returns: string
+      }
       current_user_internal_org_ids: { Args: never; Returns: string[] }
       current_user_org_ids: { Args: never; Returns: string[] }
       current_user_softphone_domain_uuids: {
@@ -12815,6 +12884,7 @@ export type Database = {
       pin_chat_message: { Args: { _message_id: string }; Returns: undefined }
       planipret_ava_org_id: { Args: never; Returns: string }
       pp_audit_realtime_check: { Args: never; Returns: Json }
+      read_planipret_sip_secret: { Args: { _name: string }; Returns: string }
       reconcile_pbx_call_records: { Args: { _org_id: string }; Returns: Json }
       relink_my_softphone_user: { Args: never; Returns: Json }
       resolve_org_by_domain_name: {
