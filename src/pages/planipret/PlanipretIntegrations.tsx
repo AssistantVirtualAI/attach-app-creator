@@ -161,6 +161,7 @@ export default function PlanipretIntegrations() {
         {/* ───────── CARD 2 — NS-API ───────── */}
         <IntegrationCard
           integrationKey="ns_api" name="NS-API (NetSapiens)"
+          backendSecrets={backendSecrets.ns_api}
           description="Système téléphonique — appels, CDRs, voicemails, SMS, enregistrements"
           emoji="📞"
           status={deriveStatus(rows.ns_api)}
@@ -213,6 +214,7 @@ export default function PlanipretIntegrations() {
         {/* ───────── CARD 5 — CLAUDE IA ───────── */}
         <IntegrationCard
           integrationKey="anthropic" name="Claude IA (Anthropic)"
+          backendSecrets={backendSecrets.anthropic}
           description="Analyse des appels, coaching IA, résumés, scoring des leads"
           emoji="🤖"
           status={deriveStatus(rows.anthropic)}
@@ -264,6 +266,7 @@ export default function PlanipretIntegrations() {
         {/* ───────── CARD 1 — MICROSOFT 365 ───────── */}
         <IntegrationCard
           integrationKey="ms365" name="Microsoft 365"
+          backendSecrets={backendSecrets.ms365}
           description="Outlook Email · Calendar · Teams Chat · OneDrive"
           emoji="🔵" fullWidth
           status={deriveStatus(rows.ms365)}
@@ -337,6 +340,7 @@ export default function PlanipretIntegrations() {
         {/* ───────── CARD 4 — ELEVENLABS ───────── */}
         <IntegrationCard
           integrationKey="elevenlabs" name="ElevenLabs — Agent AVA"
+          backendSecrets={backendSecrets.elevenlabs}
           description="Agent vocal IA · Voix française québécoise"
           emoji="🎙️"
           status={deriveStatus(rows.elevenlabs)}
@@ -377,6 +381,7 @@ export default function PlanipretIntegrations() {
         {/* ───────── CARD 3 — MAESTRO CRM ───────── */}
         <IntegrationCard
           integrationKey="maestro" name="Maestro CRM (Kanguru)"
+          backendSecrets={backendSecrets.maestro}
           description="Clients · Tâches · RDV · Pipeline · SMS"
           emoji="🏢"
           status={deriveStatus(rows.maestro)}
@@ -415,6 +420,7 @@ export default function PlanipretIntegrations() {
         {/* ───────── CARD 6 — WEBHOOKS ───────── */}
         <IntegrationCard
           integrationKey="webhooks" name="Webhooks & Automatisation"
+          backendSecrets={backendSecrets.webhooks}
           description="Pipeline post-appel — notifications événements en temps réel"
           emoji="🔗"
           status={deriveStatus(rows.webhooks)}
@@ -502,6 +508,7 @@ export default function PlanipretIntegrations() {
         {/* ───────── CARD 7 — MOBILE APP ───────── */}
         <IntegrationCard
           integrationKey="mobile_app" name="Application Mobile"
+          backendSecrets={backendSecrets.mobile_app}
           description="iOS · Android · Notifications push — synchronisation 350 courtiers"
           emoji="📱" fullWidth
           status={deriveStatus(rows.mobile_app)}
@@ -572,6 +579,7 @@ export default function PlanipretIntegrations() {
         {/* ───────── CARD 8 — COMPLIANCE ───────── */}
         <IntegrationCard
           integrationKey="compliance" name="Conformité PIPEDA / Loi 25"
+          backendSecrets={backendSecrets.compliance}
           description="Rétention des données · Consentements · Audit"
           emoji="🔏" fullWidth
           status={deriveStatus(rows.compliance)}
