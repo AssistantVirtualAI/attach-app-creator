@@ -4,12 +4,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Voicemail as VmIcon, Play, Sparkles, FileText, Trash2, CheckCircle2, Inbox, PhoneCall } from "lucide-react";
+import { Voicemail as VmIcon, Play, Sparkles, FileText, Trash2, CheckCircle2, Inbox, PhoneCall, RefreshCw } from "lucide-react";
 import { useMyVoicemails, type Voicemail } from "@/hooks/useMyVoicemail";
 import { useLanguage } from "@/context/LanguageContext";
 import { toast } from "sonner";
 import GreetingEditor from "@/components/voicemail/GreetingEditor";
 import { format } from "date-fns";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function MyVoicemail() {
   const { language } = useLanguage();
@@ -18,8 +20,48 @@ export default function MyVoicemail() {
   const [selected, setSelected] = useState<Voicemail | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
+  const [syncing, setSyncing] = useState(false);
+  const qc = useQueryClient();
 
   const t = (en: string, fr: string) => (lang === "fr" ? fr : en);
+
+  const runSync = async (silent = false) => {
+    setSyncing(true);
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) return;
+      const { data: spu } = await (supabase as any)
+        .from("pbx_softphone_users")
+        .select("organization_id, extension")
+        .eq("portal_user_id", auth.user.id)
+        .maybeSingle();
+      if (!spu?.organization_id) {
+        if (!silent) toast.error(t("No extension linked to your account.", "Aucune extension liée à votre compte."));
+        return;
+      }
+      await Promise.allSettled([
+        supabase.functions.invoke("voicemail-sync", {
+          body: { organization_id: spu.organization_id, extension: spu.extension },
+        }),
+        supabase.functions.invoke("fusionpbx-proxy", {
+          body: { action: "sync-cdrs", organization_id: spu.organization_id },
+        }),
+      ]);
+      await qc.invalidateQueries({ queryKey: ["my-voicemails"] });
+      if (!silent) toast.success(t("Synced from PBX", "Synchronisé depuis le PBX"));
+    } catch (e: any) {
+      if (!silent) toast.error(e?.message ?? "sync_error");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  // Auto-sync when page opens so users always see fresh data from the PBX.
+  useEffect(() => {
+    runSync(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
 
   const handlePlay = async (vm: Voicemail) => {
     setSelected(vm);
@@ -51,12 +93,16 @@ export default function MyVoicemail() {
     <div className="p-6 space-y-6 max-w-6xl">
       <div className="flex items-center gap-3">
         <VmIcon className="h-6 w-6 text-primary" />
-        <div>
+        <div className="flex-1">
           <h1 className="text-2xl font-bold">{t("Voicemail", "Messagerie vocale")}</h1>
           <p className="text-sm text-muted-foreground">
             {t("Listen, transcribe and summarize your voicemails.", "Écoutez, transcrivez et résumez vos messages vocaux.")}
           </p>
         </div>
+        <Button variant="outline" size="sm" onClick={() => runSync(false)} disabled={syncing}>
+          <RefreshCw className={`h-4 w-4 mr-1 ${syncing ? "animate-spin" : ""}`} />
+          {t("Sync now", "Synchroniser")}
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
