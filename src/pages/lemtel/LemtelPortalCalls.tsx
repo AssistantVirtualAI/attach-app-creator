@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { usePbxCallRecords, usePbxSync, usePbxTestCdrEndpoint, LEMTEL_ORG } from '@/hooks/usePbxData';
+import { usePbxAutoSync } from '@/hooks/usePbxAutoSync';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { loadPbxRecordingAudio } from '@/lib/pbxRecordingAudio';
 import { runTranscribeAndAnalyze, isStubTranscript, type TranscriptStage } from '@/lib/transcriptStatus';
