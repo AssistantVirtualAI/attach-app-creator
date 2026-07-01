@@ -323,6 +323,7 @@ export default function LemtelExtensions() {
                         <Button size="sm" variant="outline" onClick={() => setEditExt(e)}>
                           <Pencil className="w-3.5 h-3.5 mr-1" /> Edit
                         </Button>
+                        <ExtensionActionsMenu ext={{ id: e.id, extension: String(e.extension), organization_id: e.organization_id, effective_cid_name: e.effective_cid_name, description: e.description }} />
                         <Button size="sm" variant="outline" className="text-red-600 border-red-500/30 hover:bg-red-500/10"
                           disabled={deletingId === e.id} onClick={() => handleDelete(e)}>
                           {deletingId === e.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
