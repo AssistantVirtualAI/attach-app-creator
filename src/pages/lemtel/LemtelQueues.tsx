@@ -130,6 +130,10 @@ export default function LemtelQueues() {
         </Alert>
       )}
 
+      <FusionPbxPermissionsHelp area="queues" />
+
+
+
       <Tabs value={tab} onValueChange={(v) => setTab(v as any)} className="w-full">
         <TabsList>
           <TabsTrigger value="queues"><Headphones className="w-4 h-4 mr-1" /> Queues</TabsTrigger>
