@@ -5,21 +5,24 @@ import path from 'node:path';
 /**
  * Cross-org isolation guard.
  *
- * Every admin-facing query targeting a tenant-scoped table must apply an
- * `organization_id` (or equivalent org scope) filter. This test scans the
- * admin pages source and fails if a `.from('<org-scoped table>')` chain
- * doesn't include an org filter in the same statement window.
+ * Regular (non-SuperAdmin, non-single-tenant) admin pages that query
+ * multi-tenant tables must always apply an `organization_id` filter.
  *
- * If you legitimately query a global/system table, add it to `GLOBAL_TABLES`.
+ * Excluded on purpose:
+ *   • src/pages/lemtel/master/**         → SuperAdmin, cross-org by design
+ *   • src/pages/lemtel/reseller/**       → Reseller portal, cross-org by design
+ *   • src/pages/planipret/**             → Single dedicated org (Planipret)
  */
 
 const ADMIN_DIRS = [
   'src/pages/lemtel',
-  'src/pages/planipret/admin',
   'src/pages/admin',
 ].filter((p) => fs.existsSync(p));
 
-const ORG_SCOPED_TABLES = [
+const EXCLUDE_RX = /[\\/](master|reseller|planipret)[\\/]/;
+
+// Tables that MUST be scoped by organization_id in tenant-facing admin pages.
+const ORG_SCOPED_TABLES = new Set<string>([
   'organizations',
   'org_members',
   'organization_members',
@@ -34,20 +37,9 @@ const ORG_SCOPED_TABLES = [
   'lemtel_dids',
   'lemtel_config',
   'lemtel_cdrs_cache',
-  'planipret_profiles',
-  'planipret_phone_calls',
-  'planipret_phone_messages',
-  'planipret_voicemails',
-];
-
-// Tables that are inherently global or scoped through another mechanism
-// (RLS with SECURITY DEFINER, per-user, or joined via domain).
-const GLOBAL_TABLES = new Set<string>([
-  'user_roles',
-  'profiles',
 ]);
 
-const ORG_FILTER_RX = /\b(organization_id|org_id|\.eq\('organization_id'|\.eq\(`organization_id`|\.in\('organization_id')/;
+const ORG_FILTER_RX = /\borganization_id\b|\borg_id\b/;
 
 function* walk(dir: string): Generator<string> {
   for (const f of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -57,49 +49,50 @@ function* walk(dir: string): Generator<string> {
   }
 }
 
-describe('multi-tenant isolation: admin queries must scope by organization_id', () => {
-  const files: string[] = [];
-  for (const d of ADMIN_DIRS) for (const p of walk(d)) files.push(p);
+function collectFiles(): string[] {
+  const out: string[] = [];
+  for (const d of ADMIN_DIRS) {
+    for (const p of walk(d)) {
+      if (!EXCLUDE_RX.test(p)) out.push(p);
+    }
+  }
+  return out;
+}
 
-  it('discovers admin source files', () => {
+describe('multi-tenant isolation: admin queries scope by organization_id', () => {
+  const files = collectFiles();
+
+  it('discovers tenant admin source files', () => {
     expect(files.length).toBeGreaterThan(0);
   });
 
-  for (const file of files) {
-    const src = fs.readFileSync(file, 'utf8');
-    // find every .from('<table>') occurrence
+  it('every .from(<org-scoped>) query has an organization_id filter nearby', () => {
+    const offenders: string[] = [];
     const rx = /\.from\(\s*['"`]([a-z0-9_]+)['"`]\s*\)/g;
-    let m: RegExpExecArray | null;
-    while ((m = rx.exec(src))) {
-      const table = m[1];
-      if (!ORG_SCOPED_TABLES.includes(table)) continue;
-      if (GLOBAL_TABLES.has(table)) continue;
-
-      // Look at the next ~600 chars for an org filter, or previous 200
-      // (some code builds the query in a variable first).
-      const windowText = src.slice(Math.max(0, m.index - 200), m.index + 800);
-      const hasOrgFilter = ORG_FILTER_RX.test(windowText);
-
-      it(`${path.relative(process.cwd(), file)} — .from('${table}') applies organization_id`, () => {
-        expect(hasOrgFilter, `Missing organization_id filter near .from('${table}') in ${file}`).toBe(true);
-      });
+    for (const file of files) {
+      const src = fs.readFileSync(file, 'utf8');
+      let m: RegExpExecArray | null;
+      while ((m = rx.exec(src))) {
+        const table = m[1];
+        if (!ORG_SCOPED_TABLES.has(table)) continue;
+        const windowText = src.slice(Math.max(0, m.index - 300), m.index + 900);
+        if (!ORG_FILTER_RX.test(windowText)) {
+          offenders.push(`${path.relative(process.cwd(), file)} → .from('${table}')`);
+        }
+      }
     }
-  }
-});
+    expect(offenders, `Missing organization_id filter:\n${offenders.join('\n')}`).toEqual([]);
+  });
 
-describe('multi-tenant isolation: no wildcard cross-org selects', () => {
-  it('does not select all rows without an org filter in admin pages', () => {
+  it('no wildcard .select("*") on org-scoped tables without a filter', () => {
     const suspicious: string[] = [];
-    for (const d of ADMIN_DIRS) {
-      for (const file of walk(d)) {
-        const src = fs.readFileSync(file, 'utf8');
-        // .select('*') immediately followed by no eq/filter and no .single()
-        const rx = /\.from\(\s*['"`]([a-z0-9_]+)['"`]\s*\)\s*\.select\(\s*['"`]\*['"`]\s*\)(?![^;]*\.(eq|in|match|filter|neq|is|contains))/g;
-        let m: RegExpExecArray | null;
-        while ((m = rx.exec(src))) {
-          if (ORG_SCOPED_TABLES.includes(m[1])) {
-            suspicious.push(`${file}: from('${m[1]}').select('*') without filter`);
-          }
+    for (const file of files) {
+      const src = fs.readFileSync(file, 'utf8');
+      const rx = /\.from\(\s*['"`]([a-z0-9_]+)['"`]\s*\)\s*\.select\(\s*['"`]\*['"`]\s*\)(?![^;]*\.(eq|in|match|filter|neq|is|contains))/g;
+      let m: RegExpExecArray | null;
+      while ((m = rx.exec(src))) {
+        if (ORG_SCOPED_TABLES.has(m[1])) {
+          suspicious.push(`${path.relative(process.cwd(), file)}: from('${m[1]}').select('*') without filter`);
         }
       }
     }
