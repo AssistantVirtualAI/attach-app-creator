@@ -189,13 +189,14 @@ export default function ExtensionActionsMenu({ ext }: { ext: Ext }) {
               <>
                 <Button variant="outline" onClick={close} disabled={busy}>Cancel</Button>
                 <Button
-                  onClick={mode === "reset" ? doReset : mode === "link" ? doLink : doWelcome}
-                  disabled={busy || ((mode === "link") && !email)}
+                  onClick={mode === "reset" ? doReset : mode === "link" ? doLink : mode === "set-portal" ? doSetPortal : doWelcome}
+                  disabled={busy || ((mode === "link") && !email) || (mode === "set-portal" && (password.length < 8 || password !== confirm))}
                 >
                   {busy && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                   {mode === "reset" && "Reset password"}
                   {mode === "link" && "Link account"}
                   {mode === "welcome" && "Send email"}
+                  {mode === "set-portal" && "Set password"}
                 </Button>
               </>
             ) : (
