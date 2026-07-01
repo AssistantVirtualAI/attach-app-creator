@@ -114,9 +114,9 @@ const en = {
 
 const fr: Record<keyof typeof en, string> = {
   'nav.home': 'Accueil',
-  'nav.dialer': 'Clavier',
-  'nav.calls': 'Appels',
-  'nav.messages': 'Messages',
+  'nav.dialer': 'Téléphone',
+  'nav.calls': 'Historique d’appels',
+  'nav.messages': 'SMS',
   'nav.voicemail': 'Messagerie',
   'nav.recordings': 'Enregistrements',
   'nav.ai': 'AVA IA',
