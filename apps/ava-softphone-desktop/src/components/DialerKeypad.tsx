@@ -136,6 +136,56 @@ export default function DialerKeypad({
     [keys.length, onBackspace, onSubmit],
   );
 
+  /* ---- Global physical numpad support ----
+     When the dialer is mounted, digits/*/#/+ pressed anywhere on the
+     window are forwarded to onKey unless the focus is inside a text
+     input, textarea, or contenteditable (so we never hijack typing). */
+  useEffect(() => {
+    const isTypingTarget = (el: EventTarget | null): boolean => {
+      const node = el as HTMLElement | null;
+      if (!node) return false;
+      const tag = node.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return true;
+      if ((node as HTMLElement).isContentEditable) return true;
+      return false;
+    };
+    const flashKey = (k: string) => {
+      const idx = keys.findIndex(([kk]) => kk === k);
+      const btn = btnRefs.current[idx];
+      if (!btn) return;
+      btn.classList.add('ava-key-flash');
+      setTimeout(() => btn.classList.remove('ava-key-flash'), 140);
+    };
+    const onWinKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (isTypingTarget(e.target)) return;
+      const k = e.key;
+      if (/^[0-9]$/.test(k) || k === '*' || k === '#') {
+        e.preventDefault();
+        onKey(k);
+        flashKey(k);
+        return;
+      }
+      if (k === '+') {
+        e.preventDefault();
+        onKey('+');
+        flashKey('0');
+        return;
+      }
+      if (k === 'Backspace') {
+        e.preventDefault();
+        onBackspace?.();
+        return;
+      }
+      if (k === 'Enter') {
+        if (onSubmit) { e.preventDefault(); onSubmit(); }
+        return;
+      }
+    };
+    window.addEventListener('keydown', onWinKey);
+    return () => window.removeEventListener('keydown', onWinKey);
+  }, [keys, onKey, onBackspace, onSubmit]);
+
   /* ---- Restore focus across density/theme remounts ---- */
   useEffect(() => {
     const { key, active } = readPersistedFocus();
