@@ -362,6 +362,11 @@ function mapCdrToVoicemailEntry(r: any): VoicemailEntry {
 export const mobileApi = {
   me:        () => call<MeResponse>('/mobile-me', undefined, meMock),
   dashboard: () => call<DashboardBrief>('/mobile-dashboard', undefined, dashboardMock),
+  homeStats: (period: 'today' | 'week' | 'month', lang?: 'fr' | 'en') => call<HomeStatsResponse>(
+    `/mobile-home-stats?period=${period}&lang=${lang || 'fr'}`,
+    undefined,
+    { period, lang: lang || 'fr', scope: { organizationId: null, extension: null }, stats: emptyHomeStats(), prior: emptyHomeStats(), summary: '', insights: [] } as HomeStatsResponse,
+  ),
 
   webphoneToken: () => call<{ token: string; expiresAt: string; wssUrl: string }>(
     '/softphone-credentials', { method: 'POST' },
