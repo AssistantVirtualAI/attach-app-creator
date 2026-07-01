@@ -1139,6 +1139,14 @@ Deno.serve(async (req) => {
             const level = String(tierParams.tier_level ?? 1);
             const pos = String(tierParams.tier_position ?? 1);
             if (queueName && agent) {
+              console.warn("[fs_cli-fallback]", {
+                action: "add-queue-tier",
+                reason: w.status === 403 ? "http_403" : "perm_error_in_body",
+                perm_missing: "call_center_tier_add",
+                queue: queueName,
+                agent,
+                rest_status: w.status,
+              });
               const cli = await pbxWrite(`commands`, "POST", {
                 commands: [{ command: "callcenter_config", arguments: `queue tier add ${queueName} ${agent} ${level} ${pos}` }],
               });
@@ -1149,12 +1157,13 @@ Deno.serve(async (req) => {
                 (typeof raw?.raw === "string" && raw.raw) ||
                 (typeof raw === "string" ? raw : "");
               if (cli.ok && /\+OK|success/i.test(text)) {
+                console.info("[fs_cli-fallback] success", { action: "add-queue-tier", queue: queueName, agent });
                 return json({ ok: true, data: { fallback: "fs_cli", response: text }, warning: "Added via fs_cli fallback — REST perm 'call_center_tier_add' still missing on FusionPBX API user." });
               }
-              console.error("[add-queue-tier] fs_cli fallback also failed", { status: cli.status, text });
+              console.error("[fs_cli-fallback] failed", { action: "add-queue-tier", status: cli.status, text: text?.slice(0, 240) });
             }
           } catch (e: any) {
-            console.error("[add-queue-tier] fs_cli fallback threw", e?.message || e);
+            console.error("[fs_cli-fallback] threw", { action: "add-queue-tier", err: e?.message || String(e) });
           }
 
           return json({
