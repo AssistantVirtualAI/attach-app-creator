@@ -93,12 +93,16 @@ export default function MyVoicemail() {
     <div className="p-6 space-y-6 max-w-6xl">
       <div className="flex items-center gap-3">
         <VmIcon className="h-6 w-6 text-primary" />
-        <div>
+        <div className="flex-1">
           <h1 className="text-2xl font-bold">{t("Voicemail", "Messagerie vocale")}</h1>
           <p className="text-sm text-muted-foreground">
             {t("Listen, transcribe and summarize your voicemails.", "Écoutez, transcrivez et résumez vos messages vocaux.")}
           </p>
         </div>
+        <Button variant="outline" size="sm" onClick={() => runSync(false)} disabled={syncing}>
+          <RefreshCw className={`h-4 w-4 mr-1 ${syncing ? "animate-spin" : ""}`} />
+          {t("Sync now", "Synchroniser")}
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
