@@ -96,6 +96,9 @@ export default function ExtensionActionsMenu({ ext }: { ext: Ext }) {
           <DropdownMenuItem onClick={() => setMode("link")}>
             <Mail className="w-4 h-4 mr-2" /> Link email account
           </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setMode("set-portal")}>
+            <Lock className="w-4 h-4 mr-2" /> Set portal password
+          </DropdownMenuItem>
           <DropdownMenuItem onClick={() => setMode("welcome")}>
             <Send className="w-4 h-4 mr-2" /> Send welcome email
           </DropdownMenuItem>
