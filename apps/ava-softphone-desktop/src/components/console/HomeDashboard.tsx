@@ -310,7 +310,7 @@ export default function HomeDashboard({
 
       <header style={{ marginBottom: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 11, fontWeight: 700, letterSpacing: 2, color: c.signalGold, textTransform: 'uppercase', flexWrap: 'wrap' }}>
-          <span>Command Center</span>
+          <span>{t('home.commandCenter')}</span>
           {orgName && (
             <span style={{ padding: '3px 10px', borderRadius: 999, background: 'rgba(33,212,253,0.10)', border: `1px solid ${c.borderAI}`, color: c.avaCyan, fontSize: 10, letterSpacing: 1 }}>
               {orgName}
@@ -318,21 +318,21 @@ export default function HomeDashboard({
           )}
           <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, color: c.mutedSilver, letterSpacing: 0.6 }}>
             <span style={{ width: 7, height: 7, borderRadius: '50%', background: healthy ? c.cyan : pbx === 'error' ? c.danger : c.mutedSilver, boxShadow: `0 0 8px currentColor` }} />
-            {pbx === 'registered' ? 'PBX Online' : pbx === 'error' ? 'PBX Error' : 'Connecting'} · {syncConnected ? (lastEvent ? `Sync ${formatAge(ageMs)}` : 'Sync Live') : 'Sync Offline'}
+            {pbx === 'registered' ? t('home.pbxOnline') : pbx === 'error' ? t('home.pbxError') : t('home.connecting')} · {syncConnected ? (lastEvent ? `${t('home.syncLive').replace(' Live','')} ${formatAge(ageMs)}` : t('home.syncLive')) : t('home.syncOffline')}
           </span>
         </div>
         <h1 className="ava-display" style={{ fontSize: 34, fontWeight: 600, color: c.textIce, margin: '8px 0 6px', letterSpacing: -0.7, fontFamily: "'Space Grotesk', sans-serif", lineHeight: 1.1 }}>
           {greeting}, {displayName.split(' ')[0] || 'there'}
         </h1>
         <p style={{ fontSize: 13.5, color: c.mutedSilver, margin: 0, lineHeight: 1.55 }}>
-          Ext {extension} · Live CDR, recordings, voicemail and AVA insights for your extension.
+          {t('home.ext')} {extension} · {t('home.subtitle')}
         </p>
       </header>
 
       {/* Range selector */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 18 }}>
-        <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 1.6, color: c.mutedSilver, textTransform: 'uppercase', marginRight: 4 }}>Range</span>
-        {RANGES.map((r) => {
+        <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 1.6, color: c.mutedSilver, textTransform: 'uppercase', marginRight: 4 }}>{t('home.range')}</span>
+        {RANGES_LOCAL.map((r) => {
           const active = range === r.key;
           return (
             <button key={r.key} onClick={() => setRange(r.key)}
@@ -374,18 +374,18 @@ export default function HomeDashboard({
         }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 2, color: c.avaCyan, textTransform: 'uppercase', marginBottom: 6 }}>
-            Live Phone-System Brief · {rangeLabel}
+            {t('home.brief')} · {rangeLabel}
           </div>
           <div style={{ fontSize: 14.5, color: c.textIce, lineHeight: 1.6 }}>
-            {stats.loading ? 'Loading the live PBX picture…' : (
-              <><strong style={{ color: c.signalGold }}>{stats.totalCallsToday} call{stats.totalCallsToday === 1 ? '' : 's'}</strong>, <strong style={{ color: c.success }}>{stats.answeredToday} answered</strong>, <strong style={{ color: c.danger }}>{stats.missedToday} missed</strong> and <strong style={{ color: c.avaCyan }}>{stats.recordingsToday} recording{stats.recordingsToday === 1 ? '' : 's'}</strong>. Latest CDR {fmtRelative(stats.lastCallAt)}.</>
+            {stats.loading ? t('home.loadingBrief') : (
+              <><strong style={{ color: c.signalGold }}>{stats.totalCallsToday} {stats.totalCallsToday === 1 ? t('home.callSingular') : t('home.callPlural')}</strong>, <strong style={{ color: c.success }}>{stats.answeredToday} {t('home.answered')}</strong>, <strong style={{ color: c.danger }}>{stats.missedToday} {t('home.missed')}</strong> · <strong style={{ color: c.avaCyan }}>{stats.recordingsToday} {stats.recordingsToday === 1 ? t('home.recordingSingular') : t('home.recordingPlural')}</strong>. {t('home.latestCdr')} {fmtRelative(stats.lastCallAt)}.</>
             )}
           </div>
         </div>
         <div style={{ borderLeft: `1px solid ${c.border}`, paddingLeft: 20, display: 'grid', gap: 10, minWidth: 0 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: c.mutedSilver }}><span>CDR freshness</span><strong style={{ color: freshnessAccent }}>{stats.cdrFreshness.toUpperCase()}</strong></div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: c.mutedSilver }}><span>{t('home.cdrFreshness')}</span><strong style={{ color: freshnessAccent }}>{stats.cdrFreshness.toUpperCase()}</strong></div>
           <div style={{ height: 8, borderRadius: 999, background: 'rgba(11,21,48,0.08)', overflow: 'hidden' }}><div style={{ width: stats.cdrFreshness === 'live' ? '100%' : stats.cdrFreshness === 'stale' ? '58%' : '18%', height: '100%', background: `linear-gradient(90deg, ${freshnessAccent}, ${c.cyan})` }} /></div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: c.mutedSilver }}><span>Recording coverage</span><strong style={{ color: c.signalGold }}>{stats.recordingCoveragePct}%</strong></div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: c.mutedSilver }}><span>{t('home.recordingCoverage')}</span><strong style={{ color: c.signalGold }}>{stats.recordingCoveragePct}%</strong></div>
           <div style={{ height: 8, borderRadius: 999, background: 'rgba(11,21,48,0.08)', overflow: 'hidden' }}><div style={{ width: `${Math.max(4, stats.recordingCoveragePct)}%`, height: '100%', background: `linear-gradient(90deg, ${c.signalGold}, ${c.goldSoft})` }} /></div>
         </div>
       </section>
@@ -399,65 +399,65 @@ export default function HomeDashboard({
           display: 'flex', alignItems: 'center', gap: 10,
         }}>
           <span aria-hidden>⚠</span>
-          <span style={{ flex: 1 }}>Could not load stats: {stats.error}</span>
+          <span style={{ flex: 1 }}>{t('home.couldNotLoad')}: {stats.error}</span>
           <button onClick={() => stats.refresh()} className="ava-range-btn" style={{
             padding: '6px 12px', borderRadius: 8, border: `1px solid ${tones.red.ring}`,
             background: c.bgCard, color: c.danger, fontWeight: 700, fontSize: 12, cursor: 'pointer',
-          }}>Retry</button>
+          }}>{t('home.retry')}</button>
         </div>
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 26 }}
         aria-busy={stats.loading} aria-live="polite">
-        <Stat label={`Calls · ${rangeLabel}`} value={stats.totalCallsToday} tone={tones.cyan}
-          series={stats.series.calls} hint="Scoped to extension"
+        <Stat label={`${t('home.calls')} · ${rangeLabel}`} value={stats.totalCallsToday} tone={tones.cyan}
+          series={stats.series.calls} hint={t('home.scopedExt')}
           loading={stats.loading} error={stats.error}
-          onClick={() => openDetail('calls', `All calls — ${rangeLabel}`, tones.cyan)} />
-        <Stat label="Missed" value={stats.missedToday} tone={tones.red}
+          onClick={() => openDetail('calls', `${t('home.calls')} — ${rangeLabel}`, tones.cyan)} />
+        <Stat label={t('home.tileMissed')} value={stats.missedToday} tone={tones.red}
           series={stats.series.missed} hint={rangeLabel}
           loading={stats.loading} error={stats.error}
-          onClick={() => openDetail('missed', `Missed calls — ${rangeLabel}`, tones.red)} />
-        <Stat label="Answered" value={stats.answeredToday} tone={tones.green}
+          onClick={() => openDetail('missed', `${t('home.tileMissed')} — ${rangeLabel}`, tones.red)} />
+        <Stat label={t('home.tileAnswered')} value={stats.answeredToday} tone={tones.green}
           series={stats.series.answered} hint={rangeLabel}
           loading={stats.loading} error={stats.error}
-          onClick={() => openDetail('answered', `Answered calls — ${rangeLabel}`, tones.green)} />
-        <Stat label="Recordings" value={stats.recordingsToday} tone={tones.gold}
+          onClick={() => openDetail('answered', `${t('home.tileAnswered')} — ${rangeLabel}`, tones.green)} />
+        <Stat label={t('home.tileRecordings')} value={stats.recordingsToday} tone={tones.gold}
           series={stats.series.recordings}
-          hint={stats.lastRecordingAt ? `Latest ${fmtRelative(stats.lastRecordingAt)}` : 'None in range'}
+          hint={stats.lastRecordingAt ? `${t('home.latest')} ${fmtRelative(stats.lastRecordingAt)}` : t('home.noneInRange')}
           loading={stats.loading} error={stats.error}
-          onClick={() => openDetail('recordings', `Recordings — ${rangeLabel}`, tones.gold)} />
-        <Stat label="Unread SMS" value={stats.unreadSms} tone={tones.pink} hint="All threads"
+          onClick={() => openDetail('recordings', `${t('home.tileRecordings')} — ${rangeLabel}`, tones.gold)} />
+        <Stat label={t('home.tileUnreadSms')} value={stats.unreadSms} tone={tones.pink} hint={t('home.allThreads')}
           loading={stats.loading} error={stats.error}
-          onClick={() => openDetail('sms', 'Unread SMS threads', tones.pink)} />
-        <Stat label="Voicemail" value={stats.unreadVoicemail} tone={tones.violet} hint="Needs review"
+          onClick={() => openDetail('sms', t('home.tileUnreadSms'), tones.pink)} />
+        <Stat label={t('home.tileVoicemail')} value={stats.unreadVoicemail} tone={tones.violet} hint={t('home.needsReview')}
           loading={stats.loading} error={stats.error}
-          onClick={() => openDetail('voicemail', `Voicemails — ${rangeLabel}`, tones.violet)} />
-        <Stat label="Live Calls" value={stats.liveCalls} tone={tones.blue} hint="In progress"
+          onClick={() => openDetail('voicemail', `${t('home.tileVoicemail')} — ${rangeLabel}`, tones.violet)} />
+        <Stat label={t('home.tileLiveCalls')} value={stats.liveCalls} tone={tones.blue} hint={t('home.inProgress')}
           loading={stats.loading} error={stats.error}
-          onClick={() => openDetail('live', 'Live calls right now', tones.blue)} />
-        <Stat label="Realtime" value={syncConnected ? 'Live' : 'Off'} tone={syncConnected ? tones.cyan : tones.slate}
-          hint={lastEvent ? formatAge(ageMs) : 'Idle'}
-          onClick={() => openDetail('realtime', 'Realtime sync status', syncConnected ? tones.cyan : tones.slate)} />
+          onClick={() => openDetail('live', t('home.tileLiveCalls'), tones.blue)} />
+        <Stat label={t('home.tileRealtime')} value={syncConnected ? t('home.live') : t('home.off')} tone={syncConnected ? tones.cyan : tones.slate}
+          hint={lastEvent ? formatAge(ageMs) : t('home.idle')}
+          onClick={() => openDetail('realtime', t('home.tileRealtime'), syncConnected ? tones.cyan : tones.slate)} />
       </div>
 
       <div style={{ marginBottom: 26 }}>
         <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, color: c.mutedSilver, textTransform: 'uppercase', marginBottom: 10 }}>
-          Quick Actions
+          {t('home.quickActions')}
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <button className="ava-quick-btn" onClick={onQuickDial} style={quickBtn(tones.gold)}>New Call</button>
-          <button className="ava-quick-btn" onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'calls' }))} style={quickBtn(tones.cyan)}>Call History</button>
-          <button className="ava-quick-btn" onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'recordings' }))} style={quickBtn(tones.violet)}>Recordings</button>
-          <button className="ava-quick-btn" onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'messages' }))} style={quickBtn(tones.green)}>Messages</button>
-          <button className="ava-quick-btn" onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'pbxlive' }))} style={quickBtn(tones.slate)}>PBX Live</button>
-          <button className="ava-quick-btn" onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'admin' }))} style={quickBtn(tones.blue)}>PBX Admin</button>
-          <button className="ava-quick-btn" onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'aiadmin' }))} style={quickBtn(tones.pink)}>AI Assistant</button>
+          <button className="ava-quick-btn" onClick={onQuickDial} style={quickBtn(tones.gold)}>{t('home.newCall')}</button>
+          <button className="ava-quick-btn" onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'calls' }))} style={quickBtn(tones.cyan)}>{t('home.callHistory')}</button>
+          <button className="ava-quick-btn" onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'recordings' }))} style={quickBtn(tones.violet)}>{t('home.recordings')}</button>
+          <button className="ava-quick-btn" onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'messages' }))} style={quickBtn(tones.green)}>{t('home.messages')}</button>
+          <button className="ava-quick-btn" onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'pbxlive' }))} style={quickBtn(tones.slate)}>{t('home.pbxLive')}</button>
+          <button className="ava-quick-btn" onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'admin' }))} style={quickBtn(tones.blue)}>{t('home.pbxAdmin')}</button>
+          <button className="ava-quick-btn" onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'aiadmin' }))} style={quickBtn(tones.pink)}>{t('home.aiAssistant')}</button>
         </div>
       </div>
 
       <div>
         <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, color: c.mutedSilver, textTransform: 'uppercase', marginBottom: 10 }}>
-          Needs Attention
+          {t('home.needsAttention')}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {stats.attention.map((it, i) => {
