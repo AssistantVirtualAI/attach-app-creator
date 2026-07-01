@@ -76,7 +76,7 @@ const ICON: Record<ConsoleView, string> = {
 };
 
 const LABEL: Record<ConsoleView, string> = {
-  home: 'Home', dialer: 'Dialer', calls: 'Calls', messages: 'Messages',
+  home: 'Home', dialer: 'Phone', calls: 'Call History', messages: 'SMS',
   voicemail: 'Voicemail', recordings: 'Recordings', ai: 'AVA AI',
   contacts: 'Contacts', admin: 'Admin', settings: 'Settings',
   telecom: 'Telecom', orgchat: 'Org Chat', aiadmin: 'AI Admin', reports: 'Reports',
