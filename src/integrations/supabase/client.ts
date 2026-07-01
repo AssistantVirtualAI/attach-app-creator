@@ -24,6 +24,14 @@ function isUnauthorizedFunctionError(error: unknown) {
   return err?.context?.status === 401 || /\b401\b|unauthorized/i.test(err?.message || '');
 }
 
+async function refreshSessionSafely() {
+  try {
+    return (await supabase.auth.refreshSession()).data.session ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Harden protected Edge Function calls against auth hydration / stale JWT races.
  *
@@ -50,8 +58,7 @@ function isUnauthorizedFunctionError(error: unknown) {
   let { data: { session } } = await supabase.auth.getSession();
   const nowSec = Math.floor(Date.now() / 1000);
   if (!session || (session.expires_at && session.expires_at - nowSec < 60)) {
-    const { data: refreshed } = await supabase.auth.refreshSession();
-    session = refreshed?.session ?? session;
+    session = (await refreshSessionSafely()) ?? session;
   }
 
   if (!session?.access_token) {
@@ -64,9 +71,9 @@ function isUnauthorizedFunctionError(error: unknown) {
 
   let result = await invokeWithToken(session.access_token);
   if (isUnauthorizedFunctionError(result.error)) {
-    const { data: refreshed } = await supabase.auth.refreshSession();
-    if (refreshed?.session?.access_token) {
-      result = await invokeWithToken(refreshed.session.access_token);
+    const refreshed = await refreshSessionSafely();
+    if (refreshed?.access_token) {
+      result = await invokeWithToken(refreshed.access_token);
     }
   }
   if (isUnauthorizedFunctionError(result.error)) {
