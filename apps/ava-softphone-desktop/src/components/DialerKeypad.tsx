@@ -234,6 +234,10 @@ export default function DialerKeypad({
       }}
       {...rest}
     >
+      <style>{`
+        @keyframes ava-key-flash-kf { 0% { transform: scale(1); box-shadow: 0 0 0 rgba(33,212,253,0); } 40% { transform: scale(0.96); box-shadow: 0 0 0 6px rgba(33,212,253,0.28); } 100% { transform: scale(1); box-shadow: 0 0 0 rgba(33,212,253,0); } }
+        .ava-key-flash { animation: ava-key-flash-kf 140ms ease-out; }
+      `}</style>
       {keys.map(([key, sub], i) => {
         const row = Math.floor(i / COLS) + 1;
         const col = (i % COLS) + 1;
