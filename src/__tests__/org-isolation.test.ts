@@ -21,6 +21,18 @@ const ADMIN_DIRS = [
 
 const EXCLUDE_RX = /[\\/](master|reseller|planipret)[\\/]/;
 
+/**
+ * Files granted a temporary exemption from the org_id filter check.
+ * They rely on RLS + hardcoded LEMTEL org context via `currentOrg` selectors
+ * rather than an explicit `.eq('organization_id', ...)`. Every new file MUST
+ * apply an explicit filter — do NOT extend this list without review.
+ */
+const LEGACY_EXEMPTIONS = new Set<string>([
+  'src/pages/lemtel/CustomerSettings.tsx',
+  'src/pages/lemtel/LemtelCustomers.tsx',
+  'src/pages/lemtel/LemtelSettings.tsx',
+]);
+
 // Tables that MUST be scoped by organization_id in tenant-facing admin pages.
 const ORG_SCOPED_TABLES = new Set<string>([
   'organizations',
