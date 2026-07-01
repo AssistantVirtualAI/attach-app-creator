@@ -684,14 +684,18 @@ function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt
           tier_level, tier_position,
         }},
       });
-      if (error || data?.ok === false) throw new Error(data?.message || error?.message || 'Failed');
+      if (error || (data as any)?.ok === false || (data as any)?.error) {
+        throw new Error((data as any)?.error || (data as any)?.message || error?.message || 'Failed');
+      }
+      const tierUuid = (data as any)?.data?.call_center_tier_uuid || (data as any)?.call_center_tier_uuid || null;
       await supabase.from('pbx_queue_agents').insert({
         queue_id: queue.id, extension_id: ext.id, agent_id: ext.extension,
         agent_name: extName(ext) || ext.extension, tier_level, tier_position,
-      });
+        pbx_uuid: tierUuid, raw_data: tierUuid ? { call_center_tier_uuid: tierUuid } : null,
+      } as any);
       toast({ title: `${role === 'supervisor' ? 'Supervisor' : 'Agent'} added` });
       load();
-    } catch (e: any) { toast({ title: 'Failed', description: e.message, variant: 'destructive' }); }
+    } catch (e: any) { toast({ title: 'Failed to add member', description: e.message, variant: 'destructive' }); }
   };
 
   const removeAgent = async (a: any) => {

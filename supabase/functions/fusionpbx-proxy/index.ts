@@ -1091,8 +1091,38 @@ Deno.serve(async (req) => {
       return json({ ok: true, data: collection(r.data, "call_center_tiers"), latency_ms: r.latency_ms });
     }
     if (action === "add-queue-tier" || action === "update-queue-tier") {
-      // tier links an agent to a queue with a level (1=supervisor priority) and position
-      return json(await writeCollection("call_center_tiers", "call_center_tiers", params));
+      // FusionPBX expects tier_agent as "extension@domain_name" (not bare extension,
+      // not UUID). Resolve domain_name from the requested domain_uuid, then normalize.
+      const tierParams: Record<string, any> = { ...params };
+      if (action === "add-queue-tier" && !tierParams.call_center_queue_uuid) {
+        return json({ error: "call_center_queue_uuid required" }, 400);
+      }
+      const rawAgent = String(tierParams.tier_agent || "").trim();
+      if (action === "add-queue-tier" && !rawAgent) {
+        return json({ error: "tier_agent (extension) required" }, 400);
+      }
+      if (rawAgent && !rawAgent.includes("@")) {
+        try {
+          const dr = await pbxFetch(`domains/${requestedDomain}`);
+          const domainName =
+            (dr.data as any)?.domain?.domain_name ||
+            (dr.data as any)?.domain_name ||
+            (Array.isArray((dr.data as any)?.domains) ? (dr.data as any).domains[0]?.domain_name : null);
+          if (domainName) tierParams.tier_agent = `${rawAgent}@${domainName}`;
+        } catch (e) {
+          console.warn("[add-queue-tier] domain_name resolve failed", e);
+        }
+      }
+      // FusionPBX 422s on empty strings for numeric fields.
+      for (const k of Object.keys(tierParams)) {
+        if (tierParams[k] === "" || tierParams[k] === undefined) delete tierParams[k];
+      }
+      const w = await writeCollection("call_center_tiers", "call_center_tiers", tierParams);
+      if (!w.ok) {
+        console.error("[add-queue-tier] failed", { status: w.status, data: w.data, params: tierParams });
+        return json({ ok: false, error: (w.data as any)?.message || (w.data as any)?.error || "FusionPBX rejected tier", details: w.data, status: w.status }, w.status || 500);
+      }
+      return json(w);
     }
     if (action === "remove-queue-tier") {
       const id = params.call_center_tier_uuid || params.tier_uuid;
