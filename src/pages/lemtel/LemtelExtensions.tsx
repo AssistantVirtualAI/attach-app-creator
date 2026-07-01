@@ -14,6 +14,7 @@ import { ProvisionExtensionModal } from '@/components/lemtel/ProvisionExtensionM
 import { EnableSoftphonePopover } from '@/components/lemtel/EnableSoftphonePopover';
 import { ExtensionStatusDialog } from '@/components/lemtel/ExtensionStatusDialog';
 import { ExtensionEditDialog } from '@/components/lemtel/ExtensionEditDialog';
+import ExtensionActionsMenu from '@/components/lemtel/ExtensionActionsMenu';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
