@@ -77,7 +77,7 @@ export default function ExtensionActionsMenu({ ext }: { ext: Ext }) {
     } catch (e: any) { toast.error(e?.message || "Set failed"); }
   };
 
-
+  const copy = async (text: string) => {
     try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch {}
   };
 
