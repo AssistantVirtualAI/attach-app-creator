@@ -80,20 +80,9 @@ export default function HomeScreen({ onNavigate, haptic }: Props) {
         </div>
       )}
 
-      {/* Communication health */}
-      <SectionTitle eyebrow="Aujourd'hui" title="Santé des communications" />
-      <AnswerRateHero
-        answered={data?.metrics?.answeredCalls}
-        missed={data?.metrics?.missedCalls}
-      />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginTop: 10 }}>
-        <Metric label="Manqués" value={data?.metrics?.missedCalls} tone="danger" icon="↘" trend={-12} />
-        <Metric label="Répondus" value={data?.metrics?.answeredCalls} tone="success" icon="↗" trend={+18} />
-        <Metric label="SMS non lus" value={data?.metrics?.unreadSms} tone="cyan" icon="✉" trend={+4} />
-        <Metric label="Messagerie" value={data?.metrics?.voicemails} tone="gold" icon="◉" trend={-2} />
-        {me?.permissions?.admin && <Metric label="Utilisateurs actifs" value={data?.metrics?.activeUsers} tone="success" icon="◆" trend={+6} />}
-        <Metric label="Tâches" value={data?.metrics?.actionItems} tone="violet" icon="✦" trend={+1} />
-      </div>
+      {/* Comprehensive stats dashboard with period toggle */}
+      <StatsDashboard />
+
 
       {/* Activity sparkline */}
       <SectionTitle eyebrow="12 dernières heures" title="Activité d'appels" />
