@@ -251,18 +251,24 @@ export default function HomeDashboard({
 
   // Auto-refresh triggers: focus, 60s interval, ava:callEnded, visibility, realtime sync ping.
   useEffect(() => {
-    const refetch = () => { stats.refresh(); };
-    const onVis = () => { if (!document.hidden) refetch(); };
-    const interval = setInterval(refetch, 60_000);
-    window.addEventListener('focus', refetch);
-    window.addEventListener('ava:callEnded', refetch as EventListener);
-    window.addEventListener('lemtel:sync', refetch as EventListener);
+    const refetch = (source: string) => {
+      console.info('[dashboard-refresh]', source, new Date().toISOString());
+      stats.refresh();
+    };
+    const onFocus = () => refetch('focus');
+    const onCallEnded = () => refetch('ava:callEnded');
+    const onSyncEvt = () => refetch('lemtel:sync');
+    const onVis = () => { if (!document.hidden) refetch('visibilitychange'); };
+    const interval = setInterval(() => refetch('interval-60s'), 60_000);
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('ava:callEnded', onCallEnded as EventListener);
+    window.addEventListener('lemtel:sync', onSyncEvt as EventListener);
     document.addEventListener('visibilitychange', onVis);
     return () => {
       clearInterval(interval);
-      window.removeEventListener('focus', refetch);
-      window.removeEventListener('ava:callEnded', refetch as EventListener);
-      window.removeEventListener('lemtel:sync', refetch as EventListener);
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('ava:callEnded', onCallEnded as EventListener);
+      window.removeEventListener('lemtel:sync', onSyncEvt as EventListener);
       document.removeEventListener('visibilitychange', onVis);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

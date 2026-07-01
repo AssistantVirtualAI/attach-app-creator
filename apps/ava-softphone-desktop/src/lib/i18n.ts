@@ -371,8 +371,17 @@ export function useTranslation() {
       const detail = (e as CustomEvent).detail as DesktopLang;
       if (detail === 'en' || detail === 'fr') setLangState(detail);
     };
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== STORAGE_KEY) return;
+      const v = e.newValue;
+      if (v === 'en' || v === 'fr') setLangState(v);
+    };
     window.addEventListener('lemtel:lang', onChange as EventListener);
-    return () => window.removeEventListener('lemtel:lang', onChange as EventListener);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener('lemtel:lang', onChange as EventListener);
+      window.removeEventListener('storage', onStorage);
+    };
   }, []);
   const translate = useCallback((key: I18nKey) => t(key, lang), [lang]);
   return { t: translate, lang, setLang: (l: DesktopLang) => { setLang(l); setLangState(l); } };
