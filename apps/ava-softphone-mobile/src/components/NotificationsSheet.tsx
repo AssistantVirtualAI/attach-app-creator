@@ -41,9 +41,16 @@ export function useNotificationCounts(): Counts {
     };
 
     const subscribe = () => {
-      try { if (ch) supabase.removeChannel(ch); } catch {}
-      ch = supabase
-        .channel('notif-counts-live')
+      // Fully tear down any prior channel BEFORE creating a new one. Reusing the
+      // same channel name while a previous instance is still registered causes
+      // supabase-js to return the already-subscribed channel, and any .on()
+      // added afterwards throws:
+      //   "cannot add 'postgres_changes' callbacks ... after 'subscribe()'"
+      try { if (ch) { supabase.removeChannel(ch); ch = null; } } catch {}
+      // Unique suffix guarantees a fresh channel instance on every (re)subscribe.
+      const chanName = `notif-counts-live-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const next = supabase
+        .channel(chanName)
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pbx_call_records' }, () => load())
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pbx_call_records' }, () => load())
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pbx_call_recordings' }, () => load())
@@ -54,7 +61,6 @@ export function useNotificationCounts(): Counts {
           if (!alive) return;
           if (status === 'SUBSCRIBED') {
             backoffMs = 2_000;
-            // Backfill on every (re)connect to capture anything missed while offline.
             load();
           } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
             if (reconnectTimer) window.clearTimeout(reconnectTimer);
@@ -65,7 +71,9 @@ export function useNotificationCounts(): Counts {
             }, backoffMs);
           }
         });
+      ch = next;
     };
+
 
     load();
     subscribe();
