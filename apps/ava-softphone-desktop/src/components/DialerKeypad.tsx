@@ -137,7 +137,7 @@ export default function DialerKeypad({
   );
 
   /* ---- Global physical numpad support ----
-     When the dialer is mounted, digits/*/#/+ pressed anywhere on the
+     When the dialer is mounted, digits, star, hash, plus pressed anywhere on the
      window are forwarded to onKey unless the focus is inside a text
      input, textarea, or contenteditable (so we never hijack typing). */
   useEffect(() => {

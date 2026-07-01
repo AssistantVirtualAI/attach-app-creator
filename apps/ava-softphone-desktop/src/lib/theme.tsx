@@ -347,7 +347,7 @@ export const theme = {
     display: "'Space Grotesk', 'DM Sans', sans-serif",
     body: "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
     mono: "'JetBrains Mono', ui-monospace, monospace",
-    xs: 11, sm: 12, base: 14, md: 16, lg: 20, xl: 24, xxl: 32, display: 40,
+    xs: 11, sm: 12, base: 14, md: 16, lg: 20, xl: 24, xxl: 32, displaySize: 40,
   },
   radius: { sm: 8, md: 12, lg: 18, xl: 22, pill: 999 },
 } as const;
