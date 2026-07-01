@@ -613,6 +613,13 @@ Deno.serve(async (req) => {
       // FusionPBX GUI shows.
       let sofiaSource = "none";
       if (map.size === 0) {
+        console.warn("[fs_cli-fallback]", {
+          action: "list-gateways-merged",
+          reason: "rest_returned_zero_gateways",
+          perm_missing: "gateway_view|gateway_all",
+          global_status: globalRes.status,
+          scoped_domains: domains.length,
+        });
         try {
           const sofia = await pbxWrite(`commands`, "POST", {
             commands: [{ command: "sofia", arguments: "status gateway" }],
@@ -624,7 +631,6 @@ Deno.serve(async (req) => {
             (typeof raw?.raw === "string" && raw.raw) ||
             (typeof raw === "string" ? raw : "");
           for (const line of text.split("\n")) {
-            // Name   Type     Data                              State
             const m = line.match(/^\s*(\S+)\s+gateway\s+(\S+)\s+(\S+)\s*$/i);
             if (m) {
               const name = m[1];
@@ -648,7 +654,10 @@ Deno.serve(async (req) => {
             }
           }
           sofiaSource = "sofia";
-        } catch (_e) { /* swallow — pure best-effort fallback */ }
+          console.info("[fs_cli-fallback] success", { action: "list-gateways-merged", recovered: map.size });
+        } catch (e: any) {
+          console.error("[fs_cli-fallback] threw", { action: "list-gateways-merged", err: e?.message || String(e) });
+        }
       }
 
       const data = Array.from(map.values());
