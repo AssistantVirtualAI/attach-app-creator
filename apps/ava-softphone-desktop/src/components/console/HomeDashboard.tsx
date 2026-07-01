@@ -4,6 +4,7 @@ import { useTenant } from '../../hooks/useTenant';
 import { useDashboardStats, AttentionItem, RangeKey, DailySeries, rangeBounds } from '../../hooks/useDashboardStats';
 import { useSyncStatus, formatAge } from '../../hooks/useSyncStatus';
 import { supabase } from '../../lib/supabaseClient';
+import { useTranslation } from '../../lib/i18n';
 
 const { colors: c } = theme;
 
