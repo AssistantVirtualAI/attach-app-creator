@@ -124,9 +124,9 @@ export default function ExtensionActionsMenu({ ext }: { ext: Ext }) {
 
           {!result && (
             <div className="space-y-3">
-              {(mode === "link" || mode === "welcome") && (
+              {(mode === "link" || mode === "welcome" || mode === "set-portal") && (
                 <div>
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="email">Email {mode === "set-portal" && <span className="text-xs text-muted-foreground">(optional — auto-detected from link)</span>}</Label>
                   <Input id="email" type="email" placeholder="user@company.com" value={email} onChange={(e) => setEmail(e.target.value)} />
                 </div>
               )}
@@ -135,6 +135,23 @@ export default function ExtensionActionsMenu({ ext }: { ext: Ext }) {
                   <Label htmlFor="pwd">{mode === "reset" ? "New password (optional)" : "Initial login password (optional)"}</Label>
                   <Input id="pwd" type="text" placeholder="Leave blank to auto-generate" value={password} onChange={(e) => setPassword(e.target.value)} />
                 </div>
+              )}
+              {mode === "set-portal" && (
+                <>
+                  <div>
+                    <Label htmlFor="pwd">New password</Label>
+                    <Input id="pwd" type="password" autoComplete="new-password" placeholder="Min 8 characters" value={password} onChange={(e) => setPassword(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label htmlFor="pwd2">Confirm password</Label>
+                    <Input id="pwd2" type="password" autoComplete="new-password" placeholder="Re-enter password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+                    {confirm && password !== confirm && <p className="text-xs text-destructive mt-1">Passwords do not match.</p>}
+                  </div>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={syncSip} onChange={(e) => setSyncSip(e.target.checked)} />
+                    Also update SIP password (softphone will use same password)
+                  </label>
+                </>
               )}
             </div>
           )}
