@@ -1119,7 +1119,53 @@ Deno.serve(async (req) => {
       }
       const w = await writeCollection("call_center_tiers", "call_center_tiers", tierParams);
       if (!w.ok) {
-        console.error("[add-queue-tier] failed", { status: w.status, data: w.data, params: tierParams });
+        console.error("[add-queue-tier] REST failed", { status: w.status, data: w.data, params: tierParams });
+        const errText = JSON.stringify(w.data || {}) + " " + String((w as any).message || "");
+        const isPermErr = /call_center_tier_add|forbidden|permission/i.test(errText) || w.status === 403;
+
+        // fs_cli fallback: callcenter_config queue tier add <queue> <agent> <level> <position>
+        if (isPermErr && action === "add-queue-tier") {
+          try {
+            // Resolve queue_name from queue_uuid if not already provided.
+            let queueName = String(tierParams.queue_name || "").trim();
+            if (!queueName && tierParams.call_center_queue_uuid) {
+              const qr = await pbxFetch(`call_center_queues/${tierParams.call_center_queue_uuid}`);
+              queueName =
+                (qr.data as any)?.call_center_queue?.queue_name ||
+                (qr.data as any)?.queue_name ||
+                (Array.isArray((qr.data as any)?.call_center_queues) ? (qr.data as any).call_center_queues[0]?.queue_name : "") || "";
+            }
+            const agent = String(tierParams.tier_agent || "");
+            const level = String(tierParams.tier_level ?? 1);
+            const pos = String(tierParams.tier_position ?? 1);
+            if (queueName && agent) {
+              const cli = await pbxWrite(`commands`, "POST", {
+                commands: [{ command: "callcenter_config", arguments: `queue tier add ${queueName} ${agent} ${level} ${pos}` }],
+              });
+              const raw = cli?.data as any;
+              const text: string =
+                (typeof raw?.details?.[0]?.response === "string" && raw.details[0].response) ||
+                (typeof raw?.response === "string" && raw.response) ||
+                (typeof raw?.raw === "string" && raw.raw) ||
+                (typeof raw === "string" ? raw : "");
+              if (cli.ok && /\+OK|success/i.test(text)) {
+                return json({ ok: true, data: { fallback: "fs_cli", response: text }, warning: "Added via fs_cli fallback — REST perm 'call_center_tier_add' still missing on FusionPBX API user." });
+              }
+              console.error("[add-queue-tier] fs_cli fallback also failed", { status: cli.status, text });
+            }
+          } catch (e: any) {
+            console.error("[add-queue-tier] fs_cli fallback threw", e?.message || e);
+          }
+
+          return json({
+            ok: false,
+            error: "FusionPBX permission missing: add 'call_center_tier_add' (and 'call_center_tier_update', 'call_center_tier_delete', 'call_center_agent_add/update/delete', 'call_center_queue_view', 'command_add', 'command_edit') to the API user's group in Advanced → Group Manager, then retry.",
+            perm_missing: "call_center_tier_add",
+            details: w.data,
+            status: w.status,
+          }, 403);
+        }
+
         return json({ ok: false, error: (w.data as any)?.message || (w.data as any)?.error || "FusionPBX rejected tier", details: w.data, status: w.status }, w.status || 500);
       }
       return json(w);
