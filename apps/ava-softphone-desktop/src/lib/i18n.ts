@@ -10,9 +10,9 @@ const STORAGE_KEY = 'lemtel:lang';
 const en = {
   // Nav (LeftRail)
   'nav.home': 'Home',
-  'nav.dialer': 'Dialer',
-  'nav.calls': 'Calls',
-  'nav.messages': 'Messages',
+  'nav.dialer': 'Phone',
+  'nav.calls': 'Call History',
+  'nav.messages': 'SMS',
   'nav.voicemail': 'Voicemail',
   'nav.recordings': 'Recordings',
   'nav.ai': 'AVA AI',
