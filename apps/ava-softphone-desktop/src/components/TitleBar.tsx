@@ -38,6 +38,10 @@ export default function TitleBar(_props: Props = {}) {
       {/* Left: window controls spacer (macOS traffic lights) */}
       <div style={{ width: 70 }} />
 
+      {/* Right-side window controls (Windows/Linux) */}
+      <WindowControls />
+
+
       <details style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
         <summary style={{
           listStyle: 'none', display: 'inline-flex', alignItems: 'center', gap: 7,
