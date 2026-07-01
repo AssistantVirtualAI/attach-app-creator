@@ -84,7 +84,7 @@ const LABEL: Record<ConsoleView, string> = {
   queues: 'Call Queues', sync: 'Sync & Diag',
 };
 
-const USER_ITEMS: ConsoleView[] = ['home', 'dialer', 'calls', 'queues', 'messages', 'voicemail', 'recordings', 'orgchat', 'ai', 'telecom', 'contacts', 'sync'];
+const USER_ITEMS: ConsoleView[] = ['home', 'dialer', 'calls', 'messages', 'voicemail', 'recordings', 'orgchat', 'ai', 'contacts', 'sync'];
 const ADMIN_ITEMS: ConsoleView[] = ['pbxlive', 'customers', 'voiceagents', 'reports', 'admin', 'aiadmin', 'audit'];
 
 interface Props {
