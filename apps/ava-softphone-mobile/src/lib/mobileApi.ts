@@ -136,6 +136,30 @@ export interface DashboardBrief {
   status: { sipState: 'registered' | 'connecting' | 'offline'; doNotDisturb: boolean; forwarding: string | null; updatedAt?: string };
 }
 
+export interface HomeStatsPayload {
+  calls: { received: number; missed: number; outbound: number; avgDurationSec: number };
+  sms: { unread: number; activeThreads: number };
+  recordings: { total: number; transcribed: number; pending: number; failed: number };
+  voicemails: { new: number; total: number };
+}
+export interface HomeStatsResponse {
+  period: 'today' | 'week' | 'month';
+  lang: 'fr' | 'en';
+  scope: { organizationId: string | null; extension: string | null; sipDomain?: string | null };
+  stats: HomeStatsPayload;
+  prior: HomeStatsPayload;
+  summary: string;
+  insights: { id: string; tone: 'danger' | 'success' | 'cyan' | 'gold'; text: string }[];
+}
+export function emptyHomeStats(): HomeStatsPayload {
+  return {
+    calls: { received: 0, missed: 0, outbound: 0, avgDurationSec: 0 },
+    sms: { unread: 0, activeThreads: 0 },
+    recordings: { total: 0, transcribed: 0, pending: 0, failed: 0 },
+    voicemails: { new: 0, total: 0 },
+  };
+}
+
 export interface CallRecord {
   id: string;
   direction: 'in' | 'out';
