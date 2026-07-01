@@ -196,6 +196,49 @@ Deno.serve(async (req) => {
       return json({ ok: true, email, email_sent: emailSent, email_error: emailError, action_link: emailSent ? undefined : actionLink });
     }
 
+    if (action === "set-portal-password") {
+      const newPwd = String(body?.password || "");
+      if (newPwd.length < 8) return json({ error: "WEAK_PASSWORD", detail: "Minimum 8 characters" }, 400);
+      const alsoSip = body?.sync_sip !== false;
+
+      const { data: spu } = await admin.from("pbx_softphone_users")
+        .select("portal_user_id").eq("organization_id", orgId).eq("extension", extension).maybeSingle();
+      let portalUserId: string | null = spu?.portal_user_id || null;
+      const emailIn = String(body?.email || "").trim().toLowerCase();
+      if (!portalUserId && emailIn) {
+        const { data: prof } = await admin.from("profiles").select("id").eq("email", emailIn).maybeSingle();
+        portalUserId = prof?.id || null;
+      }
+      if (!portalUserId) return json({ error: "NO_PORTAL_USER", hint: "Link an email to this extension first." }, 404);
+
+      const { error: upErr } = await admin.auth.admin.updateUserById(portalUserId, { password: newPwd });
+      if (upErr) return json({ error: "PWD_UPDATE_FAILED", detail: upErr.message }, 500);
+
+      if (alsoSip) {
+        const wr = await admin.functions.invoke("pbx-write", {
+          body: {
+            organizationId: orgId, action: "update-extension",
+            params: { extension_uuid: extRow.pbx_uuid, extension, password: newPwd },
+            objectType: "pbx_extensions", objectPbxUuid: extRow.pbx_uuid,
+          },
+        });
+        if (wr.error || (wr.data as any)?.ok === false) {
+          await admin.functions.invoke("fusionpbx-proxy", {
+            body: { action: "update-extension", organization_id: orgId,
+              params: { extension_uuid: extRow.pbx_uuid, extension, password: newPwd } },
+          }).catch(() => {});
+        }
+        await admin.from("pbx_softphone_users").update({ sip_password: newPwd, updated_at: new Date().toISOString() })
+          .eq("organization_id", orgId).eq("extension", extension);
+      }
+
+      await admin.from("audit_logs").insert({
+        organization_id: orgId, user_id: user.id, action: "extension_portal_password_set",
+        resource_type: "pbx_extensions", metadata: { extension, sync_sip: alsoSip },
+      });
+      return json({ ok: true, extension, portal_user_id: portalUserId, sip_synced: alsoSip });
+    }
+
     return json({ error: "UNKNOWN_ACTION" }, 400);
   } catch (e: any) {
     return json({ error: "INTERNAL", detail: e?.message || String(e) }, 500);
