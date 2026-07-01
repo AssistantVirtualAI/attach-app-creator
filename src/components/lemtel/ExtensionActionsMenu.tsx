@@ -67,7 +67,17 @@ export default function ExtensionActionsMenu({ ext }: { ext: Ext }) {
     } catch (e: any) { toast.error(e?.message || "Send failed"); }
   };
 
-  const copy = async (text: string) => {
+  const doSetPortal = async () => {
+    if (password.length < 8) { toast.error("Password must be at least 8 characters"); return; }
+    if (password !== confirm) { toast.error("Passwords do not match"); return; }
+    try {
+      await invoke("set-portal-password", { password, sync_sip: syncSip, email: email || undefined });
+      setResult({ ok: true, password });
+      toast.success(`Password set for ext. ${ext.extension}`);
+    } catch (e: any) { toast.error(e?.message || "Set failed"); }
+  };
+
+
     try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch {}
   };
 
