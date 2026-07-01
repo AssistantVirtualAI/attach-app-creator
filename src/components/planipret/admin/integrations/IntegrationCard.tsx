@@ -124,8 +124,10 @@ export interface IntegrationCardProps {
   onSave: () => Promise<void> | void;
   onTest: () => Promise<void> | void;
   saveDisabled?: boolean;
+  testDisabled?: boolean;
+  testDisabledReason?: string;
   /** Backend secrets detected for this integration (e.g. ["NS_API_KEY"]). */
-  backendSecrets?: { present: string[]; missing: string[] };
+  backendSecrets?: { present: string[]; missing: string[]; values?: Record<string, string> };
 }
 
 export function BackendSecretBadge({ present, missing }: { present: string[]; missing: string[] }) {
