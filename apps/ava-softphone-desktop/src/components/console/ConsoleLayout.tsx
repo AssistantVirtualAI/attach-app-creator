@@ -122,9 +122,16 @@ export default function ConsoleLayout({
         setPaletteOpen((v) => !v);
       }
     };
+    const REMOVED: ConsoleView[] = ['queues', 'telecom'];
     const onNav = (e: Event) => {
-      const v = (e as CustomEvent).detail as ConsoleView;
-      if (v) setView(v);
+      const raw = (e as CustomEvent).detail as ConsoleView;
+      if (!raw) return;
+      if (REMOVED.includes(raw)) {
+        console.info('[nav] redirect removed route', raw, '→ home');
+        setView('home');
+        return;
+      }
+      setView(raw);
     };
     window.addEventListener('keydown', onKey);
     window.addEventListener('lemtel:nav', onNav as EventListener);
