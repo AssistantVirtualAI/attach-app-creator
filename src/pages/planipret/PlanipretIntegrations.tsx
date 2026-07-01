@@ -274,9 +274,29 @@ export default function PlanipretIntegrations() {
         </IntegrationCard>
 
         {/* ───────── CARD 1 — MICROSOFT 365 ───────── */}
+        {(() => {
+          const ms = backendSecrets.ms365;
+          const backendValues = (ms as any)?.values as Record<string, string> | undefined;
+          const clientIdVal =
+            draft.ms365?.client_id ??
+            rows.ms365?.config_data?.client_id ??
+            backendValues?.client_id ??
+            "";
+          const tenantVal =
+            draft.ms365?.tenant_id ??
+            rows.ms365?.config_data?.tenant_id ??
+            backendValues?.tenant_id ??
+            "";
+          const clientSecretPresent =
+            !!rows.ms365?.config_data?.client_secret ||
+            (ms?.present ?? []).includes("MICROSOFT_CLIENT_SECRET");
+          const clientIdMissing = !clientIdVal;
+          const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL ?? "";
+          const callbackUrl = `${supabaseUrl}/functions/v1/ms365-oauth-callback`;
+          return (
         <IntegrationCard
           integrationKey="ms365" name="Microsoft 365"
-          backendSecrets={backendSecrets.ms365}
+          backendSecrets={ms}
           description="Outlook Email · Calendar · Teams Chat · OneDrive"
           emoji="🔵" fullWidth
           status={deriveStatus(rows.ms365)}
@@ -285,9 +305,18 @@ export default function PlanipretIntegrations() {
           lastTestResult={rows.ms365?.last_test_result}
           lastTestSuccess={rows.ms365?.last_test_success}
           onToggleEnabled={(v) => toggleEnabled("ms365", v)}
-          onSave={() => save("ms365", ["tenant_id", "client_id", "client_secret"])}
+          onSave={() => save("ms365", ["tenant_id", "client_id"])}
           onTest={() => test("ms365")}
+          testDisabled={clientIdMissing}
+          testDisabledReason="Configuration incomplète — Client ID manquant"
         >
+          {clientIdMissing && (
+            <InfoBanner tone="warn">
+              <strong>Configuration incomplète — Client ID manquant.</strong>{" "}
+              Renseignez <code>MICROSOFT_CLIENT_ID</code> dans les secrets backend
+              ou saisissez-le ci-dessous pour activer le test de connexion.
+            </InfoBanner>
+          )}
           <InfoBanner>
             Créez une App Registration dans Azure AD pour <strong>planipret.ca</strong>.
             Permissions requises (Application): <code>Mail.ReadWrite</code>, <code>Mail.Send</code>,
@@ -298,27 +327,68 @@ export default function PlanipretIntegrations() {
                 style={{ background: "#0D1F35", border: "1px solid #0E2A45", color: "#2E9BDC" }}>
                 Ouvrir Azure Portal →
               </a>
-              <CopyButton value={`${window.location.origin}/auth/ms365/callback`} label="Copier Redirect URI" />
             </div>
           </InfoBanner>
 
+          {/* Read-only Redirect URIs to register in Azure AD */}
+          <div className="rounded-lg p-3 mb-4"
+            style={{ background: "#0A1628", border: "1px solid #0E2A45" }}>
+            <div className="flex items-center justify-between mb-2">
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#E8EDF5" }}>
+                🔗 Redirect URIs Azure à enregistrer
+              </div>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                style={{ background: "#0D1F35", border: "1px solid #0E2A45", color: "#4A7FA5" }}>
+                Lecture seule
+              </span>
+            </div>
+            <p className="mb-3" style={{ fontSize: 11, color: "#4A7FA5", lineHeight: 1.6 }}>
+              Ajoutez ces URIs dans <em>App Registration → Authentication</em> selon la plateforme.
+              Tous pointent vers l'Edge Function <code>ms365-oauth-callback</code>.
+            </p>
+            {[
+              { platform: "Web", hint: "Plateforme « Web » — utilisé par le portail admin", uri: callbackUrl },
+              { platform: "iOS / macOS", hint: "Plateforme « Mobile and desktop applications »", uri: callbackUrl },
+              { platform: "Android",     hint: "Plateforme « Mobile and desktop applications »", uri: callbackUrl },
+            ].map((r) => (
+              <div key={r.platform} className="flex items-center gap-2 mb-2 last:mb-0">
+                <div className="flex-shrink-0 px-2 py-1 rounded text-[10px] font-semibold"
+                  style={{ background: "#0D1F35", border: "1px solid #0E2A45", color: "#2E9BDC", minWidth: 90, textAlign: "center" }}>
+                  {r.platform}
+                </div>
+                <input readOnly value={r.uri}
+                  style={{ background: "#0D1F35", border: "1px solid #0E2A45", borderRadius: 8, padding: "6px 10px", color: "#E8EDF5", fontSize: 12, fontFamily: "monospace", flex: 1 }} />
+                <CopyButton value={r.uri} label="Copier" />
+              </div>
+            ))}
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <Field label="Tenant ID" required hint="Azure AD → Overview → Directory (tenant) ID">
-              <TextInput value={getField("ms365", "tenant_id")}
+            <Field label="Tenant ID" required hint="Auto-rempli depuis MICROSOFT_TENANT_ID">
+              <TextInput value={tenantVal}
                 onChange={(e) => setField("ms365", "tenant_id", e.target.value)}
                 placeholder="00000000-0000-0000-0000-000000000000" />
             </Field>
-            <Field label="Client ID (Application ID)" required>
-              <TextInput value={getField("ms365", "client_id")}
-                onChange={(e) => setField("ms365", "client_id", e.target.value)}
-                placeholder="00000000-0000-0000-0000-000000000000" />
+            <Field label="Client ID (Application ID)" required
+              hint={clientIdMissing ? "⚠️ À compléter — MICROSOFT_CLIENT_ID manquant" : "Auto-rempli depuis MICROSOFT_CLIENT_ID (modifiable)"}>
+              <div className="relative">
+                <TextInput value={clientIdVal}
+                  onChange={(e) => setField("ms365", "client_id", e.target.value)}
+                  placeholder="00000000-0000-0000-0000-000000000000" />
+                {clientIdMissing && (
+                  <span className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                    style={{ background: "rgba(245,166,35,0.15)", border: "1px solid #4A3000", color: "#F5A623" }}>
+                    À compléter
+                  </span>
+                )}
+              </div>
             </Field>
-            <Field label="Client Secret" required hint="Certificates & secrets → New client secret">
+            <Field label="Client Secret" hint="Auto-détecté depuis MICROSOFT_CLIENT_SECRET · masqué">
               <SecretInput value={draft.ms365?.client_secret ?? ""}
                 onChange={(v) => setField("ms365", "client_secret", v)}
-                hasSavedValue={!!rows.ms365?.config_data?.client_secret} />
+                hasSavedValue={clientSecretPresent} />
             </Field>
-            <Field label="Redirect URI" hint="À copier exactement dans Azure Portal">
+            <Field label="Redirect URI (frontend fallback)" hint="Route interne — non utilisée pour Azure">
               <TextInput readOnly value={`${typeof window !== "undefined" ? window.location.origin : ""}/auth/ms365/callback`} />
             </Field>
           </div>
@@ -346,6 +416,8 @@ export default function PlanipretIntegrations() {
             })}
           </div>
         </IntegrationCard>
+          );
+        })()}
 
         {/* ───────── CARD 4 — ELEVENLABS ───────── */}
         <IntegrationCard

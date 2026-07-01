@@ -12,7 +12,7 @@ const MAP: Record<string, string[]> = {
   anthropic: ["ANTHROPIC_API_KEY", "LOVABLE_API_KEY"],
   openai: ["OPENAI_API_KEY"],
   elevenlabs: ["ELEVENLABS_API_KEY"],
-  ms365: ["MS365_CLIENT_ID", "MS365_CLIENT_SECRET", "MS365_TENANT_ID"],
+  ms365: ["MICROSOFT_CLIENT_ID", "MICROSOFT_CLIENT_SECRET", "MICROSOFT_TENANT_ID"],
   maestro: ["MAESTRO_API_KEY", "MAESTRO_WEBHOOK_SECRET"],
   webhooks: ["NS_WEBHOOK_SECRET"],
   twilio: ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN"],
@@ -35,7 +35,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const out: Record<string, { configured: boolean; present: string[]; missing: string[] }> = {};
+    const out: Record<string, { configured: boolean; present: string[]; missing: string[]; values?: Record<string, string> }> = {};
     for (const [key, names] of Object.entries(MAP)) {
       const present: string[] = [];
       const missing: string[] = [];
@@ -44,6 +44,18 @@ Deno.serve(async (req) => {
         if (v && v.length > 0) present.push(n); else missing.push(n);
       }
       out[key] = { configured: present.length > 0, present, missing };
+    }
+
+    // Expose non-sensitive Microsoft 365 identifiers so the admin UI can
+    // auto-fill Tenant ID and Client ID from backend secrets. The client
+    // secret is NEVER returned — only its presence in `present`.
+    const msTenant = Deno.env.get("MICROSOFT_TENANT_ID");
+    const msClientId = Deno.env.get("MICROSOFT_CLIENT_ID");
+    if (msTenant || msClientId) {
+      out.ms365.values = {
+        ...(msTenant ? { tenant_id: msTenant } : {}),
+        ...(msClientId ? { client_id: msClientId } : {}),
+      };
     }
 
     return new Response(JSON.stringify({ ok: true, secrets: out }), {

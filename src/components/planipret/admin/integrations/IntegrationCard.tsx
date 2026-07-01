@@ -124,8 +124,10 @@ export interface IntegrationCardProps {
   onSave: () => Promise<void> | void;
   onTest: () => Promise<void> | void;
   saveDisabled?: boolean;
+  testDisabled?: boolean;
+  testDisabledReason?: string;
   /** Backend secrets detected for this integration (e.g. ["NS_API_KEY"]). */
-  backendSecrets?: { present: string[]; missing: string[] };
+  backendSecrets?: { present: string[]; missing: string[]; values?: Record<string, string> };
 }
 
 export function BackendSecretBadge({ present, missing }: { present: string[]; missing: string[] }) {
@@ -193,11 +195,13 @@ export function IntegrationCard(props: IntegrationCardProps) {
               ) : "Jamais testé"}
             </div>
             <div className="flex items-center gap-2">
-              <button type="button" disabled={testing} onClick={async () => {
-                setTesting(true); try { await props.onTest(); } finally { setTesting(false); }
-              }}
+              <button type="button" disabled={testing || props.testDisabled}
+                title={props.testDisabled ? (props.testDisabledReason ?? "Configuration incomplète") : undefined}
+                onClick={async () => {
+                  setTesting(true); try { await props.onTest(); } finally { setTesting(false); }
+                }}
                 className="px-3 py-2 rounded-lg text-xs font-medium inline-flex items-center gap-1.5"
-                style={{ background: "#0D1F35", border: "1px solid #0E2A45", color: "#E8EDF5", opacity: testing ? 0.6 : 1 }}>
+                style={{ background: "#0D1F35", border: "1px solid #0E2A45", color: "#E8EDF5", opacity: (testing || props.testDisabled) ? 0.5 : 1, cursor: props.testDisabled ? "not-allowed" : "pointer" }}>
                 {testing && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Tester la connexion
               </button>
               <button type="button" disabled={saving || props.saveDisabled} onClick={async () => {
