@@ -38,6 +38,10 @@ export default function TitleBar(_props: Props = {}) {
       {/* Left: window controls spacer (macOS traffic lights) */}
       <div style={{ width: 70 }} />
 
+
+
+
+
       <details style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
         <summary style={{
           listStyle: 'none', display: 'inline-flex', alignItems: 'center', gap: 7,
@@ -63,8 +67,44 @@ export default function TitleBar(_props: Props = {}) {
         </div>
       </details>
 
-      {/* Right: profile menu */}
-      <ProfileMenu />
+      {/* Right: profile menu + window controls */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+        <ProfileMenu />
+        <WindowControls />
+      </div>
+    </div>
+  );
+}
+
+function WindowControls() {
+  const { colors } = theme;
+  const api = (typeof window !== 'undefined' ? (window as any).electronAPI : null);
+  const isElectron = !!api?.minimize;
+  const isMac = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform || '');
+  const [maximized, setMaximized] = React.useState(false);
+
+  if (!isElectron || isMac) return null;
+
+  const btn: React.CSSProperties = {
+    width: 34, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    background: 'transparent', color: colors.text, border: `1px solid ${colors.border}`,
+    borderRadius: 6, cursor: 'pointer', fontSize: 13, lineHeight: 1, padding: 0,
+    WebkitAppRegion: 'no-drag',
+  } as React.CSSProperties;
+  const closeBtn: React.CSSProperties = { ...btn, borderColor: `${colors.danger}55` };
+
+  const onMin = () => { try { api.minimize(); } catch { /* noop */ } };
+  const onMax = () => { try { api.maximize(); setMaximized((v) => !v); } catch { /* noop */ } };
+  const onClose = () => { try { api.close(); } catch { /* noop */ } };
+
+  return (
+    <div style={{ display: 'inline-flex', gap: 4, marginLeft: 4 }}>
+      <button aria-label="Minimize" title="Minimize" style={btn} onClick={onMin}>—</button>
+      <button aria-label={maximized ? 'Restore' : 'Maximize'} title={maximized ? 'Restore' : 'Maximize'} style={btn} onClick={onMax}>{maximized ? '❐' : '▢'}</button>
+      <button aria-label="Close" title="Close" style={closeBtn}
+        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = colors.danger; (e.currentTarget as HTMLButtonElement).style.color = '#fff'; }}
+        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; (e.currentTarget as HTMLButtonElement).style.color = colors.text; }}
+        onClick={onClose}>✕</button>
     </div>
   );
 }
