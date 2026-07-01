@@ -34,7 +34,7 @@ function isUnauthorizedFunctionError(error: unknown) {
  * returns 401 in that case, but the app should refresh/retry instead of letting
  * that response bubble into the global runtime overlay / blank screen.
  */
-(supabase.functions.invoke as typeof supabase.functions.invoke) = async (functionName, options) => {
+(supabase.functions as any).invoke = async (functionName: string, options?: Record<string, unknown>) => {
   if (!protectedEdgeFunctions.has(String(functionName))) {
     return originalInvoke(functionName, options as never);
   }
