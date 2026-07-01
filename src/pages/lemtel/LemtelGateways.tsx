@@ -220,6 +220,8 @@ export default function LemtelGateways() {
         </div>
       </div>
 
+      <FusionPbxPermissionsHelp area="gateways" />
+
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between gap-4 flex-wrap">
