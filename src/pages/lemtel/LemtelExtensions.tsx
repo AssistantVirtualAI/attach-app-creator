@@ -64,11 +64,23 @@ export default function LemtelExtensions() {
   useEffect(() => {
     if (!isLoading && all.length === 0 && !autoSyncing) {
       setAutoSyncing(true);
-      supabase.functions.invoke('fusionpbx-proxy', {
-        body: { action: 'sync-extensions', organization_id: LEMTEL_ORG },
-      }).then(({ error }) => {
-        if (!error) { queryClient.invalidateQueries({ queryKey: ['pbx'] }); refetch(); }
-      }).finally(() => setAutoSyncing(false));
+      (async () => {
+        try {
+          // Guard: only attempt when a real user session exists, otherwise
+          // the proxy will 401 (anon key is not accepted) and surface as a
+          // blank screen via the global error boundary.
+          const { data: { session } } = await supabase.auth.getSession();
+          if (!session?.access_token) return;
+          const { error } = await supabase.functions.invoke('fusionpbx-proxy', {
+            body: { action: 'sync-extensions', organization_id: LEMTEL_ORG },
+          });
+          if (!error) { queryClient.invalidateQueries({ queryKey: ['pbx'] }); refetch(); }
+        } catch (e) {
+          console.warn('[LemtelExtensions] auto-sync skipped:', e);
+        } finally {
+          setAutoSyncing(false);
+        }
+      })();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading, all.length]);
