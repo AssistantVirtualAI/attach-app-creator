@@ -72,7 +72,7 @@ export default function AdminRecordings({ scope = 'org' }: { scope?: 'org' | 'mi
       const from = pageNum * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
       let query = (supabase as any).from('pbx_call_records')
-        .select('id,start_at,duration_seconds,caller_name,caller_number,destination,destination_number,extension,direction,recording_path,recording_name,has_recording,pbx_uuid,domain_uuid,domain_name,recording_id,transcribed,analyzed,sentiment,summary', { count: 'exact' })
+        .select('id,start_at,duration_seconds,caller_name,caller_number,destination,destination_number,extension,direction,recording_path,recording_name,has_recording,pbx_uuid,domain_uuid,domain_name,recording_id,transcribed,analyzed,sentiment,summary:ai_summary', { count: 'exact' })
         .eq('organization_id', LEMTEL_ORG_ID)
         .eq('has_recording', true)
         .order('start_at', { ascending: false })
