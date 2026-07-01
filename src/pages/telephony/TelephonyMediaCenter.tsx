@@ -77,6 +77,19 @@ export default function TelephonyMediaCenter({ scope = "org" }: { scope?: Scope 
   const filterExt: string | null = scope === "mine" ? (myExt as any)?.extension ?? null : (extFilter.trim() || null);
   const mineReady = scope !== "mine" || !!((myExt as any)?.extension);
 
+  // Auto-sync CDRs + voicemails from PBX when the /my media center opens
+  useEffect(() => {
+    if (scope !== "mine" || !mineReady || !orgId) return;
+    (async () => {
+      await Promise.allSettled([
+        supabase.functions.invoke("fusionpbx-proxy", { body: { action: "sync-cdrs", organization_id: orgId } }),
+        supabase.functions.invoke("voicemail-sync", { body: { organization_id: orgId, extension: filterExt ?? undefined } }),
+      ]);
+      qc.invalidateQueries({ queryKey: ["media"] });
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scope, mineReady, orgId, filterExt]);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
