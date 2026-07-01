@@ -16,17 +16,19 @@ type Ext = {
   description?: string | null;
 };
 
-type DialogMode = null | "reset" | "link" | "welcome";
+type DialogMode = null | "reset" | "link" | "welcome" | "set-portal";
 
 export default function ExtensionActionsMenu({ ext }: { ext: Ext }) {
   const [mode, setMode] = useState<DialogMode>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [syncSip, setSyncSip] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<{ password?: string; link?: string; sent?: boolean } | null>(null);
+  const [result, setResult] = useState<{ password?: string; link?: string; sent?: boolean; ok?: boolean } | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const close = () => { setMode(null); setResult(null); setEmail(""); setPassword(""); setCopied(false); };
+  const close = () => { setMode(null); setResult(null); setEmail(""); setPassword(""); setConfirm(""); setSyncSip(true); setCopied(false); };
 
   async function invoke(action: string, body: any) {
     setBusy(true);
