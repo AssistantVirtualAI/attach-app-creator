@@ -6,6 +6,7 @@ import {
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
 } from 'recharts';
 import { supabase } from '@/integrations/supabase/client';
+import { usePbxAutoSync } from '@/hooks/usePbxAutoSync';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 
@@ -14,18 +15,32 @@ const COLORS = ['hsl(var(--primary))', '#22c55e', '#eab308', '#ef4444', '#8b5cf6
 
 export default function AdminReports() {
   const [rows, setRows] = useState<any[]>([]);
+  // Auto-pull the latest CDRs from FusionPBX every time Reports is opened so
+  // charts and KPIs stay live without a manual "Sync" click.
+  usePbxAutoSync(['cdrs', 'recordings'], { orgId: LEMTEL_ORG_ID });
 
+  const loadRows = async () => {
+    const since = new Date(Date.now() - 30 * 86400 * 1000).toISOString();
+    const { data } = await (supabase as any).from('pbx_call_records')
+      .select('id,start_at,duration_seconds,direction,call_status,extension,missed_call')
+      .eq('organization_id', LEMTEL_ORG_ID)
+      .gte('start_at', since)
+      .order('start_at', { ascending: false })
+      .limit(5000);
+    setRows((data ?? []) as any[]);
+  };
+
+  useEffect(() => { loadRows(); }, []);
+
+  // Refresh chart data whenever the auto-sync inserts new rows.
   useEffect(() => {
-    (async () => {
-      const since = new Date(Date.now() - 30 * 86400 * 1000).toISOString();
-      const { data } = await (supabase as any).from('pbx_call_records')
-        .select('id,start_at,duration_seconds,direction,call_status,extension,missed_call')
-        .eq('organization_id', LEMTEL_ORG_ID)
-        .gte('start_at', since)
-        .order('start_at', { ascending: false })
-        .limit(5000);
-      setRows((data ?? []) as any[]);
-    })();
+    const ch = supabase
+      .channel(`admin-reports-cdr-${LEMTEL_ORG_ID}`)
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'pbx_call_records', filter: `organization_id=eq.${LEMTEL_ORG_ID}` },
+        () => { loadRows(); })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
   }, []);
 
   const trend = useMemo(() => {
