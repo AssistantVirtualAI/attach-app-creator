@@ -1,50 +1,101 @@
-## Root cause
+# Desktop App: Bug fixes + UI changes (Keeny)
 
-`src/pages/lemtel/admin/AdminRecordings.tsx` line 75 selects a non-existent column `summary` from `pbx_call_records`. The real column is `ai_summary` (all other files in the codebase already use `ai_summary`). This single typo makes the whole Recordings page throw `column pbx_call_records.summary does not exist` before any row is loaded — that's why "0 shown" for every domain.
+Scope: `apps/ava-softphone-desktop/` only. No changes to mobile app, portal, or native iOS files.
 
-The rich transcript/coaching data already lives in `pbx_call_transcripts` (joined via `call_record_id`) and `pbx_ai_insights`; the page's `hydrateMeta()` already reads from both correctly. Only the initial list query is broken.
+---
 
-## Part 1 — Fix the failing query (unblocks the page)
+## Bug 1 — Dashboard doesn't refresh
 
-In `src/pages/lemtel/admin/AdminRecordings.tsx`:
-- Replace `summary` with `ai_summary` in the `.select(...)` on line 75.
-- Update the `Rec` type: `summary?: string | null` → `ai_summary?: string | null`.
-- Update the 3 render/merge sites (lines ~218, 261, 270, 426–431) to read `r.ai_summary` instead of `r.summary` (fallback chain becomes `metaById[r.id]?.summary || r.ai_summary`).
+**File:** `apps/ava-softphone-desktop/src/components/console/HomeDashboard.tsx` + `src/hooks/useDashboardStats.ts`
 
-No DB migration. Do NOT add a `summary` column to `pbx_call_records`.
+- Expose a `refetch` callback from `useDashboardStats` (currently only auto-runs on args change).
+- In `HomeDashboard`, add:
+  - `window.addEventListener('focus', refetch)`
+  - `setInterval(refetch, 60_000)`
+  - `window.addEventListener('ava:callEnded', refetch)`
+  - `document.addEventListener('visibilitychange', () => !document.hidden && refetch())`
+  - `window.addEventListener('lemtel:sync', refetch)` (already-broadcasted realtime event from `useRealtimeSync`)
+- Verify existing realtime subscription in `useRealtimeSync.ts` chains all `.on()` before `.subscribe()` (confirmed correct) — no change needed there.
+- Add try/catch + auto-reconnect log around the subscribe status handler (already has backoff — just add a `console.info` when reconnected for debug).
 
-## Part 2 — Load recordings across all Lemtel domains
+## Bug 2 — Dashboard stays English on FR switch
 
-The list query already scopes only by `organization_id = LEMTEL_ORG_ID` + `has_recording = true` (no `domain_uuid` filter), so once Part 1 is fixed, all domains under Lemtel will appear. Additions:
+**Files:** `HomeDashboard.tsx`, `src/lib/i18n.ts`
 
-- Add an optional "Domain" `<Select>` at the top of the page for super/org admins, populated from `distinct domain_uuid/domain_name` in `pbx_domains` for the org. Default = "All domains".
-- Default date range: last 7 days (set `fromDate`/`toDate` on first mount instead of blank).
-- Wire the existing FR/EN dropdown to persist per-user (already stored in `localStorage`) and pass `target_language` to `ai-transcribe-call` on Retranscribe.
+- Replace hardcoded strings in `HomeDashboard`: greeting ("Good morning/afternoon/evening"), "Command Center", range labels ("Today / 7 days / 30 days / Custom"), tile titles/hints in `METRIC_TITLES`, "Live Phone-System Brief", "Ext {n} · Live CDR…", "Loading the live PBX picture…", "call/calls answered/missed/recording", "Range", "no activity", "trend unavailable", "Could not load · click to retry", etc.
+- Add matching keys to both `en` and `fr` in `src/lib/i18n.ts` under a `home.*` namespace.
+- Wrap the component body with `useTranslation()` so it re-renders when language changes (the hook subscribes to a lang state — verify; if not, add a lightweight event listener on a `lemtel:lang-changed` custom event dispatched by the switcher).
+- Language already persists in localStorage under `lemtel:lang` — keep.
 
-## Part 3 — Cross-platform realtime sync of transcripts
+## Bug 3 — App flickers when clicking a call detail
 
-Reuse the existing `useLemtelAiRealtime(LEMTEL_ORG_ID, reloadCurrentPage)` hook (already imported on this page) — it already subscribes to `pbx_call_transcripts` + `pbx_ai_insights` + `pbx_call_records` + `pbx_call_recordings` filtered by `organization_id` and invalidates queries. On transcript INSERT/UPDATE, refresh the affected row's meta in-place (call `hydrateMeta(r)` instead of a full page reload) to avoid flicker.
+**File:** `src/components/console/CallsView.tsx`
 
-Confirm the same hook (or its equivalent) is wired in:
-- Desktop: `apps/ava-softphone-desktop/src/lib/useRealtimeRefresh.ts` — add a subscription for `pbx_call_transcripts` on the recordings screen if missing.
-- Mobile: `apps/ava-softphone-mobile` recordings screen — verify the `pbx_call_transcripts` channel exists (it does via `useNotificationCounts` / recordings screen).
+Root cause: `load()` at line 83 replaces `sel` with a new object reference on every 20s poll + realtime tick, which re-triggers `useEffect([sel])` (line 132) that clears/refetches AI insight, and the audio effect (line 136) that revokes/rebuilds the blob URL → flicker.
 
-All three platforms already read/write the same `pbx_call_transcripts` table — no schema change.
+Fix:
+- Guard the insight effect with `useRef<string | null>(prevSelIdRef)`; only refetch when `sel?.id` actually changes:
+  ```ts
+  useEffect(() => {
+    if (!sel) { setInsight(null); return; }
+    if (prevSelIdRef.current === sel.id) return;
+    prevSelIdRef.current = sel.id;
+    ava.callDetail(sel.id).then(setInsight).catch(...);
+  }, [sel?.id]);
+  ```
+- Apply the same id-guard to the audio-load effect so the blob isn't rebuilt when the underlying row is merely refreshed.
+- In `load()` (line 83), keep the *existing* `sel` object reference when the id matches instead of swapping in the new row:
+  ```ts
+  setSel((current) => current ? (scopedCalls.find(c => c.id === current.id) ?? current) : current);
+  ```
+  → change to only replace if a meaningful field changed, or drop the swap entirely (detail panel keeps its cached copy until closed).
+- Add a `retryLimit` (max 2) to audio-load failure retries.
 
-## Part 4 — "Sync from PBX" all domains
+## Change 1 — Physical keyboard numpad for dialing
 
-`syncFromPbx()` already calls `fusionpbx-proxy` with `action: 'backfill-cdrs'` scoped to `LEMTEL_ORG_ID`. Verify in `supabase/functions/fusionpbx-proxy/index.ts` that `backfill-cdrs` iterates every domain under the org (not just the first). If it doesn't, extend it to loop over `pbx_domains` rows for the org and aggregate the counts. Return `{ inserted, updated, domains_processed }` and toast the total.
+**File:** `src/components/DialerKeypad.tsx` (+ consumers)
 
-## Out of scope for this fix
+- Add a `useEffect` inside `DialerKeypad` that listens to `keydown` on `window` while the keypad is mounted/visible:
+  - `0-9`, `*`, `#`, `+` → simulate the key press (visual highlight + call `onKey(digit)`).
+  - `Backspace` → dispatch a new `onBackspace` prop.
+  - `Enter` → dispatch `onDial` if number length > 0.
+  - `e.preventDefault()` only when the event target is not an `<input>/<textarea>/[contenteditable]` and the dialer view is active.
+- Visual feedback: set a transient `data-pressed` attribute on the matching button ref for ~120ms.
+- Wire the new `onBackspace` / `onDial` callbacks through `SoftphonePane` and the console dialer view. Also apply to any floating mini-dialpad if present.
 
-The bilingual `transcript_text_fr` / `transcript_text_en` split, per-field translation buttons, and a mobile-identical card redesign are large additive features. Not blocking the reported error and would double the size of this change. Happy to plan them as a follow-up once the page loads again — confirm if you want them bundled in.
+## Change 2 — Minimize / Maximize / Close buttons
 
-## Files to change
+**File:** `src/components/TitleBar.tsx`
 
-- `src/pages/lemtel/admin/AdminRecordings.tsx` — column rename + domain filter + default date range + in-place row hydration on realtime events.
-- `supabase/functions/fusionpbx-proxy/index.ts` — verify/extend `backfill-cdrs` to cover every Lemtel domain (only if it currently doesn't).
+- IPC bridge already exists in `electron/preload.ts` (`window.electronAPI.minimize/maximize/close`).
+- Add three buttons on the right side of TitleBar (before `ProfileMenu`), styled to match dark theme:
+  - `—` minimize, `⬜/❐` maximize/restore, `✕` close (close = red hover).
+  - Wrap them in a container with `WebkitAppRegion: 'no-drag'`.
+  - Platform detection: `window.electronAPI?.platform === 'darwin'` → hide (macOS uses native traffic lights already spaced by the 70px left spacer).
+  - If `!window.electronAPI` (web/dev browser) → don't render.
+- Track maximized state via `window.electronAPI.onWindowStateChange` (add a new IPC event in `electron/main.ts` that emits on `maximize`/`unmaximize` so the icon flips). Update `preload.ts` to expose `onWindowStateChange`.
 
-### Technical notes
+## Change 3 — Rename nav items
 
-- Column mapping confirmed via `information_schema`: `pbx_call_records` has `ai_summary`, `sentiment`, `transcribed`, `analyzed`, `recording_id`, `destination`, `has_recording` — but no `summary`.
-- Every other query in the codebase (`ava-assistant`, `mobile-recordings`, `TelephonyMediaCenter`, `my-ai-assistant`, `useMyDashboardStats`, `ai-transcribe-call`) already uses `ai_summary`. AdminRecordings is the only offender.
+**Files:** `src/lib/i18n.ts`
+
+- `nav.dialer`: EN "Dialer" → "Phone", FR "Composeur/Clavier" → "Téléphone"
+- `nav.calls`: EN "Calls" → "Call History", FR "Appels" → "Historique d'appels"
+- `nav.messages`: keep "Messages" EN → "SMS"; FR → "SMS"
+- No icon or route changes.
+
+## Change 4 — Remove Call Queue and Telecom from desktop nav
+
+**Files:** `src/components/console/LeftRail.tsx`, `src/components/console/ConsoleLayout.tsx`
+
+- Remove `'queues'` and `'telecom'` from the `USER_ITEMS` array in `LeftRail.tsx`.
+- In `ConsoleLayout.tsx`, if a stored/legacy `view === 'queues' | 'telecom'` is loaded, redirect to `'home'`.
+- Leave the view components (`QueuesView.tsx`, `TelecomSettingsView.tsx`) in the codebase (still referenced by admin flows / mobile / portal) — only the sidebar entries are removed.
+
+---
+
+## Technical notes
+
+- Language switcher already dispatches state via `useTranslation` hook; if the hook uses module-level state, add a `window.dispatchEvent(new Event('lemtel:lang-changed'))` on set and subscribe in `HomeDashboard` (verify by reading full `i18n.ts` before editing).
+- Files touched (final list): `HomeDashboard.tsx`, `useDashboardStats.ts`, `CallsView.tsx`, `DialerKeypad.tsx`, `SoftphonePane.tsx`, `TitleBar.tsx`, `electron/main.ts`, `electron/preload.ts`, `LeftRail.tsx`, `ConsoleLayout.tsx`, `i18n.ts`.
+- No changes to `apps/ava-softphone-mobile/**`, native iOS Swift, or portal pages.
