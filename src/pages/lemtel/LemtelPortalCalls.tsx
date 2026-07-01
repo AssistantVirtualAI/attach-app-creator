@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { usePbxCallRecords, usePbxSync, usePbxTestCdrEndpoint, LEMTEL_ORG } from '@/hooks/usePbxData';
+import { usePbxAutoSync } from '@/hooks/usePbxAutoSync';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { loadPbxRecordingAudio } from '@/lib/pbxRecordingAudio';
 import { runTranscribeAndAnalyze, isStubTranscript, type TranscriptStage } from '@/lib/transcriptStatus';
@@ -32,6 +33,8 @@ function today() { return new Date().toISOString().slice(0, 10); }
 function daysAgo(n: number) { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); }
 
 export default function LemtelPortalCalls({ scope = 'org' }: { scope?: 'org' | 'mine' }) {
+  // Live pull from FusionPBX on mount + polling; scoped end-users still get their extension filter.
+  usePbxAutoSync(['cdrs', 'recordings', 'voicemails']);
   const { toast } = useToast();
   const qc = useQueryClient();
   const [analyzing, setAnalyzing] = useState<string | null>(null);

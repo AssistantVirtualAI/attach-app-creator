@@ -12,8 +12,11 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Label } from '@/components/ui/label';
+import { usePbxAutoSync } from '@/hooks/usePbxAutoSync';
 
 export default function LemtelMessages() {
+  // Pull latest SMS threads from the PBX / Telnyx sync on mount.
+  usePbxAutoSync(['sms']);
   const { toast } = useToast();
   const { data: threads = [] } = usePbxSmsThreads();
   const { templates } = useSmsTemplates();

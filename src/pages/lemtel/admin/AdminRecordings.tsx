@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { loadPbxRecordingAudio } from '@/lib/pbxRecordingAudio';
 import { useLemtelAiRealtime } from '@/hooks/useLemtelAiRealtime';
+import { usePbxAutoSync } from '@/hooks/usePbxAutoSync';
 
 const LEMTEL_ORG_ID = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
 const PAGE_SIZE = 100;
@@ -46,6 +47,8 @@ type RecMeta = {
 };
 
 export default function AdminRecordings({ scope = 'org' }: { scope?: 'org' | 'mine' }) {
+  // Pull latest recordings + CDRs from FusionPBX on mount so the grid is live.
+  usePbxAutoSync(['recordings', 'cdrs'], { orgId: LEMTEL_ORG_ID });
   const [rows, setRows] = useState<Rec[]>([]);
   const [q, setQ] = useState('');
   const [direction, setDirection] = useState<string>('all');

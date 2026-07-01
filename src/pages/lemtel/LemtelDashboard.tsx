@@ -3,8 +3,11 @@ import { Badge } from '@/components/ui/badge';
 import { Phone, MessageSquare, Bot, PhoneCall, Activity, TrendingUp, Smartphone, Voicemail } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
 import { usePbxCallRecords, usePbxExtensions, usePbxIvrs, usePbxQueues, usePbxSmsThreads, usePbxIntegration } from '@/hooks/usePbxData';
+import { usePbxAutoSync } from '@/hooks/usePbxAutoSync';
 
 export default function LemtelDashboard() {
+  // Live pull from FusionPBX on mount + every 60s so "Vue d'ensemble" is never stale.
+  usePbxAutoSync(['cdrs', 'voicemails', 'sms']);
   const { data: cdrs = [] } = usePbxCallRecords(500);
   const { data: extensions = [] } = usePbxExtensions();
   const { data: ivrs = [] } = usePbxIvrs();
