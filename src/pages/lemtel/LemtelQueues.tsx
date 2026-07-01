@@ -723,7 +723,13 @@ function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt
       } as any);
       toast({ title: `${role === 'supervisor' ? 'Supervisor' : 'Agent'} added` });
       load();
-    } catch (e: any) { toast({ title: 'Failed to add member', description: e.message, variant: 'destructive' }); }
+    } catch (e: any) {
+      const msg = e?.message || 'Failed';
+      if (/call_center_tier_add|permission missing/i.test(msg)) {
+        window.dispatchEvent(new CustomEvent('lemtel:queue-perm-error', { detail: { message: msg } }));
+      }
+      toast({ title: 'Failed to add member', description: msg, variant: 'destructive' });
+    }
   };
 
   const removeAgent = async (a: any) => {
