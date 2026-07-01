@@ -194,3 +194,6 @@ verify_jwt = false
 
 [functions.realtime-stt-relay]
 verify_jwt = false
+
+[functions.extension-manage]
+verify_jwt = true
