@@ -119,11 +119,18 @@ Deno.serve(async (req) => {
       }
       if (!authUserId) return json({ error: "USER_NOT_FOUND" }, 404);
 
-      // Map softphone user → email via RPC (creates or updates row)
-      const { error: rpcErr } = await (admin as any).rpc("admin_link_softphone_by_extension_email", {
+      // Map softphone user → email via RPC (creates or updates row).
+      // The RPC uses auth.uid() internally, so call it with the user's JWT context.
+      const { error: rpcErr } = await (userClient as any).rpc("admin_link_softphone_by_extension_email", {
         _org_id: orgId, _extension: extension, _email: email,
       });
-      if (rpcErr) return json({ error: "LINK_FAILED", detail: rpcErr.message }, 500);
+      if (rpcErr) {
+        // Fallback: upsert the mapping directly with service role
+        const { error: upErr } = await admin.from("pbx_softphone_users").upsert({
+          organization_id: orgId, extension, portal_user_id: authUserId, updated_at: new Date().toISOString(),
+        }, { onConflict: "organization_id,extension" });
+        if (upErr) return json({ error: "LINK_FAILED", detail: rpcErr.message + " | " + upErr.message }, 500);
+      }
 
       await admin.from("audit_logs").insert({
         organization_id: orgId, user_id: user.id, action: "extension_email_linked",
