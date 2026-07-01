@@ -112,11 +112,13 @@ export default function ExtensionActionsMenu({ ext }: { ext: Ext }) {
               {mode === "reset" && `Reset SIP password — ext. ${ext.extension}`}
               {mode === "link" && `Link email — ext. ${ext.extension}`}
               {mode === "welcome" && `Send welcome email — ext. ${ext.extension}`}
+              {mode === "set-portal" && `Set portal password — ext. ${ext.extension}`}
             </DialogTitle>
             <DialogDescription>
               {mode === "reset" && "Generate a new SIP password. Leave blank to auto-generate. The linked portal login password will also be rotated when auto-generated."}
               {mode === "link" && "Attach an existing (or new) email to this extension so the user can sign in. If the email doesn't exist yet, an account will be created."}
               {mode === "welcome" && "Send a branded email inviting the user to choose their own password. Uses the email currently linked to the extension unless you specify one."}
+              {mode === "set-portal" && "Directly set the portal login password for the user linked to this extension. Works across all domains. Optionally sync the same value to the SIP password so the softphone keeps working."}
             </DialogDescription>
           </DialogHeader>
 
