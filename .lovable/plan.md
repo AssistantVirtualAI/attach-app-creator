@@ -1,57 +1,50 @@
-# Lemtel Portal — 4 Critical Fixes
+## Root cause
 
-## Issue 1 — Gateways: System-Level Fetch
+`src/pages/lemtel/admin/AdminRecordings.tsx` line 75 selects a non-existent column `summary` from `pbx_call_records`. The real column is `ai_summary` (all other files in the codebase already use `ai_summary`). This single typo makes the whole Recordings page throw `column pbx_call_records.summary does not exist` before any row is loaded — that's why "0 shown" for every domain.
 
-**File:** `supabase/functions/fusionpbx-proxy/index.ts`
+The rich transcript/coaching data already lives in `pbx_call_transcripts` (joined via `call_record_id`) and `pbx_ai_insights`; the page's `hydrateMeta()` already reads from both correctly. Only the initial list query is broken.
 
-- Locate the `get-gateways` (or equivalent) action.
-- Remove any `domain_uuid` filter from the `/api/v1/gateways` call — query at system scope.
-- On `403 Forbidden`, attempt `fs_cli -x 'sofia status gateway'` as read-only fallback via existing PHP session pattern.
-- If both fail, return the permission-fix message (already surfaced) but keep partial `fs_cli` data if available.
-- Frontend Gateways page: display all rows regardless of domain, show domain name column when present.
+## Part 1 — Fix the failing query (unblocks the page)
 
-## Issue 2 — Remove Duplicate "Phone Numbers" Page (Lemtel only)
+In `src/pages/lemtel/admin/AdminRecordings.tsx`:
+- Replace `summary` with `ai_summary` in the `.select(...)` on line 75.
+- Update the `Rec` type: `summary?: string | null` → `ai_summary?: string | null`.
+- Update the 3 render/merge sites (lines ~218, 261, 270, 426–431) to read `r.ai_summary` instead of `r.summary` (fallback chain becomes `metaById[r.id]?.summary || r.ai_summary`).
 
-- Remove the "Phone Numbers" nav entry from the Lemtel sidebar component.
-- Redirect the `/phone-numbers` route (Lemtel scope) → `/inbound-routes` via `<Navigate replace>`.
-- Grep for internal links pointing to the removed route and repoint them to Inbound Routes.
-- Guard the change to Lemtel org only; other orgs untouched.
+No DB migration. Do NOT add a `summary` column to `pbx_call_records`.
 
-## Issue 3 — Queue Member Add: fs_cli Fallback + Admin Notice
+## Part 2 — Load recordings across all Lemtel domains
 
-**File:** `supabase/functions/fusionpbx-proxy/index.ts`
+The list query already scopes only by `organization_id = LEMTEL_ORG_ID` + `has_recording = true` (no `domain_uuid` filter), so once Part 1 is fixed, all domains under Lemtel will appear. Additions:
 
-- In `add-queue-member` handler: on 403 with `call_center_tier_add`, fall back to:
-  `fs_cli -x "callcenter_config queue tier add <queue> <agent> <level> <position>"`
-- Parse fs_cli output; return success or a precise permission error message listing all missing ACLs (tier + agent add/update/delete, queue_view).
+- Add an optional "Domain" `<Select>` at the top of the page for super/org admins, populated from `distinct domain_uuid/domain_name` in `pbx_domains` for the org. Default = "All domains".
+- Default date range: last 7 days (set `fromDate`/`toDate` on first mount instead of blank).
+- Wire the existing FR/EN dropdown to persist per-user (already stored in `localStorage`) and pass `target_language` to `ai-transcribe-call` on Retranscribe.
 
-**Frontend:**
-- Add a dismissible admin-only notice at the top of the Call Center → Queues page when the last add attempt returned the permission error, listing the exact Group Manager permissions Keeny must add (tier + agent CRUD, queue_view, gateway_view/all, command_add/edit).
+## Part 3 — Cross-platform realtime sync of transcripts
 
-## Issue 4 — Org Isolation + Post-Login Redirect
+Reuse the existing `useLemtelAiRealtime(LEMTEL_ORG_ID, reloadCurrentPage)` hook (already imported on this page) — it already subscribes to `pbx_call_transcripts` + `pbx_ai_insights` + `pbx_call_records` + `pbx_call_recordings` filtered by `organization_id` and invalidates queries. On transcript INSERT/UPDATE, refresh the affected row's meta in-place (call `hydrateMeta(r)` instead of a full page reload) to avoid flicker.
 
-**4a — Isolation:**
-- Audit admin pages (calls, recordings, extensions, softphone users, transcripts) — ensure every Supabase query filters `organization_id = <lemtel org>`.
-- Verify RLS on `pbx_call_records`, `pbx_call_recordings`, `pbx_extensions_directory`, `pbx_softphone_users`, `pbx_call_transcripts`; add org-scoped policies where missing (migration).
-- Add guard in `fusionpbx-proxy`: if the Lemtel API key is used and body `organization_id` ≠ Lemtel org, reject with 403.
-- Route guard: mismatched `organization_id` → redirect to own dashboard + "Accès refusé" toast.
+Confirm the same hook (or its equivalent) is wired in:
+- Desktop: `apps/ava-softphone-desktop/src/lib/useRealtimeRefresh.ts` — add a subscription for `pbx_call_transcripts` on the recordings screen if missing.
+- Mobile: `apps/ava-softphone-mobile` recordings screen — verify the `pbx_call_transcripts` channel exists (it does via `useNotificationCounts` / recordings screen).
 
-**4b — Post-login redirect:**
-- In the auth callback / session hydration, resolve role from `user_roles` / `pbx_softphone_users`.
-  - super_admin / org_admin → `/dashboard`
-  - domain_admin → `/dashboard?domain=<domain_uuid>`
-  - end-user → `/my`
-- Perform redirect before rendering protected content (loading gate).
-- If deep-link target belongs to a different org, override to user's own dashboard.
+All three platforms already read/write the same `pbx_call_transcripts` table — no schema change.
 
-## Constraints Respected
+## Part 4 — "Sync from PBX" all domains
 
-- No changes to iOS Swift plugins, CallKitManager, storyboard, or Xcode project.
-- Recording/transcription/voicemail pipeline untouched.
-- Fixes apply across all Lemtel domains, not just primary.
+`syncFromPbx()` already calls `fusionpbx-proxy` with `action: 'backfill-cdrs'` scoped to `LEMTEL_ORG_ID`. Verify in `supabase/functions/fusionpbx-proxy/index.ts` that `backfill-cdrs` iterates every domain under the org (not just the first). If it doesn't, extend it to loop over `pbx_domains` rows for the org and aggregate the counts. Return `{ inserted, updated, domains_processed }` and toast the total.
 
-## Deliverables Report
+## Out of scope for this fix
 
-- List of Supabase tables + RLS policies modified.
-- List of edge function actions patched.
-- List of frontend routes/components changed.
+The bilingual `transcript_text_fr` / `transcript_text_en` split, per-field translation buttons, and a mobile-identical card redesign are large additive features. Not blocking the reported error and would double the size of this change. Happy to plan them as a follow-up once the page loads again — confirm if you want them bundled in.
+
+## Files to change
+
+- `src/pages/lemtel/admin/AdminRecordings.tsx` — column rename + domain filter + default date range + in-place row hydration on realtime events.
+- `supabase/functions/fusionpbx-proxy/index.ts` — verify/extend `backfill-cdrs` to cover every Lemtel domain (only if it currently doesn't).
+
+### Technical notes
+
+- Column mapping confirmed via `information_schema`: `pbx_call_records` has `ai_summary`, `sentiment`, `transcribed`, `analyzed`, `recording_id`, `destination`, `has_recording` — but no `summary`.
+- Every other query in the codebase (`ava-assistant`, `mobile-recordings`, `TelephonyMediaCenter`, `my-ai-assistant`, `useMyDashboardStats`, `ai-transcribe-call`) already uses `ai_summary`. AdminRecordings is the only offender.
