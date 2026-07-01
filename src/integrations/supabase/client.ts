@@ -69,5 +69,12 @@ function isUnauthorizedFunctionError(error: unknown) {
       result = await invokeWithToken(refreshed.session.access_token);
     }
   }
+  if (isUnauthorizedFunctionError(result.error)) {
+    console.warn(`[supabase] ${String(functionName)} still returned 401 after token refresh`);
+    return {
+      data: { error: 'AUTH_REQUIRED', message: 'Please sign in again before calling the PBX service.' },
+      error: null,
+    } as Awaited<ReturnType<typeof supabase.functions.invoke>>;
+  }
   return result;
 };
