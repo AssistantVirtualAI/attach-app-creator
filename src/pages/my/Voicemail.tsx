@@ -20,8 +20,48 @@ export default function MyVoicemail() {
   const [selected, setSelected] = useState<Voicemail | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
+  const [syncing, setSyncing] = useState(false);
+  const qc = useQueryClient();
 
   const t = (en: string, fr: string) => (lang === "fr" ? fr : en);
+
+  const runSync = async (silent = false) => {
+    setSyncing(true);
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) return;
+      const { data: spu } = await (supabase as any)
+        .from("pbx_softphone_users")
+        .select("organization_id, extension")
+        .eq("portal_user_id", auth.user.id)
+        .maybeSingle();
+      if (!spu?.organization_id) {
+        if (!silent) toast.error(t("No extension linked to your account.", "Aucune extension liée à votre compte."));
+        return;
+      }
+      await Promise.allSettled([
+        supabase.functions.invoke("voicemail-sync", {
+          body: { organization_id: spu.organization_id, extension: spu.extension },
+        }),
+        supabase.functions.invoke("fusionpbx-proxy", {
+          body: { action: "sync-cdrs", organization_id: spu.organization_id },
+        }),
+      ]);
+      await qc.invalidateQueries({ queryKey: ["my-voicemails"] });
+      if (!silent) toast.success(t("Synced from PBX", "Synchronisé depuis le PBX"));
+    } catch (e: any) {
+      if (!silent) toast.error(e?.message ?? "sync_error");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  // Auto-sync when page opens so users always see fresh data from the PBX.
+  useEffect(() => {
+    runSync(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
 
   const handlePlay = async (vm: Voicemail) => {
     setSelected(vm);
