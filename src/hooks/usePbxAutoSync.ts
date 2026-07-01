@@ -33,12 +33,13 @@ const ACTION_MAP: Record<SyncKey, { action: string | null; invalidate: (string |
 };
 
 async function runSync(key: SyncKey, orgId: string) {
+  const { action } = ACTION_MAP[key];
+  if (!action) return null;
   const cacheKey = `${orgId}:${key}`;
   const now = Date.now();
   // Debounce: don't re-hit the proxy for the same (org, action) within 20s.
   if (LAST_RUN[cacheKey] && now - LAST_RUN[cacheKey] < 20_000) return null;
   if (IN_FLIGHT[cacheKey]) return IN_FLIGHT[cacheKey];
-  const { action } = ACTION_MAP[key];
   const p = supabase.functions.invoke('fusionpbx-proxy', {
     body: { action, organization_id: orgId },
   }).then((res) => {
