@@ -15,3 +15,59 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     autoRefreshToken: true,
   }
 });
+
+const protectedEdgeFunctions = new Set(['fusionpbx-proxy', 'pbx-write', 'extension-manage']);
+const originalInvoke = supabase.functions.invoke.bind(supabase.functions);
+
+function isUnauthorizedFunctionError(error: unknown) {
+  const err = error as { message?: string; context?: { status?: number } } | null;
+  return err?.context?.status === 401 || /\b401\b|unauthorized/i.test(err?.message || '');
+}
+
+/**
+ * Harden protected Edge Function calls against auth hydration / stale JWT races.
+ *
+ * Supabase normally injects the current access token automatically, but the
+ * Lemtel PBX pages poll and auto-sync immediately after route changes. In the
+ * desktop/mobile webviews this can happen while auth storage is still hydrating,
+ * or with an access token that is seconds from expiry. The PBX proxy correctly
+ * returns 401 in that case, but the app should refresh/retry instead of letting
+ * that response bubble into the global runtime overlay / blank screen.
+ */
+(supabase.functions.invoke as typeof supabase.functions.invoke) = async (functionName, options) => {
+  if (!protectedEdgeFunctions.has(String(functionName))) {
+    return originalInvoke(functionName, options as never);
+  }
+
+  const invokeWithToken = async (accessToken?: string) => originalInvoke(functionName, {
+    ...(options as Record<string, unknown> | undefined),
+    headers: {
+      ...((options as { headers?: Record<string, string> } | undefined)?.headers || {}),
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
+  } as never);
+
+  let { data: { session } } = await supabase.auth.getSession();
+  const nowSec = Math.floor(Date.now() / 1000);
+  if (!session || (session.expires_at && session.expires_at - nowSec < 60)) {
+    const { data: refreshed } = await supabase.auth.refreshSession();
+    session = refreshed?.session ?? session;
+  }
+
+  if (!session?.access_token) {
+    console.warn(`[supabase] Skipped ${String(functionName)}: no authenticated session yet`);
+    return {
+      data: { error: 'AUTH_REQUIRED', message: 'Please sign in again before calling the PBX service.' },
+      error: null,
+    } as Awaited<ReturnType<typeof supabase.functions.invoke>>;
+  }
+
+  let result = await invokeWithToken(session.access_token);
+  if (isUnauthorizedFunctionError(result.error)) {
+    const { data: refreshed } = await supabase.auth.refreshSession();
+    if (refreshed?.session?.access_token) {
+      result = await invokeWithToken(refreshed.session.access_token);
+    }
+  }
+  return result;
+};
