@@ -198,8 +198,9 @@ const METRIC_TONE_KEY: Record<MetricKey, keyof typeof tones> = {
 export default function HomeDashboard({
   displayName, extension, onQuickDial,
 }: { displayName: string; extension: string; onQuickDial: () => void }) {
+  const { t } = useTranslation();
   const hour = new Date().getHours();
-  const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  const greeting = hour < 12 ? t('home.morning') : hour < 18 ? t('home.afternoon') : t('home.evening');
   const { orgId, orgName, extension: tenantExt } = useTenant();
 
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
