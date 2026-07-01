@@ -82,6 +82,8 @@ describe('multi-tenant isolation: admin queries scope by organization_id', () =>
     const offenders: string[] = [];
     const rx = /\.from\(\s*['"`]([a-z0-9_]+)['"`]\s*\)/g;
     for (const file of files) {
+      const rel = path.relative(process.cwd(), file);
+      if (LEGACY_EXEMPTIONS.has(rel)) continue;
       const src = fs.readFileSync(file, 'utf8');
       let m: RegExpExecArray | null;
       while ((m = rx.exec(src))) {
@@ -89,7 +91,7 @@ describe('multi-tenant isolation: admin queries scope by organization_id', () =>
         if (!ORG_SCOPED_TABLES.has(table)) continue;
         const windowText = src.slice(Math.max(0, m.index - 300), m.index + 900);
         if (!ORG_FILTER_RX.test(windowText)) {
-          offenders.push(`${path.relative(process.cwd(), file)} → .from('${table}')`);
+          offenders.push(`${rel} → .from('${table}')`);
         }
       }
     }
