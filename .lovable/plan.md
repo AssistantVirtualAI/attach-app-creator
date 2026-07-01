@@ -1,101 +1,63 @@
-# Desktop App: Bug fixes + UI changes (Keeny)
 
-Scope: `apps/ava-softphone-desktop/` only. No changes to mobile app, portal, or native iOS files.
+## Goal
 
----
+From the Extensions admin table, allow super_admin / lemtel_admin / org_admin to:
+1. **Reset an extension's password** — generates a new unified password, pushes it to FusionPBX + `pbx_softphone_users` + Supabase Auth, shows it once.
+2. **Link an existing email** to an extension so that user can sign into the portal/softphone with that email + SIP password.
+3. **Send a welcome email** so the user can set their own password (magic-recovery link).
+4. Works for **any organization / domain**, not just Lemtel.
 
-## Bug 1 — Dashboard doesn't refresh
+## Changes
 
-**File:** `apps/ava-softphone-desktop/src/components/console/HomeDashboard.tsx` + `src/hooks/useDashboardStats.ts`
+### 1. New Edge Function: `extension-welcome-send`
+`supabase/functions/extension-welcome-send/index.ts`
 
-- Expose a `refetch` callback from `useDashboardStats` (currently only auto-runs on args change).
-- In `HomeDashboard`, add:
-  - `window.addEventListener('focus', refetch)`
-  - `setInterval(refetch, 60_000)`
-  - `window.addEventListener('ava:callEnded', refetch)`
-  - `document.addEventListener('visibilitychange', () => !document.hidden && refetch())`
-  - `window.addEventListener('lemtel:sync', refetch)` (already-broadcasted realtime event from `useRealtimeSync`)
-- Verify existing realtime subscription in `useRealtimeSync.ts` chains all `.on()` before `.subscribe()` (confirmed correct) — no change needed there.
-- Add try/catch + auto-reconnect log around the subscribe status handler (already has backoff — just add a `console.info` when reconnected for debug).
+Input: `{ organization_id, extension, email?, mode: 'welcome' | 'reset-only' | 'link-only' }`
 
-## Bug 2 — Dashboard stays English on FR switch
+Flow:
+- RBAC: super_admin OR lemtel_admin OR org_admin of `organization_id`.
+- Locate `pbx_softphone_users` row for `(org, extension)`; create/refresh if missing via existing provisioning helper.
+- If `email` provided:
+  - Look up `auth.users` by email; create user if missing (`admin.createUser` with a random password, `email_confirm: true`).
+  - Link `pbx_softphone_users.portal_user_id` to that auth user (uses existing `admin_link_softphone_by_extension_email` RPC).
+- Call `set-unified-password` internally with `use_current_sip_password: true` so Auth password === SIP password.
+- If `mode === 'welcome'`, generate a Supabase recovery link (`admin.generateLink({ type: 'recovery' })`) and enqueue an email through the existing Lovable auth-email hook (or via `send-transactional-email` if scaffolded) with:
+  - extension number, SIP domain, temporary SIP password, "Set your password" button pointing at `/reset-password`.
+- Audit into `pbx_softphone_portal_audit` + `audit_logs`.
 
-**Files:** `HomeDashboard.tsx`, `src/lib/i18n.ts`
+### 2. UI: extensions table row actions
+`src/pages/lemtel/LemtelExtensions.tsx` + `src/components/lemtel/ExtensionEditDialog.tsx`
 
-- Replace hardcoded strings in `HomeDashboard`: greeting ("Good morning/afternoon/evening"), "Command Center", range labels ("Today / 7 days / 30 days / Custom"), tile titles/hints in `METRIC_TITLES`, "Live Phone-System Brief", "Ext {n} · Live CDR…", "Loading the live PBX picture…", "call/calls answered/missed/recording", "Range", "no activity", "trend unavailable", "Could not load · click to retry", etc.
-- Add matching keys to both `en` and `fr` in `src/lib/i18n.ts` under a `home.*` namespace.
-- Wrap the component body with `useTranslation()` so it re-renders when language changes (the hook subscribes to a lang state — verify; if not, add a lightweight event listener on a `lemtel:lang-changed` custom event dispatched by the switcher).
-- Language already persists in localStorage under `lemtel:lang` — keep.
+- Add a "…" actions menu per row:
+  - **Reset password** → confirmation, then calls `softphone-reset-password` + surfaces the new password in a copy-once dialog.
+  - **Link email…** → small dialog (email input) → invokes `extension-welcome-send` with `mode: 'link-only'` (or reuses `admin_link_softphone_by_extension_email` when the auth user already exists).
+  - **Send welcome email** → calls `extension-welcome-send` with `mode: 'welcome'`; toast confirms.
+- Show current linked email + status badge in the row (already partially there through `softphoneByExt`).
 
-## Bug 3 — App flickers when clicking a call detail
+### 3. Generic (multi-org) admin extensions page
+`src/pages/admin/AllExtensions.tsx` (new) mounted at `/admin/extensions` behind super_admin / lemtel_admin.
 
-**File:** `src/components/console/CallsView.tsx`
+- Same table + row actions as above, but with an **Organization / Domain** selector fed by `get_org_pbx_mapping()` (already exists).
+- Reuses the same hooks, parameterised by `organization_id` (extend `usePbxExtensions` / `usePbxSoftphoneUsers` to accept an override org id; today they're pinned to `LEMTEL_ORG`).
+- Add sidebar entry "All PBX Extensions" for super/lemtel admins.
 
-Root cause: `load()` at line 83 replaces `sel` with a new object reference on every 20s poll + realtime tick, which re-triggers `useEffect([sel])` (line 132) that clears/refetches AI insight, and the audio effect (line 136) that revokes/rebuilds the blob URL → flicker.
+### 4. Small hook refactor
+`src/hooks/usePbxData.ts` — accept optional `orgId` argument; default remains `LEMTEL_ORG` so existing Lemtel screens are unchanged.
 
-Fix:
-- Guard the insight effect with `useRef<string | null>(prevSelIdRef)`; only refetch when `sel?.id` actually changes:
-  ```ts
-  useEffect(() => {
-    if (!sel) { setInsight(null); return; }
-    if (prevSelIdRef.current === sel.id) return;
-    prevSelIdRef.current = sel.id;
-    ava.callDetail(sel.id).then(setInsight).catch(...);
-  }, [sel?.id]);
-  ```
-- Apply the same id-guard to the audio-load effect so the blob isn't rebuilt when the underlying row is merely refreshed.
-- In `load()` (line 83), keep the *existing* `sel` object reference when the id matches instead of swapping in the new row:
-  ```ts
-  setSel((current) => current ? (scopedCalls.find(c => c.id === current.id) ?? current) : current);
-  ```
-  → change to only replace if a meaningful field changed, or drop the swap entirely (detail panel keeps its cached copy until closed).
-- Add a `retryLimit` (max 2) to audio-load failure retries.
+### 5. Email template
+Reuse existing Lovable auth email hook if scaffolded; otherwise scaffold the transactional template `extension-welcome` (subject: "Your Lemtel/AVA extension is ready" — bilingual FR/EN body with extension, domain, temp password, "Choose your password" CTA).
 
-## Change 1 — Physical keyboard numpad for dialing
+## Out of scope
+- Bulk send-to-all buttons (can add later once single-row flow is validated).
+- Changing FusionPBX v_users passwords (only extension SIP password is rotated — v_users login stays managed via existing tools).
 
-**File:** `src/components/DialerKeypad.tsx` (+ consumers)
-
-- Add a `useEffect` inside `DialerKeypad` that listens to `keydown` on `window` while the keypad is mounted/visible:
-  - `0-9`, `*`, `#`, `+` → simulate the key press (visual highlight + call `onKey(digit)`).
-  - `Backspace` → dispatch a new `onBackspace` prop.
-  - `Enter` → dispatch `onDial` if number length > 0.
-  - `e.preventDefault()` only when the event target is not an `<input>/<textarea>/[contenteditable]` and the dialer view is active.
-- Visual feedback: set a transient `data-pressed` attribute on the matching button ref for ~120ms.
-- Wire the new `onBackspace` / `onDial` callbacks through `SoftphonePane` and the console dialer view. Also apply to any floating mini-dialpad if present.
-
-## Change 2 — Minimize / Maximize / Close buttons
-
-**File:** `src/components/TitleBar.tsx`
-
-- IPC bridge already exists in `electron/preload.ts` (`window.electronAPI.minimize/maximize/close`).
-- Add three buttons on the right side of TitleBar (before `ProfileMenu`), styled to match dark theme:
-  - `—` minimize, `⬜/❐` maximize/restore, `✕` close (close = red hover).
-  - Wrap them in a container with `WebkitAppRegion: 'no-drag'`.
-  - Platform detection: `window.electronAPI?.platform === 'darwin'` → hide (macOS uses native traffic lights already spaced by the 70px left spacer).
-  - If `!window.electronAPI` (web/dev browser) → don't render.
-- Track maximized state via `window.electronAPI.onWindowStateChange` (add a new IPC event in `electron/main.ts` that emits on `maximize`/`unmaximize` so the icon flips). Update `preload.ts` to expose `onWindowStateChange`.
-
-## Change 3 — Rename nav items
-
-**Files:** `src/lib/i18n.ts`
-
-- `nav.dialer`: EN "Dialer" → "Phone", FR "Composeur/Clavier" → "Téléphone"
-- `nav.calls`: EN "Calls" → "Call History", FR "Appels" → "Historique d'appels"
-- `nav.messages`: keep "Messages" EN → "SMS"; FR → "SMS"
-- No icon or route changes.
-
-## Change 4 — Remove Call Queue and Telecom from desktop nav
-
-**Files:** `src/components/console/LeftRail.tsx`, `src/components/console/ConsoleLayout.tsx`
-
-- Remove `'queues'` and `'telecom'` from the `USER_ITEMS` array in `LeftRail.tsx`.
-- In `ConsoleLayout.tsx`, if a stored/legacy `view === 'queues' | 'telecom'` is loaded, redirect to `'home'`.
-- Leave the view components (`QueuesView.tsx`, `TelecomSettingsView.tsx`) in the codebase (still referenced by admin flows / mobile / portal) — only the sidebar entries are removed.
-
----
-
-## Technical notes
-
-- Language switcher already dispatches state via `useTranslation` hook; if the hook uses module-level state, add a `window.dispatchEvent(new Event('lemtel:lang-changed'))` on set and subscribe in `HomeDashboard` (verify by reading full `i18n.ts` before editing).
-- Files touched (final list): `HomeDashboard.tsx`, `useDashboardStats.ts`, `CallsView.tsx`, `DialerKeypad.tsx`, `SoftphonePane.tsx`, `TitleBar.tsx`, `electron/main.ts`, `electron/preload.ts`, `LeftRail.tsx`, `ConsoleLayout.tsx`, `i18n.ts`.
-- No changes to `apps/ava-softphone-mobile/**`, native iOS Swift, or portal pages.
+## Files touched
+- `supabase/functions/extension-welcome-send/index.ts` (new)
+- `supabase/functions/_shared/email-templates/extension-welcome.tsx` (new, if auth-email-hook is scaffolded)
+- `src/pages/lemtel/LemtelExtensions.tsx`
+- `src/components/lemtel/ExtensionEditDialog.tsx`
+- `src/components/lemtel/ExtensionActionsMenu.tsx` (new)
+- `src/pages/admin/AllExtensions.tsx` (new)
+- `src/hooks/usePbxData.ts`
+- `src/components/sidebar/sidebarConfig.ts` (add "All PBX Extensions")
+- Route registration in `src/App.tsx` / router file
