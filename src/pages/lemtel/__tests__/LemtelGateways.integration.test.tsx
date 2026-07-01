@@ -17,8 +17,8 @@ const fromMock = vi.fn(() => ({
 
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
-    functions: { invoke: (...args: unknown[]) => invokeMock(...args) },
-    from: (...args: unknown[]) => fromMock(...args),
+    functions: { invoke: (fn: string, opts: any) => invokeMock(fn, opts) },
+    from: (name: string) => fromMock(name),
   },
 }));
 
