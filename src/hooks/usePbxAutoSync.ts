@@ -21,11 +21,15 @@ type SyncKey = 'cdrs' | 'voicemails' | 'sms' | 'recordings';
 const IN_FLIGHT: Record<string, Promise<unknown> | undefined> = {};
 const LAST_RUN: Record<string, number> = {};
 
-const ACTION_MAP: Record<SyncKey, { action: string; invalidate: (string | undefined)[][] }> = {
-  cdrs:        { action: 'sync-cdrs',       invalidate: [['pbx', 'pbx_call_records']] },
-  recordings:  { action: 'sync-recordings', invalidate: [['pbx', 'pbx_call_records'], ['pbx', 'pbx_call_recordings']] },
-  voicemails:  { action: 'voicemail-sync',  invalidate: [['pbx', 'pbx_voicemails'], ['my', 'voicemails']] },
-  sms:         { action: 'sync-sms',        invalidate: [['pbx', 'pbx_sms_threads'], ['pbx', 'pbx_sms_messages']] },
+// Recordings are pulled implicitly by sync-cdrs (has_recording flag), so we
+// reuse that action. SMS threads are populated by the telnyx-sms edge function
+// via inbound webhooks, so there's no proxy action — invalidating the query is
+// enough to force a re-read of any newly inserted rows.
+const ACTION_MAP: Record<SyncKey, { action: string | null; invalidate: (string | undefined)[][] }> = {
+  cdrs:        { action: 'sync-cdrs',                invalidate: [['pbx', 'pbx_call_records']] },
+  recordings:  { action: 'sync-cdrs',                invalidate: [['pbx', 'pbx_call_records'], ['pbx', 'pbx_call_recordings']] },
+  voicemails:  { action: 'sync-voicemail-messages',  invalidate: [['pbx', 'pbx_voicemails'], ['my', 'voicemails']] },
+  sms:         { action: null,                       invalidate: [['pbx', 'pbx_sms_threads'], ['pbx', 'pbx_sms_messages']] },
 };
 
 async function runSync(key: SyncKey, orgId: string) {
