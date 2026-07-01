@@ -4,12 +4,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Voicemail as VmIcon, Play, Sparkles, FileText, Trash2, CheckCircle2, Inbox, PhoneCall } from "lucide-react";
+import { Voicemail as VmIcon, Play, Sparkles, FileText, Trash2, CheckCircle2, Inbox, PhoneCall, RefreshCw } from "lucide-react";
 import { useMyVoicemails, type Voicemail } from "@/hooks/useMyVoicemail";
 import { useLanguage } from "@/context/LanguageContext";
 import { toast } from "sonner";
 import GreetingEditor from "@/components/voicemail/GreetingEditor";
 import { format } from "date-fns";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function MyVoicemail() {
   const { language } = useLanguage();
