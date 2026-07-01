@@ -1,74 +1,57 @@
-# Lemtel Portal — 9 Critical Fixes (5-Phase Plan)
+# Lemtel Portal — 4 Critical Fixes
 
-Scope: Lemtel org only. Do NOT touch `apps/ava-softphone-mobile/ios/App/App/Plugins/CapacitorSip/*`, `CallKitManager.swift`, `Main.storyboard`, or `project.pbxproj`. Reuse existing patterns (`fusionpbx-proxy`, `ai-transcribe-call`, mobile `recMeta()` org_id fallback).
+## Issue 1 — Gateways: System-Level Fetch
 
----
+**File:** `supabase/functions/fusionpbx-proxy/index.ts`
 
-## Phase 1 — Security & Isolation Foundation (Issue 8 + RLS for 2/9)
+- Locate the `get-gateways` (or equivalent) action.
+- Remove any `domain_uuid` filter from the `/api/v1/gateways` call — query at system scope.
+- On `403 Forbidden`, attempt `fs_cli -x 'sofia status gateway'` as read-only fallback via existing PHP session pattern.
+- If both fail, return the permission-fix message (already surfaced) but keep partial `fs_cli` data if available.
+- Frontend Gateways page: display all rows regardless of domain, show domain name column when present.
 
-Must come first; every later phase depends on correct scoping.
+## Issue 2 — Remove Duplicate "Phone Numbers" Page (Lemtel only)
 
-- **Post-login routing**: in the auth redirect resolver (likely `Auth.tsx` / `AuthenticatedShell` for Lemtel), force any user with `org_admin` / `domain_admin` role to `/lemtel/dashboard`; end-users to `/my`. Drop "last visited" memory for Lemtel admins.
-- **Route guards** (`LemtelGuard.tsx` + a new `MyOnlyGuard`):
-  - org admin → all `/lemtel/*` for their `organization_id` only
-  - domain admin → `/lemtel/*` filtered to their `domain_uuid` (sidebar + page-level)
-  - end-user → only `/my/*`; any other path → redirect `/my`
-- **RLS audit + migration** on: `pbx_call_recordings`, `pbx_call_transcripts`, `pbx_voicemails`, `pbx_voicemail_settings`, `pbx_call_queues`, `pbx_queue_agents`, `pbx_extensions`, `pbx_domain_users`, `pbx_domains`. Add `domain_uuid` predicates (not just `organization_id`). Use a `has_domain_access(_user, _domain_uuid)` SECURITY DEFINER helper to avoid recursion.
-- **Edge-function authorization**: every Lemtel-facing function (`fusionpbx-proxy`, `mobile-recordings`, `ai-transcribe-call`, `voicemail-sync`, etc.) must verify `domain_uuid` belongs to caller's allowed set before returning data.
-- Manual test matrix: org admin, single-domain admin, end-user → confirm UI + direct API both deny cross-tenant access.
+- Remove the "Phone Numbers" nav entry from the Lemtel sidebar component.
+- Redirect the `/phone-numbers` route (Lemtel scope) → `/inbound-routes` via `<Navigate replace>`.
+- Grep for internal links pointing to the removed route and repoint them to Inbound Routes.
+- Guard the change to Lemtel org only; other orgs untouched.
 
----
+## Issue 3 — Queue Member Add: fs_cli Fallback + Admin Notice
 
-## Phase 2 — Recordings, Transcripts & Cross-Platform Sync (Issues 2, 9, 4)
+**File:** `supabase/functions/fusionpbx-proxy/index.ts`
 
-- **Issue 2 — "missing UUID" on portal Recordings**: align portal `Recordings` page (`src/pages/my/Recordings.tsx` + Lemtel admin recordings view) to the mobile resolution chain `creds?.domainUuid || creds?.fusionpbxDomainUuid || fallbackDomainUuid`. Pull domain_uuid from session/`OrganizationContext` and pass it into the `fusionpbx-proxy` / `mobile-recordings` calls.
-- **Issue 9 — portal transcription errors**: portal's "Transcrire" call to `ai-transcribe-call` must include `{ call_record_id, organization_id, xml_cdr_uuid }` exactly like the mobile fix. Add the same fallback chain (`pbx_softphone_users` → `org_members` → hardcoded org).
-- **Issue 4 — language follows UI**:
-  - Schema migration: add `transcript_text_fr`, `transcript_text_en`, `coaching_summary_fr`, `coaching_summary_en` on `pbx_call_transcripts` (keep `transcript_text` as canonical).
-  - `ai-transcribe-call` accepts `target_language`; generates canonical + translates on first request; caches in the language-specific columns.
-  - All three UIs (portal `Recordings`, Lemtel admin call detail, mobile `RecordingsScreen.tsx`) resolve display via `i18n.language` and request translation if missing (then cache).
-- **Realtime**: standardize a `useRecordingsRealtime(domainUuid)` hook used by portal + desktop + mobile, subscribing to `pbx_call_recordings` and `pbx_call_transcripts` filtered by `domain_uuid`. Mirror mobile's `ava:callEnded` + 30s poll + focus refresh on portal/desktop.
-- Verify identical query shape across the 3 clients (same select columns, same join to `pbx_extensions`).
+- In `add-queue-member` handler: on 403 with `call_center_tier_add`, fall back to:
+  `fs_cli -x "callcenter_config queue tier add <queue> <agent> <level> <position>"`
+- Parse fs_cli output; return success or a precise permission error message listing all missing ACLs (tier + agent add/update/delete, queue_view).
 
----
+**Frontend:**
+- Add a dismissible admin-only notice at the top of the Call Center → Queues page when the last add attempt returned the permission error, listing the exact Group Manager permissions Keeny must add (tier + agent CRUD, queue_view, gateway_view/all, command_add/edit).
 
-## Phase 3 — User & Voicemail Provisioning (Issues 1, 6)
+## Issue 4 — Org Isolation + Post-Login Redirect
 
-- **Issue 1 — Sync FusionPBX user emails**:
-  - Extend `fusionpbx-proxy` with action `list_domain_users` returning `{ extension, email, username, user_uuid }` per `domain_uuid` (only domains the caller administers).
-  - New admin UI tab in `LemtelPbxUsers.tsx` (or domain detail): table of users + per-row "Sync & Assign" button.
-  - Button calls the **existing** end-user provisioning mutation (the same one triggered when a user self-enters extension+domain+SIP password) — just feed it the email pulled from FusionPBX and an admin-side flag. Same write target (`pbx_softphone_users`), no parallel schema.
-- **Issue 6 — `/my` voicemail + ElevenLabs greeting**:
-  - Wire `src/pages/my/Voicemail.tsx` to `user-voicemail` (list/play) scoped to caller's extension via RLS.
-  - Greeting generator section: text → `elevenlabs-generate-greeting` (or `voicemail-greeting-tts`) → preview → "Set as my greeting" calls `user-voicemail-greeting` which uploads/overwrites via `fusionpbx-proxy` (voicemail greeting API) for that extension only.
-  - Server-side guard: extension must match the caller (no write to other users' greetings).
+**4a — Isolation:**
+- Audit admin pages (calls, recordings, extensions, softphone users, transcripts) — ensure every Supabase query filters `organization_id = <lemtel org>`.
+- Verify RLS on `pbx_call_records`, `pbx_call_recordings`, `pbx_extensions_directory`, `pbx_softphone_users`, `pbx_call_transcripts`; add org-scoped policies where missing (migration).
+- Add guard in `fusionpbx-proxy`: if the Lemtel API key is used and body `organization_id` ≠ Lemtel org, reject with 403.
+- Route guard: mismatched `organization_id` → redirect to own dashboard + "Accès refusé" toast.
 
----
+**4b — Post-login redirect:**
+- In the auth callback / session hydration, resolve role from `user_roles` / `pbx_softphone_users`.
+  - super_admin / org_admin → `/dashboard`
+  - domain_admin → `/dashboard?domain=<domain_uuid>`
+  - end-user → `/my`
+- Perform redirect before rendering protected content (loading gate).
+- If deep-link target belongs to a different org, override to user's own dashboard.
 
-## Phase 4 — Removals & Cleanup (Issues 3, 5)
+## Constraints Respected
 
-- **Issue 3 — Remove softphone from portal**: delete portal-only softphone/dialer/WebRTC components (`LemtelSoftphoneUsers.tsx` keep; remove the embedded dialer/WebRTC widget if any in portal), routes, nav entries, and portal-only edge calls. Touch **nothing** under `apps/ava-softphone-mobile/`. Inventory pass first; list files in PR description.
-- **Issue 5 — Remove "Phone Numbers" page**:
-  - Diff `src/pages/PhoneNumbers.tsx` features vs Domain → Destinations (`LemtelDIDs.tsx` / domain detail Destinations tab). Port any missing piece (DID assignment, routing) into Destinations.
-  - Remove the route, nav item, and redirect old `/phone-numbers` URLs to `/lemtel/domains/:id/destinations`.
+- No changes to iOS Swift plugins, CallKitManager, storyboard, or Xcode project.
+- Recording/transcription/voicemail pipeline untouched.
+- Fixes apply across all Lemtel domains, not just primary.
 
----
+## Deliverables Report
 
-## Phase 5 — Queue Membership Fix & QA (Issue 7)
-
-- **Issue 7 — Add members to queue errors**:
-  - Inspect `fusionpbx-proxy` queue-related actions for the same kind of regression as the CDR `extension` column strip; verify `domain_uuid`, `queue_uuid`, extension format (`100@domain.tld` vs bare `100`).
-  - Fix payload, surface explicit error toast on partial failure (no silent catch).
-  - Test on ≥2 Lemtel domains.
-- **Cross-cutting QA**: run the 3-role × 2-domain matrix, confirm no leakage, recordings/transcripts/voicemails appear live on portal+desktop+mobile, language toggle flips transcripts, queue add works on all domains.
-- **Deliverable note** in PR: list every Supabase table + RLS policy touched per issue.
-
----
-
-## Technical Notes
-
-- Reuse `has_role` / add `has_domain_access` SECURITY DEFINER helpers for RLS.
-- Translation cache columns avoid repeat Claude/Gemini calls; only translate on first request per language per call.
-- All edge functions: keep current `verify_jwt` config, add Zod validation of `domain_uuid` / `organization_id` inputs.
-- Realtime channels: one per domain (`recordings:${domain_uuid}`) to keep payloads scoped and RLS-aligned.
-- Migrations grouped per phase so each can ship/rollback independently.
+- List of Supabase tables + RLS policies modified.
+- List of edge function actions patched.
+- List of frontend routes/components changed.

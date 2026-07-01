@@ -830,7 +830,8 @@ const App = () => (
                 <Route path="/org/lemtel/admin/dashboard" element={<LemtelAdminPage><AdminDashboard /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/extensions" element={<LemtelAdminPage><LemtelExtensions /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/pbx-users" element={<LemtelAdminPage><LemtelPbxUsers /></LemtelAdminPage>} />
-                <Route path="/org/lemtel/admin/dids" element={<LemtelAdminPage><LemtelDIDs /></LemtelAdminPage>} />
+                {/* Phone Numbers page removed — duplicate of Inbound Routes/Destinations */}
+                <Route path="/org/lemtel/admin/dids" element={<Navigate to="/org/lemtel/admin/destinations" replace />} />
                 <Route path="/org/lemtel/admin/devices" element={<LemtelAdminPage><LemtelDevices /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/ivr" element={<LemtelAdminPage><LemtelIVR /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/queues" element={<LemtelAdminPage><LemtelQueues /></LemtelAdminPage>} />

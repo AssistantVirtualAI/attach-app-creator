@@ -77,6 +77,18 @@ export default function LemtelQueues() {
   const perms = usePerms();
   const selected = (queues as any[]).find((q) => q.id === selectedId) || null;
   const openAgents = (id: string) => { setSelectedId(id); setTab('agents'); };
+  const [permNoticeDismissed, setPermNoticeDismissed] = useState<boolean>(() => {
+    try { return localStorage.getItem('lemtel:queue-perm-notice-dismissed') === '1'; } catch { return false; }
+  });
+  const [permNoticeVisible, setPermNoticeVisible] = useState(false);
+  useEffect(() => {
+    const onErr = (e: any) => {
+      const msg = String(e?.detail?.message || '');
+      if (/call_center_tier_add|permission missing/i.test(msg)) setPermNoticeVisible(true);
+    };
+    window.addEventListener('lemtel:queue-perm-error', onErr as any);
+    return () => window.removeEventListener('lemtel:queue-perm-error', onErr as any);
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -93,6 +105,22 @@ export default function LemtelQueues() {
           {perms.canManage && <QueueDialog mode="create" trigger={<Button><Plus className="w-4 h-4 mr-2" /> {txt.create}</Button>} />}
         </div>
       </div>
+
+      {!permNoticeDismissed && permNoticeVisible && (perms.canManage || perms.canAssign) && (
+        <Alert variant="destructive">
+          <AlertTriangle className="w-4 h-4" />
+          <AlertTitle>FusionPBX permission missing: <code>call_center_tier_add</code></AlertTitle>
+          <AlertDescription className="space-y-2">
+            <p>The API user (<code>mhassoun</code>) cannot add queue members via REST. Ask the FusionPBX admin to open <b>Advanced → Group Manager</b> and add these permissions to the API user's group, then click <b>Refresh</b>:</p>
+            <ul className="text-xs list-disc pl-5">
+              <li><code>call_center_tier_add</code>, <code>call_center_tier_update</code>, <code>call_center_tier_delete</code></li>
+              <li><code>call_center_agent_add</code>, <code>call_center_agent_update</code>, <code>call_center_agent_delete</code>, <code>call_center_queue_view</code></li>
+              <li><code>gateway_view</code>, <code>gateway_all</code>, <code>command_add</code>, <code>command_edit</code> (for gateways &amp; fs_cli fallback)</li>
+            </ul>
+            <Button size="sm" variant="outline" onClick={() => { try { localStorage.setItem('lemtel:queue-perm-notice-dismissed', '1'); } catch {} setPermNoticeDismissed(true); }}>Dismiss</Button>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {!perms.canManage && (
         <Alert>
@@ -695,7 +723,13 @@ function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt
       } as any);
       toast({ title: `${role === 'supervisor' ? 'Supervisor' : 'Agent'} added` });
       load();
-    } catch (e: any) { toast({ title: 'Failed to add member', description: e.message, variant: 'destructive' }); }
+    } catch (e: any) {
+      const msg = e?.message || 'Failed';
+      if (/call_center_tier_add|permission missing/i.test(msg)) {
+        window.dispatchEvent(new CustomEvent('lemtel:queue-perm-error', { detail: { message: msg } }));
+      }
+      toast({ title: 'Failed to add member', description: msg, variant: 'destructive' });
+    }
   };
 
   const removeAgent = async (a: any) => {
