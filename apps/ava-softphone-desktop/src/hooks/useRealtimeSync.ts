@@ -130,11 +130,13 @@ export function useRealtimeSync(orgId: string | null) {
       ch.subscribe((status) => {
         if (cancelled) return;
         if (status === 'SUBSCRIBED') {
+          console.info('[realtime] SUBSCRIBED', { orgId, attempt });
           attempt = 0;
           setState((s) => ({ ...s, connected: true, attempt: 0, nextRetryAt: null, lastSyncAt: Date.now() }));
           broadcastStatus(true, null);
           pushLog({ status: 'success', source: 'realtime', reason: 'Realtime CDR stream connected' });
         } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          console.warn('[realtime] disconnect', status, '→ resubscribing');
           scheduleReconnect();
         }
       });
