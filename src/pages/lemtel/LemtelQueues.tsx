@@ -106,6 +106,22 @@ export default function LemtelQueues() {
         </div>
       </div>
 
+      {!permNoticeDismissed && permNoticeVisible && (perms.canManage || perms.canAssign) && (
+        <Alert variant="destructive">
+          <AlertTriangle className="w-4 h-4" />
+          <AlertTitle>FusionPBX permission missing: <code>call_center_tier_add</code></AlertTitle>
+          <AlertDescription className="space-y-2">
+            <p>The API user (<code>mhassoun</code>) cannot add queue members via REST. Ask the FusionPBX admin to open <b>Advanced → Group Manager</b> and add these permissions to the API user's group, then click <b>Refresh</b>:</p>
+            <ul className="text-xs list-disc pl-5">
+              <li><code>call_center_tier_add</code>, <code>call_center_tier_update</code>, <code>call_center_tier_delete</code></li>
+              <li><code>call_center_agent_add</code>, <code>call_center_agent_update</code>, <code>call_center_agent_delete</code>, <code>call_center_queue_view</code></li>
+              <li><code>gateway_view</code>, <code>gateway_all</code>, <code>command_add</code>, <code>command_edit</code> (for gateways &amp; fs_cli fallback)</li>
+            </ul>
+            <Button size="sm" variant="outline" onClick={() => { try { localStorage.setItem('lemtel:queue-perm-notice-dismissed', '1'); } catch {} setPermNoticeDismissed(true); }}>Dismiss</Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {!perms.canManage && (
         <Alert>
           <Lock className="w-4 h-4" />
