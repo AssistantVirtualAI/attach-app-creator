@@ -5,6 +5,8 @@ import { mobileApi, DashboardBrief, MeResponse } from '../lib/mobileApi';
 import { Card, Chip, StatusDot, SectionTitle, AIPanel, Skeleton, PrimaryButton, GhostButton } from '../components/ui/Primitives';
 import { LemtelMark, AvaBadge, HeroGradient } from '../components/Brand';
 import type { Tab } from '../components/BottomTabs';
+import StatsDashboard from '../components/StatsDashboard';
+
 
 interface Props { onNavigate: (t: Tab) => void; haptic: (s?: ImpactStyle) => Promise<void> }
 
