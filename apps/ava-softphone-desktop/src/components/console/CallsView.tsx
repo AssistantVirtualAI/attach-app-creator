@@ -129,9 +129,14 @@ export default function CallsView({ scope = 'mine' }: { scope?: 'mine' | 'org' }
     () => load(true),
   );
 
+  const prevSelIdRef = useRef<string | null>(null);
   useEffect(() => {
-    if (sel) { setInsight(null); ava.callDetail(sel.id).then(setInsight).catch(() => setInsight({ summary: 'No AI insight has been generated for this call yet.', topics: [], actionItems: [], qualityScore: 0 })); }
-  }, [sel]);
+    if (!sel) { prevSelIdRef.current = null; return; }
+    if (prevSelIdRef.current === sel.id) return; // guard: no reload when only object ref changed
+    prevSelIdRef.current = sel.id;
+    setInsight(null);
+    ava.callDetail(sel.id).then(setInsight).catch(() => setInsight({ summary: 'No AI insight has been generated for this call yet.', topics: [], actionItems: [], qualityScore: 0 }));
+  }, [sel?.id]);
 
   useEffect(() => {
     let cancelled = false;
