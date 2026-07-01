@@ -12,6 +12,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Network, RefreshCw, Search, Loader2, Power, Play, Square, Plus, Bug, Trash2, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
+import { FusionPbxPermissionsHelp } from '@/components/lemtel/FusionPbxPermissionsHelp';
 
 type Gateway = {
   gateway_uuid: string;
@@ -218,6 +219,8 @@ export default function LemtelGateways() {
           </Sheet>
         </div>
       </div>
+
+      <FusionPbxPermissionsHelp area="gateways" />
 
       <Card>
         <CardHeader>
