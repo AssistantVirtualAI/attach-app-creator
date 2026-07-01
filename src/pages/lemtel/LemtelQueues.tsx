@@ -77,6 +77,18 @@ export default function LemtelQueues() {
   const perms = usePerms();
   const selected = (queues as any[]).find((q) => q.id === selectedId) || null;
   const openAgents = (id: string) => { setSelectedId(id); setTab('agents'); };
+  const [permNoticeDismissed, setPermNoticeDismissed] = useState<boolean>(() => {
+    try { return localStorage.getItem('lemtel:queue-perm-notice-dismissed') === '1'; } catch { return false; }
+  });
+  const [permNoticeVisible, setPermNoticeVisible] = useState(false);
+  useEffect(() => {
+    const onErr = (e: any) => {
+      const msg = String(e?.detail?.message || '');
+      if (/call_center_tier_add|permission missing/i.test(msg)) setPermNoticeVisible(true);
+    };
+    window.addEventListener('lemtel:queue-perm-error', onErr as any);
+    return () => window.removeEventListener('lemtel:queue-perm-error', onErr as any);
+  }, []);
 
   return (
     <div className="space-y-6">
