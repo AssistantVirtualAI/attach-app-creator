@@ -10,8 +10,8 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // Mock the Supabase client BEFORE importing the page under test.
-const invokeMock = vi.fn();
-const fromMock = vi.fn(() => ({
+const invokeMock: any = vi.fn();
+const fromMock: any = vi.fn(() => ({
   select: () => ({ order: () => Promise.resolve({ data: [], error: null }) }),
 }));
 
