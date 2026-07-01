@@ -33,6 +33,8 @@ function today() { return new Date().toISOString().slice(0, 10); }
 function daysAgo(n: number) { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); }
 
 export default function LemtelPortalCalls({ scope = 'org' }: { scope?: 'org' | 'mine' }) {
+  // Live pull from FusionPBX on mount + polling; scoped end-users still get their extension filter.
+  usePbxAutoSync(['cdrs', 'recordings', 'voicemails']);
   const { toast } = useToast();
   const qc = useQueryClient();
   const [analyzing, setAnalyzing] = useState<string | null>(null);
