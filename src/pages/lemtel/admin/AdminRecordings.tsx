@@ -47,6 +47,8 @@ type RecMeta = {
 };
 
 export default function AdminRecordings({ scope = 'org' }: { scope?: 'org' | 'mine' }) {
+  // Pull latest recordings + CDRs from FusionPBX on mount so the grid is live.
+  usePbxAutoSync(['recordings', 'cdrs'], { orgId: LEMTEL_ORG_ID });
   const [rows, setRows] = useState<Rec[]>([]);
   const [q, setQ] = useState('');
   const [direction, setDirection] = useState<string>('all');
