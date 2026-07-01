@@ -230,11 +230,43 @@ export default function HomeDashboard({
   const stats = useDashboardStats(orgId, tenantExt || extension, range, customFrom, customTo);
   const { pbx, syncConnected, lastEvent, ageMs, healthy } = useSyncStatus();
   const freshnessAccent = stats.cdrFreshness === 'live' ? c.success : stats.cdrFreshness === 'stale' ? c.signalGold : c.mutedSilver;
-  const rangeLabel = range === 'today' ? 'Today' : range === 'week' ? 'Last 7 days' : range === 'month' ? 'Last 30 days' : `${customFrom} → ${customTo}`;
+  const rangeLabel = range === 'today' ? t('home.rangeTodayLong') : range === 'week' ? t('home.rangeWeekLong') : range === 'month' ? t('home.rangeMonthLong') : `${customFrom} → ${customTo}`;
+
+  const RANGES_LOCAL: { key: RangeKey; label: string }[] = [
+    { key: 'today', label: t('home.rangeToday') },
+    { key: 'week', label: t('home.rangeWeek') },
+    { key: 'month', label: t('home.rangeMonth') },
+    { key: 'custom', label: t('home.rangeCustom') },
+  ];
+
+  const METRIC_TITLES_LOCAL: Record<MetricKey, string> = {
+    calls: t('home.calls'), missed: t('home.tileMissed'), answered: t('home.tileAnswered'),
+    recordings: t('home.tileRecordings'), voicemail: t('home.tileVoicemail'),
+    sms: t('home.tileUnreadSms'), live: t('home.tileLiveCalls'), realtime: t('home.tileRealtime'),
+  };
 
   const [detail, setDetail] = useState<null | { metric: MetricKey; title: string; tone: Tone }>(
     initial.metric ? { metric: initial.metric, title: `${METRIC_TITLES[initial.metric]}`, tone: tones[METRIC_TONE_KEY[initial.metric]] } : null
   );
+
+  // Auto-refresh triggers: focus, 60s interval, ava:callEnded, visibility, realtime sync ping.
+  useEffect(() => {
+    const refetch = () => { stats.refresh(); };
+    const onVis = () => { if (!document.hidden) refetch(); };
+    const interval = setInterval(refetch, 60_000);
+    window.addEventListener('focus', refetch);
+    window.addEventListener('ava:callEnded', refetch as EventListener);
+    window.addEventListener('lemtel:sync', refetch as EventListener);
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', refetch);
+      window.removeEventListener('ava:callEnded', refetch as EventListener);
+      window.removeEventListener('lemtel:sync', refetch as EventListener);
+      document.removeEventListener('visibilitychange', onVis);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const lastFocusedRef = useRef<HTMLElement | null>(null);
   const openDetail = (metric: MetricKey, title: string, tone: Tone) => {
     lastFocusedRef.current = (document.activeElement as HTMLElement) || null;
