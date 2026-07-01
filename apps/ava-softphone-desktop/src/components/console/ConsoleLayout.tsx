@@ -82,9 +82,11 @@ export default function ConsoleLayout({
   const { isAdmin, isSuperAdmin, isSupervisor } = useDesktopRole(orgId);
   const domainLabel = domainName || (domainUuid ? domainUuid.slice(0, 8) : null);
 
-  // Redirect non-admins away from admin-only views
+  // Redirect non-admins away from admin-only views, and away from removed views.
   useEffect(() => {
     const adminOnly: ConsoleView[] = ['admin', 'aiadmin', 'reports', 'customers', 'voiceagents', 'pbxlive', 'audit'];
+    const removed: ConsoleView[] = ['queues', 'telecom'];
+    if (removed.includes(view)) { console.info('[nav] removed view state', view, '→ home'); setView('home'); return; }
     if (!isAdmin && adminOnly.includes(view)) setView('home');
   }, [isAdmin, view]);
 
