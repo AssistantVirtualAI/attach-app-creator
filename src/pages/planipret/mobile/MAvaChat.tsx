@@ -1,0 +1,148 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { toast } from "sonner";
+import { Send, Plus, Menu, Loader2, Sparkles } from "lucide-react";
+
+type Msg = { id: string; role: "user" | "assistant"; message: string; created_at: string };
+type Session = { id: string; title: string; last_message_at: string };
+
+export default function MAvaChat() {
+  const [userId, setUserId] = useState<string | null>(null);
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Msg[]>([]);
+  const [input, setInput] = useState("");
+  const [busy, setBusy] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.auth.getUser();
+      if (!data.user) return;
+      setUserId(data.user.id);
+      const { data: s } = await supabase
+        .from("planipret_ava_chat_sessions")
+        .select("id,title,last_message_at")
+        .order("last_message_at", { ascending: false })
+        .limit(50);
+      setSessions((s ?? []) as Session[]);
+      if (s?.[0]) setSessionId(s[0].id);
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!sessionId) { setMessages([]); return; }
+    (async () => {
+      const { data } = await supabase
+        .from("planipret_ava_conversations")
+        .select("id,role,message,created_at")
+        .eq("session_id", sessionId)
+        .order("created_at", { ascending: true });
+      setMessages((data ?? []) as Msg[]);
+    })();
+  }, [sessionId]);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages, busy]);
+
+  const startNew = () => { setSessionId(null); setMessages([]); };
+
+  const send = async () => {
+    const text = input.trim();
+    if (!text || busy) return;
+    setBusy(true); setInput("");
+    const optimistic: Msg = { id: `tmp-${Date.now()}`, role: "user", message: text, created_at: new Date().toISOString() };
+    setMessages((m) => [...m, optimistic]);
+    try {
+      const history = messages.slice(-8).map((m) => ({ role: m.role, content: m.message }));
+      const { data, error } = await supabase.functions.invoke("pp-ava-chat", {
+        body: { mode: "chat", user_message: text, session_id: sessionId, history },
+      });
+      if (error) throw error;
+      const d = data as any;
+      const newSid = d.session_id ?? sessionId;
+      if (newSid && newSid !== sessionId) {
+        setSessionId(newSid);
+        const { data: srow } = await supabase.from("planipret_ava_chat_sessions").select("id,title,last_message_at").eq("id", newSid).maybeSingle();
+        if (srow) setSessions((s) => [srow as Session, ...s.filter((x) => x.id !== newSid)]);
+      }
+      setMessages((m) => [...m, { id: `a-${Date.now()}`, role: "assistant", message: String(d.reply ?? "…"), created_at: new Date().toISOString() }]);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Erreur AVA");
+    } finally { setBusy(false); }
+  };
+
+  const currentTitle = useMemo(() => sessions.find((s) => s.id === sessionId)?.title ?? "AVA", [sessions, sessionId]);
+
+  return (
+    <div className="flex flex-col h-[calc(100dvh-8rem)]">
+      <div className="flex items-center gap-2 p-3 border-b">
+        <Sheet>
+          <SheetTrigger asChild>
+            <Button variant="ghost" size="icon"><Menu className="w-5 h-5" /></Button>
+          </SheetTrigger>
+          <SheetContent side="left" className="w-80">
+            <SheetHeader><SheetTitle>Conversations AVA</SheetTitle></SheetHeader>
+            <div className="mt-4 space-y-2">
+              <Button size="sm" variant="secondary" className="w-full" onClick={startNew}>
+                <Plus className="w-4 h-4 mr-1" /> Nouvelle conversation
+              </Button>
+              {sessions.map((s) => (
+                <button
+                  key={s.id}
+                  onClick={() => setSessionId(s.id)}
+                  className={`w-full text-left rounded-md px-3 py-2 text-sm truncate ${s.id === sessionId ? "bg-primary/10 text-primary" : "hover:bg-muted"}`}
+                >{s.title || "Sans titre"}</button>
+              ))}
+            </div>
+          </SheetContent>
+        </Sheet>
+        <Sparkles className="w-5 h-5 text-primary" />
+        <div className="font-medium truncate flex-1">{currentTitle}</div>
+        <Button size="icon" variant="ghost" onClick={startNew}><Plus className="w-5 h-5" /></Button>
+      </div>
+
+      <ScrollArea className="flex-1">
+        <div ref={scrollRef} className="p-4 space-y-3">
+          {messages.length === 0 && (
+            <div className="text-center text-muted-foreground text-sm py-10">
+              Pose ta question à AVA. Elle a accès à tes leads, appels et courriels.
+            </div>
+          )}
+          {messages.map((m) => (
+            <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+              <div className={`max-w-[85%] rounded-2xl px-4 py-2 text-sm whitespace-pre-wrap ${
+                m.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"
+              }`}>{m.message}</div>
+            </div>
+          ))}
+          {busy && (
+            <div className="flex justify-start">
+              <div className="rounded-2xl px-4 py-2 bg-muted text-sm text-muted-foreground flex items-center gap-2">
+                <Loader2 className="w-3 h-3 animate-spin" /> AVA réfléchit…
+              </div>
+            </div>
+          )}
+        </div>
+      </ScrollArea>
+
+      <div className="p-3 border-t flex gap-2">
+        <Input
+          placeholder="Message à AVA…"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
+          disabled={busy || !userId}
+        />
+        <Button onClick={send} disabled={busy || !input.trim()} size="icon">
+          {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+        </Button>
+      </div>
+    </div>
+  );
+}

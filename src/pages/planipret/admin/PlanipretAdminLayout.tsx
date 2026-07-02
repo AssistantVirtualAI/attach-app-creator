@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import {
   LayoutDashboard, Users, Phone, MessageSquare, Mic, Plug,
-  BarChart3, LogOut, ShieldCheck, CheckSquare, Search, ChevronRight,
+  BarChart3, LogOut, ShieldCheck, CheckSquare, Search, ChevronRight, Sparkles,
 } from "lucide-react";
 import SessionTimeoutModal from "@/components/planipret/SessionTimeoutModal";
 import { useAdminRealtime } from "@/hooks/useAdminRealtime";
@@ -23,6 +23,7 @@ const NAV: NavGroup[] = [
     items: [
       { to: "/planipret/admin/overview", label: "Vue d'ensemble", Icon: LayoutDashboard },
       { to: "/planipret/admin/reports",  label: "Rapports",       Icon: BarChart3 },
+      { to: "/planipret/admin/ava",      label: "AVA Analytics",  Icon: Sparkles },
     ],
   },
   {
@@ -59,6 +60,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/planipret/admin/reports": "Rapports & Analytics",
   "/planipret/admin/audit-checklist": "Audit système",
   "/planipret/admin/compliance": "Conformité PIPEDA · Loi 25",
+  "/planipret/admin/ava": "AVA — Analytics",
 };
 
 const initials = (n?: string) =>

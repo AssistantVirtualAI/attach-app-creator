@@ -33,6 +33,7 @@ import MContacts from "./pages/planipret/mobile/MContacts";
 import MPipeline from "./pages/planipret/mobile/MPipeline";
 import MSearch from "./pages/planipret/mobile/MSearch";
 import MStats from "./pages/planipret/mobile/MStats";
+import MAvaChat from "./pages/planipret/mobile/MAvaChat";
 import PlanipretAudit from "./pages/planipret/PlanipretAudit";
 import Ms365Callback from "./pages/planipret/Ms365Callback";
 import SoftphoneSetup from "./pages/lemtel/SoftphoneSetup";
@@ -51,6 +52,7 @@ const PACompliance = lazyWithRetry(() => import("./pages/planipret/admin/PACompl
 const PALeads = lazyWithRetry(() => import("./pages/planipret/admin/PALeads"));
 const PATemplates = lazyWithRetry(() => import("./pages/planipret/admin/PATemplates"));
 const PADebug = lazyWithRetry(() => import("./pages/planipret/admin/PADebug"));
+const PAAva = lazyWithRetry(() => import("./pages/planipret/admin/PAAva"));
 const PlanipretPrivacy = lazyWithRetry(() => import("./pages/planipret/PlanipretPrivacy"));
 const PlanipretIntegrationsLazy = lazyWithRetry(() => import("./pages/planipret/PlanipretIntegrations"));
 import { AdminPageSkeleton } from "./components/planipret/Skeletons";
@@ -410,6 +412,7 @@ const App = () => (
                   <Route path="pipeline" element={<MPipeline />} />
                   <Route path="search" element={<MSearch />} />
                   <Route path="stats" element={<MStats />} />
+                  <Route path="ava" element={<MAvaChat />} />
                 </Route>
                 <Route path="/planipret/dashboard" element={<Navigate to="/planipret/admin/overview" replace />} />
                 <Route path="/planipret/integrations" element={<Navigate to="/planipret/admin/integrations" replace />} />
@@ -446,6 +449,7 @@ const App = () => (
                   <Route path="templates" element={<Suspense fallback={<AdminPageSkeleton />}><PATemplates /></Suspense>} />
                   <Route path="integrations" element={<Suspense fallback={<AdminPageSkeleton />}><PlanipretIntegrationsLazy /></Suspense>} />
                   <Route path="debug" element={<Suspense fallback={<AdminPageSkeleton />}><PADebug /></Suspense>} />
+                  <Route path="ava" element={<Suspense fallback={<AdminPageSkeleton />}><PAAva /></Suspense>} />
                 </Route>
                 <Route path="/planipret/privacy" element={<Suspense fallback={<AdminPageSkeleton />}><PlanipretPrivacy /></Suspense>} />
 

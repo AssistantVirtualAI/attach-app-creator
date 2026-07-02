@@ -38,7 +38,8 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const mode: string = String(body?.mode ?? "chat"); // chat | summarize | recommend
     const userMessage: string = String(body?.user_message ?? body?.message ?? "").slice(0, 6000);
-    const history: { role: "user" | "assistant"; content: string }[] = Array.isArray(body?.history)
+    const sessionId: string | null = body?.session_id ? String(body.session_id) : null;
+    let history: { role: "user" | "assistant"; content: string }[] = Array.isArray(body?.history)
       ? body.history.slice(-10).map((h: any) => ({ role: h.role === "assistant" ? "assistant" : "user", content: String(h.content ?? "").slice(0, 4000) }))
       : [];
     const context: Record<string, unknown> = (body?.context && typeof body.context === "object") ? body.context : {};
@@ -126,7 +127,32 @@ Mets openVoice=true seulement si l'utilisateur demande explicitement de parler. 
       }
     }
 
-    return json(result);
+    // Persist chat to planipret_ava_conversations if we have a session
+    let finalSessionId = sessionId;
+    if (mode === "chat" && userMessage) {
+      try {
+        if (!finalSessionId) {
+          const { data: s } = await admin.from("planipret_ava_chat_sessions")
+            .insert({ user_id: u.user.id, title: userMessage.slice(0, 60) })
+            .select("id").single();
+          finalSessionId = s?.id ?? null;
+        } else {
+          await admin.from("planipret_ava_chat_sessions")
+            .update({ last_message_at: new Date().toISOString() })
+            .eq("id", finalSessionId).eq("user_id", u.user.id);
+        }
+        if (finalSessionId) {
+          await admin.from("planipret_ava_conversations").insert([
+            { user_id: u.user.id, session_id: finalSessionId, role: "user", message: userMessage },
+            { user_id: u.user.id, session_id: finalSessionId, role: "assistant", message: result.reply, tool_calls: result.suggestions ?? [] },
+          ]);
+        }
+      } catch (persistErr) {
+        console.error("pp-ava-chat persist fail", persistErr);
+      }
+    }
+
+    return json({ ...result, session_id: finalSessionId });
   } catch (e) {
     console.error("pp-ava-chat error", e);
     return json({ error: String(e) }, 500);
