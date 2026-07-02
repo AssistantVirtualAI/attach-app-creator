@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
 
     const body = new URLSearchParams({
       client_id: clientId, client_secret: clientSecret, grant_type: "authorization_code",
-      code, redirect_uri, scope: "openid offline_access Mail.ReadWrite Calendars.ReadWrite User.Read",
+      code, redirect_uri, scope: "openid offline_access User.Read Mail.ReadWrite Mail.Send Calendars.ReadWrite Chat.ReadWrite ChannelMessage.Send Team.ReadBasic.All Channel.ReadBasic.All",
     });
     const r = await fetch(`https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body });
     const d = await r.json();
