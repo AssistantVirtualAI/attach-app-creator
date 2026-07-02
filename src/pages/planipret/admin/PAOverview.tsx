@@ -323,11 +323,21 @@ export default function PAOverview() {
 
       {/* KPI Hero Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard icon={<Phone className="w-5 h-5" />} title="Appels aujourd'hui" value={stats.calls} subtitle="vs hier" trend={callsTrend} color={ACCENT} />
-        <KpiCard icon={<Users className="w-5 h-5" />} title="Courtiers actifs" value={stats.brokers} subtitle={`${adoptionPct}% adoption · ${stats.brokersTotal} total`} color={SUCCESS} />
+        <KpiCard icon={<Phone className="w-5 h-5" />} title="Appels aujourd'hui" value={stats.calls} subtitle={`${stats.callsMissedToday} manqués · vs hier`} trend={callsTrend} color={ACCENT} />
+        <KpiCard icon={<Users className="w-5 h-5" />} title="Courtiers actifs" value={stats.brokers} subtitle={`${adoptionPct}% adoption · ${stats.brokersOnline} en ligne`} color={SUCCESS} />
         <KpiCard icon={<MessageSquare className="w-5 h-5" />} title="SMS aujourd'hui" value={stats.sms} subtitle="envoyés + reçus" trend={smsTrend} color={WARNING} />
-        <KpiCard icon={<Bot className="w-5 h-5" />} title="Sessions AVA aujourd'hui" value={stats.ava} subtitle={`${stats.voicemailsUnread} voicemails non lus`} color={AGENT} />
+        <KpiCard icon={<Bot className="w-5 h-5" />} title="Sessions AVA aujourd'hui" value={stats.ava} subtitle={`${stats.avaWeek} sur 7 j · ${stats.voicemailsUnread} voicemails`} color={AGENT} />
       </div>
+
+      {/* KPI Secondary Grid — call quality + follow-ups */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+        <MiniStat label="Durée moy. appel" value={stats.avgDurationSec > 0 ? `${Math.floor(stats.avgDurationSec / 60)}m ${stats.avgDurationSec % 60}s` : "—"} sub={`sur ${period} j`} color={ACCENT} />
+        <MiniStat label="Taux de réponse" value={`${stats.answerRatePct}%`} sub={`sur ${period} j`} color={SUCCESS} />
+        <MiniStat label="Appels manqués" value={stats.callsMissedToday} sub="aujourd'hui" color={DANGER} />
+        <MiniStat label="Rappels en retard" value={stats.overdueReminders} sub="à traiter" color={WARNING} />
+        <MiniStat label="Leads chauds" value={stats.hotLeads7d} sub="7 derniers jours" color={AGENT} />
+      </div>
+
 
       {/* ===== FINANCIAL SECTION ===== */}
       <div className="flex items-center gap-2 pt-2">
