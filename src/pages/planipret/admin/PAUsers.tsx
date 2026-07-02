@@ -46,7 +46,7 @@ export default function PAUsers() {
   };
   const setSearch = (s: string) => updateParams({ search: s, page: "1" });
   const setFilter = (f: string) => updateParams({ filter: f, page: "1" });
-  const setMaestroFilter = (m: string) => updateParams({ maestro: m, page: "1" });
+  
   const setPage = (p: number) => updateParams({ page: String(p) });
   const setPageSize = (s: number) => updateParams({ pageSize: String(s), ps: null, page: "1" });
 
