@@ -1,5 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
+import { theme } from '../lib/theme';
+import { useTranslation } from '../lib/i18n';
+
+const { colors: c } = theme;
 
 type Member = {
   user_id: string;
