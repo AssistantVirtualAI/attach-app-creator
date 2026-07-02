@@ -269,6 +269,36 @@ Deno.serve(async (req) => {
       return json({ ok: true });
     }
 
+    // ─── ACTION: recordings_transcriptions_probe ───────────────────
+    if (action === "recordings_transcriptions_probe") {
+      const [cdrSample, recA, recB, recC, txA, txB] = await Promise.all([
+        nsFetch(`/domains/${D}/cdrs?limit=5`),
+        nsFetch(`/domains/${D}/recordings?limit=5`),
+        nsFetch(`/domains/${D}/cdrs?type=recording&limit=5`),
+        nsFetch(`/recordings?domain=${D}&limit=5`),
+        nsFetch(`/domains/${D}/transcriptions?limit=5`),
+        nsFetch(`/domains/${D}/cdrs?transcription=true&limit=5`),
+      ]);
+      const firstCdr = Array.isArray(cdrSample.data) ? cdrSample.data[0] : null;
+      return json({
+        domain,
+        cdr_sample: {
+          status: cdrSample.status,
+          keys: firstCdr ? Object.keys(firstCdr) : [],
+          first: firstCdr,
+        },
+        recordings: {
+          "domains/{d}/recordings": { status: recA.status, first: Array.isArray(recA.data) ? recA.data[0] : recA.data },
+          "domains/{d}/cdrs?type=recording": { status: recB.status, first: Array.isArray(recB.data) ? recB.data[0] : recB.data },
+          "recordings?domain={d}": { status: recC.status, first: Array.isArray(recC.data) ? recC.data[0] : recC.data },
+        },
+        transcriptions: {
+          "domains/{d}/transcriptions": { status: txA.status, first: Array.isArray(txA.data) ? txA.data[0] : txA.data },
+          "domains/{d}/cdrs?transcription=true": { status: txB.status, first: Array.isArray(txB.data) ? txB.data[0] : txB.data },
+        },
+      });
+    }
+
     // ─── ACTION: test ──────────────────────────────────────────────
     const tStart = performance.now();
     const [version, dom, usersAll, active_calls, cdrsAll, devicesAll, phone_numbers, registrationsAll, call_queues] =

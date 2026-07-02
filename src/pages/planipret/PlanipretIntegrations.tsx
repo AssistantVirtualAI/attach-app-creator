@@ -18,6 +18,7 @@ import {
   InfoBanner, CopyButton,
 } from "@/components/planipret/admin/integrations/IntegrationCard";
 import NsLiveTestPanel from "@/components/planipret/admin/integrations/NsLiveTestPanel";
+import NsRecordingsProbe from "@/components/planipret/admin/integrations/NsRecordingsProbe";
 import Ms365LiveTestPanel from "@/components/planipret/admin/integrations/Ms365LiveTestPanel";
 import NsMigrationPanel from "@/components/planipret/admin/integrations/NsMigrationPanel";
 import NsCapabilitiesPanel from "@/components/planipret/admin/integrations/NsCapabilitiesPanel";
@@ -213,6 +214,9 @@ export default function PlanipretIntegrations() {
           </div>
 
           <NsLiveTestPanel domain={getField("ns_api", "domain", "planipret.ca") || "planipret.ca"} />
+          <div className="mt-4">
+            <NsRecordingsProbe domain={getField("ns_api", "domain", "planipret.ca") || "planipret.ca"} />
+          </div>
           <div className="mt-4">
             <NsMigrationPanel />
           </div>
