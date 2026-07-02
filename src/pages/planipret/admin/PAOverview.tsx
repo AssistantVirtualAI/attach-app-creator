@@ -111,19 +111,7 @@ export default function PAOverview() {
   // Single source of truth for broker activation counts (matches the toggles
   // on /admin/users via the planipret_broker_stats view, with Realtime sync).
   const { stats: brokerStats } = usePlanipretBrokerStats();
-  // Financial counts are scoped to real Planiprêt accounts only (excludes test
-  // profiles). Widget = every courtier with an @planipret.ca email (widget is
-  // integrated for all of them). Mobile/AI = only profiles on ns_domain
-  // planipret.ca with the respective flag enabled.
-  const [widgetCount, setWidgetCount] = useState(0);
-  const [mobilePpCount, setMobilePpCount] = useState(0);
-  const [aiPpCount, setAiPpCount] = useState(0);
-  const serviceCounts = {
-    mobile: mobilePpCount,
-    widget: widgetCount,
-    ai: aiPpCount,
-  };
-
+  const [serviceCounts, setServiceCounts] = useState({ mobile: 0, widget: 0, ai: 0 });
 
   const load = async () => {
     setRefreshing(true);
@@ -139,7 +127,7 @@ export default function PAOverview() {
     const fiveMinAgo = new Date(Date.now() - 5 * 60_000).toISOString();
     const nowIsoEarly = new Date().toISOString();
 
-    const [c1, c2, missedToday, sms, smsY, ava, avaWeek, vm, rec, callsP, smsP, callsByDir, callsPeriodStats, topCalls, svcWidget, svcMobilePP, svcAiPP, directory, onlineC, overdueRemC, hotLeadsWeekC] = await Promise.all([
+    const [c1, c2, missedToday, sms, smsY, ava, avaWeek, vm, rec, callsP, smsP, callsByDir, callsPeriodStats, topCalls, svcProfiles, directory, onlineC, overdueRemC, hotLeadsWeekC] = await Promise.all([
       getPlanipretCallCount({ from: todayIso }),
       getPlanipretCallCount({ from: yestIso, to: todayIso }),
       getPlanipretCallCount({ direction: "missed", from: todayIso }),
@@ -154,14 +142,11 @@ export default function PAOverview() {
       supabase.from("planipret_phone_calls").select("direction").gte("started_at", periodIso),
       supabase.from("planipret_phone_calls").select("duration_seconds, direction").gte("started_at", periodIso),
       supabase.from("planipret_phone_calls").select("user_id, extension, metadata, planipret_profiles(full_name)").gte("started_at", periodIso),
-      supabase.from("planipret_profiles").select("id", { count: "exact", head: true }).ilike("email", "%@planipret.ca"),
-      supabase.from("planipret_profiles").select("id", { count: "exact", head: true }).eq("ns_domain", "planipret.ca").eq("mobile_app_enabled", true),
-      supabase.from("planipret_profiles").select("id", { count: "exact", head: true }).eq("ns_domain", "planipret.ca").eq("voice_agent_enabled", true),
+      supabase.from("planipret_profiles").select("full_name, email, ns_domain, mobile_app_enabled, voice_agent_enabled"),
       getPlanipretBrokerDirectory(),
       supabase.from("planipret_profiles").select("id", { count: "exact", head: true }).gte("last_seen_at", fiveMinAgo),
       supabase.from("planipret_reminders").select("id", { count: "exact", head: true }).eq("status", "pending").lt("scheduled_at", nowIsoEarly),
       supabase.from("planipret_phone_calls").select("id", { count: "exact", head: true }).gte("started_at", sevenIso).gte("lead_score", 8),
-
     ]);
 
     const nsBrokerList = directory.brokers;
@@ -189,10 +174,22 @@ export default function PAOverview() {
       brokersOnline: onlineC.count ?? 0,
     });
 
-    setWidgetCount(svcWidget.count ?? 0);
-    setMobilePpCount(svcMobilePP.count ?? 0);
-    setAiPpCount(svcAiPP.count ?? 0);
-
+    // Compute service counts from real Planipret brokers (exclude test accounts).
+    const TEST_PATTERNS = ["scott", "mohamad", "carlo", "clinton"];
+    const isTest = (n?: string | null) => {
+      const s = (n ?? "").toLowerCase();
+      return TEST_PATTERNS.some((p) => s.includes(p));
+    };
+    const profs = (svcProfiles.data ?? []) as Array<{ full_name: string | null; email: string | null; ns_domain: string | null; mobile_app_enabled: boolean | null; voice_agent_enabled: boolean | null }>;
+    const realBrokers = profs.filter((p) => {
+      const em = (p.email ?? "").toLowerCase();
+      const hasPpEmail = em.endsWith("@planipret.ca") || em.endsWith("@planipret.com");
+      return hasPpEmail && !isTest(p.full_name);
+    });
+    const widgetN = realBrokers.length;
+    const mobileN = realBrokers.filter((p) => p.ns_domain === "planipret.ca" && p.mobile_app_enabled).length;
+    const aiN = realBrokers.filter((p) => p.ns_domain === "planipret.ca" && p.voice_agent_enabled).length;
+    setServiceCounts({ mobile: mobileN, widget: widgetN, ai: aiN });
     setRecent(rec.data ?? []);
     setBrokers(nsBrokerList.slice(0, 10));
 
@@ -363,6 +360,69 @@ export default function PAOverview() {
       </div>
 
       <RevenueBreakdown rows={finance} />
+
+      {/* Detailed broker breakdown per service */}
+      <div className="pp-card" style={{ padding: 20 }}>
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h2 style={{ fontFamily: "Inter,sans-serif", fontWeight: 600, fontSize: 14, color: "var(--pp-text-primary)" }}>Détail par service — courtiers facturables</h2>
+            <p style={{ fontSize: 11, color: "var(--pp-text-faint)" }} className="mt-0.5">Comptes test (Scott, Mohamad, Carlo, Clinton) exclus · Prix de vente 49,95 $ / courtier</p>
+          </div>
+          <span style={{ fontSize: 10, color: "var(--pp-text-faint)" }}>Total: {totals.users} unités facturées</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr style={{ borderBottom: "1px solid var(--pp-bg-border-2)" }}>
+                {["Service", "Courtiers", "Coût unitaire", "Prix unitaire", "Coût mensuel", "Revenu mensuel", "Profit mensuel", "Marge"].map((h) => (
+                  <th key={h} className="py-2 px-2 text-left" style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--pp-text-faint)" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {finance.map((f) => {
+                const unitCost = f.users > 0 ? f.cost / f.users : 0;
+                const rule = f.service === "widget"
+                  ? "courriel @planipret.ca / .com"
+                  : f.service === "mobile"
+                    ? "domain NS planipret.ca + app mobile activée"
+                    : "domain NS planipret.ca + agent AI activé";
+                return (
+                  <tr key={f.service} style={{ borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
+                    <td className="py-3 px-2">
+                      <div className="flex items-center gap-2">
+                        <span style={{ width: 8, height: 8, borderRadius: 2, background: (finance.find(x => x.service === f.service) && (f.service === "mobile" ? "#2E9BDC" : f.service === "widget" ? "#F5A623" : "#9B7FE8")) }} />
+                        <div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: "var(--pp-text-primary)" }}>{f.service === "mobile" ? "Application mobile" : f.service === "widget" ? "Widget web" : "Agent AI"}</div>
+                          <div style={{ fontSize: 10, color: "var(--pp-text-faint)" }}>{rule}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-3 px-2 tabular-nums" style={{ fontSize: 13, fontWeight: 700, color: "var(--pp-text-primary)" }}>{f.users}</td>
+                    <td className="py-3 px-2 tabular-nums" style={{ fontSize: 12, color: DANGER }}>{fmtMoney(unitCost)}</td>
+                    <td className="py-3 px-2 tabular-nums" style={{ fontSize: 12, color: "var(--pp-text-muted)" }}>{fmtMoney(49.95)}</td>
+                    <td className="py-3 px-2 tabular-nums" style={{ fontSize: 12, color: DANGER }}>{fmtMoney(f.cost)}</td>
+                    <td className="py-3 px-2 tabular-nums" style={{ fontSize: 12, color: ACCENT }}>{fmtMoney(f.revenue)}</td>
+                    <td className="py-3 px-2 tabular-nums" style={{ fontSize: 13, fontWeight: 700, color: SUCCESS }}>{fmtMoney(f.profit)}</td>
+                    <td className="py-3 px-2 tabular-nums" style={{ fontSize: 12, color: AGENT }}>{f.marginPct.toFixed(1)}%</td>
+                  </tr>
+                );
+              })}
+              <tr style={{ borderTop: "2px solid var(--pp-bg-border-2)", background: "rgba(46,155,220,0.04)" }}>
+                <td className="py-3 px-2" style={{ fontSize: 12, fontWeight: 700, color: "var(--pp-text-primary)" }}>Total</td>
+                <td className="py-3 px-2 tabular-nums" style={{ fontSize: 13, fontWeight: 700, color: "var(--pp-text-primary)" }}>{totals.users}</td>
+                <td className="py-3 px-2" style={{ fontSize: 12, color: "var(--pp-text-faint)" }}>—</td>
+                <td className="py-3 px-2" style={{ fontSize: 12, color: "var(--pp-text-faint)" }}>—</td>
+                <td className="py-3 px-2 tabular-nums" style={{ fontSize: 13, fontWeight: 700, color: DANGER }}>{fmtMoney(totals.cost)}</td>
+                <td className="py-3 px-2 tabular-nums" style={{ fontSize: 13, fontWeight: 700, color: ACCENT }}>{fmtMoney(totals.revenue)}</td>
+                <td className="py-3 px-2 tabular-nums" style={{ fontSize: 14, fontWeight: 700, color: SUCCESS }}>{fmtMoney(totals.profit)}</td>
+                <td className="py-3 px-2 tabular-nums" style={{ fontSize: 12, fontWeight: 700, color: AGENT }}>{totals.marginPct.toFixed(1)}%</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
 
       {/* Engagement strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
