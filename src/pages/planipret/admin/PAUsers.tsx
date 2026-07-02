@@ -35,7 +35,7 @@ export default function PAUsers() {
   const search = params.get("search") ?? "";
 
   const filter = (params.get("filter") as "all" | "app" | "agent" | "offline") ?? "all";
-  const maestroFilter = (params.get("maestro") as "all" | "yes" | "no") ?? "all";
+  
   const page = Math.max(1, parseInt(params.get("page") ?? "1", 10) || 1);
   const pageSizeRaw = parseInt(params.get("pageSize") ?? params.get("ps") ?? "25", 10);
   const pageSize = [25, 50, 100].includes(pageSizeRaw) ? pageSizeRaw : 25;
