@@ -9,6 +9,7 @@ import { TableErrorState, TableEmptyState } from "@/components/planipret/admin/T
 import { getPlanipretBrokerDirectory } from "@/lib/planipret/adminDirectory";
 import { applyPlanipretCallFilters } from "@/lib/planipret/adminCounts";
 import { usePlanipretNsAutoSync } from "@/hooks/usePlanipretNsAutoSync";
+import NsSyncBar from "@/components/planipret/admin/NsSyncBar";
 
 const ACCENT = "#2E9BDC";
 const SUCCESS = "#00D4AA";
@@ -124,6 +125,10 @@ export default function PACalls() {
   return (
     <div className="space-y-4">
       <DebugPanel entries={debug} />
+
+      <NsSyncBar features={["cdrs", "recordings"]} onReload={() => load(page, pageSize)} />
+
+
 
       <div className="pp-card p-4 flex flex-wrap items-end gap-2">
         <Select label="Courtier" value={filters.broker} onChange={(v) => setFilterValue("broker", v)}

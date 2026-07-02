@@ -7,6 +7,7 @@ import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import { usePlanipretBrokerStats } from "@/lib/planipret/brokerStats";
 import { usePlanipretNsAutoSync } from "@/hooks/usePlanipretNsAutoSync";
+import NsSyncBar from "@/components/planipret/admin/NsSyncBar";
 
 type Range = "week" | "month" | "quarter";
 
@@ -198,7 +199,9 @@ export default function PAReports() {
 
   return (
     <div className="space-y-4">
+      <NsSyncBar features={["cdrs", "messages", "recordings"]} onReload={() => setRefreshTick((t) => t + 1)} />
       <div className="flex flex-wrap items-center justify-between gap-2">
+
         <div className="flex gap-2">
           {(["week", "month", "quarter"] as Range[]).map((r) => (
             <button key={r} onClick={() => setRange(r)}

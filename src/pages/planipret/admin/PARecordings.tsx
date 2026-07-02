@@ -8,6 +8,7 @@ import DebugPanel, { type DebugEntry } from "@/components/planipret/admin/DebugP
 import { TableErrorState, TableEmptyState } from "@/components/planipret/admin/TableStates";
 import { getPlanipretBrokerDirectory } from "@/lib/planipret/adminDirectory";
 import { usePlanipretNsAutoSync } from "@/hooks/usePlanipretNsAutoSync";
+import NsSyncBar from "@/components/planipret/admin/NsSyncBar";
 
 const ACCENT = "#2E9BDC";
 const AGENT = "#9B7FE8";
@@ -140,6 +141,10 @@ export default function PARecordings() {
   return (
     <div className="space-y-4">
       <DebugPanel entries={debug} />
+
+      <NsSyncBar features={["recordings", "cdrs"]} onReload={() => load(page, pageSize)} />
+
+
 
       <div className="pp-card p-4 flex items-center gap-2 flex-wrap">
         <input

@@ -8,6 +8,7 @@ import DebugPanel, { type DebugEntry } from "@/components/planipret/admin/DebugP
 import { TableErrorState, TableEmptyState } from "@/components/planipret/admin/TableStates";
 import { getPlanipretBrokerDirectory } from "@/lib/planipret/adminDirectory";
 import { usePlanipretNsAutoSync } from "@/hooks/usePlanipretNsAutoSync";
+import NsSyncBar from "@/components/planipret/admin/NsSyncBar";
 
 const ACCENT = "#2E9BDC";
 const SUCCESS = "#00D4AA";
@@ -128,6 +129,10 @@ export default function PAMessages() {
   return (
     <div className="space-y-4">
       <DebugPanel entries={debug} />
+
+      <NsSyncBar features={["messages", "cdrs"]} onReload={() => load(page, pageSize)} />
+
+
 
       <div className="pp-card p-4 flex flex-wrap items-end gap-2">
         <select value={broker} onChange={(e) => setFilterValue("broker", e.target.value)} className="px-3 py-1.5 rounded-lg text-sm" style={inputStyle}>
