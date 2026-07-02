@@ -154,15 +154,8 @@ export default function PAMessages() {
         </select>
         <input type="date" value={from} onChange={(e) => setFilterValue("from", e.target.value)} className="px-3 py-1.5 rounded-lg text-sm" style={inputStyle} />
         <input type="date" value={to} onChange={(e) => setFilterValue("to", e.target.value)} className="px-3 py-1.5 rounded-lg text-sm" style={inputStyle} />
-        {hasFilters && (
-          <button onClick={resetFilters} className="px-2 py-1.5 text-xs underline" style={{ color: "var(--pp-text-muted)" }}>
-            ✕ Réinitialiser ({activeFilterCount})
-          </button>
-        )}
-        <button onClick={syncAll} disabled={syncing} className="ml-auto flex items-center gap-1.5 px-3 py-2 rounded-lg text-white text-sm font-medium disabled:opacity-50" style={{ background: ACCENT }}>
-          <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} /> Synchroniser NS-API
-        </button>
       </div>
+
 
       <div className="pp-card overflow-hidden">
         {loadError && <TableErrorState message={loadError} onRetry={() => load(page, pageSize)} />}
