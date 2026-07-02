@@ -250,6 +250,7 @@ function DesktopApp() {
       clearInterval(syncTimer);
       subscription.unsubscribe();
       window.removeEventListener('resize', onResize);
+      try { unsubscribeSip?.(); } catch { /* noop */ }
     };
   }, []);
 
