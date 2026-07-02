@@ -326,6 +326,26 @@ export default function PAReports() {
         <Stat label="Taux de réponse" value={answerRate} />
       </div>
 
+      {/* ───────── SMS · AVA · Rappels ───────── */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <MiniTile label="SMS envoyés" value={messages.filter((m) => m.direction === "outbound").length} color={ACCENT} sub="période" />
+        <MiniTile label="SMS reçus" value={messages.filter((m) => m.direction === "inbound").length} color={SUCCESS} sub="période" />
+        <MiniTile
+          label="Satisfaction AVA"
+          value={(() => {
+            const total = avaFeedback.length;
+            if (!total) return "—";
+            const up = avaFeedback.filter((f) => f.rating === "up").length;
+            return `${Math.round((up / total) * 100)}%`;
+          })()}
+          sub={`${avaFeedback.length} avis`}
+          color="#9B7FE8"
+        />
+        <MiniTile label="Rappels en attente" value={reminders.filter((r) => r.status === "pending").length} sub={`${reminders.filter((r) => r.status === "pending" && r.scheduled_at < new Date().toISOString()).length} en retard`} color={GOLD} />
+      </div>
+
+
+
       <div className="pp-card p-5">
         <div className="flex items-center justify-between mb-3">
           <h3 style={{ fontWeight: 600, color: "var(--pp-text-primary)" }}>Performance par courtier</h3>
