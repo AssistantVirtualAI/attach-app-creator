@@ -248,6 +248,37 @@ export default function MMore() {
       <Section title={t("more.sections.prefs")}>
         <Row icon={<Bell className="w-4 h-4" />} label={t("more.notifications")} right={<Toggle on={notifEnabled} onChange={toggleNotif} />} />
         <Row icon={<Moon className="w-4 h-4" />} label={t("more.darkMode")} right={<Toggle on={darkMode} onChange={setDarkMode} />} />
+        <Row
+          icon={<Languages className="w-4 h-4" />}
+          label={t("more.language")}
+          right={
+            <div className="flex items-center gap-1 p-1 rounded-full" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)" }}>
+              {(["fr", "en"] as const).map((l) => {
+                const active = lang === l;
+                return (
+                  <button
+                    key={l}
+                    onClick={async () => {
+                      setLang(l);
+                      if (profile?.user_id) {
+                        await supabase.from("planipret_profiles").update({ language: l }).eq("user_id", profile.user_id);
+                        await reloadProfile();
+                      }
+                    }}
+                    className="px-3 py-1 rounded-full text-xs font-semibold transition"
+                    style={{
+                      background: active ? "linear-gradient(135deg, #1A4A8A, #2E9BDC)" : "transparent",
+                      color: active ? "#fff" : "var(--pp-text-muted)",
+                    }}
+                    aria-label={l === "fr" ? "Français" : "English"}
+                  >
+                    {l === "fr" ? "FR" : "EN"}
+                  </button>
+                );
+              })}
+            </div>
+          }
+        />
       </Section>
 
       <MNetworkSection />
