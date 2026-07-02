@@ -9,6 +9,7 @@ import { RevenueBreakdown } from "@/components/planipret/admin/RevenueBreakdown"
 import { getPlanipretBrokerDirectory } from "@/lib/planipret/adminDirectory";
 import { getPlanipretCallCount } from "@/lib/planipret/adminCounts";
 import { usePlanipretBrokerStats } from "@/lib/planipret/brokerStats";
+import { usePlanipretNsAutoSync } from "@/hooks/usePlanipretNsAutoSync";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
   PieChart, Pie, Cell, BarChart, Bar, Legend,
@@ -213,6 +214,8 @@ export default function PAOverview() {
     setPendingByBroker(Object.values(agg).sort((a, b) => b.overdue - a.overdue || b.total - a.total).slice(0, 8));
     setRefreshing(false);
   };
+
+  usePlanipretNsAutoSync({ onQueued: load });
 
   useEffect(() => {
     load();

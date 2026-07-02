@@ -8,6 +8,7 @@ import DebugPanel, { type DebugEntry } from "@/components/planipret/admin/DebugP
 import { TableErrorState, TableEmptyState } from "@/components/planipret/admin/TableStates";
 import { getPlanipretBrokerDirectory } from "@/lib/planipret/adminDirectory";
 import { applyPlanipretCallFilters } from "@/lib/planipret/adminCounts";
+import { usePlanipretNsAutoSync } from "@/hooks/usePlanipretNsAutoSync";
 
 const ACCENT = "#2E9BDC";
 const SUCCESS = "#00D4AA";
@@ -93,6 +94,8 @@ export default function PACalls() {
     setDebug(dbg);
     setLoading(false);
   };
+
+  usePlanipretNsAutoSync({ onQueued: () => load(page, pageSize) });
 
   useEffect(() => {
     load(page, pageSize);
