@@ -459,6 +459,116 @@ function EmptyState({ tab }: { tab: "recents" | "active" | "missed" }) {
   );
 }
 
+// ---------- Transcript view (chat bubbles + auto-fetch + Analyze CTA) ----------
+type Seg = { speaker: string; text: string; start?: number | null; end?: number | null };
+function TranscriptView({
+  segments, transcript, loading, onFetch, onAnalyze, aiLoading, analyzed, t,
+}: {
+  segments: Seg[] | null;
+  transcript: string | null;
+  loading: boolean;
+  onFetch: () => Promise<void> | void;
+  onAnalyze: () => Promise<void> | void;
+  aiLoading: boolean;
+  analyzed: boolean;
+  t: (k: string) => string;
+}) {
+  const has = (segments && segments.length > 0) || !!(transcript && transcript.trim());
+  const fetchedRef = useRef(false);
+
+  useEffect(() => {
+    if (!has && !loading && !fetchedRef.current) {
+      fetchedRef.current = true;
+      void onFetch();
+    }
+  }, [has, loading, onFetch]);
+
+  const isCourtier = (speaker: string) => {
+    const s = (speaker || "").toLowerCase();
+    return s.includes("courtier") || s.startsWith("agent") || s.startsWith("broker") || s === "speaker 1" || s === "1";
+  };
+
+  if (loading && !has) {
+    return (
+      <div className="space-y-2">
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className={`flex ${i % 2 === 0 ? "justify-start" : "justify-end"}`}>
+            <div className="h-10 rounded-2xl animate-pulse" style={{ width: "60%", background: "var(--pp-bg-surface)" }} />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (!has) {
+    return (
+      <div className="pp-card p-4 space-y-3">
+        <div className="text-xs" style={{ color: "var(--pp-warning, #F5A623)" }}>
+          ⚠️ {t("calls.transcriptUnavailable") || "Transcription non disponible."}
+        </div>
+        <div className="text-[11px]" style={{ color: "var(--pp-text-secondary)" }}>
+          Vérifiez que <code>PORTAL_VOICE_TRANSCRIPTION_SENTIMENT = yes</code> est activé pour votre domaine dans NetSapiens.
+        </div>
+        <button onClick={() => onFetch()} className="w-full py-2 rounded-lg text-xs font-semibold"
+          style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }}>
+          <RefreshCw className="w-3.5 h-3.5 inline mr-1" /> Réessayer
+        </button>
+      </div>
+    );
+  }
+
+  const segs: Seg[] = segments && segments.length > 0
+    ? segments
+    : (transcript ?? "").split("\n").filter(Boolean).map((line) => {
+        const c = line.indexOf(":");
+        if (c > 0 && c < 30) return { speaker: line.slice(0, c).trim(), text: line.slice(c + 1).trim() };
+        return { speaker: "Speaker", text: line };
+      });
+  const wordCount = segs.reduce((n, s) => n + (s.text.split(/\s+/).filter(Boolean).length), 0);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-col gap-2">
+        {segs.map((s, i) => {
+          const right = isCourtier(s.speaker);
+          return (
+            <div key={i} className={`flex flex-col ${right ? "items-end" : "items-start"}`}>
+              <div className="text-[10px] mb-0.5" style={{ color: "var(--pp-text-tertiary, var(--pp-text-secondary))" }}>{s.speaker}</div>
+              <div
+                className="px-3 py-2 text-[13px] leading-relaxed"
+                style={{
+                  maxWidth: "82%",
+                  color: right ? "white" : "var(--pp-text-primary)",
+                  background: right ? "linear-gradient(135deg, var(--pp-brand-accent-2), var(--pp-brand-accent))" : "var(--pp-bg-elevated)",
+                  border: right ? "none" : "1px solid var(--pp-bg-border-2)",
+                  borderRadius: right ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
+                }}
+              >
+                {s.text}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="text-[11px] text-center" style={{ color: "var(--pp-text-muted)" }}>
+        {wordCount} mots · {segs.length} tours
+      </div>
+
+      {!analyzed && (
+        <button
+          onClick={() => onAnalyze()}
+          disabled={aiLoading}
+          className="w-full py-3 rounded-xl text-sm font-semibold text-white disabled:opacity-50 flex items-center justify-center gap-2 sticky bottom-0"
+          style={{ background: "linear-gradient(135deg, #2D1A5A, #9B7FE8)" }}
+        >
+          {aiLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Analyse en cours…</> : <><Sparkles className="w-4 h-4" /> Analyser avec Claude IA</>}
+        </button>
+      )}
+    </div>
+  );
+}
+
 
 // ============================================================
 // CALL DETAIL SHEET
