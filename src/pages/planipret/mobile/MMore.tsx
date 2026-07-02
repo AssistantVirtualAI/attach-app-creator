@@ -164,6 +164,7 @@ export default function MMore() {
       </div>
 
       <Section title={t("more.sections.pipeline")}>
+        <Row icon={<Sparkles className="w-4 h-4" />} label="Discuter avec AVA" sub="Assistante IA personnelle" onClick={() => navigate("/mplanipret/ava")} chevron />
         <Row icon={<BarChart3 className="w-4 h-4" />} label={t("more.pipelineFiles")} onClick={() => navigate("/mplanipret/pipeline")} chevron />
         <Row icon={<BarChart3 className="w-4 h-4" />} label={t("more.performance")} onClick={() => navigate("/mplanipret/stats")} chevron />
       </Section>
