@@ -124,6 +124,16 @@ function normalizeNsPath(path: string | null): string | null {
   return trimmed.replace(/^\/ns-api\/v2/i, "");
 }
 
+function recordingApiPath(domain: string, c: any): string | null {
+  const d = encodeURIComponent(domain || String(val(c, ["domain"], NS_DEFAULT_DOMAIN)));
+  const uid = String(val(c, ["uid"], ""));
+  const uidUser = uid.includes("@") ? uid.split("@")[0] : "";
+  const ext = String(val(c, ["user", "extension", "orig-user", "term-user", "subscriber", "call-orig-user", "call-term-user", "call-through-user"], uidUser)).trim();
+  // This is the NS-API endpoint that lists CDRs that have audio/intelligence.
+  // It returns JSON CDR rows; the actual audio is proxied later by maestro-recording/NS when available.
+  return ext ? `/domains/${d}/users/${encodeURIComponent(ext)}/cdrs/recordings` : `/domains/${d}/cdrs/recordings`;
+}
+
 function toIso(v: unknown): string | null {
   if (!v) return null;
   const d = new Date(v as string);
@@ -351,11 +361,11 @@ async function syncCalls(admin: ReturnType<typeof createClient>, domain: string,
   }
 
   const D = encodeURIComponent(domain);
-  const qs = `start-time=${encodeURIComponent(start)}&end-time=${encodeURIComponent(end)}`;
+  const qs = `datetime-start=${encodeURIComponent(start)}&datetime-end=${encodeURIComponent(end)}`;
+  const legacyQs = `start-time=${encodeURIComponent(start)}&end-time=${encodeURIComponent(end)}`;
   let domainCdrs = await fetchAll(`/domains/${D}/cdrs?${qs}`, 200, 50);
-  if (!domainCdrs.data.length) {
-    domainCdrs = await fetchAll(`/cdrs?domain=${D}&${qs}`, 200, 50);
-  }
+  if (!domainCdrs.data.length) domainCdrs = await fetchAll(`/domains/${D}/cdrs?${legacyQs}`, 200, 50);
+  if (!domainCdrs.data.length) domainCdrs = await fetchAll(`/cdrs?domain=${D}&${qs}`, 200, 50);
   const rawItems: Array<{ item: any; ext?: string }> = [];
   for (const c of domainCdrs.data) {
     rawItems.push({ item: c, ext: String(val(c, ["user", "orig-user", "term-user", "extension", "call-orig-user", "call-term-user", "call-through-user"], "")) || undefined });
@@ -396,9 +406,9 @@ async function syncCalls(admin: ReturnType<typeof createClient>, domain: string,
       answered_at: toIso(val(c, ["time-answer", "answer-time", "answer_time", "answered_at", "call-answer-datetime", "call-batch-answer-datetime"])),
       ended_at: toIso(val(c, ["time-release", "end-time", "end_time", "ended_at", "call-disconnect-datetime"])),
       duration_seconds: numVal(c, ["duration", "time-talking", "billsec", "talk_time", "call-total-duration-seconds", "call-batch-total-duration-seconds", "call-talking-duration-seconds"], 0),
-      recording_url: recordingUrl(c),
+      recording_url: recordingUrl(c) ?? (transcription || val(c, ["call-intelligence-job-id"], null) ? recordingApiPath(domain, c) : null),
       transcript_source: transcription ? "netsapiens" : null,
-      metadata: { ...c, transcription_path: transcription },
+      metadata: { ...c, transcription_path: transcription, recording_api_path: recordingApiPath(domain, c) },
     });
   }
 
@@ -498,12 +508,16 @@ async function syncRecordings(admin: ReturnType<typeof createClient>, domain: st
 
   const D = encodeURIComponent(domain);
   const rawItems: Array<{ item: any; ext?: string }> = [];
+  const qs = `datetime-start=${encodeURIComponent(start)}&datetime-end=${encodeURIComponent(end)}`;
+  const legacyQs = `start-time=${encodeURIComponent(start)}&end-time=${encodeURIComponent(end)}`;
   const domainRecordings = await tryPaths([
-    `/domains/${D}/recordings?start-time=${encodeURIComponent(start)}&end-time=${encodeURIComponent(end)}`,
-    `/domains/${D}/call-recordings?start-time=${encodeURIComponent(start)}&end-time=${encodeURIComponent(end)}`,
-    `/domains/${D}/recorded-calls?start-time=${encodeURIComponent(start)}&end-time=${encodeURIComponent(end)}`,
+    `/domains/${D}/cdrs/recordings?${qs}`,
+    `/domains/${D}/cdrs/recordings?${legacyQs}`,
+    `/domains/${D}/recordings?${legacyQs}`,
+    `/domains/${D}/call-recordings?${legacyQs}`,
+    `/domains/${D}/recorded-calls?${legacyQs}`,
   ]);
-  for (const r of domainRecordings.data ?? []) rawItems.push({ item: r, ext: String(val(r, ["user", "extension", "orig-user", "term-user"], "")) || undefined });
+  for (const r of domainRecordings.data ?? []) rawItems.push({ item: r, ext: String(val(r, ["user", "extension", "orig-user", "term-user", "call-orig-user", "call-term-user", "call-through-user"], "")) || undefined });
 
   if (rawItems.length === 0) {
     const extensions = Array.from(new Set(users.map(userExt).filter(Boolean)));
@@ -511,9 +525,11 @@ async function syncRecordings(admin: ReturnType<typeof createClient>, domain: st
       const chunk = extensions.slice(i, i + 16);
       const results = await Promise.all(chunk.map(async (ext) => {
         const r = await tryPaths([
-          `/domains/${D}/users/${encodeURIComponent(ext)}/recordings?start-time=${encodeURIComponent(start)}&end-time=${encodeURIComponent(end)}`,
-          `/domains/${D}/users/${encodeURIComponent(ext)}/call-recordings?start-time=${encodeURIComponent(start)}&end-time=${encodeURIComponent(end)}`,
-          `/domains/${D}/users/${encodeURIComponent(ext)}/recorded-calls?start-time=${encodeURIComponent(start)}&end-time=${encodeURIComponent(end)}`,
+          `/domains/${D}/users/${encodeURIComponent(ext)}/cdrs/recordings?${qs}`,
+          `/domains/${D}/users/${encodeURIComponent(ext)}/cdrs/recordings?${legacyQs}`,
+          `/domains/${D}/users/${encodeURIComponent(ext)}/recordings?${legacyQs}`,
+          `/domains/${D}/users/${encodeURIComponent(ext)}/call-recordings?${legacyQs}`,
+          `/domains/${D}/users/${encodeURIComponent(ext)}/recorded-calls?${legacyQs}`,
         ]);
         return { ext, data: r.data ?? [], warning: r.warning };
       }));
@@ -523,11 +539,11 @@ async function syncRecordings(admin: ReturnType<typeof createClient>, domain: st
 
   const rows: any[] = [];
   for (const { item: rec, ext: fallbackExt } of rawItems) {
-    const url = recordingUrl(rec);
-    const id = String(val(rec, ["call_id", "call-id", "cdr_id", "cdr-id", "orig-callid", "orig_callid", "session_id", "session-id", "id", "uuid", "recording_id", "recording-id"], "")).trim();
-    if (!id || !url) continue;
-    const ext = String(val(rec, ["user", "extension", "orig-user", "term-user", "subscriber"], fallbackExt ?? "")).trim();
-    const started = toIso(val(rec, ["time-start", "start-time", "start_time", "started_at", "date", "created_at", "recorded_at", "recorded-at"]));
+    const id = String(val(rec, ["call_id", "call-id", "cdr_id", "cdr-id", "orig-callid", "orig_callid", "session_id", "session-id", "id", "uuid", "recording_id", "recording-id", "call-orig-call-id", "call-term-call-id"], "")).trim();
+    if (!id) continue;
+    const ext = String(val(rec, ["user", "extension", "orig-user", "term-user", "subscriber", "call-orig-user", "call-term-user", "call-through-user"], fallbackExt ?? "")).trim();
+    const url = recordingUrl(rec) ?? recordingApiPath(domain, { ...rec, user: ext });
+    const started = toIso(val(rec, ["time-start", "start-time", "start_time", "started_at", "date", "created_at", "recorded_at", "recorded-at", "call-start-datetime", "call-batch-start-datetime", "call-record-creation-datetime"]));
     rows.push({
       user_id: extToProfile.get(ext) ?? null,
       organization_id: AVA_ORG_ID,
@@ -535,15 +551,15 @@ async function syncRecordings(admin: ReturnType<typeof createClient>, domain: st
       ns_domain: domain,
       extension: ext || null,
       direction: pickDirection(rec, ext),
-      status: String(val(rec, ["release-text", "disposition", "status"], "completed")).toLowerCase(),
-      from_number: normalizePhone(val(rec, ["orig-from-uri", "from", "from_number", "from-user", "caller_id_number"])),
-      from_name: val(rec, ["orig-from-name", "from_name", "caller_id_name"]),
-      to_number: normalizePhone(val(rec, ["term-to-uri", "to", "to_number", "to-user", "destination"])),
-      to_name: val(rec, ["term-to-name", "to_name"]),
+      status: String(val(rec, ["release-text", "call-disconnect-reason-text", "call-disposition", "disposition", "status"], "completed")).toLowerCase(),
+      from_number: normalizePhone(val(rec, ["orig-from-uri", "from", "from_number", "from-user", "caller_id_number", "call-orig-from-uri", "call-orig-from-user", "call-orig-caller-id"])),
+      from_name: val(rec, ["orig-from-name", "from_name", "caller_id_name", "call-orig-from-name"]),
+      to_number: normalizePhone(val(rec, ["term-to-uri", "to", "to_number", "to-user", "destination", "call-term-to-uri", "call-orig-to-uri", "call-term-user", "call-orig-to-user", "call-orig-request-user"])),
+      to_name: val(rec, ["term-to-name", "to_name", "call-term-to-name"]),
       started_at: started,
-      duration_seconds: Number(val(rec, ["duration", "time-talking", "billsec", "talk_time", "recording_seconds"], 0)) || 0,
+      duration_seconds: numVal(rec, ["duration", "time-talking", "billsec", "talk_time", "recording_seconds", "call-total-duration-seconds", "call-batch-total-duration-seconds", "call-talking-duration-seconds"], 0),
       recording_url: url,
-      metadata: { ns_recording: rec },
+      metadata: { ns_recording: rec, recording_api_path: url },
     });
   }
 
