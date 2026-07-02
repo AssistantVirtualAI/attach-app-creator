@@ -60,6 +60,19 @@ function KpiCard({ icon, title, value, subtitle, trend, color }: { icon: any; ti
   );
 }
 
+function RuleCard({ title, count, formula, filter, color }: { title: string; count: number; formula: string; filter: string; color: string }) {
+  return (
+    <div className="rounded-lg p-3" style={{ background: "var(--pp-bg-deep)", border: "1px solid var(--pp-bg-border-2)" }}>
+      <div className="flex items-center justify-between gap-2">
+        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--pp-text-primary)" }}>{title}</span>
+        <span className="tabular-nums" style={{ fontSize: 18, fontWeight: 800, color }}>{count}</span>
+      </div>
+      <p className="mt-2" style={{ fontSize: 11, color: "var(--pp-text-secondary)" }}>{formula}</p>
+      <p className="mt-1" style={{ fontSize: 10, color: "var(--pp-text-faint)" }}>{filter}</p>
+    </div>
+  );
+}
+
 function ChartCard({ title, subtitle, children, action }: { title: string; subtitle?: string; children: any; action?: any }) {
   return (
     <div className="pp-card" style={{ padding: 20 }}>
@@ -389,7 +402,7 @@ export default function PAOverview() {
               {finance.map((f) => {
                 const unitCost = f.users > 0 ? f.cost / f.users : 0;
                 const rule = f.service === "widget"
-                  ? "courriel @planipret.ca / .com"
+                  ? "courriel @planipret.ca + non test"
                   : f.service === "mobile"
                     ? "domain NS planipret.ca + app mobile activée"
                     : "domain NS planipret.ca + agent AI activé";
@@ -426,6 +439,18 @@ export default function PAOverview() {
               </tr>
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <div className="pp-card" style={{ padding: 20 }}>
+        <div className="mb-3">
+          <h2 style={{ fontFamily: "Inter,sans-serif", fontWeight: 600, fontSize: 14, color: "var(--pp-text-primary)" }}>Règles exactes de calcul</h2>
+          <p style={{ fontSize: 11, color: "var(--pp-text-faint)" }} className="mt-0.5">Base active: courriel @planipret.ca · comptes test exclus: Scott, Mohamad, Carlo, Clinton.</p>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+          <RuleCard title="Widget web" count={serviceCounts.widget} formula={`${serviceCounts.widget} × 18,99 $ = ${fmtMoney(serviceCounts.widget * 18.99)} / mois`} filter="email @planipret.ca + non test" color={WARNING} />
+          <RuleCard title="Application mobile" count={serviceCounts.mobile} formula={`${serviceCounts.mobile} × 8,00 $ = ${fmtMoney(serviceCounts.mobile * 8)} / mois`} filter="email @planipret.ca + non test + ns_domain = planipret.ca + mobile_app_enabled = true" color={ACCENT} />
+          <RuleCard title="Agent AI" count={serviceCounts.ai} formula={`${serviceCounts.ai} × 25,00 $ = ${fmtMoney(serviceCounts.ai * 25)} / mois`} filter="email @planipret.ca + non test + ns_domain = planipret.ca + voice_agent_enabled = true" color={AGENT} />
         </div>
       </div>
 
