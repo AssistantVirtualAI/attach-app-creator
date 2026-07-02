@@ -82,6 +82,9 @@ export const MP_DICT = {
       searching: "Recherche…",
       typeToSearch: "Tapez pour rechercher parmi vos contacts",
       sms: "SMS",
+      internal: "Interne",
+      hangupFailed: "Échec raccrocher",
+      hungUp: "Appel raccroché",
     },
     home: {
       period: { day: "Aujourd'hui", week: "Cette semaine", month: "Ce mois", shift: "Mon quart" },
