@@ -130,6 +130,10 @@ export default function PAMessages() {
     <div className="space-y-4">
       <DebugPanel entries={debug} />
 
+      <NsSyncBar features={["messages", "cdrs"]} onReload={() => load(page, pageSize)} />
+
+
+
       <div className="pp-card p-4 flex flex-wrap items-end gap-2">
         <select value={broker} onChange={(e) => setFilterValue("broker", e.target.value)} className="px-3 py-1.5 rounded-lg text-sm" style={inputStyle}>
           <option value="">Tous courtiers</option>
