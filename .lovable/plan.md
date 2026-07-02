@@ -1,63 +1,120 @@
 
-## Goal
+# Phase 1 — AVA Assistant IA + Emails Outlook
 
-From the Extensions admin table, allow super_admin / lemtel_admin / org_admin to:
-1. **Reset an extension's password** — generates a new unified password, pushes it to FusionPBX + `pbx_softphone_users` + Supabase Auth, shows it once.
-2. **Link an existing email** to an extension so that user can sign into the portal/softphone with that email + SIP password.
-3. **Send a welcome email** so the user can set their own password (magic-recovery link).
-4. Works for **any organization / domain**, not just Lemtel.
+Portée limitée : **Outlook (lecture/envoi/analyse)** + **chat AVA avec confirmations**. Teams, brief matinal, webhooks Graph, et Maestro CRM seront livrés dans les phases suivantes.
 
-## Changes
+## Prérequis à confirmer
 
-### 1. New Edge Function: `extension-welcome-send`
-`supabase/functions/extension-welcome-send/index.ts`
+- **Clé Anthropic** requise : je demanderai `ANTHROPIC_API_KEY` via `add_secret` (modèle `claude-sonnet-4-5`).
+- **OAuth Microsoft par courtier** : la fonction `ms365-oauth-exchange` existe déjà. Je vais vérifier que les tokens (`ms_access_token`, `ms_refresh_token`, `ms_token_expires_at`) sont bien stockés par broker dans `planipret_profiles` et ajouter un helper de refresh automatique.
+- **Actions Maestro** : mockées → journalisées dans `planipret_ava_action_log` avec `execution_mode='mock'`. UI affichera « Sera exécutée quand Maestro sera branché ». Aucun appel externe.
 
-Input: `{ organization_id, extension, email?, mode: 'welcome' | 'reset-only' | 'link-only' }`
+## 1. Base de données (migration)
 
-Flow:
-- RBAC: super_admin OR lemtel_admin OR org_admin of `organization_id`.
-- Locate `pbx_softphone_users` row for `(org, extension)`; create/refresh if missing via existing provisioning helper.
-- If `email` provided:
-  - Look up `auth.users` by email; create user if missing (`admin.createUser` with a random password, `email_confirm: true`).
-  - Link `pbx_softphone_users.portal_user_id` to that auth user (uses existing `admin_link_softphone_by_extension_email` RPC).
-- Call `set-unified-password` internally with `use_current_sip_password: true` so Auth password === SIP password.
-- If `mode === 'welcome'`, generate a Supabase recovery link (`admin.generateLink({ type: 'recovery' })`) and enqueue an email through the existing Lovable auth-email hook (or via `send-transactional-email` if scaffolded) with:
-  - extension number, SIP domain, temporary SIP password, "Set your password" button pointing at `/reset-password`.
-- Audit into `pbx_softphone_portal_audit` + `audit_logs`.
+```sql
+CREATE TABLE public.planipret_ava_email_analyses (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  broker_id uuid NOT NULL REFERENCES planipret_profiles(id) ON DELETE CASCADE,
+  ms_message_id text NOT NULL,
+  email_subject text,
+  email_from text,
+  email_from_name text,
+  intent text,           -- contrat_signe | nouveau_lead | demande_rdv | documents_recus | question_info | autre
+  urgency text,          -- high | medium | low
+  lead_score int,
+  key_info jsonb,
+  proposed_actions jsonb NOT NULL,
+  notification_summary text,
+  created_at timestamptz DEFAULT now(),
+  UNIQUE(broker_id, ms_message_id)
+);
 
-### 2. UI: extensions table row actions
-`src/pages/lemtel/LemtelExtensions.tsx` + `src/components/lemtel/ExtensionEditDialog.tsx`
+CREATE TABLE public.planipret_ava_action_log (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  broker_id uuid NOT NULL REFERENCES planipret_profiles(id) ON DELETE CASCADE,
+  analysis_id uuid REFERENCES planipret_ava_email_analyses(id) ON DELETE SET NULL,
+  action_type text NOT NULL,   -- email_reply | maestro_task | maestro_note | calendar_event | ...
+  action_params jsonb,
+  modified_content text,
+  execution_mode text DEFAULT 'live',  -- live | mock
+  success boolean,
+  result jsonb,
+  error text,
+  modified_by_broker boolean DEFAULT false,
+  executed_at timestamptz DEFAULT now()
+);
+```
 
-- Add a "…" actions menu per row:
-  - **Reset password** → confirmation, then calls `softphone-reset-password` + surfaces the new password in a copy-once dialog.
-  - **Link email…** → small dialog (email input) → invokes `extension-welcome-send` with `mode: 'link-only'` (or reuses `admin_link_softphone_by_extension_email` when the auth user already exists).
-  - **Send welcome email** → calls `extension-welcome-send` with `mode: 'welcome'`; toast confirms.
-- Show current linked email + status badge in the row (already partially there through `softphoneByExt`).
++ GRANTs (`authenticated`, `service_role`) + RLS scopée sur `broker_id = auth.uid()` + ajout au `supabase_realtime` publication.
 
-### 3. Generic (multi-org) admin extensions page
-`src/pages/admin/AllExtensions.tsx` (new) mounted at `/admin/extensions` behind super_admin / lemtel_admin.
+## 2. Edge Functions
 
-- Same table + row actions as above, but with an **Organization / Domain** selector fed by `get_org_pbx_mapping()` (already exists).
-- Reuses the same hooks, parameterised by `organization_id` (extend `usePbxExtensions` / `usePbxSoftphoneUsers` to accept an override org id; today they're pinned to `LEMTEL_ORG`).
-- Add sidebar entry "All PBX Extensions" for super/lemtel admins.
+**`ms365-graph-proxy`** (nouvelle) — appelle Graph pour le courtier connecté avec refresh automatique du token.
+- `GET /me/messages` (liste, filtres, pagination)
+- `GET /me/messages/{id}` (détail + body HTML)
+- `GET /me/messages/{id}/attachments/{aid}` (téléchargement)
+- `POST /me/sendMail`
+- Auth : JWT courtier → charge tokens depuis `planipret_profiles` → refresh si expiré.
 
-### 4. Small hook refactor
-`src/hooks/usePbxData.ts` — accept optional `orgId` argument; default remains `LEMTEL_ORG` so existing Lemtel screens are unchanged.
+**`ava-email-analyzer`** — analyse un email via Claude.
+- Input `{ ms_message_id }`
+- Fetch email via `ms365-graph-proxy`
+- Appel Claude (`claude-sonnet-4-5-20250929`) avec prompt JSON structuré (schéma cité dans le prompt utilisateur)
+- Insert dans `planipret_ava_email_analyses`
+- Broadcast Realtime channel `ava-analyses-{broker_id}`
+- Retourne l'analyse
 
-### 5. Email template
-Reuse existing Lovable auth email hook if scaffolded; otherwise scaffold the transactional template `extension-welcome` (subject: "Your Lemtel/AVA extension is ready" — bilingual FR/EN body with extension, domain, temp password, "Choose your password" CTA).
+**`ava-action-executor`** — exécute une action approuvée.
+- Input `{ analysis_id, action_id, modified_content? }`
+- Switch sur `action_type` :
+  - `email_reply` → `ms365-graph-proxy` `POST /me/sendMail`
+  - `calendar_event` → `ms365-graph-proxy` `POST /me/events`
+  - `maestro_*` → **mock** : insert dans `planipret_ava_action_log` avec `execution_mode='mock'`, `success=true`, note « Maestro non branché »
+- Log toujours dans `planipret_ava_action_log`
 
-## Out of scope
-- Bulk send-to-all buttons (can add later once single-row flow is validated).
-- Changing FusionPBX v_users passwords (only extension SIP password is rotated — v_users login stays managed via existing tools).
+## 3. UI mobile — `/planipret/mobile/messages`
 
-## Files touched
-- `supabase/functions/extension-welcome-send/index.ts` (new)
-- `supabase/functions/_shared/email-templates/extension-welcome.tsx` (new, if auth-email-hook is scaffolded)
-- `src/pages/lemtel/LemtelExtensions.tsx`
-- `src/components/lemtel/ExtensionEditDialog.tsx`
-- `src/components/lemtel/ExtensionActionsMenu.tsx` (new)
-- `src/pages/admin/AllExtensions.tsx` (new)
-- `src/hooks/usePbxData.ts`
-- `src/components/sidebar/sidebarConfig.ts` (add "All PBX Extensions")
-- Route registration in `src/App.tsx` / router file
+**Onglet 📧 Emails** (`src/components/planipret/mobile/messages/OutlookInbox.tsx`)
+- Header : logo Outlook #0078D4, badge « Connecté » ou CTA « Se connecter avec Microsoft » (réutilise OAuth existant).
+- Filtres : dossiers (Boîte, Envoyés, Brouillons, Importants, Supprimés).
+- Liste virtualisée : avatar initiales, expéditeur/sujet en gras si non lu, aperçu, date relative, 📎, importance, point bleu non lu.
+- Query : React Query, `useInfiniteQuery`, `$top=30` par page.
+- Bottom sheet détail email (`OutlookEmailDetail.tsx`) : sujet, expéditeur/dest, corps HTML sanitisé via `DOMPurify`, pièces jointes téléchargeables.
+- Actions sticky : Répondre / Répondre à tous / Transférer / Supprimer / Important / **🤖 Analyser avec AVA**.
+- Composer (`OutlookComposer.tsx`) : full-screen, À/Cc/Sujet/corps + envoi.
+
+**Onglet 🤖 AVA** (`src/components/planipret/mobile/messages/AvaAssistant.tsx`)
+- Chat UI (gradients spécifiés). Header avatar 🤖 + badges intégrations.
+- Suggestions rapides (chips) — Phase 1 : « 📧 Résumer mes courriels non lus », « ✏️ Rédiger un email », « 🔍 Analyser dernier email ».
+- Historique local (state) — pas de persistance en Phase 1.
+- Sur clic « Analyser avec AVA » depuis un email → ouvre l'onglet AVA avec la carte d'analyse rendue.
+- **Composant clé `AvaProposedActionsCard.tsx`** :
+  - Rend `proposed_actions` comme cartes numérotées (1️⃣ 2️⃣ ...).
+  - Chaque brouillon éditable inline (textarea repliable).
+  - Boutons `[✅ Tout faire] [✏️ Modifier] [❌ Skip]` + boutons individuels.
+  - Sur exécution → appelle `ava-action-executor`, affiche progression, puis « ✅ Effectué » avec liens (email envoyé ouvre `/planipret/mobile/messages/sent/{id}`; Maestro affiche badge « Sera synchronisé quand Maestro sera branché »).
+- Réception Realtime : nouvelle analyse push → carte apparaît en haut du fil.
+
+## 4. Intégration & routage
+
+- Ajout de `useMs365Connection()` hook (statut token + bouton connect).
+- L'onglet **👥 Équipe** est laissé inchangé (Teams = phase suivante).
+- Pas de push FCM en Phase 1 (Realtime uniquement pour l'instant) — les notifications push seront dans la phase Teams/brief.
+
+## 5. Secrets nécessaires
+
+- `ANTHROPIC_API_KEY` (à demander)
+- `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `MICROSOFT_TENANT_ID` : déjà configurés (Phase MS365 SSO précédente) — je vérifierai.
+
+## Ce qui est explicitement HORS scope Phase 1
+
+- Onglet Teams / Graph chats
+- Webhooks Graph pour push automatique sur nouveaux emails (l'analyse est déclenchée manuellement via bouton ou refresh)
+- Renouvellement CRON des subscriptions
+- Brief matinal 8h00
+- Notifications push FCM/APNs
+- Écran paramètres AVA (More tab)
+- Intégration Maestro CRM réelle
+- Intégration calendrier (les actions `calendar_event` seront branchées quand on activera Teams+webhooks)
+
+Souhaitez-vous que je réduise davantage (p. ex. remettre `calendar_event` en mock aussi pour ne toucher qu'à `sendMail` en Phase 1), ou est-ce que ce périmètre convient ?
