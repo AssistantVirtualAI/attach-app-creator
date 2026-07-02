@@ -226,6 +226,7 @@ export default function MMore() {
           right={<StatusPill ok={ms365Connected} label={ms365Connected ? t("more.connected") : "—"} />} chevron />
         {ms365Connected && (
           <div style={{ padding: 8 }}>
+            <Ms365ScopesCard profile={profile} onReconnect={connectMs365} />
             <CalendarSyncCard profile={profile} />
           </div>
         )}
