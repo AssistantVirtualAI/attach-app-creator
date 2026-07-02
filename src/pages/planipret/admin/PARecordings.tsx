@@ -142,6 +142,10 @@ export default function PARecordings() {
     <div className="space-y-4">
       <DebugPanel entries={debug} />
 
+      <NsSyncBar features={["recordings", "cdrs"]} onReload={() => load(page, pageSize)} />
+
+
+
       <div className="pp-card p-4 flex items-center gap-2 flex-wrap">
         <input
           value={search}
