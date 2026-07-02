@@ -58,12 +58,19 @@ export default function PAReports() {
     else start.setMonth(start.getMonth() - 3);
     start.setHours(0, 0, 0, 0);
     (async () => {
-      const [{ data: c }, { data: p }, nsUsers] = await Promise.all([
-        supabase.from("planipret_phone_calls").select("*").gte("started_at", start.toISOString()),
+      const startIso = start.toISOString();
+      const [{ data: c }, { data: p }, nsUsers, { data: m }, { data: fb }, { data: rem }] = await Promise.all([
+        supabase.from("planipret_phone_calls").select("*").gte("started_at", startIso),
         supabase.from("planipret_profiles").select("user_id, full_name, extension, ns_extension"),
         supabase.functions.invoke("pp-ns-users", { body: {} }).catch((error) => ({ data: null, error })),
+        supabase.from("planipret_phone_messages").select("id, sent_at, created_at, direction, user_id, extension").gte("sent_at", startIso),
+        supabase.from("planipret_ava_feedback").select("rating").gte("created_at", startIso),
+        supabase.from("planipret_reminders").select("id, user_id, status, scheduled_at, created_at").gte("created_at", startIso),
       ]);
       setCalls(c ?? []);
+      setMessages(m ?? []);
+      setAvaFeedback((fb ?? []) as any);
+      setReminders(rem ?? []);
       const map: Record<string, string> = {};
       (p ?? []).forEach((x: any) => {
         map[x.user_id] = x.full_name;
@@ -77,6 +84,8 @@ export default function PAReports() {
       setBrokers(map);
     })();
   }, [range, refreshTick]);
+
+
 
   const syncAll = async () => {
     setSyncing(true);
