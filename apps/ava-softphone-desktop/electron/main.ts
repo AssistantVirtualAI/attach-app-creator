@@ -141,6 +141,7 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       webSecurity: false,
+      backgroundThrottling: false,
     },
     icon: path.join(__dirname, '../assets/icon.png'),
     show: false,
