@@ -124,13 +124,13 @@ export default function PAOverview() {
     const [c1, c2, sms, smsY, ava, vm, rec, callsP, smsP, callsByDir, topCalls, svcWidget, svcAi, directory] = await Promise.all([
       getPlanipretCallCount({ from: todayIso }),
       getPlanipretCallCount({ from: yestIso, to: todayIso }),
-      supabase.from("planipret_phone_messages").select("id", { count: "exact", head: true }).gte("created_at", todayIso),
-      supabase.from("planipret_phone_messages").select("id", { count: "exact", head: true }).gte("created_at", yestIso).lt("created_at", todayIso),
+      supabase.from("planipret_phone_messages").select("id", { count: "exact", head: true }).gte("sent_at", todayIso),
+      supabase.from("planipret_phone_messages").select("id", { count: "exact", head: true }).gte("sent_at", yestIso).lt("sent_at", todayIso),
       supabase.from("ai_request_audit_log").select("id", { count: "exact", head: true }).gte("created_at", todayIso).like("action", "elevenlabs_tool:%"),
       supabase.from("planipret_voicemails").select("id", { count: "exact", head: true }).eq("is_read", false),
       supabase.from("planipret_phone_calls").select("id, user_id, extension, direction, from_number, to_number, duration_seconds, started_at, ai_summary, metadata, planipret_profiles(full_name)").order("started_at", { ascending: false }).limit(20),
       supabase.from("planipret_phone_calls").select("started_at").gte("started_at", periodIso),
-      supabase.from("planipret_phone_messages").select("created_at").gte("created_at", periodIso),
+      supabase.from("planipret_phone_messages").select("sent_at").gte("sent_at", periodIso),
       supabase.from("planipret_phone_calls").select("direction").gte("started_at", periodIso),
       supabase.from("planipret_phone_calls").select("user_id, extension, metadata, planipret_profiles(full_name)").gte("started_at", periodIso),
       supabase.from("planipret_profiles").select("id", { count: "exact", head: true }).eq("widget_enabled", true),
@@ -164,7 +164,7 @@ export default function PAOverview() {
         appels: 0, sms: 0,
       });
       (callsP.data ?? []).forEach((c: any) => { if (c.started_at?.slice(0, 10) === key) days[days.length - 1].appels++; });
-      (smsP.data ?? []).forEach((m: any) => { if (m.created_at?.slice(0, 10) === key) days[days.length - 1].sms++; });
+      (smsP.data ?? []).forEach((m: any) => { if (m.sent_at?.slice(0, 10) === key) days[days.length - 1].sms++; });
     }
     setSeriesData(days);
 

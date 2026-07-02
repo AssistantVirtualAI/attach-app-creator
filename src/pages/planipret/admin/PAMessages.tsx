@@ -62,18 +62,18 @@ export default function PAMessages() {
     const fromIdx = (p - 1) * ps;
     let q = supabase.from("planipret_phone_messages")
       .select("*, planipret_profiles(full_name)", { count: "exact" })
-      .order("created_at", { ascending: false })
+      .order("sent_at", { ascending: false })
       .range(fromIdx, fromIdx + ps - 1);
     if (broker?.startsWith("ext:")) q = q.eq("metadata->>extension", broker.slice(4));
     else if (broker?.startsWith("user:")) q = q.eq("user_id", broker.slice(5));
     if (direction) q = q.eq("direction", direction);
     if (status) q = q.eq("status", status);
-    if (from) q = q.gte("created_at", from);
-    if (to) q = q.lte("created_at", to);
+    if (from) q = q.gte("sent_at", from);
+    if (to) q = q.lte("sent_at", to);
     const { data, count, error } = await q;
     dbg.push({
       label: "planipret_phone_messages (page)",
-      query: `SELECT * FROM planipret_phone_messages ORDER BY created_at DESC LIMIT ${ps} OFFSET ${fromIdx}`,
+      query: `SELECT * FROM planipret_phone_messages ORDER BY sent_at DESC LIMIT ${ps} OFFSET ${fromIdx}`,
       count,
       ms: Math.round(performance.now() - t0),
       error: error?.message ?? null,
