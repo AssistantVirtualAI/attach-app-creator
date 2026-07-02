@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate, NavLink, Outlet, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
-import { Home, Phone, MessageSquare, Users, Phone as PhoneIcon, X, Delete, Plus, Lock, PhoneOff, Settings as SettingsIcon } from "lucide-react";
+import { Home, Phone, MessageSquare, Users, Phone as PhoneIcon, X, Delete, Plus, Lock, PhoneOff, Settings as SettingsIcon, Search as SearchIcon, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import planipretLogo from "@/assets/planipret-logo.png.asset.json";
 import avaWordmark from "@/assets/ava-wordmark.svg";
@@ -46,12 +46,46 @@ const KEYS: Array<{ d: string; l?: string }> = [
   { d: "*" }, { d: "0", l: "+" }, { d: "#" },
 ];
 
-function Dialer({ open, onClose, initial }: { open: boolean; onClose: () => void; initial?: string }) {
+type DialerContact = {
+  id?: string;
+  first_name?: string;
+  last_name?: string;
+  name?: string;
+  display_name?: string;
+  phone?: string;
+  cell_phone?: string;
+  work_phone?: string;
+  home_phone?: string;
+  extension?: string;
+  email?: string;
+  company?: string;
+  source?: "personal" | "shared" | "directory";
+};
+
+function contactDisplayName(c: DialerContact): string {
+  return (
+    c.display_name ||
+    c.name ||
+    [c.first_name, c.last_name].filter(Boolean).join(" ") ||
+    c.email ||
+    c.phone ||
+    "—"
+  );
+}
+function contactPrimaryPhone(c: DialerContact): string | undefined {
+  return c.cell_phone || c.phone || c.work_phone || c.home_phone || c.extension;
+}
+
+function Dialer({ open, onClose, initial, openMessages }: { open: boolean; onClose: () => void; initial?: string; openMessages: (n?: string) => void }) {
   const { t } = useMplanipretLang();
+  const [mode, setMode] = useState<"keypad" | "search">("keypad");
   const [number, setNumber] = useState("");
   const [calling, setCalling] = useState(false);
+  const [query, setQuery] = useState("");
+  const [contacts, setContacts] = useState<DialerContact[]>([]);
+  const [loadingContacts, setLoadingContacts] = useState(false);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => { if (open) setNumber(initial ?? ""); }, [open, initial]);
+  useEffect(() => { if (open) { setNumber(initial ?? ""); setMode("keypad"); setQuery(""); } }, [open, initial]);
   const append = (c: string) => setNumber((n) => (n + c).slice(0, 20));
   const back = () => setNumber((n) => n.slice(0, -1));
   const startHold = () => {
@@ -59,10 +93,11 @@ function Dialer({ open, onClose, initial }: { open: boolean; onClose: () => void
     holdTimer.current = setTimeout(() => { setNumber(""); holdTimer.current = null; }, 1000);
   };
   const endHold = () => { if (holdTimer.current) { clearTimeout(holdTimer.current); holdTimer.current = null; back(); } };
-  const startCall = async () => {
-    if (!number) return;
+  const startCall = async (destOverride?: string) => {
+    const destination = destOverride ?? number;
+    if (!destination) return;
     setCalling(true);
-    const { data, error } = await supabase.functions.invoke("ns-calls", { body: { action: "start", destination: number } });
+    const { data, error } = await supabase.functions.invoke("ns-calls", { body: { action: "start", destination } });
     setCalling(false);
     if (error || (data as any)?.success === false) {
       toast.error((data as any)?.error ?? error?.message ?? t("dialer.callFailed"));
@@ -72,6 +107,49 @@ function Dialer({ open, onClose, initial }: { open: boolean; onClose: () => void
     setNumber("");
     onClose();
   };
+
+  // Load contacts (personal + shared + directory) once when opening Search mode
+  useEffect(() => {
+    if (!open || mode !== "search" || contacts.length > 0 || loadingContacts) return;
+    let cancelled = false;
+    (async () => {
+      setLoadingContacts(true);
+      try {
+        const results: DialerContact[] = [];
+        const [personal, shared, directory] = await Promise.all([
+          supabase.functions.invoke("pp-ns-contacts", { body: { action: "list" } }),
+          supabase.functions.invoke("pp-ns-contacts", { body: { action: "shared" } }),
+          supabase.functions.invoke("pp-ns-contacts", { body: { action: "directory" } }),
+        ]);
+        for (const c of ((personal.data as any)?.contacts ?? [])) results.push({ ...c, source: "personal" });
+        for (const c of ((shared.data as any)?.contacts ?? [])) results.push({ ...c, source: "shared" });
+        for (const c of ((directory.data as any)?.directory ?? [])) results.push({ ...c, source: "directory" });
+        if (!cancelled) setContacts(results);
+      } catch (e) {
+        console.error("[Dialer] load contacts failed", e);
+      } finally {
+        if (!cancelled) setLoadingContacts(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [open, mode, contacts.length, loadingContacts]);
+
+  const normalized = query.trim().toLowerCase();
+  const filtered = normalized
+    ? contacts.filter((c) => {
+        const hay = [
+          contactDisplayName(c),
+          c.email,
+          c.company,
+          c.extension,
+          c.phone,
+          c.cell_phone,
+          c.work_phone,
+          c.home_phone,
+        ].filter(Boolean).join(" ").toLowerCase();
+        return hay.includes(normalized);
+      }).slice(0, 30)
+    : [];
 
   return (
     <AnimatePresence>
@@ -89,53 +167,144 @@ function Dialer({ open, onClose, initial }: { open: boolean; onClose: () => void
             <div style={{ width: 36, height: 4, background: "var(--pp-bg-border-2)", borderRadius: 2 }} />
             <button onClick={onClose} className="absolute right-3 top-3 p-2.5 rounded-full" style={{ color: "var(--pp-text-secondary)", minWidth: 44, minHeight: 44 }} aria-label={t("common.close")}><X className="w-5 h-5 mx-auto" /></button>
           </div>
-          <div className="flex-1 flex flex-col px-6 pt-4 overflow-hidden">
-            <div className="text-center min-h-[56px] flex items-center justify-center px-5 py-5">
-              <span style={{
-                fontFamily: "Inter, sans-serif",
-                fontWeight: 300,
-                fontSize: number ? 32 : 16,
-                color: number ? "var(--pp-text-primary)" : "var(--pp-text-faint)",
-                letterSpacing: "-0.01em",
-              }}>
-                {number || t("dialer.enterNumber")}
-              </span>
-            </div>
-            <div className="grid grid-cols-3 gap-3 mt-2 mx-auto" style={{ maxWidth: 288 }}>
-              {KEYS.map((k) => (
-                <button key={k.d} onClick={() => append(k.d)}
-                  className="flex flex-col items-center justify-center transition active:scale-[0.92] pp-keypad-btn"
+          <div className="flex-1 flex flex-col px-6 pt-2 overflow-hidden">
+            {/* Segmented control: Keypad / Search */}
+            <div className="mx-auto flex items-center gap-1 p-1 rounded-full" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)" }}>
+              {(["keypad", "search"] as const).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setMode(m)}
+                  className="px-4 py-1.5 rounded-full text-xs font-medium transition flex items-center gap-1.5"
                   style={{
-                    width: 72, height: 72, borderRadius: "50%",
-                    background: "var(--pp-bg-elevated)",
-                    border: "1px solid var(--pp-bg-border-2)",
-                  }}>
-                  <span style={{ fontFamily: "Inter, sans-serif", fontWeight: 600, fontSize: 26, color: "var(--pp-text-primary)", lineHeight: 1 }}>{k.d}</span>
-                  {k.l && <span style={{ fontFamily: "DM Sans, sans-serif", fontSize: 9, color: "var(--pp-text-muted)", marginTop: 3, letterSpacing: "0.05em" }}>{k.l}</span>}
+                    background: mode === m ? "var(--pp-bg-surface)" : "transparent",
+                    color: mode === m ? "var(--pp-text-primary)" : "var(--pp-text-muted)",
+                    boxShadow: mode === m ? "0 1px 4px rgba(0,0,0,0.25)" : "none",
+                    minHeight: 36,
+                  }}
+                >
+                  {m === "keypad" ? <PhoneIcon className="w-3.5 h-3.5" /> : <SearchIcon className="w-3.5 h-3.5" />}
+                  {t(m === "keypad" ? "dialer.modeKeypad" : "dialer.modeSearch")}
                 </button>
               ))}
             </div>
-            <div className="grid grid-cols-3 items-center gap-3 mt-5 mx-auto" style={{ maxWidth: 288 }}>
-              <button onClick={() => append("+")} className="mx-auto flex items-center justify-center active:scale-95 transition"
-                style={{ width: 48, height: 48, borderRadius: "50%", background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-muted)" }} aria-label={t("dialer.plus")}>
-                <Plus className="w-5 h-5" />
-              </button>
-              <button onClick={startCall} disabled={!number || calling}
-                className="mx-auto flex items-center justify-center text-white disabled:opacity-50 active:scale-95 transition"
-                style={{ width: 72, height: 72, borderRadius: "50%", background: "linear-gradient(135deg, #0D5C2A, #00D4AA)", boxShadow: "0 4px 20px rgba(0,212,170,0.5)" }} aria-label={t("common.call")}>
-                <PhoneIcon className="w-7 h-7" />
-              </button>
-              <button
-                onPointerDown={startHold}
-                onPointerUp={endHold}
-                onPointerLeave={() => { if (holdTimer.current) { clearTimeout(holdTimer.current); holdTimer.current = null; } }}
-                onContextMenu={(e) => { e.preventDefault(); setNumber(""); }}
-                className="mx-auto flex items-center justify-center active:scale-95 transition"
-                style={{ width: 48, height: 48, borderRadius: "50%", background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-muted)" }} aria-label={t("dialer.clear")}>
-                <Delete className="w-5 h-5" />
-              </button>
-            </div>
-            {calling && <div className="mt-4 text-center text-sm" style={{ color: "var(--pp-text-muted)" }}>{t("dialer.callInProgress")}</div>}
+
+            {mode === "keypad" ? (
+              <>
+                <div className="text-center min-h-[56px] flex items-center justify-center px-5 py-4">
+                  <span style={{
+                    fontFamily: "Inter, sans-serif",
+                    fontWeight: 300,
+                    fontSize: number ? 32 : 16,
+                    color: number ? "var(--pp-text-primary)" : "var(--pp-text-faint)",
+                    letterSpacing: "-0.01em",
+                  }}>
+                    {number || t("dialer.enterNumber")}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-3 mt-1 mx-auto" style={{ maxWidth: 288 }}>
+                  {KEYS.map((k) => (
+                    <button key={k.d} onClick={() => append(k.d)}
+                      className="flex flex-col items-center justify-center transition active:scale-[0.92] pp-keypad-btn"
+                      style={{
+                        width: 72, height: 72, borderRadius: "50%",
+                        background: "var(--pp-bg-elevated)",
+                        border: "1px solid var(--pp-bg-border-2)",
+                      }}>
+                      <span style={{ fontFamily: "Inter, sans-serif", fontWeight: 600, fontSize: 26, color: "var(--pp-text-primary)", lineHeight: 1 }}>{k.d}</span>
+                      {k.l && <span style={{ fontFamily: "DM Sans, sans-serif", fontSize: 9, color: "var(--pp-text-muted)", marginTop: 3, letterSpacing: "0.05em" }}>{k.l}</span>}
+                    </button>
+                  ))}
+                </div>
+                <div className="grid grid-cols-3 items-center gap-3 mt-5 mx-auto" style={{ maxWidth: 288 }}>
+                  <button onClick={() => append("+")} className="mx-auto flex items-center justify-center active:scale-95 transition"
+                    style={{ width: 48, height: 48, borderRadius: "50%", background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-muted)" }} aria-label={t("dialer.plus")}>
+                    <Plus className="w-5 h-5" />
+                  </button>
+                  <button onClick={() => startCall()} disabled={!number || calling}
+                    className="mx-auto flex items-center justify-center text-white disabled:opacity-50 active:scale-95 transition"
+                    style={{ width: 72, height: 72, borderRadius: "50%", background: "linear-gradient(135deg, #0D5C2A, #00D4AA)", boxShadow: "0 4px 20px rgba(0,212,170,0.5)" }} aria-label={t("common.call")}>
+                    <PhoneIcon className="w-7 h-7" />
+                  </button>
+                  <button
+                    onPointerDown={startHold}
+                    onPointerUp={endHold}
+                    onPointerLeave={() => { if (holdTimer.current) { clearTimeout(holdTimer.current); holdTimer.current = null; } }}
+                    onContextMenu={(e) => { e.preventDefault(); setNumber(""); }}
+                    className="mx-auto flex items-center justify-center active:scale-95 transition"
+                    style={{ width: 48, height: 48, borderRadius: "50%", background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-muted)" }} aria-label={t("dialer.clear")}>
+                    <Delete className="w-5 h-5" />
+                  </button>
+                </div>
+                {calling && <div className="mt-4 text-center text-sm" style={{ color: "var(--pp-text-muted)" }}>{t("dialer.callInProgress")}</div>}
+              </>
+            ) : (
+              <div className="flex-1 flex flex-col mt-3 overflow-hidden">
+                <div className="flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)" }}>
+                  <SearchIcon className="w-4 h-4" style={{ color: "var(--pp-text-muted)" }} />
+                  <input
+                    autoFocus
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder={t("dialer.searchPh")}
+                    className="flex-1 bg-transparent outline-none text-sm"
+                    style={{ color: "var(--pp-text-primary)" }}
+                  />
+                  {query && (
+                    <button onClick={() => setQuery("")} aria-label={t("dialer.clear")} style={{ color: "var(--pp-text-muted)" }}>
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+                <div className="flex-1 overflow-y-auto mt-3 -mx-2 px-2 pb-4">
+                  {loadingContacts && contacts.length === 0 ? (
+                    <div className="text-center text-sm py-8" style={{ color: "var(--pp-text-muted)" }}>{t("dialer.searching")}</div>
+                  ) : !normalized ? (
+                    <div className="text-center text-sm py-8" style={{ color: "var(--pp-text-muted)" }}>{t("dialer.typeToSearch")}</div>
+                  ) : filtered.length === 0 ? (
+                    <div className="text-center text-sm py-8" style={{ color: "var(--pp-text-muted)" }}>{t("dialer.noResults")}</div>
+                  ) : (
+                    <ul className="flex flex-col gap-1.5">
+                      {filtered.map((c, i) => {
+                        const dest = contactPrimaryPhone(c);
+                        const label = contactDisplayName(c);
+                        return (
+                          <li key={(c.id ?? "") + i} className="flex items-center gap-3 p-2.5 rounded-xl" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)" }}>
+                            <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold" style={{ background: "linear-gradient(135deg, #1A4A8A, #2E9BDC)", color: "white" }}>
+                              {label.slice(0, 1).toUpperCase()}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-medium truncate" style={{ color: "var(--pp-text-primary)" }}>{label}</div>
+                              <div className="text-xs truncate" style={{ color: "var(--pp-text-muted)" }}>
+                                {c.extension ? `#${c.extension}` : dest || c.email || ""}
+                                {c.source === "directory" && " · Interne"}
+                              </div>
+                            </div>
+                            <button
+                              disabled={!dest || calling}
+                              onClick={() => dest && startCall(dest)}
+                              className="p-2 rounded-full text-white disabled:opacity-40 active:scale-95 transition"
+                              style={{ background: "linear-gradient(135deg, #0D5C2A, #00D4AA)" }}
+                              aria-label={t("common.call")}
+                            >
+                              <PhoneIcon className="w-4 h-4" />
+                            </button>
+                            <button
+                              disabled={!dest}
+                              onClick={() => dest && openMessages(dest)}
+                              className="p-2 rounded-full disabled:opacity-40 active:scale-95 transition"
+                              style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}
+                              aria-label={t("dialer.sms")}
+                            >
+                              <MessageCircle className="w-4 h-4" />
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </motion.div>
       )}
@@ -481,7 +650,7 @@ export default function PlanipretMobile() {
         </div>
 
 
-        <Dialer open={dialerOpen} onClose={() => setDialerOpen(false)} initial={dialerInit} />
+        <Dialer open={dialerOpen} onClose={() => setDialerOpen(false)} initial={dialerInit} openMessages={(n) => { setDialerOpen(false); navigate(`/mplanipret/messages${n ? `?to=${encodeURIComponent(n)}` : ""}`); }} />
         <InboundCallOverlay call={inbound} onClose={() => setInbound(null)} />
         {avaOpen && profile?.user_id && (
           profile.voice_agent_enabled
