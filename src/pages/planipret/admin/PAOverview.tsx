@@ -127,7 +127,7 @@ export default function PAOverview() {
     const fiveMinAgo = new Date(Date.now() - 5 * 60_000).toISOString();
     const nowIsoEarly = new Date().toISOString();
 
-    const [c1, c2, missedToday, sms, smsY, ava, avaWeek, vm, rec, callsP, smsP, callsByDir, callsPeriodStats, topCalls, svcWidget, svcAi, directory, onlineC, overdueRemC, hotLeadsWeekC] = await Promise.all([
+    const [c1, c2, missedToday, sms, smsY, ava, avaWeek, vm, rec, callsP, smsP, callsByDir, callsPeriodStats, topCalls, svcProfiles, directory, onlineC, overdueRemC, hotLeadsWeekC] = await Promise.all([
       getPlanipretCallCount({ from: todayIso }),
       getPlanipretCallCount({ from: yestIso, to: todayIso }),
       getPlanipretCallCount({ direction: "missed", from: todayIso }),
@@ -142,8 +142,7 @@ export default function PAOverview() {
       supabase.from("planipret_phone_calls").select("direction").gte("started_at", periodIso),
       supabase.from("planipret_phone_calls").select("duration_seconds, direction").gte("started_at", periodIso),
       supabase.from("planipret_phone_calls").select("user_id, extension, metadata, planipret_profiles(full_name)").gte("started_at", periodIso),
-      supabase.from("planipret_profiles").select("id", { count: "exact", head: true }).eq("widget_enabled", true),
-      supabase.from("planipret_profiles").select("id", { count: "exact", head: true }).eq("voice_agent_enabled", true),
+      supabase.from("planipret_profiles").select("full_name, email, ns_domain, mobile_app_enabled, voice_agent_enabled"),
       getPlanipretBrokerDirectory(),
       supabase.from("planipret_profiles").select("id", { count: "exact", head: true }).gte("last_seen_at", fiveMinAgo),
       supabase.from("planipret_reminders").select("id", { count: "exact", head: true }).eq("status", "pending").lt("scheduled_at", nowIsoEarly),
