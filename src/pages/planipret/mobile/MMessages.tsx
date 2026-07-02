@@ -1403,3 +1403,189 @@ function ActionPill({ Icon, label, onClick, disabled }: { Icon: any; label: stri
     </button>
   );
 }
+
+// ============================================================================
+// TEAMS 365 PANEL — Microsoft Teams chats + channels via MS Graph
+// ============================================================================
+function Teams365Panel() {
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+  const [chats, setChats] = useState<any[]>([]);
+  const [teams, setTeams] = useState<any[]>([]);
+  const [active, setActive] = useState<
+    | { kind: "chat"; id: string; title: string }
+    | { kind: "channel"; teamId: string; channelId: string; title: string }
+    | null
+  >(null);
+
+  const load = async () => {
+    setLoading(true);
+    setErr(null);
+    const { data, error } = await supabase.functions.invoke("ms365-teams-list", { body: {} });
+    setLoading(false);
+    if (error || (data as any)?.error) {
+      setErr((data as any)?.error || error?.message || "Erreur");
+      return;
+    }
+    setChats((data as any).chats || []);
+    setTeams((data as any).teams || []);
+  };
+  useEffect(() => { load(); }, []);
+
+  if (active) return <TeamsThreadView target={active} onClose={() => setActive(null)} />;
+
+  return (
+    <div className="h-full overflow-y-auto px-4 py-3 space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold" style={{ color: "var(--pp-text-primary)" }}>Microsoft Teams</h2>
+        <button onClick={load} className="text-xs px-2 py-1 rounded-full flex items-center gap-1"
+          style={{ background: "var(--pp-bg-elevated)", color: "var(--pp-text-muted)" }}>
+          <RefreshCw className={`w-3 h-3 ${loading ? "animate-spin" : ""}`} /> Recharger
+        </button>
+      </div>
+
+      {err === "ms365_not_connected" && (
+        <div className="text-xs p-3 rounded-lg" style={{ background: "var(--pp-bg-elevated)", color: "var(--pp-text-muted)" }}>
+          Microsoft 365 n'est pas connecté. Ouvrez Profil → Intégrations → Microsoft 365 pour vous connecter.
+        </div>
+      )}
+      {err && err !== "ms365_not_connected" && (
+        <div className="text-xs p-3 rounded-lg" style={{ background: "rgba(220,38,38,0.08)", color: "#dc2626" }}>{err}</div>
+      )}
+
+      {!err && (
+        <>
+          <div>
+            <div className="text-[10px] uppercase tracking-wider mb-2" style={{ color: "var(--pp-text-muted)" }}>Chats récents</div>
+            {loading && !chats.length ? (
+              <div className="text-xs" style={{ color: "var(--pp-text-muted)" }}>Chargement…</div>
+            ) : chats.length === 0 ? (
+              <div className="text-xs" style={{ color: "var(--pp-text-muted)" }}>Aucun chat récent.</div>
+            ) : (
+              <div className="space-y-1">
+                {chats.map((c) => (
+                  <button
+                    key={c.id}
+                    onClick={() => setActive({ kind: "chat", id: c.id, title: c.topic })}
+                    className="w-full text-left px-3 py-2 rounded-lg flex flex-col"
+                    style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border)" }}
+                  >
+                    <div className="text-sm font-medium truncate" style={{ color: "var(--pp-text-primary)" }}>{c.topic}</div>
+                    {c.preview && (
+                      <div className="text-[11px] truncate" style={{ color: "var(--pp-text-muted)" }} dangerouslySetInnerHTML={{ __html: c.preview }} />
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {teams.length > 0 && (
+            <div>
+              <div className="text-[10px] uppercase tracking-wider mb-2" style={{ color: "var(--pp-text-muted)" }}>Équipes & canaux</div>
+              <div className="space-y-2">
+                {teams.map((tm) => (
+                  <div key={tm.id} className="rounded-lg p-2" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border)" }}>
+                    <div className="text-xs font-semibold mb-1" style={{ color: "var(--pp-text-primary)" }}>{tm.displayName}</div>
+                    <div className="flex flex-wrap gap-1">
+                      {tm.channels.map((ch: any) => (
+                        <button
+                          key={ch.id}
+                          onClick={() => setActive({ kind: "channel", teamId: tm.id, channelId: ch.id, title: `${tm.displayName} · ${ch.displayName}` })}
+                          className="text-[11px] px-2 py-1 rounded-full"
+                          style={{ background: "var(--pp-bg-deep)", color: "var(--pp-text-primary)" }}
+                        >
+                          #{ch.displayName}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function TeamsThreadView({ target, onClose }: {
+  target: { kind: "chat"; id: string; title: string } | { kind: "channel"; teamId: string; channelId: string; title: string };
+  onClose: () => void;
+}) {
+  const [messages, setMessages] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [text, setText] = useState("");
+  const [sending, setSending] = useState(false);
+
+  const invokeBody = target.kind === "chat"
+    ? { chat_id: target.id }
+    : { team_id: target.teamId, channel_id: target.channelId };
+
+  const load = async () => {
+    setLoading(true);
+    const { data, error } = await supabase.functions.invoke("ms365-teams-messages", {
+      body: { action: "list", ...invokeBody, top: 40 },
+    });
+    setLoading(false);
+    if (error || (data as any)?.error) {
+      toast.error((data as any)?.error || error?.message || "Erreur");
+      return;
+    }
+    setMessages(((data as any).messages || []).slice().reverse());
+  };
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
+
+  const send = async () => {
+    if (!text.trim() || sending) return;
+    setSending(true);
+    const { data, error } = await supabase.functions.invoke("ms365-teams-messages", {
+      body: { action: "send", ...invokeBody, content: text, contentType: "text" },
+    });
+    setSending(false);
+    if (error || (data as any)?.error) {
+      toast.error((data as any)?.error || error?.message || "Envoi refusé");
+      return;
+    }
+    setText("");
+    load();
+  };
+
+  return (
+    <div className="h-full flex flex-col" style={{ background: "var(--pp-bg-base)" }}>
+      <div className="px-4 py-3 flex items-center gap-2" style={{ borderBottom: "1px solid var(--pp-bg-border)" }}>
+        <button onClick={onClose} className="p-1"><ArrowLeft className="w-4 h-4" style={{ color: "var(--pp-text-primary)" }} /></button>
+        <div className="flex-1 text-sm font-semibold truncate" style={{ color: "var(--pp-text-primary)" }}>{target.title}</div>
+      </div>
+      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+        {loading ? <div className="text-xs" style={{ color: "var(--pp-text-muted)" }}>Chargement…</div> :
+          messages.length === 0 ? <div className="text-xs" style={{ color: "var(--pp-text-muted)" }}>Aucun message.</div> :
+          messages.map((m) => (
+            <div key={m.id} className="rounded-lg px-3 py-2" style={{ background: "var(--pp-bg-elevated)" }}>
+              <div className="text-[10px] mb-0.5" style={{ color: "var(--pp-text-muted)" }}>{m.from} · {fmtTime(m.createdAt)}</div>
+              <div className="text-sm" style={{ color: "var(--pp-text-primary)" }} dangerouslySetInnerHTML={{ __html: m.content }} />
+            </div>
+          ))
+        }
+      </div>
+      <div className="px-3 py-2 flex items-center gap-2" style={{ borderTop: "1px solid var(--pp-bg-border)", background: "var(--pp-bg-deep)" }}>
+        <input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Écrire un message…"
+          className="flex-1 text-sm px-3 py-2 rounded-full outline-none"
+          style={{ background: "var(--pp-bg-elevated)", color: "var(--pp-text-primary)" }}
+        />
+        <button
+          onClick={send}
+          disabled={sending || !text.trim()}
+          className="p-2 rounded-full"
+          style={{ background: "linear-gradient(135deg, var(--pp-brand-accent), var(--pp-brand-accent-2))", color: "white", opacity: sending || !text.trim() ? 0.5 : 1 }}
+        >
+          {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+        </button>
+      </div>
+    </div>
+  );
+}
