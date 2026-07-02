@@ -132,8 +132,8 @@ function recordingApiPath(domain: string, c: any): string | null {
 
 function recordingLookupCallId(c: any): string | null {
   const id = String(val(c, [
-    "call-orig-call-id", "call-parent-call-id", "orig-callid", "orig-call-id", "orig_callid",
-    "call-id", "call_id", "callid", "call-term-call-id", "id",
+    "call-parent-cdr-id", "call-orig-call-id", "call-parent-call-id", "orig-callid", "orig-call-id", "orig_callid",
+    "call-id", "call_id", "callid", "call-term-call-id", "cdr_id", "cdr-id", "id",
   ], "")).trim();
   return id || null;
 }
