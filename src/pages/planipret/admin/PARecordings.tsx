@@ -194,16 +194,8 @@ export default function PARecordings() {
             ✕ Réinitialiser ({activeFilterCount})
           </button>
         )}
-        <button
-          onClick={syncAll}
-          disabled={syncing}
-          className="ml-auto flex items-center gap-1.5 px-3 py-2 rounded-lg text-white text-sm font-medium disabled:opacity-50"
-          style={{ background: ACCENT }}
-        >
-          <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} />
-          {syncing ? "Synchronisation…" : "Synchroniser NS-API"}
-        </button>
       </div>
+
 
       <div className="pp-card overflow-hidden">
         {loadError && <TableErrorState message={loadError} onRetry={() => load(page, pageSize)} />}
