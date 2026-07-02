@@ -30,8 +30,10 @@ type Profile = PlanipretBrokerRow & {
 };
 
 export default function PAUsers() {
+  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const search = params.get("search") ?? "";
+
   const filter = (params.get("filter") as "all" | "app" | "agent" | "offline") ?? "all";
   const maestroFilter = (params.get("maestro") as "all" | "yes" | "no") ?? "all";
   const page = Math.max(1, parseInt(params.get("page") ?? "1", 10) || 1);
