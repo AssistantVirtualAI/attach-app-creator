@@ -23,6 +23,8 @@ export default function Ms365Callback() {
         setStatus("error"); setError((data as any)?.error ?? e?.message ?? "Échec OAuth");
         return;
       }
+      // Active automatiquement l'abonnement AVA aux nouveaux courriels (non-bloquant)
+      supabase.functions.invoke("ms365-mail-webhook-setup", { body: {} }).catch(() => {});
       setStatus("ok");
       setTimeout(() => navigate("/mplanipret/more?ms365=ok", { replace: true }), 1200);
     })();

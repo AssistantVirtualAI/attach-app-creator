@@ -197,3 +197,6 @@ verify_jwt = false
 
 [functions.extension-manage]
 verify_jwt = true
+
+[functions.ms365-mail-webhook-receiver]
+verify_jwt = false

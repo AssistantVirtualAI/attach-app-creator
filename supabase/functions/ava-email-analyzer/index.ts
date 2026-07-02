@@ -140,15 +140,25 @@ const j = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
-    const authHeader = req.headers.get("Authorization") ?? "";
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    const userClient = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: authHeader } } });
-    const { data: claims } = await userClient.auth.getClaims(authHeader.replace("Bearer ", ""));
-    const userId = claims?.claims?.sub as string | undefined;
-    if (!userId) return j({ success: false, error: "Unauthorized" }, 401);
+    const svcHeader = req.headers.get("x-ava-service") ?? "";
+    const isService = svcHeader && svcHeader === Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-    const { ms_message_id } = await req.json();
+    const payload = await req.json();
+    const { ms_message_id } = payload;
     if (!ms_message_id) return j({ success: false, error: "ms_message_id required" }, 400);
+
+    let userId: string | undefined;
+    if (isService) {
+      userId = payload.broker_user_id;
+      if (!userId) return j({ success: false, error: "broker_user_id required (service)" }, 400);
+    } else {
+      const authHeader = req.headers.get("Authorization") ?? "";
+      const userClient = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: authHeader } } });
+      const { data: claims } = await userClient.auth.getClaims(authHeader.replace("Bearer ", ""));
+      userId = claims?.claims?.sub as string | undefined;
+      if (!userId) return j({ success: false, error: "Unauthorized" }, 401);
+    }
 
     // Check cached analysis first
     const { data: existing } = await admin
@@ -165,6 +175,7 @@ Deno.serve(async (req) => {
       .eq("user_id", userId)
       .maybeSingle();
     if (!profile?.ms365_access_token) return j({ success: false, error: "Microsoft 365 non connecté" }, 400);
+
 
     const emailResp = await graph(admin, profile, `/me/messages/${encodeURIComponent(ms_message_id)}?$select=id,subject,from,toRecipients,receivedDateTime,body,bodyPreview,hasAttachments,importance,conversationId`);
     if (!emailResp.ok) {
