@@ -60,6 +60,23 @@ export default function PAAva() {
     toast.success(`AVA réentraînée sur ${(data as any).count} courtier(s)`);
     load();
   };
+  const analyzeAll = async () => {
+    setAnalyzing(true);
+    const tid = toast.loading("Analyse des emails des courtiers…");
+    try {
+      const { data, error } = await supabase.functions.invoke("ava-analyze-all", { body: { top: 20 } });
+      if (error) throw error;
+      const d = data as any;
+      if (!d?.ok) throw new Error(d?.error ?? "Échec");
+      toast.success(`${d.total_analyses} email(s) analysé(s) sur ${d.analyzed_brokers} courtier(s)`, { id: tid });
+      await load();
+    } catch (e: any) {
+      toast.error(`Analyse échouée: ${e.message ?? e}`, { id: tid });
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
 
   const totals = rows.reduce((acc, r) => ({
     analyses: acc.analyses + (r.analyses_30d ?? 0),
