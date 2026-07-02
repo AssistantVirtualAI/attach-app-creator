@@ -374,7 +374,7 @@ export default function PlanipretMobile() {
   const hangupActive = async () => {
     if (!activeCallId) return;
     const { error } = await supabase.functions.invoke("ns-calls", { body: { action: "hangup", call_id: activeCallId } });
-    if (error) toast.error("Échec raccrocher"); else toast.success("Appel raccroché");
+    if (error) toast.error(t("dialer.hangupFailed")); else toast.success(t("dialer.hungUp"));
   };
 
   useEffect(() => {
