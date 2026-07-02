@@ -174,7 +174,22 @@ export default function PAOverview() {
       brokersOnline: onlineC.count ?? 0,
     });
 
-    setWidgetCount(svcWidget.count ?? 0);
+    // Compute service counts from real Planipret brokers (exclude test accounts).
+    const TEST_PATTERNS = ["scott", "mohamad", "carlo", "clinton"];
+    const isTest = (n?: string | null) => {
+      const s = (n ?? "").toLowerCase();
+      return TEST_PATTERNS.some((p) => s.includes(p));
+    };
+    const profs = (svcProfiles.data ?? []) as Array<{ full_name: string | null; email: string | null; ns_domain: string | null; mobile_app_enabled: boolean | null; voice_agent_enabled: boolean | null }>;
+    const realBrokers = profs.filter((p) => {
+      const em = (p.email ?? "").toLowerCase();
+      const hasPpEmail = em.endsWith("@planipret.ca") || em.endsWith("@planipret.com");
+      return hasPpEmail && !isTest(p.full_name);
+    });
+    const widgetN = realBrokers.length;
+    const mobileN = realBrokers.filter((p) => p.ns_domain === "planipret.ca" && p.mobile_app_enabled).length;
+    const aiN = realBrokers.filter((p) => p.ns_domain === "planipret.ca" && p.voice_agent_enabled).length;
+    setServiceCounts({ mobile: mobileN, widget: widgetN, ai: aiN });
     setRecent(rec.data ?? []);
     setBrokers(nsBrokerList.slice(0, 10));
 
