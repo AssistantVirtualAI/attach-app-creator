@@ -73,11 +73,20 @@ export default function PAAva() {
   const approvalRate = totals.ok + totals.err > 0 ? Math.round((totals.ok / (totals.ok + totals.err)) * 100) : 0;
   const modificationRate = totals.ok + totals.err > 0 ? Math.round((totals.modified / (totals.ok + totals.err)) * 100) : 0;
 
+  const fbTotal = fbStats.up + fbStats.down + fbStats.modified + fbStats.skipped;
+  const satisfaction = fbTotal > 0 ? Math.round(((fbStats.up) / fbTotal) * 100) : 0;
+
   return (
     <div className="p-4 md:p-6 space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold">AVA — Analytics (30 j)</h1>
-        <p className="text-sm text-muted-foreground">Analyses d'emails, actions proposées et exécutées, taux d'approbation.</p>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-semibold">AVA — Analytics (30 j)</h1>
+          <p className="text-sm text-muted-foreground">Analyses d'emails, actions proposées et exécutées, feedback et apprentissage.</p>
+        </div>
+        <Button onClick={retune} disabled={tuning} variant="outline" size="sm">
+          {tuning ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 mr-1.5" />}
+          Réentraîner AVA
+        </Button>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -87,9 +96,13 @@ export default function PAAva() {
         <Kpi label="Actions exécutées" value={totals.ok} />
         <Kpi label="Taux de succès" value={`${approvalRate}%`} />
         <Kpi label="Modifiées par courtier" value={`${modificationRate}%`} />
+        <Kpi label="👍 Feedback positif" value={fbStats.up} />
+        <Kpi label="👎 Feedback négatif" value={fbStats.down} />
+        <Kpi label="Satisfaction AVA" value={`${satisfaction}%`} />
         <Kpi label="Erreurs" value={totals.err} />
         <Kpi label="Courtiers actifs" value={rows.length} />
       </div>
+
 
       <Card>
         <CardHeader><CardTitle>Par courtier</CardTitle></CardHeader>
