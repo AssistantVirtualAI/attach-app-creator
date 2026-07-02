@@ -154,12 +154,14 @@ export default function PAOverview() {
       supabase.from("planipret_phone_calls").select("direction").gte("started_at", periodIso),
       supabase.from("planipret_phone_calls").select("duration_seconds, direction").gte("started_at", periodIso),
       supabase.from("planipret_phone_calls").select("user_id, extension, metadata, planipret_profiles(full_name)").gte("started_at", periodIso),
-      supabase.from("planipret_profiles").select("id", { count: "exact", head: true }).eq("widget_enabled", true),
-      supabase.from("planipret_profiles").select("id", { count: "exact", head: true }).eq("voice_agent_enabled", true),
+      supabase.from("planipret_profiles").select("id", { count: "exact", head: true }).ilike("email", "%@planipret.ca"),
+      supabase.from("planipret_profiles").select("id", { count: "exact", head: true }).eq("ns_domain", "planipret.ca").eq("mobile_app_enabled", true),
+      supabase.from("planipret_profiles").select("id", { count: "exact", head: true }).eq("ns_domain", "planipret.ca").eq("voice_agent_enabled", true),
       getPlanipretBrokerDirectory(),
       supabase.from("planipret_profiles").select("id", { count: "exact", head: true }).gte("last_seen_at", fiveMinAgo),
       supabase.from("planipret_reminders").select("id", { count: "exact", head: true }).eq("status", "pending").lt("scheduled_at", nowIsoEarly),
       supabase.from("planipret_phone_calls").select("id", { count: "exact", head: true }).gte("started_at", sevenIso).gte("lead_score", 8),
+
     ]);
 
     const nsBrokerList = directory.brokers;
