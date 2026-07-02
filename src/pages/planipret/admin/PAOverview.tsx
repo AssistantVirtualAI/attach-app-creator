@@ -111,12 +111,7 @@ export default function PAOverview() {
   // Single source of truth for broker activation counts (matches the toggles
   // on /admin/users via the planipret_broker_stats view, with Realtime sync).
   const { stats: brokerStats } = usePlanipretBrokerStats();
-  const [widgetCount, setWidgetCount] = useState(0);
-  const serviceCounts = {
-    mobile: brokerStats.app_mobile_active,
-    widget: widgetCount,
-    ai: brokerStats.agent_ia_active,
-  };
+  const [serviceCounts, setServiceCounts] = useState({ mobile: 0, widget: 0, ai: 0 });
 
   const load = async () => {
     setRefreshing(true);
