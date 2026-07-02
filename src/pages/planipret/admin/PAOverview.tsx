@@ -94,7 +94,12 @@ type Period = 7 | 30 | 90;
 export default function PAOverview() {
   const [period, setPeriod] = useState<Period>(7);
   const [refreshing, setRefreshing] = useState(false);
-  const [stats, setStats] = useState({ calls: 0, callsYest: 0, brokers: 0, brokersTotal: 0, sms: 0, ava: 0, smsYest: 0, voicemailsUnread: 0 });
+  const [stats, setStats] = useState({
+    calls: 0, callsYest: 0, callsMissedToday: 0, brokers: 0, brokersTotal: 0,
+    sms: 0, ava: 0, smsYest: 0, voicemailsUnread: 0,
+    avgDurationSec: 0, answerRatePct: 0,
+    overdueReminders: 0, hotLeads7d: 0, avaWeek: 0, brokersOnline: 0,
+  });
   const [recent, setRecent] = useState<any[]>([]);
   const [brokers, setBrokers] = useState<any[]>([]);
   const [hotLeads, setHotLeads] = useState<any[]>([]);
