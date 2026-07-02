@@ -8023,6 +8023,53 @@ export type Database = {
         }
         Relationships: []
       }
+      planipret_ava_feedback: {
+        Row: {
+          action_id: string | null
+          action_type: string | null
+          analysis_id: string | null
+          broker_user_id: string
+          comment: string | null
+          created_at: string
+          final_content: string | null
+          id: string
+          original_draft: string | null
+          rating: string
+        }
+        Insert: {
+          action_id?: string | null
+          action_type?: string | null
+          analysis_id?: string | null
+          broker_user_id: string
+          comment?: string | null
+          created_at?: string
+          final_content?: string | null
+          id?: string
+          original_draft?: string | null
+          rating: string
+        }
+        Update: {
+          action_id?: string | null
+          action_type?: string | null
+          analysis_id?: string | null
+          broker_user_id?: string
+          comment?: string | null
+          created_at?: string
+          final_content?: string | null
+          id?: string
+          original_draft?: string | null
+          rating?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planipret_ava_feedback_analysis_id_fkey"
+            columns: ["analysis_id"]
+            isOneToOne: false
+            referencedRelation: "planipret_ava_email_analyses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       planipret_ava_mail_subscriptions: {
         Row: {
           broker_id: string | null
@@ -8104,6 +8151,36 @@ export type Database = {
           read_at?: string | null
           title?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      planipret_ava_prompt_versions: {
+        Row: {
+          active: boolean
+          broker_user_id: string
+          generated_at: string
+          id: string
+          preferences_text: string
+          sample_size: number
+          version: number
+        }
+        Insert: {
+          active?: boolean
+          broker_user_id: string
+          generated_at?: string
+          id?: string
+          preferences_text: string
+          sample_size?: number
+          version?: number
+        }
+        Update: {
+          active?: boolean
+          broker_user_id?: string
+          generated_at?: string
+          id?: string
+          preferences_text?: string
+          sample_size?: number
+          version?: number
         }
         Relationships: []
       }
@@ -8996,6 +9073,8 @@ export type Database = {
           auth_method: string | null
           ava_autonomy_mode: string
           ava_last_session_at: string | null
+          ava_learned_preferences: string | null
+          ava_learned_updated_at: string | null
           ava_preferred_lang: string
           ava_sessions_count: number
           avatar_url: string | null
@@ -9079,6 +9158,8 @@ export type Database = {
           auth_method?: string | null
           ava_autonomy_mode?: string
           ava_last_session_at?: string | null
+          ava_learned_preferences?: string | null
+          ava_learned_updated_at?: string | null
           ava_preferred_lang?: string
           ava_sessions_count?: number
           avatar_url?: string | null
@@ -9162,6 +9243,8 @@ export type Database = {
           auth_method?: string | null
           ava_autonomy_mode?: string
           ava_last_session_at?: string | null
+          ava_learned_preferences?: string | null
+          ava_learned_updated_at?: string | null
           ava_preferred_lang?: string
           ava_sessions_count?: number
           avatar_url?: string | null
