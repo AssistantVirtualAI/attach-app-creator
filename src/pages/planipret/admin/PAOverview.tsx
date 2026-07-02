@@ -127,34 +127,59 @@ export default function PAOverview() {
     const yestIso = yest.toISOString();
     const periodIso = periodAgo.toISOString();
 
-    const [c1, c2, sms, smsY, ava, vm, rec, callsP, smsP, callsByDir, topCalls, svcWidget, svcAi, directory] = await Promise.all([
+    const sevenAgo = new Date(today); sevenAgo.setDate(sevenAgo.getDate() - 7);
+    const sevenIso = sevenAgo.toISOString();
+    const fiveMinAgo = new Date(Date.now() - 5 * 60_000).toISOString();
+    const nowIsoEarly = new Date().toISOString();
+
+    const [c1, c2, missedToday, sms, smsY, ava, avaWeek, vm, rec, callsP, smsP, callsByDir, callsPeriodStats, topCalls, svcWidget, svcAi, directory, onlineC, overdueRemC, hotLeadsWeekC] = await Promise.all([
       getPlanipretCallCount({ from: todayIso }),
       getPlanipretCallCount({ from: yestIso, to: todayIso }),
+      getPlanipretCallCount({ direction: "missed", from: todayIso }),
       supabase.from("planipret_phone_messages").select("id", { count: "exact", head: true }).gte("sent_at", todayIso),
       supabase.from("planipret_phone_messages").select("id", { count: "exact", head: true }).gte("sent_at", yestIso).lt("sent_at", todayIso),
       supabase.from("ai_request_audit_log").select("id", { count: "exact", head: true }).gte("created_at", todayIso).like("action", "elevenlabs_tool:%"),
+      supabase.from("ai_request_audit_log").select("id", { count: "exact", head: true }).gte("created_at", sevenIso).like("action", "elevenlabs_tool:%"),
       supabase.from("planipret_voicemails").select("id", { count: "exact", head: true }).eq("is_read", false),
       supabase.from("planipret_phone_calls").select("id, user_id, extension, direction, from_number, to_number, duration_seconds, started_at, ai_summary, metadata, planipret_profiles(full_name)").order("started_at", { ascending: false }).limit(20),
       supabase.from("planipret_phone_calls").select("started_at").gte("started_at", periodIso),
       supabase.from("planipret_phone_messages").select("sent_at").gte("sent_at", periodIso),
       supabase.from("planipret_phone_calls").select("direction").gte("started_at", periodIso),
+      supabase.from("planipret_phone_calls").select("duration_seconds, direction").gte("started_at", periodIso),
       supabase.from("planipret_phone_calls").select("user_id, extension, metadata, planipret_profiles(full_name)").gte("started_at", periodIso),
       supabase.from("planipret_profiles").select("id", { count: "exact", head: true }).eq("widget_enabled", true),
       supabase.from("planipret_profiles").select("id", { count: "exact", head: true }).eq("voice_agent_enabled", true),
       getPlanipretBrokerDirectory(),
+      supabase.from("planipret_profiles").select("id", { count: "exact", head: true }).gte("last_seen_at", fiveMinAgo),
+      supabase.from("planipret_reminders").select("id", { count: "exact", head: true }).eq("status", "pending").lt("scheduled_at", nowIsoEarly),
+      supabase.from("planipret_phone_calls").select("id", { count: "exact", head: true }).gte("started_at", sevenIso).gte("lead_score", 8),
     ]);
 
     const nsBrokerList = directory.brokers;
-    // Brokers total = NS-API directory size (single source via adminDirectory).
-    // Active brokers = those with App Mobile toggle ON in planipret_profiles.
     const brokerTotal = directory.count;
 
+    // Period duration + answer-rate stats
+    let totalDur = 0, durCount = 0, answered = 0, totalCallsPeriod = 0;
+    (callsPeriodStats.data ?? []).forEach((c: any) => {
+      totalCallsPeriod++;
+      if (c.duration_seconds) { totalDur += c.duration_seconds; durCount++; }
+      if (c.direction !== "missed") answered++;
+    });
+    const avgDur = durCount > 0 ? Math.round(totalDur / durCount) : 0;
+    const answerPct = totalCallsPeriod > 0 ? Math.round((answered / totalCallsPeriod) * 100) : 0;
+
     setStats({
-      calls: c1 ?? 0, callsYest: c2 ?? 0,
+      calls: c1 ?? 0, callsYest: c2 ?? 0, callsMissedToday: missedToday ?? 0,
       brokers: brokerStats.app_mobile_active, brokersTotal: brokerTotal,
       sms: sms.count ?? 0, smsYest: smsY.count ?? 0,
-      ava: ava.count ?? 0, voicemailsUnread: vm.count ?? 0,
+      ava: ava.count ?? 0, avaWeek: avaWeek.count ?? 0,
+      voicemailsUnread: vm.count ?? 0,
+      avgDurationSec: avgDur, answerRatePct: answerPct,
+      overdueReminders: overdueRemC.count ?? 0,
+      hotLeads7d: hotLeadsWeekC.count ?? 0,
+      brokersOnline: onlineC.count ?? 0,
     });
+
     setWidgetCount(svcWidget.count ?? 0);
     setRecent(rec.data ?? []);
     setBrokers(nsBrokerList.slice(0, 10));
