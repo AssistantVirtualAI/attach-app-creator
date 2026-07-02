@@ -15,14 +15,45 @@ Deno.serve(async (req) => {
     webpush.setVapidDetails(SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);
 
     const body = await req.json().catch(() => ({}));
-    const { user_id, title, body: text, data, icon } = body ?? {};
+    const { user_id, title, body: text, data, icon, category, deep_link } = body ?? {};
     if (!user_id || !title) return json({ error: "missing_fields" }, 400);
 
-    // admin already created above for VAPID lookup
+    // Preference gating by category
+    const cat = String(category ?? "info");
+    const prefMap: Record<string, string> = {
+      hot_lead: "notif_hot_leads",
+      missed_call: "notif_missed_call",
+      appointment: "notif_appointment_reminder",
+      morning_brief: "notif_morning_brief",
+      eod_summary: "notif_eod_summary",
+      ai: "notif_ai",
+      sms: "notif_sms",
+      call: "notif_calls",
+      voicemail: "notif_voicemails",
+      reminder: "notif_reminders",
+    };
+    const prefCol = prefMap[cat];
+    let allowed = true;
+    if (prefCol) {
+      const { data: prof } = await admin.from("planipret_profiles")
+        .select(prefCol).eq("user_id", user_id).maybeSingle();
+      if (prof && (prof as any)[prefCol] === false) allowed = false;
+    }
+    const finalDeepLink = deep_link ?? data?.deep_link ?? null;
+
+    // Always log in-app notification (even if push disabled)
+    await admin.from("planipret_ava_notifications").insert({
+      user_id, category: cat, title, body: text ?? null,
+      data: { ...(data ?? {}), deep_link: finalDeepLink }, deep_link: finalDeepLink,
+      delivered: false,
+    });
+
+    if (!allowed) return json({ delivered: 0, blocked_by_preference: true });
+
     const { data: subs } = await admin.from("planipret_push_subscriptions").select("id,endpoint,p256dh,auth").eq("user_id", user_id);
     if (!subs?.length) return json({ delivered: 0 });
 
-    const payload = JSON.stringify({ title, body: text ?? "", data: data ?? {}, icon: icon ?? "/icon-192.png" });
+    const payload = JSON.stringify({ title, body: text ?? "", data: { ...(data ?? {}), category: cat, deep_link: finalDeepLink }, icon: icon ?? "/icon-192.png" });
     let delivered = 0;
     const expired: string[] = [];
     for (const s of subs) {
@@ -33,6 +64,11 @@ Deno.serve(async (req) => {
         const code = err?.statusCode;
         if (code === 404 || code === 410) expired.push(s.id);
       }
+    }
+    if (delivered > 0) {
+      await admin.from("planipret_ava_notifications")
+        .update({ delivered: true })
+        .eq("user_id", user_id).eq("title", title).order("created_at", { ascending: false }).limit(1);
     }
     if (expired.length) await admin.from("planipret_push_subscriptions").delete().in("id", expired);
     return json({ delivered, expired: expired.length });
