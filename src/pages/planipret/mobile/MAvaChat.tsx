@@ -78,10 +78,78 @@ export default function MAvaChat() {
         const { data: srow } = await supabase.from("planipret_ava_chat_sessions").select("id,title,last_message_at").eq("id", newSid).maybeSingle();
         if (srow) setSessions((s) => [srow as Session, ...s.filter((x) => x.id !== newSid)]);
       }
-      setMessages((m) => [...m, { id: `a-${Date.now()}`, role: "assistant", message: String(d.reply ?? "…"), created_at: new Date().toISOString() }]);
+      const replyText = String(d.reply ?? "…");
+      const replyId = `a-${Date.now()}`;
+      setMessages((m) => [...m, { id: replyId, role: "assistant", message: replyText, created_at: new Date().toISOString() }]);
+      if (speakReplies) speak(replyId, replyText);
     } catch (e: any) {
       toast.error(e?.message ?? "Erreur AVA");
     } finally { setBusy(false); }
+  };
+
+  const speak = async (id: string, text: string) => {
+    try {
+      audioRef.current?.pause();
+      setSpeakingId(id);
+      const { data, error } = await supabase.functions.invoke("pp-ava-tts", { body: { text, language: "fr" } });
+      if (error) throw error;
+      const d = data as any;
+      if (!d?.audioContent) throw new Error("no_audio");
+      const audio = new Audio(`data:audio/mpeg;base64,${d.audioContent}`);
+      audioRef.current = audio;
+      audio.onended = () => setSpeakingId(null);
+      audio.onerror = () => setSpeakingId(null);
+      await audio.play();
+    } catch (e: any) {
+      setSpeakingId(null);
+      toast.error("Lecture vocale indisponible");
+    }
+  };
+
+  const toggleTts = () => {
+    const next = !speakReplies;
+    setSpeakReplies(next);
+    localStorage.setItem("ava_tts_on", next ? "1" : "0");
+    if (!next) { audioRef.current?.pause(); setSpeakingId(null); }
+  };
+
+  const startRec = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mime = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "audio/mp4";
+      const mr = new MediaRecorder(stream, { mimeType: mime });
+      chunksRef.current = [];
+      mr.ondataavailable = (e) => { if (e.data.size) chunksRef.current.push(e.data); };
+      mr.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(chunksRef.current, { type: mime });
+        setTranscribing(true);
+        try {
+          const buf = await blob.arrayBuffer();
+          let bin = ""; const bytes = new Uint8Array(buf);
+          for (let i = 0; i < bytes.byteLength; i++) bin += String.fromCharCode(bytes[i]);
+          const b64 = btoa(bin);
+          const { data, error } = await supabase.functions.invoke("pp-ava-stt", { body: { audio: b64, mime } });
+          if (error) throw error;
+          const text = String((data as any)?.text ?? "").trim();
+          if (text) setInput((v) => (v ? `${v} ${text}` : text));
+          else toast.info("Rien détecté");
+        } catch (e: any) {
+          toast.error("Transcription indisponible");
+        } finally { setTranscribing(false); }
+      };
+      mr.start();
+      mediaRef.current = mr;
+      setRecording(true);
+    } catch {
+      toast.error("Micro non autorisé");
+    }
+  };
+
+  const stopRec = () => {
+    mediaRef.current?.stop();
+    mediaRef.current = null;
+    setRecording(false);
   };
 
   const currentTitle = useMemo(() => sessions.find((s) => s.id === sessionId)?.title ?? "AVA", [sessions, sessionId]);
