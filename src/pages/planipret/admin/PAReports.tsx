@@ -36,12 +36,16 @@ const TooltipDark = ({ active, payload, label }: any) => {
 export default function PAReports() {
   const [range, setRange] = useState<Range>("week");
   const [calls, setCalls] = useState<any[]>([]);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [avaFeedback, setAvaFeedback] = useState<Array<{ rating: string }>>([]);
+  const [reminders, setReminders] = useState<any[]>([]);
   const [brokers, setBrokers] = useState<Record<string, string>>({});
   const [exporting, setExporting] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
   const reportRef = useRef<HTMLDivElement>(null);
   const { stats: brokerStats } = usePlanipretBrokerStats();
+
 
   const periodLabel = range === "week" ? "7 derniers jours" : range === "month" ? "30 derniers jours" : "3 derniers mois";
 
