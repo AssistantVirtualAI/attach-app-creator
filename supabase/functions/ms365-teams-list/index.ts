@@ -76,7 +76,7 @@ Deno.serve(async (req) => {
 
     const chats = (chatsBody.value ?? []).map((c: any) => ({
       id: c.id,
-      topic: c.topic ?? (c.members ?? []).filter((m: any) => m.userId).map((m: any) => m.displayName).join(", ") || "Chat",
+      topic: c.topic ?? ((c.members ?? []).filter((m: any) => m.userId).map((m: any) => m.displayName).join(", ") || "Chat"),
       chatType: c.chatType,
       lastUpdated: c.lastUpdatedDateTime,
       preview: c.lastMessagePreview?.body?.content ?? null,
