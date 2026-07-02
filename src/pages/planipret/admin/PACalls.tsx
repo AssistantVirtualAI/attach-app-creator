@@ -9,6 +9,7 @@ import { TableErrorState, TableEmptyState } from "@/components/planipret/admin/T
 import { getPlanipretBrokerDirectory } from "@/lib/planipret/adminDirectory";
 import { applyPlanipretCallFilters } from "@/lib/planipret/adminCounts";
 import { usePlanipretNsAutoSync } from "@/hooks/usePlanipretNsAutoSync";
+import NsSyncBar from "@/components/planipret/admin/NsSyncBar";
 
 const ACCENT = "#2E9BDC";
 const SUCCESS = "#00D4AA";
