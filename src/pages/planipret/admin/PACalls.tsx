@@ -126,6 +126,10 @@ export default function PACalls() {
     <div className="space-y-4">
       <DebugPanel entries={debug} />
 
+      <NsSyncBar features={["cdrs", "recordings"]} onReload={() => load(page, pageSize)} />
+
+
+
       <div className="pp-card p-4 flex flex-wrap items-end gap-2">
         <Select label="Courtier" value={filters.broker} onChange={(v) => setFilterValue("broker", v)}
           options={[{ v: "", l: "Tous" }, ...brokers.map((b) => ({ v: b.ns_only ? `ext:${b.extension}` : `user:${b.user_id}`, l: `${b.full_name}${b.extension ? ` · ${b.extension}` : ""}` }))]} />
