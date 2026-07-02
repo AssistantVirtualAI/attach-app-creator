@@ -449,6 +449,7 @@ const App = () => (
                   <Route path="templates" element={<Suspense fallback={<AdminPageSkeleton />}><PATemplates /></Suspense>} />
                   <Route path="integrations" element={<Suspense fallback={<AdminPageSkeleton />}><PlanipretIntegrationsLazy /></Suspense>} />
                   <Route path="debug" element={<Suspense fallback={<AdminPageSkeleton />}><PADebug /></Suspense>} />
+                  <Route path="ava" element={<Suspense fallback={<AdminPageSkeleton />}><PAAva /></Suspense>} />
                 </Route>
                 <Route path="/planipret/privacy" element={<Suspense fallback={<AdminPageSkeleton />}><PlanipretPrivacy /></Suspense>} />
 
