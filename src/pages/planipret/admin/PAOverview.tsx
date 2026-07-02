@@ -139,7 +139,7 @@ export default function PAOverview() {
     const fiveMinAgo = new Date(Date.now() - 5 * 60_000).toISOString();
     const nowIsoEarly = new Date().toISOString();
 
-    const [c1, c2, missedToday, sms, smsY, ava, avaWeek, vm, rec, callsP, smsP, callsByDir, callsPeriodStats, topCalls, svcWidget, svcAi, directory, onlineC, overdueRemC, hotLeadsWeekC] = await Promise.all([
+    const [c1, c2, missedToday, sms, smsY, ava, avaWeek, vm, rec, callsP, smsP, callsByDir, callsPeriodStats, topCalls, svcWidget, svcMobilePP, svcAiPP, directory, onlineC, overdueRemC, hotLeadsWeekC] = await Promise.all([
       getPlanipretCallCount({ from: todayIso }),
       getPlanipretCallCount({ from: yestIso, to: todayIso }),
       getPlanipretCallCount({ direction: "missed", from: todayIso }),
