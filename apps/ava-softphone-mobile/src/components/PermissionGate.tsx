@@ -49,8 +49,8 @@ export default function PermissionGate({ onComplete }: PermissionGateProps) {
   const [error, setError] = useState<string | null>(null);
 
   const advance = (from: StepId) => {
-    const order: StepId[] = ['microphone', 'contacts', 'notifications'];
-    const i = order.indexOf(from);
+    const order: StepId[] = PERMISSION_STEPS.map((s) => s.id) as StepId[];
+    const i = order.indexOf(from as any);
     if (i < order.length - 1) setStep(order[i + 1]);
     else {
       setStep('done');
