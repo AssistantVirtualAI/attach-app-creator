@@ -811,6 +811,8 @@ function CallDetailSheet({
           {/* ===== TAB COACHING ===== */}
           {activeTab === "coaching" && (
             <>
+              <ClaudeCoachingBlock analysis={(call as any).ai_analysis_json ?? null} coachingScore={(call as any).coaching_score ?? null} />
+
               {/* Score circle */}
               {score != null && (
                 <div className="flex items-center gap-4 pp-card p-4">
