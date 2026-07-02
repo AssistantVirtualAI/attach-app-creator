@@ -247,6 +247,8 @@ export default function PAOverview() {
 
   return (
     <div className="space-y-5">
+      <NsSyncBar features={["cdrs", "messages", "recordings"]} onReload={load} />
+
       {/* Header with period selector */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
