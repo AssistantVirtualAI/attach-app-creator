@@ -676,48 +676,23 @@ function CallDetailSheet({
 
           {/* ===== TAB AUDIO ===== */}
           {activeTab === "audio" && (
-            <>
-              {call.recording_url ? (
-                <div className="pp-card p-4">
-                  <audio controls className="w-full" style={{ accentColor: "var(--pp-brand-accent)" }} src={call.recording_url} />
-                  <a href={call.recording_url} download className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold" style={{ color: "var(--pp-brand-accent)" }}>
-                    ⬇ Télécharger
-                  </a>
-                </div>
-              ) : (
-                <button onClick={fetchRecording} disabled={recLoading}
-                  className="w-full py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
-                  style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }}>
-                  {recLoading && <Loader2 className="w-4 h-4 animate-spin" />} Charger l'enregistrement
-                </button>
-              )}
-            </>
+            <CallRecordingPlayer
+              callId={call.ns_call_id ?? call.id}
+              duration={call.duration_seconds ?? 0}
+            />
           )}
 
           {/* ===== TAB TRANSCRIPT ===== */}
           {activeTab === "transcript" && (
-            <>
-              {call.transcript ? (
-                <div className="pp-card p-4">
-                  <div className="flex justify-end mb-2">
-                    <button onClick={copyTranscript} className="text-[11px] px-2.5 py-1 rounded-md flex items-center gap-1"
-                      style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>
-                      <Copy className="w-3 h-3" /> {t("calls.copyTranscript")}
-                    </button>
-                  </div>
-                  <div className="text-xs whitespace-pre-wrap leading-relaxed" style={{ color: "var(--pp-text-primary)", maxHeight: 360, overflowY: "auto" }}>
-                    {call.transcript}
-                  </div>
-                </div>
-              ) : (
-                <button onClick={fetchTranscript} disabled={txLoading}
-                  className="w-full py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
-                  style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }}>
-                  {txLoading && <Loader2 className="w-4 h-4 animate-spin" />} Obtenir la transcription
-                </button>
-              )}
-            </>
+            <TranscriptTab
+              call={call}
+              loading={txLoading}
+              onFetch={fetchTranscript}
+              onAnalyze={analyzeAI}
+              aiLoading={aiLoading}
+            />
           )}
+
 
           {/* ===== TAB COACHING ===== */}
           {activeTab === "coaching" && (
