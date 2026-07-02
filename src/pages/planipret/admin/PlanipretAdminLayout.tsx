@@ -60,6 +60,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/planipret/admin/reports": "Rapports & Analytics",
   "/planipret/admin/audit-checklist": "Audit système",
   "/planipret/admin/compliance": "Conformité PIPEDA · Loi 25",
+  "/planipret/admin/ava": "AVA — Analytics",
 };
 
 const initials = (n?: string) =>
