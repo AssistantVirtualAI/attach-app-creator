@@ -175,28 +175,38 @@ export default function MAvaNotifications() {
               const Icon = iconFor(n.category);
               const unreadItem = !n.read_at;
               return (
-                <button
+                <div
                   key={n.id}
-                  onClick={() => open(n)}
-                  className="w-full text-left px-4 py-3 flex items-start gap-3 hover:opacity-90 transition"
+                  className="w-full px-4 py-3 flex items-start gap-3 transition"
                   style={{ background: unreadItem ? "var(--pp-bg-elevated)" : "transparent" }}
                 >
-                  <div className="mt-0.5 w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-                    style={{ background: unreadItem ? "linear-gradient(135deg, var(--pp-brand-accent), var(--pp-brand-accent-2))" : "var(--pp-bg-deep)" }}>
-                    <Icon className="w-4 h-4" style={{ color: unreadItem ? "white" : "var(--pp-text-muted)" }} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <div className={`text-sm truncate ${unreadItem ? "font-semibold" : "font-medium"}`} style={{ color: "var(--pp-text-primary)" }}>{n.title}</div>
-                      {unreadItem && <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: "var(--pp-brand-accent)" }} />}
+                  <button onClick={() => open(n)} className="flex items-start gap-3 flex-1 min-w-0 text-left hover:opacity-90">
+                    <div className="mt-0.5 w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                      style={{ background: unreadItem ? "linear-gradient(135deg, var(--pp-brand-accent), var(--pp-brand-accent-2))" : "var(--pp-bg-deep)" }}>
+                      <Icon className="w-4 h-4" style={{ color: unreadItem ? "white" : "var(--pp-text-muted)" }} />
                     </div>
-                    {n.body && <div className="text-xs mt-0.5 line-clamp-2" style={{ color: "var(--pp-text-muted)" }}>{n.body}</div>}
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-[10px] uppercase tracking-wide" style={{ color: "var(--pp-text-muted)" }}>{n.category || "info"}</span>
-                      <span className="text-[10px]" style={{ color: "var(--pp-text-muted)" }}>· {fmtWhen(n.created_at)}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <div className={`text-sm truncate ${unreadItem ? "font-semibold" : "font-medium"}`} style={{ color: "var(--pp-text-primary)" }}>{n.title}</div>
+                        {unreadItem && <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: "var(--pp-brand-accent)" }} />}
+                      </div>
+                      {n.body && <div className="text-xs mt-0.5 line-clamp-2" style={{ color: "var(--pp-text-muted)" }}>{n.body}</div>}
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[10px] uppercase tracking-wide" style={{ color: "var(--pp-text-muted)" }}>{n.category || "info"}</span>
+                        <span className="text-[10px]" style={{ color: "var(--pp-text-muted)" }}>· {fmtWhen(n.created_at)}</span>
+                      </div>
                     </div>
-                  </div>
-                </button>
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); toggleRead(n); }}
+                    title={unreadItem ? "Marquer comme lu" : "Marquer comme non lu"}
+                    aria-label={unreadItem ? "Marquer comme lu" : "Marquer comme non lu"}
+                    className="p-2 rounded-full flex-shrink-0"
+                    style={{ background: "var(--pp-bg-deep)" }}
+                  >
+                    {unreadItem ? <Check className="w-3.5 h-3.5" style={{ color: "var(--pp-text-muted)" }} /> : <Circle className="w-3.5 h-3.5" style={{ color: "var(--pp-text-muted)" }} />}
+                  </button>
+                </div>
               );
             })}
           </div>
