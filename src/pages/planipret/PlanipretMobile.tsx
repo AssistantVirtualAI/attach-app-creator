@@ -46,12 +46,46 @@ const KEYS: Array<{ d: string; l?: string }> = [
   { d: "*" }, { d: "0", l: "+" }, { d: "#" },
 ];
 
-function Dialer({ open, onClose, initial }: { open: boolean; onClose: () => void; initial?: string }) {
+type DialerContact = {
+  id?: string;
+  first_name?: string;
+  last_name?: string;
+  name?: string;
+  display_name?: string;
+  phone?: string;
+  cell_phone?: string;
+  work_phone?: string;
+  home_phone?: string;
+  extension?: string;
+  email?: string;
+  company?: string;
+  source?: "personal" | "shared" | "directory";
+};
+
+function contactDisplayName(c: DialerContact): string {
+  return (
+    c.display_name ||
+    c.name ||
+    [c.first_name, c.last_name].filter(Boolean).join(" ") ||
+    c.email ||
+    c.phone ||
+    "—"
+  );
+}
+function contactPrimaryPhone(c: DialerContact): string | undefined {
+  return c.cell_phone || c.phone || c.work_phone || c.home_phone || c.extension;
+}
+
+function Dialer({ open, onClose, initial, openMessages }: { open: boolean; onClose: () => void; initial?: string; openMessages: (n?: string) => void }) {
   const { t } = useMplanipretLang();
+  const [mode, setMode] = useState<"keypad" | "search">("keypad");
   const [number, setNumber] = useState("");
   const [calling, setCalling] = useState(false);
+  const [query, setQuery] = useState("");
+  const [contacts, setContacts] = useState<DialerContact[]>([]);
+  const [loadingContacts, setLoadingContacts] = useState(false);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => { if (open) setNumber(initial ?? ""); }, [open, initial]);
+  useEffect(() => { if (open) { setNumber(initial ?? ""); setMode("keypad"); setQuery(""); } }, [open, initial]);
   const append = (c: string) => setNumber((n) => (n + c).slice(0, 20));
   const back = () => setNumber((n) => n.slice(0, -1));
   const startHold = () => {
