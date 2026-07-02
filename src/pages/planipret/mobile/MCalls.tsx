@@ -684,14 +684,18 @@ function CallDetailSheet({
 
           {/* ===== TAB TRANSCRIPT ===== */}
           {activeTab === "transcript" && (
-            <TranscriptTab
-              call={call}
+            <TranscriptView
+              segments={Array.isArray(call.transcript_segments) ? call.transcript_segments : null}
+              transcript={call.transcript}
               loading={txLoading}
               onFetch={fetchTranscript}
               onAnalyze={analyzeAI}
               aiLoading={aiLoading}
+              analyzed={!!(call as any).ai_analysis_json}
+              t={t}
             />
           )}
+
 
 
           {/* ===== TAB COACHING ===== */}
