@@ -264,10 +264,16 @@ export default function PAReports() {
             </button>
           ))}
         </div>
-        <button onClick={exportPdf} disabled={exporting}
-          className="pp-btn-primary flex items-center gap-2 text-sm disabled:opacity-50">
-          <FileText className="w-4 h-4" /> {exporting ? "Génération…" : "Exporter PDF"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={exportCsv} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm"
+            style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>
+            <Download className="w-4 h-4" /> CSV
+          </button>
+          <button onClick={exportPdf} disabled={exporting}
+            className="pp-btn-primary flex items-center gap-2 text-sm disabled:opacity-50">
+            <FileText className="w-4 h-4" /> {exporting ? "Génération…" : "PDF"}
+          </button>
+        </div>
       </div>
 
       <div ref={reportRef} className="space-y-4">
@@ -297,7 +303,11 @@ export default function PAReports() {
       <div className="flex items-center gap-2 mt-2">
         <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full"
           style={{ background: "rgba(245,200,66,0.12)", color: GOLD, border: "1px solid rgba(245,200,66,0.25)" }}>
-          Période sélectionnée · {periodLabel}
+          Période sélectionnée · {selectedPeriodLabel}
+        </span>
+        <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full"
+          style={{ background: loadingPeriod ? "rgba(245,200,66,0.12)" : "rgba(0,212,170,0.12)", color: loadingPeriod ? GOLD : SUCCESS, border: `1px solid ${loadingPeriod ? "rgba(245,200,66,0.25)" : "rgba(0,212,170,0.25)"}` }}>
+          {loadingPeriod ? "Chargement…" : `Données chargées${loadedAt ? ` · ${loadedAt.toLocaleTimeString("fr-CA", { hour: "2-digit", minute: "2-digit" })}` : ""}`}
         </span>
       </div>
 
