@@ -165,94 +165,187 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ success: true, insights: inserted, analysis: inserted, transcript_text: transcript }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    if (!transcript || !String(transcript).trim()) {
-      return new Response(JSON.stringify({ success: false, error: "missing call_id or transcript" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    // ================== PLANIPRET COACHING BRANCH ==================
+    // Accept either raw text transcript OR structured segments.
+    const segments = Array.isArray(body?.segments) ? body.segments : null;
+    if (!transcript && segments && segments.length > 0) {
+      transcript = segments.map((s: any) => `${s.speaker ?? "Speaker"}: ${s.text ?? ""}`).join("\n");
     }
 
-    const apiKey = (await getSecret(admin, "anthropic", "api_key")) ?? Deno.env.get("ANTHROPIC_API_KEY");
-    if (!apiKey) {
-      return new Response(JSON.stringify({ success: false, error: "ANTHROPIC_API_KEY non configuré" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
+    // Load call context from planipret_phone_calls to enrich the prompt.
+    const { data: ppCall } = await admin.from("planipret_phone_calls")
+      .select("id, user_id, organization_id, metadata, direction, duration_seconds, from_number, to_number, started_at, transcript, transcript_segments, ai_analysis_json")
+      .eq("id", call_id).maybeSingle();
 
-    const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-5-20250929",
-        max_tokens: 2000,
-        system: SYSTEM_PROMPT,
-        messages: [{ role: "user", content: transcript }],
-      }),
-    });
-
-    if (!claudeRes.ok) {
-      const errText = await claudeRes.text();
-      console.error("Claude error", claudeRes.status, errText);
-      return new Response(JSON.stringify({ success: false, error: "Claude API error", details: errText }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-
-    const claudeData = await claudeRes.json();
-    const text = claudeData.content?.[0]?.text ?? "{}";
-    let insights: any;
-    try { insights = JSON.parse(text); } catch { insights = JSON.parse(text.match(/\{[\s\S]*\}/)?.[0] ?? "{}"); }
-
-    const { data: call } = await admin.from("planipret_phone_calls").select("user_id, organization_id, metadata").eq("id", call_id).maybeSingle();
-    if (!call) {
+    if (!ppCall) {
       return new Response(JSON.stringify({ success: false, error: "Appel introuvable" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const newMeta = { ...(call.metadata ?? {}), ai_coaching: insights.coaching, ai_tasks: insights.tasks, ai_events: insights.events, ai_next_action: insights.next_action };
-    const validTemp = ["hot","warm","cold"].includes(insights.lead_temperature) ? insights.lead_temperature : null;
-    const leadScore = typeof insights.lead_score === "number" ? Math.min(10, Math.max(1, Math.round(insights.lead_score))) : null;
+    if (!transcript || !String(transcript).trim()) {
+      transcript = (ppCall as any).transcript ?? "";
+      if (!transcript && Array.isArray((ppCall as any).transcript_segments)) {
+        transcript = (ppCall as any).transcript_segments.map((s: any) => `${s.speaker ?? "Speaker"}: ${s.text ?? ""}`).join("\n");
+      }
+    }
+    if (!transcript || !String(transcript).trim()) {
+      return new Response(JSON.stringify({ success: false, error: "missing transcript", message: "Transcription requise avant analyse." }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const apiKey = (await getSecret(admin, "anthropic", "api_key")) ?? Deno.env.get("ANTHROPIC_API_KEY");
+    const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+
+    const COACHING_SYSTEM = `Tu es AVA, coach IA pour courtiers hypothécaires Planiprêt (Québec).
+Analyse la transcription et retourne UNIQUEMENT un JSON valide (aucun markdown, aucun texte avant/après) suivant EXACTEMENT ce schéma:
+{
+  "corrected_transcript": [{"speaker":"Courtier"|"Client","text":"...","start":null}],
+  "summary": {
+    "short":"1-2 phrases",
+    "detailed":"3-5 phrases",
+    "client_needs":["..."],
+    "key_info":{"budget":null,"property_type":null,"timeline":null,"concerns":[]},
+    "outcome":"...",
+    "next_steps":["..."]
+  },
+  "lead_analysis": {
+    "score":1-10,
+    "temperature":"hot"|"warm"|"cold",
+    "buying_signals":["..."],
+    "objections":["..."],
+    "recommendation":"..."
+  },
+  "coaching": {
+    "overall_score":1-10,
+    "score_breakdown":{"listening":n,"questioning":n,"empathy":n,"product_knowledge":n,"closing":n},
+    "strengths":["..."],
+    "improvements":["..."],
+    "missed_opportunities":["..."],
+    "best_moment":"...",
+    "coaching_message":"2-3 phrases encourageantes",
+    "suggested_phrases":[{"context":"...","phrase":"..."}]
+  },
+  "compliance": {"consent_mentioned":bool,"privacy_mentioned":bool,"flags":[]}
+}
+Français québécois professionnel.`;
+
+    const meta = ppCall as any;
+    const userMsg = `MÉTADONNÉES:
+- Direction: ${meta.direction ?? "?"}
+- Durée: ${meta.duration_seconds ?? "?"}s
+- De → Vers: ${meta.from_number ?? "?"} → ${meta.to_number ?? "?"}
+- Date: ${meta.started_at ?? "?"}
+
+TRANSCRIPTION:
+${String(transcript).slice(0, 18000)}`;
+
+    let analysis: any = null;
+    let modelUsed = "";
+
+    // Prefer Claude if available, otherwise fall back to Lovable AI Gateway (Gemini).
+    if (apiKey) {
+      modelUsed = "claude-sonnet-4-5-20250929";
+      const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+        body: JSON.stringify({
+          model: modelUsed,
+          max_tokens: 3000,
+          system: COACHING_SYSTEM,
+          messages: [{ role: "user", content: userMsg }],
+        }),
+      });
+      if (!claudeRes.ok) {
+        const errText = await claudeRes.text();
+        return new Response(JSON.stringify({ success: false, error: "Claude API error", details: errText.slice(0, 500) }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const claudeData = await claudeRes.json();
+      const raw = claudeData.content?.[0]?.text ?? "{}";
+      try { analysis = JSON.parse(raw); } catch { analysis = JSON.parse(raw.match(/\{[\s\S]*\}/)?.[0] ?? "{}"); }
+    } else if (lovableKey) {
+      modelUsed = "google/gemini-2.5-pro";
+      const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { "Lovable-API-Key": lovableKey, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: modelUsed,
+          messages: [
+            { role: "system", content: COACHING_SYSTEM },
+            { role: "user", content: userMsg },
+          ],
+          response_format: { type: "json_object" },
+        }),
+      });
+      if (!aiRes.ok) {
+        const errText = await aiRes.text();
+        return new Response(JSON.stringify({ success: false, error: "AI gateway error", details: errText.slice(0, 500) }), { status: aiRes.status === 429 || aiRes.status === 402 ? aiRes.status : 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const aiData = await aiRes.json();
+      const raw = aiData.choices?.[0]?.message?.content ?? "{}";
+      try { analysis = JSON.parse(raw); } catch { analysis = JSON.parse(raw.match(/\{[\s\S]*\}/)?.[0] ?? "{}"); }
+    } else {
+      return new Response(JSON.stringify({ success: false, error: "Aucune clé IA configurée (ANTHROPIC_API_KEY ou LOVABLE_API_KEY)" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    if (!analysis || typeof analysis !== "object") {
+      return new Response(JSON.stringify({ success: false, error: "Réponse IA invalide" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const coaching = analysis.coaching ?? {};
+    const summary = analysis.summary ?? {};
+    const leadA = analysis.lead_analysis ?? {};
+
+    const overall = typeof coaching.overall_score === "number" ? Math.round(coaching.overall_score * 10) / 10 : null;
+    const leadScore = typeof leadA.score === "number" ? Math.min(10, Math.max(1, Math.round(leadA.score))) : null;
+    const leadTemp = ["hot", "warm", "cold"].includes(leadA.temperature) ? leadA.temperature : null;
+    const correctedSegs = Array.isArray(analysis.corrected_transcript) ? analysis.corrected_transcript : (ppCall as any).transcript_segments ?? null;
+
+    // Back-compat metadata used by existing MCalls coaching UI
+    const newMeta = {
+      ...((meta.metadata ?? {}) as Record<string, unknown>),
+      ai_coaching: coaching.coaching_message ?? coaching.overall ?? null,
+      ai_strengths: coaching.strengths ?? [],
+      ai_improvements: coaching.improvements ?? [],
+      ai_key_info: summary.key_info ?? null,
+      ai_next_action: summary.next_steps?.[0] ?? null,
+    };
+
     await admin.from("planipret_phone_calls").update({
-      ai_summary: insights.summary,
-      metadata: newMeta,
+      transcript_segments: correctedSegs,
+      ai_summary: summary.detailed ?? null,
+      ai_summary_short: summary.short ?? null,
+      ai_analysis_json: analysis,
+      coaching_score: overall,
       lead_score: leadScore,
-      lead_temperature: validTemp,
-      lead_score_reason: insights.lead_score_reason ?? null,
-      suggested_callback_delay: insights.suggested_callback_delay ?? null,
-      callback_reason: insights.callback_reason ?? null,
+      lead_temperature: leadTemp,
+      lead_score_reason: leadA.recommendation ?? null,
+      next_actions: summary.next_steps ?? [],
+      analyzed_at: new Date().toISOString(),
+      metadata: newMeta,
     }).eq("id", call_id);
 
     await admin.from("planipret_ai_insights").insert({
-      user_id: call.user_id,
-      organization_id: call.organization_id,
+      user_id: (ppCall as any).user_id,
+      organization_id: (ppCall as any).organization_id,
       call_id,
-      summary: insights.summary,
-      customer_intent: insights.customer_intent,
-      sentiment: insights.sentiment,
-      topics: insights.objections ?? [],
-      suggested_actions: insights.tasks ?? [],
-      coaching_notes: insights.coaching,
-      raw_response: insights,
-      model: "claude-sonnet-4-5-20250929",
+      summary: summary.detailed ?? null,
+      customer_intent: leadA.recommendation ?? null,
+      sentiment: leadTemp === "hot" ? "positive" : leadTemp === "cold" ? "negative" : "neutral",
+      topics: leadA.buying_signals ?? [],
+      suggested_actions: summary.next_steps ?? [],
+      coaching_notes: coaching.coaching_message ?? null,
+      raw_response: analysis,
+      model: modelUsed,
     });
 
-    // Trigger Maestro actions
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const invokeFn = (name: string, body: any) =>
-      fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
-        body: JSON.stringify(body),
-      }).catch((e) => console.error(`${name} failed`, e));
-
-    if (insights.should_create_maestro_task && insights.tasks?.[0]) {
-      const t = insights.tasks[0];
-      invokeFn("maestro-actions", { action: "create_task", payload: { title: t.title, description: insights.summary, due_date: new Date(Date.now() + (t.due_days_from_now ?? 1) * 86400000).toISOString(), call_id } });
-    }
-    if (insights.should_create_maestro_event && insights.events?.[0]) {
-      const e = insights.events[0];
-      const start = new Date(Date.now() + (e.start_offset_hours ?? 24) * 3600000);
-      const end = new Date(start.getTime() + (e.duration_minutes ?? 30) * 60000);
-      invokeFn("maestro-actions", { action: "create_event", payload: { title: e.title, start: start.toISOString(), end: end.toISOString(), description: insights.summary, call_id } });
-    }
-
     // Realtime broadcast
-    await admin.channel(`ai-insights:${call.user_id}`).send({ type: "broadcast", event: "ai-insights", payload: { call_id, insights } });
+    try {
+      await admin.channel(`ai-insights:${(ppCall as any).user_id}`).send({
+        type: "broadcast", event: "ai-insights",
+        payload: { call_id, analysis },
+      });
+    } catch (_) {}
 
-    return new Response(JSON.stringify({ success: true, insights }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ success: true, analysis, model: modelUsed }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
   } catch (e: any) {
     console.error("ai-analyze-call error", e);
     return new Response(JSON.stringify({ success: false, error: e?.message ?? "Erreur serveur" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
