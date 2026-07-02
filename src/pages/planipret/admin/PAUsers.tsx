@@ -96,17 +96,31 @@ export default function PAUsers() {
   }, []);
 
   const filtered = useMemo(() => {
+    const hasSearch = !!search.trim();
     return rows.filter((r) => {
-      if (filter === "app" && !r.mobile_app_enabled) return false;
-      if (filter === "agent" && !r.voice_agent_enabled) return false;
-      if (filter === "offline" && r.mobile_app_enabled) return false;
-      if (search) {
+      // When searching, don't hide rows behind the app/agent/offline tab —
+      // the tab filter is muted so results are visible regardless of status.
+      if (!hasSearch) {
+        if (filter === "app" && !r.mobile_app_enabled) return false;
+        if (filter === "agent" && !r.voice_agent_enabled) return false;
+        if (filter === "offline" && r.mobile_app_enabled) return false;
+      }
+      if (hasSearch) {
         const s = search.toLowerCase();
-        return r.full_name?.toLowerCase().includes(s) || r.email?.toLowerCase().includes(s) || r.extension?.toLowerCase().includes(s);
+        const anyR = r as any;
+        const fields = [
+          r.full_name,
+          r.email,
+          r.extension,
+          anyR.ns_extension,
+          anyR.ns_domain,
+        ];
+        return fields.some((v) => String(v ?? "").toLowerCase().includes(s));
       }
       return true;
     });
   }, [rows, filter, search]);
+
 
   const paged = filtered.slice((page - 1) * pageSize, page * pageSize);
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
