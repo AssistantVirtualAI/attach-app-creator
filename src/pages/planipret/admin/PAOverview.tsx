@@ -9,6 +9,7 @@ import { RevenueBreakdown } from "@/components/planipret/admin/RevenueBreakdown"
 import { getPlanipretBrokerDirectory } from "@/lib/planipret/adminDirectory";
 import { getPlanipretCallCount } from "@/lib/planipret/adminCounts";
 import { usePlanipretBrokerStats } from "@/lib/planipret/brokerStats";
+import { readAdminReportFilters, writeAdminReportFilters, type AdminPeriod } from "@/lib/planipret/adminReportFilters";
 import { usePlanipretNsAutoSync } from "@/hooks/usePlanipretNsAutoSync";
 import NsSyncBar from "@/components/planipret/admin/NsSyncBar";
 import {
@@ -92,7 +93,7 @@ const TooltipDark = ({ active, payload, label }: any) => {
 type Period = 7 | 30 | 90;
 
 export default function PAOverview() {
-  const [period, setPeriod] = useState<Period>(7);
+  const [period, setPeriodState] = useState<Period>(() => readAdminReportFilters().period as Period);
   const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState({
     calls: 0, callsYest: 0, callsMissedToday: 0, brokers: 0, brokersTotal: 0,
@@ -176,15 +177,15 @@ export default function PAOverview() {
 
     // Compute service counts from real Planipret brokers (exclude test accounts).
     const TEST_PATTERNS = ["scott", "mohamad", "carlo", "clinton"];
-    const isTest = (n?: string | null) => {
-      const s = (n ?? "").toLowerCase();
+    const isTest = (name?: string | null, email?: string | null) => {
+      const s = `${name ?? ""} ${email ?? ""}`.toLowerCase();
       return TEST_PATTERNS.some((p) => s.includes(p));
     };
     const profs = (svcProfiles.data ?? []) as Array<{ full_name: string | null; email: string | null; ns_domain: string | null; mobile_app_enabled: boolean | null; voice_agent_enabled: boolean | null }>;
     const realBrokers = profs.filter((p) => {
       const em = (p.email ?? "").toLowerCase();
-      const hasPpEmail = em.endsWith("@planipret.ca") || em.endsWith("@planipret.com");
-      return hasPpEmail && !isTest(p.full_name);
+      const hasPpEmail = em.endsWith("@planipret.ca");
+      return hasPpEmail && !isTest(p.full_name, p.email);
     });
     const widgetN = realBrokers.length;
     const mobileN = realBrokers.filter((p) => p.ns_domain === "planipret.ca" && p.mobile_app_enabled).length;
@@ -256,6 +257,11 @@ export default function PAOverview() {
   };
 
   usePlanipretNsAutoSync({ onQueued: load });
+
+  const setPeriod = (next: Period) => {
+    setPeriodState(next);
+    writeAdminReportFilters({ period: next as AdminPeriod, dispatcher: "all" });
+  };
 
   useEffect(() => {
     load();
