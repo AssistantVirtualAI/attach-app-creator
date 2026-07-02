@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useCallBus } from '../../hooks/useCallBus';
 import { theme } from '../../lib/theme';
+import { useTranslation } from '../../lib/i18n';
 
 const { colors: c } = theme;
 
 export default function ActiveCallDock() {
   const { call, hangup, mute, hold } = useCallBus();
+  const { t } = useTranslation();
   const [, force] = useState(0);
 
   useEffect(() => {
@@ -37,21 +39,21 @@ export default function ActiveCallDock() {
         animation: 'pulse 1.5s ease-in-out infinite',
       }} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <div style={{ fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: c.textIce }}>
           {call.displayName || call.number}
         </div>
         <div style={{ fontSize: 10.5, color: c.mutedSilver, fontFamily: 'JetBrains Mono, monospace' }}>
-          {call.status === 'held' ? 'On hold' : 'In call'} · {mm}:{ss}
+          {call.status === 'held' ? t('dialer.onHold') : t('dialer.inCall')} · {mm}:{ss}
         </div>
       </div>
-      <DockBtn label={call.muted ? 'Unmute' : 'Mute'} active={call.muted} accent={c.warning} onClick={() => mute(!call.muted)} hint="⌘M" />
-      <DockBtn label={call.status === 'held' ? 'Resume' : 'Hold'} active={call.status === 'held'} accent={c.avaCyan} onClick={() => hold(call.status !== 'held')} hint="⌘H" />
+      <DockBtn label={call.muted ? t('dialer.unmute') : t('dialer.mute')} active={call.muted} accent={c.warning} onClick={() => mute(!call.muted)} hint="⌘M" />
+      <DockBtn label={call.status === 'held' ? t('dialer.resume') : t('dialer.hold')} active={call.status === 'held'} accent={c.avaCyan} onClick={() => hold(call.status !== 'held')} hint="⌘H" />
       <button onClick={hangup} style={{
         padding: '7px 14px', borderRadius: 9,
         background: `linear-gradient(135deg, ${c.danger}, #b21a30)`,
-        border: 'none', color: '#fff', fontSize: 11, fontWeight: 800,
+        border: 'none', color: c.textIce, fontSize: 11, fontWeight: 800,
         cursor: 'pointer', letterSpacing: 0.4,
-      }}>End</button>
+      }}>{t('dialer.end')}</button>
     </div>
   );
 }

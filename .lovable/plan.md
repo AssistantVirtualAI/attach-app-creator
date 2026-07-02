@@ -1,42 +1,52 @@
+## Scope
 
-## Problems observed
+Desktop app only (`apps/ava-softphone-desktop/`). No changes to `apps/ava-softphone-mobile/` or any iOS native files.
 
-1. **Recordings** — 666 calls in `planipret_phone_calls`, `0` with `recording_url`. Latest `pp-admin-ns-sync` runs return `fetched: 666, recordings: 0, upserted: 0`. Root cause: `syncRecordings()` extracts the call ID with a narrow key list; the CDR-recordings items coming from `/domains/{d}/cdrs/recordings` use the same NS-API v2 CDR field names (`orig-callid`, `orig-call-id`, `call-orig-call-id`) that `syncCalls`'s `nsCallId()` handles, but `syncRecordings` looks up only a subset AND aborts (`continue`) when the id key isn't found. Also the recording-access-url resolver only runs for rows already in the batch; existing calls never get their `recording_url` back-filled.
+## Root causes found
 
-2. **AVA Analytics empty** — `planipret_ava_email_analyses`, `planipret_ava_action_log`, `planipret_ava_feedback` all have 0 rows. No email has ever been analyzed because no manual/scheduled run has produced data yet.
+- `src/App.tsx` swaps between `ConsoleLayout` and `SoftphonePane` at the 980px width breakpoint. That swap unmounts the pane holding the `<audio>` element and the call UI — this is what actually kills audio and forces the dialer → dashboard jump.
+- `electron/main.ts` `BrowserWindow` has no `backgroundThrottling: false`, so audio can be throttled during resize.
+- Some dialer/call-control surfaces use hardcoded light colors instead of `useTheme()` tokens.
+- Dialer/call components render hardcoded English strings; `useTranslation()` from `src/lib/i18n.ts` already exists but is not wired into the dialer.
 
-3. **Overview / Reports** — user didn't specify what is missing; both pages already query all the expected data. Since the recording fix will re-populate calls and enrich metadata, several derived widgets (recordings count, transcripts) will start filling in. I'll leave the layout alone until the user names a specific gap.
+## Fixes
 
-## Changes
+### Bug 1 — Audio dropped on resize
 
-### A. `supabase/functions/pp-admin-ns-sync/index.ts` — recordings sync
-- Replace the narrow id extraction in `syncRecordings` with the same `nsCallId()` fallback used in `syncCalls` so every row synthesizes a stable id from ext+time+from+to+duration when a raw id isn't present.
-- Widen the recording-URL extraction: try `recordingUrl(rec)` first, then `fetchRecordingAccessUrl(domain, rec)` (which already calls `/domains/{d}/recordings/{callId}` and reads `file-access-url`).
-- After the sync loop, **also back-fill existing `planipret_phone_calls` rows** for the same window that still have `recording_url IS NULL`: for each row with a `metadata.recording_api_path` or a resolvable call id, call `fetchRecordingAccessUrl` and update the row. Bounded (max ~200 lookups per run) to keep runtime sane.
-- Persist `metadata.recording_api_path` on every CDR row inside `syncCalls` (already partially there) so the on-demand fetch below can use it.
+- `electron/main.ts`: add `backgroundThrottling: false` to `webPreferences`.
+- `src/App.tsx`:
+  - Track `callActive` from `SipKeepAlive` via the existing `sipProvider` snapshot (call states `ringing-in`, `ringing-out`, `active`, `held`).
+  - In the resize handler, do not update `wide` while a call is active — freeze the current layout for the duration of the call.
+- Keep `SipKeepAlive` at root (already the case) so SIP itself never remounts.
 
-### B. `supabase/functions/pp-ns-recordings/index.ts` — on-demand lookup safety net
-- Already exists. Add a `resolve` action that, given a `call_id`, calls NS-API `/domains/{domain}/recordings/{call_id}`, extracts `file-access-url`, saves it into `planipret_phone_calls.recording_url` for that broker's row, and returns the URL. This lets the UI recover a missing recording per-click.
+### Bug 2 — Resize navigates to dashboard + flicker
 
-### C. `src/pages/planipret/admin/PARecordings.tsx`
-- When a row's `recording_url` is null or the audio 404s, show a "Récupérer l'enregistrement" button in the drawer that calls `pp-ns-recordings` with `action: "resolve"`, then refreshes the row.
-- Broaden the list query to include calls where `metadata->>'recording_api_path' is not null` OR `recording_url is not null`, so calls that have a recording path but no resolved URL still surface and can be resolved on click.
+- Same `callActive` guard from Bug 1 prevents the `wide`/pane swap during ringing or active calls, which removes the dashboard jump and the remount flicker.
+- Additionally, render both `ConsoleLayout` and `SoftphonePane` conditionally by `wide` but keep the active one mounted; the guard already prevents mid-call swaps, so no `display:none` shadow tree is needed.
+- Confirm `SoftphonePane` isn't unmounted mid-call by any child breakpoint logic (spot check only — no rewrite).
 
-### D. AVA Analytics manual run — `src/pages/planipret/admin/PAAva.tsx`
-- Add a second action button "Analyser les emails maintenant" next to "Réentraîner AVA".
-- It calls a new/existing edge function `ava-email-analyzer` with `{ mode: "all_brokers", lookback_days: 7 }`. If the function doesn't accept that shape, add a small wrapper edge function `ava-analyze-all` that:
-  - Selects all `planipret_profiles` with `ms365_access_token_encrypted IS NOT NULL` (or equivalent M365-connected flag),
-  - Invokes `ava-email-analyzer` per broker in parallel (chunks of 4),
-  - Returns `{ analyzed_brokers, total_emails, errors }`.
-- Toast progress; on success call `load()` so the KPI grid and table repopulate.
+### Bug 3 — Dialer flips to light mode during call
+
+- Audit `DialerKeypad.tsx`, `CallControlGrid.tsx`, and `console/ActiveCallDock.tsx` for hardcoded `#fff`/`#000`/`white`/`black` and replace with `useTheme()` tokens (`t.bg`, `t.text`, `t.textMuted`, etc.) that already exist in `src/lib/theme.tsx`.
+- No portal target is currently used; nothing to patch there.
+
+### Bug 4 — Dialer stays in English
+
+- Add missing keys to the `en` and `fr` maps in `src/lib/i18n.ts`:
+  `dialer.calling`, `dialer.hangup`, `dialer.enterNumber`, `dialer.mute`, `dialer.unmute`, `dialer.hold`, `dialer.resume`, `dialer.transfer`, `dialer.keypad`, `dialer.speaker`, `dialer.active`, `dialer.ringing`, `dialer.ended`.
+- Wire `useTranslation()` into `DialerKeypad.tsx`, `CallControlGrid.tsx`, and `console/ActiveCallDock.tsx`, replacing hardcoded English strings (button labels, placeholders, status text).
+- `useTranslation` already re-renders on the `lemtel:lang` event, so no memo dependency changes are needed.
+
+## Files to edit
+
+- `apps/ava-softphone-desktop/electron/main.ts`
+- `apps/ava-softphone-desktop/src/App.tsx`
+- `apps/ava-softphone-desktop/src/lib/i18n.ts`
+- `apps/ava-softphone-desktop/src/components/DialerKeypad.tsx`
+- `apps/ava-softphone-desktop/src/components/CallControlGrid.tsx`
+- `apps/ava-softphone-desktop/src/components/console/ActiveCallDock.tsx`
 
 ## Verification
 
-- Run `pp-admin-ns-sync` from the Recordings page, wait for the run to finish, then re-query `select count(*) from planipret_phone_calls where recording_url is not null` — expect > 0.
-- Click a call row → the audio element loads.
-- Click "Analyser les emails maintenant" → after completion, `select count(*) from planipret_ava_email_analyses` > 0 and the AVA page shows KPIs.
-
-## Out of scope (until user clarifies)
-
-- Overview/Reports layout changes — waiting on specifics.
-- ava-email-analyzer scheduler / M365 token audit — separate follow-up if manual pass reveals no broker is connected.
+- Typecheck the desktop app.
+- Manual QA cases the user listed: resize during a call (audio stays, layout frozen), theme = dark during a call (dialer stays dark), language = fr during a call (all dialer labels in French).

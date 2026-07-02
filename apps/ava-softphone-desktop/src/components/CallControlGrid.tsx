@@ -1,5 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
+import { theme } from '../lib/theme';
+import { useTranslation } from '../lib/i18n';
+
+const { colors: c } = theme;
 
 type Member = {
   user_id: string;
@@ -22,6 +26,7 @@ interface Props {
  * Keyboard shortcuts handled by parent (useShortcuts hook).
  */
 function CallControlGridImpl({ organizationId, onDial, onTransfer }: Props) {
+  const { t } = useTranslation();
   const [members, setMembers] = useState<Member[]>([]);
   const [activeLines, setActiveLines] = useState<any[]>([]);
   const [parked, setParked] = useState<any[]>([]);
@@ -105,9 +110,9 @@ function CallControlGridImpl({ organizationId, onDial, onTransfer }: Props) {
   } as Record<string, string>)[s] || '#64748b';
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, padding: 12, height: '100%', color: '#e2e8f0' }}>
-      <Panel title={`Active Lines (${activeLines.length})`}>
-        {activeLines.length === 0 && <Empty>No active calls</Empty>}
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, padding: 12, height: '100%', color: c.textIce }}>
+      <Panel title={`${t('dialer.activeLines')} (${activeLines.length})`}>
+        {activeLines.length === 0 && <Empty>{t('dialer.noActive')}</Empty>}
         {activeLines.map((l: any, i) => (
           <Row key={i}>
             <strong>{l.caller_number || l.from}</strong>
@@ -116,17 +121,17 @@ function CallControlGridImpl({ organizationId, onDial, onTransfer }: Props) {
         ))}
       </Panel>
 
-      <Panel title={`Parked / Hold (${parked.length})`}>
-        {parked.length === 0 && <Empty>Nothing parked</Empty>}
+      <Panel title={`${t('dialer.parked')} (${parked.length})`}>
+        {parked.length === 0 && <Empty>{t('dialer.nothingParked')}</Empty>}
         {parked.map((p: any, i) => (
           <Row key={i}>
-            <span>Slot {p.slot || i + 1} · {p.caller}</span>
-            <button onClick={() => onDial?.(p.slot)} style={btnStyle}>Pickup</button>
+            <span>{t('dialer.slot')} {p.slot || i + 1} · {p.caller}</span>
+            <button onClick={() => onDial?.(p.slot)} style={btnStyle}>{t('dialer.pickup')}</button>
           </Row>
         ))}
       </Panel>
 
-      <Panel title={`Team (${members.length})`}>
+      <Panel title={`${t('dialer.team')} (${members.length})`}>
         {members.map((m) => (
           <Row key={m.user_id}>
             <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -135,8 +140,8 @@ function CallControlGridImpl({ organizationId, onDial, onTransfer }: Props) {
               <span style={{ fontSize: 11, opacity: 0.6 }}>{m.extension}</span>
             </span>
             <span style={{ display: 'flex', gap: 4 }}>
-              <button onClick={() => m.extension && onDial?.(m.extension)} style={btnStyle}>Call</button>
-              <button onClick={() => m.extension && onTransfer?.(m.extension)} style={btnStyle}>Xfer</button>
+              <button onClick={() => m.extension && onDial?.(m.extension)} style={btnStyle}>{t('dialer.call')}</button>
+              <button onClick={() => m.extension && onTransfer?.(m.extension)} style={btnStyle}>{t('dialer.xfer')}</button>
             </span>
           </Row>
         ))}
@@ -146,19 +151,19 @@ function CallControlGridImpl({ organizationId, onDial, onTransfer }: Props) {
 }
 
 const Panel = ({ title, children }: { title: string; children: React.ReactNode }) => (
-  <div style={{ background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(148,163,184,0.2)', borderRadius: 8, padding: 12, overflow: 'auto' }}>
-    <div style={{ fontSize: 12, textTransform: 'uppercase', opacity: 0.7, marginBottom: 8 }}>{title}</div>
+  <div style={{ background: c.deepPanel, border: `1px solid ${c.border}`, borderRadius: 8, padding: 12, overflow: 'auto', color: c.textIce }}>
+    <div style={{ fontSize: 12, textTransform: 'uppercase', opacity: 0.7, marginBottom: 8, color: c.mutedSilver }}>{title}</div>
     {children}
   </div>
 );
 const Row = ({ children }: { children: React.ReactNode }) => (
-  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid rgba(148,163,184,0.1)' }}>{children}</div>
+  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: `1px solid ${c.border}` }}>{children}</div>
 );
 const Empty = ({ children }: { children: React.ReactNode }) => (
-  <div style={{ fontSize: 12, opacity: 0.5, padding: '8px 0' }}>{children}</div>
+  <div style={{ fontSize: 12, opacity: 0.5, padding: '8px 0', color: c.mutedSilver }}>{children}</div>
 );
 const btnStyle: React.CSSProperties = {
-  background: 'rgba(0,35,230,0.2)', color: '#e2e8f0', border: '1px solid rgba(0,35,230,0.4)',
+  background: c.primarySoft, color: c.textIce, border: `1px solid ${c.border}`,
   borderRadius: 4, padding: '2px 8px', fontSize: 11, cursor: 'pointer',
 };
 
