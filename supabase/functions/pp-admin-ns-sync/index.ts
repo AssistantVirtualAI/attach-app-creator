@@ -573,10 +573,15 @@ async function syncRecordings(admin: ReturnType<typeof createClient>, domain: st
 
   const rows: any[] = [];
   for (const { item: rec, ext: fallbackExt } of rawItems) {
-    const id = String(val(rec, ["call_id", "call-id", "cdr_id", "cdr-id", "orig-callid", "orig_callid", "session_id", "session-id", "id", "uuid", "recording_id", "recording-id", "call-orig-call-id", "call-term-call-id"], "")).trim();
+    // Try explicit id keys first, then fall back to the synthetic
+    // ext:started:from:to:duration key syncCalls uses — same NS-API v2 CDR
+    // shape, so recordings and CDRs share stable ids.
+    const explicitId = String(val(rec, ["call_id", "call-id", "cdr_id", "cdr-id", "orig-callid", "orig_callid", "session_id", "session-id", "id", "uuid", "recording_id", "recording-id", "call-orig-call-id", "call-term-call-id", "call-parent-call-id"], "")).trim();
+    const id = explicitId || nsCallId(rec);
     if (!id) continue;
     const ext = String(val(rec, ["user", "extension", "orig-user", "term-user", "subscriber", "call-orig-user", "call-term-user", "call-through-user"], fallbackExt ?? "")).trim();
-    const url = recordingUrl(rec) ?? recordingApiPath(domain, { ...rec, user: ext });
+    const apiPath = recordingApiPath(domain, { ...rec, user: ext });
+    const url = recordingUrl(rec) ?? apiPath;
     const started = toIso(val(rec, ["time-start", "start-time", "start_time", "started_at", "date", "created_at", "recorded_at", "recorded-at", "call-start-datetime", "call-batch-start-datetime", "call-record-creation-datetime"]));
     rows.push({
       user_id: extToProfile.get(ext) ?? null,
@@ -593,7 +598,7 @@ async function syncRecordings(admin: ReturnType<typeof createClient>, domain: st
       started_at: started,
       duration_seconds: numVal(rec, ["duration", "time-talking", "billsec", "talk_time", "recording_seconds", "call-total-duration-seconds", "call-batch-total-duration-seconds", "call-talking-duration-seconds"], 0),
       recording_url: url,
-      metadata: { ns_recording: rec, recording_api_path: url },
+      metadata: { ns_recording: rec, recording_api_path: apiPath },
     });
   }
 
