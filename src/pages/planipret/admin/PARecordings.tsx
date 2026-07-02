@@ -64,7 +64,7 @@ export default function PARecordings() {
     let q: any = supabase
       .from("planipret_phone_calls")
       .select("*, planipret_profiles(full_name, extension)", { count: "exact" })
-      .not("recording_url", "is", null)
+      .or("recording_url.not.is.null,metadata->>recording_api_path.not.is.null")
       .order("started_at", { ascending: false })
       .range(fromIdx, fromIdx + ps - 1);
     if (search) q = q.or(`from_number.ilike.%${search}%,to_number.ilike.%${search}%,extension.ilike.%${search}%`);
