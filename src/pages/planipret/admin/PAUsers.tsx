@@ -180,20 +180,7 @@ export default function PAUsers() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={async () => {
-              const id = toast.loading("Synchronisation NS-API…");
-              try {
-                const { data, error } = await supabase.functions.invoke("pp-admin-ns-sync", { body: {} });
-                if (error) throw error;
-                toast.success(`${(data as any)?.extensions ?? (data as any)?.users_total ?? 0} extensions synchronisées · données en arrière-plan`, { id });
-                await load();
-              } catch (e: any) { toast.error(`Échec: ${e.message ?? e}`, { id }); }
-            }}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium"
-            style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>
-            <RefreshCw className="w-4 h-4" /> Synchroniser NS-API
-          </button>
+
           <div className="relative">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--pp-text-muted)" }} />
             <input value={search} onChange={(e) => setSearch(e.target.value)}
