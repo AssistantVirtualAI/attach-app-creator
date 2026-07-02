@@ -26,6 +26,7 @@ interface Props {
  * Keyboard shortcuts handled by parent (useShortcuts hook).
  */
 function CallControlGridImpl({ organizationId, onDial, onTransfer }: Props) {
+  const { t } = useTranslation();
   const [members, setMembers] = useState<Member[]>([]);
   const [activeLines, setActiveLines] = useState<any[]>([]);
   const [parked, setParked] = useState<any[]>([]);
