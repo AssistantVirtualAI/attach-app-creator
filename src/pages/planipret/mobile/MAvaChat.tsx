@@ -179,6 +179,9 @@ export default function MAvaChat() {
         </Sheet>
         <Sparkles className="w-5 h-5 text-primary" />
         <div className="font-medium truncate flex-1">{currentTitle}</div>
+        <Button size="icon" variant="ghost" onClick={toggleTts} title={speakReplies ? "Voix activée" : "Voix désactivée"}>
+          {speakReplies ? <Volume2 className="w-5 h-5 text-primary" /> : <VolumeX className="w-5 h-5" />}
+        </Button>
         <Button size="icon" variant="ghost" onClick={startNew}><Plus className="w-5 h-5" /></Button>
       </div>
 
@@ -193,7 +196,18 @@ export default function MAvaChat() {
             <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
               <div className={`max-w-[85%] rounded-2xl px-4 py-2 text-sm whitespace-pre-wrap ${
                 m.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"
-              }`}>{m.message}</div>
+              }`}>
+                {m.message}
+                {m.role === "assistant" && (
+                  <button
+                    onClick={() => (speakingId === m.id ? (audioRef.current?.pause(), setSpeakingId(null)) : speak(m.id, m.message))}
+                    className="ml-2 inline-flex items-center align-middle text-muted-foreground hover:text-primary"
+                    title="Écouter"
+                  >
+                    {speakingId === m.id ? <Square className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
+                  </button>
+                )}
+              </div>
             </div>
           ))}
           {busy && (
@@ -207,12 +221,21 @@ export default function MAvaChat() {
       </ScrollArea>
 
       <div className="p-3 border-t flex gap-2">
+        <Button
+          onClick={recording ? stopRec : startRec}
+          disabled={busy || transcribing || !userId}
+          size="icon"
+          variant={recording ? "destructive" : "outline"}
+          title={recording ? "Arrêter" : "Dicter"}
+        >
+          {transcribing ? <Loader2 className="w-4 h-4 animate-spin" /> : recording ? <Square className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+        </Button>
         <Input
-          placeholder="Message à AVA…"
+          placeholder={recording ? "Enregistrement…" : "Message à AVA…"}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
-          disabled={busy || !userId}
+          disabled={busy || !userId || recording}
         />
         <Button onClick={send} disabled={busy || !input.trim()} size="icon">
           {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
