@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, CheckCircle2, XCircle, Edit3, Sparkles, Mail, Calendar, ClipboardList, StickyNote, UserPlus, RefreshCw } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, Edit3, Sparkles, Mail, Calendar, ClipboardList, StickyNote, UserPlus, RefreshCw, ThumbsUp, ThumbsDown } from "lucide-react";
+
 
 export type AvaAction = {
   id: string;
@@ -58,6 +59,29 @@ export default function AvaProposedActionsCard({ analysis, onDismiss }: { analys
   );
   const [editing, setEditing] = useState<Record<string, boolean>>({});
   const [exec, setExec] = useState<Record<string, ExecState>>({});
+  const [feedback, setFeedback] = useState<Record<string, "up" | "down" | "skipped" | "modified">>({});
+  const [showComment, setShowComment] = useState<Record<string, boolean>>({});
+  const [comments, setComments] = useState<Record<string, string>>({});
+
+  const sendFeedback = async (action: AvaAction, rating: "up" | "down" | "skipped" | "modified", comment?: string) => {
+    setFeedback((f) => ({ ...f, [action.id]: rating }));
+    const original = action.draft_content ?? "";
+    const final = drafts[action.id] ?? "";
+    const modified = rating === "modified" || (rating !== "skipped" && final && final !== original);
+    const { error } = await supabase.functions.invoke("ava-feedback-record", {
+      body: {
+        analysis_id: analysis.id,
+        action_id: action.id,
+        action_type: action.type,
+        rating: modified && rating === "up" ? "modified" : rating,
+        comment: comment ?? null,
+        original_draft: original || null,
+        final_content: final || null,
+      },
+    });
+    if (error) { toast.error("Feedback non enregistré"); return; }
+    toast.success(rating === "up" ? "Merci — AVA apprend 👍" : rating === "down" ? "Noté — AVA s'améliorera" : "Enregistré");
+  };
 
   const runAction = async (action: AvaAction) => {
     setExec((s) => ({ ...s, [action.id]: { status: "running" } }));
@@ -87,6 +111,7 @@ export default function AvaProposedActionsCard({ analysis, onDismiss }: { analys
       await runAction(a);
     }
   };
+
 
   return (
     <div
