@@ -21,6 +21,9 @@ interface PermDef {
   color: string;
 }
 
+// Only microphone is requested up-front (required for calls).
+// Contacts and notifications are requested just-in-time when the user
+// first engages the corresponding feature (per Apple Guideline 5.1.1).
 const PERMISSION_STEPS: PermDef[] = [
   {
     id: 'microphone',
@@ -30,24 +33,6 @@ const PERMISSION_STEPS: PermDef[] = [
     why: '⚡ Required for all voice calls',
     required: true,
     color: '#10B981',
-  },
-  {
-    id: 'contacts',
-    icon: '👥',
-    title: 'Contacts Access',
-    description: 'Show your contacts in the dialer for one-tap calling and caller ID lookups.',
-    why: '✨ Optional — enhances your experience',
-    required: false,
-    color: '#7C3AED',
-  },
-  {
-    id: 'notifications',
-    icon: '🔔',
-    title: 'Notifications',
-    description: 'Get alerted of incoming calls, missed calls, and messages even when the app is closed.',
-    why: '✅ Recommended for incoming calls',
-    required: false,
-    color: '#F59E0B',
   },
 ];
 
