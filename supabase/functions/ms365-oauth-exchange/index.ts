@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
     const d = await r.json();
     if (!r.ok) return new Response(JSON.stringify({ success: false, error: d.error_description ?? "OAuth failed", details: d }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-    await admin.from("planipret_profiles").update({ ms365_access_token: d.access_token, ms365_refresh_token: d.refresh_token }).eq("user_id", userId);
+    await admin.from("planipret_profiles").update({ ms365_access_token: d.access_token, ms365_refresh_token: d.refresh_token, ms365_scopes: d.scope ?? null }).eq("user_id", userId);
     return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e: any) {
     return new Response(JSON.stringify({ success: false, error: e?.message ?? "Erreur" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });

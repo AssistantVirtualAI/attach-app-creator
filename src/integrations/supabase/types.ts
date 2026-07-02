@@ -9108,6 +9108,7 @@ export type Database = {
           ms365_display_name: string | null
           ms365_email: string | null
           ms365_refresh_token: string | null
+          ms365_scopes: string | null
           ms365_token_expiry: string | null
           notif_ai: boolean
           notif_appointment_reminder: boolean
@@ -9193,6 +9194,7 @@ export type Database = {
           ms365_display_name?: string | null
           ms365_email?: string | null
           ms365_refresh_token?: string | null
+          ms365_scopes?: string | null
           ms365_token_expiry?: string | null
           notif_ai?: boolean
           notif_appointment_reminder?: boolean
@@ -9278,6 +9280,7 @@ export type Database = {
           ms365_display_name?: string | null
           ms365_email?: string | null
           ms365_refresh_token?: string | null
+          ms365_scopes?: string | null
           ms365_token_expiry?: string | null
           notif_ai?: boolean
           notif_appointment_reminder?: boolean

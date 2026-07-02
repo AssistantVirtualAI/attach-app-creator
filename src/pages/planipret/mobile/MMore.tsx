@@ -9,6 +9,7 @@ import {
 import type { PlanipretMobileContext } from "../PlanipretMobile";
 import { usePlanipretPush } from "@/hooks/usePlanipretPush";
 import { CalendarSyncCard } from "@/components/planipret/CalendarSyncCard";
+import { Ms365ScopesCard } from "@/components/planipret/Ms365ScopesCard";
 import { SiriShortcutsCard } from "@/components/planipret/SiriShortcutsCard";
 import { safeEdgeFunction } from "@/lib/safeEdgeFunction";
 import MNetworkSection from "@/components/planipret/mobile/MNetworkSection";
@@ -225,6 +226,7 @@ export default function MMore() {
           right={<StatusPill ok={ms365Connected} label={ms365Connected ? t("more.connected") : "—"} />} chevron />
         {ms365Connected && (
           <div style={{ padding: 8 }}>
+            <Ms365ScopesCard profile={profile} onReconnect={connectMs365} />
             <CalendarSyncCard profile={profile} />
           </div>
         )}
