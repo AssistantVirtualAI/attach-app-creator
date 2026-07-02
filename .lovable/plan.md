@@ -1,47 +1,103 @@
-## Fix 1 — Courtiers search returning nothing on `/planipret/admin/users`
 
-**Diagnosis**
+# Multi-Phase Implementation Plan
 
-- The list filter (`src/pages/planipret/admin/PAUsers.tsx:98-109`) matches only `full_name`, `email`, `extension`. It does **not** match `ns_extension`, and matching is on `r.extension?.toLowerCase().includes(s)` — if `extension` is `null` for NS-only rows the row is silently dropped from search results.
-- The status filter tab default may be `"app"` (only mobile-app-enabled) instead of `"all"`, which hides brokers that don't have the mobile app enabled while searching — this looks like "search doesn't work".
-- Vestigial `maestroFilter` state is declared but never applied — noise, not the bug, but will be removed.
+Scope: Planiprêt admin + mobile app (`/planipret/mobile`). Delivered in 5 phases, each independently shippable.
 
-**Changes** (single file, `src/pages/planipret/admin/PAUsers.tsx`)
+---
 
-1. Extend the search predicate to also match `ns_extension`, and coerce every field to string before `.toLowerCase().includes(s)` so `null`/`undefined` never short-circuit the row.
-2. When the user types in the search box, do not silently keep an "app / agent / offline" tab active — force `filter = "all"` while the search text is non-empty (or just show a small "Filter: app" chip so it's obvious what's hiding rows).
-3. Remove the unused `maestroFilter` state.
+## Phase 1 — Microsoft 365 Live Connection Test
 
-## Fix 2 — Link Mohamad Hassoun's Planiprêt courtier extension (NS ext 113) to your mobile-app profile (ext 300)
+**Goal:** Verify real MS365 credentials from the Integrations page.
 
-**Current DB state (verified)**
+- Create edge function `supabase/functions/ms365-connection-test/index.ts`:
+  - App-only OAuth2 token via `login.microsoftonline.com/{tenant}/oauth2/v2.0/token`
+  - Runs 5 sub-tests: auth, `/organization`, `/users?$top=5`, `/applications` (redirect URIs), `/servicePrincipals` (permissions)
+  - Returns `{ summary, results }` JSON with CORS
+- Requires secrets: `MICROSOFT_TENANT_ID`, `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` (confirm present via `fetch_secrets`, request any missing).
+- UI: add "🔬 Test en direct" section inside the MS365 card in `src/pages/planipret/admin/PAIntegrations.tsx` (or equivalent):
+  - Blue MS-branded button → invokes function
+  - Row-per-test result with ✅/❌ icon, message, expandable JSON detail
+  - Summary bar (passed/total, elapsed ms, timestamp)
+  - Highlight missing Supabase redirect URI with copy button
 
-| user_id | email | full_name | extension | ns_extension | ns_domain | mobile_app |
-|---|---|---|---|---|---|---|
-| `e5d025c9…` | mhassoun@assistantvirtualai.com | Mohammed Hassoun | 300 | *(null)* | *(null)* | **true** |
-| *(null)* | scott+2@kanguru.ca | Mohamad Hassoun | 113 | 113 | planipret.ca | false |
+---
 
-Row 2 is an orphan NS placeholder created during an earlier sync; it is not linked to any auth user.
+## Phase 2 — Live SIP Calls (mirror Lemtel PJSIP)
 
-**Data change (single migration/insert step)**
+**Goal:** Broker on `/planipret/mobile` can register + place/receive calls via `voice.ava-telecom.ca`.
 
-1. `UPDATE planipret_profiles` on `user_id = e5d025c9-eef2-4422-b97d-3190388b7376`:
-   - `full_name = 'Mohamad Hassoun'` (correct spelling)
-   - `ns_extension = '113'`
-   - `ns_domain    = 'planipret.ca'`
-   - `mobile_app_enabled = true`
-2. `DELETE FROM planipret_profiles` for the orphan row (`email = 'scott+2@kanguru.ca'` AND `user_id IS NULL` AND `extension = '113'`) — safe because it has no auth user and no owned FKs.
+- New hook `src/hooks/useSipPhone.ts` mirroring Lemtel:
+  - Fetch creds via existing `ns-resolve-sip-credentials` edge function
+  - Register with `CapacitorSip` (username, password, domain `planipret.ca`, proxy `voice.ava-telecom.ca:5060`, TCP)
+  - Expose `status`, `activeCall`, `callState`, `makeCall`, `answerCall`, `hangupCall`, `holdCall`, `muteCall`, `transferCall`, `sendDtmf`
+  - Listeners: `registrationState`, `callState`, `incomingCall`
+- Full-screen call overlay component `src/components/planipret/mobile/ActiveCallOverlay.tsx`:
+  - Gradient bg, avatar, caller name/number, live duration timer, extension label
+  - 3×2 controls grid (mute, hold, transfer, keypad, speaker, hangup)
+  - Incoming variant: decline / answer / quick-SMS ("Je vous rappelle")
+- Wire overlay into mobile shell so it renders when `callState ∈ {ringing, active}`.
 
-After this, the Courtiers page will show a single Mohamad Hassoun row with ext 300 local + NS ext 113 on planipret.ca, mobile app enabled — so the softphone connects to NS user 113@planipret.ca.
+---
 
-**Not changed**
+## Phase 3 — Live SMS via NS-API
 
-- The `pbx_softphone_users` migration row for ext 300 stays intact.
-- No RLS, schema, or edge-function changes.
+**Goal:** Real send + persisted thread.
 
-## Verification steps after apply
+- Edge function `supabase/functions/ns-send-sms/index.ts`:
+  - Find-or-create message session under `/domains/{domain}/users/{ext}/messagesessions`
+  - POST message, then insert row into `planipret_phone_messages` via service-role client
+  - Requires `NS_API_KEY`, `NS_API_BASE_URL`, `NS_DEFAULT_DOMAIN` secrets (verify).
+- SMS thread UI in Messages → SMS tab:
+  - Header with contact + call button
+  - Bubble list (sent right / received left), delivery ticks
+  - Sticky composer with attachment/voice/text/send
+  - Optimistic send → invoke edge fn → resolve status
+  - Supabase Realtime subscription on `planipret_phone_messages` for inbound
 
-- Open `/planipret/admin/users`, type "mohamad" → row appears.
-- Type "113" → same row appears (via `ns_extension`).
-- Toggle `filter` tabs while search is populated → row stays visible when appropriate.
-- Confirm Mohamad Hassoun row shows extension 300 / ns_extension 113 / ns_domain planipret.ca / mobile app ON.
+---
+
+## Phase 4 — Dialpad with Maestro Client Search
+
+**Goal:** Two-mode dialpad sheet (Keypad + Search).
+
+- Refactor existing dialpad sheet (`src/components/planipret/mobile/Dialpad*.tsx`):
+  - Segmented control at top: Clavier / Rechercher
+  - **Keypad mode:** existing 12-key grid + new SMS action + inline auto-suggest card (contact/Maestro lookup as user types)
+  - **Search mode:** auto-focused input → debounced call to `maestro-client-lookup` edge fn (create if missing) → result cards with avatar, pipeline pill, actions [Appeler / SMS / Dossier]
+  - Recents (empty state): last 5 from `planipret_phone_calls` + `planipret_phone_messages`
+  - No-results state with "Créer un nouveau client" → POST to Maestro
+- Client detail bottom sheet showing Maestro dossier + call history + SMS + tasks + emails.
+
+---
+
+## Phase 5 — Full i18n (FR/EN)
+
+**Goal:** Every user-visible string translatable, FR default.
+
+- `bun add react-i18next i18next i18next-browser-languagedetector`
+- Create `src/i18n/index.ts`, `src/i18n/locales/fr.json`, `src/i18n/locales/en.json` (full keyset from prompt: nav/home/calls/messages/dialpad/ava/more/auth/status/common/notifications)
+- Import `./i18n` in `src/main.tsx`
+- Persist language in `localStorage` (`planipret_lang`) + `planipret_profiles.preferred_language`
+- Language switcher in More → Préférences (🇫🇷 / 🇬🇧)
+- Sweep all mobile components, replace hardcoded FR strings with `t('…')` calls (keep emojis)
+
+---
+
+## Technical Notes
+
+- All edge functions use `corsHeaders` + OPTIONS handler.
+- Secrets required (will request if absent): `MICROSOFT_TENANT_ID`, `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `NS_API_KEY`, `NS_API_BASE_URL`, `NS_DEFAULT_DOMAIN`, `MAESTRO_API_URL`.
+- No schema changes expected; reuses `planipret_phone_messages`, `planipret_phone_calls`, `planipret_profiles`.
+- Auth: broker identity taken from `supabase.auth.getUser()`; edge functions validate JWT.
+
+---
+
+## Delivery Order
+
+1. Phase 1 (MS365 test) — smallest, isolated, verifies infra.
+2. Phase 5 (i18n scaffolding) — foundational; new UI in later phases uses `t()` from the start.
+3. Phase 3 (SMS edge fn + thread UI).
+4. Phase 4 (dialpad redesign, depends on SMS + call actions).
+5. Phase 2 (SIP calls + overlay) — largest native surface; ship last.
+
+Reply **go** to start Phase 1, or tell me which phase to tackle first / adjust.
