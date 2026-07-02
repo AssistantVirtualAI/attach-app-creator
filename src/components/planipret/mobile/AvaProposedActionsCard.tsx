@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, CheckCircle2, XCircle, Edit3, Sparkles, Mail, Calendar, ClipboardList, StickyNote, UserPlus, RefreshCw } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, Edit3, Sparkles, Mail, Calendar, ClipboardList, StickyNote, UserPlus, RefreshCw, ThumbsUp, ThumbsDown } from "lucide-react";
+
 
 export type AvaAction = {
   id: string;
@@ -58,6 +59,29 @@ export default function AvaProposedActionsCard({ analysis, onDismiss }: { analys
   );
   const [editing, setEditing] = useState<Record<string, boolean>>({});
   const [exec, setExec] = useState<Record<string, ExecState>>({});
+  const [feedback, setFeedback] = useState<Record<string, "up" | "down" | "skipped" | "modified">>({});
+  const [showComment, setShowComment] = useState<Record<string, boolean>>({});
+  const [comments, setComments] = useState<Record<string, string>>({});
+
+  const sendFeedback = async (action: AvaAction, rating: "up" | "down" | "skipped" | "modified", comment?: string) => {
+    setFeedback((f) => ({ ...f, [action.id]: rating }));
+    const original = action.draft_content ?? "";
+    const final = drafts[action.id] ?? "";
+    const modified = rating === "modified" || (rating !== "skipped" && final && final !== original);
+    const { error } = await supabase.functions.invoke("ava-feedback-record", {
+      body: {
+        analysis_id: analysis.id,
+        action_id: action.id,
+        action_type: action.type,
+        rating: modified && rating === "up" ? "modified" : rating,
+        comment: comment ?? null,
+        original_draft: original || null,
+        final_content: final || null,
+      },
+    });
+    if (error) { toast.error("Feedback non enregistré"); return; }
+    toast.success(rating === "up" ? "Merci — AVA apprend 👍" : rating === "down" ? "Noté — AVA s'améliorera" : "Enregistré");
+  };
 
   const runAction = async (action: AvaAction) => {
     setExec((s) => ({ ...s, [action.id]: { status: "running" } }));
@@ -87,6 +111,7 @@ export default function AvaProposedActionsCard({ analysis, onDismiss }: { analys
       await runAction(a);
     }
   };
+
 
   return (
     <div
@@ -240,7 +265,7 @@ export default function AvaProposedActionsCard({ analysis, onDismiss }: { analys
                 )}
                 {!isDone && (
                   <button
-                    onClick={() => setExec((s) => ({ ...s, [a.id]: { status: "done", mocked: false, result: { skipped: true } } }))}
+                    onClick={() => { sendFeedback(a, "skipped"); setExec((s) => ({ ...s, [a.id]: { status: "done", mocked: false, result: { skipped: true } } })); }}
                     className="px-2.5 py-1.5 rounded-full text-[11px]"
                     style={{ background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.6)" }}
                   >
@@ -248,7 +273,53 @@ export default function AvaProposedActionsCard({ analysis, onDismiss }: { analys
                   </button>
                 )}
               </div>
+
+              {isDone && !st?.result?.skipped && (
+                <div className="mt-2 pt-2 flex items-center gap-2" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+                  <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.55)" }}>AVA a-t-elle bien fait ?</span>
+                  <button
+                    onClick={() => sendFeedback(a, "up")}
+                    disabled={!!feedback[a.id]}
+                    className="p-1 rounded-full disabled:opacity-100"
+                    style={{ background: feedback[a.id] === "up" ? "rgba(74,222,128,0.25)" : "rgba(255,255,255,0.06)", color: feedback[a.id] === "up" ? "#4ade80" : "rgba(255,255,255,0.75)" }}
+                  ><ThumbsUp className="w-3 h-3" /></button>
+                  <button
+                    onClick={() => { setShowComment((c) => ({ ...c, [a.id]: true })); }}
+                    disabled={!!feedback[a.id] && feedback[a.id] !== "down"}
+                    className="p-1 rounded-full disabled:opacity-100"
+                    style={{ background: feedback[a.id] === "down" ? "rgba(248,113,113,0.25)" : "rgba(255,255,255,0.06)", color: feedback[a.id] === "down" ? "#f87171" : "rgba(255,255,255,0.75)" }}
+                  ><ThumbsDown className="w-3 h-3" /></button>
+                  {feedback[a.id] && (
+                    <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.5)" }}>merci</span>
+                  )}
+                </div>
+              )}
+              {showComment[a.id] && !feedback[a.id] && (
+                <div className="mt-2 space-y-1.5">
+                  <textarea
+                    value={comments[a.id] ?? ""}
+                    onChange={(e) => setComments((c) => ({ ...c, [a.id]: e.target.value }))}
+                    placeholder="Qu'est-ce qui n'allait pas ? (optionnel)"
+                    rows={2}
+                    className="w-full text-[11px] rounded-lg px-2 py-1.5 outline-none"
+                    style={{ background: "rgba(0,0,0,0.35)", border: "1px solid rgba(255,255,255,0.15)", color: "white" }}
+                  />
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={() => { sendFeedback(a, "down", comments[a.id]); setShowComment((c) => ({ ...c, [a.id]: false })); }}
+                      className="flex-1 py-1 rounded-full text-[10px] font-semibold"
+                      style={{ background: "rgba(248,113,113,0.25)", color: "#f87171" }}
+                    >Envoyer</button>
+                    <button
+                      onClick={() => setShowComment((c) => ({ ...c, [a.id]: false }))}
+                      className="px-2 py-1 rounded-full text-[10px]"
+                      style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.6)" }}
+                    >Annuler</button>
+                  </div>
+                </div>
+              )}
             </div>
+
           );
         })}
       </div>
