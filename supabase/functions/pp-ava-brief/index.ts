@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
         .eq("user_id", profile.user_id).gte("lead_score", 7).gte("started_at", sinceIso)
         .order("lead_score", { ascending: false }).limit(8),
       admin.from("appointments").select("title, start_time, attendee_name")
-        .eq("host_user_id", u.user.id).gte("start_time", sinceIso).lte("start_time", until.toISOString())
+        .eq("host_user_id", effectiveUserId).gte("start_time", sinceIso).lte("start_time", until.toISOString())
         .order("start_time", { ascending: true }).limit(10),
       admin.from("planipret_reminders").select("note, contact_name, contact_number, scheduled_at")
         .eq("user_id", profile.user_id).eq("status", "pending")
