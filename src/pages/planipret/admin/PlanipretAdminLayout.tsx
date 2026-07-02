@@ -23,6 +23,7 @@ const NAV: NavGroup[] = [
     items: [
       { to: "/planipret/admin/overview", label: "Vue d'ensemble", Icon: LayoutDashboard },
       { to: "/planipret/admin/reports",  label: "Rapports",       Icon: BarChart3 },
+      { to: "/planipret/admin/ava",      label: "AVA Analytics",  Icon: Sparkles },
     ],
   },
   {
