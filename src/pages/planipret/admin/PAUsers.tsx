@@ -35,7 +35,7 @@ export default function PAUsers() {
   const search = params.get("search") ?? "";
 
   const filter = (params.get("filter") as "all" | "app" | "agent" | "offline") ?? "all";
-  const maestroFilter = (params.get("maestro") as "all" | "yes" | "no") ?? "all";
+  
   const page = Math.max(1, parseInt(params.get("page") ?? "1", 10) || 1);
   const pageSizeRaw = parseInt(params.get("pageSize") ?? params.get("ps") ?? "25", 10);
   const pageSize = [25, 50, 100].includes(pageSizeRaw) ? pageSizeRaw : 25;
@@ -46,7 +46,7 @@ export default function PAUsers() {
   };
   const setSearch = (s: string) => updateParams({ search: s, page: "1" });
   const setFilter = (f: string) => updateParams({ filter: f, page: "1" });
-  const setMaestroFilter = (m: string) => updateParams({ maestro: m, page: "1" });
+  
   const setPage = (p: number) => updateParams({ page: String(p) });
   const setPageSize = (s: number) => updateParams({ pageSize: String(s), ps: null, page: "1" });
 
@@ -96,17 +96,31 @@ export default function PAUsers() {
   }, []);
 
   const filtered = useMemo(() => {
+    const hasSearch = !!search.trim();
     return rows.filter((r) => {
-      if (filter === "app" && !r.mobile_app_enabled) return false;
-      if (filter === "agent" && !r.voice_agent_enabled) return false;
-      if (filter === "offline" && r.mobile_app_enabled) return false;
-      if (search) {
+      // When searching, don't hide rows behind the app/agent/offline tab —
+      // the tab filter is muted so results are visible regardless of status.
+      if (!hasSearch) {
+        if (filter === "app" && !r.mobile_app_enabled) return false;
+        if (filter === "agent" && !r.voice_agent_enabled) return false;
+        if (filter === "offline" && r.mobile_app_enabled) return false;
+      }
+      if (hasSearch) {
         const s = search.toLowerCase();
-        return r.full_name?.toLowerCase().includes(s) || r.email?.toLowerCase().includes(s) || r.extension?.toLowerCase().includes(s);
+        const anyR = r as any;
+        const fields = [
+          r.full_name,
+          r.email,
+          r.extension,
+          anyR.ns_extension,
+          anyR.ns_domain,
+        ];
+        return fields.some((v) => String(v ?? "").toLowerCase().includes(s));
       }
       return true;
     });
   }, [rows, filter, search]);
+
 
   const paged = filtered.slice((page - 1) * pageSize, page * pageSize);
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
