@@ -127,7 +127,32 @@ Mets openVoice=true seulement si l'utilisateur demande explicitement de parler. 
       }
     }
 
-    return json(result);
+    // Persist chat to planipret_ava_conversations if we have a session
+    let finalSessionId = sessionId;
+    if (mode === "chat" && userMessage) {
+      try {
+        if (!finalSessionId) {
+          const { data: s } = await admin.from("planipret_ava_chat_sessions")
+            .insert({ user_id: u.user.id, title: userMessage.slice(0, 60) })
+            .select("id").single();
+          finalSessionId = s?.id ?? null;
+        } else {
+          await admin.from("planipret_ava_chat_sessions")
+            .update({ last_message_at: new Date().toISOString() })
+            .eq("id", finalSessionId).eq("user_id", u.user.id);
+        }
+        if (finalSessionId) {
+          await admin.from("planipret_ava_conversations").insert([
+            { user_id: u.user.id, session_id: finalSessionId, role: "user", message: userMessage },
+            { user_id: u.user.id, session_id: finalSessionId, role: "assistant", message: result.reply, tool_calls: result.suggestions ?? [] },
+          ]);
+        }
+      } catch (persistErr) {
+        console.error("pp-ava-chat persist fail", persistErr);
+      }
+    }
+
+    return json({ ...result, session_id: finalSessionId });
   } catch (e) {
     console.error("pp-ava-chat error", e);
     return json({ error: String(e) }, 500);
