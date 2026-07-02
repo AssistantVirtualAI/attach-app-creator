@@ -515,7 +515,7 @@ export default function PlanipretMobile() {
         </div>
 
 
-        <Dialer open={dialerOpen} onClose={() => setDialerOpen(false)} initial={dialerInit} />
+        <Dialer open={dialerOpen} onClose={() => setDialerOpen(false)} initial={dialerInit} openMessages={(n) => { setDialerOpen(false); navigate(`/mplanipret/messages${n ? `?to=${encodeURIComponent(n)}` : ""}`); }} />
         <InboundCallOverlay call={inbound} onClose={() => setInbound(null)} />
         {avaOpen && profile?.user_id && (
           profile.voice_agent_enabled
