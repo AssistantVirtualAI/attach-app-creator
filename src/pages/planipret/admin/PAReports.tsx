@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import { usePlanipretBrokerStats } from "@/lib/planipret/brokerStats";
+import { ADMIN_REPORT_FILTERS_EVENT, periodLabel, periodToRange, rangeToPeriod, readAdminReportFilters, writeAdminReportFilters } from "@/lib/planipret/adminReportFilters";
 import { usePlanipretNsAutoSync } from "@/hooks/usePlanipretNsAutoSync";
 import NsSyncBar from "@/components/planipret/admin/NsSyncBar";
 
@@ -34,7 +35,7 @@ const TooltipDark = ({ active, payload, label }: any) => {
 };
 
 export default function PAReports() {
-  const [range, setRange] = useState<Range>("week");
+  const [range, setRangeState] = useState<Range>(() => periodToRange(readAdminReportFilters().period));
   const [calls, setCalls] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
   const [avaFeedback, setAvaFeedback] = useState<Array<{ rating: string }>>([]);
@@ -43,15 +44,37 @@ export default function PAReports() {
   const [exporting, setExporting] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
+  const [loadingPeriod, setLoadingPeriod] = useState(false);
+  const [loadedAt, setLoadedAt] = useState<Date | null>(null);
   const reportRef = useRef<HTMLDivElement>(null);
   const { stats: brokerStats } = usePlanipretBrokerStats();
 
 
-  const periodLabel = range === "week" ? "7 derniers jours" : range === "month" ? "30 derniers jours" : "3 derniers mois";
+  const selectedPeriod = rangeToPeriod(range);
+  const selectedPeriodLabel = periodLabel(selectedPeriod);
+
+  const setRange = (next: Range) => {
+    setRangeState(next);
+    writeAdminReportFilters({ period: rangeToPeriod(next), dispatcher: "all" });
+  };
 
   usePlanipretNsAutoSync({ onQueued: () => setRefreshTick((t) => t + 1) });
 
   useEffect(() => {
+    const onFilters = (event: Event) => {
+      const next = (event as CustomEvent).detail?.period ?? readAdminReportFilters().period;
+      setRangeState(periodToRange(next));
+    };
+    window.addEventListener(ADMIN_REPORT_FILTERS_EVENT, onFilters);
+    window.addEventListener("storage", onFilters);
+    return () => {
+      window.removeEventListener(ADMIN_REPORT_FILTERS_EVENT, onFilters);
+      window.removeEventListener("storage", onFilters);
+    };
+  }, []);
+
+  useEffect(() => {
+    setLoadingPeriod(true);
     const start = new Date();
     if (range === "week") start.setDate(start.getDate() - 7);
     else if (range === "month") start.setMonth(start.getMonth() - 1);
@@ -82,6 +105,8 @@ export default function PAReports() {
         if (x.user_id && !String(x.user_id).startsWith("ns:")) map[x.user_id] = x.full_name || map[x.user_id];
       });
       setBrokers(map);
+      setLoadedAt(new Date());
+      setLoadingPeriod(false);
     })();
   }, [range, refreshTick]);
 
@@ -157,12 +182,25 @@ export default function PAReports() {
   const podium = (byBroker as any[]).slice(0, 3);
 
   const exportCsv = () => {
-    const headers = ["Courtier", "Total", "Entrants", "Sortants", "Manqués", "Durée moy."];
-    const lines = [headers.join(",")].concat((byBroker as any[]).map((b: any) =>
-      [b.name, b.total, b.in, b.out, b.missed, b.durCount ? Math.round(b.totalDur / b.durCount) + "s" : "—"].map((v) => `"${v}"`).join(",")
-    ));
-    const blob = new Blob([lines.join("\n")], { type: "text/csv" });
-    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `rapport-${Date.now()}.csv`; a.click();
+    const q = (v: any) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const outboundSms = messages.filter((m) => m.direction === "outbound").length;
+    const lines = [
+      ["Rapport Planiprêt", selectedPeriodLabel].map(q).join(","),
+      "",
+      ["Appels par jour"].map(q).join(","),
+      ["Date", "Appels"].map(q).join(","),
+      ...byDay.map((d) => [d.date, d.count].map(q).join(",")),
+      "",
+      ["Répartition des appels"].map(q).join(","),
+      ["Type", "Total"].map(q).join(","),
+      ...byDirection.map((d) => [d.name, d.value].map(q).join(",")),
+      "",
+      ["SMS envoyés"].map(q).join(","),
+      ["Période", "SMS envoyés"].map(q).join(","),
+      [selectedPeriodLabel, outboundSms].map(q).join(","),
+    ];
+    const blob = new Blob(["\ufeff" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `planipret-rapport-${range}-${new Date().toISOString().slice(0,10)}.csv`; a.click();
   };
 
   const exportPdf = async () => {
@@ -186,7 +224,7 @@ export default function PAReports() {
       pdf.setTextColor(255, 255, 255); pdf.setFontSize(16);
       pdf.text("Planiprêt — Rapport admin", 10, 12);
       pdf.setFontSize(9); pdf.setTextColor(143, 168, 192);
-      pdf.text(`Période : ${range === "week" ? "7 jours" : range === "month" ? "30 jours" : "90 jours"} · Généré le ${dateLabel}`, 10, 18);
+      pdf.text(`Période : ${selectedPeriodLabel} · Généré le ${dateLabel}`, 10, 18);
       let y = 24, remaining = imgH, srcY = 0;
       const ratio = canvas.width / imgW;
       while (remaining > 0) {
@@ -226,10 +264,16 @@ export default function PAReports() {
             </button>
           ))}
         </div>
-        <button onClick={exportPdf} disabled={exporting}
-          className="pp-btn-primary flex items-center gap-2 text-sm disabled:opacity-50">
-          <FileText className="w-4 h-4" /> {exporting ? "Génération…" : "Exporter PDF"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={exportCsv} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm"
+            style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>
+            <Download className="w-4 h-4" /> CSV
+          </button>
+          <button onClick={exportPdf} disabled={exporting}
+            className="pp-btn-primary flex items-center gap-2 text-sm disabled:opacity-50">
+            <FileText className="w-4 h-4" /> {exporting ? "Génération…" : "PDF"}
+          </button>
+        </div>
       </div>
 
       <div ref={reportRef} className="space-y-4">
@@ -259,7 +303,11 @@ export default function PAReports() {
       <div className="flex items-center gap-2 mt-2">
         <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full"
           style={{ background: "rgba(245,200,66,0.12)", color: GOLD, border: "1px solid rgba(245,200,66,0.25)" }}>
-          Période sélectionnée · {periodLabel}
+          Période sélectionnée · {selectedPeriodLabel}
+        </span>
+        <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full"
+          style={{ background: loadingPeriod ? "rgba(245,200,66,0.12)" : "rgba(0,212,170,0.12)", color: loadingPeriod ? GOLD : SUCCESS, border: `1px solid ${loadingPeriod ? "rgba(245,200,66,0.25)" : "rgba(0,212,170,0.25)"}` }}>
+          {loadingPeriod ? "Chargement…" : `Données chargées${loadedAt ? ` · ${loadedAt.toLocaleTimeString("fr-CA", { hour: "2-digit", minute: "2-digit" })}` : ""}`}
         </span>
       </div>
 
