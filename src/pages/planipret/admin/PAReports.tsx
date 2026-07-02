@@ -217,12 +217,8 @@ export default function PAReports() {
           className="pp-btn-primary flex items-center gap-2 text-sm disabled:opacity-50">
           <FileText className="w-4 h-4" /> {exporting ? "Génération…" : "Exporter PDF"}
         </button>
-        <button onClick={syncAll} disabled={syncing}
-          className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg disabled:opacity-50"
-          style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>
-          <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} /> Synchroniser NS-API
-        </button>
       </div>
+
       <div ref={reportRef} className="space-y-4">
 
       {/* ───────── SECTION A — État actuel (non filtré par période) ───────── */}
