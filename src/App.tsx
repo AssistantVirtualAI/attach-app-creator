@@ -414,6 +414,7 @@ const App = () => (
                   <Route path="search" element={<MSearch />} />
                   <Route path="stats" element={<MStats />} />
                   <Route path="ava" element={<MAvaChat />} />
+                  <Route path="notifications" element={<MAvaNotifications />} />
                 </Route>
                 <Route path="/planipret/dashboard" element={<Navigate to="/planipret/admin/overview" replace />} />
                 <Route path="/planipret/integrations" element={<Navigate to="/planipret/admin/integrations" replace />} />
