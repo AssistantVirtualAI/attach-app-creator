@@ -65,10 +65,9 @@ Deno.serve(async (req) => {
         if (code === 404 || code === 410) expired.push(s.id);
       }
     }
-    if (delivered > 0) {
+    if (delivered > 0 && notifRow?.id) {
       await admin.from("planipret_ava_notifications")
-        .update({ delivered: true })
-        .eq("user_id", user_id).eq("title", title).order("created_at", { ascending: false }).limit(1);
+        .update({ delivered: true }).eq("id", notifRow.id);
     }
     if (expired.length) await admin.from("planipret_push_subscriptions").delete().in("id", expired);
     return json({ delivered, expired: expired.length });
