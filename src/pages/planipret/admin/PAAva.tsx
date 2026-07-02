@@ -101,10 +101,16 @@ export default function PAAva() {
           <h1 className="text-2xl font-semibold">AVA — Analytics (30 j)</h1>
           <p className="text-sm text-muted-foreground">Analyses d'emails, actions proposées et exécutées, feedback et apprentissage.</p>
         </div>
-        <Button onClick={retune} disabled={tuning} variant="outline" size="sm">
-          {tuning ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 mr-1.5" />}
-          Réentraîner AVA
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button onClick={analyzeAll} disabled={analyzing} variant="default" size="sm">
+            {analyzing ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 mr-1.5" />}
+            Analyser les emails maintenant
+          </Button>
+          <Button onClick={retune} disabled={tuning} variant="outline" size="sm">
+            {tuning ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 mr-1.5" />}
+            Réentraîner AVA
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
