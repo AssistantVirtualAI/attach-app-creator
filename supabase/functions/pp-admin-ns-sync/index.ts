@@ -169,8 +169,7 @@ function transcriptText(t: any): string | null {
   const lines = segments
     .map((seg: any) => String(val(seg, ["comment", "text", "transcript"], "")).trim())
     .filter(Boolean);
-  return lines.length ? lines.join("
-") : null;
+  return lines.length ? lines.join("\n") : null;
 }
 
 function nsCallId(c: any): string | null {
@@ -430,7 +429,7 @@ async function syncMessages(admin: ReturnType<typeof createClient>, domain: stri
   ]);
   if (!r.data.length && users.length) {
     const collected: any[] = [];
-    const sampleUsers = users.slice(0, 50); // bound work; background job retries the rest
+    const sampleUsers = users; // scan every Planiprêt user so SMS appears on admin pages
     for (const u of sampleUsers) {
       const ext = userExt(u);
       if (!ext) continue;
