@@ -154,7 +154,13 @@ export default function PAMessages() {
         </select>
         <input type="date" value={from} onChange={(e) => setFilterValue("from", e.target.value)} className="px-3 py-1.5 rounded-lg text-sm" style={inputStyle} />
         <input type="date" value={to} onChange={(e) => setFilterValue("to", e.target.value)} className="px-3 py-1.5 rounded-lg text-sm" style={inputStyle} />
+        {hasFilters && (
+          <button onClick={resetFilters} className="ml-auto px-2 py-1.5 text-xs underline" style={{ color: "var(--pp-text-muted)" }}>
+            ✕ Réinitialiser ({activeFilterCount})
+          </button>
+        )}
       </div>
+
 
 
       <div className="pp-card overflow-hidden">
