@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import SessionTimeoutModal from "@/components/planipret/SessionTimeoutModal";
 import { useAdminRealtime } from "@/hooks/useAdminRealtime";
+import { usePlanipretNsAutoSync } from "@/hooks/usePlanipretNsAutoSync";
 import NotificationsBell from "@/components/planipret/admin/NotificationsBell";
 import CommandPalette from "@/components/planipret/admin/CommandPalette";
 import { WorkspaceHeaderExtras } from "@/components/portals/WorkspaceHeaderExtras";
