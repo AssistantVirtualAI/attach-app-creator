@@ -45,11 +45,17 @@ Deno.serve(async (req) => {
     if (!authHeader?.startsWith("Bearer ")) return json({ error: "Unauthorized" }, 401);
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    const { data: userData } = await admin.auth.getUser(authHeader.replace(/^Bearer\s+/i, ""));
-    if (!userData?.user) return json({ error: "Unauthorized" }, 401);
-    const { data: isMember } = await admin.rpc("is_planipret_member", { _user_id: userData.user.id });
+    const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const token = authHeader.replace(/^Bearer\s+/i, "");
+    const { data: claimsData, error: claimsErr } = await userClient.auth.getClaims(token);
+    const userId = claimsData?.claims?.sub as string | undefined;
+    if (claimsErr || !userId) return json({ error: "Unauthorized" }, 401);
+    const { data: isMember } = await admin.rpc("is_planipret_member", { _user_id: userId });
     if (isMember !== true) return json({ error: "Forbidden" }, 403);
 
     if (!NS_API_KEY) return json({ error: "NS_API_KEY missing in secrets" }, 500);
