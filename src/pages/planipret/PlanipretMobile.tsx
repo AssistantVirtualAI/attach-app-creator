@@ -276,7 +276,7 @@ function Dialer({ open, onClose, initial, openMessages }: { open: boolean; onClo
                               <div className="text-sm font-medium truncate" style={{ color: "var(--pp-text-primary)" }}>{label}</div>
                               <div className="text-xs truncate" style={{ color: "var(--pp-text-muted)" }}>
                                 {c.extension ? `#${c.extension}` : dest || c.email || ""}
-                                {c.source === "directory" && " · Interne"}
+                                {c.source === "directory" && ` · ${t("dialer.internal")}`}
                               </div>
                             </div>
                             <button
