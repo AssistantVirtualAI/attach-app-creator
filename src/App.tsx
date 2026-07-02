@@ -33,6 +33,7 @@ import MContacts from "./pages/planipret/mobile/MContacts";
 import MPipeline from "./pages/planipret/mobile/MPipeline";
 import MSearch from "./pages/planipret/mobile/MSearch";
 import MStats from "./pages/planipret/mobile/MStats";
+import MAvaChat from "./pages/planipret/mobile/MAvaChat";
 import PlanipretAudit from "./pages/planipret/PlanipretAudit";
 import Ms365Callback from "./pages/planipret/Ms365Callback";
 import SoftphoneSetup from "./pages/lemtel/SoftphoneSetup";
