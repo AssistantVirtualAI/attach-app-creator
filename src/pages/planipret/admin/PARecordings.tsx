@@ -136,6 +136,26 @@ export default function PARecordings() {
     }
   };
 
+  const [resolving, setResolving] = useState<string | null>(null);
+  const resolveRecording = async (row: any) => {
+    setResolving(row.id);
+    try {
+      const { data, error } = await supabase.functions.invoke("pp-admin-recording-resolve", { body: { call_row_id: row.id } });
+      if (error) throw error;
+      if ((data as any)?.recording_url) {
+        toast.success("Enregistrement récupéré");
+        setDetail({ ...row, recording_url: (data as any).recording_url });
+        await load(page, pageSize);
+      } else {
+        toast.error((data as any)?.error ?? "Aucun enregistrement disponible côté NS-API");
+      }
+    } catch (e: any) {
+      toast.error(`Récupération échouée: ${e.message ?? e}`);
+    } finally {
+      setResolving(null);
+    }
+  };
+
   const inputStyle = { background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" };
 
   return (
