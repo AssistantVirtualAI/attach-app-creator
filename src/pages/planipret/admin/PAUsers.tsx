@@ -32,8 +32,7 @@ type Profile = PlanipretBrokerRow & {
 export default function PAUsers() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
-  const searchParam = params.get("search") ?? "";
-  const [search, setSearch] = useState(searchParam);
+  const [search, setSearch] = useState(params.get("search") ?? "");
 
   const filter = (params.get("filter") as "all" | "app" | "agent" | "offline") ?? "all";
   
@@ -95,18 +94,6 @@ export default function PAUsers() {
     return () => { supabase.removeChannel(ch); };
   }, []);
 
-  useEffect(() => {
-    setSearch(searchParam);
-  }, [searchParam]);
-
-  useEffect(() => {
-    const handle = window.setTimeout(() => {
-      const current = params.get("search") ?? "";
-      if (search !== current) updateParams({ search, page: "1" });
-    }, 250);
-    return () => window.clearTimeout(handle);
-  }, [search, params]);
-
   const normalizeSearch = (value: unknown) => String(value ?? "")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -141,7 +128,8 @@ export default function PAUsers() {
   }, [rows, filter, search]);
 
 
-  const paged = filtered.slice((page - 1) * pageSize, page * pageSize);
+  const effectivePage = search.trim() ? 1 : page;
+  const paged = filtered.slice((effectivePage - 1) * pageSize, effectivePage * pageSize);
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
 
   const toggleField = async (u: Profile, field: "mobile_app_enabled" | "voice_agent_enabled") => {
