@@ -38,7 +38,8 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const mode: string = String(body?.mode ?? "chat"); // chat | summarize | recommend
     const userMessage: string = String(body?.user_message ?? body?.message ?? "").slice(0, 6000);
-    const history: { role: "user" | "assistant"; content: string }[] = Array.isArray(body?.history)
+    const sessionId: string | null = body?.session_id ? String(body.session_id) : null;
+    let history: { role: "user" | "assistant"; content: string }[] = Array.isArray(body?.history)
       ? body.history.slice(-10).map((h: any) => ({ role: h.role === "assistant" ? "assistant" : "user", content: String(h.content ?? "").slice(0, 4000) }))
       : [];
     const context: Record<string, unknown> = (body?.context && typeof body.context === "object") ? body.context : {};
