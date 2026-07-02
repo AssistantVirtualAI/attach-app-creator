@@ -7999,6 +7999,51 @@ export type Database = {
         }
         Relationships: []
       }
+      planipret_ava_mail_subscriptions: {
+        Row: {
+          broker_id: string | null
+          broker_user_id: string
+          client_state: string
+          created_at: string
+          expiration_datetime: string
+          id: string
+          last_notification_at: string | null
+          last_renewed_at: string | null
+          ms_subscription_id: string
+          notification_url: string
+          resource: string
+          updated_at: string
+        }
+        Insert: {
+          broker_id?: string | null
+          broker_user_id: string
+          client_state: string
+          created_at?: string
+          expiration_datetime: string
+          id?: string
+          last_notification_at?: string | null
+          last_renewed_at?: string | null
+          ms_subscription_id: string
+          notification_url: string
+          resource: string
+          updated_at?: string
+        }
+        Update: {
+          broker_id?: string | null
+          broker_user_id?: string
+          client_state?: string
+          created_at?: string
+          expiration_datetime?: string
+          id?: string
+          last_notification_at?: string | null
+          last_renewed_at?: string | null
+          ms_subscription_id?: string
+          notification_url?: string
+          resource?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       planipret_calendar_sync: {
         Row: {
           created_at: string
