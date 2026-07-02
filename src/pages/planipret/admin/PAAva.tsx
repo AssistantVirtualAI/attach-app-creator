@@ -25,6 +25,7 @@ export default function PAAva() {
   const [loading, setLoading] = useState(true);
   const [fbStats, setFbStats] = useState({ up: 0, down: 0, modified: 0, skipped: 0 });
   const [tuning, setTuning] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
 
   const load = async () => {
     const since = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
