@@ -215,6 +215,9 @@ export default function PlanipretIntegrations() {
 
           <NsLiveTestPanel domain={getField("ns_api", "domain", "planipret.ca") || "planipret.ca"} />
           <div className="mt-4">
+            <NsRecordingsProbe domain={getField("ns_api", "domain", "planipret.ca") || "planipret.ca"} />
+          </div>
+          <div className="mt-4">
             <NsMigrationPanel />
           </div>
           <NsCapabilitiesPanel domain={getField("ns_api", "domain", "planipret.ca") || "planipret.ca"} />
