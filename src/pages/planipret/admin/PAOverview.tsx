@@ -190,6 +190,9 @@ export default function PAOverview() {
     });
 
     setWidgetCount(svcWidget.count ?? 0);
+    setMobilePpCount(svcMobilePP.count ?? 0);
+    setAiPpCount(svcAiPP.count ?? 0);
+
     setRecent(rec.data ?? []);
     setBrokers(nsBrokerList.slice(0, 10));
 
