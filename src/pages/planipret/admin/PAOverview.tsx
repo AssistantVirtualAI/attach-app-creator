@@ -361,6 +361,69 @@ export default function PAOverview() {
 
       <RevenueBreakdown rows={finance} />
 
+      {/* Detailed broker breakdown per service */}
+      <div className="pp-card" style={{ padding: 20 }}>
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h2 style={{ fontFamily: "Inter,sans-serif", fontWeight: 600, fontSize: 14, color: "var(--pp-text-primary)" }}>Détail par service — courtiers facturables</h2>
+            <p style={{ fontSize: 11, color: "var(--pp-text-faint)" }} className="mt-0.5">Comptes test (Scott, Mohamad, Carlo, Clinton) exclus · Prix de vente 49,95 $ / courtier</p>
+          </div>
+          <span style={{ fontSize: 10, color: "var(--pp-text-faint)" }}>Total: {totals.users} unités facturées</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr style={{ borderBottom: "1px solid var(--pp-bg-border-2)" }}>
+                {["Service", "Courtiers", "Coût unitaire", "Prix unitaire", "Coût mensuel", "Revenu mensuel", "Profit mensuel", "Marge"].map((h) => (
+                  <th key={h} className="py-2 px-2 text-left" style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--pp-text-faint)" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {finance.map((f) => {
+                const unitCost = f.users > 0 ? f.cost / f.users : 0;
+                const rule = f.service === "widget"
+                  ? "courriel @planipret.ca / .com"
+                  : f.service === "mobile"
+                    ? "domain NS planipret.ca + app mobile activée"
+                    : "domain NS planipret.ca + agent AI activé";
+                return (
+                  <tr key={f.service} style={{ borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
+                    <td className="py-3 px-2">
+                      <div className="flex items-center gap-2">
+                        <span style={{ width: 8, height: 8, borderRadius: 2, background: (finance.find(x => x.service === f.service) && (f.service === "mobile" ? "#2E9BDC" : f.service === "widget" ? "#F5A623" : "#9B7FE8")) }} />
+                        <div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: "var(--pp-text-primary)" }}>{f.service === "mobile" ? "Application mobile" : f.service === "widget" ? "Widget web" : "Agent AI"}</div>
+                          <div style={{ fontSize: 10, color: "var(--pp-text-faint)" }}>{rule}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-3 px-2 tabular-nums" style={{ fontSize: 13, fontWeight: 700, color: "var(--pp-text-primary)" }}>{f.users}</td>
+                    <td className="py-3 px-2 tabular-nums" style={{ fontSize: 12, color: DANGER }}>{fmtMoney(unitCost)}</td>
+                    <td className="py-3 px-2 tabular-nums" style={{ fontSize: 12, color: "var(--pp-text-muted)" }}>{fmtMoney(49.95)}</td>
+                    <td className="py-3 px-2 tabular-nums" style={{ fontSize: 12, color: DANGER }}>{fmtMoney(f.cost)}</td>
+                    <td className="py-3 px-2 tabular-nums" style={{ fontSize: 12, color: ACCENT }}>{fmtMoney(f.revenue)}</td>
+                    <td className="py-3 px-2 tabular-nums" style={{ fontSize: 13, fontWeight: 700, color: SUCCESS }}>{fmtMoney(f.profit)}</td>
+                    <td className="py-3 px-2 tabular-nums" style={{ fontSize: 12, color: AGENT }}>{f.marginPct.toFixed(1)}%</td>
+                  </tr>
+                );
+              })}
+              <tr style={{ borderTop: "2px solid var(--pp-bg-border-2)", background: "rgba(46,155,220,0.04)" }}>
+                <td className="py-3 px-2" style={{ fontSize: 12, fontWeight: 700, color: "var(--pp-text-primary)" }}>Total</td>
+                <td className="py-3 px-2 tabular-nums" style={{ fontSize: 13, fontWeight: 700, color: "var(--pp-text-primary)" }}>{totals.users}</td>
+                <td className="py-3 px-2" style={{ fontSize: 12, color: "var(--pp-text-faint)" }}>—</td>
+                <td className="py-3 px-2" style={{ fontSize: 12, color: "var(--pp-text-faint)" }}>—</td>
+                <td className="py-3 px-2 tabular-nums" style={{ fontSize: 13, fontWeight: 700, color: DANGER }}>{fmtMoney(totals.cost)}</td>
+                <td className="py-3 px-2 tabular-nums" style={{ fontSize: 13, fontWeight: 700, color: ACCENT }}>{fmtMoney(totals.revenue)}</td>
+                <td className="py-3 px-2 tabular-nums" style={{ fontSize: 14, fontWeight: 700, color: SUCCESS }}>{fmtMoney(totals.profit)}</td>
+                <td className="py-3 px-2 tabular-nums" style={{ fontSize: 12, fontWeight: 700, color: AGENT }}>{totals.marginPct.toFixed(1)}%</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+
       {/* Engagement strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <MiniStat label="Adoption mobile" value={`${adoptionPct}%`} sub={`${stats.brokers}/${stats.brokersTotal} courtiers`} color={ACCENT} />
