@@ -643,8 +643,40 @@ async function syncRecordings(admin: ReturnType<typeof createClient>, domain: st
     }));
     upserted += updates.length;
   }
-  return { fetched: rawItems.length, upserted, recordings: rows.length, warning: domainRecordings.warning, errors };
+
+  // Backfill: for any existing calls in the window that still have no recording_url,
+  // try to resolve it directly via NS-API using the call metadata already stored.
+  let backfilled = 0;
+  const { data: pending } = await admin
+    .from("planipret_phone_calls")
+    .select("id, ns_call_id, extension, from_number, to_number, started_at, duration_seconds, metadata")
+    .eq("organization_id", AVA_ORG_ID)
+    .eq("ns_domain", domain)
+    .is("recording_url", null)
+    .gte("started_at", start)
+    .lte("started_at", end)
+    .order("started_at", { ascending: false })
+    .limit(200);
+  for (let i = 0; i < (pending ?? []).length; i += 8) {
+    const chunk = (pending ?? []).slice(i, i + 8);
+    await Promise.all(chunk.map(async (row: any) => {
+      const meta = row.metadata ?? {};
+      // Prefer a call id we already extracted, else synthesize from raw NS data
+      const nsRaw = meta.ns_recording ?? meta;
+      const url = await fetchRecordingAccessUrl(domain, { ...nsRaw, user: row.extension });
+      if (url) {
+        await admin.from("planipret_phone_calls").update({
+          recording_url: url,
+          metadata: { ...meta, recording_access_url_resolved: true },
+        }).eq("id", row.id);
+        backfilled++;
+      }
+    }));
+  }
+
+  return { fetched: rawItems.length, upserted, recordings: rows.length, backfilled, warning: domainRecordings.warning, errors };
 }
+
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
