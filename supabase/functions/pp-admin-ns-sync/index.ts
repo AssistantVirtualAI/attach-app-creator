@@ -132,8 +132,8 @@ function recordingApiPath(domain: string, c: any): string | null {
 
 function recordingLookupCallId(c: any): string | null {
   const id = String(val(c, [
-    "call-orig-call-id", "call-parent-call-id", "orig-callid", "orig-call-id", "orig_callid",
-    "call-id", "call_id", "callid", "call-term-call-id", "id",
+    "call-parent-cdr-id", "call-orig-call-id", "call-parent-call-id", "orig-callid", "orig-call-id", "orig_callid",
+    "call-id", "call_id", "callid", "call-term-call-id", "cdr_id", "cdr-id", "id",
   ], "")).trim();
   return id || null;
 }
@@ -573,10 +573,15 @@ async function syncRecordings(admin: ReturnType<typeof createClient>, domain: st
 
   const rows: any[] = [];
   for (const { item: rec, ext: fallbackExt } of rawItems) {
-    const id = String(val(rec, ["call_id", "call-id", "cdr_id", "cdr-id", "orig-callid", "orig_callid", "session_id", "session-id", "id", "uuid", "recording_id", "recording-id", "call-orig-call-id", "call-term-call-id"], "")).trim();
+    // Try explicit id keys first, then fall back to the synthetic
+    // ext:started:from:to:duration key syncCalls uses — same NS-API v2 CDR
+    // shape, so recordings and CDRs share stable ids.
+    const explicitId = String(val(rec, ["call_id", "call-id", "cdr_id", "cdr-id", "orig-callid", "orig_callid", "session_id", "session-id", "id", "uuid", "recording_id", "recording-id", "call-orig-call-id", "call-term-call-id", "call-parent-call-id"], "")).trim();
+    const id = explicitId || nsCallId(rec);
     if (!id) continue;
     const ext = String(val(rec, ["user", "extension", "orig-user", "term-user", "subscriber", "call-orig-user", "call-term-user", "call-through-user"], fallbackExt ?? "")).trim();
-    const url = recordingUrl(rec) ?? recordingApiPath(domain, { ...rec, user: ext });
+    const apiPath = recordingApiPath(domain, { ...rec, user: ext });
+    const url = recordingUrl(rec) ?? apiPath;
     const started = toIso(val(rec, ["time-start", "start-time", "start_time", "started_at", "date", "created_at", "recorded_at", "recorded-at", "call-start-datetime", "call-batch-start-datetime", "call-record-creation-datetime"]));
     rows.push({
       user_id: extToProfile.get(ext) ?? null,
@@ -593,7 +598,7 @@ async function syncRecordings(admin: ReturnType<typeof createClient>, domain: st
       started_at: started,
       duration_seconds: numVal(rec, ["duration", "time-talking", "billsec", "talk_time", "recording_seconds", "call-total-duration-seconds", "call-batch-total-duration-seconds", "call-talking-duration-seconds"], 0),
       recording_url: url,
-      metadata: { ns_recording: rec, recording_api_path: url },
+      metadata: { ns_recording: rec, recording_api_path: apiPath },
     });
   }
 
@@ -638,8 +643,40 @@ async function syncRecordings(admin: ReturnType<typeof createClient>, domain: st
     }));
     upserted += updates.length;
   }
-  return { fetched: rawItems.length, upserted, recordings: rows.length, warning: domainRecordings.warning, errors };
+
+  // Backfill: for any existing calls in the window that still have no recording_url,
+  // try to resolve it directly via NS-API using the call metadata already stored.
+  let backfilled = 0;
+  const { data: pending } = await admin
+    .from("planipret_phone_calls")
+    .select("id, ns_call_id, extension, from_number, to_number, started_at, duration_seconds, metadata")
+    .eq("organization_id", AVA_ORG_ID)
+    .eq("ns_domain", domain)
+    .is("recording_url", null)
+    .gte("started_at", start)
+    .lte("started_at", end)
+    .order("started_at", { ascending: false })
+    .limit(200);
+  for (let i = 0; i < (pending ?? []).length; i += 8) {
+    const chunk = (pending ?? []).slice(i, i + 8);
+    await Promise.all(chunk.map(async (row: any) => {
+      const meta = row.metadata ?? {};
+      // Prefer a call id we already extracted, else synthesize from raw NS data
+      const nsRaw = meta.ns_recording ?? meta;
+      const url = await fetchRecordingAccessUrl(domain, { ...nsRaw, user: row.extension });
+      if (url) {
+        await admin.from("planipret_phone_calls").update({
+          recording_url: url,
+          metadata: { ...meta, recording_access_url_resolved: true },
+        }).eq("id", row.id);
+        backfilled++;
+      }
+    }));
+  }
+
+  return { fetched: rawItems.length, upserted, recordings: rows.length, backfilled, warning: domainRecordings.warning, errors };
 }
+
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });

@@ -1,74 +1,42 @@
-# Phase 2 AVA — Teams, Brief matinal, Maestro live
 
-Phase 1 (Outlook webhook + analyse + push) est en prod. On enchaîne avec les 3 blocs restants de la vision AVA.
+## Problems observed
 
-## Bloc A — Microsoft Teams (Chats + Channels)
+1. **Recordings** — 666 calls in `planipret_phone_calls`, `0` with `recording_url`. Latest `pp-admin-ns-sync` runs return `fetched: 666, recordings: 0, upserted: 0`. Root cause: `syncRecordings()` extracts the call ID with a narrow key list; the CDR-recordings items coming from `/domains/{d}/cdrs/recordings` use the same NS-API v2 CDR field names (`orig-callid`, `orig-call-id`, `call-orig-call-id`) that `syncCalls`'s `nsCallId()` handles, but `syncRecordings` looks up only a subset AND aborts (`continue`) when the id key isn't found. Also the recording-access-url resolver only runs for rows already in the batch; existing calls never get their `recording_url` back-filled.
 
-**But** : le courtier lit/répond ses conversations Teams depuis l'app mobile Planiprêt, et AVA peut proposer des réponses avec confirmation.
+2. **AVA Analytics empty** — `planipret_ava_email_analyses`, `planipret_ava_action_log`, `planipret_ava_feedback` all have 0 rows. No email has ever been analyzed because no manual/scheduled run has produced data yet.
 
-- Edge Functions :
-  - `ms365-teams-list` (chats récents + canaux joints, via `/me/chats` et `/me/joinedTeams`)
-  - `ms365-teams-messages` (GET messages d'un chat/canal, POST envoi après approbation)
-- Réutilise le token MS Graph déjà stocké dans `planipret_profiles` (scopes `Chat.ReadWrite`, `ChannelMessage.Send`, `Team.ReadBasic.All` — ajout au consentement OAuth existant).
-- UI mobile : nouvel onglet **Teams** dans `MMessages.tsx` (segmenté Email / SMS / Teams), liste conversations + fil, composer avec bouton "🤖 Suggérer avec AVA" → réutilise `AvaProposedActionsCard` (nouvelle action `teams_reply`).
-- Extension de `ava-action-executor` : handler `teams_reply` qui poste dans `/me/chats/{id}/messages`.
+3. **Overview / Reports** — user didn't specify what is missing; both pages already query all the expected data. Since the recording fix will re-populate calls and enrich metadata, several derived widgets (recordings count, transcripts) will start filling in. I'll leave the layout alone until the user names a specific gap.
 
-## Bloc B — Brief matinal AVA (7h30 heure du courtier)
+## Changes
 
-**But** : chaque matin, AVA résume la journée à venir + priorités et pousse une notif "Bonjour, voici votre journée".
+### A. `supabase/functions/pp-admin-ns-sync/index.ts` — recordings sync
+- Replace the narrow id extraction in `syncRecordings` with the same `nsCallId()` fallback used in `syncCalls` so every row synthesizes a stable id from ext+time+from+to+duration when a raw id isn't present.
+- Widen the recording-URL extraction: try `recordingUrl(rec)` first, then `fetchRecordingAccessUrl(domain, rec)` (which already calls `/domains/{d}/recordings/{callId}` and reads `file-access-url`).
+- After the sync loop, **also back-fill existing `planipret_phone_calls` rows** for the same window that still have `recording_url IS NULL`: for each row with a `metadata.recording_api_path` or a resolvable call id, call `fetchRecordingAccessUrl` and update the row. Bounded (max ~200 lookups per run) to keep runtime sane.
+- Persist `metadata.recording_api_path` on every CDR row inside `syncCalls` (already partially there) so the on-demand fetch below can use it.
 
-- Table `planipret_ava_morning_briefs` (broker_user_id, date, summary, priorities jsonb, sent_at) + RLS courtier lit siens.
-- Edge Function `ava-morning-brief-generator` :
-  - Récupère rendez-vous du jour (calendar_integrations), leads chauds (lead_score ≥ 7 des dernières 24h), courriels non traités, tâches Maestro dues.
-  - Claude Sonnet 4.5 → résumé FR 4-6 lignes + top 3 priorités.
-  - Insère dans la table, appelle `pp-push-notify` avec deep link `/mplanipret/home?brief=today`.
-- `pg_cron` toutes les 15 min : sélectionne les courtiers dont `timezone` local = 07:30 et pas de brief pour la date locale → invoque la function.
-- UI : `MorningBriefCard.tsx` sur `MHome.tsx` (bandeau haut, dismissible), route `/mplanipret/home?brief=today` scroll-to.
+### B. `supabase/functions/pp-ns-recordings/index.ts` — on-demand lookup safety net
+- Already exists. Add a `resolve` action that, given a `call_id`, calls NS-API `/domains/{domain}/recordings/{call_id}`, extracts `file-access-url`, saves it into `planipret_phone_calls.recording_url` for that broker's row, and returns the URL. This lets the UI recover a missing recording per-click.
 
-## Bloc C — Maestro tasks live (retire le mock)
+### C. `src/pages/planipret/admin/PARecordings.tsx`
+- When a row's `recording_url` is null or the audio 404s, show a "Récupérer l'enregistrement" button in the drawer that calls `pp-ns-recordings` with `action: "resolve"`, then refreshes the row.
+- Broaden the list query to include calls where `metadata->>'recording_api_path' is not null` OR `recording_url is not null`, so calls that have a recording path but no resolved URL still surface and can be resolved on click.
 
-**But** : les actions `create_task_maestro` proposées par AVA créent vraiment la tâche dans Maestro CRM.
+### D. AVA Analytics manual run — `src/pages/planipret/admin/PAAva.tsx`
+- Add a second action button "Analyser les emails maintenant" next to "Réentraîner AVA".
+- It calls a new/existing edge function `ava-email-analyzer` with `{ mode: "all_brokers", lookback_days: 7 }`. If the function doesn't accept that shape, add a small wrapper edge function `ava-analyze-all` that:
+  - Selects all `planipret_profiles` with `ms365_access_token_encrypted IS NOT NULL` (or equivalent M365-connected flag),
+  - Invokes `ava-email-analyzer` per broker in parallel (chunks of 4),
+  - Returns `{ analyzed_brokers, total_emails, errors }`.
+- Toast progress; on success call `load()` so the KPI grid and table repopulate.
 
-- Secret : `MAESTRO_API_KEY` + `MAESTRO_BASE_URL` (à demander).
-- Dans `ava-action-executor` : remplace la branche mock par un POST authentifié vers `${MAESTRO_BASE_URL}/tasks` avec mapping (title, due_at, client_id résolu via `planipret_maestro_clients` sur le courriel/téléphone de l'analyse).
-- Fallback : si client Maestro introuvable, on crée un lead Maestro d'abord puis la tâche, et on logue `client_resolution: created`.
-- Rien à changer côté UI — `AvaProposedActionsCard` gère déjà l'affichage du résultat.
+## Verification
 
-## Détails techniques
+- Run `pp-admin-ns-sync` from the Recordings page, wait for the run to finish, then re-query `select count(*) from planipret_phone_calls where recording_url is not null` — expect > 0.
+- Click a call row → the audio element loads.
+- Click "Analyser les emails maintenant" → after completion, `select count(*) from planipret_ava_email_analyses` > 0 and the AVA page shows KPIs.
 
-```text
-DB
-  planipret_ava_morning_briefs (id, broker_user_id, brief_date, summary, priorities jsonb, sent_at, created_at)
-  RLS: courtier SELECT own, service_role ALL
-  GRANT SELECT to authenticated, ALL to service_role
+## Out of scope (until user clarifies)
 
-Edge Functions (nouvelles)
-  ms365-teams-list         (JWT)
-  ms365-teams-messages     (JWT, GET+POST)
-  ava-morning-brief-generator (verify_jwt=false, appelée par cron)
-Edge Functions (modifiées)
-  ava-action-executor      (+ handler teams_reply, + Maestro live)
-  ms365-mail-webhook-setup (+ scopes Teams pour prochains consents — noop si déjà accordés)
-
-Cron
-  select cron.schedule('ava-morning-brief', '*/15 * * * *', $$ select net.http_post(...) $$)
-
-UI
-  src/pages/mobile/planipret/MMessages.tsx  (tabs Email/SMS/Teams)
-  src/components/mobile/planipret/TeamsThreadList.tsx
-  src/components/mobile/planipret/TeamsThreadView.tsx
-  src/components/mobile/planipret/MorningBriefCard.tsx
-  src/pages/mobile/planipret/MHome.tsx (mount MorningBriefCard)
-```
-
-## Ordre d'exécution
-
-1. Bloc B (brief matinal) — autonome, valeur immédiate visible dès demain matin.
-2. Bloc A (Teams) — nécessite ré-autorisation OAuth avec scopes Teams.
-3. Bloc C (Maestro live) — dès que `MAESTRO_API_KEY` fournie.
-
-## Ce dont j'ai besoin de toi
-
-- **Confirmer l'ordre** ci-dessus (ou en changer).
-- **Fuseau horaire par défaut** pour le brief si le courtier n'a pas de `timezone` sur son profil : `America/Toronto` OK ?
-- **Maestro** : tu as la clé API + l'URL de base sous la main, ou on ship Bloc C plus tard ?
+- Overview/Reports layout changes — waiting on specifics.
+- ava-email-analyzer scheduler / M365 token audit — separate follow-up if manual pass reveals no broker is connected.

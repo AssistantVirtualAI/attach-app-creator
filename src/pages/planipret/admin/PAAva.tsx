@@ -25,6 +25,7 @@ export default function PAAva() {
   const [loading, setLoading] = useState(true);
   const [fbStats, setFbStats] = useState({ up: 0, down: 0, modified: 0, skipped: 0 });
   const [tuning, setTuning] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
 
   const load = async () => {
     const since = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
@@ -59,6 +60,23 @@ export default function PAAva() {
     toast.success(`AVA réentraînée sur ${(data as any).count} courtier(s)`);
     load();
   };
+  const analyzeAll = async () => {
+    setAnalyzing(true);
+    const tid = toast.loading("Analyse des emails des courtiers…");
+    try {
+      const { data, error } = await supabase.functions.invoke("ava-analyze-all", { body: { top: 20 } });
+      if (error) throw error;
+      const d = data as any;
+      if (!d?.ok) throw new Error(d?.error ?? "Échec");
+      toast.success(`${d.total_analyses} email(s) analysé(s) sur ${d.analyzed_brokers} courtier(s)`, { id: tid });
+      await load();
+    } catch (e: any) {
+      toast.error(`Analyse échouée: ${e.message ?? e}`, { id: tid });
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
 
   const totals = rows.reduce((acc, r) => ({
     analyses: acc.analyses + (r.analyses_30d ?? 0),
@@ -83,10 +101,16 @@ export default function PAAva() {
           <h1 className="text-2xl font-semibold">AVA — Analytics (30 j)</h1>
           <p className="text-sm text-muted-foreground">Analyses d'emails, actions proposées et exécutées, feedback et apprentissage.</p>
         </div>
-        <Button onClick={retune} disabled={tuning} variant="outline" size="sm">
-          {tuning ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 mr-1.5" />}
-          Réentraîner AVA
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button onClick={analyzeAll} disabled={analyzing} variant="default" size="sm">
+            {analyzing ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 mr-1.5" />}
+            Analyser les emails maintenant
+          </Button>
+          <Button onClick={retune} disabled={tuning} variant="outline" size="sm">
+            {tuning ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 mr-1.5" />}
+            Réentraîner AVA
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
