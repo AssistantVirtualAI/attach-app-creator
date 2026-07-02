@@ -1,15 +1,13 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { RefreshCw, Loader2, CheckCircle2, XCircle, AlertCircle, Activity } from "lucide-react";
-import { toast } from "sonner";
+import { CheckCircle2, XCircle, AlertCircle, Activity } from "lucide-react";
 
 /**
- * NsSyncBar — barre unifiée de connectivité et rechargement NS-API.
+ * NsSyncBar — passive NS-API status indicator.
  *
- * Utilisée par PAOverview / PAReports / PACalls / PAMessages / PARecordings.
- * Elle affiche l'état des endpoints NS-API (CDR/SMS/enregistrements),
- * offre un bouton « Recharger maintenant » (invalidation + refetch local)
- * et un bouton « Synchroniser NS-API » (déclenche pp-admin-ns-sync).
+ * All manual sync buttons have been removed. Sync now runs automatically in the
+ * background via `usePlanipretNsAutoSync` mounted at the admin layout level.
+ * This component only reports connectivity + last-sync timestamp.
  */
 
 type FeatureKey = "cdrs" | "messages" | "recordings" | "voicemails";
@@ -46,21 +44,28 @@ function statusIcon(s: FeatureStatus) {
   return <Activity className="w-3 h-3" style={{ color: statusColor(s) }} />;
 }
 
+function relTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const s = Math.max(0, Math.floor(diff / 1000));
+  if (s < 60) return `il y a ${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `il y a ${m} min`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `il y a ${h} h`;
+  return new Date(iso).toLocaleString("fr-CA", { dateStyle: "short", timeStyle: "short" });
+}
+
 export interface NsSyncBarProps {
-  /** Fonctionnalités à afficher (par défaut cdrs+messages+recordings). */
   features?: FeatureKey[];
-  /** Callback local (refetch de la page). */
+  /** Ignored — kept for backwards compatibility. */
   onReload?: () => void | Promise<void>;
-  /** Libellé du bouton recharger (par défaut « Recharger »). */
   reloadLabel?: string;
 }
 
-export default function NsSyncBar({ features = ["cdrs", "messages", "recordings"], onReload, reloadLabel = "Recharger maintenant" }: NsSyncBarProps) {
+export default function NsSyncBar({ features = ["cdrs", "messages", "recordings"] }: NsSyncBarProps) {
   const [rows, setRows] = useState<Feature[]>([]);
-  const [probing, setProbing] = useState(false);
-  const [syncing, setSyncing] = useState(false);
-  const [reloading, setReloading] = useState(false);
   const [lastSync, setLastSync] = useState<string | null>(null);
+  const [tick, setTick] = useState(0);
 
   const loadStatus = useCallback(async () => {
     const { data } = await supabase
@@ -82,64 +87,51 @@ export default function NsSyncBar({ features = ["cdrs", "messages", "recordings"
     if (run) setLastSync(run.finished_at ?? run.started_at ?? null);
   }, [features.join(",")]);
 
-  useEffect(() => { loadStatus(); }, [loadStatus]);
-
-  const probe = async () => {
-    setProbing(true);
-    try {
-      const { error } = await supabase.functions.invoke("ns-debug-audit", { body: { mode: "capabilities", domain: NS_DOMAIN } });
-      if (error) throw error;
-      toast.success("Sonde NS-API terminée");
-      await loadStatus();
-    } catch (e: any) {
-      toast.error(`Sonde échouée: ${e?.message ?? e}`);
-    } finally {
-      setProbing(false);
-    }
-  };
-
-  const syncNow = async () => {
-    setSyncing(true);
-    const id = toast.loading("Synchronisation NS-API…");
-    try {
-      const { data, error } = await supabase.functions.invoke("pp-admin-ns-sync", { body: {} });
-      if (error) throw error;
-      const d = data as any;
-      toast.success(`Synchro lancée · ${d?.extensions ?? d?.users_total ?? 0} extensions`, { id });
-      await Promise.all([loadStatus(), onReload?.()]);
-    } catch (e: any) {
-      toast.error(`Échec sync: ${e?.message ?? e}`, { id });
-    } finally {
-      setSyncing(false);
-    }
-  };
-
-  const reloadNow = async () => {
-    setReloading(true);
-    try {
-      await onReload?.();
-      await loadStatus();
-    } finally {
-      setReloading(false);
-    }
-  };
-
-  // Refetch on window focus + toutes les 60s.
   useEffect(() => {
-    const onFocus = () => { onReload?.(); loadStatus(); };
+    loadStatus();
+    const t = window.setInterval(loadStatus, 30_000);
+    const rel = window.setInterval(() => setTick((x) => x + 1), 15_000);
+    const onFocus = () => loadStatus();
     window.addEventListener("focus", onFocus);
-    const t = window.setInterval(() => { onReload?.(); }, 60_000);
-    return () => { window.removeEventListener("focus", onFocus); window.clearInterval(t); };
-  }, [onReload, loadStatus]);
+    return () => {
+      window.clearInterval(t);
+      window.clearInterval(rel);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [loadStatus]);
 
   return (
     <div
-      className="pp-card p-3 flex flex-wrap items-center gap-3"
+      className="pp-card p-2.5 flex flex-wrap items-center gap-3"
       style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)" }}
     >
       <div className="flex items-center gap-2">
-        <span className="text-[11px] uppercase tracking-wider" style={{ color: "var(--pp-text-muted)" }}>NS-API</span>
-        <div className="flex items-center gap-2">
+        <span
+          className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full"
+          style={{
+            background: "rgba(0,212,170,0.10)",
+            border: "1px solid rgba(0,212,170,0.30)",
+            fontSize: 10,
+            fontWeight: 700,
+            color: "#00D4AA",
+            letterSpacing: "0.05em",
+            textTransform: "uppercase",
+          }}
+          title="Synchronisation NS-API automatique en arrière-plan"
+        >
+          <span
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: "50%",
+              background: "#00D4AA",
+              boxShadow: "0 0 0 3px rgba(0,212,170,0.18)",
+              animation: "pp-pulse 2s ease-in-out infinite",
+            }}
+          />
+          Sync auto
+        </span>
+        <div className="flex items-center gap-1.5">
           {rows.map((r) => (
             <span
               key={r.feature}
@@ -155,37 +147,11 @@ export default function NsSyncBar({ features = ["cdrs", "messages", "recordings"
       </div>
 
       {lastSync && (
-        <span className="text-[10px]" style={{ color: "var(--pp-text-faint)" }}>
-          Dernière sync : {new Date(lastSync).toLocaleTimeString("fr-CA", { hour: "2-digit", minute: "2-digit" })}
+        <span className="text-[10px] ml-auto" style={{ color: "var(--pp-text-faint)" }} data-tick={tick}>
+          Dernière sync · {relTime(lastSync)}
         </span>
       )}
-
-      <div className="ml-auto flex items-center gap-2">
-        <button
-          onClick={probe}
-          disabled={probing}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs disabled:opacity-50"
-          style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}
-        >
-          {probing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Activity className="w-3 h-3" />} Tester connectivité
-        </button>
-        <button
-          onClick={reloadNow}
-          disabled={reloading}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs disabled:opacity-50"
-          style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }}
-        >
-          {reloading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />} {reloadLabel}
-        </button>
-        <button
-          onClick={syncNow}
-          disabled={syncing}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white disabled:opacity-50"
-          style={{ background: "#2E9BDC" }}
-        >
-          {syncing ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />} Synchroniser NS-API
-        </button>
-      </div>
+      <style>{`@keyframes pp-pulse { 0%,100%{opacity:1} 50%{opacity:.55} }`}</style>
     </div>
   );
 }
