@@ -110,9 +110,9 @@ function CallControlGridImpl({ organizationId, onDial, onTransfer }: Props) {
   } as Record<string, string>)[s] || '#64748b';
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, padding: 12, height: '100%', color: '#e2e8f0' }}>
-      <Panel title={`Active Lines (${activeLines.length})`}>
-        {activeLines.length === 0 && <Empty>No active calls</Empty>}
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, padding: 12, height: '100%', color: c.textIce }}>
+      <Panel title={`${t('dialer.activeLines')} (${activeLines.length})`}>
+        {activeLines.length === 0 && <Empty>{t('dialer.noActive')}</Empty>}
         {activeLines.map((l: any, i) => (
           <Row key={i}>
             <strong>{l.caller_number || l.from}</strong>
@@ -121,17 +121,17 @@ function CallControlGridImpl({ organizationId, onDial, onTransfer }: Props) {
         ))}
       </Panel>
 
-      <Panel title={`Parked / Hold (${parked.length})`}>
-        {parked.length === 0 && <Empty>Nothing parked</Empty>}
+      <Panel title={`${t('dialer.parked')} (${parked.length})`}>
+        {parked.length === 0 && <Empty>{t('dialer.nothingParked')}</Empty>}
         {parked.map((p: any, i) => (
           <Row key={i}>
-            <span>Slot {p.slot || i + 1} · {p.caller}</span>
-            <button onClick={() => onDial?.(p.slot)} style={btnStyle}>Pickup</button>
+            <span>{t('dialer.slot')} {p.slot || i + 1} · {p.caller}</span>
+            <button onClick={() => onDial?.(p.slot)} style={btnStyle}>{t('dialer.pickup')}</button>
           </Row>
         ))}
       </Panel>
 
-      <Panel title={`Team (${members.length})`}>
+      <Panel title={`${t('dialer.team')} (${members.length})`}>
         {members.map((m) => (
           <Row key={m.user_id}>
             <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -140,8 +140,8 @@ function CallControlGridImpl({ organizationId, onDial, onTransfer }: Props) {
               <span style={{ fontSize: 11, opacity: 0.6 }}>{m.extension}</span>
             </span>
             <span style={{ display: 'flex', gap: 4 }}>
-              <button onClick={() => m.extension && onDial?.(m.extension)} style={btnStyle}>Call</button>
-              <button onClick={() => m.extension && onTransfer?.(m.extension)} style={btnStyle}>Xfer</button>
+              <button onClick={() => m.extension && onDial?.(m.extension)} style={btnStyle}>{t('dialer.call')}</button>
+              <button onClick={() => m.extension && onTransfer?.(m.extension)} style={btnStyle}>{t('dialer.xfer')}</button>
             </span>
           </Row>
         ))}
