@@ -13,6 +13,7 @@ import { TEMP_COLORS, TEMP_EMOJI, TEMP_LABEL, tempBorder, callbackDelayToDate, d
 import ContactTimeline from "@/components/planipret/ContactTimeline";
 import RecordingsList from "@/components/planipret/mobile/recordings/RecordingsList";
 import { CallRecordingPlayer } from "@/components/planipret/mobile/call/CallRecordingPlayer";
+import MaestroTab from "@/components/planipret/mobile/call/MaestroTab";
 import { useMplanipretLang } from "@/hooks/useMplanipretLang";
 
 
@@ -1029,29 +1030,7 @@ function CallDetailSheet({
 
           {/* ===== TAB MAESTRO ===== */}
           {activeTab === "maestro" && (
-            <>
-              <div className="pp-card p-4">
-                <div className="flex items-center justify-between">
-                  <div className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--pp-text-secondary)" }}>Statut sync</div>
-                  <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold" style={{
-                    background: call.maestro_synced ? "rgba(0,212,170,0.15)" : "rgba(245,166,35,0.15)",
-                    color: call.maestro_synced ? "var(--pp-success)" : "var(--pp-warning)",
-                  }}>
-                    {call.maestro_synced ? "✅ Synchronisé" : "⏳ En attente"}
-                  </span>
-                </div>
-                {call.maestro_client_id && (
-                  <div className="text-xs mt-2" style={{ color: "var(--pp-text-secondary)" }}>
-                    Client : <span style={{ color: "var(--pp-text-primary)", fontFamily: "monospace" }}>{String(call.maestro_client_id).slice(0, 12)}</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="pp-card p-4">
-                <div className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: "var(--pp-text-secondary)" }}>Historique du contact</div>
-                <ContactTimeline number={peerNumber} />
-              </div>
-            </>
+            <MaestroTab call={call as any} onUpdated={refreshCall} />
           )}
 
         </div>
