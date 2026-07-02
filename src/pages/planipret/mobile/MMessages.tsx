@@ -9,6 +9,7 @@ import {
 import type { PlanipretMobileContext } from "../PlanipretMobile";
 import SmsTemplatesSheet from "@/components/planipret/SmsTemplatesSheet";
 import AvaSummarizeSheet from "@/components/planipret/ava/AvaSummarizeSheet";
+import AvaProposedActionsCard from "@/components/planipret/mobile/AvaProposedActionsCard";
 import AvaHistorySheet from "@/components/planipret/ava/AvaHistorySheet";
 import CoachOverlay from "@/components/planipret/ava/CoachOverlay";
 import { callAva, type AvaSuggestion } from "@/services/avaProactive";
@@ -993,6 +994,28 @@ function EmailDetailSheet({ email, onClose, onReply }: { email: any; onClose: ()
   const subject = email.subject ?? t("messages.noSubject");
   const preview = email.bodyPreview ?? "";
   const [sumOpen, setSumOpen] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysis, setAnalysis] = useState<any | null>(null);
+
+  const analyzeWithAva = async () => {
+    if (!email.id) { toast.error("Message ID manquant"); return; }
+    setAnalyzing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("ava-email-analyzer", {
+        body: { ms_message_id: email.id },
+      });
+      if (error || !(data as any)?.success) {
+        throw new Error((data as any)?.error ?? error?.message ?? "Échec de l'analyse");
+      }
+      setAnalysis((data as any).analysis);
+      if ((data as any).cached) toast.info("Analyse récupérée du cache");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Erreur AVA");
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
 
   return (
     <div className="absolute inset-0 z-40 bg-black/60 backdrop-blur-sm flex items-end" onClick={onClose}>
@@ -1017,16 +1040,34 @@ function EmailDetailSheet({ email, onClose, onReply }: { email: any; onClose: ()
           </div>
 
           <button
+            onClick={analyzeWithAva}
+            disabled={analyzing}
+            className="w-full px-3 py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-60"
+            style={{
+              background: "linear-gradient(135deg, #2D1A5A, #9B7FE8)",
+              border: "1px solid rgba(155,127,232,0.35)",
+              color: "white",
+            }}
+          >
+            {analyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+            {analyzing ? "AVA analyse…" : "🤖 Analyser avec AVA"}
+          </button>
+
+          <button
             onClick={() => setSumOpen(true)}
-            className="w-full px-3 py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
+            className="w-full px-3 py-2 rounded-xl text-xs font-medium flex items-center justify-center gap-2"
             style={{
               background: "rgba(155,127,232,0.12)",
               border: "1px solid rgba(155,127,232,0.30)",
               color: "var(--pp-agent)",
             }}
           >
-            <Sparkles className="w-4 h-4" /> {t("messages.summarizeWithAva")}
+            <Sparkles className="w-3.5 h-3.5" /> {t("messages.summarizeWithAva")}
           </button>
+
+          {analysis && (
+            <AvaProposedActionsCard analysis={analysis} onDismiss={() => setAnalysis(null)} />
+          )}
 
           <div
             className="rounded-xl p-3 text-sm whitespace-pre-wrap"
@@ -1037,6 +1078,7 @@ function EmailDetailSheet({ email, onClose, onReply }: { email: any; onClose: ()
         </div>
 
         <div className="px-4 py-3 flex gap-2" style={{ borderTop: "1px solid var(--pp-bg-border)" }}>
+
           <button
             onClick={() => onReply({
               to: fromAddr,

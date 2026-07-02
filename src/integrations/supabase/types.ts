@@ -7841,6 +7841,62 @@ export type Database = {
           },
         ]
       }
+      planipret_ava_action_log: {
+        Row: {
+          action_params: Json | null
+          action_type: string
+          analysis_id: string | null
+          broker_id: string | null
+          broker_user_id: string
+          error: string | null
+          executed_at: string
+          execution_mode: string
+          id: string
+          modified_by_broker: boolean | null
+          modified_content: string | null
+          result: Json | null
+          success: boolean | null
+        }
+        Insert: {
+          action_params?: Json | null
+          action_type: string
+          analysis_id?: string | null
+          broker_id?: string | null
+          broker_user_id: string
+          error?: string | null
+          executed_at?: string
+          execution_mode?: string
+          id?: string
+          modified_by_broker?: boolean | null
+          modified_content?: string | null
+          result?: Json | null
+          success?: boolean | null
+        }
+        Update: {
+          action_params?: Json | null
+          action_type?: string
+          analysis_id?: string | null
+          broker_id?: string | null
+          broker_user_id?: string
+          error?: string | null
+          executed_at?: string
+          execution_mode?: string
+          id?: string
+          modified_by_broker?: boolean | null
+          modified_content?: string | null
+          result?: Json | null
+          success?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planipret_ava_action_log_analysis_id_fkey"
+            columns: ["analysis_id"]
+            isOneToOne: false
+            referencedRelation: "planipret_ava_email_analyses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       planipret_ava_conversations: {
         Row: {
           audio_url: string | null
@@ -7883,6 +7939,63 @@ export type Database = {
           tool_params?: Json | null
           tool_result?: Json | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      planipret_ava_email_analyses: {
+        Row: {
+          broker_id: string
+          broker_user_id: string
+          created_at: string
+          email_from: string | null
+          email_from_name: string | null
+          email_subject: string | null
+          id: string
+          intent: string | null
+          key_info: Json | null
+          lead_score: number | null
+          ms_message_id: string
+          notification_summary: string | null
+          proposed_actions: Json
+          raw_ai_response: Json | null
+          received_at: string | null
+          urgency: string | null
+        }
+        Insert: {
+          broker_id: string
+          broker_user_id: string
+          created_at?: string
+          email_from?: string | null
+          email_from_name?: string | null
+          email_subject?: string | null
+          id?: string
+          intent?: string | null
+          key_info?: Json | null
+          lead_score?: number | null
+          ms_message_id: string
+          notification_summary?: string | null
+          proposed_actions?: Json
+          raw_ai_response?: Json | null
+          received_at?: string | null
+          urgency?: string | null
+        }
+        Update: {
+          broker_id?: string
+          broker_user_id?: string
+          created_at?: string
+          email_from?: string | null
+          email_from_name?: string | null
+          email_subject?: string | null
+          id?: string
+          intent?: string | null
+          key_info?: Json | null
+          lead_score?: number | null
+          ms_message_id?: string
+          notification_summary?: string | null
+          proposed_actions?: Json
+          raw_ai_response?: Json | null
+          received_at?: string | null
+          urgency?: string | null
         }
         Relationships: []
       }

@@ -68,9 +68,18 @@ Deno.serve(async (req) => {
 
     switch (action) {
       case "read_emails": {
-        const r = await graph(admin, profile, `/me/messages?$top=20&$orderby=receivedDateTime%20desc&$select=subject,from,receivedDateTime,bodyPreview,isRead`);
+        const top = Math.min(Number(payload.top ?? 25), 50);
+        const filter = payload.folder === "unread" ? "&$filter=isRead%20eq%20false" : "";
+        const r = await graph(admin, profile, `/me/messages?$top=${top}&$orderby=receivedDateTime%20desc&$select=id,subject,from,receivedDateTime,bodyPreview,isRead,hasAttachments,importance${filter}`);
         const d = await r.json();
         return j({ success: r.ok, emails: d.value ?? [] }, r.ok ? 200 : 500);
+      }
+      case "read_email_detail": {
+        const id = String(payload.message_id ?? "");
+        if (!id) return j({ success: false, error: "message_id required" }, 400);
+        const r = await graph(admin, profile, `/me/messages/${encodeURIComponent(id)}?$select=id,subject,from,toRecipients,receivedDateTime,body,bodyPreview,hasAttachments,importance,conversationId`);
+        const d = await r.json();
+        return j({ success: r.ok, email: d }, r.ok ? 200 : 500);
       }
       case "send_email": {
         const r = await graph(admin, profile, `/me/sendMail`, { method: "POST", body: JSON.stringify({ message: { subject: payload.subject, body: { contentType: "HTML", content: payload.body }, toRecipients: (payload.to ?? []).map((e: string) => ({ emailAddress: { address: e } })) } }) });
