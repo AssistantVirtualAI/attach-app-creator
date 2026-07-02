@@ -32,7 +32,8 @@ type Profile = PlanipretBrokerRow & {
 export default function PAUsers() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
-  const search = params.get("search") ?? "";
+  const searchParam = params.get("search") ?? "";
+  const [search, setSearch] = useState(searchParam);
 
   const filter = (params.get("filter") as "all" | "app" | "agent" | "offline") ?? "all";
   
@@ -44,7 +45,6 @@ export default function PAUsers() {
     Object.entries(patch).forEach(([k, v]) => { if (v == null || v === "") next.delete(k); else next.set(k, v); });
     setParams(next, { replace: true });
   };
-  const setSearch = (s: string) => updateParams({ search: s, page: "1" });
   const setFilter = (f: string) => updateParams({ filter: f, page: "1" });
   
   const setPage = (p: number) => updateParams({ page: String(p) });
@@ -95,6 +95,25 @@ export default function PAUsers() {
     return () => { supabase.removeChannel(ch); };
   }, []);
 
+  useEffect(() => {
+    setSearch(searchParam);
+  }, [searchParam]);
+
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      const current = params.get("search") ?? "";
+      if (search !== current) updateParams({ search, page: "1" });
+    }, 250);
+    return () => window.clearTimeout(handle);
+  }, [search, params]);
+
+  const normalizeSearch = (value: unknown) => String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+
   const filtered = useMemo(() => {
     const hasSearch = !!search.trim();
     return rows.filter((r) => {
@@ -106,7 +125,7 @@ export default function PAUsers() {
         if (filter === "offline" && r.mobile_app_enabled) return false;
       }
       if (hasSearch) {
-        const s = search.toLowerCase();
+        const s = normalizeSearch(search);
         const anyR = r as any;
         const fields = [
           r.full_name,
@@ -115,7 +134,7 @@ export default function PAUsers() {
           anyR.ns_extension,
           anyR.ns_domain,
         ];
-        return fields.some((v) => String(v ?? "").toLowerCase().includes(s));
+        return fields.some((v) => normalizeSearch(v).includes(s));
       }
       return true;
     });
