@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import SessionTimeoutModal from "@/components/planipret/SessionTimeoutModal";
 import { useAdminRealtime } from "@/hooks/useAdminRealtime";
+import { usePlanipretNsAutoSync } from "@/hooks/usePlanipretNsAutoSync";
 import NotificationsBell from "@/components/planipret/admin/NotificationsBell";
 import CommandPalette from "@/components/planipret/admin/CommandPalette";
 import { WorkspaceHeaderExtras } from "@/components/portals/WorkspaceHeaderExtras";
@@ -78,6 +79,10 @@ export default function PlanipretAdminLayout() {
   const { status: rtStatus } = useAdminRealtime();
   const realtimeOk = rtStatus === "live";
   const [paletteOpen, setPaletteOpen] = useState(false);
+
+  // Auto-sync NS-API in the background for every admin page. Idempotent via
+  // module-level in-flight guard, safe to mount once at the layout.
+  usePlanipretNsAutoSync();
 
   // Keyboard shortcuts
   useEffect(() => {

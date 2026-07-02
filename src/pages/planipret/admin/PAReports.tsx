@@ -36,12 +36,16 @@ const TooltipDark = ({ active, payload, label }: any) => {
 export default function PAReports() {
   const [range, setRange] = useState<Range>("week");
   const [calls, setCalls] = useState<any[]>([]);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [avaFeedback, setAvaFeedback] = useState<Array<{ rating: string }>>([]);
+  const [reminders, setReminders] = useState<any[]>([]);
   const [brokers, setBrokers] = useState<Record<string, string>>({});
   const [exporting, setExporting] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
   const reportRef = useRef<HTMLDivElement>(null);
   const { stats: brokerStats } = usePlanipretBrokerStats();
+
 
   const periodLabel = range === "week" ? "7 derniers jours" : range === "month" ? "30 derniers jours" : "3 derniers mois";
 
@@ -54,12 +58,19 @@ export default function PAReports() {
     else start.setMonth(start.getMonth() - 3);
     start.setHours(0, 0, 0, 0);
     (async () => {
-      const [{ data: c }, { data: p }, nsUsers] = await Promise.all([
-        supabase.from("planipret_phone_calls").select("*").gte("started_at", start.toISOString()),
+      const startIso = start.toISOString();
+      const [{ data: c }, { data: p }, nsUsers, { data: m }, { data: fb }, { data: rem }] = await Promise.all([
+        supabase.from("planipret_phone_calls").select("*").gte("started_at", startIso),
         supabase.from("planipret_profiles").select("user_id, full_name, extension, ns_extension"),
         supabase.functions.invoke("pp-ns-users", { body: {} }).catch((error) => ({ data: null, error })),
+        supabase.from("planipret_phone_messages").select("id, sent_at, created_at, direction, user_id, extension").gte("sent_at", startIso),
+        supabase.from("planipret_ava_feedback").select("rating").gte("created_at", startIso),
+        supabase.from("planipret_reminders").select("id, user_id, status, scheduled_at, created_at").gte("created_at", startIso),
       ]);
       setCalls(c ?? []);
+      setMessages(m ?? []);
+      setAvaFeedback((fb ?? []) as any);
+      setReminders(rem ?? []);
       const map: Record<string, string> = {};
       (p ?? []).forEach((x: any) => {
         map[x.user_id] = x.full_name;
@@ -73,6 +84,8 @@ export default function PAReports() {
       setBrokers(map);
     })();
   }, [range, refreshTick]);
+
+
 
   const syncAll = async () => {
     setSyncing(true);
@@ -217,12 +230,8 @@ export default function PAReports() {
           className="pp-btn-primary flex items-center gap-2 text-sm disabled:opacity-50">
           <FileText className="w-4 h-4" /> {exporting ? "Génération…" : "Exporter PDF"}
         </button>
-        <button onClick={syncAll} disabled={syncing}
-          className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg disabled:opacity-50"
-          style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>
-          <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} /> Synchroniser NS-API
-        </button>
       </div>
+
       <div ref={reportRef} className="space-y-4">
 
       {/* ───────── SECTION A — État actuel (non filtré par période) ───────── */}
@@ -317,6 +326,26 @@ export default function PAReports() {
         <Stat label="Taux de réponse" value={answerRate} />
       </div>
 
+      {/* ───────── SMS · AVA · Rappels ───────── */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <MiniTile label="SMS envoyés" value={messages.filter((m) => m.direction === "outbound").length} color={ACCENT} sub="période" />
+        <MiniTile label="SMS reçus" value={messages.filter((m) => m.direction === "inbound").length} color={SUCCESS} sub="période" />
+        <MiniTile
+          label="Satisfaction AVA"
+          value={(() => {
+            const total = avaFeedback.length;
+            if (!total) return "—";
+            const up = avaFeedback.filter((f) => f.rating === "up").length;
+            return `${Math.round((up / total) * 100)}%`;
+          })()}
+          sub={`${avaFeedback.length} avis`}
+          color="#9B7FE8"
+        />
+        <MiniTile label="Rappels en attente" value={reminders.filter((r) => r.status === "pending").length} sub={`${reminders.filter((r) => r.status === "pending" && r.scheduled_at < new Date().toISOString()).length} en retard`} color={GOLD} />
+      </div>
+
+
+
       <div className="pp-card p-5">
         <div className="flex items-center justify-between mb-3">
           <h3 style={{ fontWeight: 600, color: "var(--pp-text-primary)" }}>Performance par courtier</h3>
@@ -374,4 +403,16 @@ function StatTile({ icon, label, value, sub, color }: { icon: any; label: string
     </div>
   );
 }
+
+function MiniTile({ label, value, sub, color }: { label: string; value: number | string; sub?: string; color: string }) {
+  return (
+    <div className="pp-card p-4" style={{ position: "relative", overflow: "hidden" }}>
+      <div aria-hidden style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${color}, transparent)` }} />
+      <p style={{ fontSize: 10, color: "var(--pp-text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</p>
+      <p className="tabular-nums" style={{ fontSize: 22, fontWeight: 700, marginTop: 4, color: "var(--pp-text-primary)" }}>{value}</p>
+      {sub && <p style={{ fontSize: 10, color: "var(--pp-text-faint)", marginTop: 2 }}>{sub}</p>}
+    </div>
+  );
+}
+
 

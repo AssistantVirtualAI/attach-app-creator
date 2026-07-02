@@ -94,7 +94,12 @@ type Period = 7 | 30 | 90;
 export default function PAOverview() {
   const [period, setPeriod] = useState<Period>(7);
   const [refreshing, setRefreshing] = useState(false);
-  const [stats, setStats] = useState({ calls: 0, callsYest: 0, brokers: 0, brokersTotal: 0, sms: 0, ava: 0, smsYest: 0, voicemailsUnread: 0 });
+  const [stats, setStats] = useState({
+    calls: 0, callsYest: 0, callsMissedToday: 0, brokers: 0, brokersTotal: 0,
+    sms: 0, ava: 0, smsYest: 0, voicemailsUnread: 0,
+    avgDurationSec: 0, answerRatePct: 0,
+    overdueReminders: 0, hotLeads7d: 0, avaWeek: 0, brokersOnline: 0,
+  });
   const [recent, setRecent] = useState<any[]>([]);
   const [brokers, setBrokers] = useState<any[]>([]);
   const [hotLeads, setHotLeads] = useState<any[]>([]);
@@ -122,34 +127,59 @@ export default function PAOverview() {
     const yestIso = yest.toISOString();
     const periodIso = periodAgo.toISOString();
 
-    const [c1, c2, sms, smsY, ava, vm, rec, callsP, smsP, callsByDir, topCalls, svcWidget, svcAi, directory] = await Promise.all([
+    const sevenAgo = new Date(today); sevenAgo.setDate(sevenAgo.getDate() - 7);
+    const sevenIso = sevenAgo.toISOString();
+    const fiveMinAgo = new Date(Date.now() - 5 * 60_000).toISOString();
+    const nowIsoEarly = new Date().toISOString();
+
+    const [c1, c2, missedToday, sms, smsY, ava, avaWeek, vm, rec, callsP, smsP, callsByDir, callsPeriodStats, topCalls, svcWidget, svcAi, directory, onlineC, overdueRemC, hotLeadsWeekC] = await Promise.all([
       getPlanipretCallCount({ from: todayIso }),
       getPlanipretCallCount({ from: yestIso, to: todayIso }),
+      getPlanipretCallCount({ direction: "missed", from: todayIso }),
       supabase.from("planipret_phone_messages").select("id", { count: "exact", head: true }).gte("sent_at", todayIso),
       supabase.from("planipret_phone_messages").select("id", { count: "exact", head: true }).gte("sent_at", yestIso).lt("sent_at", todayIso),
       supabase.from("ai_request_audit_log").select("id", { count: "exact", head: true }).gte("created_at", todayIso).like("action", "elevenlabs_tool:%"),
+      supabase.from("ai_request_audit_log").select("id", { count: "exact", head: true }).gte("created_at", sevenIso).like("action", "elevenlabs_tool:%"),
       supabase.from("planipret_voicemails").select("id", { count: "exact", head: true }).eq("is_read", false),
       supabase.from("planipret_phone_calls").select("id, user_id, extension, direction, from_number, to_number, duration_seconds, started_at, ai_summary, metadata, planipret_profiles(full_name)").order("started_at", { ascending: false }).limit(20),
       supabase.from("planipret_phone_calls").select("started_at").gte("started_at", periodIso),
       supabase.from("planipret_phone_messages").select("sent_at").gte("sent_at", periodIso),
       supabase.from("planipret_phone_calls").select("direction").gte("started_at", periodIso),
+      supabase.from("planipret_phone_calls").select("duration_seconds, direction").gte("started_at", periodIso),
       supabase.from("planipret_phone_calls").select("user_id, extension, metadata, planipret_profiles(full_name)").gte("started_at", periodIso),
       supabase.from("planipret_profiles").select("id", { count: "exact", head: true }).eq("widget_enabled", true),
       supabase.from("planipret_profiles").select("id", { count: "exact", head: true }).eq("voice_agent_enabled", true),
       getPlanipretBrokerDirectory(),
+      supabase.from("planipret_profiles").select("id", { count: "exact", head: true }).gte("last_seen_at", fiveMinAgo),
+      supabase.from("planipret_reminders").select("id", { count: "exact", head: true }).eq("status", "pending").lt("scheduled_at", nowIsoEarly),
+      supabase.from("planipret_phone_calls").select("id", { count: "exact", head: true }).gte("started_at", sevenIso).gte("lead_score", 8),
     ]);
 
     const nsBrokerList = directory.brokers;
-    // Brokers total = NS-API directory size (single source via adminDirectory).
-    // Active brokers = those with App Mobile toggle ON in planipret_profiles.
     const brokerTotal = directory.count;
 
+    // Period duration + answer-rate stats
+    let totalDur = 0, durCount = 0, answered = 0, totalCallsPeriod = 0;
+    (callsPeriodStats.data ?? []).forEach((c: any) => {
+      totalCallsPeriod++;
+      if (c.duration_seconds) { totalDur += c.duration_seconds; durCount++; }
+      if (c.direction !== "missed") answered++;
+    });
+    const avgDur = durCount > 0 ? Math.round(totalDur / durCount) : 0;
+    const answerPct = totalCallsPeriod > 0 ? Math.round((answered / totalCallsPeriod) * 100) : 0;
+
     setStats({
-      calls: c1 ?? 0, callsYest: c2 ?? 0,
+      calls: c1 ?? 0, callsYest: c2 ?? 0, callsMissedToday: missedToday ?? 0,
       brokers: brokerStats.app_mobile_active, brokersTotal: brokerTotal,
       sms: sms.count ?? 0, smsYest: smsY.count ?? 0,
-      ava: ava.count ?? 0, voicemailsUnread: vm.count ?? 0,
+      ava: ava.count ?? 0, avaWeek: avaWeek.count ?? 0,
+      voicemailsUnread: vm.count ?? 0,
+      avgDurationSec: avgDur, answerRatePct: answerPct,
+      overdueReminders: overdueRemC.count ?? 0,
+      hotLeads7d: hotLeadsWeekC.count ?? 0,
+      brokersOnline: onlineC.count ?? 0,
     });
+
     setWidgetCount(svcWidget.count ?? 0);
     setRecent(rec.data ?? []);
     setBrokers(nsBrokerList.slice(0, 10));
@@ -220,15 +250,22 @@ export default function PAOverview() {
 
   useEffect(() => {
     load();
+    // Debounced reload to avoid thrash when many rows change at once.
+    let deb: number | undefined;
+    const reload = () => { if (deb) window.clearTimeout(deb); deb = window.setTimeout(load, 800); };
     const ch = supabase.channel("admin-overview")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "planipret_phone_calls" }, () => load())
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "planipret_phone_messages" }, () => load())
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "planipret_profiles" }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "planipret_phone_calls" }, reload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "planipret_phone_messages" }, reload)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "planipret_profiles" }, reload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "planipret_voicemails" }, reload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "planipret_reminders" }, reload)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "ai_request_audit_log" }, reload)
       .subscribe();
     const t = window.setInterval(load, 30000);
-    return () => { supabase.removeChannel(ch); window.clearInterval(t); };
+    return () => { supabase.removeChannel(ch); window.clearInterval(t); if (deb) window.clearTimeout(deb); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [period]);
+
 
   const callsTrend = stats.callsYest > 0 ? Math.round(((stats.calls - stats.callsYest) / stats.callsYest) * 100) : undefined;
   const smsTrend = stats.smsYest > 0 ? Math.round(((stats.sms - stats.smsYest) / stats.smsYest) * 100) : undefined;
@@ -286,11 +323,21 @@ export default function PAOverview() {
 
       {/* KPI Hero Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard icon={<Phone className="w-5 h-5" />} title="Appels aujourd'hui" value={stats.calls} subtitle="vs hier" trend={callsTrend} color={ACCENT} />
-        <KpiCard icon={<Users className="w-5 h-5" />} title="Courtiers actifs" value={stats.brokers} subtitle={`${adoptionPct}% adoption · ${stats.brokersTotal} total`} color={SUCCESS} />
+        <KpiCard icon={<Phone className="w-5 h-5" />} title="Appels aujourd'hui" value={stats.calls} subtitle={`${stats.callsMissedToday} manqués · vs hier`} trend={callsTrend} color={ACCENT} />
+        <KpiCard icon={<Users className="w-5 h-5" />} title="Courtiers actifs" value={stats.brokers} subtitle={`${adoptionPct}% adoption · ${stats.brokersOnline} en ligne`} color={SUCCESS} />
         <KpiCard icon={<MessageSquare className="w-5 h-5" />} title="SMS aujourd'hui" value={stats.sms} subtitle="envoyés + reçus" trend={smsTrend} color={WARNING} />
-        <KpiCard icon={<Bot className="w-5 h-5" />} title="Sessions AVA aujourd'hui" value={stats.ava} subtitle={`${stats.voicemailsUnread} voicemails non lus`} color={AGENT} />
+        <KpiCard icon={<Bot className="w-5 h-5" />} title="Sessions AVA aujourd'hui" value={stats.ava} subtitle={`${stats.avaWeek} sur 7 j · ${stats.voicemailsUnread} voicemails`} color={AGENT} />
       </div>
+
+      {/* KPI Secondary Grid — call quality + follow-ups */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+        <MiniStat label="Durée moy. appel" value={stats.avgDurationSec > 0 ? `${Math.floor(stats.avgDurationSec / 60)}m ${stats.avgDurationSec % 60}s` : "—"} sub={`sur ${period} j`} color={ACCENT} />
+        <MiniStat label="Taux de réponse" value={`${stats.answerRatePct}%`} sub={`sur ${period} j`} color={SUCCESS} />
+        <MiniStat label="Appels manqués" value={stats.callsMissedToday} sub="aujourd'hui" color={DANGER} />
+        <MiniStat label="Rappels en retard" value={stats.overdueReminders} sub="à traiter" color={WARNING} />
+        <MiniStat label="Leads chauds" value={stats.hotLeads7d} sub="7 derniers jours" color={AGENT} />
+      </div>
+
 
       {/* ===== FINANCIAL SECTION ===== */}
       <div className="flex items-center gap-2 pt-2">

@@ -194,16 +194,8 @@ export default function PARecordings() {
             ✕ Réinitialiser ({activeFilterCount})
           </button>
         )}
-        <button
-          onClick={syncAll}
-          disabled={syncing}
-          className="ml-auto flex items-center gap-1.5 px-3 py-2 rounded-lg text-white text-sm font-medium disabled:opacity-50"
-          style={{ background: ACCENT }}
-        >
-          <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} />
-          {syncing ? "Synchronisation…" : "Synchroniser NS-API"}
-        </button>
       </div>
+
 
       <div className="pp-card overflow-hidden">
         {loadError && <TableErrorState message={loadError} onRetry={() => load(page, pageSize)} />}
@@ -229,7 +221,7 @@ export default function PARecordings() {
                   title="Aucun enregistrement trouvé"
                   hint={hasFilters
                     ? "Essayez d'élargir vos critères de recherche."
-                    : "Aucun enregistrement n'est encore synchronisé. Lancez « Synchroniser NS-API » ou vérifiez que les enregistrements sont activés dans la config NetSapiens."}
+                    : "Aucun enregistrement n'est encore synchronisé. La synchronisation NS-API est automatique · vérifiez que les enregistrements sont activés dans la config NetSapiens."}
                   action={hasFilters ? (
                     <button onClick={resetFilters} className="px-3 py-1.5 rounded-lg text-xs font-medium text-white" style={{ background: ACCENT }}>Réinitialiser les filtres</button>
                   ) : (

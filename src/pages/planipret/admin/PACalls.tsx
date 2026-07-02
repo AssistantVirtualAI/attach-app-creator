@@ -147,22 +147,8 @@ export default function PACalls() {
             ✕ Réinitialiser ({activeFilterCount})
           </button>
         )}
-        <button
-          onClick={async () => {
-            const id = toast.loading("Synchronisation NS-API…");
-            try {
-              const { data, error } = await supabase.functions.invoke("pp-admin-ns-sync", { body: {} });
-              if (error) throw error;
-              const d = data as any;
-              toast.success(`${d.extensions ?? d.users_total ?? 0} ext synchronisées · appels/enregistrements en arrière-plan`, { id });
-              await load(1, pageSize);
-            } catch (e: any) { toast.error(`Échec: ${e.message ?? e}`, { id }); }
-          }}
-          className="ml-auto flex items-center gap-1.5 px-3 py-2 rounded-lg text-white text-sm font-medium"
-          style={{ background: "#2E9BDC" }}>
-          <RefreshCw className="w-4 h-4" /> Synchroniser NS-API
-        </button>
-        <button onClick={exportCsv} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm"
+        <button onClick={exportCsv} className="ml-auto flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm"
+
           style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>
           <Download className="w-4 h-4" /> Exporter CSV
         </button>
@@ -193,7 +179,7 @@ export default function PACalls() {
                   title="Aucun appel trouvé"
                   hint={hasFilters
                     ? "Essayez d'élargir vos critères de recherche."
-                    : "Aucun appel enregistré. Vérifiez que le webhook NS-API est configuré dans Intégrations, puis lancez « Synchroniser NS-API »."}
+                    : "Aucun appel enregistré. Synchronisation NS-API automatique. Vérifiez que le webhook NS-API est configuré dans Intégrations."}
                   action={hasFilters ? (
                     <button onClick={resetFilters} className="px-3 py-1.5 rounded-lg text-xs font-medium text-white" style={{ background: ACCENT }}>
                       Réinitialiser les filtres

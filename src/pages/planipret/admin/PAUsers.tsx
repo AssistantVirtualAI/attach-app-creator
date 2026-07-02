@@ -1,12 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Search, Plus, Edit3, Trash2, ExternalLink, X, AlertTriangle, Eye, EyeOff, RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
+import { Search, Plus, Edit3, Trash2, ExternalLink, X, AlertTriangle, Eye, EyeOff, RefreshCw, ChevronDown, ChevronUp, MoreHorizontal, KeyRound, Copy, Smartphone, Bot, Phone, Sparkles } from "lucide-react";
 import Pagination from "@/components/planipret/admin/Pagination";
 import DebugPanel, { type DebugEntry } from "@/components/planipret/admin/DebugPanel";
 import { TableErrorState, TableEmptyState } from "@/components/planipret/admin/TableStates";
 import { getPlanipretBrokerDirectory, type PlanipretBrokerRow } from "@/lib/planipret/adminDirectory";
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuLabel, DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+
 
 const ACCENT = "#2E9BDC";
 const SUCCESS = "#00D4AA";
@@ -25,8 +30,10 @@ type Profile = PlanipretBrokerRow & {
 };
 
 export default function PAUsers() {
+  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const search = params.get("search") ?? "";
+
   const filter = (params.get("filter") as "all" | "app" | "agent" | "offline") ?? "all";
   const maestroFilter = (params.get("maestro") as "all" | "yes" | "no") ?? "all";
   const page = Math.max(1, parseInt(params.get("page") ?? "1", 10) || 1);
@@ -180,20 +187,7 @@ export default function PAUsers() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={async () => {
-              const id = toast.loading("Synchronisation NS-API…");
-              try {
-                const { data, error } = await supabase.functions.invoke("pp-admin-ns-sync", { body: {} });
-                if (error) throw error;
-                toast.success(`${(data as any)?.extensions ?? (data as any)?.users_total ?? 0} extensions synchronisées · données en arrière-plan`, { id });
-                await load();
-              } catch (e: any) { toast.error(`Échec: ${e.message ?? e}`, { id }); }
-            }}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium"
-            style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>
-            <RefreshCw className="w-4 h-4" /> Synchroniser NS-API
-          </button>
+
           <div className="relative">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--pp-text-muted)" }} />
             <input value={search} onChange={(e) => setSearch(e.target.value)}
@@ -309,11 +303,99 @@ export default function PAUsers() {
                   </td>
                   <td className="p-3 tabular-nums" style={{ color: "var(--pp-text-primary)" }}>{callsByUser[u.user_id] ?? callsByUser[`ext:${u.extension}`] ?? 0}</td>
                   <td className="p-3" style={{ fontSize: 11, color: "var(--pp-text-faint)" }}>{u.updated_at ? new Date(u.updated_at).toLocaleString("fr-CA", { dateStyle: "short", timeStyle: "short" }) : "—"}</td>
-                  <td className="p-3 flex items-center gap-1">
-                    <button disabled={u.ns_only} onClick={() => setEditUser(u)} className="p-1.5 rounded hover:bg-white/[0.05] disabled:opacity-30" title={u.ns_only ? "Courtier NS non lié" : "Modifier"}><Edit3 className="w-3.5 h-3.5" style={{ color: "var(--pp-text-muted)" }} /></button>
-                    <a href="/mplanipret" target="_blank" rel="noopener" className="p-1.5 rounded hover:bg-white/[0.05]" title="Prévisualiser"><ExternalLink className="w-3.5 h-3.5" style={{ color: "var(--pp-text-muted)" }} /></a>
-                    <button disabled={u.ns_only} onClick={() => setDelUser(u)} className="p-1.5 rounded hover:bg-red-500/10 disabled:opacity-30" title={u.ns_only ? "Courtier NS non lié" : "Supprimer"}><Trash2 className="w-3.5 h-3.5" style={{ color: DANGER }} /></button>
+                  <td className="p-3">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium hover:bg-white/[0.05] transition"
+                          style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }}
+                        >
+                          Actions <ChevronDown className="w-3 h-3" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-56">
+                        <DropdownMenuLabel className="text-xs">{u.full_name}</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        {!u.ns_only && (
+                          <DropdownMenuItem onClick={() => setEditUser(u)}>
+                            <Edit3 className="w-3.5 h-3.5 mr-2" /> Modifier le courtier
+                          </DropdownMenuItem>
+                        )}
+                        {!u.ns_only && (
+                          <DropdownMenuItem
+                            onClick={async () => {
+                              const { data } = await supabase.functions.invoke("pp-admin-user", { body: { action: "reset_password", payload: { email: u.email } } });
+                              if ((data as any)?.success) toast.success("Email de réinitialisation envoyé");
+                              else toast.error("Échec de l'envoi");
+                            }}
+                          >
+                            <KeyRound className="w-3.5 h-3.5 mr-2" /> Réinitialiser le mot de passe
+                          </DropdownMenuItem>
+                        )}
+                        {!u.ns_only && <DropdownMenuSeparator />}
+                        {!u.ns_only && (
+                          <DropdownMenuItem onClick={() => toggleField(u, "mobile_app_enabled")}>
+                            <Smartphone className="w-3.5 h-3.5 mr-2" />
+                            {u.mobile_app_enabled ? "Désactiver l'app mobile" : "Activer l'app mobile"}
+                          </DropdownMenuItem>
+                        )}
+                        {!u.ns_only && (
+                          <DropdownMenuItem onClick={() => toggleField(u, "voice_agent_enabled")}>
+                            <Bot className="w-3.5 h-3.5 mr-2" />
+                            {u.voice_agent_enabled ? "Désactiver l'agent IA" : "Activer l'agent IA"}
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => { navigator.clipboard.writeText(u.email); toast.success("Courriel copié"); }}
+                        >
+                          <Copy className="w-3.5 h-3.5 mr-2" /> Copier le courriel
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => navigate(`/planipret/admin/calls?broker=${u.ns_only ? `ext:${u.extension}` : `user:${u.user_id}`}`)}
+                        >
+                          <Phone className="w-3.5 h-3.5 mr-2" /> Voir les appels
+                        </DropdownMenuItem>
+                        {!u.ns_only && (
+                          <DropdownMenuItem
+                            onClick={() => navigate(`/planipret/admin/ava?user=${u.user_id}`)}
+                          >
+                            <Sparkles className="w-3.5 h-3.5 mr-2" /> Historique AVA
+                          </DropdownMenuItem>
+                        )}
+                        {!u.ns_only && (
+                          <DropdownMenuItem asChild>
+                            <a href="/mplanipret" target="_blank" rel="noopener">
+                              <ExternalLink className="w-3.5 h-3.5 mr-2" /> Prévisualiser l'app
+                            </a>
+                          </DropdownMenuItem>
+                        )}
+                        {!u.ns_only && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => setDelUser(u)}
+                              className="text-red-500 focus:text-red-500 focus:bg-red-500/10"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 mr-2" /> Supprimer le courtier
+                            </DropdownMenuItem>
+                          </>
+                        )}
+                        {u.ns_only && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => setAddOpen(true)}
+                              className="text-[color:var(--pp-brand-accent-2,#2E9BDC)]"
+                            >
+                              <Plus className="w-3.5 h-3.5 mr-2" /> Créer un compte Planiprêt
+                            </DropdownMenuItem>
+                          </>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </td>
+
                 </tr>
               ))}
             </tbody>
