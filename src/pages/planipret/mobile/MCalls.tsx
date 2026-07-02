@@ -569,6 +569,102 @@ function TranscriptView({
   );
 }
 
+// ---------- Claude coaching block (reads ai_analysis_json) ----------
+function ClaudeCoachingBlock({ analysis, coachingScore }: { analysis: any; coachingScore: number | null }) {
+  if (!analysis || typeof analysis !== "object") return null;
+  const coaching = analysis.coaching ?? {};
+  const summary = analysis.summary ?? {};
+  const key = summary.key_info ?? {};
+  const overall = typeof coaching.overall_score === "number" ? coaching.overall_score : coachingScore;
+  const breakdown = coaching.score_breakdown ?? {};
+  const phrases: Array<{ context?: string; phrase?: string }> = Array.isArray(coaching.suggested_phrases) ? coaching.suggested_phrases : [];
+  const strengths: string[] = Array.isArray(coaching.strengths) ? coaching.strengths : [];
+  const improvements: string[] = Array.isArray(coaching.improvements) ? coaching.improvements : [];
+
+  const scoreColor = overall != null && overall >= 8 ? "#00D4AA" : overall != null && overall >= 6 ? "#F5A623" : "#E84C4C";
+  const label = overall != null && overall >= 8 ? "Excellent" : overall != null && overall >= 6 ? "Bien" : "À améliorer";
+
+  const barKeys: Array<[string, string]> = [
+    ["listening", "Écoute"],
+    ["questioning", "Questions"],
+    ["empathy", "Empathie"],
+    ["product_knowledge", "Connaissance"],
+    ["closing", "Conclusion"],
+  ];
+
+  return (
+    <>
+      {overall != null && (
+        <div className="pp-card p-4 flex items-center gap-4" style={{ borderLeft: `4px solid ${scoreColor}` }}>
+          <div className="w-16 h-16 rounded-full flex flex-col items-center justify-center shrink-0"
+            style={{ border: `3px solid ${scoreColor}`, background: "var(--pp-bg-elevated)" }}>
+            <div className="text-xl font-bold" style={{ color: scoreColor }}>{overall}</div>
+            <div className="text-[9px]" style={{ color: "var(--pp-text-muted)" }}>/10</div>
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-[10px] uppercase tracking-wider font-bold" style={{ color: scoreColor }}>Score de coaching</div>
+            <div className="text-sm font-semibold" style={{ color: "var(--pp-text-primary)" }}>{label}</div>
+            <div className="mt-2 space-y-1">
+              {barKeys.map(([k, lbl]) => {
+                const v = typeof breakdown[k] === "number" ? breakdown[k] : null;
+                if (v == null) return null;
+                return (
+                  <div key={k} className="flex items-center gap-2 text-[10px]" style={{ color: "var(--pp-text-secondary)" }}>
+                    <span className="w-20 shrink-0">{lbl}</span>
+                    <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "var(--pp-bg-border-2)" }}>
+                      <div style={{ width: `${Math.min(100, v * 10)}%`, height: "100%", background: scoreColor }} />
+                    </div>
+                    <span className="w-6 text-right">{v}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {(key.budget || key.property_type || key.timeline) && (
+        <div className="flex flex-wrap gap-1.5">
+          {key.budget && <span className="text-[11px] px-2 py-1 rounded-full" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }}>💰 {key.budget}</span>}
+          {key.property_type && <span className="text-[11px] px-2 py-1 rounded-full" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }}>🏠 {key.property_type}</span>}
+          {key.timeline && <span className="text-[11px] px-2 py-1 rounded-full" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }}>⏰ {key.timeline}</span>}
+        </div>
+      )}
+
+      {strengths.length > 0 && (
+        <div className="pp-card p-3">
+          <div className="text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "#00D4AA" }}>✅ Points forts</div>
+          <ul className="space-y-1 text-xs" style={{ color: "var(--pp-text-primary)" }}>
+            {strengths.map((s, i) => <li key={i}>• {s}</li>)}
+          </ul>
+        </div>
+      )}
+      {improvements.length > 0 && (
+        <div className="pp-card p-3">
+          <div className="text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "#F5A623" }}>⚠️ À améliorer</div>
+          <ul className="space-y-1 text-xs" style={{ color: "var(--pp-text-primary)" }}>
+            {improvements.map((s, i) => <li key={i}>• {s}</li>)}
+          </ul>
+        </div>
+      )}
+
+      {phrases.length > 0 && (
+        <div className="pp-card p-3">
+          <div className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "#9B7FE8" }}>💬 Formulations suggérées</div>
+          <div className="space-y-2">
+            {phrases.map((p, i) => (
+              <div key={i} className="rounded-lg p-2" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)" }}>
+                {p.context && <div className="text-[10px] italic mb-1" style={{ color: "var(--pp-text-secondary)" }}>{p.context}</div>}
+                <div className="text-xs" style={{ color: "var(--pp-text-primary)" }}>« {p.phrase} »</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 
 // ============================================================
 // CALL DETAIL SHEET
