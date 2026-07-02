@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowLeft, Bell, Mail, PhoneCall, Sparkles, Calendar, Voicemail, RefreshCw, CheckCheck, Trash2 } from "lucide-react";
+import { ArrowLeft, Bell, Mail, PhoneCall, Sparkles, Calendar, Voicemail, RefreshCw, CheckCheck, Trash2, Check, Circle } from "lucide-react";
 import { toast } from "sonner";
 
 type Notif = {
