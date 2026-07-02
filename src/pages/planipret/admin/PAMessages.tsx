@@ -8,6 +8,7 @@ import DebugPanel, { type DebugEntry } from "@/components/planipret/admin/DebugP
 import { TableErrorState, TableEmptyState } from "@/components/planipret/admin/TableStates";
 import { getPlanipretBrokerDirectory } from "@/lib/planipret/adminDirectory";
 import { usePlanipretNsAutoSync } from "@/hooks/usePlanipretNsAutoSync";
+import NsSyncBar from "@/components/planipret/admin/NsSyncBar";
 
 const ACCENT = "#2E9BDC";
 const SUCCESS = "#00D4AA";
