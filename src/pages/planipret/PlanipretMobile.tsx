@@ -459,10 +459,10 @@ export default function PlanipretMobile() {
     const { error } = await supabase.auth.signInWithPassword({ email: loginEmail.trim(), password: loginPassword });
     setLoginLoading(false);
     if (error) {
-      toast.error(error.message || "Connexion impossible");
+      toast.error(error.message || t("home.connectionImpossible"));
       return;
     }
-    toast.success("Connexion réussie");
+    toast.success(t("auth.success"));
     setLoading(true);
     await loadProfile();
   };
