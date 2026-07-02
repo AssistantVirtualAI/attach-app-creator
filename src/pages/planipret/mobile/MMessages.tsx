@@ -993,6 +993,28 @@ function EmailDetailSheet({ email, onClose, onReply }: { email: any; onClose: ()
   const subject = email.subject ?? t("messages.noSubject");
   const preview = email.bodyPreview ?? "";
   const [sumOpen, setSumOpen] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysis, setAnalysis] = useState<any | null>(null);
+
+  const analyzeWithAva = async () => {
+    if (!email.id) { toast.error("Message ID manquant"); return; }
+    setAnalyzing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("ava-email-analyzer", {
+        body: { ms_message_id: email.id },
+      });
+      if (error || !(data as any)?.success) {
+        throw new Error((data as any)?.error ?? error?.message ?? "Échec de l'analyse");
+      }
+      setAnalysis((data as any).analysis);
+      if ((data as any).cached) toast.info("Analyse récupérée du cache");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Erreur AVA");
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
 
   return (
     <div className="absolute inset-0 z-40 bg-black/60 backdrop-blur-sm flex items-end" onClick={onClose}>
