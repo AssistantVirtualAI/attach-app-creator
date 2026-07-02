@@ -12,6 +12,7 @@ import type { PlanipretMobileContext } from "../PlanipretMobile";
 import { TEMP_COLORS, TEMP_EMOJI, TEMP_LABEL, tempBorder, callbackDelayToDate, delayLabel, type LeadTemp } from "@/components/planipret/leadHelpers";
 import ContactTimeline from "@/components/planipret/ContactTimeline";
 import RecordingsList from "@/components/planipret/mobile/recordings/RecordingsList";
+import { CallRecordingPlayer } from "@/components/planipret/mobile/call/CallRecordingPlayer";
 import { useMplanipretLang } from "@/hooks/useMplanipretLang";
 
 
@@ -458,6 +459,212 @@ function EmptyState({ tab }: { tab: "recents" | "active" | "missed" }) {
   );
 }
 
+// ---------- Transcript view (chat bubbles + auto-fetch + Analyze CTA) ----------
+type Seg = { speaker: string; text: string; start?: number | null; end?: number | null };
+function TranscriptView({
+  segments, transcript, loading, onFetch, onAnalyze, aiLoading, analyzed, t,
+}: {
+  segments: Seg[] | null;
+  transcript: string | null;
+  loading: boolean;
+  onFetch: () => Promise<void> | void;
+  onAnalyze: () => Promise<void> | void;
+  aiLoading: boolean;
+  analyzed: boolean;
+  t: (k: string) => string;
+}) {
+  const has = (segments && segments.length > 0) || !!(transcript && transcript.trim());
+  const fetchedRef = useRef(false);
+
+  useEffect(() => {
+    if (!has && !loading && !fetchedRef.current) {
+      fetchedRef.current = true;
+      void onFetch();
+    }
+  }, [has, loading, onFetch]);
+
+  const isCourtier = (speaker: string) => {
+    const s = (speaker || "").toLowerCase();
+    return s.includes("courtier") || s.startsWith("agent") || s.startsWith("broker") || s === "speaker 1" || s === "1";
+  };
+
+  if (loading && !has) {
+    return (
+      <div className="space-y-2">
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className={`flex ${i % 2 === 0 ? "justify-start" : "justify-end"}`}>
+            <div className="h-10 rounded-2xl animate-pulse" style={{ width: "60%", background: "var(--pp-bg-surface)" }} />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (!has) {
+    return (
+      <div className="pp-card p-4 space-y-3">
+        <div className="text-xs" style={{ color: "var(--pp-warning, #F5A623)" }}>
+          ⚠️ {t("calls.transcriptUnavailable") || "Transcription non disponible."}
+        </div>
+        <div className="text-[11px]" style={{ color: "var(--pp-text-secondary)" }}>
+          Vérifiez que <code>PORTAL_VOICE_TRANSCRIPTION_SENTIMENT = yes</code> est activé pour votre domaine dans NetSapiens.
+        </div>
+        <button onClick={() => onFetch()} className="w-full py-2 rounded-lg text-xs font-semibold"
+          style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }}>
+          <RefreshCw className="w-3.5 h-3.5 inline mr-1" /> Réessayer
+        </button>
+      </div>
+    );
+  }
+
+  const segs: Seg[] = segments && segments.length > 0
+    ? segments
+    : (transcript ?? "").split("\n").filter(Boolean).map((line) => {
+        const c = line.indexOf(":");
+        if (c > 0 && c < 30) return { speaker: line.slice(0, c).trim(), text: line.slice(c + 1).trim() };
+        return { speaker: "Speaker", text: line };
+      });
+  const wordCount = segs.reduce((n, s) => n + (s.text.split(/\s+/).filter(Boolean).length), 0);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-col gap-2">
+        {segs.map((s, i) => {
+          const right = isCourtier(s.speaker);
+          return (
+            <div key={i} className={`flex flex-col ${right ? "items-end" : "items-start"}`}>
+              <div className="text-[10px] mb-0.5" style={{ color: "var(--pp-text-tertiary, var(--pp-text-secondary))" }}>{s.speaker}</div>
+              <div
+                className="px-3 py-2 text-[13px] leading-relaxed"
+                style={{
+                  maxWidth: "82%",
+                  color: right ? "white" : "var(--pp-text-primary)",
+                  background: right ? "linear-gradient(135deg, var(--pp-brand-accent-2), var(--pp-brand-accent))" : "var(--pp-bg-elevated)",
+                  border: right ? "none" : "1px solid var(--pp-bg-border-2)",
+                  borderRadius: right ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
+                }}
+              >
+                {s.text}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="text-[11px] text-center" style={{ color: "var(--pp-text-muted)" }}>
+        {wordCount} mots · {segs.length} tours
+      </div>
+
+      {!analyzed && (
+        <button
+          onClick={() => onAnalyze()}
+          disabled={aiLoading}
+          className="w-full py-3 rounded-xl text-sm font-semibold text-white disabled:opacity-50 flex items-center justify-center gap-2 sticky bottom-0"
+          style={{ background: "linear-gradient(135deg, #2D1A5A, #9B7FE8)" }}
+        >
+          {aiLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Analyse en cours…</> : <><Sparkles className="w-4 h-4" /> Analyser avec Claude IA</>}
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ---------- Claude coaching block (reads ai_analysis_json) ----------
+function ClaudeCoachingBlock({ analysis, coachingScore }: { analysis: any; coachingScore: number | null }) {
+  if (!analysis || typeof analysis !== "object") return null;
+  const coaching = analysis.coaching ?? {};
+  const summary = analysis.summary ?? {};
+  const key = summary.key_info ?? {};
+  const overall = typeof coaching.overall_score === "number" ? coaching.overall_score : coachingScore;
+  const breakdown = coaching.score_breakdown ?? {};
+  const phrases: Array<{ context?: string; phrase?: string }> = Array.isArray(coaching.suggested_phrases) ? coaching.suggested_phrases : [];
+  const strengths: string[] = Array.isArray(coaching.strengths) ? coaching.strengths : [];
+  const improvements: string[] = Array.isArray(coaching.improvements) ? coaching.improvements : [];
+
+  const scoreColor = overall != null && overall >= 8 ? "#00D4AA" : overall != null && overall >= 6 ? "#F5A623" : "#E84C4C";
+  const label = overall != null && overall >= 8 ? "Excellent" : overall != null && overall >= 6 ? "Bien" : "À améliorer";
+
+  const barKeys: Array<[string, string]> = [
+    ["listening", "Écoute"],
+    ["questioning", "Questions"],
+    ["empathy", "Empathie"],
+    ["product_knowledge", "Connaissance"],
+    ["closing", "Conclusion"],
+  ];
+
+  return (
+    <>
+      {overall != null && (
+        <div className="pp-card p-4 flex items-center gap-4" style={{ borderLeft: `4px solid ${scoreColor}` }}>
+          <div className="w-16 h-16 rounded-full flex flex-col items-center justify-center shrink-0"
+            style={{ border: `3px solid ${scoreColor}`, background: "var(--pp-bg-elevated)" }}>
+            <div className="text-xl font-bold" style={{ color: scoreColor }}>{overall}</div>
+            <div className="text-[9px]" style={{ color: "var(--pp-text-muted)" }}>/10</div>
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-[10px] uppercase tracking-wider font-bold" style={{ color: scoreColor }}>Score de coaching</div>
+            <div className="text-sm font-semibold" style={{ color: "var(--pp-text-primary)" }}>{label}</div>
+            <div className="mt-2 space-y-1">
+              {barKeys.map(([k, lbl]) => {
+                const v = typeof breakdown[k] === "number" ? breakdown[k] : null;
+                if (v == null) return null;
+                return (
+                  <div key={k} className="flex items-center gap-2 text-[10px]" style={{ color: "var(--pp-text-secondary)" }}>
+                    <span className="w-20 shrink-0">{lbl}</span>
+                    <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "var(--pp-bg-border-2)" }}>
+                      <div style={{ width: `${Math.min(100, v * 10)}%`, height: "100%", background: scoreColor }} />
+                    </div>
+                    <span className="w-6 text-right">{v}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {(key.budget || key.property_type || key.timeline) && (
+        <div className="flex flex-wrap gap-1.5">
+          {key.budget && <span className="text-[11px] px-2 py-1 rounded-full" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }}>💰 {key.budget}</span>}
+          {key.property_type && <span className="text-[11px] px-2 py-1 rounded-full" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }}>🏠 {key.property_type}</span>}
+          {key.timeline && <span className="text-[11px] px-2 py-1 rounded-full" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }}>⏰ {key.timeline}</span>}
+        </div>
+      )}
+
+      {strengths.length > 0 && (
+        <div className="pp-card p-3">
+          <div className="text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "#00D4AA" }}>✅ Points forts</div>
+          <ul className="space-y-1 text-xs" style={{ color: "var(--pp-text-primary)" }}>
+            {strengths.map((s, i) => <li key={i}>• {s}</li>)}
+          </ul>
+        </div>
+      )}
+      {improvements.length > 0 && (
+        <div className="pp-card p-3">
+          <div className="text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "#F5A623" }}>⚠️ À améliorer</div>
+          <ul className="space-y-1 text-xs" style={{ color: "var(--pp-text-primary)" }}>
+            {improvements.map((s, i) => <li key={i}>• {s}</li>)}
+          </ul>
+        </div>
+      )}
+
+      {phrases.length > 0 && (
+        <div className="pp-card p-3">
+          <div className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "#9B7FE8" }}>💬 Formulations suggérées</div>
+          <div className="space-y-2">
+            {phrases.map((p, i) => (
+              <div key={i} className="rounded-lg p-2" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)" }}>
+                {p.context && <div className="text-[10px] italic mb-1" style={{ color: "var(--pp-text-secondary)" }}>{p.context}</div>}
+                <div className="text-xs" style={{ color: "var(--pp-text-primary)" }}>« {p.phrase} »</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 
 // ============================================================
 // CALL DETAIL SHEET
@@ -532,9 +739,12 @@ function CallDetailSheet({
   };
 
   const analyzeAI = async () => {
-    if (!call.transcript) return;
+    const segments = Array.isArray(call.transcript_segments) ? call.transcript_segments : null;
+    if (!call.transcript && !segments) return;
     setAiLoading(true);
-    const { data, error } = await supabase.functions.invoke("ai-analyze-call", { body: { call_id: call.id, transcript: call.transcript } });
+    const { data, error } = await supabase.functions.invoke("ai-analyze-call", {
+      body: { call_id: call.id, transcript: call.transcript ?? null, segments },
+    });
     setAiLoading(false);
     if (error) { toast.error(error.message ?? t("common.failed")); return; }
     toast.success(t("calls.analysisDone"));
@@ -542,6 +752,7 @@ function CallDetailSheet({
     const { data: ins } = await supabase.from("planipret_ai_insights").select("*").eq("call_id", call.id).maybeSingle();
     setInsight((ins as any) ?? null);
   };
+
 
   const meta = (call.metadata ?? {}) as any;
   const aiTasks: Array<any> = Array.isArray(meta.ai_tasks) ? meta.ai_tasks
@@ -675,52 +886,33 @@ function CallDetailSheet({
 
           {/* ===== TAB AUDIO ===== */}
           {activeTab === "audio" && (
-            <>
-              {call.recording_url ? (
-                <div className="pp-card p-4">
-                  <audio controls className="w-full" style={{ accentColor: "var(--pp-brand-accent)" }} src={call.recording_url} />
-                  <a href={call.recording_url} download className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold" style={{ color: "var(--pp-brand-accent)" }}>
-                    ⬇ Télécharger
-                  </a>
-                </div>
-              ) : (
-                <button onClick={fetchRecording} disabled={recLoading}
-                  className="w-full py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
-                  style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }}>
-                  {recLoading && <Loader2 className="w-4 h-4 animate-spin" />} Charger l'enregistrement
-                </button>
-              )}
-            </>
+            <CallRecordingPlayer
+              callId={call.ns_call_id ?? call.id}
+              duration={call.duration_seconds ?? 0}
+            />
           )}
 
           {/* ===== TAB TRANSCRIPT ===== */}
           {activeTab === "transcript" && (
-            <>
-              {call.transcript ? (
-                <div className="pp-card p-4">
-                  <div className="flex justify-end mb-2">
-                    <button onClick={copyTranscript} className="text-[11px] px-2.5 py-1 rounded-md flex items-center gap-1"
-                      style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>
-                      <Copy className="w-3 h-3" /> {t("calls.copyTranscript")}
-                    </button>
-                  </div>
-                  <div className="text-xs whitespace-pre-wrap leading-relaxed" style={{ color: "var(--pp-text-primary)", maxHeight: 360, overflowY: "auto" }}>
-                    {call.transcript}
-                  </div>
-                </div>
-              ) : (
-                <button onClick={fetchTranscript} disabled={txLoading}
-                  className="w-full py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
-                  style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }}>
-                  {txLoading && <Loader2 className="w-4 h-4 animate-spin" />} Obtenir la transcription
-                </button>
-              )}
-            </>
+            <TranscriptView
+              segments={Array.isArray(call.transcript_segments) ? call.transcript_segments : null}
+              transcript={call.transcript}
+              loading={txLoading}
+              onFetch={fetchTranscript}
+              onAnalyze={analyzeAI}
+              aiLoading={aiLoading}
+              analyzed={!!(call as any).ai_analysis_json}
+              t={t}
+            />
           )}
+
+
 
           {/* ===== TAB COACHING ===== */}
           {activeTab === "coaching" && (
             <>
+              <ClaudeCoachingBlock analysis={(call as any).ai_analysis_json ?? null} coachingScore={(call as any).coaching_score ?? null} />
+
               {/* Score circle */}
               {score != null && (
                 <div className="flex items-center gap-4 pp-card p-4">

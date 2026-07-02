@@ -8743,10 +8743,12 @@ export type Database = {
       }
       planipret_phone_calls: {
         Row: {
+          ai_analysis_json: Json | null
           ai_client_insights: Json | null
           ai_coaching: Json | null
           ai_key_points: Json | null
           ai_summary: string | null
+          ai_summary_short: string | null
           answered_at: string | null
           callback_reason: string | null
           created_at: string
@@ -8769,6 +8771,7 @@ export type Database = {
           maestro_synced: boolean
           maestro_tasks_created: Json
           metadata: Json
+          next_actions: Json | null
           ns_call_id: string | null
           ns_domain: string | null
           organization_id: string
@@ -8792,10 +8795,12 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          ai_analysis_json?: Json | null
           ai_client_insights?: Json | null
           ai_coaching?: Json | null
           ai_key_points?: Json | null
           ai_summary?: string | null
+          ai_summary_short?: string | null
           answered_at?: string | null
           callback_reason?: string | null
           created_at?: string
@@ -8818,6 +8823,7 @@ export type Database = {
           maestro_synced?: boolean
           maestro_tasks_created?: Json
           metadata?: Json
+          next_actions?: Json | null
           ns_call_id?: string | null
           ns_domain?: string | null
           organization_id?: string
@@ -8841,10 +8847,12 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          ai_analysis_json?: Json | null
           ai_client_insights?: Json | null
           ai_coaching?: Json | null
           ai_key_points?: Json | null
           ai_summary?: string | null
+          ai_summary_short?: string | null
           answered_at?: string | null
           callback_reason?: string | null
           created_at?: string
@@ -8867,6 +8875,7 @@ export type Database = {
           maestro_synced?: boolean
           maestro_tasks_created?: Json
           metadata?: Json
+          next_actions?: Json | null
           ns_call_id?: string | null
           ns_domain?: string | null
           organization_id?: string
