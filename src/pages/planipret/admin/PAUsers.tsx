@@ -423,7 +423,7 @@ export default function PAUsers() {
           </table>
         </div>
         <Pagination
-          page={page}
+          page={effectivePage}
           pageSize={pageSize}
           total={filtered.length}
           loading={loading}
