@@ -12,6 +12,7 @@ import type { PlanipretMobileContext } from "../PlanipretMobile";
 import { TEMP_COLORS, TEMP_EMOJI, TEMP_LABEL, tempBorder, callbackDelayToDate, delayLabel, type LeadTemp } from "@/components/planipret/leadHelpers";
 import ContactTimeline from "@/components/planipret/ContactTimeline";
 import RecordingsList from "@/components/planipret/mobile/recordings/RecordingsList";
+import { CallRecordingPlayer } from "@/components/planipret/mobile/call/CallRecordingPlayer";
 import { useMplanipretLang } from "@/hooks/useMplanipretLang";
 
 
