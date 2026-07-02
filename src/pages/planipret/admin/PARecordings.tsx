@@ -303,7 +303,18 @@ export default function PARecordings() {
                   </a>
                 </div>
               ) : (
-                <div style={{ color: "var(--pp-text-faint)" }}>Audio indisponible</div>
+                <div className="space-y-2">
+                  <div style={{ color: "var(--pp-text-faint)" }}>Audio indisponible localement</div>
+                  <button
+                    onClick={() => resolveRecording(detail)}
+                    disabled={resolving === detail.id}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-white text-sm disabled:opacity-50"
+                    style={{ background: ACCENT }}
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${resolving === detail.id ? "animate-spin" : ""}`} />
+                    {resolving === detail.id ? "Récupération…" : "Récupérer l'enregistrement (NS-API)"}
+                  </button>
+                </div>
               )}
               {detail.transcript ? (
                 <div>
