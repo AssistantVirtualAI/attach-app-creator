@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Loader2, Play, Pause, SkipBack, SkipForward, Download, RotateCw } from "lucide-react";
 import { recordingsApi } from "@/lib/planipret/nsApi";
-import { useMplanipretLang } from "@/lib/i18n/mplanipret";
+import { useMplanipretLang } from "@/hooks/useMplanipretLang";
 
 interface Props {
   callId: string;
