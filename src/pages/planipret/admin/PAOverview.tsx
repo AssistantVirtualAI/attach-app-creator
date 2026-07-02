@@ -111,12 +111,19 @@ export default function PAOverview() {
   // Single source of truth for broker activation counts (matches the toggles
   // on /admin/users via the planipret_broker_stats view, with Realtime sync).
   const { stats: brokerStats } = usePlanipretBrokerStats();
+  // Financial counts are scoped to real Planiprêt accounts only (excludes test
+  // profiles). Widget = every courtier with an @planipret.ca email (widget is
+  // integrated for all of them). Mobile/AI = only profiles on ns_domain
+  // planipret.ca with the respective flag enabled.
   const [widgetCount, setWidgetCount] = useState(0);
+  const [mobilePpCount, setMobilePpCount] = useState(0);
+  const [aiPpCount, setAiPpCount] = useState(0);
   const serviceCounts = {
-    mobile: brokerStats.app_mobile_active,
+    mobile: mobilePpCount,
     widget: widgetCount,
-    ai: brokerStats.agent_ia_active,
+    ai: aiPpCount,
   };
+
 
   const load = async () => {
     setRefreshing(true);
