@@ -133,6 +133,25 @@ Deno.serve(async (req) => {
           result = { event_id: d.id, web_link: d.webLink };
           break;
         }
+        case "teams_reply": {
+          if (!profile?.ms365_access_token) throw new Error("Microsoft 365 non connecté");
+          const chatId = params.chat_id;
+          const teamId = params.team_id;
+          const channelId = params.channel_id;
+          const scope = chatId
+            ? `/chats/${chatId}/messages`
+            : (teamId && channelId) ? `/teams/${teamId}/channels/${channelId}/messages` : null;
+          if (!scope) throw new Error("teams_reply: chat_id ou team_id+channel_id requis");
+          const r = await graph(admin, profile, scope, {
+            method: "POST",
+            body: JSON.stringify({ body: { contentType: params.contentType ?? "text", content } }),
+          });
+          const d = await r.json();
+          if (!r.ok) throw new Error(`Graph teams ${r.status}: ${JSON.stringify(d).slice(0, 200)}`);
+          success = true;
+          result = { message_id: d.id, scope };
+          break;
+        }
         case "maestro_task":
         case "maestro_note":
         case "maestro_client_create":
