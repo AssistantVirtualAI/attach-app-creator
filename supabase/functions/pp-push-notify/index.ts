@@ -42,11 +42,11 @@ Deno.serve(async (req) => {
     const finalDeepLink = deep_link ?? data?.deep_link ?? null;
 
     // Always log in-app notification (even if push disabled)
-    await admin.from("planipret_ava_notifications").insert({
+    const { data: notifRow } = await admin.from("planipret_ava_notifications").insert({
       user_id, category: cat, title, body: text ?? null,
       data: { ...(data ?? {}), deep_link: finalDeepLink }, deep_link: finalDeepLink,
       delivered: false,
-    });
+    }).select("id").maybeSingle();
 
     if (!allowed) return json({ delivered: 0, blocked_by_preference: true });
 
