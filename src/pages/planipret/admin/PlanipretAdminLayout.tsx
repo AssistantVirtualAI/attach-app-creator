@@ -80,6 +80,10 @@ export default function PlanipretAdminLayout() {
   const realtimeOk = rtStatus === "live";
   const [paletteOpen, setPaletteOpen] = useState(false);
 
+  // Auto-sync NS-API in the background for every admin page. Idempotent via
+  // module-level in-flight guard, safe to mount once at the layout.
+  usePlanipretNsAutoSync();
+
   // Keyboard shortcuts
   useEffect(() => {
     let gPressed = 0;
