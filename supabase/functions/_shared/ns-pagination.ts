@@ -47,18 +47,37 @@ function pickArray(data: any): any[] {
 
 async function nsFetchRaw(path: string, init: RequestInit = {}) {
   const url = path.startsWith("http") ? path : `${NS_API_BASE_URL}${path}`;
-  const res = await fetch(url, {
-    ...init,
-    headers: {
-      Accept: "application/json",
-      Authorization: `Bearer ${NS_API_KEY}`,
-      ...(init.headers ?? {}),
-    },
-  });
-  const text = await res.text();
-  let data: any = null;
-  try { data = text ? JSON.parse(text) : null; } catch { data = null; }
-  return { ok: res.ok, status: res.status, url, data, text, headers: res.headers };
+  const headers = {
+    Accept: "application/json",
+    Authorization: `Bearer ${NS_API_KEY}`,
+    Connection: "close",
+    ...(init.headers ?? {}),
+  };
+  let lastErr: unknown = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const ac = new AbortController();
+      const timer = setTimeout(() => ac.abort(), 25000);
+      try {
+        const res = await fetch(url, { ...init, headers, signal: ac.signal });
+        const text = await res.text();
+        let data: any = null;
+        try { data = text ? JSON.parse(text) : null; } catch { data = null; }
+        // Retry on transient 5xx
+        if (!res.ok && res.status >= 500 && res.status < 600 && attempt < 2) {
+          lastErr = new Error(`upstream ${res.status}`);
+        } else {
+          return { ok: res.ok, status: res.status, url, data, text, headers: res.headers };
+        }
+      } finally {
+        clearTimeout(timer);
+      }
+    } catch (e) {
+      lastErr = e;
+    }
+    await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
+  }
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
 }
 
 export async function nsProbe(path: string): Promise<NsPageProbe & { data: any; ok: boolean }> {
