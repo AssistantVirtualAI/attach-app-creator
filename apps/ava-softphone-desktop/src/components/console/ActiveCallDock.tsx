@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useCallBus } from '../../hooks/useCallBus';
-import { useTheme } from '../../lib/theme';
+import { theme } from '../../lib/theme';
 import { useTranslation } from '../../lib/i18n';
+
+const { colors: c } = theme;
 
 export default function ActiveCallDock() {
   const { call, hangup, mute, hold } = useCallBus();
-  const { t: theme } = useTheme();
   const { t } = useTranslation();
-  const c = theme.colors;
   const [, force] = useState(0);
 
   useEffect(() => {
@@ -46,8 +46,8 @@ export default function ActiveCallDock() {
           {call.status === 'held' ? t('dialer.onHold') : t('dialer.inCall')} · {mm}:{ss}
         </div>
       </div>
-      <DockBtn c={c} label={call.muted ? t('dialer.unmute') : t('dialer.mute')} active={call.muted} accent={c.warning} onClick={() => mute(!call.muted)} hint="⌘M" />
-      <DockBtn c={c} label={call.status === 'held' ? t('dialer.resume') : t('dialer.hold')} active={call.status === 'held'} accent={c.avaCyan} onClick={() => hold(call.status !== 'held')} hint="⌘H" />
+      <DockBtn label={call.muted ? t('dialer.unmute') : t('dialer.mute')} active={call.muted} accent={c.warning} onClick={() => mute(!call.muted)} hint="⌘M" />
+      <DockBtn label={call.status === 'held' ? t('dialer.resume') : t('dialer.hold')} active={call.status === 'held'} accent={c.avaCyan} onClick={() => hold(call.status !== 'held')} hint="⌘H" />
       <button onClick={hangup} style={{
         padding: '7px 14px', borderRadius: 9,
         background: `linear-gradient(135deg, ${c.danger}, #b21a30)`,
@@ -58,7 +58,7 @@ export default function ActiveCallDock() {
   );
 }
 
-function DockBtn({ c, label, active, accent, onClick, hint }: { c: any; label: string; active: boolean; accent: string; onClick: () => void; hint: string }) {
+function DockBtn({ label, active, accent, onClick, hint }: { label: string; active: boolean; accent: string; onClick: () => void; hint: string }) {
   return (
     <button onClick={onClick} title={hint} style={{
       padding: '7px 11px', borderRadius: 9,
