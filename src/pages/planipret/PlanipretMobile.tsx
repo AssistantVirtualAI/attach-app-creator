@@ -21,6 +21,7 @@ import AvaVoiceAgent from "@/components/planipret/mobile/AvaVoiceAgent";
 import AvaChatSheet from "@/components/planipret/mobile/AvaChatSheet";
 import MobileAuthScreen from "@/components/planipret/mobile/MobileAuthScreen";
 import MobileHeaderControls from "@/components/planipret/mobile/MobileHeaderControls";
+import ActiveCallOverlay from "@/components/planipret/mobile/ActiveCallOverlay";
 import { useMplanipretTheme } from "@/hooks/useMplanipretTheme";
 import { useMplanipretLang } from "@/hooks/useMplanipretLang";
 import { ROUTES } from "@/lib/routes";
