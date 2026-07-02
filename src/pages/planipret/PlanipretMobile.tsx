@@ -21,6 +21,7 @@ import AvaVoiceAgent from "@/components/planipret/mobile/AvaVoiceAgent";
 import AvaChatSheet from "@/components/planipret/mobile/AvaChatSheet";
 import MobileAuthScreen from "@/components/planipret/mobile/MobileAuthScreen";
 import MobileHeaderControls from "@/components/planipret/mobile/MobileHeaderControls";
+import ActiveCallOverlay from "@/components/planipret/mobile/ActiveCallOverlay";
 import { useMplanipretTheme } from "@/hooks/useMplanipretTheme";
 import { useMplanipretLang } from "@/hooks/useMplanipretLang";
 import { ROUTES } from "@/lib/routes";
@@ -651,6 +652,7 @@ export default function PlanipretMobile() {
 
 
         <Dialer open={dialerOpen} onClose={() => setDialerOpen(false)} initial={dialerInit} openMessages={(n) => { setDialerOpen(false); navigate(`/mplanipret/messages${n ? `?to=${encodeURIComponent(n)}` : ""}`); }} />
+        <ActiveCallOverlay callId={activeCallId} onClosed={() => setActiveCallId(null)} />
         <InboundCallOverlay call={inbound} onClose={() => setInbound(null)} />
         {avaOpen && profile?.user_id && (
           profile.voice_agent_enabled
