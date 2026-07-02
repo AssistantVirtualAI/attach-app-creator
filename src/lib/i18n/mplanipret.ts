@@ -545,6 +545,9 @@ export const MP_DICT = {
       searching: "Searching…",
       typeToSearch: "Type to search your contacts",
       sms: "SMS",
+      internal: "Internal",
+      hangupFailed: "Hang up failed",
+      hungUp: "Call ended",
     },
     home: {
       period: { day: "Today", week: "This week", month: "This month", shift: "My shift" },
