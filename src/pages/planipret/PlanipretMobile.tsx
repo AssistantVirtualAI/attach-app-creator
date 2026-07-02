@@ -198,7 +198,7 @@ function Dialer({ open, onClose, initial, openMessages }: { open: boolean; onClo
                 style={{ width: 48, height: 48, borderRadius: "50%", background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-muted)" }} aria-label={t("dialer.plus")}>
                 <Plus className="w-5 h-5" />
               </button>
-              <button onClick={startCall} disabled={!number || calling}
+              <button onClick={() => startCall()} disabled={!number || calling}
                 className="mx-auto flex items-center justify-center text-white disabled:opacity-50 active:scale-95 transition"
                 style={{ width: 72, height: 72, borderRadius: "50%", background: "linear-gradient(135deg, #0D5C2A, #00D4AA)", boxShadow: "0 4px 20px rgba(0,212,170,0.5)" }} aria-label={t("common.call")}>
                 <PhoneIcon className="w-7 h-7" />
