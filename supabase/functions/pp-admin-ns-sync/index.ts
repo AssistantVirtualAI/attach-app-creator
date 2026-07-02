@@ -126,12 +126,29 @@ function normalizeNsPath(path: string | null): string | null {
 
 function recordingApiPath(domain: string, c: any): string | null {
   const d = encodeURIComponent(domain || String(val(c, ["domain"], NS_DEFAULT_DOMAIN)));
-  const uid = String(val(c, ["uid"], ""));
-  const uidUser = uid.includes("@") ? uid.split("@")[0] : "";
-  const ext = String(val(c, ["user", "extension", "orig-user", "term-user", "subscriber", "call-orig-user", "call-term-user", "call-through-user"], uidUser)).trim();
-  // This is the NS-API endpoint that lists CDRs that have audio/intelligence.
-  // It returns JSON CDR rows; the actual audio is proxied later by maestro-recording/NS when available.
-  return ext ? `/domains/${d}/users/${encodeURIComponent(ext)}/cdrs/recordings` : `/domains/${d}/cdrs/recordings`;
+  const callId = recordingLookupCallId(c);
+  return callId ? `/domains/${d}/recordings/${encodeURIComponent(callId)}` : null;
+}
+
+function recordingLookupCallId(c: any): string | null {
+  const id = String(val(c, [
+    "call-orig-call-id", "call-parent-call-id", "orig-callid", "orig-call-id", "orig_callid",
+    "call-id", "call_id", "callid", "call-term-call-id", "id",
+  ], "")).trim();
+  return id || null;
+}
+
+function recordingAccessUrl(raw: any): string | null {
+  const first = Array.isArray(raw) ? raw[0] : raw;
+  return val(first, ["file-access-url", "file_access_url", "recording_url", "recording-url", "url"], null);
+}
+
+async function fetchRecordingAccessUrl(domain: string, c: any): Promise<string | null> {
+  const path = recordingApiPath(domain, c);
+  if (!path) return null;
+  const r = await nsFetch(path);
+  if (!r.ok) return null;
+  return recordingAccessUrl(r.data);
 }
 
 function toIso(v: unknown): string | null {
@@ -437,6 +454,20 @@ async function syncMessages(admin: ReturnType<typeof createClient>, domain: stri
     `/domains/${D}/messages?start-time=${encodeURIComponent(start)}&end-time=${encodeURIComponent(end)}`,
     `/domains/${D}/sms?start-time=${encodeURIComponent(start)}&end-time=${encodeURIComponent(end)}`,
   ]);
+  if (!r.data.length) {
+    const sessions = await fetchAll(`/domains/${D}/messagesessions`, 200, 30);
+    const collected: any[] = [];
+    for (const s of sessions.data) {
+      const ext = String(val(s, ["user", "extension"], "")).trim();
+      const sid = String(val(s, ["messagesession-id", "session_id", "session-id", "id"], "")).trim();
+      const last = toIso(val(s, ["messagesession-last-datetime", "messagesession-last-timestamp", "updated_at"], null));
+      if (!ext || !sid) continue;
+      if (last && (last < start || last > end)) continue;
+      const msgs = await fetchAll(`/domains/${D}/users/${encodeURIComponent(ext)}/messagesessions/${encodeURIComponent(sid)}/messages`, 100, 5);
+      for (const m of msgs.data) collected.push({ ...m, user: ext, ns_session: s });
+    }
+    r = { data: collected, warning: collected.length ? null : (sessions.warning ?? "domain_messagesessions_empty") };
+  }
   if (!r.data.length && users.length) {
     const collected: any[] = [];
     const sampleUsers = users; // scan every Planiprêt user so SMS appears on admin pages
@@ -468,20 +499,23 @@ async function syncMessages(admin: ReturnType<typeof createClient>, domain: stri
   const rows = r.data.map((m: any) => {
     const ext = String(val(m, ["user", "extension", "subscriber", "from-user", "to-user", "source-user", "destination-user", "owner"], "")).trim();
     const mid = String(val(m, ["id", "message_id", "message-id", "uuid", "sms-id", "sms_id"], crypto.randomUUID())).trim();
-    const dir = String(val(m, ["direction", "type", "message-direction"], "inbound")).toLowerCase().includes("out") ? "outbound" : "inbound";
+    const fromUser = String(val(m, ["from-user-id", "from_user_id", "from-user"], ""));
+    const dirRaw = String(val(m, ["direction", "type", "message-direction"], "inbound")).toLowerCase();
+    const dir = dirRaw.includes("out") || (ext && fromUser.startsWith(`${ext}@`)) ? "outbound" : "inbound";
     const peer = dir === "outbound" ? normalizePhone(val(m, ["to", "to_number", "to-number", "destination", "destination-number"])) : normalizePhone(val(m, ["from", "from_number", "from-number", "source", "source-number"]));
+    const sessionId = String(val(m, ["messagesession-id", "thread_id", "thread-id"], `${ext}:${peer ?? mid}`));
     return {
       user_id: extToProfile.get(ext) ?? null,
       organization_id: AVA_ORG_ID,
       ns_message_id: mid,
-      thread_id: String(val(m, ["thread_id", "thread-id"], `${ext}:${peer ?? mid}`)),
+      thread_id: sessionId,
       direction: dir,
-      from_number: normalizePhone(val(m, ["from", "from_number", "from-number", "source", "source-number"])),
-      to_number: normalizePhone(val(m, ["to", "to_number", "to-number", "destination", "destination-number"])),
+      from_number: normalizePhone(val(m, ["from", "from_number", "from-number", "source", "source-number", "from-user-id"])),
+      to_number: normalizePhone(val(m, ["to", "to_number", "to-number", "destination", "destination-number", "terminating-number", "terminating-user-id", "dialed"])),
       body: val(m, ["body", "message", "text", "content", "message-text"], ""),
       media_urls: val(m, ["media_urls", "media-urls", "attachments", "media"], []),
       status: val(m, ["status", "delivery_status", "delivery-status"], null),
-      sent_at: toIso(val(m, ["sent_at", "sent-at", "time", "created_at", "message-datetime", "date"])),
+      sent_at: toIso(val(m, ["sent_at", "sent-at", "time", "created_at", "message-datetime", "timestamp", "date"])),
       metadata: { ...m, extension: ext },
     };
   });
@@ -561,6 +595,17 @@ async function syncRecordings(admin: ReturnType<typeof createClient>, domain: st
       recording_url: url,
       metadata: { ns_recording: rec, recording_api_path: url },
     });
+  }
+
+  for (let i = 0; i < rows.length; i += 8) {
+    await Promise.all(rows.slice(i, i + 8).map(async (row) => {
+      if (row.recording_url?.startsWith("http")) return;
+      const accessUrl = await fetchRecordingAccessUrl(domain, row.metadata?.ns_recording ?? row.metadata ?? row);
+      if (accessUrl) {
+        row.recording_url = accessUrl;
+        row.metadata = { ...(row.metadata ?? {}), recording_access_url_resolved: true };
+      }
+    }));
   }
 
   let upserted = 0;
