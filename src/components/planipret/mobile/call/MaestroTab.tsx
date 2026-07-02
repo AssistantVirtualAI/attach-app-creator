@@ -38,10 +38,10 @@ export default function MaestroTab({ call, onUpdated }: { call: MaestroCall; onU
     (async () => {
       const { data } = await supabase
         .from("planipret_integration_config")
-        .select("provider,is_active")
-        .eq("provider", "maestro")
+        .select("integration_key,is_enabled")
+        .eq("integration_key", "maestro")
         .maybeSingle();
-      setConfigured(!!(data as any)?.is_active);
+      setConfigured(!!(data as any)?.is_enabled);
     })();
   }, []);
 
@@ -50,10 +50,13 @@ export default function MaestroTab({ call, onUpdated }: { call: MaestroCall; onU
       const { data } = await supabase
         .from("planipret_maestro_sync_log")
         .select("*")
-        .eq("call_id", call.id)
         .order("created_at", { ascending: false })
         .limit(10);
-      setSyncLog((data as any[]) ?? []);
+      const rows = ((data as any[]) ?? []).filter((r) => {
+        const body = typeof r.request_body === "string" ? r.request_body : JSON.stringify(r.request_body ?? {});
+        return body.includes(call.id);
+      });
+      setSyncLog(rows);
     })();
   }, [call.id]);
 
