@@ -220,15 +220,22 @@ export default function PAOverview() {
 
   useEffect(() => {
     load();
+    // Debounced reload to avoid thrash when many rows change at once.
+    let deb: number | undefined;
+    const reload = () => { if (deb) window.clearTimeout(deb); deb = window.setTimeout(load, 800); };
     const ch = supabase.channel("admin-overview")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "planipret_phone_calls" }, () => load())
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "planipret_phone_messages" }, () => load())
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "planipret_profiles" }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "planipret_phone_calls" }, reload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "planipret_phone_messages" }, reload)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "planipret_profiles" }, reload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "planipret_voicemails" }, reload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "planipret_reminders" }, reload)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "ai_request_audit_log" }, reload)
       .subscribe();
     const t = window.setInterval(load, 30000);
-    return () => { supabase.removeChannel(ch); window.clearInterval(t); };
+    return () => { supabase.removeChannel(ch); window.clearInterval(t); if (deb) window.clearTimeout(deb); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [period]);
+
 
   const callsTrend = stats.callsYest > 0 ? Math.round(((stats.calls - stats.callsYest) / stats.callsYest) * 100) : undefined;
   const smsTrend = stats.smsYest > 0 ? Math.round(((stats.sms - stats.smsYest) / stats.smsYest) * 100) : undefined;
