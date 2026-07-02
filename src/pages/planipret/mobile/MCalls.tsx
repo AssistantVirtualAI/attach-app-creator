@@ -733,8 +733,13 @@ function CallDetailSheet({
     setTxLoading(true);
     const { data, error } = await supabase.functions.invoke("ns-transcription", { body: { call_id: call.ns_call_id ?? call.id } });
     setTxLoading(false);
-    if (error || !(data as any)?.transcript) { toast.error(t("calls.transcriptUnavailable")); return; }
-    await supabase.from("planipret_phone_calls").update({ transcript: (data as any).transcript }).eq("id", call.id);
+    const res = (data ?? {}) as any;
+    if (error || res.success === false || (!res.transcript && !(Array.isArray(res.segments) && res.segments.length))) {
+      toast.error(res.hint ?? res.error ?? t("calls.transcriptUnavailable"));
+      return;
+    }
+    // Optimistic UI update — the edge function already persists to DB.
+    onUpdated({ ...call, transcript: res.transcript ?? call.transcript, transcript_segments: res.segments ?? call.transcript_segments });
     await refreshCall();
     toast.success(t("calls.transcriptFetched"));
   };
