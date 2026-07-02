@@ -34,6 +34,7 @@ import MPipeline from "./pages/planipret/mobile/MPipeline";
 import MSearch from "./pages/planipret/mobile/MSearch";
 import MStats from "./pages/planipret/mobile/MStats";
 import MAvaChat from "./pages/planipret/mobile/MAvaChat";
+import MAvaNotifications from "./pages/planipret/mobile/MAvaNotifications";
 import PlanipretAudit from "./pages/planipret/PlanipretAudit";
 import Ms365Callback from "./pages/planipret/Ms365Callback";
 import SoftphoneSetup from "./pages/lemtel/SoftphoneSetup";
@@ -413,6 +414,7 @@ const App = () => (
                   <Route path="search" element={<MSearch />} />
                   <Route path="stats" element={<MStats />} />
                   <Route path="ava" element={<MAvaChat />} />
+                  <Route path="notifications" element={<MAvaNotifications />} />
                 </Route>
                 <Route path="/planipret/dashboard" element={<Navigate to="/planipret/admin/overview" replace />} />
                 <Route path="/planipret/integrations" element={<Navigate to="/planipret/admin/integrations" replace />} />
