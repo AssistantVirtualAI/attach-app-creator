@@ -404,3 +404,15 @@ function StatTile({ icon, label, value, sub, color }: { icon: any; label: string
   );
 }
 
+function MiniTile({ label, value, sub, color }: { label: string; value: number | string; sub?: string; color: string }) {
+  return (
+    <div className="pp-card p-4" style={{ position: "relative", overflow: "hidden" }}>
+      <div aria-hidden style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${color}, transparent)` }} />
+      <p style={{ fontSize: 10, color: "var(--pp-text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</p>
+      <p className="tabular-nums" style={{ fontSize: 22, fontWeight: 700, marginTop: 4, color: "var(--pp-text-primary)" }}>{value}</p>
+      {sub && <p style={{ fontSize: 10, color: "var(--pp-text-faint)", marginTop: 2 }}>{sub}</p>}
+    </div>
+  );
+}
+
+
