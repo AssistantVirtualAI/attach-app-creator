@@ -151,19 +151,19 @@ function CallControlGridImpl({ organizationId, onDial, onTransfer }: Props) {
 }
 
 const Panel = ({ title, children }: { title: string; children: React.ReactNode }) => (
-  <div style={{ background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(148,163,184,0.2)', borderRadius: 8, padding: 12, overflow: 'auto' }}>
-    <div style={{ fontSize: 12, textTransform: 'uppercase', opacity: 0.7, marginBottom: 8 }}>{title}</div>
+  <div style={{ background: c.deepPanel, border: `1px solid ${c.border}`, borderRadius: 8, padding: 12, overflow: 'auto', color: c.textIce }}>
+    <div style={{ fontSize: 12, textTransform: 'uppercase', opacity: 0.7, marginBottom: 8, color: c.mutedSilver }}>{title}</div>
     {children}
   </div>
 );
 const Row = ({ children }: { children: React.ReactNode }) => (
-  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid rgba(148,163,184,0.1)' }}>{children}</div>
+  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: `1px solid ${c.border}` }}>{children}</div>
 );
 const Empty = ({ children }: { children: React.ReactNode }) => (
-  <div style={{ fontSize: 12, opacity: 0.5, padding: '8px 0' }}>{children}</div>
+  <div style={{ fontSize: 12, opacity: 0.5, padding: '8px 0', color: c.mutedSilver }}>{children}</div>
 );
 const btnStyle: React.CSSProperties = {
-  background: 'rgba(0,35,230,0.2)', color: '#e2e8f0', border: '1px solid rgba(0,35,230,0.4)',
+  background: c.primarySoft, color: c.textIce, border: `1px solid ${c.border}`,
   borderRadius: 4, padding: '2px 8px', fontSize: 11, cursor: 'pointer',
 };
 
