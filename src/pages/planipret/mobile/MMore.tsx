@@ -20,7 +20,7 @@ const initials = (name?: string) =>
 
 export default function MMore() {
   const { profile, reloadProfile } = useOutletContext<PlanipretMobileContext>();
-  const { t } = useMplanipretLang();
+  const { t, lang, setLang } = useMplanipretLang();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const [editOpen, setEditOpen] = useState(false);
