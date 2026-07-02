@@ -1039,16 +1039,34 @@ function EmailDetailSheet({ email, onClose, onReply }: { email: any; onClose: ()
           </div>
 
           <button
+            onClick={analyzeWithAva}
+            disabled={analyzing}
+            className="w-full px-3 py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-60"
+            style={{
+              background: "linear-gradient(135deg, #2D1A5A, #9B7FE8)",
+              border: "1px solid rgba(155,127,232,0.35)",
+              color: "white",
+            }}
+          >
+            {analyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+            {analyzing ? "AVA analyse…" : "🤖 Analyser avec AVA"}
+          </button>
+
+          <button
             onClick={() => setSumOpen(true)}
-            className="w-full px-3 py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
+            className="w-full px-3 py-2 rounded-xl text-xs font-medium flex items-center justify-center gap-2"
             style={{
               background: "rgba(155,127,232,0.12)",
               border: "1px solid rgba(155,127,232,0.30)",
               color: "var(--pp-agent)",
             }}
           >
-            <Sparkles className="w-4 h-4" /> {t("messages.summarizeWithAva")}
+            <Sparkles className="w-3.5 h-3.5" /> {t("messages.summarizeWithAva")}
           </button>
+
+          {analysis && (
+            <AvaProposedActionsCard analysis={analysis} onDismiss={() => setAnalysis(null)} />
+          )}
 
           <div
             className="rounded-xl p-3 text-sm whitespace-pre-wrap"
@@ -1059,6 +1077,7 @@ function EmailDetailSheet({ email, onClose, onReply }: { email: any; onClose: ()
         </div>
 
         <div className="px-4 py-3 flex gap-2" style={{ borderTop: "1px solid var(--pp-bg-border)" }}>
+
           <button
             onClick={() => onReply({
               to: fromAddr,
