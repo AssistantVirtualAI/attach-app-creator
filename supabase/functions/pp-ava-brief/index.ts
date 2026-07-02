@@ -49,18 +49,28 @@ Deno.serve(async (req) => {
     const period: Period = (["day","week","month","shift"].includes(body?.period) ? body.period : "day") as Period;
     const force = !!body?.force;
 
-    const sb = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-      { global: { headers: { Authorization: authHeader } } },
-    );
-    const { data: u } = await sb.auth.getUser();
-    if (!u?.user) return json({ error: "unauthorized" }, 401);
-
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+
+    // Mode service (cron scheduler) : accepte broker_user_id via header/body si appelé avec service_role.
+    const serviceHeader = req.headers.get("x-ava-service");
+    let effectiveUserId: string | null = null;
+    if (serviceHeader) {
+      effectiveUserId = req.headers.get("x-broker-user-id") ?? body?.broker_user_id ?? null;
+    } else {
+      const sb = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+        { global: { headers: { Authorization: authHeader } } },
+      );
+      const { data: u } = await sb.auth.getUser();
+      if (!u?.user) return json({ error: "unauthorized" }, 401);
+      effectiveUserId = u.user.id;
+    }
+    if (!effectiveUserId) return json({ error: "no_user" }, 400);
+
     const { data: profile } = await admin.from("planipret_profiles")
       .select("id, user_id, full_name, extension, organization_id")
-      .eq("user_id", u.user.id).maybeSingle();
+      .eq("user_id", effectiveUserId).maybeSingle();
     if (!profile) return json({ error: "no_profile" }, 404);
 
     // Caching is handled by React Query on the client; force flag is accepted for future use.
@@ -84,7 +94,7 @@ Deno.serve(async (req) => {
         .eq("user_id", profile.user_id).gte("lead_score", 7).gte("started_at", sinceIso)
         .order("lead_score", { ascending: false }).limit(8),
       admin.from("appointments").select("title, start_time, attendee_name")
-        .eq("host_user_id", u.user.id).gte("start_time", sinceIso).lte("start_time", until.toISOString())
+        .eq("host_user_id", effectiveUserId).gte("start_time", sinceIso).lte("start_time", until.toISOString())
         .order("start_time", { ascending: true }).limit(10),
       admin.from("planipret_reminders").select("note, contact_name, contact_number, scheduled_at")
         .eq("user_id", profile.user_id).eq("status", "pending")
