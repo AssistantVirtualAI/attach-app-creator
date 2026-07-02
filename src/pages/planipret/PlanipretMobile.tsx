@@ -276,7 +276,7 @@ function Dialer({ open, onClose, initial, openMessages }: { open: boolean; onClo
                               <div className="text-sm font-medium truncate" style={{ color: "var(--pp-text-primary)" }}>{label}</div>
                               <div className="text-xs truncate" style={{ color: "var(--pp-text-muted)" }}>
                                 {c.extension ? `#${c.extension}` : dest || c.email || ""}
-                                {c.source === "directory" && " · Interne"}
+                                {c.source === "directory" && ` · ${t("dialer.internal")}`}
                               </div>
                             </div>
                             <button
@@ -374,7 +374,7 @@ export default function PlanipretMobile() {
   const hangupActive = async () => {
     if (!activeCallId) return;
     const { error } = await supabase.functions.invoke("ns-calls", { body: { action: "hangup", call_id: activeCallId } });
-    if (error) toast.error("Échec raccrocher"); else toast.success("Appel raccroché");
+    if (error) toast.error(t("dialer.hangupFailed")); else toast.success(t("dialer.hungUp"));
   };
 
   useEffect(() => {
@@ -459,10 +459,10 @@ export default function PlanipretMobile() {
     const { error } = await supabase.auth.signInWithPassword({ email: loginEmail.trim(), password: loginPassword });
     setLoginLoading(false);
     if (error) {
-      toast.error(error.message || "Connexion impossible");
+      toast.error(error.message || t("home.connectionImpossible"));
       return;
     }
-    toast.success("Connexion réussie");
+    toast.success(t("auth.success"));
     setLoading(true);
     await loadProfile();
   };
