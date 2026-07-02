@@ -86,7 +86,7 @@ export default function MMore() {
     const tenant = cfg.tenant_id ?? "common";
     if (!clientId) { toast.error(t("more.msNotConfigured")); return; }
     const redirect = `${window.location.origin}/auth/ms365/callback`;
-    const scope = encodeURIComponent("openid profile email Mail.ReadWrite Calendars.ReadWrite offline_access");
+    const scope = encodeURIComponent("openid profile email offline_access User.Read Mail.ReadWrite Mail.Send Calendars.ReadWrite Chat.ReadWrite ChannelMessage.Send Team.ReadBasic.All Channel.ReadBasic.All");
     const { data: { user } } = await supabase.auth.getUser();
     const state = user?.id ?? "";
     window.location.href = `https://login.microsoftonline.com/${tenant}/oauth2/v2.0/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirect)}&response_mode=query&scope=${scope}&state=${state}`;
