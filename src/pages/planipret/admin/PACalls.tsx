@@ -179,7 +179,7 @@ export default function PACalls() {
                   title="Aucun appel trouvé"
                   hint={hasFilters
                     ? "Essayez d'élargir vos critères de recherche."
-                    : "Aucun appel enregistré. Vérifiez que le webhook NS-API est configuré dans Intégrations, puis lancez « Synchroniser NS-API »."}
+                    : "Aucun appel enregistré. Synchronisation NS-API automatique. Vérifiez que le webhook NS-API est configuré dans Intégrations."}
                   action={hasFilters ? (
                     <button onClick={resetFilters} className="px-3 py-1.5 rounded-lg text-xs font-medium text-white" style={{ background: ACCENT }}>
                       Réinitialiser les filtres

@@ -187,7 +187,7 @@ export default function PAMessages() {
                   title="Aucun message trouvé"
                   hint={hasFilters
                     ? "Essayez d'élargir vos critères de recherche."
-                    : "Aucun message synchronisé. Vérifiez que le webhook NS-API est configuré dans Intégrations, puis lancez « Synchroniser NS-API »."}
+                    : "Aucun message synchronisé. Synchronisation NS-API automatique. Vérifiez que le webhook NS-API est configuré dans Intégrations."}
                   action={hasFilters ? (
                     <button onClick={resetFilters} className="px-3 py-1.5 rounded-lg text-xs font-medium text-white" style={{ background: ACCENT }}>Réinitialiser les filtres</button>
                   ) : (

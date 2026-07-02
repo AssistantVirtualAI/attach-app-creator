@@ -221,7 +221,7 @@ export default function PARecordings() {
                   title="Aucun enregistrement trouvé"
                   hint={hasFilters
                     ? "Essayez d'élargir vos critères de recherche."
-                    : "Aucun enregistrement n'est encore synchronisé. Lancez « Synchroniser NS-API » ou vérifiez que les enregistrements sont activés dans la config NetSapiens."}
+                    : "Aucun enregistrement n'est encore synchronisé. La synchronisation NS-API est automatique · vérifiez que les enregistrements sont activés dans la config NetSapiens."}
                   action={hasFilters ? (
                     <button onClick={resetFilters} className="px-3 py-1.5 rounded-lg text-xs font-medium text-white" style={{ background: ACCENT }}>Réinitialiser les filtres</button>
                   ) : (
