@@ -74,6 +74,12 @@ export default function MAvaNotifications() {
         .on("postgres_changes", { event: "INSERT", schema: "public", table: "planipret_ava_notifications", filter: `user_id=eq.${userId}` }, (payload: any) => {
           setItems((prev) => [payload.new as Notif, ...prev].slice(0, 200));
         })
+        .on("postgres_changes", { event: "UPDATE", schema: "public", table: "planipret_ava_notifications", filter: `user_id=eq.${userId}` }, (payload: any) => {
+          setItems((prev) => prev.map((n) => n.id === (payload.new as Notif).id ? (payload.new as Notif) : n));
+        })
+        .on("postgres_changes", { event: "DELETE", schema: "public", table: "planipret_ava_notifications", filter: `user_id=eq.${userId}` }, (payload: any) => {
+          setItems((prev) => prev.filter((n) => n.id !== (payload.old as any).id));
+        })
         .subscribe();
     })();
     return () => { if (channel) supabase.removeChannel(channel); };
