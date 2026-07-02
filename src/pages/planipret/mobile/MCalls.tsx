@@ -13,6 +13,7 @@ import { TEMP_COLORS, TEMP_EMOJI, TEMP_LABEL, tempBorder, callbackDelayToDate, d
 import ContactTimeline from "@/components/planipret/ContactTimeline";
 import RecordingsList from "@/components/planipret/mobile/recordings/RecordingsList";
 import { CallRecordingPlayer } from "@/components/planipret/mobile/call/CallRecordingPlayer";
+import MaestroTab from "@/components/planipret/mobile/call/MaestroTab";
 import { useMplanipretLang } from "@/hooks/useMplanipretLang";
 
 
