@@ -91,6 +91,14 @@ export default function MAvaNotifications() {
     await sb.from("planipret_ava_notifications").update({ read_at: new Date().toISOString() }).eq("id", id).is("read_at", null);
   };
 
+  const toggleRead = async (n: Notif) => {
+    const nextRead = n.read_at ? null : new Date().toISOString();
+    setItems((prev) => prev.map((x) => x.id === n.id ? { ...x, read_at: nextRead } : x));
+    const sb: any = supabase;
+    const { error } = await sb.from("planipret_ava_notifications").update({ read_at: nextRead }).eq("id", n.id);
+    if (error) { toast.error(error.message); setItems((prev) => prev.map((x) => x.id === n.id ? { ...x, read_at: n.read_at } : x)); }
+  };
+
   const markAllRead = async () => {
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) return;
