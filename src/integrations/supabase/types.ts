@@ -7897,6 +7897,30 @@ export type Database = {
           },
         ]
       }
+      planipret_ava_chat_sessions: {
+        Row: {
+          created_at: string
+          id: string
+          last_message_at: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_message_at?: string
+          title?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_message_at?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       planipret_ava_conversations: {
         Row: {
           audio_url: string | null
@@ -8041,6 +8065,45 @@ export type Database = {
           notification_url?: string
           resource?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      planipret_ava_notifications: {
+        Row: {
+          body: string | null
+          category: string
+          created_at: string
+          data: Json
+          deep_link: string | null
+          delivered: boolean
+          id: string
+          read_at: string | null
+          title: string
+          user_id: string
+        }
+        Insert: {
+          body?: string | null
+          category?: string
+          created_at?: string
+          data?: Json
+          deep_link?: string | null
+          delivered?: boolean
+          id?: string
+          read_at?: string | null
+          title: string
+          user_id: string
+        }
+        Update: {
+          body?: string | null
+          category?: string
+          created_at?: string
+          data?: Json
+          deep_link?: string | null
+          delivered?: boolean
+          id?: string
+          read_at?: string | null
+          title?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -12485,6 +12548,18 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      planipret_ava_stats: {
+        Row: {
+          actions_err_30d: number | null
+          actions_modified_30d: number | null
+          actions_ok_30d: number | null
+          analyses_30d: number | null
+          leads_30d: number | null
+          urgent_30d: number | null
+          user_id: string | null
+        }
+        Relationships: []
       }
       planipret_broker_stats: {
         Row: {
