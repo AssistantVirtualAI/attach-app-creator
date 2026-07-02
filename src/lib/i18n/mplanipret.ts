@@ -716,6 +716,7 @@ export const MP_DICT = {
       customizeAva: "Customize AVA",
       notifications: "Notifications",
       darkMode: "Dark mode",
+      language: "Language",
       helpCenter: "Help center",
       contactSupport: "Contact support",
       privacy: "Privacy policy",
