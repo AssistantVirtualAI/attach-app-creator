@@ -16,7 +16,7 @@ import { callAva, type AvaSuggestion } from "@/services/avaProactive";
 import { useAvaDraft } from "@/hooks/useAvaDraft";
 import { useMplanipretLang } from "@/hooks/useMplanipretLang";
 
-type SubTab = "sms" | "team" | "ava" | "emails" | "roster";
+type SubTab = "sms" | "team" | "teams365" | "ava" | "emails" | "roster";
 
 
 type Msg = {
@@ -69,6 +69,7 @@ export default function MMessages() {
           {[
             { k: "sms" as SubTab, label: t("messages.tabs.sms"), Icon: MessageSquare },
             { k: "team" as SubTab, label: t("messages.tabs.team"), Icon: Users },
+            { k: "teams365" as SubTab, label: "Teams", Icon: Users },
             { k: "roster" as SubTab, label: t("messages.tabs.roster"), Icon: Users },
             { k: "ava" as SubTab, label: t("messages.tabs.ava"), Icon: Bot },
             { k: "emails" as SubTab, label: t("messages.tabs.emails"), Icon: Mail },
@@ -99,11 +100,11 @@ export default function MMessages() {
       <div className="flex-1 overflow-hidden">
         {sub === "sms" && <SmsList profile={profile} openDialer={openDialer} registerRefresh={registerRefresh} />}
         {sub === "team" && <TeamChat profile={profile} />}
+        {sub === "teams365" && <Teams365Panel />}
         {sub === "roster" && <TeamRoster profile={profile} openDialer={openDialer} onSwitchTab={setSub} />}
         {sub === "ava" && <AvaChat profile={profile} openAva={openAva} openDialer={openDialer} />}
         {sub === "emails" && <EmailsList profile={profile} openAva={openAva} />}
       </div>
-
     </div>
   );
 }
