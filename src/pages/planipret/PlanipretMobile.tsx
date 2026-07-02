@@ -93,10 +93,11 @@ function Dialer({ open, onClose, initial, openMessages }: { open: boolean; onClo
     holdTimer.current = setTimeout(() => { setNumber(""); holdTimer.current = null; }, 1000);
   };
   const endHold = () => { if (holdTimer.current) { clearTimeout(holdTimer.current); holdTimer.current = null; back(); } };
-  const startCall = async () => {
-    if (!number) return;
+  const startCall = async (destOverride?: string) => {
+    const destination = destOverride ?? number;
+    if (!destination) return;
     setCalling(true);
-    const { data, error } = await supabase.functions.invoke("ns-calls", { body: { action: "start", destination: number } });
+    const { data, error } = await supabase.functions.invoke("ns-calls", { body: { action: "start", destination } });
     setCalling(false);
     if (error || (data as any)?.success === false) {
       toast.error((data as any)?.error ?? error?.message ?? t("dialer.callFailed"));
@@ -106,6 +107,49 @@ function Dialer({ open, onClose, initial, openMessages }: { open: boolean; onClo
     setNumber("");
     onClose();
   };
+
+  // Load contacts (personal + shared + directory) once when opening Search mode
+  useEffect(() => {
+    if (!open || mode !== "search" || contacts.length > 0 || loadingContacts) return;
+    let cancelled = false;
+    (async () => {
+      setLoadingContacts(true);
+      try {
+        const results: DialerContact[] = [];
+        const [personal, shared, directory] = await Promise.all([
+          supabase.functions.invoke("pp-ns-contacts", { body: { action: "list" } }),
+          supabase.functions.invoke("pp-ns-contacts", { body: { action: "shared" } }),
+          supabase.functions.invoke("pp-ns-contacts", { body: { action: "directory" } }),
+        ]);
+        for (const c of ((personal.data as any)?.contacts ?? [])) results.push({ ...c, source: "personal" });
+        for (const c of ((shared.data as any)?.contacts ?? [])) results.push({ ...c, source: "shared" });
+        for (const c of ((directory.data as any)?.directory ?? [])) results.push({ ...c, source: "directory" });
+        if (!cancelled) setContacts(results);
+      } catch (e) {
+        console.error("[Dialer] load contacts failed", e);
+      } finally {
+        if (!cancelled) setLoadingContacts(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [open, mode, contacts.length, loadingContacts]);
+
+  const normalized = query.trim().toLowerCase();
+  const filtered = normalized
+    ? contacts.filter((c) => {
+        const hay = [
+          contactDisplayName(c),
+          c.email,
+          c.company,
+          c.extension,
+          c.phone,
+          c.cell_phone,
+          c.work_phone,
+          c.home_phone,
+        ].filter(Boolean).join(" ").toLowerCase();
+        return hay.includes(normalized);
+      }).slice(0, 30)
+    : [];
 
   return (
     <AnimatePresence>
