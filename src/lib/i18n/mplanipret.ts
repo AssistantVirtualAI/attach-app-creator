@@ -534,6 +534,13 @@ export const MP_DICT = {
       dialNumber: "Dial a number",
       talkToAva: "Talk to AVA",
       chatWithAva: "Chat with AVA",
+      modeKeypad: "Keypad",
+      modeSearch: "Search",
+      searchPh: "Name, email, extension or number…",
+      noResults: "No contact found",
+      searching: "Searching…",
+      typeToSearch: "Type to search your contacts",
+      sms: "SMS",
     },
     home: {
       period: { day: "Today", week: "This week", month: "This month", shift: "My shift" },
