@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import { usePlanipretBrokerStats } from "@/lib/planipret/brokerStats";
+import { usePlanipretNsAutoSync } from "@/hooks/usePlanipretNsAutoSync";
 
 type Range = "week" | "month" | "quarter";
 
@@ -37,10 +38,13 @@ export default function PAReports() {
   const [brokers, setBrokers] = useState<Record<string, string>>({});
   const [exporting, setExporting] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [refreshTick, setRefreshTick] = useState(0);
   const reportRef = useRef<HTMLDivElement>(null);
   const { stats: brokerStats } = usePlanipretBrokerStats();
 
   const periodLabel = range === "week" ? "7 derniers jours" : range === "month" ? "30 derniers jours" : "3 derniers mois";
+
+  usePlanipretNsAutoSync({ onQueued: () => setRefreshTick((t) => t + 1) });
 
   useEffect(() => {
     const start = new Date();
@@ -67,7 +71,7 @@ export default function PAReports() {
       });
       setBrokers(map);
     })();
-  }, [range]);
+  }, [range, refreshTick]);
 
   const syncAll = async () => {
     setSyncing(true);

@@ -7,6 +7,7 @@ import Pagination from "@/components/planipret/admin/Pagination";
 import DebugPanel, { type DebugEntry } from "@/components/planipret/admin/DebugPanel";
 import { TableErrorState, TableEmptyState } from "@/components/planipret/admin/TableStates";
 import { getPlanipretBrokerDirectory } from "@/lib/planipret/adminDirectory";
+import { usePlanipretNsAutoSync } from "@/hooks/usePlanipretNsAutoSync";
 
 const ACCENT = "#2E9BDC";
 const AGENT = "#9B7FE8";
@@ -92,6 +93,8 @@ export default function PARecordings() {
     setDebug(dbg);
     setLoading(false);
   };
+
+  usePlanipretNsAutoSync({ onQueued: () => load(page, pageSize) });
 
   useEffect(() => { load(page, pageSize); /* eslint-disable-next-line */ }, [page, pageSize, search, broker, from, to, withTranscript]);
 
