@@ -214,14 +214,9 @@ export default function PermissionGate({ onComplete }: PermissionGateProps) {
       )}
 
       <button onClick={requestCurrent} disabled={requesting} style={{ ...primaryBtnStyle, opacity: requesting ? 0.6 : 1 }}>
-        {requesting ? 'Requesting…' : `Allow ${current.title}`}
+        {requesting ? 'Requesting…' : 'Continue'}
       </button>
 
-      {!current.required && (
-        <button onClick={() => advance(step)} disabled={requesting} style={ghostBtnStyle}>
-          Not now
-        </button>
-      )}
 
       {/* Step dots */}
       <div style={{ display: 'flex', gap: 8, marginTop: 24 }}>
