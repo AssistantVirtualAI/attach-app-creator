@@ -223,8 +223,23 @@ function DesktopApp() {
     window.electronAPI?.onSetStatus?.((s: any) => {
       window.dispatchEvent(new CustomEvent('lemtel:set-status', { detail: s }));
     });
-    const onResize = () => setWide(window.innerWidth >= 980);
+    const isCallBusy = () => {
+      const s = sipProvider.getSnapshot?.().callState;
+      return s === 'ringing-in' || s === 'ringing-out' || s === 'active' || s === 'held';
+    };
+    const onResize = () => {
+      // Freeze layout during an active/ringing call so the pane holding the
+      // <audio> element and the dialer view is never unmounted mid-call.
+      if (isCallBusy()) return;
+      setWide(window.innerWidth >= 980);
+    };
     window.addEventListener('resize', onResize);
+    // When the call ends, re-sync layout to the current window size.
+    const unsubscribeSip = sipProvider.subscribe?.((snap) => {
+      if (snap.callState === 'idle' || snap.callState === 'ended') {
+        setWide(window.innerWidth >= 980);
+      }
+    });
 
     import('./lib/mediaPermissions').then(({ requestMediaPermissions }) => {
       requestMediaPermissions().catch(() => { /* noop */ });
