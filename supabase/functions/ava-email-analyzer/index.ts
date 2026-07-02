@@ -91,7 +91,7 @@ Règles:
 - Ton chaleureux et professionnel.
 - Aucun texte hors du JSON.`;
 
-async function analyzeWithClaude(email: any): Promise<any> {
+async function analyzeWithClaude(email: any, learnedPreferences?: string | null): Promise<any> {
   const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured");
   const subject = email.subject ?? "(sans objet)";
@@ -109,6 +109,10 @@ Reçu: ${email.receivedDateTime ?? ""}
 Corps:
 ${bodyText}`;
 
+  const systemFinal = learnedPreferences
+    ? `${SYSTEM_PROMPT}\n\nPRÉFÉRENCES APPRISES DE CE COURTIER (à respecter en priorité) :\n${learnedPreferences}`
+    : SYSTEM_PROMPT;
+
   const r = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -119,7 +123,7 @@ ${bodyText}`;
     body: JSON.stringify({
       model: "claude-sonnet-4-5-20250929",
       max_tokens: 2000,
-      system: SYSTEM_PROMPT,
+      system: systemFinal,
       messages: [{ role: "user", content: userContent }],
     }),
   });
@@ -134,6 +138,7 @@ ${bodyText}`;
   if (!jsonMatch) throw new Error("Claude did not return JSON");
   return { parsed: JSON.parse(jsonMatch[0]), raw: d };
 }
+
 
 const j = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
@@ -171,7 +176,7 @@ Deno.serve(async (req) => {
 
     const { data: profile } = await admin
       .from("planipret_profiles")
-      .select("id, user_id, ms365_access_token, ms365_refresh_token")
+      .select("id, user_id, ms365_access_token, ms365_refresh_token, ava_learned_preferences")
       .eq("user_id", userId)
       .maybeSingle();
     if (!profile?.ms365_access_token) return j({ success: false, error: "Microsoft 365 non connecté" }, 400);
@@ -184,7 +189,8 @@ Deno.serve(async (req) => {
     }
     const email = await emailResp.json();
 
-    const { parsed, raw } = await analyzeWithClaude(email);
+    const { parsed, raw } = await analyzeWithClaude(email, profile.ava_learned_preferences);
+
 
     const row = {
       broker_id: profile.id,
