@@ -179,6 +179,12 @@ export async function ensureBrokerJwt(
   admin: ReturnType<typeof supaAdmin>,
   profile: { id: string; extension: string; ns_jwt: string | null; ns_refresh_token: string | null; ns_jwt_expires_at: string | null },
 ): Promise<string> {
+  // Fallback: if NS_API_KEY (static bearer) is configured, use it directly.
+  // This avoids the OAuth2 password flow (which requires NS_API_CLIENT_ID/SECRET).
+  const staticKey = Deno.env.get("NS_API_KEY");
+  const hasOauth = !!Deno.env.get("NS_API_CLIENT_ID") && !!Deno.env.get("NS_API_CLIENT_SECRET");
+  if (staticKey && !hasOauth) return staticKey;
+
   const expSoon = !profile.ns_jwt_expires_at ||
     new Date(profile.ns_jwt_expires_at).getTime() - Date.now() < 60_000;
   if (profile.ns_jwt && !expSoon) return profile.ns_jwt;
@@ -188,8 +194,9 @@ export async function ensureBrokerJwt(
     result = profile.ns_refresh_token
       ? await refreshBrokerJwt(profile.ns_refresh_token)
       : await obtainBrokerJwt(profile.extension);
-  } catch {
-    result = await obtainBrokerJwt(profile.extension);
+  } catch (e) {
+    if (staticKey) return staticKey;
+    throw e;
   }
   await admin.from("planipret_profiles").update({
     ns_jwt: result.token,

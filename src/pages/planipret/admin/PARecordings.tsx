@@ -125,10 +125,15 @@ export default function PARecordings() {
   const transcribe = async (callId: string) => {
     setTranscribing(callId);
     try {
-      const { error } = await supabase.functions.invoke("ai-transcribe-call", { body: { call_id: callId } });
+      const { data, error } = await supabase.functions.invoke("pp-admin-transcribe", { body: { call_id: callId } });
       if (error) throw error;
-      toast.success("Transcription lancée");
-      await load(page, pageSize);
+      if ((data as any)?.transcript) {
+        toast.success("Transcription complétée");
+        setDetail((d: any) => d && d.id === callId ? { ...d, transcript: (data as any).transcript } : d);
+        await load(page, pageSize);
+      } else {
+        throw new Error((data as any)?.error ?? "transcription vide");
+      }
     } catch (e: any) {
       toast.error(`Transcription échouée: ${e.message ?? e}`);
     } finally {
@@ -137,10 +142,10 @@ export default function PARecordings() {
   };
 
   const [resolving, setResolving] = useState<string | null>(null);
-  const resolveRecording = async (row: any) => {
+  const resolveRecording = async (row: any, force = false) => {
     setResolving(row.id);
     try {
-      const { data, error } = await supabase.functions.invoke("pp-admin-recording-resolve", { body: { call_row_id: row.id } });
+      const { data, error } = await supabase.functions.invoke("pp-admin-recording-resolve", { body: { call_row_id: row.id, force } });
       if (error) throw error;
       if ((data as any)?.recording_url) {
         toast.success("Enregistrement récupéré");
@@ -155,6 +160,7 @@ export default function PARecordings() {
       setResolving(null);
     }
   };
+
 
   const inputStyle = { background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" };
 
@@ -290,9 +296,20 @@ export default function PARecordings() {
                 <div>
                   <p style={{ fontSize: 11, color: "var(--pp-text-muted)", marginBottom: 4 }}>Audio</p>
                   <audio src={detail.recording_url} controls className="w-full" />
-                  <a href={detail.recording_url} download className="inline-flex items-center gap-1 mt-2 text-xs" style={{ color: ACCENT }}>
-                    <Download className="w-3 h-3" /> Télécharger
-                  </a>
+                  <div className="flex items-center gap-3 mt-2">
+                    <a href={detail.recording_url} download className="inline-flex items-center gap-1 text-xs" style={{ color: ACCENT }}>
+                      <Download className="w-3 h-3" /> Télécharger
+                    </a>
+                    <button
+                      onClick={() => resolveRecording(detail, true)}
+                      disabled={resolving === detail.id}
+                      className="inline-flex items-center gap-1 text-xs disabled:opacity-50"
+                      style={{ color: ACCENT }}
+                    >
+                      <RefreshCw className={`w-3 h-3 ${resolving === detail.id ? "animate-spin" : ""}`} />
+                      Rafraîchir l'URL
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-2">

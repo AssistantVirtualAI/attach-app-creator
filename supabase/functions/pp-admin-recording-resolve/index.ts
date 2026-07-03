@@ -59,6 +59,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const callRowId = body.call_row_id ?? body.id;
+    const force = body.force === true;
     if (!callRowId) return json({ error: "call_row_id required" }, 400);
 
     const { data: row, error: rowErr } = await admin
@@ -68,7 +69,7 @@ Deno.serve(async (req) => {
       .maybeSingle();
     if (rowErr || !row) return json({ error: "call not found" }, 404);
 
-    if (row.recording_url && String(row.recording_url).startsWith("http")) {
+    if (!force && row.recording_url && String(row.recording_url).startsWith("http")) {
       return json({ ok: true, recording_url: row.recording_url, cached: true });
     }
 
