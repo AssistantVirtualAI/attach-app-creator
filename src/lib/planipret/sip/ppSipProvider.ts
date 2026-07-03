@@ -28,12 +28,14 @@ export interface PpSipSnapshot {
   remoteIdentity: string;
   remoteNumber: string;
   direction: "in" | "out" | null;
+  callId: string;
   muted: boolean;
   onHold: boolean;
   startedAt: number | null;
   errorCause?: string;
   lastRegistrationAt: number | null;
 }
+
 
 type Listener = (s: PpSipSnapshot) => void;
 
