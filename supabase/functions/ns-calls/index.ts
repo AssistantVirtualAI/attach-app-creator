@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
           await logAudit(admin, req, {
             user_id: profile.id, action: "CALL_START",
             resource_type: "call", resource_id: newCallId ? String(newCallId) : null,
-            metadata: { direction: "outbound", to: body.to_number },
+            metadata: { direction: "outbound", to: toNumber },
           });
         }
         break;
