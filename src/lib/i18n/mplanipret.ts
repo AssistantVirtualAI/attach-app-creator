@@ -102,6 +102,18 @@ export const MP_DICT = {
     },
     tabs: { home: "Accueil", calls: "Appels", messages: "Messages", contacts: "Contacts" },
     footer: { poweredBy: "PROPULSÉ PAR", developedBy: "DÉVELOPPÉ PAR AVA" },
+    extSync: {
+      extLabel: "Extension",
+      ready: "Prête à recevoir et émettre",
+      needsResync: "Synchronisation requise",
+      resync: "Resynchroniser",
+      syncing: "Synchro…",
+      synced: "Extension synchronisée ✅",
+      failed: "Échec de la synchronisation",
+      notLinked: "Extension non liée — contactez votre admin",
+      noExtension: "Aucune extension configurée",
+      contactAdmin: "Contactez votre administrateur Planiprêt",
+    },
     dialer: {
       enterNumber: "Entrer un numéro…",
       callInProgress: "Appel en cours…",
