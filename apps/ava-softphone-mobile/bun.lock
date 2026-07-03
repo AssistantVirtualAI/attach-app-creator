@@ -20,7 +20,7 @@
         "@capacitor/push-notifications": "^6.0.2",
         "@capacitor/splash-screen": "^6.0.2",
         "@capacitor/status-bar": "^6.0.1",
-        "@mozartec/capacitor-microphone": "^7.1.0",
+        "@mozartec/capacitor-microphone": "^6.0.0",
         "@supabase/supabase-js": "^2.76.1",
         "jssip": "^3.10.0",
         "lucide-react": "^1.21.0",
@@ -198,7 +198,7 @@
 
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.31", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@jridgewell/trace-mapping/-/trace-mapping-0.3.31.tgz", { "dependencies": { "@jridgewell/resolve-uri": "^3.1.0", "@jridgewell/sourcemap-codec": "^1.4.14" } }, "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="],
 
-    "@mozartec/capacitor-microphone": ["@mozartec/capacitor-microphone@7.1.0", "https://europe-west1-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@mozartec/capacitor-microphone/-/capacitor-microphone-7.1.0.tgz", { "peerDependencies": { "@capacitor/core": ">=7.0.0" } }, "sha512-7adiK4UKGOPQbKbPlFNLFFT756EwTv8viFlU0FDLqxzDsMWIIk6+I3RWMhhgQPPIJrPxYS4Wf9O6phtRfmcTnw=="],
+    "@mozartec/capacitor-microphone": ["@mozartec/capacitor-microphone@6.0.0", "https://europe-west1-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@mozartec/capacitor-microphone/-/capacitor-microphone-6.0.0.tgz", { "peerDependencies": { "@capacitor/core": "^6.0.0" } }, "sha512-bx2Dcp84C9/crmBc3yRAg4tDAJYUIzjnRTZX2CluNBNrFRpPrXkRuwNGPNBy3pXP8fjhGM8NqSZ/7eMYfKRuNg=="],
 
     "@rolldown/pluginutils": ["@rolldown/pluginutils@1.0.0-beta.27", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@rolldown/pluginutils/-/pluginutils-1.0.0-beta.27.tgz", {}, "sha512-+d0F4MKMCbeVUJwG96uQ4SgAznZNSq93I3V+9NHA4OpvqG8mRCpGdKmK8l/dl02h2CCDHwW2FqilnTyDcAnqjA=="],
 
