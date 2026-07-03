@@ -83,9 +83,9 @@ Deno.serve(async (req) => {
   const { data: profiles, error: pErr } = await admin
     .from("planipret_profiles")
     .select("id,ns_extension,ns_domain,ns_mobile_device_id,ns_sip_password_ref_mobile,ns_linked")
-    .eq("ns_linked", true)
     .not("ns_extension", "is", null)
     .limit(limit);
+
 
   if (pErr) return json({ error: "profile_query_failed", detail: pErr.message }, 500);
 
