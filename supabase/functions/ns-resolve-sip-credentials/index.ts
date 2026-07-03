@@ -145,6 +145,8 @@ Deno.serve(async (req) => {
     sip_extension: extension,
     sip_domain: domain,
     sip_proxy: NS_SIP_PROXY,
+    sip_wss_url: NS_SIP_WSS_URL,
+    sip_wss_urls: Array.from(new Set([NS_SIP_WSS_URL, ...NS_SIP_WSS_URLS])),
     sip_password: sipPassword,
     // never log this response
   });
