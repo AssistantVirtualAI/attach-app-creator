@@ -28,6 +28,7 @@ function formatDuration(sec: number) {
 
 export default function ActiveCallOverlay({ callId, onClosed }: { callId: string | null; onClosed: () => void }) {
   const { t } = useMplanipretLang();
+  const { net, quality } = useMplanipretSoftphone();
   const [call, setCall] = useState<Call | null>(null);
   const [muted, setMuted] = useState(false);
   const [held, setHeld] = useState(false);
