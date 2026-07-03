@@ -87,6 +87,6 @@ Deno.serve(async (req) => {
     return jsonResponse({ success: true, data });
   } catch (e) {
     console.error("ns-calls error", e);
-    return jsonResponse({ success: false, error: "Connexion perdue", code: 0 }, 200);
+    return jsonResponse({ success: false, error: (e as Error).message ?? "Connexion perdue", code: 0 }, 200);
   }
 });
