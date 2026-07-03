@@ -188,6 +188,15 @@ export default function PAReports() {
 
   const podium = (byBroker as any[]).slice(0, 3);
 
+  // Financial — same source of truth as /admin/vue-ensemble (planipret_broker_stats view).
+  const finance = useMemo<ServiceFinance[]>(() => [
+    computeServiceFinance("mobile", brokerStats.app_mobile_active),
+    computeServiceFinance("widget", brokerStats.total_courtiers),
+    computeServiceFinance("ai", brokerStats.agent_ia_active),
+  ], [brokerStats.app_mobile_active, brokerStats.total_courtiers, brokerStats.agent_ia_active]);
+  const financeTotals = useMemo(() => computeTotals(finance), [finance]);
+
+
   const exportCsv = () => {
     const q = (v: any) => `"${String(v ?? "").replace(/"/g, '""')}"`;
     const outboundSms = messages.filter((m) => m.direction === "outbound").length;
