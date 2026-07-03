@@ -295,7 +295,20 @@ export default function PARecordings() {
               {detail.recording_url ? (
                 <div>
                   <p style={{ fontSize: 11, color: "var(--pp-text-muted)", marginBottom: 4 }}>Audio</p>
-                  <audio src={detail.recording_url} controls className="w-full" />
+                  <audio
+                    key={detail.recording_url}
+                    src={detail.recording_url}
+                    controls
+                    className="w-full"
+                    onError={() => {
+                      // Auto-refresh once when playback fails (usually expired signed URL).
+                      if (resolving !== detail.id && !(detail as any).__autoRefreshed) {
+                        (detail as any).__autoRefreshed = true;
+                        toast.message("URL expirée — rafraîchissement automatique…");
+                        resolveRecording(detail, true);
+                      }
+                    }}
+                  />
                   <div className="flex items-center gap-3 mt-2">
                     <a href={detail.recording_url} download className="inline-flex items-center gap-1 text-xs" style={{ color: ACCENT }}>
                       <Download className="w-3 h-3" /> Télécharger
