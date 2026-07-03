@@ -48,6 +48,40 @@ export default function PermissionGate({ onComplete }: PermissionGateProps) {
   const [requesting, setRequesting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Re-check permissions when the user comes back from the OS Settings page
+  // (typical flow after they tap "Open Settings" following a denial).
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    let mounted = true;
+    const recheck = async () => {
+      try {
+        const p = await checkAllPermissions();
+        if (!mounted) return;
+        setPerms((cur) => ({ ...cur, ...p }));
+        if (step === 'microphone' && p.microphone === 'granted') {
+          setError(null);
+          advance('microphone');
+        }
+      } catch { /* ignore */ }
+    };
+    const onVis = () => { if (document.visibilityState === 'visible') void recheck(); };
+    document.addEventListener('visibilitychange', onVis);
+    let removeApp: (() => void) | undefined;
+    (async () => {
+      try {
+        const { App } = await import('@capacitor/app');
+        const h = await App.addListener('appStateChange', ({ isActive }) => { if (isActive) void recheck(); });
+        removeApp = () => { try { h.remove(); } catch {} };
+      } catch { /* ignore */ }
+    })();
+    return () => {
+      mounted = false;
+      document.removeEventListener('visibilitychange', onVis);
+      removeApp?.();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
+
   const advance = (from: StepId) => {
     const order: StepId[] = PERMISSION_STEPS.map((s) => s.id) as StepId[];
     const i = order.indexOf(from as any);
