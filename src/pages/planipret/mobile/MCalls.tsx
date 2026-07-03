@@ -969,6 +969,7 @@ function CallDetailSheet({
               aiLoading={aiLoading}
               analyzed={!!(call as any).ai_analysis_json}
               t={t}
+              filenameHint={`transcript_${displayLabel(call)}_${(call.started_at || "").slice(0,10)}`}
             />
           )}
 
