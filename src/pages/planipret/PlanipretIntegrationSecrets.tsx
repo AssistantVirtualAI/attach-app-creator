@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AVA_OWNER_USER_ID } from "@/lib/avaOwner";
+import { PlanipretLangSwitch } from "@/components/planipret/PlanipretLangSwitch";
 
 type Item = {
   provider: "microsoft" | "maestro";
