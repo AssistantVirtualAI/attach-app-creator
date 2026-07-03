@@ -117,13 +117,13 @@ export default function PAReports() {
 
   const syncAll = async () => {
     setSyncing(true);
-    const id = toast.loading("Synchronisation NS-API complète…");
+    const id = toast.loading(t("reports.syncing"));
     try {
       const { data, error } = await supabase.functions.invoke("pp-admin-ns-sync", { body: {} });
       if (error) throw error;
-      toast.success(`${(data as any)?.extensions ?? (data as any)?.users_total ?? 0} extensions synchronisées · rapports mis à jour sous peu`, { id });
+      toast.success(`${(data as any)?.extensions ?? (data as any)?.users_total ?? 0} ${t("reports.syncSuccess")}`, { id });
     } catch (e: any) {
-      toast.error(`Échec: ${e.message ?? e}`, { id });
+      toast.error(`${t("reports.syncError")}${e.message ?? e}`, { id });
     } finally {
       setSyncing(false);
     }
@@ -132,21 +132,22 @@ export default function PAReports() {
   const byDay = useMemo(() => {
     const map: Record<string, number> = {};
     calls.forEach((c) => {
-      const d = new Date(c.started_at).toLocaleDateString("fr-CA", { day: "2-digit", month: "short" });
+      const d = new Date(c.started_at).toLocaleDateString(dateLocale, { day: "2-digit", month: "short" });
       map[d] = (map[d] ?? 0) + 1;
     });
     return Object.entries(map).map(([date, count]) => ({ date, count }));
-  }, [calls]);
+  }, [calls, dateLocale]);
 
   const byDirection = useMemo(() => {
     const m = { inbound: 0, outbound: 0, missed: 0 };
     calls.forEach((c) => { if (c.direction in m) (m as any)[c.direction]++; });
     return [
-      { name: "Entrant", value: m.inbound, color: ACCENT },
-      { name: "Sortant", value: m.outbound, color: SUCCESS },
-      { name: "Manqué", value: m.missed, color: DANGER },
+      { name: t("reports.dirInbound"), value: m.inbound, color: ACCENT },
+      { name: t("reports.dirOutbound"), value: m.outbound, color: SUCCESS },
+      { name: t("reports.dirMissed"), value: m.missed, color: DANGER },
     ];
-  }, [calls]);
+  }, [calls, t]);
+
 
   const avgDuration = useMemo(() => {
     const arr = calls.filter((c) => c.duration_seconds).map((c) => c.duration_seconds);
