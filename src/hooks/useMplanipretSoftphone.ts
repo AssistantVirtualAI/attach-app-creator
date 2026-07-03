@@ -18,6 +18,7 @@ import { networkMonitor, type NetSample } from "@/lib/planipret/network/networkM
 import { handoverController } from "@/lib/planipret/net/handoverController";
 import { callQualitySampler, type CallQualitySnapshot } from "@/lib/planipret/audio/callQualitySampler";
 import { getAudioConstraints, type NCMode } from "@/lib/planipret/audio/audioConstraints";
+import { ensureMicPermission, type MicPermissionState } from "@/lib/planipret/audio/micPermission";
 
 let gumProxyInstalled = false;
 let gumOriginal: typeof navigator.mediaDevices.getUserMedia | null = null;
@@ -25,6 +26,10 @@ let gumOriginal: typeof navigator.mediaDevices.getUserMedia | null = null;
 function readNCMode(): NCMode {
   try { return (localStorage.getItem("pp_nc_mode") as NCMode) || "standard"; }
   catch { return "standard"; }
+}
+function readNCEnabled(): boolean {
+  try { const v = localStorage.getItem("pp_nc_enabled"); return v === null ? true : v === "1"; }
+  catch { return true; }
 }
 
 /** Install a one-time getUserMedia proxy that upgrades audio-only requests with
