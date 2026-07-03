@@ -9,6 +9,7 @@ import { usePlanipretBrokerStats } from "@/lib/planipret/brokerStats";
 import { ADMIN_REPORT_FILTERS_EVENT, periodLabel, periodToRange, rangeToPeriod, readAdminReportFilters, writeAdminReportFilters } from "@/lib/planipret/adminReportFilters";
 import { usePlanipretNsAutoSync } from "@/hooks/usePlanipretNsAutoSync";
 import NsSyncBar from "@/components/planipret/admin/NsSyncBar";
+import { useMplanipretLang } from "@/hooks/useMplanipretLang";
 
 type Range = "week" | "month" | "quarter";
 
@@ -35,6 +36,8 @@ const TooltipDark = ({ active, payload, label }: any) => {
 };
 
 export default function PAReports() {
+  const { t, lang } = useMplanipretLang();
+  const dateLocale = lang === "en" ? "en-CA" : "fr-CA";
   const [range, setRangeState] = useState<Range>(() => periodToRange(readAdminReportFilters().period));
   const [calls, setCalls] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
@@ -114,13 +117,13 @@ export default function PAReports() {
 
   const syncAll = async () => {
     setSyncing(true);
-    const id = toast.loading("Synchronisation NS-API complète…");
+    const id = toast.loading(t("reports.syncing"));
     try {
       const { data, error } = await supabase.functions.invoke("pp-admin-ns-sync", { body: {} });
       if (error) throw error;
-      toast.success(`${(data as any)?.extensions ?? (data as any)?.users_total ?? 0} extensions synchronisées · rapports mis à jour sous peu`, { id });
+      toast.success(`${(data as any)?.extensions ?? (data as any)?.users_total ?? 0} ${t("reports.syncSuccess")}`, { id });
     } catch (e: any) {
-      toast.error(`Échec: ${e.message ?? e}`, { id });
+      toast.error(`${t("reports.syncError")}${e.message ?? e}`, { id });
     } finally {
       setSyncing(false);
     }
@@ -129,21 +132,22 @@ export default function PAReports() {
   const byDay = useMemo(() => {
     const map: Record<string, number> = {};
     calls.forEach((c) => {
-      const d = new Date(c.started_at).toLocaleDateString("fr-CA", { day: "2-digit", month: "short" });
+      const d = new Date(c.started_at).toLocaleDateString(dateLocale, { day: "2-digit", month: "short" });
       map[d] = (map[d] ?? 0) + 1;
     });
     return Object.entries(map).map(([date, count]) => ({ date, count }));
-  }, [calls]);
+  }, [calls, dateLocale]);
 
   const byDirection = useMemo(() => {
     const m = { inbound: 0, outbound: 0, missed: 0 };
     calls.forEach((c) => { if (c.direction in m) (m as any)[c.direction]++; });
     return [
-      { name: "Entrant", value: m.inbound, color: ACCENT },
-      { name: "Sortant", value: m.outbound, color: SUCCESS },
-      { name: "Manqué", value: m.missed, color: DANGER },
+      { name: t("reports.dirInbound"), value: m.inbound, color: ACCENT },
+      { name: t("reports.dirOutbound"), value: m.outbound, color: SUCCESS },
+      { name: t("reports.dirMissed"), value: m.missed, color: DANGER },
     ];
-  }, [calls]);
+  }, [calls, t]);
+
 
   const avgDuration = useMemo(() => {
     const arr = calls.filter((c) => c.duration_seconds).map((c) => c.duration_seconds);
@@ -219,12 +223,12 @@ export default function PAReports() {
       const pageH = pdf.internal.pageSize.getHeight();
       const imgW = pageW - 20;
       const imgH = (canvas.height * imgW) / canvas.width;
-      const dateLabel = new Date().toLocaleDateString("fr-CA");
+      const dateLabel = new Date().toLocaleDateString(dateLocale);
       pdf.setFillColor(11, 20, 55); pdf.rect(0, 0, pageW, pageH, "F");
       pdf.setTextColor(255, 255, 255); pdf.setFontSize(16);
       pdf.text("Planiprêt — Rapport admin", 10, 12);
       pdf.setFontSize(9); pdf.setTextColor(143, 168, 192);
-      pdf.text(`Période : ${selectedPeriodLabel} · Généré le ${dateLabel}`, 10, 18);
+      pdf.text(`${t("reports.periodBadge")} : ${selectedPeriodLabel} · ${dateLabel}`, 10, 18);
       let y = 24, remaining = imgH, srcY = 0;
       const ratio = canvas.width / imgW;
       while (remaining > 0) {
@@ -240,9 +244,9 @@ export default function PAReports() {
         if (remaining > 0) { pdf.addPage(); pdf.setFillColor(11, 20, 55); pdf.rect(0, 0, pageW, pageH, "F"); y = 10; }
       }
       pdf.save(`planipret-rapport-${range}-${new Date().toISOString().slice(0,10)}.pdf`);
-      toast.success("PDF généré");
+      toast.success(t("reports.pdfSuccess"));
     } catch (e: any) {
-      toast.error("Échec de l'export PDF : " + (e?.message ?? "erreur"));
+      toast.error(t("reports.pdfError") + (e?.message ?? "error"));
     } finally {
       setExporting(false);
     }
@@ -260,18 +264,18 @@ export default function PAReports() {
               style={range === r
                 ? { background: ACCENT, color: "#fff", border: `1px solid ${ACCENT}` }
                 : { background: "var(--pp-bg-elevated)", color: "var(--pp-text-secondary)", border: "1px solid var(--pp-bg-border-2)" }}>
-              {r === "week" ? "Cette semaine" : r === "month" ? "Ce mois" : "3 derniers mois"}
+              {r === "week" ? t("reports.rangeWeek") : r === "month" ? t("reports.rangeMonth") : t("reports.rangeQuarter")}
             </button>
           ))}
         </div>
         <div className="flex items-center gap-2">
           <button onClick={exportCsv} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm"
             style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>
-            <Download className="w-4 h-4" /> CSV
+            <Download className="w-4 h-4" /> {t("reports.csv")}
           </button>
           <button onClick={exportPdf} disabled={exporting}
             className="pp-btn-primary flex items-center gap-2 text-sm disabled:opacity-50">
-            <FileText className="w-4 h-4" /> {exporting ? "Génération…" : "PDF"}
+            <FileText className="w-4 h-4" /> {exporting ? t("reports.pdfGenerating") : t("reports.pdf")}
           </button>
         </div>
       </div>
@@ -282,20 +286,20 @@ export default function PAReports() {
       <div className="pp-card p-5">
         <div className="flex items-center justify-between mb-3">
           <h3 className="flex items-center gap-2" style={{ fontWeight: 600, color: "var(--pp-text-primary)" }}>
-            <Users className="w-4 h-4" style={{ color: ACCENT }} /> Activité des courtiers — État actuel
+            <Users className="w-4 h-4" style={{ color: ACCENT }} /> {t("reports.sectionActivityTitle")}
           </h3>
           <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full"
             style={{ background: "rgba(46,155,220,0.12)", color: ACCENT, border: "1px solid rgba(46,155,220,0.25)" }}>
-            Snapshot temps réel
+            {t("reports.snapshotBadge")}
           </span>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          <StatTile icon={<Users className="w-3.5 h-3.5" />} label="Courtiers" value={brokerStats.total_courtiers} color={ACCENT} />
-          <StatTile icon={<Smartphone className="w-3.5 h-3.5" />} label="App Mobile active" value={brokerStats.app_mobile_active} color={SUCCESS} sub={`sur ${brokerStats.total_courtiers}`} />
-          <StatTile icon={<Bot className="w-3.5 h-3.5" />} label="Agent IA actif" value={brokerStats.agent_ia_active} color="#9B7FE8" sub={`sur ${brokerStats.total_courtiers}`} />
-          <StatTile icon={<Plug className="w-3.5 h-3.5" />} label="Maestro lié" value={brokerStats.maestro_connected} color="#F5A623" />
-          <StatTile icon={<Mail className="w-3.5 h-3.5" />} label="M365 connecté" value={brokerStats.ms365_connected} color="#2E9BDC" />
-          <StatTile icon={<Link2 className="w-3.5 h-3.5" />} label="NS lié" value={brokerStats.ns_linked} color={GOLD} />
+          <StatTile icon={<Users className="w-3.5 h-3.5" />} label={t("reports.tileBrokers")} value={brokerStats.total_courtiers} color={ACCENT} />
+          <StatTile icon={<Smartphone className="w-3.5 h-3.5" />} label={t("reports.tileMobileActive")} value={brokerStats.app_mobile_active} color={SUCCESS} sub={`${t("reports.tileOutOf")} ${brokerStats.total_courtiers}`} />
+          <StatTile icon={<Bot className="w-3.5 h-3.5" />} label={t("reports.tileAiActive")} value={brokerStats.agent_ia_active} color="#9B7FE8" sub={`${t("reports.tileOutOf")} ${brokerStats.total_courtiers}`} />
+          <StatTile icon={<Plug className="w-3.5 h-3.5" />} label={t("reports.tileMaestro")} value={brokerStats.maestro_connected} color="#F5A623" />
+          <StatTile icon={<Mail className="w-3.5 h-3.5" />} label={t("reports.tileMs365")} value={brokerStats.ms365_connected} color="#2E9BDC" />
+          <StatTile icon={<Link2 className="w-3.5 h-3.5" />} label={t("reports.tileNs")} value={brokerStats.ns_linked} color={GOLD} />
         </div>
       </div>
 
@@ -303,11 +307,11 @@ export default function PAReports() {
       <div className="flex items-center gap-2 mt-2">
         <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full"
           style={{ background: "rgba(245,200,66,0.12)", color: GOLD, border: "1px solid rgba(245,200,66,0.25)" }}>
-          Période sélectionnée · {selectedPeriodLabel}
+          {t("reports.periodBadge")} · {selectedPeriodLabel}
         </span>
         <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full"
           style={{ background: loadingPeriod ? "rgba(245,200,66,0.12)" : "rgba(0,212,170,0.12)", color: loadingPeriod ? GOLD : SUCCESS, border: `1px solid ${loadingPeriod ? "rgba(245,200,66,0.25)" : "rgba(0,212,170,0.25)"}` }}>
-          {loadingPeriod ? "Chargement…" : `Données chargées${loadedAt ? ` · ${loadedAt.toLocaleTimeString("fr-CA", { hour: "2-digit", minute: "2-digit" })}` : ""}`}
+          {loadingPeriod ? t("reports.loading") : `${t("reports.loaded")}${loadedAt ? ` · ${loadedAt.toLocaleTimeString(dateLocale, { hour: "2-digit", minute: "2-digit" })}` : ""}`}
         </span>
       </div>
 
@@ -315,7 +319,7 @@ export default function PAReports() {
       {podium.length > 0 && (
         <div className="pp-card p-5">
           <h3 className="flex items-center gap-2 mb-4" style={{ fontWeight: 600, color: "var(--pp-text-primary)" }}>
-            <Trophy className="w-4 h-4" style={{ color: GOLD }} /> Podium courtiers
+            <Trophy className="w-4 h-4" style={{ color: GOLD }} /> {t("reports.podiumTitle")}
           </h3>
           <div className="grid grid-cols-3 gap-3 items-end">
             {[1, 0, 2].map((idx) => {
@@ -332,7 +336,7 @@ export default function PAReports() {
                   <div className="rounded-t-lg flex items-end justify-center pb-2" style={{ height: h, background: `linear-gradient(180deg, ${c}40, ${c}10)`, border: `1px solid ${c}66`, borderBottom: "none" }}>
                     <span style={{ fontSize: 20, fontWeight: 700, color: c }}>{b.total}</span>
                   </div>
-                  <div style={{ fontSize: 10, color: "var(--pp-text-muted)", marginTop: 4 }}>{b.in} entrants · {b.out} sortants</div>
+                  <div style={{ fontSize: 10, color: "var(--pp-text-muted)", marginTop: 4 }}>{b.in} {t("reports.dirInbound").toLowerCase()} · {b.out} {t("reports.dirOutbound").toLowerCase()}</div>
                 </div>
               );
             })}
@@ -342,20 +346,20 @@ export default function PAReports() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="pp-card p-5">
-          <h3 className="mb-3" style={{ fontWeight: 600, color: "var(--pp-text-primary)" }}>Appels par jour</h3>
+          <h3 className="mb-3" style={{ fontWeight: 600, color: "var(--pp-text-primary)" }}>{t("reports.callsByDay")}</h3>
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={byDay}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
               <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#4A7FA5" }} />
               <YAxis tick={{ fontSize: 11, fill: "#4A7FA5" }} />
               <Tooltip content={<TooltipDark />} cursor={{ fill: "rgba(46,155,220,0.08)" }} />
-              <Bar dataKey="count" name="Appels" fill={ACCENT} radius={[4, 4, 0, 0]} />
+              <Bar dataKey="count" name={t("reports.thCalls")} fill={ACCENT} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
 
         <div className="pp-card p-5">
-          <h3 className="mb-3" style={{ fontWeight: 600, color: "var(--pp-text-primary)" }}>Répartition des appels</h3>
+          <h3 className="mb-3" style={{ fontWeight: 600, color: "var(--pp-text-primary)" }}>{t("reports.callsDistribution")}</h3>
           <ResponsiveContainer width="100%" height={240}>
             <PieChart>
               <Pie data={byDirection} dataKey="value" nameKey="name" innerRadius={50} outerRadius={80} paddingAngle={4}>
@@ -369,48 +373,48 @@ export default function PAReports() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Stat label="Durée moyenne" value={avgDuration} />
-        <Stat label="Heure de pointe" value={peakHour} />
-        <Stat label="Taux de réponse" value={answerRate} />
+        <Stat label={t("reports.avgDuration")} value={avgDuration} />
+        <Stat label={t("reports.peakHour")} value={peakHour} />
+        <Stat label={t("reports.answerRate")} value={answerRate} />
       </div>
 
       {/* ───────── SMS · AVA · Rappels ───────── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <MiniTile label="SMS envoyés" value={messages.filter((m) => m.direction === "outbound").length} color={ACCENT} sub="période" />
-        <MiniTile label="SMS reçus" value={messages.filter((m) => m.direction === "inbound").length} color={SUCCESS} sub="période" />
+        <MiniTile label={t("reports.smsSent")} value={messages.filter((m) => m.direction === "outbound").length} color={ACCENT} sub={t("reports.period")} />
+        <MiniTile label={t("reports.smsReceived")} value={messages.filter((m) => m.direction === "inbound").length} color={SUCCESS} sub={t("reports.period")} />
         <MiniTile
-          label="Satisfaction AVA"
+          label={t("reports.avaSatisfaction")}
           value={(() => {
             const total = avaFeedback.length;
             if (!total) return "—";
             const up = avaFeedback.filter((f) => f.rating === "up").length;
             return `${Math.round((up / total) * 100)}%`;
           })()}
-          sub={`${avaFeedback.length} avis`}
+          sub={`${avaFeedback.length} ${t("reports.avaReviews")}`}
           color="#9B7FE8"
         />
-        <MiniTile label="Rappels en attente" value={reminders.filter((r) => r.status === "pending").length} sub={`${reminders.filter((r) => r.status === "pending" && r.scheduled_at < new Date().toISOString()).length} en retard`} color={GOLD} />
+        <MiniTile label={t("reports.pendingReminders")} value={reminders.filter((r) => r.status === "pending").length} sub={`${reminders.filter((r) => r.status === "pending" && r.scheduled_at < new Date().toISOString()).length} ${t("reports.inLate")}`} color={GOLD} />
       </div>
 
 
 
       <div className="pp-card p-5">
         <div className="flex items-center justify-between mb-3">
-          <h3 style={{ fontWeight: 600, color: "var(--pp-text-primary)" }}>Performance par courtier</h3>
+          <h3 style={{ fontWeight: 600, color: "var(--pp-text-primary)" }}>{t("reports.brokerPerformance")}</h3>
           <button onClick={exportCsv} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs"
             style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>
-            <Download className="w-3.5 h-3.5" /> Exporter CSV
+            <Download className="w-3.5 h-3.5" /> {t("reports.exportCsv")}
           </button>
         </div>
         <table className="w-full text-sm">
           <thead>
             <tr style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--pp-text-faint)", borderBottom: "1px solid var(--pp-bg-border-2)" }} className="text-left">
-              <th className="py-2">Courtier</th><th>Appels</th><th>Entrants</th><th>Sortants</th><th>Manqués</th><th>Durée moy.</th>
+              <th className="py-2">{t("overview.thBroker")}</th><th>{t("reports.thCalls")}</th><th>{t("reports.thIn")}</th><th>{t("reports.thOut")}</th><th>{t("reports.thMissed")}</th><th>{t("reports.thAvgDur")}</th>
             </tr>
           </thead>
           <tbody>
             {(byBroker as any[]).length === 0 ? (
-              <tr><td colSpan={6} className="py-6 text-center" style={{ color: "var(--pp-text-faint)" }}>Aucune donnée</td></tr>
+              <tr><td colSpan={6} className="py-6 text-center" style={{ color: "var(--pp-text-faint)" }}>{t("reports.empty")}</td></tr>
             ) : (byBroker as any[]).map((b: any) => (
               <tr key={b.name} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
                 <td className="py-2" style={{ color: "var(--pp-text-primary)" }}>{b.name}</td>
