@@ -19,6 +19,7 @@ import {
 } from "@/components/planipret/admin/integrations/IntegrationCard";
 import NsLiveTestPanel from "@/components/planipret/admin/integrations/NsLiveTestPanel";
 import NsRecordingsProbe from "@/components/planipret/admin/integrations/NsRecordingsProbe";
+import CallE2ECheck from "@/components/planipret/admin/integrations/CallE2ECheck";
 import Ms365LiveTestPanel from "@/components/planipret/admin/integrations/Ms365LiveTestPanel";
 import NsMigrationPanel from "@/components/planipret/admin/integrations/NsMigrationPanel";
 import NsCapabilitiesPanel from "@/components/planipret/admin/integrations/NsCapabilitiesPanel";
