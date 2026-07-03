@@ -10,9 +10,10 @@ Deno.serve(async (req) => {
     const ext = profile.extension;
 
     const url = new URL(req.url);
-    const action = url.searchParams.get("action") ?? "list";
-    const callId = url.searchParams.get("call_id") ?? "";
     const body = req.method !== "GET" ? await req.json().catch(() => ({})) : {};
+    const action = body.action ?? url.searchParams.get("action") ?? "list";
+    const callId = body.call_id ?? url.searchParams.get("call_id") ?? "";
+    const toNumber = body.to_number ?? body.destination ?? body.number ?? null;
 
     let res: Response;
     switch (action) {
