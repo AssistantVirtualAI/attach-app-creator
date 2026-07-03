@@ -10,9 +10,10 @@ Deno.serve(async (req) => {
     const ext = profile.extension;
 
     const url = new URL(req.url);
-    const action = url.searchParams.get("action") ?? "list";
-    const callId = url.searchParams.get("call_id") ?? "";
     const body = req.method !== "GET" ? await req.json().catch(() => ({})) : {};
+    const action = body.action ?? url.searchParams.get("action") ?? "list";
+    const callId = body.call_id ?? url.searchParams.get("call_id") ?? "";
+    const toNumber = body.to_number ?? body.destination ?? body.number ?? null;
 
     let res: Response;
     switch (action) {
@@ -20,10 +21,13 @@ Deno.serve(async (req) => {
         res = await nsBrokerFetch(admin, profile, nsPath(env.domain, ext, "/calls"), { method: "GET" });
         break;
       case "start": {
+        if (!toNumber) {
+          return jsonResponse({ success: false, error: "to_number requis", code: 400 }, 400);
+        }
         res = await nsBrokerFetch(admin, profile, nsPath(env.domain, ext, "/calls"), {
           method: "POST",
           body: JSON.stringify({
-            to_number: body.to_number,
+            to_number: toNumber,
             caller_id_number: body.caller_id_number,
             caller_id_name: body.caller_id_name,
           }),
@@ -42,7 +46,7 @@ Deno.serve(async (req) => {
           await logAudit(admin, req, {
             user_id: profile.id, action: "CALL_START",
             resource_type: "call", resource_id: newCallId ? String(newCallId) : null,
-            metadata: { direction: "outbound", to: body.to_number },
+            metadata: { direction: "outbound", to: toNumber },
           });
         }
         break;
@@ -83,6 +87,6 @@ Deno.serve(async (req) => {
     return jsonResponse({ success: true, data });
   } catch (e) {
     console.error("ns-calls error", e);
-    return jsonResponse({ success: false, error: "Connexion perdue", code: 0 }, 200);
+    return jsonResponse({ success: false, error: (e as Error).message ?? "Connexion perdue", code: 0 }, 200);
   }
 });
