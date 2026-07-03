@@ -227,12 +227,32 @@ export async function openAppSettings(): Promise<void> {
     // Capacitor App plugin doesn't directly expose settings on all versions;
     // fall back to platform-specific deep link via window.open.
     const platform = Capacitor.getPlatform();
+/** Open the OS-level app settings page so the user can flip a denied permission. */
+export async function openAppSettings(): Promise<void> {
+  if (!Capacitor.isNativePlatform()) return;
+  const platform = Capacitor.getPlatform();
+  try {
     if (platform === 'ios') {
       window.open('app-settings:', '_system');
-    } else if (platform === 'android') {
+      return;
+    }
+    if (platform === 'android') {
+      // Android: use the @mozartec/capacitor-microphone plugin's built-in
+      // openSettings when available, else fall back to a generic intent.
+      try {
+        const { Microphone } = await import('@mozartec/capacitor-microphone');
+        // The plugin does not expose openSettings on v6; use a native intent.
+        void Microphone;
+      } catch { /* ignore */ }
+      try {
+        const { App } = await import('@capacitor/app');
+        // Best-effort: opens the app details page on most Android versions.
+        await App.openUrl({ url: 'package:com.lemtel.softphone' });
+        return;
+      } catch { /* ignore */ }
       window.open('package:com.lemtel.softphone', '_system');
     }
-    // Touch App import to avoid unused warning.
-    void App;
+  } catch { /* ignore */ }
+}
   } catch { /* ignore */ }
 }
