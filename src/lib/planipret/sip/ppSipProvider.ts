@@ -50,11 +50,13 @@ class PpSipProvider {
     remoteIdentity: "",
     remoteNumber: "",
     direction: null,
+    callId: "",
     muted: false,
     onHold: false,
     startedAt: null,
     lastRegistrationAt: null,
   };
+
   audioEl: HTMLAudioElement | null = null;
   private lastSig = "";
 
