@@ -137,14 +137,22 @@ class PpSipProvider {
     const incoming = originator === "remote";
     const remoteUri = session.remote_identity?.uri?.user || "";
     const remoteName = session.remote_identity?.display_name || remoteUri;
+    // SIP Call-ID is the shared identifier between mobile and widget for the
+    // same call — used to coordinate collision handling via Supabase.
+    const callId: string = session?.request?.call_id
+      || session?.request?.getHeader?.("Call-ID")
+      || session?.id
+      || "";
     this.update({
       callState: incoming ? "ringing-in" : "ringing-out",
       remoteIdentity: remoteName,
       remoteNumber: remoteUri,
       direction: incoming ? "in" : "out",
+      callId,
       muted: false,
       onHold: false,
     });
+
     session.on("progress", () => { if (!incoming) this.update({ callState: "ringing-out" }); });
     session.on("confirmed", () => this.update({ callState: "active", startedAt: Date.now() }));
     session.on("failed", (e: any) => {
