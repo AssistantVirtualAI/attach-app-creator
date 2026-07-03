@@ -65,6 +65,8 @@ export function NsSyncDashboardPanel() {
   const [lastResult, setLastResult] = useState<any>(null);
   const [joinStats, setJoinStats] = useState<{ total: number; linked: number; unlinked: number; samples: any[] } | null>(null);
   const [joinLoading, setJoinLoading] = useState(false);
+  const [mobileBackfilling, setMobileBackfilling] = useState(false);
+
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
