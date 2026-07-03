@@ -186,11 +186,13 @@ class PpSipProvider {
       remoteIdentity: "",
       remoteNumber: "",
       direction: null,
+      callId: "",
       startedAt: null,
       muted: false,
       onHold: false,
     });
   }
+
 
   async call(number: string) {
     if (!this.cfg || !this.ua) return;
