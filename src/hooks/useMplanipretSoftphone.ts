@@ -61,7 +61,7 @@ export type OutboundResult =
 
 export function useMplanipretSoftphone() {
   const sp = useSoftphone();
-  const [net, setNet] = useState<NetSnapshot>(networkMonitor.getSnapshot());
+  const [net, setNet] = useState<NetSample>(networkMonitor.current());
   const [quality, setQuality] = useState<CallQualitySnapshot | null>(null);
 
   // Boot: audio proxy + network monitor + handover.
