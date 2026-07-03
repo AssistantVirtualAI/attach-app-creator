@@ -29,7 +29,7 @@ export default function ExtensionSyncBanner({
 
   const resync = async () => {
     setBusy(true);
-    const { data, error } = await supabase.functions.invoke("ns-resolve-sip-credentials", { body: {} });
+    const { data, error } = await supabase.functions.invoke("ns-resolve-sip-credentials", { body: { client_type: "mobile" } });
     setBusy(false);
     setLastCheck(Date.now());
     const res = (data ?? {}) as any;

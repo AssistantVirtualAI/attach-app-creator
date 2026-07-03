@@ -9136,10 +9136,13 @@ export type Database = {
           ns_link_method: string | null
           ns_linked: boolean
           ns_linked_at: string | null
+          ns_mobile_device_id: string | null
           ns_refresh_token: string | null
           ns_sip_password_ref: string | null
+          ns_sip_password_ref_mobile: string | null
           ns_sip_username: string | null
           ns_user_id: string | null
+          ns_widget_device_id: string | null
           onboarding_completed: boolean
           onboarding_email_sent_at: string | null
           onboarding_step: number
@@ -9222,10 +9225,13 @@ export type Database = {
           ns_link_method?: string | null
           ns_linked?: boolean
           ns_linked_at?: string | null
+          ns_mobile_device_id?: string | null
           ns_refresh_token?: string | null
           ns_sip_password_ref?: string | null
+          ns_sip_password_ref_mobile?: string | null
           ns_sip_username?: string | null
           ns_user_id?: string | null
+          ns_widget_device_id?: string | null
           onboarding_completed?: boolean
           onboarding_email_sent_at?: string | null
           onboarding_step?: number
@@ -9308,10 +9314,13 @@ export type Database = {
           ns_link_method?: string | null
           ns_linked?: boolean
           ns_linked_at?: string | null
+          ns_mobile_device_id?: string | null
           ns_refresh_token?: string | null
           ns_sip_password_ref?: string | null
+          ns_sip_password_ref_mobile?: string | null
           ns_sip_username?: string | null
           ns_user_id?: string | null
+          ns_widget_device_id?: string | null
           onboarding_completed?: boolean
           onboarding_email_sent_at?: string | null
           onboarding_step?: number

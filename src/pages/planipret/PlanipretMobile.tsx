@@ -477,7 +477,7 @@ export default function PlanipretMobile() {
     // Silently resolve SIP credentials for the softphone (fire-and-forget).
     if (data?.ns_linked) {
       try {
-        const { data: sip } = await supabase.functions.invoke("ns-resolve-sip-credentials", { body: {} });
+        const { data: sip } = await supabase.functions.invoke("ns-resolve-sip-credentials", { body: { client_type: "mobile" } });
         if (sip?.ok) {
           sessionStorage.setItem("pp_sip_config", JSON.stringify({
             username: sip.sip_username, password: sip.sip_password,
