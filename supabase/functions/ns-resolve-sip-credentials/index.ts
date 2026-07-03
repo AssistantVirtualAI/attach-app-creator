@@ -242,12 +242,27 @@ Deno.serve(async (req) => {
 
   // Re-list devices after mutations so the client can display fresh state.
   let devicesNow: string[] = [];
+  let devicesDetail: Array<{ id: string; user_agent: string | null; ip: string | null; registered_at: string | null; registered: boolean; is_mine: boolean }> = [];
+  let registeredDeviceId: string | null = null;
   try {
     const after = await nsFetch(
       `/domains/${encodeURIComponent(domain)}/users/${encodeURIComponent(extension)}/devices`,
     );
     const afterList: any[] = Array.isArray(after.data) ? after.data : [];
     devicesNow = afterList.map((d) => deviceIdOf(d)).filter(Boolean) as string[];
+    devicesDetail = afterList.map((d) => {
+      const id = deviceIdOf(d) || "";
+      const ua = d?.["user-agent"] ?? d?.user_agent ?? d?.["registration-user-agent"] ?? null;
+      const ip = d?.["subscribe-registration-address"] ?? d?.["registration-address"] ?? d?.ip ?? d?.["user-ip"] ?? null;
+      const at = d?.["registration-time"] ?? d?.["last-registration"] ?? d?.registered_at ?? null;
+      const registered = !!(ua || ip || at);
+      if (registered && !registeredDeviceId && id === resolvedDeviceId) registeredDeviceId = id;
+      return { id, user_agent: ua ? String(ua) : null, ip: ip ? String(ip) : null, registered_at: at ? String(at) : null, registered, is_mine: id === resolvedDeviceId };
+    }).filter((d) => d.id);
+    if (!registeredDeviceId) {
+      const anyReg = devicesDetail.find((d) => d.registered);
+      registeredDeviceId = anyReg?.id ?? null;
+    }
   } catch { /* non fatal */ }
 
   return json({
@@ -257,6 +272,8 @@ Deno.serve(async (req) => {
     device_created: !device,
     ns_create: createDetails,
     ns_devices: devicesNow,
+    ns_devices_detail: devicesDetail,
+    ns_registered_device_id: registeredDeviceId,
     sip_username: sipUsername,
     sip_extension: extension,
     sip_domain: domain,

@@ -116,9 +116,12 @@ export function useMplanipretSoftphone() {
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
-    const doInit = async () => {
+    const doInit = async (opts?: { force?: boolean }) => {
       setLoading(true);
       try {
+        if (opts?.force) {
+          try { ppSipProvider.stop(); } catch {}
+        }
         const { data, error } = await supabase.functions.invoke("ns-resolve-sip-credentials", { body: { client_type: "mobile" } });
         if (cancelled) return;
         if (error || !data || (data as any)?.error) return;
@@ -133,14 +136,26 @@ export function useMplanipretSoftphone() {
           password: String(d.sip_password),
           displayName: String(d.sip_extension),
         });
+        // Broadcast our registered device id so any UI can highlight it.
+        try {
+          window.dispatchEvent(new CustomEvent("pp:sip-registered", {
+            detail: { registered: true, deviceId: d.device_id },
+          }));
+        } catch {}
       } finally {
         if (!cancelled) setLoading(false);
       }
     };
     void doInit();
-    const onReady = () => { void doInit(); };
+    const onReady = (e: any) => { void doInit({ force: !!e?.detail?.force }); };
+    const onForce = () => { void doInit({ force: true }); };
     window.addEventListener("pp:sip-ready", onReady as any);
-    return () => { cancelled = true; window.removeEventListener("pp:sip-ready", onReady as any); };
+    window.addEventListener("pp:sip-force-reregister", onForce as any);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("pp:sip-ready", onReady as any);
+      window.removeEventListener("pp:sip-force-reregister", onForce as any);
+    };
   }, [user?.id]);
 
 
