@@ -86,6 +86,7 @@ function Dialer({ open, onClose, initial, openMessages }: { open: boolean; onClo
   const [mode, setMode] = useState<"keypad" | "search">("keypad");
   const [number, setNumber] = useState("");
   const [calling, setCalling] = useState(false);
+  const [micDialog, setMicDialog] = useState<{ open: boolean; state: MicPermissionState; pending?: string }>({ open: false, state: "prompt" });
   const [query, setQuery] = useState("");
   const [contacts, setContacts] = useState<DialerContact[]>([]);
   const [loadingContacts, setLoadingContacts] = useState(false);
