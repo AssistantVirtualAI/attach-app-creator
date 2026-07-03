@@ -463,7 +463,7 @@ function EmptyState({ tab }: { tab: "recents" | "active" | "missed" }) {
 // ---------- Transcript view (chat bubbles + auto-fetch + Analyze CTA) ----------
 type Seg = { speaker: string; text: string; start?: number | null; end?: number | null };
 function TranscriptView({
-  segments, transcript, loading, onFetch, onAnalyze, aiLoading, analyzed, t,
+  segments, transcript, loading, onFetch, onAnalyze, aiLoading, analyzed, t, filenameHint,
 }: {
   segments: Seg[] | null;
   transcript: string | null;
@@ -473,6 +473,7 @@ function TranscriptView({
   aiLoading: boolean;
   analyzed: boolean;
   t: (k: string) => string;
+  filenameHint?: string;
 }) {
   const has = (segments && segments.length > 0) || !!(transcript && transcript.trim());
   const fetchedRef = useRef(false);
