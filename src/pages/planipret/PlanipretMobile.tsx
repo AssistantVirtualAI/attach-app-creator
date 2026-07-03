@@ -439,8 +439,15 @@ export default function PlanipretMobile() {
     setProfile(data);
     setLoading(false);
     // Hydrate FR/EN from DB (source of truth across devices)
-    if ((data.language === "fr" || data.language === "en") && data.language !== lang) {
-      setLang(data.language);
+    if (data.language === "fr" || data.language === "en") {
+      if (data.language !== lang) setLang(data.language);
+    } else {
+      // Fallback: no language stored → use current detected lang and persist back
+      const fallback: "fr" | "en" = lang === "en" ? "en" : "fr";
+      setLang(fallback);
+      try {
+        await supabase.from("planipret_profiles").update({ language: fallback }).eq("user_id", user.id);
+      } catch { /* non-blocking */ }
     }
     // Silently resolve SIP credentials for the softphone (fire-and-forget).
     if (data?.ns_linked) {

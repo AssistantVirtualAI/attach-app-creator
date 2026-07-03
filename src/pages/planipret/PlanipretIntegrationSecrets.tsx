@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AVA_OWNER_USER_ID } from "@/lib/avaOwner";
+import { PlanipretLangSwitch } from "@/components/planipret/PlanipretLangSwitch";
 
 type Item = {
   provider: "microsoft" | "maestro";
@@ -127,13 +128,18 @@ export default function PlanipretIntegrationSecrets() {
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="px-6 py-4 text-white" style={{ background: "#1F4E79" }}>
-        <div className="text-xs opacity-80">AVA · Planiprêt</div>
-        <h1 className="text-xl font-semibold">Intégrations sécurisées</h1>
-        <p className="text-xs opacity-80 mt-1">
-          Les clés sont stockées côté serveur, masquées à l'affichage, et accessibles uniquement
-          par votre compte propriétaire AVA. Elles alimentent l'application mobile via les
-          fonctions Edge.
-        </p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="text-xs opacity-80">AVA · Planiprêt</div>
+            <h1 className="text-xl font-semibold">Intégrations sécurisées</h1>
+            <p className="text-xs opacity-80 mt-1">
+              Les clés sont stockées côté serveur, masquées à l'affichage, et accessibles uniquement
+              par votre compte propriétaire AVA. Elles alimentent l'application mobile via les
+              fonctions Edge.
+            </p>
+          </div>
+          <PlanipretLangSwitch />
+        </div>
       </header>
       <main className="p-6 max-w-3xl mx-auto space-y-5">
         {msg && (
