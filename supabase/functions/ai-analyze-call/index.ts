@@ -217,6 +217,8 @@ Deno.serve(async (req) => {
 
     const apiKey = (await getSecret(admin, "anthropic", "api_key")) ?? Deno.env.get("ANTHROPIC_API_KEY");
     const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+    const openaiKey = Deno.env.get("OPENAI_API_KEY");
+
 
     const COACHING_SYSTEM = `Tu es AVA, coach IA pour courtiers hypothécaires Planiprêt (Québec).
 Analyse la transcription et retourne UNIQUEMENT un JSON valide (aucun markdown, aucun texte avant/après) suivant EXACTEMENT ce schéma:
