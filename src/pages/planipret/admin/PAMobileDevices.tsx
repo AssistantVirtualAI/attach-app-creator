@@ -80,6 +80,25 @@ export default function PAMobileDevices() {
     refresh();
   }, [refresh]);
 
+  const provisionAppReview = useCallback(async () => {
+    if (!confirm("Créer le compte de test appreview (poste 2000) sur NetSapiens ?")) return;
+    const { data, error } = await supabase.functions.invoke("pp-appreview-provision", {
+      body: {
+        domain: "appreview",
+        extension: "2000",
+        password: "Appreview2026!",
+        email: "appreview@planipret.ca",
+        first_name: "App",
+        last_name: "Review",
+      },
+    });
+    if (error) { toast.error("Provision AppReview échouée", { description: error.message }); return; }
+    if (!data?.ok) { toast.error("Provision AppReview échouée", { description: JSON.stringify(data?.steps?.[0]?.data ?? data) }); return; }
+    toast.success("Compte AppReview prêt", {
+      description: `Ext ${data.extension} · Domaine ${data.domain} · Devices: ${data.devices?.mobile}, ${data.devices?.widget}`,
+    });
+  }, []);
+
   const startTest = useCallback(async () => {
     if (!testBroker) return;
     setTesting(true);
