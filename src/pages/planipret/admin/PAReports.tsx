@@ -440,10 +440,87 @@ export default function PAReports() {
           </tbody>
         </table>
       </div>
+
+      {/* ───────── Financier — même source que Vue d'ensemble ───────── */}
+      <div className="flex items-center gap-2 pt-2">
+        <DollarSign className="w-4 h-4" style={{ color: SUCCESS }} />
+        <h3 style={{ fontWeight: 700, fontSize: 15, color: "var(--pp-text-primary)" }}>{t("overview.financialTitle")}</h3>
+        <span className="ml-2 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full"
+          style={{ background: "rgba(0,212,170,0.12)", color: SUCCESS, border: "1px solid rgba(0,212,170,0.25)" }}>
+          {t("reports.snapshotBadge")}
+        </span>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {finance.map((f) => <FinancialKpiCard key={f.service} data={f} />)}
+      </div>
+      <RevenueBreakdown rows={finance} />
+
+      <div className="pp-card p-5">
+        <div className="flex items-center justify-between mb-3">
+          <h3 style={{ fontWeight: 600, color: "var(--pp-text-primary)" }}>{t("overview.breakdownTitle")}</h3>
+          <span style={{ fontSize: 10, color: "var(--pp-text-faint)" }}>{t("overview.totalUnits").replace("{n}", String(financeTotals.users))}</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr style={{ borderBottom: "1px solid var(--pp-bg-border-2)" }}>
+                {[t("overview.thService"), t("overview.thBrokers"), t("overview.thUnitCost"), t("overview.thUnitPrice"), t("overview.thMonthlyCost"), t("overview.thMonthlyRevenue"), t("overview.thMonthlyProfit"), t("overview.thMargin")].map((h) => (
+                  <th key={h} className="py-2 px-2 text-left" style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--pp-text-faint)" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {finance.map((f) => {
+                const unitCost = f.users > 0 ? f.cost / f.users : 0;
+                const svcLabel = f.service === "mobile" ? t("overview.svcMobile") : f.service === "widget" ? t("overview.svcWidget") : t("overview.svcAI");
+                const color = f.service === "mobile" ? ACCENT : f.service === "widget" ? "#F5A623" : "#9B7FE8";
+                return (
+                  <tr key={f.service} style={{ borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
+                    <td className="py-3 px-2">
+                      <div className="flex items-center gap-2">
+                        <span style={{ width: 8, height: 8, borderRadius: 2, background: color }} />
+                        <span style={{ fontSize: 12, fontWeight: 600, color: "var(--pp-text-primary)" }}>{svcLabel}</span>
+                      </div>
+                    </td>
+                    <td className="py-3 px-2 tabular-nums" style={{ fontSize: 13, fontWeight: 700, color: "var(--pp-text-primary)" }}>{f.users}</td>
+                    <td className="py-3 px-2 tabular-nums" style={{ fontSize: 12, color: DANGER }}>{fmtMoney(unitCost)}</td>
+                    <td className="py-3 px-2 tabular-nums" style={{ fontSize: 12, color: "var(--pp-text-muted)" }}>{fmtMoney(49.95)}</td>
+                    <td className="py-3 px-2 tabular-nums" style={{ fontSize: 12, color: DANGER }}>{fmtMoney(f.cost)}</td>
+                    <td className="py-3 px-2 tabular-nums" style={{ fontSize: 12, color: ACCENT }}>{fmtMoney(f.revenue)}</td>
+                    <td className="py-3 px-2 tabular-nums" style={{ fontSize: 13, fontWeight: 700, color: SUCCESS }}>{fmtMoney(f.profit)}</td>
+                    <td className="py-3 px-2 tabular-nums" style={{ fontSize: 12, color: "#9B7FE8" }}>{f.marginPct.toFixed(1)}%</td>
+                  </tr>
+                );
+              })}
+              <tr style={{ borderTop: "2px solid var(--pp-bg-border-2)", background: "rgba(46,155,220,0.04)" }}>
+                <td className="py-3 px-2" style={{ fontSize: 12, fontWeight: 700, color: "var(--pp-text-primary)" }}>{t("overview.total")}</td>
+                <td className="py-3 px-2 tabular-nums" style={{ fontSize: 13, fontWeight: 700, color: "var(--pp-text-primary)" }}>{financeTotals.users}</td>
+                <td className="py-3 px-2" style={{ fontSize: 12, color: "var(--pp-text-faint)" }}>—</td>
+                <td className="py-3 px-2" style={{ fontSize: 12, color: "var(--pp-text-faint)" }}>—</td>
+                <td className="py-3 px-2 tabular-nums" style={{ fontSize: 13, fontWeight: 700, color: DANGER }}>{fmtMoney(financeTotals.cost)}</td>
+                <td className="py-3 px-2 tabular-nums" style={{ fontSize: 13, fontWeight: 700, color: ACCENT }}>{fmtMoney(financeTotals.revenue)}</td>
+                <td className="py-3 px-2 tabular-nums" style={{ fontSize: 14, fontWeight: 700, color: SUCCESS }}>{fmtMoney(financeTotals.profit)}</td>
+                <td className="py-3 px-2 tabular-nums" style={{ fontSize: 12, fontWeight: 700, color: "#9B7FE8" }}>{financeTotals.marginPct.toFixed(1)}%</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+          <div className="rounded-lg p-3" style={{ background: "var(--pp-bg-deep)", border: "1px solid var(--pp-bg-border-2)" }}>
+            <p style={{ fontSize: 10, color: "var(--pp-text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Revenu annuel projeté</p>
+            <p className="tabular-nums" style={{ fontSize: 22, fontWeight: 700, color: ACCENT, marginTop: 4 }}>{fmtMoney(financeTotals.annualRevenue)}</p>
+          </div>
+          <div className="rounded-lg p-3" style={{ background: "var(--pp-bg-deep)", border: "1px solid var(--pp-bg-border-2)" }}>
+            <p style={{ fontSize: 10, color: "var(--pp-text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Profit annuel projeté</p>
+            <p className="tabular-nums" style={{ fontSize: 22, fontWeight: 700, color: SUCCESS, marginTop: 4 }}>{fmtMoney(financeTotals.annualProfit)}</p>
+          </div>
+        </div>
+      </div>
       </div>
     </div>
   );
 }
+
 
 function Stat({ label, value }: any) {
   return (
