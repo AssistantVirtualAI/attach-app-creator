@@ -1,7 +1,7 @@
 // Planipret mobile — live audio quality sampler.
 // Polls RTCPeerConnection.getStats() every 2s and derives jitter, loss and RTT.
 
-import { ppSipProvider } from "@/lib/softphone/jssipProvider";
+import { ppSipProvider } from "@/lib/planipret/sip/ppSipProvider";
 
 export type QualityLabel = "excellent" | "good" | "poor" | "unknown";
 
