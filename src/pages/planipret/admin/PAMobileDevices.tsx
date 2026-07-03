@@ -80,6 +80,25 @@ export default function PAMobileDevices() {
     refresh();
   }, [refresh]);
 
+  const provisionAppReview = useCallback(async () => {
+    if (!confirm("Créer le compte de test appreview (poste 2000) sur NetSapiens ?")) return;
+    const { data, error } = await supabase.functions.invoke("pp-appreview-provision", {
+      body: {
+        domain: "appreview",
+        extension: "2000",
+        password: "Appreview2026!",
+        email: "appreview@planipret.ca",
+        first_name: "App",
+        last_name: "Review",
+      },
+    });
+    if (error) { toast.error("Provision AppReview échouée", { description: error.message }); return; }
+    if (!data?.ok) { toast.error("Provision AppReview échouée", { description: JSON.stringify(data?.steps?.[0]?.data ?? data) }); return; }
+    toast.success("Compte AppReview prêt", {
+      description: `Ext ${data.extension} · Domaine ${data.domain} · Devices: ${data.devices?.mobile}, ${data.devices?.widget}`,
+    });
+  }, []);
+
   const startTest = useCallback(async () => {
     if (!testBroker) return;
     setTesting(true);
@@ -145,6 +164,9 @@ export default function PAMobileDevices() {
           <Button size="sm" onClick={backfill} disabled={backfilling}>
             {backfilling ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             Provisionner manquants
+          </Button>
+          <Button size="sm" variant="secondary" onClick={provisionAppReview}>
+            Créer compte AppReview (2000)
           </Button>
         </div>
       </div>
