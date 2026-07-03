@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
+import { PlanipretLangSwitch } from "@/components/planipret/PlanipretLangSwitch";
 
 export default function PlanipretPrivacy() {
   const nav = useNavigate();
@@ -13,6 +14,7 @@ export default function PlanipretPrivacy() {
         <h1 style={{ fontFamily: "Inter,sans-serif", fontWeight: 700, fontSize: 16, color: "var(--pp-text-primary)" }}>
           🔏 Politique de confidentialité
         </h1>
+        <div className="ml-auto"><PlanipretLangSwitch /></div>
       </header>
       <article className="px-5 py-6 max-w-2xl mx-auto space-y-6" style={{ color: "var(--pp-text-secondary)", fontSize: 14, lineHeight: 1.7 }}>
         <p style={{ color: "var(--pp-text-muted)", fontSize: 12 }}>Version 2026-06 · Conforme Loi 25 (Québec) et PIPEDA (Canada)</p>
