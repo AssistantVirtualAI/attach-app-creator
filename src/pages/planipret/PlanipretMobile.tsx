@@ -320,6 +320,9 @@ export default function PlanipretMobile() {
   const navigate = useNavigate();
   const location = useLocation();
   const { t, lang, setLang } = useMplanipretLang();
+  // Boot the shared softphone engine (WebRTC + noise cancellation + auto handover).
+  // Uses the exact same JsSIP stack as the Lemtel mobile app.
+  useMplanipretSoftphone();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [accessError, setAccessError] = useState<"unauthenticated" | "missing_profile" | "load_failed" | null>(null);
