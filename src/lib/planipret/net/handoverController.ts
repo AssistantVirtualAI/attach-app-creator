@@ -38,6 +38,11 @@ class HandoverController {
   }
   private emit(e: HandoverEvent) { this.listeners.forEach((l) => { try { l(e); } catch {} }); }
 
+  private autoEnabled(): boolean {
+    try { const v = localStorage.getItem("pp_auto_handover"); return v === null ? true : v === "1"; }
+    catch { return true; }
+  }
+
   private async onNet(s: NetSample) {
     const prev = this.lastType;
     this.lastType = s.type;
@@ -47,6 +52,7 @@ class HandoverController {
     this.lastActionAt = Date.now();
     this.emit({ kind: "network-change", from: prev, to: s.type, at: Date.now() });
     if (!s.connected) return;
+    if (!this.autoEnabled()) return;
     if (this.inFlight) return;
     this.inFlight = true;
     try {
