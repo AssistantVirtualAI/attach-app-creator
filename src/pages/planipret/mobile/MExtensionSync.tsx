@@ -37,6 +37,9 @@ export default function MExtensionSync() {
     }
     setBusy(true);
     setState("provisioning");
+    // Invalidate cached SIP config BEFORE fetching new creds so the softphone
+    // never re-registers on stale (widget) credentials after a resync.
+    try { sessionStorage.removeItem("pp_sip_config"); } catch {}
     const { data, error } = await supabase.functions.invoke("ns-resolve-sip-credentials", {
       body: { client_type: "mobile" },
     });
@@ -45,6 +48,8 @@ export default function MExtensionSync() {
     setLastResult({ error: error?.message ?? null, ...res });
     if (Array.isArray(res?.ns_devices)) setDevices(res.ns_devices);
     else if (Array.isArray(res?.ns_devices_now)) setDevices(res.ns_devices_now);
+    if (Array.isArray(res?.ns_devices_detail)) setDevicesDetail(res.ns_devices_detail);
+    if (res?.ns_registered_device_id) setRegisteredDeviceId(res.ns_registered_device_id);
     if (error || !res?.ok) {
       setState("error");
       if (!opts?.silent) toast.error(res?.error ?? error?.message ?? "Échec du resync");
@@ -58,6 +63,14 @@ export default function MExtensionSync() {
     await reloadProfile();
     setState("ok");
     if (!opts?.silent) toast.success(`Extension ${res.sip_extension} synchronisée`);
+  };
+
+  const forceReregister = () => {
+    try { sessionStorage.removeItem("pp_sip_config"); } catch {}
+    window.dispatchEvent(new CustomEvent("pp:sip-force-reregister", { detail: { at: Date.now() } }));
+    toast.success("Réinscription SIP demandée sur " + (mobileDeviceId ?? "l'appareil mobile"));
+    // Refresh device list shortly after so the UI reflects the new registration.
+    setTimeout(() => { void runResync({ silent: true }); }, 3500);
   };
 
 
