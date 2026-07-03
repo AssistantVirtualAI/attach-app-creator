@@ -786,6 +786,7 @@ export const MP_DICT = {
       callInProgress: "Calling…",
       callFailed: "Call failed",
       callStarted: "Call started",
+      callStartedWebrtc: "HD call started (WebRTC)",
       clear: "Clear",
       plus: "Plus",
       hangup: "Hang up",
