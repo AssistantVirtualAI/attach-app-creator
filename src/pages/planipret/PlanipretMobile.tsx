@@ -106,12 +106,22 @@ function Dialer({ open, onClose, initial, openMessages }: { open: boolean; onClo
     const result = await softphone.placeCall(destination);
     setCalling(false);
     if (!result.ok) {
+      if ("micState" in result && (result.micState === "denied" || result.micState === "unavailable")) {
+        setMicDialog({ open: true, state: result.micState, pending: destination });
+        return;
+      }
       toast.error(("error" in result && result.error) || t("dialer.callFailed"));
       return;
     }
     toast.success(result.via === "webrtc" ? t("dialer.callStartedWebrtc") : t("dialer.callStarted"));
     setNumber("");
     onClose();
+  };
+
+  const retryMic = async () => {
+    const pending = micDialog.pending;
+    setMicDialog({ open: false, state: "prompt" });
+    if (pending) await startCall(pending);
   };
 
 
