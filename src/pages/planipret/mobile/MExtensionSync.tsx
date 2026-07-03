@@ -195,11 +195,31 @@ export default function MExtensionSync() {
         {busy ? "Synchronisation en cours…" : "Forcer le resync"}
       </button>
 
-      {devices && (
+      <button
+        onClick={forceReregister}
+        disabled={!extension}
+        className="w-full flex items-center justify-center gap-2 active:scale-[0.99] transition"
+        style={{
+          padding: "12px 16px",
+          borderRadius: 12,
+          background: "var(--pp-bg-elevated)",
+          color: "var(--pp-text)",
+          fontFamily: "Inter,sans-serif",
+          fontWeight: 700,
+          fontSize: 13,
+          border: "1px solid var(--pp-bg-border-2)",
+          opacity: !extension ? 0.5 : 1,
+        }}
+      >
+        <Zap className="w-4 h-4" />
+        Forcer la réinscription {mobileDeviceId ? `(${mobileDeviceId})` : ""}
+      </button>
+
+      {(devicesDetail || devices) && (
         <div className="pp-card" style={{ padding: 10 }}>
           <div className="flex items-center justify-between" style={{ marginBottom: 6 }}>
             <div style={{ fontSize: 12, fontWeight: 700 }}>
-              Appareils SIP ({devices.length})
+              Appareils SIP ({(devicesDetail ?? devices ?? []).length})
             </div>
             <button
               onClick={() => runResync({ silent: true })}
@@ -212,32 +232,60 @@ export default function MExtensionSync() {
               Rafraîchir
             </button>
           </div>
-          {devices.length === 0 ? (
+          {(devicesDetail ?? []).length === 0 && (devices ?? []).length === 0 ? (
             <div style={{ fontSize: 12, color: "var(--pp-text-muted)" }}>Aucun appareil trouvé.</div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              {devices.map((d) => {
-                const isMine = d === mobileDeviceId;
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {(devicesDetail ?? (devices ?? []).map((id) => ({ id, user_agent: null, ip: null, registered_at: null, registered: false, is_mine: id === mobileDeviceId } as DeviceDetail))).map((d) => {
+                const isMine = d.is_mine || d.id === mobileDeviceId;
+                const isActive = d.id === registeredDeviceId || d.registered;
+                const borderColor = isActive
+                  ? "rgba(52,199,89,0.55)"
+                  : isMine
+                    ? "rgba(46,155,220,0.35)"
+                    : "var(--pp-bg-border-2)";
+                const bg = isActive
+                  ? "rgba(52,199,89,0.10)"
+                  : isMine
+                    ? "rgba(46,155,220,0.08)"
+                    : "transparent";
                 return (
                   <div
-                    key={d}
-                    className="flex items-center gap-2"
+                    key={d.id}
                     style={{
                       fontSize: 12,
-                      padding: "6px 8px",
+                      padding: "8px 10px",
                       borderRadius: 8,
-                      background: isMine ? "rgba(46,155,220,0.10)" : "transparent",
-                      border: isMine ? "1px solid rgba(46,155,220,0.35)" : "1px solid transparent",
+                      background: bg,
+                      border: `1px solid ${borderColor}`,
                     }}
                   >
-                    {isMine
-                      ? <CheckCircle2 className="w-3.5 h-3.5" style={{ color: "var(--pp-color-success)" }} />
-                      : <Smartphone className="w-3.5 h-3.5" style={{ color: "var(--pp-text-muted)" }} />}
-                    <span style={{ fontWeight: isMine ? 700 : 500, wordBreak: "break-all" }}>{d}</span>
-                    {isMine && (
-                      <span style={{ fontSize: 10, color: "var(--pp-color-success)", marginLeft: "auto" }}>
-                        ce téléphone
+                    <div className="flex items-center gap-2">
+                      {isActive
+                        ? <CheckCircle2 className="w-3.5 h-3.5" style={{ color: "var(--pp-color-success)" }} />
+                        : isMine
+                          ? <Smartphone className="w-3.5 h-3.5" style={{ color: "#2E9BDC" }} />
+                          : <Radio className="w-3.5 h-3.5" style={{ color: "var(--pp-text-muted)" }} />}
+                      <span style={{ fontWeight: (isMine || isActive) ? 700 : 500, wordBreak: "break-all" }}>{d.id}</span>
+                      <span style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+                        {isActive && (
+                          <span style={{ fontSize: 10, fontWeight: 700, color: "var(--pp-color-success)" }}>● ACTIF</span>
+                        )}
+                        {isMine && (
+                          <span style={{ fontSize: 10, color: "#2E9BDC" }}>ce téléphone</span>
+                        )}
                       </span>
+                    </div>
+                    {(d.user_agent || d.ip || d.registered_at) ? (
+                      <div style={{ fontSize: 10.5, color: "var(--pp-text-muted)", marginTop: 4, lineHeight: 1.4 }}>
+                        {d.user_agent && <div>UA · {d.user_agent}</div>}
+                        {d.ip && <div>IP · {d.ip}</div>}
+                        {d.registered_at && <div>Registré · {d.registered_at}</div>}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: 10.5, color: "var(--pp-text-muted)", marginTop: 4 }}>
+                        Aucun REGISTER reçu — appareil créé mais non enregistré.
+                      </div>
                     )}
                   </div>
                 );
