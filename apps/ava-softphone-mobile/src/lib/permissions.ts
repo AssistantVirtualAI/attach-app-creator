@@ -166,19 +166,29 @@ export async function checkAllPermissions(): Promise<AllPermissions> {
 
   // Microphone — try Permissions API, then enumerateDevices heuristic.
   try {
-    const anyPerm: any = (navigator as any).permissions;
-    if (anyPerm?.query) {
+    if (Capacitor.isNativePlatform()) {
       try {
-        const st = await anyPerm.query({ name: 'microphone' as PermissionName });
-        if (st?.state === 'granted' || st?.state === 'denied' || st?.state === 'prompt') {
-          perms.microphone = st.state as PermissionStatus;
+        const { Microphone } = await import('@mozartec/capacitor-microphone');
+        const res = await Microphone.checkPermissions();
+        if (res?.microphone === 'granted' || res?.microphone === 'denied' || res?.microphone === 'prompt') {
+          perms.microphone = res.microphone as PermissionStatus;
         }
-      } catch { /* not supported */ }
-    }
-    if (perms.microphone === 'prompt' && navigator.mediaDevices?.enumerateDevices) {
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const mic = devices.find((d) => d.kind === 'audioinput');
-      if (mic && mic.label) perms.microphone = 'granted';
+      } catch { /* plugin missing */ }
+    } else {
+      const anyPerm: any = (navigator as any).permissions;
+      if (anyPerm?.query) {
+        try {
+          const st = await anyPerm.query({ name: 'microphone' as PermissionName });
+          if (st?.state === 'granted' || st?.state === 'denied' || st?.state === 'prompt') {
+            perms.microphone = st.state as PermissionStatus;
+          }
+        } catch { /* not supported */ }
+      }
+      if (perms.microphone === 'prompt' && navigator.mediaDevices?.enumerateDevices) {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const mic = devices.find((d) => d.kind === 'audioinput');
+        if (mic && mic.label) perms.microphone = 'granted';
+      }
     }
   } catch { /* ignore */ }
 
