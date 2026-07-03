@@ -803,6 +803,28 @@ export const MP_DICT = {
       noExtension: "No extension configured",
       contactAdmin: "Contact your Planiprêt administrator",
     },
+    mic: {
+      deniedTitle: "Microphone permission required",
+      deniedBody: "Planipret can't place calls without microphone access. Allow access in your device settings, then try again.",
+      unavailableTitle: "No microphone detected",
+      unavailableBody: "No audio device was found. Plug in a headset or microphone and try again.",
+      step1: "Open your device settings",
+      step2: "Find Planipret in the apps list",
+      step3: "Enable Microphone",
+      retry: "Retry",
+    },
+    handover: {
+      iceOk: "Call migrated",
+      iceFail: "Migration failed",
+      reregistered: "Line restored",
+    },
+    callSettings: {
+      title: "Calls & audio",
+      ncLabel: "Noise cancellation",
+      ncSub: "Boosts voice and removes background noise",
+      handoverLabel: "Automatic network handover",
+      handoverSub: "Keeps calls up when switching between Wi-Fi and LTE",
+    },
     dialer: {
       enterNumber: "Enter a number…",
       callInProgress: "Calling…",
