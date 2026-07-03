@@ -165,8 +165,8 @@ Deno.serve(async (req) => {
       "authentication-key": sipPassword,
       "device-provisioning-protocol": "sip",
       ...(withModel ? { "device-model": modelPref } : {}),
-      });
     });
+
     let createRes = await nsFetch(
       `/domains/${encodeURIComponent(domain)}/users/${encodeURIComponent(extension)}/devices`,
       { method: "POST", body: buildBody(true) },
