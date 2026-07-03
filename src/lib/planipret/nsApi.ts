@@ -113,13 +113,22 @@ export const recordingsApi = {
       },
     });
     if (!res.ok) throw new Error(`Recording fetch failed (${res.status})`);
-    return res.blob();
+    const ct = res.headers.get("content-type") ?? "";
+    // Edge function returns 200 + JSON when NS reports the recording is missing/forbidden.
+    if (ct.includes("application/json")) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err?.error ?? "Enregistrement indisponible");
+    }
+    const buf = await res.arrayBuffer();
+    if (buf.byteLength < 128) throw new Error("Empty recording");
+    return new Blob([buf], { type: ct.startsWith("audio/") ? ct : "audio/wav" });
   },
   async fetchAudioUrl(callId: string): Promise<string> {
     const blob = await this.fetchAudio(callId);
     return URL.createObjectURL(blob);
   },
 };
+
 
 /* ============================================================
  * Voicemails — ns-voicemail
