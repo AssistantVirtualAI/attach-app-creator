@@ -20,13 +20,33 @@ export interface AllPermissions {
 /** Microphone + speaker output (WebRTC). Triggers OS prompt on native. */
 export async function requestMicrophone(): Promise<PermissionStatus> {
   try {
-    if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios') {
-      const res = await CapacitorPjsip.requestMicrophonePermission();
-      return res?.granted ? 'granted' : 'denied';
+    if (Capacitor.isNativePlatform()) {
+      const platform = Capacitor.getPlatform();
+      // iOS uses the custom PJSIP plugin (already wired to AVAudioSession).
+      if (platform === 'ios') {
+        try {
+          const res = await CapacitorPjsip.requestMicrophonePermission();
+          if (res?.granted) return 'granted';
+        } catch { /* fall through to Microphone plugin */ }
+      }
+      // Android (and iOS fallback) — request RECORD_AUDIO via the
+      // @mozartec/capacitor-microphone plugin. This is what actually shows
+      // the native OS prompt on Android; getUserMedia alone will NOT trigger
+      // Android's runtime permission dialog inside a Capacitor WebView.
+      try {
+        const { Microphone } = await import('@mozartec/capacitor-microphone');
+        const check = await Microphone.checkPermissions();
+        if (check?.microphone === 'granted') return 'granted';
+        const req = await Microphone.requestPermissions();
+        if (req?.microphone === 'granted') return 'granted';
+        if (req?.microphone === 'denied') return 'denied';
+        return 'prompt';
+      } catch (e) {
+        console.warn('[permissions] Microphone plugin failed, falling back to getUserMedia', e);
+      }
     }
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) return 'unsupported';
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    // Immediately stop so we don't keep the mic open before a call.
     stream.getTracks().forEach((t) => t.stop());
     return 'granted';
   } catch {
@@ -146,19 +166,29 @@ export async function checkAllPermissions(): Promise<AllPermissions> {
 
   // Microphone — try Permissions API, then enumerateDevices heuristic.
   try {
-    const anyPerm: any = (navigator as any).permissions;
-    if (anyPerm?.query) {
+    if (Capacitor.isNativePlatform()) {
       try {
-        const st = await anyPerm.query({ name: 'microphone' as PermissionName });
-        if (st?.state === 'granted' || st?.state === 'denied' || st?.state === 'prompt') {
-          perms.microphone = st.state as PermissionStatus;
+        const { Microphone } = await import('@mozartec/capacitor-microphone');
+        const res = await Microphone.checkPermissions();
+        if (res?.microphone === 'granted' || res?.microphone === 'denied' || res?.microphone === 'prompt') {
+          perms.microphone = res.microphone as PermissionStatus;
         }
-      } catch { /* not supported */ }
-    }
-    if (perms.microphone === 'prompt' && navigator.mediaDevices?.enumerateDevices) {
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const mic = devices.find((d) => d.kind === 'audioinput');
-      if (mic && mic.label) perms.microphone = 'granted';
+      } catch { /* plugin missing */ }
+    } else {
+      const anyPerm: any = (navigator as any).permissions;
+      if (anyPerm?.query) {
+        try {
+          const st = await anyPerm.query({ name: 'microphone' as PermissionName });
+          if (st?.state === 'granted' || st?.state === 'denied' || st?.state === 'prompt') {
+            perms.microphone = st.state as PermissionStatus;
+          }
+        } catch { /* not supported */ }
+      }
+      if (perms.microphone === 'prompt' && navigator.mediaDevices?.enumerateDevices) {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const mic = devices.find((d) => d.kind === 'audioinput');
+        if (mic && mic.label) perms.microphone = 'granted';
+      }
     }
   } catch { /* ignore */ }
 
@@ -192,17 +222,19 @@ export async function checkAllPermissions(): Promise<AllPermissions> {
 /** Open the OS-level app settings page so the user can flip a denied permission. */
 export async function openAppSettings(): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
+  const platform = Capacitor.getPlatform();
   try {
-    const { App } = await import('@capacitor/app');
-    // Capacitor App plugin doesn't directly expose settings on all versions;
-    // fall back to platform-specific deep link via window.open.
-    const platform = Capacitor.getPlatform();
     if (platform === 'ios') {
       window.open('app-settings:', '_system');
-    } else if (platform === 'android') {
+      return;
+    }
+    if (platform === 'android') {
+      try {
+        const { App } = await import('@capacitor/app');
+        await App.openUrl({ url: 'package:com.lemtel.softphone' });
+        return;
+      } catch { /* ignore */ }
       window.open('package:com.lemtel.softphone', '_system');
     }
-    // Touch App import to avoid unused warning.
-    void App;
   } catch { /* ignore */ }
 }
