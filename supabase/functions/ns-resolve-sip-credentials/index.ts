@@ -202,6 +202,10 @@ Deno.serve(async (req) => {
   const updatePatch: Record<string, unknown> = { [passwordRefColumn]: secretName };
   if (clientType === "widget") updatePatch.ns_widget_device_id = resolvedDeviceId;
   else updatePatch.ns_mobile_device_id = resolvedDeviceId;
+  if (!profile.ns_linked) {
+    updatePatch.ns_linked = true;
+    updatePatch.ns_linked_at = new Date().toISOString();
+  }
   await admin.from("planipret_profiles").update(updatePatch).eq("id", profile.id);
 
   return json({
