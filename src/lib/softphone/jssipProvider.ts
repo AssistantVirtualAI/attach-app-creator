@@ -552,6 +552,49 @@ class JsSipProvider {
       callEvents: this.snap.callEvents,
     };
   }
+
+  // ---- Additive helpers used by /mplanipret quality controller.
+  // Lemtel softphone must not depend on these; they are safe no-ops when idle.
+  getActivePeerConnection(): RTCPeerConnection | null {
+    return (this.session as any)?.connection ?? null;
+  }
+  hasActiveCall(): boolean {
+    return !!this.session && (this.snap.callState === "active" || this.snap.callState === "held");
+  }
+  /** Trigger an ICE restart on the current call (seamless Wi-Fi ↔ LTE handover). */
+  async iceRestart(): Promise<boolean> {
+    const s = this.session;
+    if (!s) return false;
+    try {
+      if (typeof s.renegotiate === "function") {
+        s.renegotiate({ rtcOfferConstraints: { iceRestart: true } });
+        this.logCall("info", "[ice] restart requested (renegotiate)");
+        return true;
+      }
+      const pc: RTCPeerConnection | undefined = s.connection;
+      if (pc && typeof pc.restartIce === "function") {
+        pc.restartIce();
+        this.logCall("info", "[ice] restart requested (pc.restartIce)");
+        return true;
+      }
+    } catch (e: any) {
+      this.logCall("error", `[ice] restart failed: ${e?.message || e}`);
+    }
+    return false;
+  }
+  /** Force re-registration (useful when network interface changes while idle). */
+  async forceReregister(): Promise<void> {
+    try {
+      if (this.ua) {
+        try { this.ua.unregister({ all: true }); } catch {}
+        setTimeout(() => { try { this.ua?.register(); } catch {} }, 250);
+        this.log("info", "sip", "Forced re-registration (network change)");
+      }
+    } catch (e: any) {
+      this.log("warn", "sip", `forceReregister failed: ${e?.message || e}`);
+    }
+  }
 }
 
 export const sipProvider = new JsSipProvider();
+
