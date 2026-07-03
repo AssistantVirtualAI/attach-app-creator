@@ -6,6 +6,8 @@ import {
   Mic, MicOff, Pause, Play, PhoneForwarded, Grid3X3, Volume2, VolumeX, PhoneOff, User,
 } from "lucide-react";
 import { useMplanipretLang } from "@/hooks/useMplanipretLang";
+import { useMplanipretSoftphone } from "@/hooks/useMplanipretSoftphone";
+import NetworkQualityBadge from "@/components/planipret/mobile/NetworkQualityBadge";
 
 type Call = {
   id: string;
