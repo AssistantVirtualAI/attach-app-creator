@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { colors, gradients, radius, font } from '../lib/theme';
 import { LemtelMark } from './Brand';
-import { requestMicrophone } from '../lib/permissions';
+import { requestMicrophone, openAppSettings, checkAllPermissions } from '../lib/permissions';
 import type { AllPermissions, PermissionStatus } from '../lib/permissions';
 
 interface PermissionGateProps {
