@@ -110,10 +110,13 @@ export function useMplanipretSoftphone() {
   }, [user?.id]);
 
   // Resolve NS-API SIP credentials and register the softphone per user.
+  // Re-runs whenever the ExtensionSync page dispatches `pp:sip-ready`, so a
+  // freshly-created `{ext}_mobile` device actually REGISTERs and shows up in
+  // NetSapiens with IP/User-Agent instead of empty columns.
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
-    (async () => {
+    const doInit = async () => {
       setLoading(true);
       try {
         const { data, error } = await supabase.functions.invoke("ns-resolve-sip-credentials", { body: { client_type: "mobile" } });
@@ -133,9 +136,13 @@ export function useMplanipretSoftphone() {
       } finally {
         if (!cancelled) setLoading(false);
       }
-    })();
-    return () => { cancelled = true; };
+    };
+    void doInit();
+    const onReady = () => { void doInit(); };
+    window.addEventListener("pp:sip-ready", onReady as any);
+    return () => { cancelled = true; window.removeEventListener("pp:sip-ready", onReady as any); };
   }, [user?.id]);
+
 
   // Live call quality only while a call is active.
   useEffect(() => {
