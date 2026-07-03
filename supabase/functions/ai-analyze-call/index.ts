@@ -266,7 +266,24 @@ ${String(transcript).slice(0, 18000)}`;
     let analysis: any = null;
     let modelUsed = "";
 
-    // Prefer Claude if available, otherwise fall back to Lovable AI Gateway (Gemini).
+    const tryOpenAI = async () => {
+      modelUsed = "openai/gpt-4o-mini";
+      const r = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${openaiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "gpt-4o-mini",
+          response_format: { type: "json_object" },
+          messages: [{ role: "system", content: COACHING_SYSTEM }, { role: "user", content: userMsg }],
+        }),
+      });
+      if (!r.ok) throw new Error(`openai ${r.status}: ${(await r.text()).slice(0, 300)}`);
+      const d = await r.json();
+      const raw = d.choices?.[0]?.message?.content ?? "{}";
+      try { analysis = JSON.parse(raw); } catch { analysis = JSON.parse(raw.match(/\{[\s\S]*\}/)?.[0] ?? "{}"); }
+    };
+
+    // Prefer Claude, then Lovable Gateway (Gemini), then OpenAI as final fallback.
     if (apiKey) {
       modelUsed = "claude-sonnet-4-5-20250929";
       const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
@@ -281,11 +298,14 @@ ${String(transcript).slice(0, 18000)}`;
       });
       if (!claudeRes.ok) {
         const errText = await claudeRes.text();
-        return new Response(JSON.stringify({ success: false, error: "Claude API error", details: errText.slice(0, 500) }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        console.error("Claude error, trying fallbacks", claudeRes.status, errText);
+        if (openaiKey) { try { await tryOpenAI(); } catch (e) { return new Response(JSON.stringify({ success: false, error: "Claude+OpenAI failed", details: (e as Error).message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }); } }
+        else return new Response(JSON.stringify({ success: false, error: "Claude API error", details: errText.slice(0, 500) }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      } else {
+        const claudeData = await claudeRes.json();
+        const raw = claudeData.content?.[0]?.text ?? "{}";
+        try { analysis = JSON.parse(raw); } catch { analysis = JSON.parse(raw.match(/\{[\s\S]*\}/)?.[0] ?? "{}"); }
       }
-      const claudeData = await claudeRes.json();
-      const raw = claudeData.content?.[0]?.text ?? "{}";
-      try { analysis = JSON.parse(raw); } catch { analysis = JSON.parse(raw.match(/\{[\s\S]*\}/)?.[0] ?? "{}"); }
     } else if (lovableKey) {
       modelUsed = "google/gemini-2.5-pro";
       const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -302,14 +322,22 @@ ${String(transcript).slice(0, 18000)}`;
       });
       if (!aiRes.ok) {
         const errText = await aiRes.text();
-        return new Response(JSON.stringify({ success: false, error: "AI gateway error", details: errText.slice(0, 500) }), { status: aiRes.status === 429 || aiRes.status === 402 ? aiRes.status : 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        console.error("Lovable gateway error, trying OpenAI", aiRes.status, errText);
+        if (openaiKey) { try { await tryOpenAI(); } catch (e) { return new Response(JSON.stringify({ success: false, error: "Gateway+OpenAI failed", details: (e as Error).message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }); } }
+        else return new Response(JSON.stringify({ success: false, error: "AI gateway error", details: errText.slice(0, 500) }), { status: aiRes.status === 429 || aiRes.status === 402 ? aiRes.status : 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      } else {
+        const aiData = await aiRes.json();
+        const raw = aiData.choices?.[0]?.message?.content ?? "{}";
+        try { analysis = JSON.parse(raw); } catch { analysis = JSON.parse(raw.match(/\{[\s\S]*\}/)?.[0] ?? "{}"); }
       }
-      const aiData = await aiRes.json();
-      const raw = aiData.choices?.[0]?.message?.content ?? "{}";
-      try { analysis = JSON.parse(raw); } catch { analysis = JSON.parse(raw.match(/\{[\s\S]*\}/)?.[0] ?? "{}"); }
+    } else if (openaiKey) {
+      try { await tryOpenAI(); } catch (e) {
+        return new Response(JSON.stringify({ success: false, error: "OpenAI error", details: (e as Error).message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
     } else {
-      return new Response(JSON.stringify({ success: false, error: "Aucune clé IA configurée (ANTHROPIC_API_KEY ou LOVABLE_API_KEY)" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ success: false, error: "Aucune clé IA configurée (ANTHROPIC_API_KEY, LOVABLE_API_KEY ou OPENAI_API_KEY)" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
+
 
     if (!analysis || typeof analysis !== "object") {
       return new Response(JSON.stringify({ success: false, error: "Réponse IA invalide" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
