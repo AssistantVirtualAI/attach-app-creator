@@ -158,7 +158,8 @@ Deno.serve(async (req) => {
         escalation_needed: false,
         key_phrases: insights.key_phrases ?? [],
         prompt_version: "claude-mobile-v1",
-        ai_model: "claude-sonnet-4-5-20250929",
+        ai_model: usedModel || "claude-sonnet-4-5-20250929",
+
       };
 
       await admin.from("pbx_ai_insights").delete().eq("call_record_id", call_id);
