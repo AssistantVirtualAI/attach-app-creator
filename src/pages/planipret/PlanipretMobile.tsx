@@ -316,7 +316,7 @@ function Dialer({ open, onClose, initial, openMessages }: { open: boolean; onClo
 export default function PlanipretMobile() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { t } = useMplanipretLang();
+  const { t, lang, setLang } = useMplanipretLang();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [accessError, setAccessError] = useState<"unauthenticated" | "missing_profile" | "load_failed" | null>(null);
@@ -341,12 +341,12 @@ export default function PlanipretMobile() {
     setInbound({ call_id: row.id, from_number: row.from_number, caller_name: row.caller_name });
   }, []);
   const onAiInsight = useCallback((row: any) => {
-    toast(`🤖 Analyse IA disponible`, {
+    toast(t("toasts.aiAnalysisReady"), {
       description: String(row.ai_summary ?? "").slice(0, 80),
       duration: 8000,
-      action: { label: "Voir", onClick: () => navigate(`/mplanipret/calls?call=${row.id}`) },
+      action: { label: t("common.view"), onClick: () => navigate(`/mplanipret/calls?call=${row.id}`) },
     });
-  }, [navigate]);
+  }, [navigate, t]);
   useRealtimeManager(profile?.user_id, { onInboundRinging, onAiInsight });
   useAvaNavigation(profile?.user_id);
 
@@ -438,6 +438,10 @@ export default function PlanipretMobile() {
     setAccessError(null);
     setProfile(data);
     setLoading(false);
+    // Hydrate FR/EN from DB (source of truth across devices)
+    if ((data.language === "fr" || data.language === "en") && data.language !== lang) {
+      setLang(data.language);
+    }
     // Silently resolve SIP credentials for the softphone (fire-and-forget).
     if (data?.ns_linked) {
       try {

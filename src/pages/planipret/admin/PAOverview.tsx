@@ -12,6 +12,7 @@ import { usePlanipretBrokerStats } from "@/lib/planipret/brokerStats";
 import { readAdminReportFilters, writeAdminReportFilters, type AdminPeriod } from "@/lib/planipret/adminReportFilters";
 import { usePlanipretNsAutoSync } from "@/hooks/usePlanipretNsAutoSync";
 import NsSyncBar from "@/components/planipret/admin/NsSyncBar";
+import { useMplanipretLang } from "@/hooks/useMplanipretLang";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
   PieChart, Pie, Cell, BarChart, Bar, Legend,
@@ -106,6 +107,8 @@ const TooltipDark = ({ active, payload, label }: any) => {
 type Period = 7 | 30 | 90;
 
 export default function PAOverview() {
+  const { t, lang } = useMplanipretLang();
+  const dateLocale = lang === "en" ? "en-CA" : "fr-CA";
   const [period, setPeriodState] = useState<Period>(() => readAdminReportFilters().period as Period);
   const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState({
@@ -214,7 +217,7 @@ export default function PAOverview() {
       const d = new Date(today); d.setDate(d.getDate() - i);
       const key = d.toISOString().slice(0, 10);
       days.push({
-        day: period <= 7 ? d.toLocaleDateString("fr-CA", { weekday: "short" }) : d.toLocaleDateString("fr-CA", { day: "2-digit", month: "2-digit" }),
+        day: period <= 7 ? d.toLocaleDateString(dateLocale, { weekday: "short" }) : d.toLocaleDateString(dateLocale, { day: "2-digit", month: "2-digit" }),
         appels: 0, sms: 0,
       });
       (callsP.data ?? []).forEach((c: any) => { if (c.started_at?.slice(0, 10) === key) days[days.length - 1].appels++; });
@@ -226,9 +229,9 @@ export default function PAOverview() {
     const distMap: Record<string, number> = { inbound: 0, outbound: 0, missed: 0 };
     (callsByDir.data ?? []).forEach((c: any) => { if (c.direction in distMap) distMap[c.direction]++; });
     setDirectionDist([
-      { name: "Entrants", value: distMap.inbound, color: ACCENT },
-      { name: "Sortants", value: distMap.outbound, color: SUCCESS },
-      { name: "Manqués", value: distMap.missed, color: DANGER },
+      { name: t("overview.dirInbound"), value: distMap.inbound, color: ACCENT },
+      { name: t("overview.dirOutbound"), value: distMap.outbound, color: SUCCESS },
+      { name: t("overview.dirMissed"), value: distMap.missed, color: DANGER },
     ]);
 
     // Top 5 brokers
@@ -317,8 +320,8 @@ export default function PAOverview() {
       {/* Header with period selector */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 style={{ fontFamily: "Inter,sans-serif", fontWeight: 700, fontSize: 22, color: "var(--pp-text-primary)" }}>Vue d'ensemble</h1>
-          <p style={{ fontSize: 12, color: "var(--pp-text-faint)" }} className="mt-0.5">Cockpit Planiprêt · {totals.users} utilisateurs facturables · {fmtMoney(totals.profit)} profit / mois</p>
+          <h1 style={{ fontFamily: "Inter,sans-serif", fontWeight: 700, fontSize: 22, color: "var(--pp-text-primary)" }}>{t("overview.title")}</h1>
+          <p style={{ fontSize: 12, color: "var(--pp-text-faint)" }} className="mt-0.5">{t("overview.cockpit")} · {totals.users} {t("overview.subtitleBillable")} · {fmtMoney(totals.profit)} {t("overview.subtitleProfit")}</p>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center rounded-lg overflow-hidden" style={{ background: "var(--pp-bg-deep)", border: "1px solid var(--pp-bg-border-2)" }}>
@@ -334,7 +337,7 @@ export default function PAOverview() {
                   background: period === p ? ACCENT : "transparent",
                 }}
               >
-                {p}j
+                {p}{t("overview.days")}
               </button>
             ))}
           </div>
@@ -344,34 +347,35 @@ export default function PAOverview() {
             style={{ background: "var(--pp-bg-deep)", border: "1px solid var(--pp-bg-border-2)", fontSize: 11, color: "var(--pp-text-muted)" }}
           >
             <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
-            Actualiser
+            {t("overview.refresh")}
           </button>
         </div>
       </div>
 
       {/* KPI Hero Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard icon={<Phone className="w-5 h-5" />} title="Appels aujourd'hui" value={stats.calls} subtitle={`${stats.callsMissedToday} manqués · vs hier`} trend={callsTrend} color={ACCENT} />
-        <KpiCard icon={<Users className="w-5 h-5" />} title="Courtiers actifs" value={stats.brokers} subtitle={`${adoptionPct}% adoption · ${stats.brokersOnline} en ligne`} color={SUCCESS} />
-        <KpiCard icon={<MessageSquare className="w-5 h-5" />} title="SMS aujourd'hui" value={stats.sms} subtitle="envoyés + reçus" trend={smsTrend} color={WARNING} />
-        <KpiCard icon={<Bot className="w-5 h-5" />} title="Sessions AVA aujourd'hui" value={stats.ava} subtitle={`${stats.avaWeek} sur 7 j · ${stats.voicemailsUnread} voicemails`} color={AGENT} />
+        <KpiCard icon={<Phone className="w-5 h-5" />} title={t("overview.kpiCallsToday")} value={stats.calls} subtitle={`${stats.callsMissedToday} ${t("overview.kpiCallsSub")}`} trend={callsTrend} color={ACCENT} />
+        <KpiCard icon={<Users className="w-5 h-5" />} title={t("overview.kpiActiveBrokers")} value={stats.brokers} subtitle={`${adoptionPct}% ${t("overview.kpiActiveBrokersSub")} · ${stats.brokersOnline} ${t("overview.kpiOnline")}`} color={SUCCESS} />
+        <KpiCard icon={<MessageSquare className="w-5 h-5" />} title={t("overview.kpiSmsToday")} value={stats.sms} subtitle={t("overview.kpiSmsSub")} trend={smsTrend} color={WARNING} />
+        <KpiCard icon={<Bot className="w-5 h-5" />} title={t("overview.kpiAvaToday")} value={stats.ava} subtitle={`${stats.avaWeek} ${t("overview.kpiAvaSubDays")} · ${stats.voicemailsUnread} ${t("overview.kpiAvaSubVm")}`} color={AGENT} />
       </div>
 
       {/* KPI Secondary Grid — call quality + follow-ups */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-        <MiniStat label="Durée moy. appel" value={stats.avgDurationSec > 0 ? `${Math.floor(stats.avgDurationSec / 60)}m ${stats.avgDurationSec % 60}s` : "—"} sub={`sur ${period} j`} color={ACCENT} />
-        <MiniStat label="Taux de réponse" value={`${stats.answerRatePct}%`} sub={`sur ${period} j`} color={SUCCESS} />
-        <MiniStat label="Appels manqués" value={stats.callsMissedToday} sub="aujourd'hui" color={DANGER} />
-        <MiniStat label="Rappels en retard" value={stats.overdueReminders} sub="à traiter" color={WARNING} />
-        <MiniStat label="Leads chauds" value={stats.hotLeads7d} sub="7 derniers jours" color={AGENT} />
+        <MiniStat label={t("overview.miniAvgDuration")} value={stats.avgDurationSec > 0 ? `${Math.floor(stats.avgDurationSec / 60)}m ${stats.avgDurationSec % 60}s` : "—"} sub={`${t("overview.miniPeriod")} ${period} ${t("overview.days")}`} color={ACCENT} />
+        <MiniStat label={t("overview.miniAnswerRate")} value={`${stats.answerRatePct}%`} sub={`${t("overview.miniPeriod")} ${period} ${t("overview.days")}`} color={SUCCESS} />
+        <MiniStat label={t("overview.miniMissedCalls")} value={stats.callsMissedToday} sub={t("overview.miniToday")} color={DANGER} />
+        <MiniStat label={t("overview.miniOverdue")} value={stats.overdueReminders} sub={t("overview.miniToProcess")} color={WARNING} />
+        <MiniStat label={t("overview.miniHotLeads")} value={stats.hotLeads7d} sub={`7 ${t("overview.miniLastDays")}`} color={AGENT} />
       </div>
+
 
 
       {/* ===== FINANCIAL SECTION ===== */}
       <div className="flex items-center gap-2 pt-2">
         <DollarSign className="w-4 h-4" style={{ color: SUCCESS }} />
-        <h2 style={{ fontFamily: "Inter,sans-serif", fontWeight: 700, fontSize: 16, color: "var(--pp-text-primary)" }}>Performance financière</h2>
-        <span style={{ fontSize: 10, color: "var(--pp-text-faint)" }} className="ml-2 px-2 py-0.5 rounded-full" >Live</span>
+        <h2 style={{ fontFamily: "Inter,sans-serif", fontWeight: 700, fontSize: 16, color: "var(--pp-text-primary)" }}>{t("overview.financialTitle")}</h2>
+        <span style={{ fontSize: 10, color: "var(--pp-text-faint)" }} className="ml-2 px-2 py-0.5 rounded-full" >{t("overview.live")}</span>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -384,16 +388,16 @@ export default function PAOverview() {
       <div className="pp-card" style={{ padding: 20 }}>
         <div className="flex items-center justify-between mb-3">
           <div>
-            <h2 style={{ fontFamily: "Inter,sans-serif", fontWeight: 600, fontSize: 14, color: "var(--pp-text-primary)" }}>Détail par service — courtiers facturables</h2>
-            <p style={{ fontSize: 11, color: "var(--pp-text-faint)" }} className="mt-0.5">Comptes test (Scott, Mohamad, Carlo, Clinton) exclus · Prix de vente 49,95 $ / courtier</p>
+            <h2 style={{ fontFamily: "Inter,sans-serif", fontWeight: 600, fontSize: 14, color: "var(--pp-text-primary)" }}>{t("overview.breakdownTitle")}</h2>
+            <p style={{ fontSize: 11, color: "var(--pp-text-faint)" }} className="mt-0.5">{t("overview.breakdownSubtitle")}</p>
           </div>
-          <span style={{ fontSize: 10, color: "var(--pp-text-faint)" }}>Total: {totals.users} unités facturées</span>
+          <span style={{ fontSize: 10, color: "var(--pp-text-faint)" }}>{t("overview.totalUnits").replace("{n}", String(totals.users))}</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr style={{ borderBottom: "1px solid var(--pp-bg-border-2)" }}>
-                {["Service", "Courtiers", "Coût unitaire", "Prix unitaire", "Coût mensuel", "Revenu mensuel", "Profit mensuel", "Marge"].map((h) => (
+                {[t("overview.thService"), t("overview.thBrokers"), t("overview.thUnitCost"), t("overview.thUnitPrice"), t("overview.thMonthlyCost"), t("overview.thMonthlyRevenue"), t("overview.thMonthlyProfit"), t("overview.thMargin")].map((h) => (
                   <th key={h} className="py-2 px-2 text-left" style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--pp-text-faint)" }}>{h}</th>
                 ))}
               </tr>
@@ -402,17 +406,18 @@ export default function PAOverview() {
               {finance.map((f) => {
                 const unitCost = f.users > 0 ? f.cost / f.users : 0;
                 const rule = f.service === "widget"
-                  ? "courriel @planipret.ca + non test"
+                  ? t("overview.ruleWidget")
                   : f.service === "mobile"
-                    ? "domain NS planipret.ca + app mobile activée"
-                    : "domain NS planipret.ca + agent AI activé";
+                    ? t("overview.ruleMobile")
+                    : t("overview.ruleAi");
+                const svcLabel = f.service === "mobile" ? t("overview.svcMobile") : f.service === "widget" ? t("overview.svcWidget") : t("overview.svcAI");
                 return (
                   <tr key={f.service} style={{ borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
                     <td className="py-3 px-2">
                       <div className="flex items-center gap-2">
                         <span style={{ width: 8, height: 8, borderRadius: 2, background: (finance.find(x => x.service === f.service) && (f.service === "mobile" ? "#2E9BDC" : f.service === "widget" ? "#F5A623" : "#9B7FE8")) }} />
                         <div>
-                          <div style={{ fontSize: 12, fontWeight: 600, color: "var(--pp-text-primary)" }}>{f.service === "mobile" ? "Application mobile" : f.service === "widget" ? "Widget web" : "Agent AI"}</div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: "var(--pp-text-primary)" }}>{svcLabel}</div>
                           <div style={{ fontSize: 10, color: "var(--pp-text-faint)" }}>{rule}</div>
                         </div>
                       </div>
@@ -428,7 +433,7 @@ export default function PAOverview() {
                 );
               })}
               <tr style={{ borderTop: "2px solid var(--pp-bg-border-2)", background: "rgba(46,155,220,0.04)" }}>
-                <td className="py-3 px-2" style={{ fontSize: 12, fontWeight: 700, color: "var(--pp-text-primary)" }}>Total</td>
+                <td className="py-3 px-2" style={{ fontSize: 12, fontWeight: 700, color: "var(--pp-text-primary)" }}>{t("overview.total")}</td>
                 <td className="py-3 px-2 tabular-nums" style={{ fontSize: 13, fontWeight: 700, color: "var(--pp-text-primary)" }}>{totals.users}</td>
                 <td className="py-3 px-2" style={{ fontSize: 12, color: "var(--pp-text-faint)" }}>—</td>
                 <td className="py-3 px-2" style={{ fontSize: 12, color: "var(--pp-text-faint)" }}>—</td>
@@ -444,29 +449,30 @@ export default function PAOverview() {
 
       <div className="pp-card" style={{ padding: 20 }}>
         <div className="mb-3">
-          <h2 style={{ fontFamily: "Inter,sans-serif", fontWeight: 600, fontSize: 14, color: "var(--pp-text-primary)" }}>Règles exactes de calcul</h2>
-          <p style={{ fontSize: 11, color: "var(--pp-text-faint)" }} className="mt-0.5">Base active: courriel @planipret.ca · comptes test exclus: Scott, Mohamad, Carlo, Clinton.</p>
+          <h2 style={{ fontFamily: "Inter,sans-serif", fontWeight: 600, fontSize: 14, color: "var(--pp-text-primary)" }}>{t("overview.rulesTitle")}</h2>
+          <p style={{ fontSize: 11, color: "var(--pp-text-faint)" }} className="mt-0.5">{t("overview.rulesSubtitle")}</p>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-          <RuleCard title="Widget web" count={serviceCounts.widget} formula={`${serviceCounts.widget} × 18,99 $ = ${fmtMoney(serviceCounts.widget * 18.99)} / mois`} filter="email @planipret.ca + non test" color={WARNING} />
-          <RuleCard title="Application mobile" count={serviceCounts.mobile} formula={`${serviceCounts.mobile} × 8,00 $ = ${fmtMoney(serviceCounts.mobile * 8)} / mois`} filter="email @planipret.ca + non test + ns_domain = planipret.ca + mobile_app_enabled = true" color={ACCENT} />
-          <RuleCard title="Agent AI" count={serviceCounts.ai} formula={`${serviceCounts.ai} × 25,00 $ = ${fmtMoney(serviceCounts.ai * 25)} / mois`} filter="email @planipret.ca + non test + ns_domain = planipret.ca + voice_agent_enabled = true" color={AGENT} />
+          <RuleCard title={t("overview.svcWidget")} count={serviceCounts.widget} formula={`${serviceCounts.widget} × 18,99 $ = ${fmtMoney(serviceCounts.widget * 18.99)} / mois`} filter={t("overview.ruleWidget")} color={WARNING} />
+          <RuleCard title={t("overview.svcMobile")} count={serviceCounts.mobile} formula={`${serviceCounts.mobile} × 8,00 $ = ${fmtMoney(serviceCounts.mobile * 8)} / mois`} filter={t("overview.ruleMobile")} color={ACCENT} />
+          <RuleCard title={t("overview.svcAI")} count={serviceCounts.ai} formula={`${serviceCounts.ai} × 25,00 $ = ${fmtMoney(serviceCounts.ai * 25)} / mois`} filter={t("overview.ruleAi")} color={AGENT} />
         </div>
       </div>
 
 
+
       {/* Engagement strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <MiniStat label="Adoption mobile" value={`${adoptionPct}%`} sub={`${stats.brokers}/${stats.brokersTotal} courtiers`} color={ACCENT} />
-        <MiniStat label={`Appels / courtier (${period}j)`} value={avgCallsPerBroker} sub="moyenne" color={SUCCESS} />
-        <MiniStat label="Leads chauds" value={hotLeads.length} sub="≥ 8/10 aujourd'hui" color={DANGER} />
-        <MiniStat label="Voicemails" value={stats.voicemailsUnread} sub="non lus" color={WARNING} />
+        <MiniStat label={t("overview.engagementMobileAdoption")} value={`${adoptionPct}%`} sub={`${stats.brokers}/${stats.brokersTotal} ${t("overview.engagementBrokers")}`} color={ACCENT} />
+        <MiniStat label={`${t("overview.engagementCallsPerBroker")} (${period}${t("overview.days")})`} value={avgCallsPerBroker} sub={t("overview.engagementAverage")} color={SUCCESS} />
+        <MiniStat label={t("overview.engagementHotLeads")} value={hotLeads.length} sub={t("overview.engagementHotLeadsSub")} color={DANGER} />
+        <MiniStat label={t("overview.engagementVoicemails")} value={stats.voicemailsUnread} sub={t("overview.engagementUnread")} color={WARNING} />
       </div>
 
       {/* Activity charts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2">
-          <ChartCard title={`Activité ${period} derniers jours`} subtitle="Appels et messages cumulés">
+          <ChartCard title={`${t("overview.chartActivityTitle")} ${period} ${t("overview.miniLastDays")}`} subtitle={t("overview.chartActivitySubtitle")}>
             <div style={{ width: "100%", height: 240 }}>
               <ResponsiveContainer>
                 <AreaChart data={seriesData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -485,15 +491,15 @@ export default function PAOverview() {
                   <YAxis stroke="#4A7FA5" fontSize={11} />
                   <Tooltip content={<TooltipDark />} />
                   <Legend wrapperStyle={{ fontSize: 11, color: "#8FA8C0" }} />
-                  <Area type="monotone" dataKey="appels" name="Appels" stroke={ACCENT} strokeWidth={2} fill="url(#gradCalls)" />
-                  <Area type="monotone" dataKey="sms" name="SMS" stroke={WARNING} strokeWidth={2} fill="url(#gradSms)" />
+                  <Area type="monotone" dataKey="appels" name={t("overview.seriesCalls")} stroke={ACCENT} strokeWidth={2} fill="url(#gradCalls)" />
+                  <Area type="monotone" dataKey="sms" name={t("overview.seriesSms")} stroke={WARNING} strokeWidth={2} fill="url(#gradSms)" />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
           </ChartCard>
         </div>
 
-        <ChartCard title="Distribution des appels" subtitle={`Période ${period}j`}>
+        <ChartCard title={t("overview.chartDistTitle")} subtitle={`${t("overview.chartDistSubtitle")} ${period}${t("overview.days")}`}>
           <div style={{ width: "100%", height: 240 }}>
             <ResponsiveContainer>
               <PieChart>
@@ -510,10 +516,10 @@ export default function PAOverview() {
 
       {/* Top brokers + Hot leads */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <ChartCard title={`Top 5 courtiers (${period}j)`}>
+        <ChartCard title={`${t("overview.chartTop5Title")} (${period}${t("overview.days")})`}>
           <div style={{ width: "100%", height: 240 }}>
             {topBrokers.length === 0 ? (
-              <p style={{ fontSize: 12, color: "var(--pp-text-faint)" }} className="text-center py-8">Aucune donnée</p>
+              <p style={{ fontSize: 12, color: "var(--pp-text-faint)" }} className="text-center py-8">{t("overview.noData")}</p>
             ) : (
               <ResponsiveContainer>
                 <BarChart data={topBrokers} layout="vertical" margin={{ top: 4, right: 16, left: 4, bottom: 0 }}>
@@ -521,18 +527,18 @@ export default function PAOverview() {
                   <XAxis type="number" stroke="#4A7FA5" fontSize={11} />
                   <YAxis type="category" dataKey="name" stroke="#4A7FA5" fontSize={11} width={120} />
                   <Tooltip content={<TooltipDark />} cursor={{ fill: "rgba(46,155,220,0.08)" }} />
-                  <Bar dataKey="calls" name="Appels" fill={ACCENT} radius={[0, 6, 6, 0]} />
+                  <Bar dataKey="calls" name={t("overview.seriesCalls")} fill={ACCENT} radius={[0, 6, 6, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             )}
           </div>
         </ChartCard>
 
-        <ChartCard title="Top leads chauds aujourd'hui" action={
-          <Link to="/planipret/admin/leads" style={{ fontSize: 11, color: ACCENT }} className="hover:underline">Voir tous →</Link>
+        <ChartCard title={t("overview.chartHotLeadsTitle")} action={
+          <Link to="/planipret/admin/leads" style={{ fontSize: 11, color: ACCENT }} className="hover:underline">{t("overview.viewAll")}</Link>
         }>
           {hotLeads.length === 0 ? (
-            <p style={{ fontSize: 12, color: "var(--pp-text-faint)" }} className="text-center py-8">Aucun lead chaud aujourd'hui</p>
+            <p style={{ fontSize: 12, color: "var(--pp-text-faint)" }} className="text-center py-8">{t("overview.chartHotLeadsEmpty")}</p>
           ) : (
             <ul className="space-y-1.5 max-h-[240px] overflow-y-auto">
               {hotLeads.map((l) => {
@@ -545,7 +551,7 @@ export default function PAOverview() {
                       <p className="truncate" style={{ fontSize: 11, color: "var(--pp-text-muted)" }}>{contact}</p>
                     </div>
                     <span style={{ fontSize: 11, fontWeight: 700, color: TEMP_COLORS.hot }}>{TEMP_EMOJI.hot} {l.lead_score}/10</span>
-                    <span style={{ fontSize: 10, color: "var(--pp-text-faint)" }}>{new Date(l.started_at).toLocaleTimeString("fr-CA", { hour: "2-digit", minute: "2-digit" })}</span>
+                    <span style={{ fontSize: 10, color: "var(--pp-text-faint)" }}>{new Date(l.started_at).toLocaleTimeString(dateLocale, { hour: "2-digit", minute: "2-digit" })}</span>
                   </li>
                 );
               })}
@@ -557,12 +563,12 @@ export default function PAOverview() {
       {/* Recent activity + Brokers online */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
         <div className="lg:col-span-3 pp-card" style={{ padding: 20 }}>
-          <h2 style={{ fontFamily: "Inter,sans-serif", fontWeight: 600, fontSize: 14, color: "var(--pp-text-primary)", marginBottom: 12 }}>Activité récente</h2>
+          <h2 style={{ fontFamily: "Inter,sans-serif", fontWeight: 600, fontSize: 14, color: "var(--pp-text-primary)", marginBottom: 12 }}>{t("overview.recentTitle")}</h2>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr style={{ borderBottom: "1px solid var(--pp-bg-border-2)" }}>
-                  {["Courtier", "Dir.", "Numéro", "Durée", "Heure", "IA"].map((h) => (
+                  {[t("overview.thBroker"), t("overview.thDirection"), t("overview.thNumber"), t("overview.thDuration"), t("overview.thTime"), t("overview.thAi")].map((h) => (
                     <th key={h} className="py-2 text-left" style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--pp-text-faint)" }}>{h}</th>
                   ))}
                 </tr>
@@ -579,19 +585,20 @@ export default function PAOverview() {
                       <td><Icon className="w-3.5 h-3.5" style={{ color: col }} /></td>
                       <td style={{ fontSize: 12, color: "var(--pp-text-secondary)" }}>{num ?? "—"}</td>
                       <td style={{ fontSize: 12, color: "var(--pp-text-muted)" }}>{c.duration_seconds ? `${Math.floor(c.duration_seconds / 60)}m${c.duration_seconds % 60}s` : "—"}</td>
-                      <td style={{ fontSize: 11, color: "var(--pp-text-faint)" }}>{c.started_at ? new Date(c.started_at).toLocaleTimeString("fr-CA", { hour: "2-digit", minute: "2-digit" }) : ""}</td>
+                      <td style={{ fontSize: 11, color: "var(--pp-text-faint)" }}>{c.started_at ? new Date(c.started_at).toLocaleTimeString(dateLocale, { hour: "2-digit", minute: "2-digit" }) : ""}</td>
                       <td>{c.ai_summary && <Sparkles className="w-3.5 h-3.5" style={{ color: AGENT }} />}</td>
                     </tr>
                   );
                 })}
-                {recent.length === 0 && <tr><td colSpan={6} className="py-6 text-center" style={{ fontSize: 11, color: "var(--pp-text-faint)" }}>Aucun appel récent</td></tr>}
+                {recent.length === 0 && <tr><td colSpan={6} className="py-6 text-center" style={{ fontSize: 11, color: "var(--pp-text-faint)" }}>{t("overview.recentEmpty")}</td></tr>}
               </tbody>
             </table>
           </div>
         </div>
 
+
         <div className="lg:col-span-2 pp-card" style={{ padding: 20 }}>
-          <h2 style={{ fontFamily: "Inter,sans-serif", fontWeight: 600, fontSize: 14, color: "var(--pp-text-primary)", marginBottom: 12 }}>Courtiers</h2>
+          <h2 style={{ fontFamily: "Inter,sans-serif", fontWeight: 600, fontSize: 14, color: "var(--pp-text-primary)", marginBottom: 12 }}>{t("overview.brokersTitle")}</h2>
           <ul className="space-y-1 max-h-[420px] overflow-y-auto">
             {brokers.map((b) => {
               const online = b.mobile_app_enabled;
@@ -602,11 +609,11 @@ export default function PAOverview() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="truncate" style={{ fontSize: 12, color: "var(--pp-text-primary)" }}>{b.full_name}</p>
-                    <p style={{ fontSize: 10, color: "var(--pp-text-faint)" }}>{b.updated_at ? new Date(b.updated_at).toLocaleString("fr-CA", { hour: "2-digit", minute: "2-digit" }) : ""}</p>
+                    <p style={{ fontSize: 10, color: "var(--pp-text-faint)" }}>{b.updated_at ? new Date(b.updated_at).toLocaleString(dateLocale, { hour: "2-digit", minute: "2-digit" }) : ""}</p>
                   </div>
                   <span className="flex items-center gap-1" style={{ fontSize: 10 }}>
                     <span style={{ width: 6, height: 6, borderRadius: "50%", background: online ? SUCCESS : "var(--pp-text-faint)", boxShadow: online ? `0 0 6px ${SUCCESS}` : "none" }} />
-                    <span style={{ color: online ? SUCCESS : "var(--pp-text-faint)" }}>{online ? "Actif" : "Inactif"}</span>
+                    <span style={{ color: online ? SUCCESS : "var(--pp-text-faint)" }}>{online ? t("overview.brokerActive") : t("overview.brokerInactive")}</span>
                   </span>
                 </li>
               );
@@ -619,16 +626,16 @@ export default function PAOverview() {
       {pendingByBroker.length > 0 && (
         <div className="pp-card" style={{ padding: 20 }}>
           <h2 className="flex items-center gap-2 mb-3" style={{ fontFamily: "Inter,sans-serif", fontWeight: 600, fontSize: 14, color: "var(--pp-text-primary)" }}>
-            <Clock className="w-4 h-4" style={{ color: WARNING }} /> Rappels en attente
+            <Clock className="w-4 h-4" style={{ color: WARNING }} /> {t("overview.remindersTitle")}
           </h2>
           <ul className="space-y-1">
             {pendingByBroker.map((p, i) => (
               <li key={i} className="flex items-center gap-2 py-2" style={{ borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
                 <span className="flex-1 truncate" style={{ fontSize: 12, color: "var(--pp-text-primary)" }}>{p.name}</span>
-                <span style={{ fontSize: 11, color: "var(--pp-text-muted)" }} className="tabular-nums">{p.total} en attente</span>
+                <span style={{ fontSize: 11, color: "var(--pp-text-muted)" }} className="tabular-nums">{p.total} {t("overview.pending")}</span>
                 {p.overdue > 0 && (
                   <span className="px-2 py-0.5 rounded-full text-white" style={{ fontSize: 10, fontWeight: 700, background: DANGER }}>
-                    {p.overdue} en retard
+                    {p.overdue} {t("overview.overdue")}
                   </span>
                 )}
               </li>
