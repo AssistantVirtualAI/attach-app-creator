@@ -296,9 +296,20 @@ export default function PARecordings() {
                 <div>
                   <p style={{ fontSize: 11, color: "var(--pp-text-muted)", marginBottom: 4 }}>Audio</p>
                   <audio src={detail.recording_url} controls className="w-full" />
-                  <a href={detail.recording_url} download className="inline-flex items-center gap-1 mt-2 text-xs" style={{ color: ACCENT }}>
-                    <Download className="w-3 h-3" /> Télécharger
-                  </a>
+                  <div className="flex items-center gap-3 mt-2">
+                    <a href={detail.recording_url} download className="inline-flex items-center gap-1 text-xs" style={{ color: ACCENT }}>
+                      <Download className="w-3 h-3" /> Télécharger
+                    </a>
+                    <button
+                      onClick={() => resolveRecording(detail, true)}
+                      disabled={resolving === detail.id}
+                      className="inline-flex items-center gap-1 text-xs disabled:opacity-50"
+                      style={{ color: ACCENT }}
+                    >
+                      <RefreshCw className={`w-3 h-3 ${resolving === detail.id ? "animate-spin" : ""}`} />
+                      Rafraîchir l'URL
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-2">
