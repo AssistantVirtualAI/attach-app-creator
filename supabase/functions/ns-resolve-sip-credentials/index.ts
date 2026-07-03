@@ -134,14 +134,11 @@ Deno.serve(async (req) => {
 
   let device = deviceList.find((d) => deviceIdOf(d) === targetId) ?? null;
 
-  // Fallback discovery: if we don't have a stored id yet, try to detect an
-  // existing device with a naming hint (_web/_widget for widget, _mobile/_app
-  // for mobile) but NEVER pick the device already claimed by the other
-  // client type.
-  if (!device && !storedDeviceId) {
-    const hints = clientType === "widget"
-      ? ["_web", "_widget", "web", "widget", "maestro"]
-      : ["_mobile", "_app", "mobile"];
+  // Fallback discovery is ONLY for widget (legacy Maestro naming). For mobile
+  // we ALWAYS use `{ext}_mobile` and never inspect other devices, so we can
+  // never accidentally hijack the widget's registration/password.
+  if (!device && !storedDeviceId && clientType === "widget") {
+    const hints = ["_web", "_widget", "web", "widget", "maestro"];
     device = deviceList.find((d) => {
       const id = (deviceIdOf(d) || "").toLowerCase();
       if (!id) return false;
@@ -155,7 +152,7 @@ Deno.serve(async (req) => {
   if (!device) {
     // Create a dedicated device for this client_type. Do NOT touch other devices.
     sipPassword = sipPassword || randomPassword(22);
-    await nsFetch(
+    const createRes = await nsFetch(
       `/domains/${encodeURIComponent(domain)}/users/${encodeURIComponent(extension)}/devices`,
       {
         method: "POST",
@@ -167,6 +164,17 @@ Deno.serve(async (req) => {
         }),
       },
     );
+    // Trace per-broker provisioning (idempotent — the unique device id makes
+    // repeated calls safe on NS-API side; we only log the first success).
+    try {
+      await admin.from("planipret_ns_migration_log").insert({
+        broker_id: profile.id,
+        action: `create_${clientType}_device`,
+        status: createRes.ok ? "ok" : "error",
+        details: { device_id: resolvedDeviceId, ns_status: createRes.status },
+      });
+    } catch { /* logging is best-effort */ }
+
   } else if (!sipPassword) {
     // We own the device but lost the password (fresh Vault, migration, etc.).
     // Rotate ONLY this device's key.

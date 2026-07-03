@@ -28,12 +28,14 @@ export interface PpSipSnapshot {
   remoteIdentity: string;
   remoteNumber: string;
   direction: "in" | "out" | null;
+  callId: string;
   muted: boolean;
   onHold: boolean;
   startedAt: number | null;
   errorCause?: string;
   lastRegistrationAt: number | null;
 }
+
 
 type Listener = (s: PpSipSnapshot) => void;
 
@@ -48,11 +50,13 @@ class PpSipProvider {
     remoteIdentity: "",
     remoteNumber: "",
     direction: null,
+    callId: "",
     muted: false,
     onHold: false,
     startedAt: null,
     lastRegistrationAt: null,
   };
+
   audioEl: HTMLAudioElement | null = null;
   private lastSig = "";
 
@@ -133,14 +137,22 @@ class PpSipProvider {
     const incoming = originator === "remote";
     const remoteUri = session.remote_identity?.uri?.user || "";
     const remoteName = session.remote_identity?.display_name || remoteUri;
+    // SIP Call-ID is the shared identifier between mobile and widget for the
+    // same call — used to coordinate collision handling via Supabase.
+    const callId: string = session?.request?.call_id
+      || session?.request?.getHeader?.("Call-ID")
+      || session?.id
+      || "";
     this.update({
       callState: incoming ? "ringing-in" : "ringing-out",
       remoteIdentity: remoteName,
       remoteNumber: remoteUri,
       direction: incoming ? "in" : "out",
+      callId,
       muted: false,
       onHold: false,
     });
+
     session.on("progress", () => { if (!incoming) this.update({ callState: "ringing-out" }); });
     session.on("confirmed", () => this.update({ callState: "active", startedAt: Date.now() }));
     session.on("failed", (e: any) => {
@@ -174,11 +186,13 @@ class PpSipProvider {
       remoteIdentity: "",
       remoteNumber: "",
       direction: null,
+      callId: "",
       startedAt: null,
       muted: false,
       onHold: false,
     });
   }
+
 
   async call(number: string) {
     if (!this.cfg || !this.ua) return;

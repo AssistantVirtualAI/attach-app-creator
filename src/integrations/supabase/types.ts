@@ -8269,6 +8269,62 @@ export type Database = {
           },
         ]
       }
+      planipret_call_sessions: {
+        Row: {
+          answered_at: string | null
+          answered_by: string | null
+          broker_id: string
+          call_id: string
+          created_at: string
+          direction: string
+          ended_at: string | null
+          ended_reason: string | null
+          id: string
+          remote_number: string | null
+          started_at: string
+          state: string
+          updated_at: string
+        }
+        Insert: {
+          answered_at?: string | null
+          answered_by?: string | null
+          broker_id: string
+          call_id: string
+          created_at?: string
+          direction: string
+          ended_at?: string | null
+          ended_reason?: string | null
+          id?: string
+          remote_number?: string | null
+          started_at?: string
+          state?: string
+          updated_at?: string
+        }
+        Update: {
+          answered_at?: string | null
+          answered_by?: string | null
+          broker_id?: string
+          call_id?: string
+          created_at?: string
+          direction?: string
+          ended_at?: string | null
+          ended_reason?: string | null
+          id?: string
+          remote_number?: string | null
+          started_at?: string
+          state?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planipret_call_sessions_broker_id_fkey"
+            columns: ["broker_id"]
+            isOneToOne: false
+            referencedRelation: "planipret_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       planipret_consent_settings: {
         Row: {
           consent_delay_seconds: number
@@ -13424,6 +13480,10 @@ export type Database = {
       pin_chat_message: { Args: { _message_id: string }; Returns: undefined }
       planipret_ava_org_id: { Args: never; Returns: string }
       pp_audit_realtime_check: { Args: never; Returns: Json }
+      pp_claim_call: {
+        Args: { _answered_by: string; _call_id: string }
+        Returns: boolean
+      }
       read_planipret_sip_secret: { Args: { _name: string }; Returns: string }
       reconcile_pbx_call_records: { Args: { _org_id: string }; Returns: Json }
       relink_my_softphone_user: { Args: never; Returns: Json }

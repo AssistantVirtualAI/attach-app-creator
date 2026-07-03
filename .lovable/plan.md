@@ -1,44 +1,80 @@
 
-## Problème
+## Objectif
 
-Actuellement `ns-resolve-sip-credentials` prend **le premier device softphone** de l'extension NS-API et **rote son mot de passe** à chaque login mobile. Résultat : quand l'app mobile s'enregistre, elle réutilise/écrase le device du widget Maestro. Un seul endpoint reste enregistrable → un seul appareil sonne.
+1. Isoler strictement le device mobile (jamais toucher au device du widget existant).
+2. Provisionner automatiquement un device mobile dédié pour chaque utilisateur au premier login mobile.
+3. Gérer les collisions quand widget + mobile sonnent en parallèle : décrochage simultané, CANCEL, reprise d'appel, perte réseau.
+4. Partager un `call_id` unique entre mobile et widget pour synchroniser l'état.
 
-Sur NetSapiens, il suffit d'avoir **deux devices SIP distincts** enregistrés sous la même extension pour qu'ils sonnent en parallèle (fork natif). Il faut donc réserver un device dédié « mobile » qui ne touche jamais au device du widget.
+## 1. Verrouiller le device mobile (edge fn `ns-resolve-sip-credentials`)
 
-## Changements
+- Pour `client_type: "mobile"` : matcher **uniquement** l'id exact `{ext}_mobile` (ou celui déjà mémorisé dans `planipret_profiles.ns_mobile_device_id`).
+- Retirer la « fallback discovery » côté mobile — plus aucune chance d'attraper le device du widget (`_web`, `_app`, etc.).
+- Si le device n'existe pas sur NS-API → `POST /devices` avec `device: "{ext}_mobile"`, model `"Mobile Softphone"`, protocole `sip`.
+- Le widget n'est jamais touché : aucune requête PUT/POST sur autre chose que `{ext}_mobile`.
+- La colonne `ns_mobile_device_id` sert de garde-fou (une fois écrite, elle est immuable côté fonction).
 
-### 1. `supabase/functions/ns-resolve-sip-credentials/index.ts`
-- Accepter un paramètre `client_type` dans le body (`"mobile"` par défaut pour cette fonction ; `"widget"` réservé au widget Maestro).
-- Construire un `deviceId` déterministe :
-  - `mobile`  → `${extension}_mobile`
-  - `widget`  → `${extension}_web` (inchangé côté Maestro)
-- Chercher **uniquement** le device qui correspond à ce `deviceId` exact (au lieu du « premier softphone trouvé »).
-- Si absent → créer ce device (POST `/devices`) avec un mot de passe dédié.
-- Si présent → réutiliser le mot de passe stocké en Vault ; ne jamais rotate le mot de passe d'un autre device.
-- Aucune modification du device widget existant.
+## 2. Provisionnement par utilisateur
 
-### 2. Stockage du secret par client
-- Nouveau nom de secret Vault : `pp_sip_${profile.id}_${client_type}`.
-- Nouvelle colonne facultative sur `planipret_profiles` : `ns_sip_password_ref_mobile` (le champ `ns_sip_password_ref` actuel reste pour compatibilité widget).
-- Migration SQL courte (ajout de colonne texte nullable).
+- Le resolver déclenche la création du device au premier appel (déjà en place).
+- Ajout d'un log `planipret_ns_migration_log` (row `action=create_mobile_device`) pour tracer par broker.
+- Idempotent : deux logins parallèles ne créent pas deux devices (guard via `ns_mobile_device_id` + upsert avant POST NS-API).
 
-### 3. Appel côté app mobile
-- `useMplanipretSoftphone` passe déjà par `supabase.functions.invoke("ns-resolve-sip-credentials", { body: {} })`. On ajoute `body: { client_type: "mobile" }`.
-- Aucun changement d'UI.
+## 3. Table de sessions d'appel partagée
 
-### 4. Provisioning initial (fonction `provision-softphone-user`)
-- Vérifier qu'à la création d'un nouveau broker, on ne crée que le device `_web` (widget). Le device `_mobile` sera créé à la demande, au premier login mobile.
+Nouvelle table `planipret_call_sessions` :
 
-### 5. Détails techniques NetSapiens
-- Fork parallèle par défaut : rien à activer côté extension.
-- Contact de registration WSS différent (mobile / widget) → NS route correctement l'INVITE aux deux.
-- ICE restart / re-registration mobile ne touchent que le device `_mobile`.
+```
+id uuid pk
+call_id text unique   -- SIP Call-ID (partagé mobile/widget)
+broker_id uuid -> planipret_profiles(id)
+direction text        -- inbound | outbound
+remote_number text
+started_at timestamptz
+answered_at timestamptz
+answered_by text      -- 'mobile' | 'widget' | null
+ended_at timestamptz
+ended_reason text     -- answered_elsewhere | hangup | cancel | network_lost
+state text            -- ringing | active | ended
+```
 
-## Vérifications post-implémentation
-- Appel entrant → widget Maestro **et** app mobile sonnent simultanément.
-- Décrocher sur l'un raccroche l'autre (cancel natif NS).
-- Rotation de mot de passe mobile n'invalide plus le widget.
-- `pp-call-e2e-check` continue de passer.
+GRANTs + RLS : broker lit/écrit uniquement ses propres sessions ; service_role plein accès.
 
-## Questions ouvertes (non bloquantes)
-- Nom exact du device widget existant sur NS-API pour le broker de test ? (par défaut on cible `${extension}_web` ; si c'est autre chose ex. `${extension}_app`, je lis le nom depuis les devices existants au premier appel et je le mémorise dans `planipret_profiles.ns_widget_device_id` pour ne plus jamais y toucher.)
+Realtime activé (`ALTER PUBLICATION supabase_realtime ADD TABLE`).
+
+## 4. Client mobile : capture du Call-ID + sync
+
+Dans `ppSipProvider.ts` : exposer `session.request.call_id` (JsSIP le fournit) via un callback `onCall({ callId, direction, remote })`.
+
+Dans `useMplanipretSoftphone.ts` :
+- À la sonnerie (`newRTCSession`) → upsert `planipret_call_sessions` `(call_id, state='ringing')`.
+- À l'acceptation locale → update `state='active'`, `answered_by='mobile'` avec `WHERE state='ringing'` (guard atomique).
+- Si le UPDATE renvoie 0 rows → un autre appareil a déjà décroché → forcer `session.terminate()` local, afficher toast « Répondu sur un autre appareil ».
+- À la fin → update `state='ended'`, `ended_reason`.
+- Souscription realtime sur `call_id` → si `answered_by !== 'mobile'` pendant qu'on sonne → dismiss ring UI proprement.
+
+## 5. Gestion collisions & reprise
+
+- **Décrochage simultané** : le UPDATE conditionnel garantit un seul gagnant. Le perdant reçoit un CANCEL SIP (natif NS) + confirmation via realtime.
+- **Perte réseau pendant appel actif** : `handoverController` déclenche déjà ICE restart ; on ajoute un timeout de 15s → si pas de reprise, marquer `ended_reason='network_lost'`.
+- **Double raccrochage** : idempotent grâce à `state='ended'`.
+- **Reprise post-handover** : le Call-ID SIP reste identique → la row n'est pas dupliquée.
+
+## 6. UI mobile
+
+- `ActiveCallOverlay` affiche « Répondu sur le widget web » quand realtime signale un answer distant.
+- Aucun changement widget.
+
+## Détails techniques
+
+- Migration SQL : création table + RLS + GRANT + publication realtime.
+- Edge fn `ns-resolve-sip-credentials` : retrait fallback discovery pour mobile, log migration, guard idempotent.
+- Nouveau helper `src/lib/planipret/calls/callSessionSync.ts` pour la logique upsert/guard/subscription.
+- Wiring dans `ppSipProvider` + `useMplanipretSoftphone`.
+
+## Vérifications
+
+- Deux appareils sonnent, un décroche → l'autre s'éteint proprement avec message clair.
+- Perte de réseau mid-call → ICE restart, sinon fin propre.
+- Chaque nouveau broker obtient automatiquement son `{ext}_mobile` sans intervention manuelle.
+- Le device widget n'apparaît jamais dans les requêtes NS-API PUT/POST côté mobile.

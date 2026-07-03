@@ -10,7 +10,7 @@
 //   - Outbound fallback to `ns-calls action:start` when WebRTC is not registered
 //     ("both, with fallback" policy).
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { ppSipProvider, type PpSipSnapshot } from "@/lib/planipret/sip/ppSipProvider";
@@ -19,6 +19,16 @@ import { handoverController } from "@/lib/planipret/net/handoverController";
 import { callQualitySampler, type CallQualitySnapshot } from "@/lib/planipret/audio/callQualitySampler";
 import { getAudioConstraints, type NCMode } from "@/lib/planipret/audio/audioConstraints";
 import { ensureMicPermission, type MicPermissionState } from "@/lib/planipret/audio/micPermission";
+import {
+  upsertRingingSession,
+  claimCall,
+  endSession,
+  subscribeToCall,
+  type CallSessionRow,
+  type AnsweredBy,
+} from "@/lib/planipret/calls/callSessionSync";
+
+
 
 let gumProxyInstalled = false;
 let gumOriginal: typeof navigator.mediaDevices.getUserMedia | null = null;
@@ -67,6 +77,9 @@ export function useMplanipretSoftphone() {
   const [loading, setLoading] = useState(false);
   const [net, setNet] = useState<NetSample>(networkMonitor.current());
   const [quality, setQuality] = useState<CallQualitySnapshot | null>(null);
+  const [brokerId, setBrokerId] = useState<string | null>(null);
+  const [answeredElsewhere, setAnsweredElsewhere] = useState<AnsweredBy | null>(null);
+  const seenCallIds = useRef<Set<string>>(new Set());
 
   // Subscribe to the SIP snapshot.
   useEffect(() => ppSipProvider.subscribe(setSnap), []);
@@ -78,6 +91,23 @@ export function useMplanipretSoftphone() {
     const un = networkMonitor.subscribe(setNet);
     return () => { un(); };
   }, []);
+
+  // Load broker id (planipret_profiles.id) once.
+  useEffect(() => {
+    if (!user) { setBrokerId(null); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from("planipret_profiles")
+          .select("id")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (!cancelled) setBrokerId((data?.id as string) ?? null);
+      } catch { /* ignore */ }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id]);
 
   // Resolve NS-API SIP credentials and register the softphone per user.
   useEffect(() => {
@@ -115,6 +145,37 @@ export function useMplanipretSoftphone() {
     return () => { un(); };
   }, [snap.callState]);
 
+  // Cross-device call session sync (mobile ↔ widget via SIP Call-ID).
+  useEffect(() => {
+    const callId = snap.callId;
+    if (!callId || !brokerId) return;
+    const ringing = snap.callState === "ringing-in" || snap.callState === "ringing-out";
+    if (!ringing) return;
+    if (seenCallIds.current.has(callId)) return;
+    seenCallIds.current.add(callId);
+    setAnsweredElsewhere(null);
+    void upsertRingingSession({
+      callId,
+      brokerId,
+      direction: snap.direction === "in" ? "inbound" : "outbound",
+      remoteNumber: snap.remoteNumber || undefined,
+    });
+    const unsub = subscribeToCall(callId, (row: CallSessionRow) => {
+      // Another device answered while we were still ringing — dismiss locally.
+      if (row.state === "active" && row.answered_by && row.answered_by !== "mobile") {
+        setAnsweredElsewhere(row.answered_by);
+        try { ppSipProvider.hangup(); } catch {}
+      }
+    });
+    return () => { unsub(); };
+  }, [snap.callId, snap.callState, snap.direction, snap.remoteNumber, brokerId]);
+
+  // Mark session ended when local call ends.
+  useEffect(() => {
+    if (snap.callState !== "ended" || !snap.callId) return;
+    void endSession(snap.callId, snap.errorCause || "hangup");
+  }, [snap.callState, snap.callId, snap.errorCause]);
+
   const registered = snap.status === "registered";
 
   const callViaPBX = useCallback(async (destination: string): Promise<OutboundResult> => {
@@ -127,10 +188,8 @@ export function useMplanipretSoftphone() {
 
   const placeCall = useCallback(async (destination: string): Promise<OutboundResult> => {
     if (!destination) return { via: "none", ok: false, error: "empty destination" };
-    // Ask for the mic BEFORE dialing so the user sees a clear prompt/fallback.
     const mic = await ensureMicPermission();
     if (mic.state !== "granted") {
-      // Stop any temporary probe stream — real call will re-acquire via the SIP layer.
       try { mic.stream?.getTracks().forEach((tr) => tr.stop()); } catch {}
       return { via: "none", ok: false, error: mic.error ?? "microphone unavailable", micState: mic.state };
     }
@@ -142,15 +201,37 @@ export function useMplanipretSoftphone() {
     return await callViaPBX(destination);
   }, [registered, callViaPBX]);
 
+  // Wrapped answer: race to claim the call before actually picking up. If we
+  // lose (widget answered first), don't pick up — the winner already has audio.
+  const answer = useCallback(async () => {
+    const callId = ppSipProvider.getSnapshot().callId;
+    const won = await claimCall(callId, "mobile");
+    if (!won) {
+      setAnsweredElsewhere("widget");
+      try { ppSipProvider.hangup(); } catch {}
+      return false;
+    }
+    ppSipProvider.answer();
+    return true;
+  }, []);
+
+  const hangup = useCallback(() => {
+    const callId = ppSipProvider.getSnapshot().callId;
+    ppSipProvider.hangup();
+    if (callId) void endSession(callId, "hangup");
+  }, []);
+
   return useMemo(() => ({
     snap,
     loading,
     net,
     quality,
     placeCall,
+    answeredElsewhere,
+    dismissAnsweredElsewhere: () => setAnsweredElsewhere(null),
     call: (n: string) => ppSipProvider.call(n),
-    answer: () => ppSipProvider.answer(),
-    hangup: () => ppSipProvider.hangup(),
+    answer,
+    hangup,
     mute: () => ppSipProvider.mute(),
     unmute: () => ppSipProvider.unmute(),
     hold: () => ppSipProvider.hold(),
@@ -159,5 +240,6 @@ export function useMplanipretSoftphone() {
     transfer: (t: string) => ppSipProvider.transfer(t),
     setAudioEl: (el: HTMLAudioElement | null) => { ppSipProvider.audioEl = el; },
     forceHandover: () => handoverController.forceHandover(),
-  }), [snap, loading, net, quality, placeCall]);
+  }), [snap, loading, net, quality, placeCall, answer, hangup, answeredElsewhere]);
+
 }
