@@ -180,7 +180,7 @@ export default function PlanipretAdminLayout() {
   }
 
   const title = PAGE_TITLES[location.pathname] ?? "Tableau de bord";
-  const dateLabel = new Date().toLocaleDateString("fr-CA", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const dateLabel = new Date().toLocaleDateString(lang === "en" ? "en-CA" : "fr-CA", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
   const sectionLabel = NAV.find((g) => g.items.some((i) => i.to === location.pathname))?.title ?? "Administration";
 
   const renderBadge = (b?: NavBadge) => {
