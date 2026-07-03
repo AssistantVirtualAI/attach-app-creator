@@ -143,7 +143,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    const allOk = report.recording.ok && report.transcript.ok && report.ai_actions.ok;
+    const allOk = !!report.extension?.ok && report.recording.ok && report.transcript.ok && report.ai_actions.ok;
 
     return json({
       success: true,
