@@ -4,7 +4,7 @@
 // is active, so RTP resumes on the new interface without dropping the call.
 
 import { networkMonitor, type NetSample } from "@/lib/planipret/network/networkMonitor";
-import { sipProvider } from "@/lib/softphone/jssipProvider";
+import { ppSipProvider } from "@/lib/planipret/sip/ppSipProvider";
 
 export type HandoverEvent =
   | { kind: "network-change"; from: string; to: string; at: number }
