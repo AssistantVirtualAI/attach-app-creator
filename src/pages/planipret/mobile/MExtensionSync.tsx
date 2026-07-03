@@ -14,6 +14,8 @@ export default function MExtensionSync() {
   const [state, setState] = useState<State>("idle");
   const [lastResult, setLastResult] = useState<any>(null);
   const [registered, setRegistered] = useState<boolean | null>(null);
+  const [devices, setDevices] = useState<string[] | null>(null);
+
 
   const extension = profile?.ns_extension || profile?.extension || null;
   const domain = profile?.ns_domain || "planipret.ca";
