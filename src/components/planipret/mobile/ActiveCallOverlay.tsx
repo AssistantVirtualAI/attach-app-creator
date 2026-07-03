@@ -6,6 +6,8 @@ import {
   Mic, MicOff, Pause, Play, PhoneForwarded, Grid3X3, Volume2, VolumeX, PhoneOff, User,
 } from "lucide-react";
 import { useMplanipretLang } from "@/hooks/useMplanipretLang";
+import { useMplanipretSoftphone } from "@/hooks/useMplanipretSoftphone";
+import NetworkQualityBadge from "@/components/planipret/mobile/NetworkQualityBadge";
 
 type Call = {
   id: string;
@@ -26,6 +28,7 @@ function formatDuration(sec: number) {
 
 export default function ActiveCallOverlay({ callId, onClosed }: { callId: string | null; onClosed: () => void }) {
   const { t } = useMplanipretLang();
+  const { net, quality } = useMplanipretSoftphone();
   const [call, setCall] = useState<Call | null>(null);
   const [muted, setMuted] = useState(false);
   const [held, setHeld] = useState(false);
@@ -108,6 +111,9 @@ export default function ActiveCallOverlay({ callId, onClosed }: { callId: string
           {otherParty && call.caller_name && <div className="text-sm text-white/60 mt-1">{otherParty}</div>}
           <div className="mt-3 text-sm text-white/70">
             {isRinging ? t("call.ringing") : held ? t("call.onHold") : formatDuration(elapsed)}
+          </div>
+          <div className="mt-3">
+            <NetworkQualityBadge net={net} quality={quality} />
           </div>
           {dtmfBuffer && <div className="mt-2 text-xs text-white/50">DTMF: {dtmfBuffer}</div>}
         </div>

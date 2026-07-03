@@ -26,6 +26,7 @@ import { useMplanipretTheme } from "@/hooks/useMplanipretTheme";
 import { useMplanipretLang } from "@/hooks/useMplanipretLang";
 import { ROUTES } from "@/lib/routes";
 import { recordRedirect } from "@/lib/debug/navDebug";
+import { useMplanipretSoftphone } from "@/hooks/useMplanipretSoftphone";
 
 const ACCENT = "#2E9BDC";
 
@@ -79,6 +80,7 @@ function contactPrimaryPhone(c: DialerContact): string | undefined {
 
 function Dialer({ open, onClose, initial, openMessages }: { open: boolean; onClose: () => void; initial?: string; openMessages: (n?: string) => void }) {
   const { t } = useMplanipretLang();
+  const softphone = useMplanipretSoftphone();
   const [mode, setMode] = useState<"keypad" | "search">("keypad");
   const [number, setNumber] = useState("");
   const [calling, setCalling] = useState(false);
@@ -98,16 +100,17 @@ function Dialer({ open, onClose, initial, openMessages }: { open: boolean; onClo
     const destination = destOverride ?? number;
     if (!destination) return;
     setCalling(true);
-    const { data, error } = await supabase.functions.invoke("ns-calls", { body: { action: "start", destination } });
+    const result = await softphone.placeCall(destination);
     setCalling(false);
-    if (error || (data as any)?.success === false) {
-      toast.error((data as any)?.error ?? error?.message ?? t("dialer.callFailed"));
+    if (!result.ok) {
+      toast.error(("error" in result && result.error) || t("dialer.callFailed"));
       return;
     }
-    toast.success(t("dialer.callStarted"));
+    toast.success(result.via === "webrtc" ? t("dialer.callStartedWebrtc") : t("dialer.callStarted"));
     setNumber("");
     onClose();
   };
+
 
   // Load contacts (personal + shared + directory) once when opening Search mode
   useEffect(() => {
@@ -317,6 +320,9 @@ export default function PlanipretMobile() {
   const navigate = useNavigate();
   const location = useLocation();
   const { t, lang, setLang } = useMplanipretLang();
+  // Boot the shared softphone engine (WebRTC + noise cancellation + auto handover).
+  // Uses the exact same JsSIP stack as the Lemtel mobile app.
+  useMplanipretSoftphone();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [accessError, setAccessError] = useState<"unauthenticated" | "missing_profile" | "load_failed" | null>(null);

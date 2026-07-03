@@ -1,59 +1,81 @@
+# Planipret Mobile — Qualité d'appel « bulletproof »
 
-## Objectif
-Aligner l'app mobile courtier (`/mplanipret` + l'aperçu `/planipret/mobile`) sur la configuration admin (`/planipret/admin`) : extension bien synchronisée, appels sortants fonctionnels, CDR / enregistrements / voicemails visibles, transcription + notes IA automatiques dès qu'un enregistrement arrive. Portée : chaque courtier ne voit que ses propres données.
+Objectif : que l'app mobile Planipret utilise **exactement le même moteur d'appel que Lemtel mobile** (JsSIP + WebRTC + wss fallbacks Lemtel), avec **noise cancellation activée par défaut**, **détection auto Wi-Fi/LTE** et **bascule transparente** en cours d'appel, sans coupure ni dégradation.
 
-## 1. Extension bien synchronisée
-- Au boot de `PlanipretMobile.tsx`, appeler `ns-resolve-sip-credentials` (déjà en place mais silencieux) puis persister le résultat dans `planipret_profiles` (`sip_extension`, `sip_domain`) si absent/différent, et dans `sessionStorage.pp_sip_config`.
-- Ajouter une bannière `ExtensionSyncStatus` en haut de MHome : état (résolue / manquante / erreur) + bouton "Resynchroniser" qui rappelle `ns-resolve-sip-credentials` et met à jour le profil. i18n FR/EN.
-- Exposer `useExtensionSync()` (hook partagé) pour que MCalls / dialer / MVoicemail utilisent la même source (extension + org).
+## 1. Aligner le moteur d'appel sur Lemtel mobile
 
-## 2. Appels sortants (WebRTC + fallback click-to-call)
-- Le dialer actuel appelle déjà un backend (`dialer.callFailed`). Le rebrancher pour :
-  1. Tenter WebRTC (SIP.js) si `pp_sip_config` prêt et `wssUrl` dispo.
-  2. Sinon fallback : `supabase.functions.invoke("ns-click-to-call", { body: { to, from_extension } })`.
-- Ajouter `supabase/functions/ns-click-to-call/index.ts` (nouveau) — POST NS-API `/click-to-call` avec l'extension du courtier authentifié (via `authBroker`). Journalise dans `planipret_phone_calls` en `status='initiated'`.
-- Bouton d'appel dans MCalls / MContacts / RecordingsList utilise le même helper `useOutboundCall()`.
+Aujourd'hui Planipret mobile déclenche les appels via l'API PBX (`ns-calls action:start`, click‑to‑call côté serveur) — pas de média WebRTC dans l'app, donc pas de contrôle qualité côté téléphone. Lemtel mobile, lui, utilise `useSoftphone` → `sipProvider` (`src/lib/softphone/jssipProvider.ts`) avec `PC_CONFIG` (ICE relay, TURN Lemtel), fallbacks `wss://pbxnode.lemtel.tel:7443` + `wss://node.lemtelcloud.net:7443`, session timers 120s.
 
-## 3. CDR, enregistrements, voicemails (isolation par extension)
-- Vérifier/renforcer que `ns-cdrs`, `pp-ns-recordings`, `ns-voicemails` filtrent bien par `profile.extension` (déjà fait via `nsPath(domain, extension, ...)` — juste ajouter un test dans `pp-call-e2e-check` pour empêcher toute fuite).
-- MCalls et RecordingsList existent déjà ; ajouter un pull-to-refresh + un état vide clair ("Aucun appel — extension: XXX").
-- Ajouter un onglet "Voicemail" déjà présent (MVoicemail) — vérifier que la lecture Bearer marche (mêmes fix que ns-recordings).
+Actions :
+- Créer `useMplanipretSoftphone` (wrapper de `useSoftphone`) qui, en mobile, force `platform:"mobile"` vers `softphone-credentials` et réutilise `sipProvider`, `PC_CONFIG`, `sdpModifier`, ringtones et logs Lemtel. **Aucune duplication du provider**.
+- Rebrancher le bouton d'appel de `PlanipretMobile.tsx` / `Dialer` / `MContacts` / `MCalls` sur ce hook : chemin principal = **WebRTC in-app** (audio HD, contrôle codec), fallback = `ns-calls start` si `sipProvider` non enregistré ou WSS injoignable (règle existante « les deux avec fallback » déjà validée).
+- Respecter l'isolation `/mplanipret` : les changements du provider Lemtel sont interdits ; on ne fait que le consommer.
 
-## 4. Transcription + notes IA automatiques (parité admin)
-- Créer un job auto : nouvelle fonction `pp-auto-ai-pipeline` déclenchée par un cron (existant `pbx_ai_jobs`) OU par un trigger DB sur `planipret_phone_calls` insert with `has_recording=true`.
-  - Étape 1 : `ai-transcribe-call` (fallback OpenAI Whisper → LOVABLE_API_KEY gpt-4o-mini-transcribe).
-  - Étape 2 : `ai-analyze-call` (résumé + prochaines étapes, mêmes prompts que l'admin).
-- Ajouter table `planipret_ai_insights` (déjà existante) — écrire `summary`, `next_steps`, `sentiment`, `key_topics`.
-- Dans MCalls (détail d'appel) : afficher automatiquement transcription + notes IA dès qu'elles sont dispo. Bouton "Régénérer" en cas d'échec.
-- Ajouter un badge de statut : "Transcription en cours…", "Notes IA prêtes", "Échec — réessayer".
+## 2. Noise cancellation par défaut + chaîne audio renforcée
 
-## 5. Route jumelle `/planipret/mobile`
-- La route `/planipret/mobile` (aperçu web) réutilise déjà `PlanipretMobile.tsx`. Rien à dupliquer — les mêmes changements se propagent automatiquement.
-- Vérifier que la garde ne redirige pas cet aperçu vers `/planipret/admin` (respecte `mplanipret-isolation-locked.md` : on ne touche PAS aux routes /mplanipret/*).
+`src/lib/planipret/audio/audioConstraints.ts`, `rnnoise.ts`, `vad.ts` existent déjà mais ne sont utilisés que dans le `CallAudioSheet` — pas dans le vrai flux d'appel.
 
-## 6. Vérification bout-en-bout
-- Étendre `pp-call-e2e-check` pour valider dans l'ordre : extension résolue → CDR visibles → enregistrement lisible (Bearer) → transcription dispo → AI insights présents.
-- Ajouter un bouton "Diagnostic" dans MMore qui invoque cette fonction et affiche le rapport.
+Actions :
+- Dans `useMplanipretSoftphone.call()` / `.answer()`, remplacer `getUserMedia({audio:{ec,ns,agc:true}})` par `getAudioConstraints(ncMode)` (mode persistant `pp_nc_mode`, défaut = `standard`).
+- Passer le stream micro dans `applyRnnoise` (WASM) quand `ncMode="office"` avant de le fournir à JsSIP via l'option `mediaStream`.
+- Forcer le codec Opus DTX + FEC dans `sdpModifier` (ajout `usedtx=1; useinbandfec=1; stereo=0; maxaveragebitrate=24000; cbr=0`) + `a=ptime:20` — meilleure résilience à la perte de paquets LTE.
+- Ajouter `RTCRtpSender.setParameters` avec `networkPriority:"high"` et `priority:"high"` sur la piste audio (QoS DSCP quand supporté).
+- Brancher `startVad` sur la piste live pour l'auto-mute + indicateur "vous parlez" dans `ActiveCallOverlay`.
+
+## 3. Détection réseau + bascule Wi-Fi ↔ LTE sans coupure
+
+Nouveau module `src/lib/planipret/net/networkMonitor.ts` :
+- Écoute `navigator.connection.change`, `online/offline`, et, sous Capacitor, `@capacitor/network` (`Network.addListener('networkStatusChange')`) pour distinguer `wifi` / `cellular` / `none`.
+- Publie un `NetSnapshot { type, effectiveType, downlink, rtt, quality: 'excellent'|'good'|'poor' }` (règles : rtt>300 ou downlink<0.5 → poor).
+- Exécute un ping WSS léger (`/health` sur `pbxnode.lemtel.tel`) toutes les 15s pendant un appel actif pour détecter la dégradation avant que l'utilisateur ne l'entende.
+
+Bascule sans coupure — nouveau `handoverController.ts` consommé par `useMplanipretSoftphone` :
+- **En veille** : sur changement de réseau, `sipProvider` fait un `register` immédiat sur le nouveau chemin (déjà géré par JsSIP quand le socket tombe ; on force `unregister()` puis `register()` pour raccourcir la fenêtre).
+- **En appel actif** :
+  1. Capturer un nouveau `MediaStream` sur le nouveau réseau (le mic reste local, mais on relance `getUserMedia` pour purger toute contrainte cellulaire).
+  2. Déclencher un **ICE restart** via `session.renegotiate({ rtcOfferConstraints:{ iceRestart:true } })` sur la session JsSIP en cours → nouvelle paire de candidats, TURN Lemtel prend le relais, aucune interruption RTP au-delà de ~300-800 ms.
+  3. Si la renégociation échoue en <3 s, tenter un second essai ; sinon afficher un toast « Réseau instable, reprise… » et laisser la reprise SIP standard (re-INVITE) faire son travail.
+  4. Adapter le bitrate Opus : `poor` → 16 kbps + ptime 40 ; `good` → 24 kbps ; `excellent` → 32 kbps stéréo mono forcé.
+- Un badge réseau (Wi-Fi/LTE/⚠) apparaît dans `ActiveCallOverlay` avec la qualité live (basée sur `getStats()` : `packetsLost`, `jitter`, `roundTripTime`).
+
+## 4. Statistiques & auto-diagnostic en direct
+
+- Boucle `pc.getStats()` toutes les 2 s pendant l'appel : `jitter`, `packetsLost/packetsSent`, `audioLevel`, `roundTripTime`.
+- Seuils : jitter>60ms ou loss>5% → étiquette « Qualité dégradée » + tentative auto de handover (§3) si un autre réseau est disponible.
+- Journalisation dans `planipret_call_quality_events` (nouvelle table optionnelle) — hors périmètre si non demandé ; par défaut on log seulement en session (console + snapshot dans `sipProvider.logs`).
+
+## 5. UI
+
+- `ActiveCallOverlay` : ajouter (a) icône réseau live, (b) barre qualité (vert/orange/rouge), (c) bouton « Audio » ouvrant le `CallAudioSheet` déjà existant (routing haut-parleur/BT/écouteur + mode NC).
+- `MMore` → nouvelle ligne « Diagnostic audio & réseau » qui lance un test 10 s (mic loopback + ping WSS + mesure débit) et affiche un rapport.
+- i18n FR/EN dans `src/lib/i18n/mplanipret.ts` pour tous les nouveaux libellés.
+
+## 6. Capacitor natif (si build mobile)
+
+- Ajouter (si absent) `@capacitor/network` — sans lancer `cap sync` (le user le fera).
+- `AndroidManifest` / `Info.plist` : rappeler à l'utilisateur d'ajouter `MODIFY_AUDIO_SETTINGS`, `RECORD_AUDIO`, `ACCESS_NETWORK_STATE`, `CHANGE_NETWORK_STATE`, `background modes: voip, audio` (iOS) pour tenir un appel en arrière-plan lors du switch réseau.
 
 ## Fichiers touchés
-**Créés**
-- `supabase/functions/ns-click-to-call/index.ts`
-- `supabase/functions/pp-auto-ai-pipeline/index.ts`
-- `src/hooks/planipret/useExtensionSync.ts`
-- `src/hooks/planipret/useOutboundCall.ts`
-- `src/components/planipret/mobile/ExtensionSyncStatus.tsx`
-- `src/components/planipret/mobile/AiInsightsPanel.tsx`
 
-**Édités**
-- `src/pages/planipret/PlanipretMobile.tsx` (hydrate extension + expose au dialer)
-- `src/pages/planipret/mobile/MCalls.tsx` (auto AI panel, badges, régénérer)
-- `src/pages/planipret/mobile/MHome.tsx` (bannière sync)
-- `src/pages/planipret/mobile/MMore.tsx` (bouton diagnostic)
-- `src/components/planipret/mobile/recordings/RecordingsList.tsx` (bouton appel via useOutboundCall)
-- `supabase/functions/pp-call-e2e-check/index.ts` (ajout étape extension + AI)
-- `src/lib/i18n/mplanipret.ts` (nouvelles clés FR/EN)
+Créés
+- `src/hooks/useMplanipretSoftphone.ts`
+- `src/lib/planipret/net/networkMonitor.ts`
+- `src/lib/planipret/net/handoverController.ts`
+- `src/lib/planipret/audio/opusSdp.ts` (modificateur SDP Opus)
+- `src/components/planipret/mobile/NetworkQualityBadge.tsx`
 
-## Contraintes respectées
-- Aucune modification des routes `/mplanipret/*`, de `MplanipretGuard`, ni d'`App.tsx`.
-- Isolation : chaque courtier ne voit que sa propre extension (aucun changement RLS).
-- Pas de nouveaux secrets requis (OPENAI_API_KEY et LOVABLE_API_KEY déjà en place).
+Édités
+- `src/pages/planipret/PlanipretMobile.tsx` (bouton dial → hook)
+- `src/pages/planipret/mobile/MCalls.tsx`, `MContacts.tsx`, `MMore.tsx`
+- `src/components/planipret/mobile/ActiveCallOverlay.tsx` (badge + qualité)
+- `src/components/planipret/mobile/call/CallAudioSheet.tsx` (NC mode branché sur la vraie session)
+- `src/lib/i18n/mplanipret.ts`
+
+Non touchés
+- `src/lib/softphone/jssipProvider.ts`, `rtcConfig.ts`, `useSoftphone.ts` (Lemtel — consommés uniquement).
+
+## Hors périmètre
+
+- Modifier le PBX / TURN / codecs côté serveur Lemtel.
+- Persister l'historique qualité en base (peut être ajouté ensuite si demandé).
+- Créer un nouveau provider SIP concurrent.
