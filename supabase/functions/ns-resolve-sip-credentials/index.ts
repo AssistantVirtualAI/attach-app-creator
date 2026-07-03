@@ -14,6 +14,8 @@ const NS_API_KEY = Deno.env.get("NS_API_KEY") ?? "";
 const NS_API_BASE_URL = Deno.env.get("NS_API_BASE_URL") ?? "https://voice.ava-telecom.ca/ns-api/v2";
 const NS_DEFAULT_DOMAIN = Deno.env.get("NS_DEFAULT_DOMAIN") ?? "planipret.ca";
 const NS_SIP_PROXY = Deno.env.get("NS_SIP_PROXY") ?? "voice.ava-telecom.ca";
+const NS_SIP_WSS_URL = Deno.env.get("NS_SIP_WSS_URL") ?? `wss://${NS_SIP_PROXY}:7443`;
+const NS_SIP_WSS_URLS = (Deno.env.get("NS_SIP_WSS_URLS") ?? "").split(",").map((s) => s.trim()).filter(Boolean);
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
