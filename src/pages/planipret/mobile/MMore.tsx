@@ -202,7 +202,8 @@ export default function MMore() {
           right={<StatusPill ok={nsConnected} label={reconnecting ? "…" : nsConnected ? t("more.connected") : t("home.offline")} />}
         />
         <Row icon={<Info className="w-4 h-4" />} label={t("more.myExtension")}
-          right={<span style={{ fontSize: 12, color: "var(--pp-text-muted)" }}>{profile?.extension ?? "—"}</span>} />
+          onClick={() => navigate("/mplanipret/extension-sync")}
+          right={<span style={{ fontSize: 12, color: "var(--pp-text-muted)" }}>{profile?.ns_extension ?? profile?.extension ?? "—"}</span>} chevron />
         <Row icon={<Voicemail className="w-4 h-4" />} label={t("more.voicemail")}
           onClick={() => navigate("/mplanipret/calls?tab=voicemails")} chevron />
       </Section>
