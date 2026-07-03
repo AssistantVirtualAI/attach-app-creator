@@ -191,21 +191,22 @@ export default function PAOverview() {
       brokersOnline: onlineC.count ?? 0,
     });
 
-    // Compute service counts from real Planipret brokers (exclude test accounts).
+    // Service counts — use the same canonical source of truth as /admin/rapports
+    // (planipret_broker_stats view) to avoid drift between pages. The widget
+    // base = every courtier NS actif (total_courtiers), mobile/AI use the
+    // toggles already aggregated by the view.
     const TEST_PATTERNS = ["scott", "mohamad", "carlo", "clinton"];
     const isTest = (name?: string | null, email?: string | null) => {
       const s = `${name ?? ""} ${email ?? ""}`.toLowerCase();
       return TEST_PATTERNS.some((p) => s.includes(p));
     };
     const profs = (svcProfiles.data ?? []) as Array<{ full_name: string | null; email: string | null; ns_domain: string | null; mobile_app_enabled: boolean | null; voice_agent_enabled: boolean | null }>;
-    const realBrokers = profs.filter((p) => {
-      const em = (p.email ?? "").toLowerCase();
-      const hasPpEmail = em.endsWith("@planipret.ca");
-      return hasPpEmail && !isTest(p.full_name, p.email);
-    });
-    const widgetN = realBrokers.length;
-    const mobileN = realBrokers.filter((p) => p.ns_domain === "planipret.ca" && p.mobile_app_enabled).length;
-    const aiN = realBrokers.filter((p) => p.ns_domain === "planipret.ca" && p.voice_agent_enabled).length;
+    const isRealBroker = (p: { full_name: string | null; email: string | null; ns_domain: string | null }) =>
+      p.ns_domain === "planipret.ca" && !isTest(p.full_name, p.email);
+    const realBrokers = profs.filter(isRealBroker);
+    const widgetN = brokerStats.total_courtiers || realBrokers.length;
+    const mobileN = brokerStats.app_mobile_active || realBrokers.filter((p) => p.mobile_app_enabled).length;
+    const aiN = brokerStats.agent_ia_active || realBrokers.filter((p) => p.voice_agent_enabled).length;
     setServiceCounts({ mobile: mobileN, widget: widgetN, ai: aiN });
     setRecent(rec.data ?? []);
     setBrokers(nsBrokerList.slice(0, 10));
