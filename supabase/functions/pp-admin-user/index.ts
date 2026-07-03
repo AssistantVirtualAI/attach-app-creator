@@ -1,5 +1,93 @@
 import { authBroker, corsHeaders, jsonResponse, logAudit, supaAdmin } from "../_shared/ns-broker.ts";
 
+const NS_API_KEY = Deno.env.get("NS_API_KEY") ?? "";
+const NS_API_BASE_URL = Deno.env.get("NS_API_BASE_URL") ?? "https://voice.ava-telecom.ca/ns-api/v2";
+const NS_DEFAULT_DOMAIN = Deno.env.get("NS_DEFAULT_DOMAIN") ?? "planipret.ca";
+
+/** Direct NS-API call using service bearer key (admin ops). */
+async function nsFetch(path: string, init: RequestInit = {}) {
+  const res = await fetch(`${NS_API_BASE_URL}${path}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${NS_API_KEY}`,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      ...(init.headers ?? {}),
+    },
+  });
+  const text = await res.text();
+  let data: any = null;
+  try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+  return { ok: res.ok, status: res.status, data };
+}
+
+function randomPassword(len = 22): string {
+  const chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+  const buf = new Uint8Array(len);
+  crypto.getRandomValues(buf);
+  let s = "";
+  for (let i = 0; i < len; i++) s += chars[buf[i] % chars.length];
+  return s;
+}
+
+/**
+ * Ensure the broker has a dedicated {ext}_mobile SIP device on NS so the
+ * mobile app rings in parallel with the widget. Never touches the widget
+ * device — that provisioning is locked upstream.
+ */
+async function ensureMobileDevice(
+  admin: ReturnType<typeof supaAdmin>,
+  brokerId: string,
+  extension: string,
+  domain: string,
+): Promise<{ device_id: string; created: boolean; error?: string }> {
+  const targetId = `${extension}_mobile`;
+  const password = randomPassword(22);
+  const createRes = await nsFetch(
+    `/domains/${encodeURIComponent(domain)}/users/${encodeURIComponent(extension)}/devices`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        device: targetId,
+        "authentication-key": password,
+        "device-provisioning-protocol": "sip",
+        "device-model": "Mobile Softphone",
+      }),
+    },
+  );
+
+  if (!createRes.ok && createRes.status !== 409) {
+    try {
+      await admin.from("planipret_ns_migration_log").insert({
+        broker_id: brokerId, action: "create_mobile_device", status: "error",
+        details: { device_id: targetId, ns_status: createRes.status, response: createRes.data },
+      });
+    } catch { /* ignore */ }
+    return { device_id: targetId, created: false, error: `NS ${createRes.status}` };
+  }
+
+  const secretName = `pp_sip_${brokerId}_mobile`;
+  try {
+    await admin.rpc("create_planipret_sip_secret", {
+      _name: secretName, _value: password, _broker_id: brokerId,
+    });
+  } catch (e) {
+    console.error("vault_store_failed", (e as Error).message);
+  }
+  await admin.from("planipret_profiles")
+    .update({ ns_mobile_device_id: targetId, ns_sip_password_ref_mobile: secretName })
+    .eq("id", brokerId);
+
+  try {
+    await admin.from("planipret_ns_migration_log").insert({
+      broker_id: brokerId, action: "create_mobile_device", status: "ok",
+      details: { device_id: targetId },
+    });
+  } catch { /* ignore */ }
+
+  return { device_id: targetId, created: true };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
@@ -20,43 +108,81 @@ Deno.serve(async (req) => {
       if (/@lemtel\.com$/i.test(String(email).trim())) {
         return jsonResponse({ success: false, error: "Les emails @lemtel.com appartiennent à Lemtel et ne peuvent pas être ajoutés à Planiprêt." }, 422);
       }
-      // Unique extension check
       const { data: existing } = await admin.from("planipret_profiles").select("id").eq("extension", ns_extension).maybeSingle();
       if (existing) return jsonResponse({ success: false, error: "Extension déjà utilisée" }, 400);
 
+      const [firstName, ...rest] = String(full_name).trim().split(/\s+/);
+      const lastName = rest.join(" ");
+
+      // 1) Provision the NetSapiens user (extension) so it exists in the
+      //    phone system BEFORE we wire up the Supabase profile. That way,
+      //    the widget + softphone can register immediately.
+      const nsUserRes = await nsFetch(
+        `/domains/${encodeURIComponent(NS_DEFAULT_DOMAIN)}/users`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            user: ns_extension,
+            extension: ns_extension,
+            first_name: firstName,
+            last_name: lastName,
+            email,
+            password,
+            "name-first-name": firstName,
+            "name-last-name": lastName,
+          }),
+        },
+      );
+      if (!nsUserRes.ok && nsUserRes.status !== 409) {
+        return jsonResponse({
+          success: false,
+          error: `Échec création NS: ${nsUserRes.status} ${JSON.stringify(nsUserRes.data).slice(0, 200)}`,
+        }, 200);
+      }
+
+      // 2) Supabase auth user
       const { data: created, error: cErr } = await admin.auth.admin.createUser({
         email, password, email_confirm: true,
       });
       if (cErr || !created.user) return jsonResponse({ success: false, error: cErr?.message ?? "Échec création auth" }, 200);
 
-      const { error: pErr } = await admin.from("planipret_profiles").insert({
+      // 3) Local profile
+      const { data: newProfile, error: pErr } = await admin.from("planipret_profiles").insert({
         user_id: created.user.id,
         organization_id: profile.organization_id,
         email,
         full_name,
         extension: ns_extension,
-        ns_domain: "planipret.ca",
+        ns_extension,
+        ns_domain: NS_DEFAULT_DOMAIN,
+        ns_linked: true,
+        ns_linked_at: new Date().toISOString(),
         role: "broker",
         mobile_app_enabled: mobile_app_enabled ?? true,
         voice_agent_enabled: voice_agent_enabled ?? false,
         elevenlabs_agent_id: elevenlabs_agent_id || null,
-      });
-      if (pErr) {
+      }).select("id").maybeSingle();
+      if (pErr || !newProfile) {
         await admin.auth.admin.deleteUser(created.user.id);
-        return jsonResponse({ success: false, error: pErr.message }, 200);
+        return jsonResponse({ success: false, error: pErr?.message ?? "Profil non créé" }, 200);
       }
       await admin.from("user_roles").upsert({
         user_id: created.user.id,
         organization_id: profile.organization_id,
         role: "planipret_broker",
       }, { onConflict: "user_id,organization_id" });
+
+      // 4) Dedicated {ext}_mobile device so the mobile app rings in parallel
+      //    with the widget (widget device is NEVER touched here).
+      const mobile = await ensureMobileDevice(admin, newProfile.id, ns_extension, NS_DEFAULT_DOMAIN);
+
       await logAudit(admin, req, {
         admin_id: profile.id, action: "USER_CREATE",
         resource_type: "user", resource_id: created.user.id,
-        metadata: { email, extension: ns_extension },
+        metadata: { email, extension: ns_extension, ns_status: nsUserRes.status, mobile_device: mobile.device_id, mobile_error: mobile.error ?? null },
       });
 
-      // Welcome sequence (best-effort, non-blocking)
+      // Welcome sequence (best-effort)
       try {
         const appUrl = "https://avastatistic.ca/mplanipret";
         const html = `
@@ -66,49 +192,113 @@ Deno.serve(async (req) => {
             <p>Votre accès est prêt. Voici vos informations :</p>
             <ul style="background:#F4F8FC;padding:16px 24px;border-radius:8px">
               <li><strong>Extension :</strong> ${ns_extension}</li>
-              <li><strong>Domaine :</strong> planipret.ca</li>
+              <li><strong>Domaine :</strong> ${NS_DEFAULT_DOMAIN}</li>
               <li><strong>Email :</strong> ${email}</li>
             </ul>
             <p style="text-align:center;margin:24px 0">
               <a href="${appUrl}" style="background:#1F4E79;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600">Ouvrir Planiprêt AI</a>
             </p>
-            <p><img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(appUrl)}" alt="QR code" /></p>
-            <h3>Démarrage en 3 étapes</h3>
-            <ol>
-              <li>Connectez-vous à l'app et acceptez la politique de confidentialité</li>
-              <li>Ajoutez l'app à votre écran d'accueil (PWA)</li>
-              <li>Connectez Microsoft 365 dans Plus → Intégrations</li>
-            </ol>
             <p style="font-size:12px;color:#94A3B8;margin-top:32px">Support : support@avastatistic.ca</p>
           </div>`;
         await admin.functions.invoke("send-transactional-email", {
           body: { to: email, subject: "Bienvenue sur Planiprêt AI Portal 🎉", html, from: "support@avastatistic.ca" },
         }).catch(() => null);
-
-        // Welcome SMS via NS-API
-        await admin.functions.invoke("ns-sms", {
-          body: { action: "send", to: payload.phone_number, body: `Bonjour ${full_name}! Votre accès Planiprêt AI est prêt. Connectez-vous: ${appUrl} Extension: ${ns_extension} - Support: support@avastatistic.ca` },
-        }).catch(() => null);
       } catch (e) { console.error("welcome sequence", e); }
 
-      return jsonResponse({ success: true, user_id: created.user.id });
+      return jsonResponse({
+        success: true,
+        user_id: created.user.id,
+        ns_extension,
+        ns_domain: NS_DEFAULT_DOMAIN,
+        mobile_device_id: mobile.device_id,
+        mobile_device_created: mobile.created,
+        mobile_device_error: mobile.error ?? null,
+      });
     }
 
     if (action === "update") {
       const { user_id, updates } = payload ?? {};
       if (!user_id) return jsonResponse({ success: false, error: "user_id requis" }, 400);
+
+      const { data: current } = await admin
+        .from("planipret_profiles")
+        .select("id, extension, ns_extension, ns_domain, full_name, email")
+        .eq("user_id", user_id)
+        .maybeSingle();
+
       const allowed: any = {};
       for (const k of ["full_name", "extension", "mobile_app_enabled", "voice_agent_enabled", "elevenlabs_agent_id"]) {
         if (k in (updates ?? {})) allowed[k] = updates[k];
       }
       const { error } = await admin.from("planipret_profiles").update(allowed).eq("user_id", user_id);
       if (error) return jsonResponse({ success: false, error: error.message }, 200);
+
+      // Propagate name / extension changes to NS.
+      if (current) {
+        const domain = current.ns_domain || NS_DEFAULT_DOMAIN;
+        const oldExt = String(current.ns_extension || current.extension || "");
+        const newExt = String(allowed.extension ?? oldExt);
+        const nameChanged = "full_name" in allowed && allowed.full_name !== current.full_name;
+
+        if (nameChanged && oldExt) {
+          const [firstName, ...rest] = String(allowed.full_name).trim().split(/\s+/);
+          const lastName = rest.join(" ");
+          await nsFetch(
+            `/domains/${encodeURIComponent(domain)}/users/${encodeURIComponent(oldExt)}`,
+            {
+              method: "PUT",
+              body: JSON.stringify({
+                first_name: firstName,
+                last_name: lastName,
+                "name-first-name": firstName,
+                "name-last-name": lastName,
+              }),
+            },
+          ).catch(() => null);
+        }
+
+        // If a new extension was assigned but no NS mobile device exists yet,
+        // provision one so mobile keeps ringing.
+        if (newExt && newExt === oldExt) {
+          const { data: prof } = await admin
+            .from("planipret_profiles")
+            .select("id, ns_mobile_device_id")
+            .eq("user_id", user_id)
+            .maybeSingle();
+          if (prof && !prof.ns_mobile_device_id) {
+            await ensureMobileDevice(admin, prof.id, newExt, domain);
+          }
+        }
+      }
+
+      await logAudit(admin, req, {
+        admin_id: profile.id, action: "USER_UPDATE",
+        resource_type: "user", resource_id: user_id, metadata: allowed,
+      });
       return jsonResponse({ success: true });
     }
 
     if (action === "delete") {
       const { user_id } = payload ?? {};
       if (!user_id) return jsonResponse({ success: false, error: "user_id requis" }, 400);
+
+      const { data: target } = await admin
+        .from("planipret_profiles")
+        .select("id, extension, ns_extension, ns_domain")
+        .eq("user_id", user_id)
+        .maybeSingle();
+
+      if (target) {
+        const domain = target.ns_domain || NS_DEFAULT_DOMAIN;
+        const ext = String(target.ns_extension || target.extension || "");
+        if (ext) {
+          await nsFetch(
+            `/domains/${encodeURIComponent(domain)}/users/${encodeURIComponent(ext)}`,
+            { method: "DELETE" },
+          ).catch(() => null);
+        }
+      }
+
       await admin.from("planipret_profiles").delete().eq("user_id", user_id);
       await admin.auth.admin.deleteUser(user_id).catch(() => null);
       await logAudit(admin, req, {
