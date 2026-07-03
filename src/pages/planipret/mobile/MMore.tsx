@@ -293,7 +293,8 @@ export default function MMore() {
         <Row icon={<SettingsIcon className="w-4 h-4" />} label={t("more.diagnostic")} sub={t("more.diagnosticSub")}
           onClick={async () => {
             toast.info(t("more.diagnosticRunning"));
-            const { data: lastCall } = await supabase
+            const sb: any = supabase;
+            const { data: lastCall } = await sb
               .from("planipret_phone_calls")
               .select("id, ns_call_id")
               .eq("broker_id", profile.id)
