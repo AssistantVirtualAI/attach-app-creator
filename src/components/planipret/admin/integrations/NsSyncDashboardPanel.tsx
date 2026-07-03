@@ -190,8 +190,31 @@ export function NsSyncDashboardPanel() {
             {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
             Lancer backfill NS CDR (90j)
           </button>
+          <button
+            onClick={async () => {
+              setMobileBackfilling(true);
+              try {
+                const { data, error } = await supabase.functions.invoke("pp-backfill-mobile-devices", { body: {} });
+                if (error) throw error;
+                const d: any = data ?? {};
+                toast.success(`Devices mobiles — créés: ${d.created ?? 0}, existants: ${d.skipped ?? 0}, erreurs: ${d.errors ?? 0}`);
+                setLastResult(d);
+              } catch (e: any) {
+                toast.error(e?.message ?? "Échec backfill mobile");
+              } finally {
+                setMobileBackfilling(false);
+              }
+            }}
+            disabled={mobileBackfilling}
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-blue-500/20 border border-blue-500/40 text-blue-200 hover:bg-blue-500/30 disabled:opacity-50"
+            title="Crée un device SIP mobile dédié pour chaque courtier (sans toucher au widget)"
+          >
+            {mobileBackfilling ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+            Provisionner devices mobiles
+          </button>
         </div>
       </div>
+
 
       {/* Per-function status cards */}
       <div className="grid md:grid-cols-2 gap-3">
