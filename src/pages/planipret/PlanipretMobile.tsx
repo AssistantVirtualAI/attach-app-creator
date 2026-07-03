@@ -27,6 +27,8 @@ import { useMplanipretLang } from "@/hooks/useMplanipretLang";
 import { ROUTES } from "@/lib/routes";
 import { recordRedirect } from "@/lib/debug/navDebug";
 import { useMplanipretSoftphone } from "@/hooks/useMplanipretSoftphone";
+import MicPermissionDialog from "@/components/planipret/mobile/MicPermissionDialog";
+import type { MicPermissionState } from "@/lib/planipret/audio/micPermission";
 
 const ACCENT = "#2E9BDC";
 
@@ -84,6 +86,7 @@ function Dialer({ open, onClose, initial, openMessages }: { open: boolean; onClo
   const [mode, setMode] = useState<"keypad" | "search">("keypad");
   const [number, setNumber] = useState("");
   const [calling, setCalling] = useState(false);
+  const [micDialog, setMicDialog] = useState<{ open: boolean; state: MicPermissionState; pending?: string }>({ open: false, state: "prompt" });
   const [query, setQuery] = useState("");
   const [contacts, setContacts] = useState<DialerContact[]>([]);
   const [loadingContacts, setLoadingContacts] = useState(false);
@@ -103,12 +106,22 @@ function Dialer({ open, onClose, initial, openMessages }: { open: boolean; onClo
     const result = await softphone.placeCall(destination);
     setCalling(false);
     if (!result.ok) {
+      if ("micState" in result && (result.micState === "denied" || result.micState === "unavailable")) {
+        setMicDialog({ open: true, state: result.micState, pending: destination });
+        return;
+      }
       toast.error(("error" in result && result.error) || t("dialer.callFailed"));
       return;
     }
     toast.success(result.via === "webrtc" ? t("dialer.callStartedWebrtc") : t("dialer.callStarted"));
     setNumber("");
     onClose();
+  };
+
+  const retryMic = async () => {
+    const pending = micDialog.pending;
+    setMicDialog({ open: false, state: "prompt" });
+    if (pending) await startCall(pending);
   };
 
 
@@ -312,6 +325,12 @@ function Dialer({ open, onClose, initial, openMessages }: { open: boolean; onClo
           </div>
         </motion.div>
       )}
+      <MicPermissionDialog
+        open={micDialog.open}
+        state={micDialog.state}
+        onRetry={retryMic}
+        onClose={() => setMicDialog({ open: false, state: "prompt" })}
+      />
     </AnimatePresence>
   );
 }

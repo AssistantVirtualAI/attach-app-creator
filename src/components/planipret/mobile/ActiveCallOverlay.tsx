@@ -8,6 +8,7 @@ import {
 import { useMplanipretLang } from "@/hooks/useMplanipretLang";
 import { useMplanipretSoftphone } from "@/hooks/useMplanipretSoftphone";
 import NetworkQualityBadge from "@/components/planipret/mobile/NetworkQualityBadge";
+import HandoverIndicator from "@/components/planipret/mobile/HandoverIndicator";
 
 type Call = {
   id: string;
@@ -114,6 +115,9 @@ export default function ActiveCallOverlay({ callId, onClosed }: { callId: string
           </div>
           <div className="mt-3">
             <NetworkQualityBadge net={net} quality={quality} />
+          </div>
+          <div className="mt-3">
+            <HandoverIndicator />
           </div>
           {dtmfBuffer && <div className="mt-2 text-xs text-white/50">DTMF: {dtmfBuffer}</div>}
         </div>

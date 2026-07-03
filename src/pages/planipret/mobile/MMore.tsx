@@ -13,6 +13,7 @@ import { Ms365ScopesCard } from "@/components/planipret/Ms365ScopesCard";
 import { SiriShortcutsCard } from "@/components/planipret/SiriShortcutsCard";
 import { safeEdgeFunction } from "@/lib/safeEdgeFunction";
 import MNetworkSection from "@/components/planipret/mobile/MNetworkSection";
+import MCallAudioSettings from "@/components/planipret/mobile/MCallAudioSettings";
 import { useMplanipretLang } from "@/hooks/useMplanipretLang";
 
 const initials = (name?: string) =>
@@ -282,6 +283,9 @@ export default function MMore() {
       </Section>
 
       <MNetworkSection />
+
+      <MCallAudioSettings />
+
 
       <NotificationsSection profile={profile} reloadProfile={reloadProfile} />
 

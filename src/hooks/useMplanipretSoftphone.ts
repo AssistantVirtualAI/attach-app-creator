@@ -18,6 +18,7 @@ import { networkMonitor, type NetSample } from "@/lib/planipret/network/networkM
 import { handoverController } from "@/lib/planipret/net/handoverController";
 import { callQualitySampler, type CallQualitySnapshot } from "@/lib/planipret/audio/callQualitySampler";
 import { getAudioConstraints, type NCMode } from "@/lib/planipret/audio/audioConstraints";
+import { ensureMicPermission, type MicPermissionState } from "@/lib/planipret/audio/micPermission";
 
 let gumProxyInstalled = false;
 let gumOriginal: typeof navigator.mediaDevices.getUserMedia | null = null;
@@ -25,6 +26,10 @@ let gumOriginal: typeof navigator.mediaDevices.getUserMedia | null = null;
 function readNCMode(): NCMode {
   try { return (localStorage.getItem("pp_nc_mode") as NCMode) || "standard"; }
   catch { return "standard"; }
+}
+function readNCEnabled(): boolean {
+  try { const v = localStorage.getItem("pp_nc_enabled"); return v === null ? true : v === "1"; }
+  catch { return true; }
 }
 
 /** Install a one-time getUserMedia proxy that upgrades audio-only requests with
@@ -37,7 +42,7 @@ function ensureGumProxy() {
   md.getUserMedia = async (constraints: MediaStreamConstraints) => {
     try {
       const wantsAudioOnly = constraints && constraints.audio && !constraints.video;
-      if (wantsAudioOnly) {
+      if (wantsAudioOnly && readNCEnabled()) {
         const cfg = getAudioConstraints(readNCMode());
         const merged: MediaStreamConstraints = {
           audio: { ...(cfg.audio as any), ...(typeof constraints.audio === "object" ? constraints.audio : {}) },
@@ -54,7 +59,7 @@ function ensureGumProxy() {
 export type OutboundResult =
   | { via: "webrtc"; ok: true }
   | { via: "pbx"; ok: true }
-  | { via: "none"; ok: false; error: string };
+  | { via: "none"; ok: false; error: string; micState?: MicPermissionState };
 
 export function useMplanipretSoftphone() {
   const { user } = useAuth();
@@ -122,6 +127,14 @@ export function useMplanipretSoftphone() {
 
   const placeCall = useCallback(async (destination: string): Promise<OutboundResult> => {
     if (!destination) return { via: "none", ok: false, error: "empty destination" };
+    // Ask for the mic BEFORE dialing so the user sees a clear prompt/fallback.
+    const mic = await ensureMicPermission();
+    if (mic.state !== "granted") {
+      // Stop any temporary probe stream — real call will re-acquire via the SIP layer.
+      try { mic.stream?.getTracks().forEach((tr) => tr.stop()); } catch {}
+      return { via: "none", ok: false, error: mic.error ?? "microphone unavailable", micState: mic.state };
+    }
+    try { mic.stream?.getTracks().forEach((tr) => tr.stop()); } catch {}
     if (registered) {
       try { await ppSipProvider.call(destination); return { via: "webrtc", ok: true }; }
       catch { /* fall through */ }
