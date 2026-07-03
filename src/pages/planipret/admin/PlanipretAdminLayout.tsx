@@ -69,6 +69,7 @@ const initials = (n?: string) =>
   (n ?? "A").split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase()).join("") || "A";
 
 export default function PlanipretAdminLayout() {
+  const { lang, setLang } = useMplanipretLang();
   const navigate = useNavigate();
   const location = useLocation();
   const [profile, setProfile] = useState<any>(null);
