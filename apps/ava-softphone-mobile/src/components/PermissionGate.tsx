@@ -237,8 +237,10 @@ export default function PermissionGate({ onComplete }: PermissionGateProps) {
         </div>
       )}
       {status === 'denied' && (
-        <div style={{ color: colors.danger, fontSize: font.xs, marginBottom: 16, textAlign: 'center', maxWidth: 320 }}>
-          Accès refusé. Activez-le dans Réglages iOS → Lemtel → Microphone, puis relancez l’application.
+        <div style={{ color: colors.danger, fontSize: font.xs, marginBottom: 16, textAlign: 'center', maxWidth: 320, lineHeight: 1.5 }}>
+          {Capacitor.getPlatform() === 'android'
+            ? 'Accès microphone refusé. Ouvrez Réglages → Applications → Lemtel → Autorisations → Microphone, puis revenez à l’application.'
+            : 'Accès microphone refusé. Ouvrez Réglages iOS → Lemtel → Microphone, puis revenez à l’application.'}
         </div>
       )}
       {error && (
@@ -248,8 +250,23 @@ export default function PermissionGate({ onComplete }: PermissionGateProps) {
       )}
 
       <button onClick={requestCurrent} disabled={requesting} style={{ ...primaryBtnStyle, opacity: requesting ? 0.6 : 1 }}>
-        {requesting ? 'Requesting…' : 'Continue'}
+        {requesting ? 'Requesting…' : status === 'denied' ? 'Réessayer' : 'Allow Microphone & Audio'}
       </button>
+
+      {status === 'denied' && Capacitor.isNativePlatform() && (
+        <button onClick={() => { void openAppSettings(); }} style={{ ...ghostBtnStyle }}>
+          Ouvrir les Réglages
+        </button>
+      )}
+
+      {status === 'denied' && (
+        <button
+          onClick={() => advance(step)}
+          style={{ ...ghostBtnStyle, marginTop: 8, color: colors.mutedSilver }}
+        >
+          Continuer sans microphone (les appels ne fonctionneront pas)
+        </button>
+      )}
 
 
       {/* Step dots */}
