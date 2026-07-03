@@ -218,6 +218,10 @@ export default function PlanipretIntegrations() {
             <NsRecordingsProbe domain={getField("ns_api", "domain", "planipret.ca") || "planipret.ca"} />
           </div>
           <div className="mt-4">
+            <CallE2ECheck />
+          </div>
+
+          <div className="mt-4">
             <NsMigrationPanel />
           </div>
           <NsCapabilitiesPanel domain={getField("ns_api", "domain", "planipret.ca") || "planipret.ca"} />
