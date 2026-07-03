@@ -14,6 +14,7 @@ import { WorkspaceHeaderExtras } from "@/components/portals/WorkspaceHeaderExtra
 import { getPlanipretBrokerDirectoryCount } from "@/lib/planipret/adminDirectory";
 import { getPlanipretCallCount } from "@/lib/planipret/adminCounts";
 import { useMplanipretLang } from "@/hooks/useMplanipretLang";
+import { PlanipretLangSwitch } from "@/components/planipret/PlanipretLangSwitch";
 
 type NavBadge = "brokers" | "missed" | "integrations" | "audit";
 type NavItem = { to: string; label: string; Icon: any; badge?: NavBadge };
