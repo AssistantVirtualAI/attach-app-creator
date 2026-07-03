@@ -757,6 +757,49 @@ function CallDetailSheet({
     })();
   }, [call.id]);
 
+  // Auto-run transcription + AI analysis when opening a call that has a
+  // recording but no transcript/insight yet (parity with /planipret/admin).
+  const autoRanRef = useRef<string | null>(null);
+  useEffect(() => {
+    const hasRecording = !!(call.recording_url || (call as any).has_recording || call.ns_call_id);
+    const hasTranscript = !!call.transcript || (Array.isArray(call.transcript_segments) && call.transcript_segments.length > 0);
+    const hasInsight = !!insight?.summary;
+    if (!hasRecording || autoRanRef.current === call.id) return;
+    if (hasTranscript && hasInsight) return;
+    autoRanRef.current = call.id;
+    (async () => {
+      try {
+        if (!hasTranscript) {
+          setTxLoading(true);
+          const { data } = await supabase.functions.invoke("ns-transcription", { body: { call_id: call.ns_call_id ?? call.id } });
+          setTxLoading(false);
+          const res = (data ?? {}) as any;
+          if (res?.transcript || (Array.isArray(res?.segments) && res.segments.length)) {
+            onUpdated({ ...call, transcript: res.transcript ?? call.transcript, transcript_segments: res.segments ?? call.transcript_segments });
+          }
+        }
+        // Reload latest call state before analyzing
+        const { data: fresh } = await supabase.from("planipret_phone_calls").select("*").eq("id", call.id).maybeSingle();
+        const freshCall = (fresh as Call) ?? call;
+        const segs = Array.isArray(freshCall.transcript_segments) ? freshCall.transcript_segments : null;
+        if ((freshCall.transcript || segs) && !hasInsight) {
+          setAiLoading(true);
+          await supabase.functions.invoke("ai-analyze-call", {
+            body: { call_id: call.id, transcript: freshCall.transcript ?? null, segments: segs },
+          });
+          setAiLoading(false);
+          const { data: ins } = await supabase.from("planipret_ai_insights").select("*").eq("call_id", call.id).maybeSingle();
+          setInsight((ins as any) ?? null);
+          if (fresh) onUpdated(freshCall);
+        }
+      } catch (e) {
+        setTxLoading(false); setAiLoading(false);
+        console.error("[MCalls] auto AI pipeline failed", e);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [call.id, insight?.summary]);
+
   // Realtime refresh on ai-insights channel
   useEffect(() => {
     if (!userId) return;
