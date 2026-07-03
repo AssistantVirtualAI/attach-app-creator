@@ -152,33 +152,65 @@ Deno.serve(async (req) => {
   }
 
   const resolvedDeviceId = device ? (deviceIdOf(device) ?? targetId) : targetId;
+  let createDetails: any = null;
 
   if (!device) {
     // Create a dedicated device for this client_type. Do NOT touch other devices.
     sipPassword = sipPassword || randomPassword(22);
-    const createRes = await nsFetch(
+    const modelPref = clientType === "widget" ? "Web Softphone" : "Mobile Softphone";
+    // Try with device-model first. If NS rejects (some tenants restrict the
+    // catalog), retry without it — device-model is optional on NS-API v2.
+    const buildBody = (withModel: boolean) => JSON.stringify({
+      device: resolvedDeviceId,
+      "authentication-key": sipPassword,
+      "device-provisioning-protocol": "sip",
+      ...(withModel ? { "device-model": modelPref } : {}),
+      "user": extension,
+    });
+    let createRes = await nsFetch(
       `/domains/${encodeURIComponent(domain)}/users/${encodeURIComponent(extension)}/devices`,
-      {
-        method: "POST",
-        body: JSON.stringify({
-          device: resolvedDeviceId,
-          "authentication-key": sipPassword,
-          "device-provisioning-protocol": "sip",
-          "device-model": clientType === "widget" ? "Web Softphone" : "Mobile Softphone",
-        }),
-      },
+      { method: "POST", body: buildBody(true) },
     );
-    // Trace per-broker provisioning (idempotent — the unique device id makes
-    // repeated calls safe on NS-API side; we only log the first success).
+    if (!createRes.ok) {
+      const retry = await nsFetch(
+        `/domains/${encodeURIComponent(domain)}/users/${encodeURIComponent(extension)}/devices`,
+        { method: "POST", body: buildBody(false) },
+      );
+      createDetails = { first: { status: createRes.status, data: createRes.data }, retry: { status: retry.status, data: retry.data } };
+      createRes = retry;
+    } else {
+      createDetails = { first: { status: createRes.status, data: createRes.data } };
+    }
+
+    // Trace per-broker provisioning (idempotent). Best-effort — the log table
+    // may not have action/status/details columns on older deployments.
     try {
       await admin.from("planipret_ns_migration_log").insert({
         broker_id: profile.id,
         action: `create_${clientType}_device`,
         status: createRes.ok ? "ok" : "error",
-        details: { device_id: resolvedDeviceId, ns_status: createRes.status },
+        details: { device_id: resolvedDeviceId, ns_status: createRes.status, ns_body: createRes.data },
       });
     } catch { /* logging is best-effort */ }
 
+    // Verify the device actually exists on NS before persisting our mapping.
+    const verify = await nsFetch(
+      `/domains/${encodeURIComponent(domain)}/users/${encodeURIComponent(extension)}/devices`,
+    );
+    const verifyList: any[] = Array.isArray(verify.data) ? verify.data : [];
+    const exists = verifyList.some((d) => deviceIdOf(d) === resolvedDeviceId);
+    if (!exists) {
+      return json({
+        ok: false,
+        error: "device_create_failed",
+        client_type: clientType,
+        target_device_id: resolvedDeviceId,
+        ns_extension: extension,
+        ns_domain: domain,
+        ns_create: createDetails,
+        ns_devices_now: verifyList.map((d) => deviceIdOf(d)).filter(Boolean),
+      }, 502);
+    }
   } else if (!sipPassword) {
     // We own the device but lost the password (fresh Vault, migration, etc.).
     // Rotate ONLY this device's key.
@@ -212,6 +244,8 @@ Deno.serve(async (req) => {
     ok: true,
     client_type: clientType,
     device_id: resolvedDeviceId,
+    device_created: !device,
+    ns_create: createDetails,
     sip_username: sipUsername,
     sip_extension: extension,
     sip_domain: domain,
@@ -222,3 +256,4 @@ Deno.serve(async (req) => {
     // never log this response
   });
 });
+
