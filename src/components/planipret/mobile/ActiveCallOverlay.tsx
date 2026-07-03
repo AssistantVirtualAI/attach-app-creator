@@ -8,6 +8,7 @@ import {
 import { useMplanipretLang } from "@/hooks/useMplanipretLang";
 import { useMplanipretSoftphone } from "@/hooks/useMplanipretSoftphone";
 import NetworkQualityBadge from "@/components/planipret/mobile/NetworkQualityBadge";
+import HandoverIndicator from "@/components/planipret/mobile/HandoverIndicator";
 
 type Call = {
   id: string;
