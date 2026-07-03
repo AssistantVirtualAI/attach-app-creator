@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import {
   Search, X, Phone, PhoneIncoming, PhoneOutgoing, PhoneMissed, PhoneOff, Copy,
   Bot, ChevronDown, ChevronUp, Pause, Play, Mic, MicOff, ArrowRightLeft, Loader2,
-  Check, Sparkles, RefreshCw, Voicemail as VmIcon, Save, Trash2, FileText,
+  Check, Sparkles, RefreshCw, Voicemail as VmIcon, Save, Trash2, FileText, Download,
 } from "lucide-react";
 import type { PlanipretMobileContext } from "../PlanipretMobile";
 import { TEMP_COLORS, TEMP_EMOJI, TEMP_LABEL, tempBorder, callbackDelayToDate, delayLabel, type LeadTemp } from "@/components/planipret/leadHelpers";
