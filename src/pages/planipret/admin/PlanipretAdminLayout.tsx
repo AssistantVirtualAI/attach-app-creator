@@ -47,6 +47,7 @@ const NAV: NavGroup[] = [
     title: "Système",
     items: [
       { to: "/planipret/admin/integrations",    label: "Intégrations", Icon: Plug,        badge: "integrations" },
+      { to: "/planipret/admin/mobile-devices",  label: "Devices mobiles", Icon: Smartphone },
       { to: "/planipret/admin/compliance",      label: "Conformité",   Icon: ShieldCheck },
       { to: "/planipret/admin/audit-checklist", label: "Audit",        Icon: CheckSquare, badge: "audit" },
     ],
