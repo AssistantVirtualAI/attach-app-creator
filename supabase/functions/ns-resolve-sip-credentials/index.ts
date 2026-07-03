@@ -240,12 +240,23 @@ Deno.serve(async (req) => {
   }
   await admin.from("planipret_profiles").update(updatePatch).eq("id", profile.id);
 
+  // Re-list devices after mutations so the client can display fresh state.
+  let devicesNow: string[] = [];
+  try {
+    const after = await nsFetch(
+      `/domains/${encodeURIComponent(domain)}/users/${encodeURIComponent(extension)}/devices`,
+    );
+    const afterList: any[] = Array.isArray(after.data) ? after.data : [];
+    devicesNow = afterList.map((d) => deviceIdOf(d)).filter(Boolean) as string[];
+  } catch { /* non fatal */ }
+
   return json({
     ok: true,
     client_type: clientType,
     device_id: resolvedDeviceId,
     device_created: !device,
     ns_create: createDetails,
+    ns_devices: devicesNow,
     sip_username: sipUsername,
     sip_extension: extension,
     sip_domain: domain,
@@ -255,5 +266,6 @@ Deno.serve(async (req) => {
     sip_password: sipPassword,
     // never log this response
   });
+
 });
 

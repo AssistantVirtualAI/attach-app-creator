@@ -14,6 +14,8 @@ export default function MExtensionSync() {
   const [state, setState] = useState<State>("idle");
   const [lastResult, setLastResult] = useState<any>(null);
   const [registered, setRegistered] = useState<boolean | null>(null);
+  const [devices, setDevices] = useState<string[] | null>(null);
+
 
   const extension = profile?.ns_extension || profile?.extension || null;
   const domain = profile?.ns_domain || "planipret.ca";
@@ -37,6 +39,8 @@ export default function MExtensionSync() {
     setBusy(false);
     const res = (data ?? {}) as any;
     setLastResult({ error: error?.message ?? null, ...res });
+    if (Array.isArray(res?.ns_devices)) setDevices(res.ns_devices);
+    else if (Array.isArray(res?.ns_devices_now)) setDevices(res.ns_devices_now);
     if (error || !res?.ok) {
       setState("error");
       if (!opts?.silent) toast.error(res?.error ?? error?.message ?? "Échec du resync");
@@ -51,6 +55,7 @@ export default function MExtensionSync() {
     setState("ok");
     if (!opts?.silent) toast.success(`Extension ${res.sip_extension} synchronisée`);
   };
+
 
   // Listen for SIP registration events fired by the softphone layer.
   useEffect(() => {
@@ -173,7 +178,60 @@ export default function MExtensionSync() {
         {busy ? "Synchronisation en cours…" : "Forcer le resync"}
       </button>
 
+      {devices && (
+        <div className="pp-card" style={{ padding: 10 }}>
+          <div className="flex items-center justify-between" style={{ marginBottom: 6 }}>
+            <div style={{ fontSize: 12, fontWeight: 700 }}>
+              Appareils SIP ({devices.length})
+            </div>
+            <button
+              onClick={() => runResync({ silent: true })}
+              disabled={busy}
+              className="flex items-center gap-1 px-2 py-1 rounded-md"
+              style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", fontSize: 11 }}
+              aria-label="Rafraîchir la liste"
+            >
+              <RefreshCw className={`w-3 h-3 ${busy ? "animate-spin" : ""}`} />
+              Rafraîchir
+            </button>
+          </div>
+          {devices.length === 0 ? (
+            <div style={{ fontSize: 12, color: "var(--pp-text-muted)" }}>Aucun appareil trouvé.</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              {devices.map((d) => {
+                const isMine = d === mobileDeviceId;
+                return (
+                  <div
+                    key={d}
+                    className="flex items-center gap-2"
+                    style={{
+                      fontSize: 12,
+                      padding: "6px 8px",
+                      borderRadius: 8,
+                      background: isMine ? "rgba(46,155,220,0.10)" : "transparent",
+                      border: isMine ? "1px solid rgba(46,155,220,0.35)" : "1px solid transparent",
+                    }}
+                  >
+                    {isMine
+                      ? <CheckCircle2 className="w-3.5 h-3.5" style={{ color: "var(--pp-color-success)" }} />
+                      : <Smartphone className="w-3.5 h-3.5" style={{ color: "var(--pp-text-muted)" }} />}
+                    <span style={{ fontWeight: isMine ? 700 : 500, wordBreak: "break-all" }}>{d}</span>
+                    {isMine && (
+                      <span style={{ fontSize: 10, color: "var(--pp-color-success)", marginLeft: "auto" }}>
+                        ce téléphone
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       {lastResult && (
+
         <div className="pp-card" style={{ padding: 10 }}>
           <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Dernier résultat</div>
           <pre style={{
