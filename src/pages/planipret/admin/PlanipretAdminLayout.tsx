@@ -124,8 +124,14 @@ export default function PlanipretAdminLayout() {
       if (data && data.role && data.role !== "admin") { navigate("/mplanipret", { replace: true }); return; }
       setProfile(data ?? { full_name: user.email, role: "admin" });
       setLoading(false);
-      if (data && (data.language === "fr" || data.language === "en") && data.language !== lang) {
-        setLang(data.language);
+      if (data && (data.language === "fr" || data.language === "en")) {
+        if (data.language !== lang) setLang(data.language);
+      } else if (data) {
+        const fallback: "fr" | "en" = lang === "en" ? "en" : "fr";
+        setLang(fallback);
+        try {
+          await supabase.from("planipret_profiles").update({ language: fallback }).eq("user_id", user.id);
+        } catch { /* non-blocking */ }
       }
 
       try {
