@@ -83,12 +83,12 @@ export function useMplanipretSoftphone() {
   const registered = sp.snap.status === "registered";
   const callViaWebRTC = useCallback((n: string) => sp.call(n), [sp]);
 
-  const callViaPBX = useCallback(async (destination: string) => {
+  const callViaPBX = useCallback(async (destination: string): Promise<OutboundResult> => {
     const { data, error } = await supabase.functions.invoke("ns-calls", { body: { action: "start", destination } });
     if (error || (data as any)?.success === false) {
-      return { via: "none" as const, ok: false, error: (data as any)?.error ?? error?.message ?? "PBX call failed" };
+      return { via: "none", ok: false, error: (data as any)?.error ?? error?.message ?? "PBX call failed" };
     }
-    return { via: "pbx" as const, ok: true };
+    return { via: "pbx", ok: true };
   }, []);
 
   const placeCall = useCallback(async (destination: string): Promise<OutboundResult> => {
