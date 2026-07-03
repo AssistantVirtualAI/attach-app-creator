@@ -284,6 +284,9 @@ export default function MMore() {
 
       <MNetworkSection />
 
+      <MCallAudioSettings />
+
+
       <NotificationsSection profile={profile} reloadProfile={reloadProfile} />
 
       <Section title={t("more.sections.support")}>
