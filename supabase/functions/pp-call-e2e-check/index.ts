@@ -41,6 +41,31 @@ Deno.serve(async (req) => {
 
     const report: Record<string, StepReport> = {};
 
+    // 0) Extension resolved for the calling broker
+    try {
+      const userClient = createClient(supaUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const { data: u } = await userClient.auth.getUser();
+      if (u?.user) {
+        const { data: p } = await admin
+          .from("planipret_profiles")
+          .select("extension, ns_extension, ns_linked, ns_domain")
+          .eq("user_id", u.user.id)
+          .maybeSingle();
+        const ext = (p as any)?.extension || (p as any)?.ns_extension;
+        report.extension = {
+          ok: !!ext && !!(p as any)?.ns_linked,
+          detail: { extension: ext ?? null, ns_linked: (p as any)?.ns_linked ?? false, domain: (p as any)?.ns_domain ?? null },
+          error: !ext ? "no_extension" : (!(p as any)?.ns_linked ? "not_linked" : undefined),
+        };
+      } else {
+        report.extension = { ok: false, error: "unauthorized" };
+      }
+    } catch (e) {
+      report.extension = { ok: false, error: (e as Error).message };
+    }
+
     // 1) Recording
     try {
       const { status, ms, res } = await invoke("ns-recordings", { method: "GET", qs: `call_id=${encodeURIComponent(callId)}` });
