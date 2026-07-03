@@ -768,6 +768,18 @@ export const MP_DICT = {
     },
     tabs: { home: "Home", calls: "Calls", messages: "Messages", contacts: "Contacts" },
     footer: { poweredBy: "POWERED BY", developedBy: "DEVELOPED BY AVA" },
+    extSync: {
+      extLabel: "Extension",
+      ready: "Ready for inbound & outbound",
+      needsResync: "Sync required",
+      resync: "Resync",
+      syncing: "Syncing…",
+      synced: "Extension synced ✅",
+      failed: "Sync failed",
+      notLinked: "Extension not linked — contact your admin",
+      noExtension: "No extension configured",
+      contactAdmin: "Contact your Planiprêt administrator",
+    },
     dialer: {
       enterNumber: "Enter a number…",
       callInProgress: "Calling…",
