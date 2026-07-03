@@ -36,6 +36,8 @@ const TooltipDark = ({ active, payload, label }: any) => {
 };
 
 export default function PAReports() {
+  const { t, lang } = useMplanipretLang();
+  const dateLocale = lang === "en" ? "en-CA" : "fr-CA";
   const [range, setRangeState] = useState<Range>(() => periodToRange(readAdminReportFilters().period));
   const [calls, setCalls] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
