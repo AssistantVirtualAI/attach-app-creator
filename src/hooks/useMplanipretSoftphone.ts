@@ -10,7 +10,7 @@
 //   - Outbound fallback to `ns-calls action:start` when WebRTC is not registered
 //     ("both, with fallback" policy).
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { ppSipProvider, type PpSipSnapshot } from "@/lib/planipret/sip/ppSipProvider";
@@ -19,6 +19,14 @@ import { handoverController } from "@/lib/planipret/net/handoverController";
 import { callQualitySampler, type CallQualitySnapshot } from "@/lib/planipret/audio/callQualitySampler";
 import { getAudioConstraints, type NCMode } from "@/lib/planipret/audio/audioConstraints";
 import { ensureMicPermission, type MicPermissionState } from "@/lib/planipret/audio/micPermission";
+import {
+  upsertRingingSession,
+  claimCall,
+  endSession,
+  subscribeToCall,
+  type CallSessionRow,
+} from "@/lib/planipret/calls/callSessionSync";
+
 
 let gumProxyInstalled = false;
 let gumOriginal: typeof navigator.mediaDevices.getUserMedia | null = null;
