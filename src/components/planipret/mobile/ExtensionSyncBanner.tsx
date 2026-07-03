@@ -20,7 +20,9 @@ export default function ExtensionSyncBanner({
   const [busy, setBusy] = useState(false);
   const [lastCheck, setLastCheck] = useState<number>(0);
 
-  const extension = profile?.extension || profile?.ns_extension;
+  // Source of truth is the NetSapiens extension. `profile.extension` can hold
+  // a stale/legacy value from earlier migrations and must never be preferred.
+  const extension = profile?.ns_extension || profile?.extension;
   const hasSip = !!extension && !!profile?.ns_linked;
   const cached = (() => {
     try { return JSON.parse(sessionStorage.getItem("pp_sip_config") || "null"); } catch { return null; }
