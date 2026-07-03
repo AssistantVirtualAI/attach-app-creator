@@ -39,6 +39,8 @@ export default function MExtensionSync() {
     setBusy(false);
     const res = (data ?? {}) as any;
     setLastResult({ error: error?.message ?? null, ...res });
+    if (Array.isArray(res?.ns_devices)) setDevices(res.ns_devices);
+    else if (Array.isArray(res?.ns_devices_now)) setDevices(res.ns_devices_now);
     if (error || !res?.ok) {
       setState("error");
       if (!opts?.silent) toast.error(res?.error ?? error?.message ?? "Échec du resync");
@@ -53,6 +55,7 @@ export default function MExtensionSync() {
     setState("ok");
     if (!opts?.silent) toast.success(`Extension ${res.sip_extension} synchronisée`);
   };
+
 
   // Listen for SIP registration events fired by the softphone layer.
   useEffect(() => {
