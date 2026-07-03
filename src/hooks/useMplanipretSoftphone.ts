@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSoftphone } from "@/hooks/useSoftphone";
 import { supabase } from "@/integrations/supabase/client";
-import { networkMonitor, type NetSnapshot } from "@/lib/planipret/net/networkMonitor";
+import { networkMonitor, type NetSample } from "@/lib/planipret/network/networkMonitor";
 import { handoverController } from "@/lib/planipret/net/handoverController";
 import { callQualitySampler, type CallQualitySnapshot } from "@/lib/planipret/audio/callQualitySampler";
 import { getAudioConstraints, type NCMode } from "@/lib/planipret/audio/audioConstraints";
