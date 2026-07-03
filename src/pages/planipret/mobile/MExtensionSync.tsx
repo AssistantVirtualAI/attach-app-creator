@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
-import { ArrowLeft, RefreshCw, CheckCircle2, AlertTriangle, XCircle, Smartphone, Radio } from "lucide-react";
+import { ArrowLeft, RefreshCw, CheckCircle2, AlertTriangle, XCircle, Smartphone, Radio, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { PlanipretMobileContext } from "../PlanipretMobile";
 
 type State = "ok" | "provisioning" | "missing" | "error" | "idle";
+
+type DeviceDetail = { id: string; user_agent: string | null; ip: string | null; registered_at: string | null; registered: boolean; is_mine: boolean };
 
 export default function MExtensionSync() {
   const { profile, reloadProfile } = useOutletContext<PlanipretMobileContext>();
@@ -15,6 +17,8 @@ export default function MExtensionSync() {
   const [lastResult, setLastResult] = useState<any>(null);
   const [registered, setRegistered] = useState<boolean | null>(null);
   const [devices, setDevices] = useState<string[] | null>(null);
+  const [devicesDetail, setDevicesDetail] = useState<DeviceDetail[] | null>(null);
+  const [registeredDeviceId, setRegisteredDeviceId] = useState<string | null>(null);
 
 
   const extension = profile?.ns_extension || profile?.extension || null;
