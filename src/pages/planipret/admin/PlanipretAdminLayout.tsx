@@ -65,6 +65,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/planipret/admin/audit-checklist": "Audit système",
   "/planipret/admin/compliance": "Conformité PIPEDA · Loi 25",
   "/planipret/admin/ava": "AVA — Analytics",
+  "/planipret/admin/mobile-devices": "Vérification devices mobiles",
 };
 
 const initials = (n?: string) =>
