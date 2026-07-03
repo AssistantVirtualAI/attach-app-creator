@@ -223,12 +223,12 @@ export default function PAReports() {
       const pageH = pdf.internal.pageSize.getHeight();
       const imgW = pageW - 20;
       const imgH = (canvas.height * imgW) / canvas.width;
-      const dateLabel = new Date().toLocaleDateString("fr-CA");
+      const dateLabel = new Date().toLocaleDateString(dateLocale);
       pdf.setFillColor(11, 20, 55); pdf.rect(0, 0, pageW, pageH, "F");
       pdf.setTextColor(255, 255, 255); pdf.setFontSize(16);
       pdf.text("Planiprêt — Rapport admin", 10, 12);
       pdf.setFontSize(9); pdf.setTextColor(143, 168, 192);
-      pdf.text(`Période : ${selectedPeriodLabel} · Généré le ${dateLabel}`, 10, 18);
+      pdf.text(`${t("reports.periodBadge")} : ${selectedPeriodLabel} · ${dateLabel}`, 10, 18);
       let y = 24, remaining = imgH, srcY = 0;
       const ratio = canvas.width / imgW;
       while (remaining > 0) {
@@ -244,9 +244,9 @@ export default function PAReports() {
         if (remaining > 0) { pdf.addPage(); pdf.setFillColor(11, 20, 55); pdf.rect(0, 0, pageW, pageH, "F"); y = 10; }
       }
       pdf.save(`planipret-rapport-${range}-${new Date().toISOString().slice(0,10)}.pdf`);
-      toast.success("PDF généré");
+      toast.success(t("reports.pdfSuccess"));
     } catch (e: any) {
-      toast.error("Échec de l'export PDF : " + (e?.message ?? "erreur"));
+      toast.error(t("reports.pdfError") + (e?.message ?? "error"));
     } finally {
       setExporting(false);
     }
