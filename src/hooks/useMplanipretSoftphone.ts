@@ -42,7 +42,7 @@ function ensureGumProxy() {
   md.getUserMedia = async (constraints: MediaStreamConstraints) => {
     try {
       const wantsAudioOnly = constraints && constraints.audio && !constraints.video;
-      if (wantsAudioOnly) {
+      if (wantsAudioOnly && readNCEnabled()) {
         const cfg = getAudioConstraints(readNCMode());
         const merged: MediaStreamConstraints = {
           audio: { ...(cfg.audio as any), ...(typeof constraints.audio === "object" ? constraints.audio : {}) },
@@ -59,7 +59,7 @@ function ensureGumProxy() {
 export type OutboundResult =
   | { via: "webrtc"; ok: true }
   | { via: "pbx"; ok: true }
-  | { via: "none"; ok: false; error: string };
+  | { via: "none"; ok: false; error: string; micState?: MicPermissionState };
 
 export function useMplanipretSoftphone() {
   const { user } = useAuth();
