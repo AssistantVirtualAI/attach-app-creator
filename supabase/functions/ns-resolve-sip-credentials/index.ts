@@ -93,7 +93,11 @@ Deno.serve(async (req) => {
 
   if (pErr) return json({ error: "profile_lookup_failed" }, 500);
   if (!profile) return json({ error: "no_profile" }, 404);
-  if (!profile.ns_linked || !profile.ns_extension) {
+  // Only ns_extension is strictly required — if ns_linked is false but an
+  // extension exists we can still (re)provision {ext}_mobile/{ext}_web on
+  // NS-API and flip ns_linked=true on success. This is what makes the mobile
+  // app self-heal when the admin flow forgot to mark the profile as linked.
+  if (!profile.ns_extension) {
     return json({ error: "not_linked", needs_link: true }, 409);
   }
 
