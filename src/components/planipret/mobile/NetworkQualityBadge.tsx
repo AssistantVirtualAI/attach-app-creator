@@ -16,7 +16,7 @@ export default function NetworkQualityBadge({
   quality,
   compact,
 }: {
-  net: NetSnapshot;
+  net: NetSample;
   quality?: CallQualitySnapshot | null;
   compact?: boolean;
 }) {
@@ -26,13 +26,13 @@ export default function NetworkQualityBadge({
   const Icon =
     net.type === "wifi" ? Wifi
     : net.type === "cellular" ? Signal
-    : net.type === "none" ? SignalZero
+    : !net.connected ? SignalZero
     : Radio;
 
   const kindLabel =
     net.type === "wifi" ? "Wi-Fi"
-    : net.type === "cellular" ? (net.effectiveType?.toUpperCase() || "LTE")
-    : net.type === "none" ? "Offline"
+    : net.type === "cellular" ? "LTE"
+    : !net.connected ? "Offline"
     : "Net";
 
   return (
