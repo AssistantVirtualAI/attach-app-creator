@@ -112,6 +112,9 @@ export default function ActiveCallOverlay({ callId, onClosed }: { callId: string
           <div className="mt-3 text-sm text-white/70">
             {isRinging ? t("call.ringing") : held ? t("call.onHold") : formatDuration(elapsed)}
           </div>
+          <div className="mt-3">
+            <NetworkQualityBadge net={net} quality={quality} />
+          </div>
           {dtmfBuffer && <div className="mt-2 text-xs text-white/50">DTMF: {dtmfBuffer}</div>}
         </div>
 
