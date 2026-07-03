@@ -26,6 +26,7 @@ import { useMplanipretTheme } from "@/hooks/useMplanipretTheme";
 import { useMplanipretLang } from "@/hooks/useMplanipretLang";
 import { ROUTES } from "@/lib/routes";
 import { recordRedirect } from "@/lib/debug/navDebug";
+import { useMplanipretSoftphone } from "@/hooks/useMplanipretSoftphone";
 
 const ACCENT = "#2E9BDC";
 
