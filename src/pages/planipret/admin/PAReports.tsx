@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, CartesianGrid } from "recharts";
-import { Download, Trophy, FileText, RefreshCw, Smartphone, Bot, Plug, Mail, Link2, Users } from "lucide-react";
+import { Download, Trophy, FileText, RefreshCw, Smartphone, Bot, Plug, Mail, Link2, Users, DollarSign } from "lucide-react";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
@@ -10,6 +10,9 @@ import { ADMIN_REPORT_FILTERS_EVENT, periodLabel, periodToRange, rangeToPeriod, 
 import { usePlanipretNsAutoSync } from "@/hooks/usePlanipretNsAutoSync";
 import NsSyncBar from "@/components/planipret/admin/NsSyncBar";
 import { useMplanipretLang } from "@/hooks/useMplanipretLang";
+import { computeServiceFinance, computeTotals, fmtMoney, type ServiceFinance } from "@/lib/planipret/pricing";
+import { FinancialKpiCard } from "@/components/planipret/admin/FinancialKpiCard";
+import { RevenueBreakdown } from "@/components/planipret/admin/RevenueBreakdown";
 
 type Range = "week" | "month" | "quarter";
 
