@@ -38,6 +38,14 @@ export async function getNsJwt(): Promise<string> {
   const env = getEnv();
   const clientId = Deno.env.get("NS_API_CLIENT_ID") ?? "";
   const clientSecret = Deno.env.get("NS_API_CLIENT_SECRET") ?? "";
+  const staticKey = Deno.env.get("NS_API_KEY") ?? "";
+
+  // Fallback: if NS_API_KEY (static bearer) is configured and no OAuth client
+  // credentials, use it directly.
+  if (staticKey && (!clientId || !clientSecret)) {
+    cachedToken = { token: staticKey, exp: Date.now() + 3600_000 };
+    return staticKey;
+  }
 
   // NetSapiens NS-API v2 standard auth: POST /ns-api/oauth2/token (form-encoded, grant_type=password).
   // Fallback to legacy /ns-api/v2/jwt (JSON) for installs that expose it.
@@ -88,6 +96,10 @@ export async function getNsJwt(): Promise<string> {
     } catch (e) {
       errors.push(`${a.label}: ${(e as Error).message}`);
     }
+  }
+  if (staticKey) {
+    cachedToken = { token: staticKey, exp: Date.now() + 3600_000 };
+    return staticKey;
   }
   throw new Error(`NS-API auth failed: ${errors.join(" | ")}`);
 }
