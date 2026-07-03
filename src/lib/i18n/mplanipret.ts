@@ -114,6 +114,28 @@ export const MP_DICT = {
       noExtension: "Aucune extension configurée",
       contactAdmin: "Contactez votre administrateur Planiprêt",
     },
+    mic: {
+      deniedTitle: "Autorisation microphone requise",
+      deniedBody: "Planipret ne peut pas passer d'appel sans accès au microphone. Autorisez l'accès dans les réglages de votre appareil, puis réessayez.",
+      unavailableTitle: "Aucun microphone détecté",
+      unavailableBody: "Aucun périphérique audio n'a été trouvé. Branchez un casque ou un micro, puis réessayez.",
+      step1: "Ouvrez les réglages de votre appareil",
+      step2: "Trouvez Planipret dans la liste des applications",
+      step3: "Activez le microphone",
+      retry: "Réessayer",
+    },
+    handover: {
+      iceOk: "Appel migré",
+      iceFail: "Migration échouée",
+      reregistered: "Ligne restaurée",
+    },
+    callSettings: {
+      title: "Appels & audio",
+      ncLabel: "Réduction de bruit",
+      ncSub: "Améliore la voix et supprime les bruits ambiants",
+      handoverLabel: "Bascule réseau automatique",
+      handoverSub: "Continue l'appel sans coupure entre Wi-Fi et LTE",
+    },
     dialer: {
       enterNumber: "Entrer un numéro…",
       callInProgress: "Appel en cours…",
