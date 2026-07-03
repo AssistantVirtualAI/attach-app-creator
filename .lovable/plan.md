@@ -1,81 +1,44 @@
-# Planipret Mobile — Qualité d'appel « bulletproof »
 
-Objectif : que l'app mobile Planipret utilise **exactement le même moteur d'appel que Lemtel mobile** (JsSIP + WebRTC + wss fallbacks Lemtel), avec **noise cancellation activée par défaut**, **détection auto Wi-Fi/LTE** et **bascule transparente** en cours d'appel, sans coupure ni dégradation.
+## Problème
 
-## 1. Aligner le moteur d'appel sur Lemtel mobile
+Actuellement `ns-resolve-sip-credentials` prend **le premier device softphone** de l'extension NS-API et **rote son mot de passe** à chaque login mobile. Résultat : quand l'app mobile s'enregistre, elle réutilise/écrase le device du widget Maestro. Un seul endpoint reste enregistrable → un seul appareil sonne.
 
-Aujourd'hui Planipret mobile déclenche les appels via l'API PBX (`ns-calls action:start`, click‑to‑call côté serveur) — pas de média WebRTC dans l'app, donc pas de contrôle qualité côté téléphone. Lemtel mobile, lui, utilise `useSoftphone` → `sipProvider` (`src/lib/softphone/jssipProvider.ts`) avec `PC_CONFIG` (ICE relay, TURN Lemtel), fallbacks `wss://pbxnode.lemtel.tel:7443` + `wss://node.lemtelcloud.net:7443`, session timers 120s.
+Sur NetSapiens, il suffit d'avoir **deux devices SIP distincts** enregistrés sous la même extension pour qu'ils sonnent en parallèle (fork natif). Il faut donc réserver un device dédié « mobile » qui ne touche jamais au device du widget.
 
-Actions :
-- Créer `useMplanipretSoftphone` (wrapper de `useSoftphone`) qui, en mobile, force `platform:"mobile"` vers `softphone-credentials` et réutilise `sipProvider`, `PC_CONFIG`, `sdpModifier`, ringtones et logs Lemtel. **Aucune duplication du provider**.
-- Rebrancher le bouton d'appel de `PlanipretMobile.tsx` / `Dialer` / `MContacts` / `MCalls` sur ce hook : chemin principal = **WebRTC in-app** (audio HD, contrôle codec), fallback = `ns-calls start` si `sipProvider` non enregistré ou WSS injoignable (règle existante « les deux avec fallback » déjà validée).
-- Respecter l'isolation `/mplanipret` : les changements du provider Lemtel sont interdits ; on ne fait que le consommer.
+## Changements
 
-## 2. Noise cancellation par défaut + chaîne audio renforcée
+### 1. `supabase/functions/ns-resolve-sip-credentials/index.ts`
+- Accepter un paramètre `client_type` dans le body (`"mobile"` par défaut pour cette fonction ; `"widget"` réservé au widget Maestro).
+- Construire un `deviceId` déterministe :
+  - `mobile`  → `${extension}_mobile`
+  - `widget`  → `${extension}_web` (inchangé côté Maestro)
+- Chercher **uniquement** le device qui correspond à ce `deviceId` exact (au lieu du « premier softphone trouvé »).
+- Si absent → créer ce device (POST `/devices`) avec un mot de passe dédié.
+- Si présent → réutiliser le mot de passe stocké en Vault ; ne jamais rotate le mot de passe d'un autre device.
+- Aucune modification du device widget existant.
 
-`src/lib/planipret/audio/audioConstraints.ts`, `rnnoise.ts`, `vad.ts` existent déjà mais ne sont utilisés que dans le `CallAudioSheet` — pas dans le vrai flux d'appel.
+### 2. Stockage du secret par client
+- Nouveau nom de secret Vault : `pp_sip_${profile.id}_${client_type}`.
+- Nouvelle colonne facultative sur `planipret_profiles` : `ns_sip_password_ref_mobile` (le champ `ns_sip_password_ref` actuel reste pour compatibilité widget).
+- Migration SQL courte (ajout de colonne texte nullable).
 
-Actions :
-- Dans `useMplanipretSoftphone.call()` / `.answer()`, remplacer `getUserMedia({audio:{ec,ns,agc:true}})` par `getAudioConstraints(ncMode)` (mode persistant `pp_nc_mode`, défaut = `standard`).
-- Passer le stream micro dans `applyRnnoise` (WASM) quand `ncMode="office"` avant de le fournir à JsSIP via l'option `mediaStream`.
-- Forcer le codec Opus DTX + FEC dans `sdpModifier` (ajout `usedtx=1; useinbandfec=1; stereo=0; maxaveragebitrate=24000; cbr=0`) + `a=ptime:20` — meilleure résilience à la perte de paquets LTE.
-- Ajouter `RTCRtpSender.setParameters` avec `networkPriority:"high"` et `priority:"high"` sur la piste audio (QoS DSCP quand supporté).
-- Brancher `startVad` sur la piste live pour l'auto-mute + indicateur "vous parlez" dans `ActiveCallOverlay`.
+### 3. Appel côté app mobile
+- `useMplanipretSoftphone` passe déjà par `supabase.functions.invoke("ns-resolve-sip-credentials", { body: {} })`. On ajoute `body: { client_type: "mobile" }`.
+- Aucun changement d'UI.
 
-## 3. Détection réseau + bascule Wi-Fi ↔ LTE sans coupure
+### 4. Provisioning initial (fonction `provision-softphone-user`)
+- Vérifier qu'à la création d'un nouveau broker, on ne crée que le device `_web` (widget). Le device `_mobile` sera créé à la demande, au premier login mobile.
 
-Nouveau module `src/lib/planipret/net/networkMonitor.ts` :
-- Écoute `navigator.connection.change`, `online/offline`, et, sous Capacitor, `@capacitor/network` (`Network.addListener('networkStatusChange')`) pour distinguer `wifi` / `cellular` / `none`.
-- Publie un `NetSnapshot { type, effectiveType, downlink, rtt, quality: 'excellent'|'good'|'poor' }` (règles : rtt>300 ou downlink<0.5 → poor).
-- Exécute un ping WSS léger (`/health` sur `pbxnode.lemtel.tel`) toutes les 15s pendant un appel actif pour détecter la dégradation avant que l'utilisateur ne l'entende.
+### 5. Détails techniques NetSapiens
+- Fork parallèle par défaut : rien à activer côté extension.
+- Contact de registration WSS différent (mobile / widget) → NS route correctement l'INVITE aux deux.
+- ICE restart / re-registration mobile ne touchent que le device `_mobile`.
 
-Bascule sans coupure — nouveau `handoverController.ts` consommé par `useMplanipretSoftphone` :
-- **En veille** : sur changement de réseau, `sipProvider` fait un `register` immédiat sur le nouveau chemin (déjà géré par JsSIP quand le socket tombe ; on force `unregister()` puis `register()` pour raccourcir la fenêtre).
-- **En appel actif** :
-  1. Capturer un nouveau `MediaStream` sur le nouveau réseau (le mic reste local, mais on relance `getUserMedia` pour purger toute contrainte cellulaire).
-  2. Déclencher un **ICE restart** via `session.renegotiate({ rtcOfferConstraints:{ iceRestart:true } })` sur la session JsSIP en cours → nouvelle paire de candidats, TURN Lemtel prend le relais, aucune interruption RTP au-delà de ~300-800 ms.
-  3. Si la renégociation échoue en <3 s, tenter un second essai ; sinon afficher un toast « Réseau instable, reprise… » et laisser la reprise SIP standard (re-INVITE) faire son travail.
-  4. Adapter le bitrate Opus : `poor` → 16 kbps + ptime 40 ; `good` → 24 kbps ; `excellent` → 32 kbps stéréo mono forcé.
-- Un badge réseau (Wi-Fi/LTE/⚠) apparaît dans `ActiveCallOverlay` avec la qualité live (basée sur `getStats()` : `packetsLost`, `jitter`, `roundTripTime`).
+## Vérifications post-implémentation
+- Appel entrant → widget Maestro **et** app mobile sonnent simultanément.
+- Décrocher sur l'un raccroche l'autre (cancel natif NS).
+- Rotation de mot de passe mobile n'invalide plus le widget.
+- `pp-call-e2e-check` continue de passer.
 
-## 4. Statistiques & auto-diagnostic en direct
-
-- Boucle `pc.getStats()` toutes les 2 s pendant l'appel : `jitter`, `packetsLost/packetsSent`, `audioLevel`, `roundTripTime`.
-- Seuils : jitter>60ms ou loss>5% → étiquette « Qualité dégradée » + tentative auto de handover (§3) si un autre réseau est disponible.
-- Journalisation dans `planipret_call_quality_events` (nouvelle table optionnelle) — hors périmètre si non demandé ; par défaut on log seulement en session (console + snapshot dans `sipProvider.logs`).
-
-## 5. UI
-
-- `ActiveCallOverlay` : ajouter (a) icône réseau live, (b) barre qualité (vert/orange/rouge), (c) bouton « Audio » ouvrant le `CallAudioSheet` déjà existant (routing haut-parleur/BT/écouteur + mode NC).
-- `MMore` → nouvelle ligne « Diagnostic audio & réseau » qui lance un test 10 s (mic loopback + ping WSS + mesure débit) et affiche un rapport.
-- i18n FR/EN dans `src/lib/i18n/mplanipret.ts` pour tous les nouveaux libellés.
-
-## 6. Capacitor natif (si build mobile)
-
-- Ajouter (si absent) `@capacitor/network` — sans lancer `cap sync` (le user le fera).
-- `AndroidManifest` / `Info.plist` : rappeler à l'utilisateur d'ajouter `MODIFY_AUDIO_SETTINGS`, `RECORD_AUDIO`, `ACCESS_NETWORK_STATE`, `CHANGE_NETWORK_STATE`, `background modes: voip, audio` (iOS) pour tenir un appel en arrière-plan lors du switch réseau.
-
-## Fichiers touchés
-
-Créés
-- `src/hooks/useMplanipretSoftphone.ts`
-- `src/lib/planipret/net/networkMonitor.ts`
-- `src/lib/planipret/net/handoverController.ts`
-- `src/lib/planipret/audio/opusSdp.ts` (modificateur SDP Opus)
-- `src/components/planipret/mobile/NetworkQualityBadge.tsx`
-
-Édités
-- `src/pages/planipret/PlanipretMobile.tsx` (bouton dial → hook)
-- `src/pages/planipret/mobile/MCalls.tsx`, `MContacts.tsx`, `MMore.tsx`
-- `src/components/planipret/mobile/ActiveCallOverlay.tsx` (badge + qualité)
-- `src/components/planipret/mobile/call/CallAudioSheet.tsx` (NC mode branché sur la vraie session)
-- `src/lib/i18n/mplanipret.ts`
-
-Non touchés
-- `src/lib/softphone/jssipProvider.ts`, `rtcConfig.ts`, `useSoftphone.ts` (Lemtel — consommés uniquement).
-
-## Hors périmètre
-
-- Modifier le PBX / TURN / codecs côté serveur Lemtel.
-- Persister l'historique qualité en base (peut être ajouté ensuite si demandé).
-- Créer un nouveau provider SIP concurrent.
+## Questions ouvertes (non bloquantes)
+- Nom exact du device widget existant sur NS-API pour le broker de test ? (par défaut on cible `${extension}_web` ; si c'est autre chose ex. `${extension}_app`, je lis le nom depuis les devices existants au premier appel et je le mémorise dans `planipret_profiles.ns_widget_device_id` pour ne plus jamais y toucher.)
