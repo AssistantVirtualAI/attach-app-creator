@@ -9,6 +9,7 @@ import { usePlanipretBrokerStats } from "@/lib/planipret/brokerStats";
 import { ADMIN_REPORT_FILTERS_EVENT, periodLabel, periodToRange, rangeToPeriod, readAdminReportFilters, writeAdminReportFilters } from "@/lib/planipret/adminReportFilters";
 import { usePlanipretNsAutoSync } from "@/hooks/usePlanipretNsAutoSync";
 import NsSyncBar from "@/components/planipret/admin/NsSyncBar";
+import { useMplanipretLang } from "@/hooks/useMplanipretLang";
 
 type Range = "week" | "month" | "quarter";
 
