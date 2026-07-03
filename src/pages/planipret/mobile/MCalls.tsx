@@ -528,8 +528,70 @@ function TranscriptView({
       });
   const wordCount = segs.reduce((n, s) => n + (s.text.split(/\s+/).filter(Boolean).length), 0);
 
+  const buildPlainText = () => segs.map((s) => `${s.speaker}: ${s.text}`).join("\n");
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(buildPlainText());
+      toast.success(t("calls.transcriptCopied") || "Transcription copiée");
+    } catch {
+      toast.error("Copie impossible");
+    }
+  };
+
+  const handleDownload = (format: "txt" | "md") => {
+    const safe = (filenameHint || "transcription").replace(/[^\w.-]+/g, "_").slice(0, 60);
+    let content = "";
+    let mime = "text/plain;charset=utf-8";
+    let ext = "txt";
+    if (format === "md") {
+      content = segs.map((s) => `**${s.speaker}**\n\n${s.text}\n`).join("\n");
+      mime = "text/markdown;charset=utf-8";
+      ext = "md";
+    } else {
+      content = buildPlainText();
+    }
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${safe}.${ext}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success(`Téléchargé .${ext}`);
+  };
+
   return (
     <div className="space-y-3">
+      <div className="flex items-center justify-between gap-2 sticky top-0 z-10 py-1"
+        style={{ background: "var(--pp-bg-base)" }}>
+        <div className="text-[11px]" style={{ color: "var(--pp-text-muted)" }}>
+          {wordCount} mots · {segs.length} tours
+        </div>
+        <div className="flex items-center gap-1.5">
+          <button onClick={handleCopy}
+            className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold flex items-center gap-1"
+            style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }}
+            aria-label="Copier">
+            <Copy className="w-3.5 h-3.5" /> Copier
+          </button>
+          <button onClick={() => handleDownload("txt")}
+            className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold flex items-center gap-1"
+            style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }}
+            aria-label="Télécharger .txt">
+            <Download className="w-3.5 h-3.5" /> .txt
+          </button>
+          <button onClick={() => handleDownload("md")}
+            className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold flex items-center gap-1"
+            style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }}
+            aria-label="Télécharger .md">
+            <Download className="w-3.5 h-3.5" /> .md
+          </button>
+        </div>
+      </div>
+
       <div className="flex flex-col gap-2">
         {segs.map((s, i) => {
           const right = isCourtier(s.speaker);
@@ -553,9 +615,6 @@ function TranscriptView({
         })}
       </div>
 
-      <div className="text-[11px] text-center" style={{ color: "var(--pp-text-muted)" }}>
-        {wordCount} mots · {segs.length} tours
-      </div>
 
       {!analyzed && (
         <button
