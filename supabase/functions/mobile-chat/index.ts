@@ -46,19 +46,43 @@ Deno.serve(async (req) => {
     }
 
     const key = Deno.env.get("LOVABLE_API_KEY");
-    if (!key) return json({ answer: "AVA is not configured yet (missing AI key)." });
+    const openaiKey = Deno.env.get("OPENAI_API_KEY");
+    if (!key && !openaiKey) return json({ answer: "AVA is not configured yet (missing AI key)." });
 
-    const gateway = createLovableAiGatewayProvider(key);
-    const messages: any[] = [
-      { role: "system", content: `You are AVA, the AI assistant inside the AVA Softphone mobile app. Answer concisely (max 4 sentences) about the user's phone system. Use the data below when relevant.\n\n${context}` },
+    const systemPrompt = `You are AVA, the AI assistant inside the AVA Softphone mobile app. Answer concisely (max 4 sentences) about the user's phone system. Use the data below when relevant.\n\n${context}`;
+    const chatMessages: any[] = [
+      { role: "system", content: systemPrompt },
       ...history.filter((h: any) => h && (h.role === "user" || h.role === "assistant") && typeof h.content === "string").map((h: any) => ({ role: h.role, content: h.content })),
       { role: "user", content: message },
     ];
 
-    const { text } = await generateText({
-      model: gateway("google/gemini-3-flash-preview"),
-      messages,
-    });
+    // Try Lovable AI Gateway first, then fall back to OpenAI if it fails or is missing.
+    const tryOpenAI = async (): Promise<string> => {
+      if (!openaiKey) throw new Error("no-openai-key");
+      const r = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${openaiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "gpt-4o-mini", messages: chatMessages }),
+      });
+      if (!r.ok) throw new Error(`openai ${r.status}: ${(await r.text()).slice(0, 300)}`);
+      const d = await r.json();
+      return String(d?.choices?.[0]?.message?.content ?? "");
+    };
+
+    let text = "";
+    if (key) {
+      try {
+        const gateway = createLovableAiGatewayProvider(key);
+        const res = await generateText({ model: gateway("google/gemini-3-flash-preview"), messages: chatMessages });
+        text = res.text;
+      } catch (e) {
+        console.warn("Lovable gateway failed, falling back to OpenAI", (e as Error).message);
+        text = await tryOpenAI();
+      }
+    } else {
+      text = await tryOpenAI();
+    }
+
 
     return json({ answer: text });
   } catch (e: any) {
