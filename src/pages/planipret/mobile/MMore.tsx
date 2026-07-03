@@ -290,6 +290,29 @@ export default function MMore() {
         <Row icon={<MessageCircle className="w-4 h-4" />} label={t("more.contactSupport")}
           onClick={() => { window.location.href = "mailto:support@avastatistic.ca?subject=Support%20Planipr%C3%AAt%20AI%20Portal"; }} chevron />
         <Row icon={<Shield className="w-4 h-4" />} label={t("more.privacy")} onClick={() => navigate("/planipret/privacy")} chevron />
+        <Row icon={<SettingsIcon className="w-4 h-4" />} label={t("more.diagnostic")} sub={t("more.diagnosticSub")}
+          onClick={async () => {
+            toast.info(t("more.diagnosticRunning"));
+            const sb: any = supabase;
+            const { data: lastCall } = await sb
+              .from("planipret_phone_calls")
+              .select("id, ns_call_id")
+              .eq("broker_id", profile.id)
+              .order("started_at", { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            if (!lastCall?.id) { toast.error(t("more.diagnosticNoCall")); return; }
+            const { data, error } = await supabase.functions.invoke("pp-call-e2e-check", { body: { call_id: (lastCall as any).ns_call_id ?? lastCall.id } });
+            if (error) { toast.error(error.message ?? t("more.diagnosticFailed")); return; }
+            const r = (data as any)?.report ?? {};
+            const flags = [
+              `Ext: ${r.extension?.ok ? "✓" : "✗"}`,
+              `Rec: ${r.recording?.ok ? "✓" : "✗"}`,
+              `Tx: ${r.transcript?.ok ? "✓" : "✗"}`,
+              `AI: ${r.ai_actions?.ok ? "✓" : "✗"}`,
+            ].join(" · ");
+            ((data as any)?.coherent ? toast.success : toast.warning)(`${t("more.diagnostic")}: ${flags}`);
+          }} chevron />
         <Row icon={<Info className="w-4 h-4" />} label={t("more.appVersion")} right={<span style={{ fontSize: 12, color: "var(--pp-text-faint)" }}>v1.0.0 (build 1)</span>} />
       </Section>
 

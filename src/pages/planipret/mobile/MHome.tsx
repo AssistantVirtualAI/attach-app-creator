@@ -12,6 +12,7 @@ import {
 import type { PlanipretMobileContext } from "../PlanipretMobile";
 import { toast } from "sonner";
 import PWAInstallBanner from "@/components/planipret/PWAInstallBanner";
+import ExtensionSyncBanner from "@/components/planipret/mobile/ExtensionSyncBanner";
 import { TEMP_EMOJI } from "@/components/planipret/leadHelpers";
 import { useMaestroPipelineToasts } from "@/hooks/useMaestroPipelineToasts";
 import { safeEdgeFunction } from "@/lib/safeEdgeFunction";
@@ -170,6 +171,7 @@ export default function MHome() {
   return (
     <div className="p-4 space-y-4 pb-8" style={{ background: "var(--pp-bg-base)", minHeight: "100%" }}>
       <PWAInstallBanner />
+      <ExtensionSyncBanner profile={profile} reloadProfile={reloadProfile} />
 
       {/* ===== HEADER ===== */}
       <header className="flex items-start justify-between">
