@@ -86,7 +86,7 @@ export function useMplanipretSoftphone() {
     (async () => {
       setLoading(true);
       try {
-        const { data, error } = await supabase.functions.invoke("ns-resolve-sip-credentials", { body: {} });
+        const { data, error } = await supabase.functions.invoke("ns-resolve-sip-credentials", { body: { client_type: "mobile" } });
         if (cancelled) return;
         if (error || !data || (data as any)?.error) return;
         const d = data as any;
