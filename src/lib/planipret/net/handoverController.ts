@@ -4,7 +4,7 @@
 // is active, so RTP resumes on the new interface without dropping the call.
 
 import { networkMonitor, type NetSample } from "@/lib/planipret/network/networkMonitor";
-import { sipProvider } from "@/lib/softphone/jssipProvider";
+import { ppSipProvider } from "@/lib/planipret/sip/ppSipProvider";
 
 export type HandoverEvent =
   | { kind: "network-change"; from: string; to: string; at: number }
@@ -50,11 +50,11 @@ class HandoverController {
     if (this.inFlight) return;
     this.inFlight = true;
     try {
-      if (sipProvider.hasActiveCall()) {
-        const ok = await sipProvider.iceRestart();
+      if (ppSipProvider.hasActiveCall()) {
+        const ok = await ppSipProvider.iceRestart();
         this.emit({ kind: "ice-restart", at: Date.now(), ok });
       } else {
-        await sipProvider.forceReregister();
+        await ppSipProvider.forceReregister();
         this.emit({ kind: "reregister", at: Date.now() });
       }
     } finally {
@@ -63,8 +63,8 @@ class HandoverController {
   }
 
   async forceHandover(): Promise<boolean> {
-    if (sipProvider.hasActiveCall()) return sipProvider.iceRestart();
-    await sipProvider.forceReregister();
+    if (ppSipProvider.hasActiveCall()) return ppSipProvider.iceRestart();
+    await ppSipProvider.forceReregister();
     return true;
   }
 }

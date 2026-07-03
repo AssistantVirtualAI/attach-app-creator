@@ -1,18 +1,19 @@
-// Planipret mobile — softphone hook aligned on the Lemtel engine.
+// Planipret mobile — softphone hook bound to the NS-API PBX.
 //
-// This is a thin adapter over `useSoftphone`. It re-uses the shared sipProvider so
-// there is exactly one WebRTC/JsSIP stack in the app, and layers on top:
-//   - Stronger microphone constraints (getAudioConstraints) with noise cancellation
-//     modes (`pp_nc_mode`) applied via a `navigator.mediaDevices.getUserMedia` proxy
-//     scoped to the current call.
+// This is fully independent from the Lemtel softphone: registration uses the
+// NS-API SIP credentials returned by the `ns-resolve-sip-credentials` edge
+// function, and RTP flows through NS-API. Layered on top:
+//   - Stronger microphone constraints (getAudioConstraints) with a
+//     `navigator.mediaDevices.getUserMedia` proxy scoped to Planipret calls.
 //   - Auto network handover (Wi-Fi ↔ LTE) via handoverController.
 //   - Live call-quality sampling via callQualitySampler.
-//   - Fallback to `ns-calls action:start` (PBX click-to-call) when WebRTC is not
-//     registered (matches the "both, with fallback" outbound policy).
+//   - Outbound fallback to `ns-calls action:start` when WebRTC is not registered
+//     ("both, with fallback" policy).
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useSoftphone } from "@/hooks/useSoftphone";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { ppSipProvider, type PpSipSnapshot } from "@/lib/planipret/sip/ppSipProvider";
 import { networkMonitor, type NetSample } from "@/lib/planipret/network/networkMonitor";
 import { handoverController } from "@/lib/planipret/net/handoverController";
 import { callQualitySampler, type CallQualitySnapshot } from "@/lib/planipret/audio/callQualitySampler";
@@ -35,9 +36,7 @@ function ensureGumProxy() {
   gumOriginal = md.getUserMedia.bind(md);
   md.getUserMedia = async (constraints: MediaStreamConstraints) => {
     try {
-      const wantsAudioOnly = constraints
-        && constraints.audio
-        && !constraints.video;
+      const wantsAudioOnly = constraints && constraints.audio && !constraints.video;
       if (wantsAudioOnly) {
         const cfg = getAudioConstraints(readNCMode());
         const merged: MediaStreamConstraints = {
@@ -46,9 +45,7 @@ function ensureGumProxy() {
         };
         return await gumOriginal!(merged);
       }
-    } catch {
-      // fall through to original
-    }
+    } catch { /* fall through */ }
     return gumOriginal!(constraints);
   };
   gumProxyInstalled = true;
@@ -60,11 +57,16 @@ export type OutboundResult =
   | { via: "none"; ok: false; error: string };
 
 export function useMplanipretSoftphone() {
-  const sp = useSoftphone();
+  const { user } = useAuth();
+  const [snap, setSnap] = useState<PpSipSnapshot>(() => ppSipProvider.getSnapshot());
+  const [loading, setLoading] = useState(false);
   const [net, setNet] = useState<NetSample>(networkMonitor.current());
   const [quality, setQuality] = useState<CallQualitySnapshot | null>(null);
 
-  // Boot: audio proxy + network monitor + handover.
+  // Subscribe to the SIP snapshot.
+  useEffect(() => ppSipProvider.subscribe(setSnap), []);
+
+  // Boot audio proxy + network monitor + handover once.
   useEffect(() => {
     ensureGumProxy();
     handoverController.start();
@@ -72,16 +74,43 @@ export function useMplanipretSoftphone() {
     return () => { un(); };
   }, []);
 
+  // Resolve NS-API SIP credentials and register the softphone per user.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase.functions.invoke("ns-resolve-sip-credentials", { body: {} });
+        if (cancelled) return;
+        if (error || !data || (data as any)?.error) return;
+        const d = data as any;
+        await ppSipProvider.init({
+          extension: String(d.sip_extension),
+          sipUsername: String(d.sip_username || d.sip_extension),
+          sipDomain: String(d.sip_domain),
+          sipProxy: d.sip_proxy,
+          wssUrl: String(d.sip_wss_url),
+          wssUrls: Array.isArray(d.sip_wss_urls) ? d.sip_wss_urls : undefined,
+          password: String(d.sip_password),
+          displayName: String(d.sip_extension),
+        });
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id]);
+
   // Live call quality only while a call is active.
   useEffect(() => {
-    const active = sp.snap.callState === "active" || sp.snap.callState === "held";
+    const active = snap.callState === "active" || snap.callState === "held";
     if (!active) { setQuality(null); return; }
     const un = callQualitySampler.subscribe(setQuality);
     return () => { un(); };
-  }, [sp.snap.callState]);
+  }, [snap.callState]);
 
-  const registered = sp.snap.status === "registered";
-  const callViaWebRTC = useCallback((n: string) => sp.call(n), [sp]);
+  const registered = snap.status === "registered";
 
   const callViaPBX = useCallback(async (destination: string): Promise<OutboundResult> => {
     const { data, error } = await supabase.functions.invoke("ns-calls", { body: { action: "start", destination } });
@@ -93,19 +122,29 @@ export function useMplanipretSoftphone() {
 
   const placeCall = useCallback(async (destination: string): Promise<OutboundResult> => {
     if (!destination) return { via: "none", ok: false, error: "empty destination" };
-    // WebRTC first, PBX fallback.
     if (registered) {
-      try { callViaWebRTC(destination); return { via: "webrtc", ok: true }; }
-      catch { /* fall through to PBX */ }
+      try { await ppSipProvider.call(destination); return { via: "webrtc", ok: true }; }
+      catch { /* fall through */ }
     }
     return await callViaPBX(destination);
-  }, [registered, callViaWebRTC, callViaPBX]);
+  }, [registered, callViaPBX]);
 
   return useMemo(() => ({
-    ...sp,
+    snap,
+    loading,
     net,
     quality,
     placeCall,
+    call: (n: string) => ppSipProvider.call(n),
+    answer: () => ppSipProvider.answer(),
+    hangup: () => ppSipProvider.hangup(),
+    mute: () => ppSipProvider.mute(),
+    unmute: () => ppSipProvider.unmute(),
+    hold: () => ppSipProvider.hold(),
+    unhold: () => ppSipProvider.unhold(),
+    sendDTMF: (k: string) => ppSipProvider.sendDTMF(k),
+    transfer: (t: string) => ppSipProvider.transfer(t),
+    setAudioEl: (el: HTMLAudioElement | null) => { ppSipProvider.audioEl = el; },
     forceHandover: () => handoverController.forceHandover(),
-  }), [sp, net, quality, placeCall]);
+  }), [snap, loading, net, quality, placeCall]);
 }
