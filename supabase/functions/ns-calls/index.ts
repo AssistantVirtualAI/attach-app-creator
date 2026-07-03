@@ -21,10 +21,13 @@ Deno.serve(async (req) => {
         res = await nsBrokerFetch(admin, profile, nsPath(env.domain, ext, "/calls"), { method: "GET" });
         break;
       case "start": {
+        if (!toNumber) {
+          return jsonResponse({ success: false, error: "to_number requis", code: 400 }, 400);
+        }
         res = await nsBrokerFetch(admin, profile, nsPath(env.domain, ext, "/calls"), {
           method: "POST",
           body: JSON.stringify({
-            to_number: body.to_number,
+            to_number: toNumber,
             caller_id_number: body.caller_id_number,
             caller_id_name: body.caller_id_name,
           }),
