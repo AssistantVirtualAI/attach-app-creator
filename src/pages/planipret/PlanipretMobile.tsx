@@ -325,6 +325,12 @@ function Dialer({ open, onClose, initial, openMessages }: { open: boolean; onClo
           </div>
         </motion.div>
       )}
+      <MicPermissionDialog
+        open={micDialog.open}
+        state={micDialog.state}
+        onRetry={retryMic}
+        onClose={() => setMicDialog({ open: false, state: "prompt" })}
+      />
     </AnimatePresence>
   );
 }
