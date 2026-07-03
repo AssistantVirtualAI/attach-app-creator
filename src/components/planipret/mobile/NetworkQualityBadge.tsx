@@ -1,6 +1,6 @@
 // Planipret mobile — network + call-quality live badge.
 import { Wifi, Signal, SignalZero, Radio } from "lucide-react";
-import type { NetSnapshot } from "@/lib/planipret/net/networkMonitor";
+import type { NetSample } from "@/lib/planipret/network/networkMonitor";
 import type { CallQualitySnapshot } from "@/lib/planipret/audio/callQualitySampler";
 
 const QUALITY_COLORS: Record<string, string> = {
