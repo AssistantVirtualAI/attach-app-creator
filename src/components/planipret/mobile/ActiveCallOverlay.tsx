@@ -116,6 +116,9 @@ export default function ActiveCallOverlay({ callId, onClosed }: { callId: string
           <div className="mt-3">
             <NetworkQualityBadge net={net} quality={quality} />
           </div>
+          <div className="mt-3">
+            <HandoverIndicator />
+          </div>
           {dtmfBuffer && <div className="mt-2 text-xs text-white/50">DTMF: {dtmfBuffer}</div>}
         </div>
 
