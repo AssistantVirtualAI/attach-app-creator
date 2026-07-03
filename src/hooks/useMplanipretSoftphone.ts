@@ -127,6 +127,14 @@ export function useMplanipretSoftphone() {
 
   const placeCall = useCallback(async (destination: string): Promise<OutboundResult> => {
     if (!destination) return { via: "none", ok: false, error: "empty destination" };
+    // Ask for the mic BEFORE dialing so the user sees a clear prompt/fallback.
+    const mic = await ensureMicPermission();
+    if (mic.state !== "granted") {
+      // Stop any temporary probe stream — real call will re-acquire via the SIP layer.
+      try { mic.stream?.getTracks().forEach((tr) => tr.stop()); } catch {}
+      return { via: "none", ok: false, error: mic.error ?? "microphone unavailable", micState: mic.state };
+    }
+    try { mic.stream?.getTracks().forEach((tr) => tr.stop()); } catch {}
     if (registered) {
       try { await ppSipProvider.call(destination); return { via: "webrtc", ok: true }; }
       catch { /* fall through */ }
