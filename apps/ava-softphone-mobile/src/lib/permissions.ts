@@ -29,21 +29,34 @@ export async function requestMicrophone(): Promise<PermissionStatus> {
           if (res?.granted) return 'granted';
         } catch { /* fall through to Microphone plugin */ }
       }
-      // Android (and iOS fallback) — request RECORD_AUDIO via the
-      // @mozartec/capacitor-microphone plugin. This is what actually shows
-      // the native OS prompt on Android; getUserMedia alone will NOT trigger
-      // Android's runtime permission dialog inside a Capacitor WebView.
+      // Try @mozartec/capacitor-microphone (Android + iOS fallback).
+      let pluginGranted = false;
+      let pluginDenied = false;
       try {
         const { Microphone } = await import('@mozartec/capacitor-microphone');
         const check = await Microphone.checkPermissions();
-        if (check?.microphone === 'granted') return 'granted';
-        const req = await Microphone.requestPermissions();
-        if (req?.microphone === 'granted') return 'granted';
-        if (req?.microphone === 'denied') return 'denied';
-        return 'prompt';
+        if (check?.microphone === 'granted') pluginGranted = true;
+        if (!pluginGranted) {
+          const req = await Microphone.requestPermissions();
+          if (req?.microphone === 'granted') pluginGranted = true;
+          else if (req?.microphone === 'denied') pluginDenied = true;
+        }
       } catch (e) {
-        console.warn('[permissions] Microphone plugin failed, falling back to getUserMedia', e);
+        console.warn('[permissions] Microphone plugin unavailable, falling back to getUserMedia', e);
       }
+      if (pluginGranted) return 'granted';
+      // Fallback: getUserMedia inside Capacitor WebView. On Android with
+      // RECORD_AUDIO in the manifest this triggers the OS runtime prompt.
+      try {
+        if (navigator.mediaDevices?.getUserMedia) {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          stream.getTracks().forEach((t) => t.stop());
+          return 'granted';
+        }
+      } catch (e: any) {
+        if (e?.name === 'NotAllowedError' || e?.name === 'SecurityError') return 'denied';
+      }
+      return pluginDenied ? 'denied' : 'prompt';
     }
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) return 'unsupported';
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
