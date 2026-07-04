@@ -221,6 +221,16 @@ export default function PARecordings() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detail?.id]);
 
+  // Auto-fetch audio via ns-get-recording when a recording detail opens without a playable URL
+  useEffect(() => {
+    if (!detail?.id) return;
+    if (detail.recording_url && String(detail.recording_url).startsWith("blob:")) return;
+    if (detail.recording_url && String(detail.recording_url).startsWith("http")) return;
+    if (resolving === detail.id) return;
+    resolveRecording(detail);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detail?.id]);
+
 
   const inputStyle = { background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" };
 
@@ -375,9 +385,16 @@ export default function PARecordings() {
             </div>
             <div className="space-y-3 text-sm" style={{ color: "var(--pp-text-secondary)" }}>
               <div>Courtier: <span style={{ color: "var(--pp-text-primary)" }}>{brokerName(detail)}</span></div>
-              <div>Ext: {detail.extension ?? "—"}</div>
+              <div>Ext: {detail.extension ?? "—"} · Direction: {detail.direction ?? "—"} · Statut: {detail.status ?? "—"}</div>
               <div>De: {detail.from_number ?? "—"} → Vers: {detail.to_number ?? "—"}</div>
-              <div>Date: {detail.started_at ? new Date(detail.started_at).toLocaleString("fr-CA") : "—"}</div>
+              <div>Date: {detail.started_at ? new Date(detail.started_at).toLocaleString("fr-CA") : "—"} · Durée: {detail.duration_seconds ? `${Math.floor(detail.duration_seconds / 60)}m${detail.duration_seconds % 60}s` : "—"}</div>
+              <div style={{ fontSize: 10, color: "var(--pp-text-faint)", fontFamily: "monospace" }}>NS callid: {detail.ns_callid ?? detail.ns_orig_callid ?? "—"}</div>
+              {String(detail.recording_url ?? "").startsWith("blob:") && resolving !== detail.id && (
+                <div style={{ fontSize: 10, color: "var(--pp-success)" }}>● Audio streamé depuis NS-API</div>
+              )}
+              {resolving === detail.id && (
+                <div style={{ fontSize: 11, color: "var(--pp-text-muted)" }}>Chargement de l'audio depuis NS-API…</div>
+              )}
               {detail.recording_url ? (
                 <div>
                   <p style={{ fontSize: 11, color: "var(--pp-text-muted)", marginBottom: 4 }}>Audio</p>
