@@ -133,6 +133,7 @@ export default function PARecordings() {
     setTranscribing(callId);
     setTranscriptionError(null);
     setTranscriptionUnavailable(false);
+    setTranscriptionDebug(null);
     try {
       const { data, error } = await supabase.functions.invoke("ns-get-transcription", { body: { call_db_id: callId } });
       if (error) throw error;
