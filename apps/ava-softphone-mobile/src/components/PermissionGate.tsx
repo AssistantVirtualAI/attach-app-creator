@@ -4,6 +4,7 @@ import { colors, gradients, radius, font } from '../lib/theme';
 import { LemtelMark } from './Brand';
 import { requestMicrophone, openAppSettings, checkAllPermissions } from '../lib/permissions';
 import type { AllPermissions, PermissionStatus } from '../lib/permissions';
+import PermissionDiagPanel from './PermissionDiagPanel';
 
 interface PermissionGateProps {
   onComplete: () => void;
@@ -47,6 +48,7 @@ export default function PermissionGate({ onComplete }: PermissionGateProps) {
   });
   const [requesting, setRequesting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showDiag, setShowDiag] = useState(false);
 
   // Re-check permissions when the user comes back from the OS Settings page
   // (typical flow after they tap "Open Settings" following a denial).
@@ -293,6 +295,19 @@ export default function PermissionGate({ onComplete }: PermissionGateProps) {
           }} />
         ))}
       </div>
+
+      <button
+        onClick={() => setShowDiag(true)}
+        style={{
+          marginTop: 18, background: 'transparent', color: '#94A3B8',
+          border: '1px dashed rgba(255,255,255,0.2)', borderRadius: 10,
+          padding: '8px 14px', fontSize: 11, fontWeight: 600, cursor: 'pointer',
+        }}
+      >
+        🔧 Run diagnostic
+      </button>
+
+      {showDiag && <PermissionDiagPanel onClose={() => setShowDiag(false)} />}
     </Shell>
   );
 }
