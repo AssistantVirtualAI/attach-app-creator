@@ -446,6 +446,38 @@ export default function PARecordings() {
                   {transcribing === detail.id ? "Transcription en cours…" : "Lancer la transcription IA"}
                 </button>
               )}
+              {detail.transcript && (
+                <button
+                  onClick={() => runCoaching(detail.id)}
+                  disabled={coaching === detail.id}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-white text-sm disabled:opacity-50"
+                  style={{ background: AGENT }}
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  {coaching === detail.id ? "Analyse Claude en cours…" : (detail.ai_coaching ? "Régénérer coaching IA" : "Analyser & coacher (Claude)")}
+                </button>
+              )}
+              {detail.ai_coaching && (
+                <div>
+                  <p style={{ fontSize: 11, color: "var(--pp-text-muted)", marginBottom: 4 }}>Coaching IA</p>
+                  <div className="p-3 rounded-lg space-y-2" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", fontSize: 12 }}>
+                    {typeof detail.ai_coaching === "object" && (
+                      <>
+                        {detail.lead_score != null && <div>Score : <b>{detail.lead_score}/100</b></div>}
+                        {(detail.ai_coaching as any).strengths?.length ? (
+                          <div><b>Points forts :</b><ul className="list-disc pl-4">{(detail.ai_coaching as any).strengths.map((s: string, i: number) => <li key={i}>{s}</li>)}</ul></div>
+                        ) : null}
+                        {(detail.ai_coaching as any).improvements?.length ? (
+                          <div><b>À améliorer :</b><ul className="list-disc pl-4">{(detail.ai_coaching as any).improvements.map((s: string, i: number) => <li key={i}>{s}</li>)}</ul></div>
+                        ) : null}
+                        {(detail.ai_coaching as any).next_steps?.length ? (
+                          <div><b>Prochaines étapes :</b><ul className="list-disc pl-4">{(detail.ai_coaching as any).next_steps.map((s: string, i: number) => <li key={i}>{s}</li>)}</ul></div>
+                        ) : null}
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
               {detail.ai_summary && (
                 <div>
                   <p style={{ fontSize: 11, color: "var(--pp-text-muted)", marginBottom: 4 }}>Résumé IA</p>
