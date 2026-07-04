@@ -803,8 +803,8 @@ function CallDetailSheet({
         const segs = Array.isArray(freshCall.transcript_segments) ? freshCall.transcript_segments : null;
         if ((freshCall.transcript || segs) && !hasInsight) {
           setAiLoading(true);
-          await supabase.functions.invoke("ai-analyze-call", {
-            body: { call_id: call.id, transcript: freshCall.transcript ?? null, segments: segs },
+          await supabase.functions.invoke("pp-coach-call", {
+            body: { call_id: call.id, transcript: freshCall.transcript ?? null },
           });
           setAiLoading(false);
           const { data: ins } = await supabase.from("planipret_ai_insights").select("*").eq("call_id", call.id).maybeSingle();
@@ -911,8 +911,8 @@ function CallDetailSheet({
     const segments = Array.isArray(call.transcript_segments) ? call.transcript_segments : null;
     if (!call.transcript && !segments) return;
     setAiLoading(true);
-    const { data, error } = await supabase.functions.invoke("ai-analyze-call", {
-      body: { call_id: call.id, transcript: call.transcript ?? null, segments },
+    const { data, error } = await supabase.functions.invoke("pp-coach-call", {
+      body: { call_id: call.id, transcript: call.transcript ?? null },
     });
     setAiLoading(false);
     if (error) { toast.error(error.message ?? t("common.failed")); return; }

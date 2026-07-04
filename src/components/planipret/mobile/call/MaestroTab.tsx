@@ -115,7 +115,7 @@ export default function MaestroTab({ call, onUpdated }: { call: MaestroCall; onU
     }
     setAnalyzing(true);
     try {
-      const { data, error } = await supabase.functions.invoke("ai-analyze-call", {
+      const { data, error } = await supabase.functions.invoke("pp-coach-call", {
         body: { call_id: call.id, force: true },
       });
       if (error || (data as any)?.success === false) {
