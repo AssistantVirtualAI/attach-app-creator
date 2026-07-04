@@ -63,10 +63,10 @@ Deno.serve(async (req) => {
 
   if (!ns_callid) {
     return json({
-      error: "RECORDING_NOT_FOUND",
+      error: "MISSING_CALLID",
       message: "Identifiant NS-API introuvable pour cet appel. Relancez la synchronisation CDR.",
       call_db_id, ns_callid, ns_extension,
-    }, 404);
+    }, 200);
   }
 
   const headers = { Authorization: `Bearer ${NS_API_KEY}`, Accept: "audio/*, application/json" };
@@ -132,5 +132,5 @@ Deno.serve(async (req) => {
       "Le fichier a expiré ou été purgé côté NetSapiens",
       "Le ns_callid stocké ne correspond à aucun enregistrement — vérifier la synchro CDR",
     ],
-  }, 404);
+  }, 200);
 });
