@@ -46,6 +46,7 @@ Deno.serve(async (req) => {
   let body: any = {};
   try { body = await req.json(); } catch { /* empty */ }
   const call_id = body.call_id;
+  const bodyTranscript = typeof body.transcript === "string" ? body.transcript : null;
   if (!call_id) return json({ error: "call_id required" }, 400);
 
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
@@ -55,9 +56,14 @@ Deno.serve(async (req) => {
     .eq("id", call_id)
     .maybeSingle();
   if (error || !row) return json({ error: "call not found", details: error?.message }, 404);
-  if (!row.transcript || row.transcript.trim().length < 20) {
+  // Fallback: si la DB n'a pas encore le transcript, utiliser celui fourni dans le body
+  const effectiveTranscript = (row.transcript && row.transcript.trim().length >= 20)
+    ? row.transcript
+    : (bodyTranscript && bodyTranscript.trim().length >= 20 ? bodyTranscript : null);
+  if (!effectiveTranscript) {
     return json({ success: false, error: "TRANSCRIPT_MISSING", message: "Aucune transcription à analyser. Lancez d'abord la transcription NS-API." }, 200);
   }
+  (row as any).transcript = effectiveTranscript;
 
   // Enrich: broker (by extension) + client (by phone number)
   let brokerName = "Courtier";
