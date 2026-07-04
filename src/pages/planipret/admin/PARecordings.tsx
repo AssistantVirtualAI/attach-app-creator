@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Mic, Sparkles, RefreshCw, X, Download, Play } from "lucide-react";
+import { Mic, Sparkles, RefreshCw, X, Download } from "lucide-react";
 import Pagination from "@/components/planipret/admin/Pagination";
 import DebugPanel, { type DebugEntry } from "@/components/planipret/admin/DebugPanel";
 import { TableErrorState, TableEmptyState } from "@/components/planipret/admin/TableStates";
