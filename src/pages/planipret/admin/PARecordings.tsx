@@ -232,31 +232,72 @@ export default function PARecordings() {
   };
 
   const [coaching, setCoaching] = useState<string | null>(null);
+  // Coaching status per call: 'queued' | 'running' | 'done' | 'error'
+  const [coachStatus, setCoachStatus] = useState<Record<string, "queued" | "running" | "done" | "error">>({});
+  const [coachStartedAt, setCoachStartedAt] = useState<Record<string, number>>({});
+  const [coachElapsed, setCoachElapsed] = useState<number>(0);
+
+  // Tick elapsed while any coaching is running
+  useEffect(() => {
+    const running = Object.values(coachStatus).some((s) => s === "queued" || s === "running");
+    if (!running) return;
+    const id = setInterval(() => setCoachElapsed((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, [coachStatus]);
+
   const runCoaching = async (callId: string) => {
     // Guard: never call coaching without a transcript in local state
     const cur = detail;
     const hasT = cur && cur.id === callId && (Boolean(cur.transcript) || (Array.isArray(cur.transcript_segments) && cur.transcript_segments.length > 0));
     if (!hasT) return;
+    // Cache: si déjà analysé, ne relance pas
+    if (cur.ai_coaching) {
+      setCoachStatus((s) => ({ ...s, [callId]: "done" }));
+      return;
+    }
     setCoaching(callId);
+    setCoachStatus((s) => ({ ...s, [callId]: "queued" }));
+    setCoachStartedAt((s) => ({ ...s, [callId]: Date.now() }));
+    setCoachElapsed(0);
+    // Bascule "en cours" après un court délai pour matérialiser la queue → running
+    setTimeout(() => setCoachStatus((s) => (s[callId] === "queued" ? { ...s, [callId]: "running" } : s)), 400);
     try {
       const { data, error } = await supabase.functions.invoke("pp-coach-call", { body: { call_id: callId } });
       const d = (data as any) ?? {};
       if (d?.error === "TRANSCRIPT_MISSING" || error) {
-        // Silent: transcript not ready yet on the server side
         if (d?.error && d.error !== "TRANSCRIPT_MISSING") toast.error(d.error);
+        setCoachStatus((s) => ({ ...s, [callId]: "error" }));
         return;
       }
       if (d?.success) {
         toast.success(`Coaching généré (score ${d.score ?? "—"}/100)`);
         setDetail((c: any) => c && c.id === callId ? { ...c, ai_summary: d.summary, ai_coaching: d.coaching, transcript: d.corrected_transcript ?? c.transcript, lead_score: d.score } : c);
+        setCoachStatus((s) => ({ ...s, [callId]: "done" }));
       }
     } catch (e: any) {
       const msg = String(e?.message ?? e);
       if (!msg.includes("TRANSCRIPT_MISSING")) toast.error(`Coaching échoué: ${msg}`);
+      setCoachStatus((s) => ({ ...s, [callId]: "error" }));
     } finally {
       setCoaching(null);
     }
   };
+
+  // Realtime: auto-refresh detail when ai_coaching lands (from any source)
+  useEffect(() => {
+    if (!detail?.id) return;
+    const callId = detail.id;
+    const ch = supabase
+      .channel(`pa-call-${callId}`)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "planipret_phone_calls", filter: `id=eq.${callId}` }, (payload: any) => {
+        const n = payload?.new;
+        if (!n) return;
+        setDetail((c: any) => (c && c.id === callId ? { ...c, ...n } : c));
+        if (n.ai_coaching) setCoachStatus((s) => ({ ...s, [callId]: "done" }));
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [detail?.id]);
 
   // Auto-fetch transcription via ns-get-transcription when a recording detail opens
   useEffect(() => {
@@ -544,19 +585,50 @@ export default function PARecordings() {
 
               {hasDetailTranscript && detail.ai_coaching ? (
                 <div>
-                  <p style={{ fontSize: 11, color: "var(--pp-text-muted)", marginBottom: 4 }}>Transcription corrigée (IA)</p>
+                  <div className="flex items-center justify-between mb-1">
+                    <p style={{ fontSize: 11, color: "var(--pp-text-muted)" }}>Transcription corrigée (IA)</p>
+                    <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 999, background: "rgba(16,185,129,0.14)", color: "#10b981", border: "1px solid #10b98155", fontWeight: 700, letterSpacing: 0.4, textTransform: "uppercase" }}>● Terminé</span>
+                  </div>
                   <div className="p-3 rounded-lg" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", fontSize: 12 }}>
                     <div className="whitespace-pre-wrap">{detail.transcript}</div>
                   </div>
                 </div>
               ) : (hasDetailTranscript && !detail.ai_coaching) || coaching === detail.id ? (
-                <div>
-                  <p style={{ fontSize: 11, color: "var(--pp-text-muted)", marginBottom: 4 }}>Transcription</p>
-                  <div className="flex items-center gap-2 p-3 rounded-lg text-xs" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>
-                    <div className="w-3 h-3 rounded-full border-2 animate-spin" style={{ borderColor: "var(--pp-text-muted)", borderTopColor: "transparent" }} />
-                    AVA analyse et corrige la transcription (noms, résumé, coaching)…
-                  </div>
-                </div>
+                (() => {
+                  const st = coachStatus[detail.id] ?? "queued";
+                  const label = st === "queued" ? "En attente" : st === "running" ? "En cours" : st === "error" ? "Erreur" : "Terminé";
+                  const color = st === "queued" ? "#f59e0b" : st === "running" ? "#2E9BDC" : st === "error" ? "#ef4444" : "#10b981";
+                  const started = coachStartedAt[detail.id];
+                  const elapsed = started ? Math.max(0, Math.floor((Date.now() - started) / 1000)) + Math.min(coachElapsed, 0) : 0;
+                  // Estimation ~15s, barre progressive plafonnée à 92% tant que pas fini
+                  const pct = st === "error" ? 100 : Math.min(92, Math.round((elapsed / 15) * 100));
+                  return (
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <p style={{ fontSize: 11, color: "var(--pp-text-muted)" }}>Analyse coaching AVA</p>
+                        <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 999, background: `${color}22`, color, border: `1px solid ${color}55`, fontWeight: 700, letterSpacing: 0.4, textTransform: "uppercase" }}>● {label}</span>
+                      </div>
+                      <div className="p-3 rounded-lg space-y-2" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)" }}>
+                        <div className="flex items-center gap-2 text-xs" style={{ color: "var(--pp-text-secondary)" }}>
+                          {st !== "error" && <div className="w-3 h-3 rounded-full border-2 animate-spin" style={{ borderColor: color, borderTopColor: "transparent" }} />}
+                          <span>
+                            {st === "queued" && "En file — préparation du contexte…"}
+                            {st === "running" && `AVA analyse et corrige la transcription… (${elapsed}s)`}
+                            {st === "error" && "Analyse échouée — vous pouvez réessayer."}
+                          </span>
+                        </div>
+                        <div style={{ height: 4, borderRadius: 999, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
+                          <div style={{ height: "100%", width: `${pct}%`, background: color, transition: "width 0.6s linear" }} />
+                        </div>
+                        {st === "error" && (
+                          <button onClick={() => runCoaching(detail.id)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-xs" style={{ background: ACCENT }}>
+                            <RefreshCw className="w-3 h-3" /> Réessayer l'analyse
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()
               ) : transcribing === detail.id ? (
                 <div>
                   <p style={{ fontSize: 11, color: "var(--pp-text-muted)", marginBottom: 4 }}>Transcription</p>
