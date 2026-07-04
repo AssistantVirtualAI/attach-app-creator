@@ -407,7 +407,7 @@ export default function PARecordings() {
             ) : rows.map((c) => (
               <tr key={c.id} className="cursor-pointer hover:bg-white/[0.02]"
                 style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}
-                onClick={() => { setRecordingError(null); setTranscriptionError(null); setDetail(c); }}>
+                onClick={() => { setRecordingError(null); setTranscriptionError(null); setTranscriptionUnavailable(false); setDetail(c); }}>
                 <td className="p-3" style={{ color: "var(--pp-text-primary)" }}>{brokerName(c)}</td>
                 <td style={{ color: "var(--pp-text-secondary)" }}>{c.extension ?? c.planipret_profiles?.extension ?? "—"}</td>
                 <td style={{ color: "var(--pp-text-secondary)" }}>{c.from_number ?? "—"}</td>
