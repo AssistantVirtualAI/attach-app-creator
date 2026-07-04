@@ -225,14 +225,18 @@ export default function PAOverview() {
         day: period <= 7 ? d.toLocaleDateString(dateLocale, { weekday: "short" }) : d.toLocaleDateString(dateLocale, { day: "2-digit", month: "2-digit" }),
         appels: 0, sms: 0,
       });
-      (callsP.data ?? []).forEach((c: any) => { if (c.started_at?.slice(0, 10) === key) days[days.length - 1].appels++; });
-      (smsP.data ?? []).forEach((m: any) => { if (m.sent_at?.slice(0, 10) === key) days[days.length - 1].sms++; });
+      (callsP.data ?? []).forEach((c: any) => { if (c.created_at?.slice(0, 10) === key) days[days.length - 1].appels++; });
+      (smsP.data ?? []).forEach((m: any) => { if (m.created_at?.slice(0, 10) === key) days[days.length - 1].sms++; });
     }
     setSeriesData(days);
 
-    // Direction distribution
-    const distMap: Record<string, number> = { inbound: 0, outbound: 0, missed: 0 };
-    (callsByDir.data ?? []).forEach((c: any) => { if (c.direction in distMap) distMap[c.direction]++; });
+    // Direction distribution (missed comes from status, not direction)
+    const distMap = { inbound: 0, outbound: 0, missed: 0 };
+    (callsByDir.data ?? []).forEach((c: any) => {
+      if (c.status === "missed") distMap.missed++;
+      else if (c.direction === "inbound") distMap.inbound++;
+      else if (c.direction === "outbound") distMap.outbound++;
+    });
     setDirectionDist([
       { name: t("overview.dirInbound"), value: distMap.inbound, color: ACCENT },
       { name: t("overview.dirOutbound"), value: distMap.outbound, color: SUCCESS },
