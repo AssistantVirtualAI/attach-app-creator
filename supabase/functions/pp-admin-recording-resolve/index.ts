@@ -66,6 +66,23 @@ function accessUrl(raw: any): string | null {
   return val(first, ["file-access-url", "file_access_url", "recording_url", "recording-url", "url"], null);
 }
 
+function normalizeNsPath(path: unknown): string | null {
+  const s = String(path ?? "").trim();
+  if (!s) return null;
+  if (s.startsWith("http")) {
+    try {
+      const u = new URL(s);
+      const idx = u.pathname.indexOf("/ns-api/v2");
+      return `${idx >= 0 ? u.pathname.slice(idx + "/ns-api/v2".length) : u.pathname}${u.search}`;
+    } catch { return s; }
+  }
+  return s.replace(/^\/ns-api\/v2/i, "");
+}
+
+function transcriptionPath(raw: any): string | null {
+  return normalizeNsPath(val(raw, ["transcription_path", "prefilled-transcription-api", "transcription_url", "transcription-url", "transcript_url", "transcript-url"], null));
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
@@ -111,6 +128,20 @@ Deno.serve(async (req) => {
       return json({ ok: true, recording_url: directUrl, cached: false, source: "metadata_direct_url" });
     }
 
+    const transcriptionAttempts: Array<{ path: string; status: number; ok: boolean; detail?: any }> = [];
+    const txPath = transcriptionPath(nsRaw) ?? transcriptionPath(meta);
+    if (txPath) {
+      const tx = await nsFetch(txPath);
+      transcriptionAttempts.push({ path: txPath, status: tx.status, ok: tx.ok, detail: tx.ok ? undefined : tx.data });
+      if (tx.ok) {
+        const txData = Array.isArray(tx.data) ? tx.data[0] : tx.data;
+        nsRaw["call-id"] = nsRaw["call-id"] ?? txData?.["call-id"];
+        nsRaw["geo-call-id"] = nsRaw["geo-call-id"] ?? txData?.["geo-call-id"];
+        nsRaw["call-orig-call-id"] = nsRaw["call-orig-call-id"] ?? txData?.["call-orig-call-id"] ?? txData?.orig_callid;
+        nsRaw["call-term-call-id"] = nsRaw["call-term-call-id"] ?? txData?.["call-term-call-id"] ?? txData?.term_callid;
+      }
+    }
+
     const ids = lookupCallIds(nsRaw, meta, { ns_call_id: row.ns_call_id });
     if (!ids.length) return json({ ok: false, fallback: true, error: "NO_NS_CALL_ID", hint: "Aucun identifiant NetSapiens exploitable sur cet appel." }, 200);
 
@@ -143,12 +174,12 @@ Deno.serve(async (req) => {
       error: attempts.some((a) => a.status === 404) ? "RECORDING_NOT_FOUND" : "NO_ACCESS_URL",
       hint: "Aucune URL audio valide n'a été retournée. L'appel peut être non enregistré, l'archive peut être expirée, ou l'identifiant CDR n'est pas accepté par l'endpoint d'enregistrement.",
       attempted_ids: ids,
-      attempts,
+      attempts: [...transcriptionAttempts, ...attempts],
     }, 200);
 
     await admin.from("planipret_phone_calls").update({
       recording_url: url,
-      metadata: { ...meta, recording_access_url_resolved: true, recording_api_path: sourcePath, recording_resolution: { attempted_ids: ids, attempts } },
+      metadata: { ...meta, recording_access_url_resolved: true, recording_api_path: sourcePath, recording_resolution: { attempted_ids: ids, attempts: [...transcriptionAttempts, ...attempts] } },
     }).eq("id", row.id);
 
     return json({ ok: true, recording_url: url, cached: false, source: sourcePath });
