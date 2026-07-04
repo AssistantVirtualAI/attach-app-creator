@@ -106,13 +106,26 @@ Deno.serve(async (req) => {
     }
 
     const ids = lookupCallIds(nsRaw, meta, { call_id: callId, ns_call_id: row?.ns_call_id });
+    const extensions = Array.from(new Set([
+      row?.extension,
+      profile.extension,
+      meta.extension,
+      nsRaw?.["orig-user"],
+      nsRaw?.["term-user"],
+      nsRaw?.["user"],
+    ].map((e) => String(e ?? "").trim()).filter((e) => e && !e.includes("@"))));
+
     for (const id of ids) {
       if (res?.ok) break;
-      const paths = [
+      const paths: string[] = [
         `/domains/${encodeURIComponent(env.domain)}/recordings/${encodeURIComponent(id)}`,
-        nsPath(env.domain, profile.extension, `/recordings/${encodeURIComponent(id)}`),
       ];
+      // User-level fallback for each candidate extension when domain-level returns 404.
+      for (const ext of extensions) {
+        paths.push(nsPath(env.domain, ext, `/recordings/${encodeURIComponent(id)}`));
+      }
       for (const p of paths) {
+        if (res?.ok) break;
         path = p;
         console.log("NS-API recording metadata GET", path);
         const metaRes = await nsBrokerFetch(admin, profile, path, { method: "GET" });
@@ -126,7 +139,6 @@ Deno.serve(async (req) => {
         if (res.ok && row?.id) {
           admin.from("planipret_phone_calls").update({ recording_url: audioUrl }).eq("id", row.id).then(() => {}, () => {});
         }
-        break;
       }
     }
 
