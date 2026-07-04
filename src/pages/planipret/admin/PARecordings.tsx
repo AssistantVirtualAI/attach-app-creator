@@ -212,6 +212,15 @@ export default function PARecordings() {
     }
   };
 
+  // Auto-fetch transcription via ns-get-transcription when a recording detail opens
+  useEffect(() => {
+    if (!detail?.id) return;
+    if (detail.transcript) return;
+    if (transcribing === detail.id) return;
+    transcribe(detail.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detail?.id]);
+
 
   const inputStyle = { background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" };
 
