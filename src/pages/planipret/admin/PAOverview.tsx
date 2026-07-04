@@ -133,24 +133,23 @@ export default function PAOverview() {
   const load = async () => {
     setRefreshing(true);
     const today = new Date(); today.setHours(0, 0, 0, 0);
-    const yest = new Date(today); yest.setDate(yest.getDate() - 1);
     const periodAgo = new Date(today); periodAgo.setDate(periodAgo.getDate() - (period - 1));
-    const todayIso = today.toISOString();
-    const yestIso = yest.toISOString();
+    const prevPeriodAgo = new Date(today); prevPeriodAgo.setDate(prevPeriodAgo.getDate() - (period * 2 - 1));
     const periodIso = periodAgo.toISOString();
+    const prevPeriodIso = prevPeriodAgo.toISOString();
 
     const sevenAgo = new Date(today); sevenAgo.setDate(sevenAgo.getDate() - 7);
     const sevenIso = sevenAgo.toISOString();
     const fiveMinAgo = new Date(Date.now() - 5 * 60_000).toISOString();
     const nowIsoEarly = new Date().toISOString();
 
-    const [c1, c2, missedToday, sms, smsY, ava, avaWeek, vm, rec, callsP, smsP, callsByDir, callsPeriodStats, topCalls, svcProfiles, directory, onlineC, overdueRemC, hotLeadsWeekC] = await Promise.all([
-      getPlanipretCallCount({ from: todayIso }, "created_at"),
-      getPlanipretCallCount({ from: yestIso, to: todayIso }, "created_at"),
-      getPlanipretCallCount({ status: "missed", from: todayIso }, "created_at"),
-      supabase.from("planipret_phone_messages").select("id", { count: "exact", head: true }).gte("created_at", todayIso),
-      supabase.from("planipret_phone_messages").select("id", { count: "exact", head: true }).gte("created_at", yestIso).lt("created_at", todayIso),
-      supabase.from("ai_request_audit_log").select("id", { count: "exact", head: true }).gte("created_at", todayIso).like("action", "elevenlabs_tool:%"),
+    const [c1, c2, missedPeriod, sms, smsY, ava, avaWeek, vm, rec, callsP, smsP, callsByDir, callsPeriodStats, topCalls, svcProfiles, directory, onlineC, overdueRemC, hotLeadsPeriodC] = await Promise.all([
+      getPlanipretCallCount({ from: periodIso }, "created_at"),
+      getPlanipretCallCount({ from: prevPeriodIso, to: periodIso }, "created_at"),
+      getPlanipretCallCount({ status: "missed", from: periodIso }, "created_at"),
+      supabase.from("planipret_phone_messages").select("id", { count: "exact", head: true }).gte("created_at", periodIso),
+      supabase.from("planipret_phone_messages").select("id", { count: "exact", head: true }).gte("created_at", prevPeriodIso).lt("created_at", periodIso),
+      supabase.from("ai_request_audit_log").select("id", { count: "exact", head: true }).gte("created_at", periodIso).like("action", "elevenlabs_tool:%"),
       supabase.from("ai_request_audit_log").select("id", { count: "exact", head: true }).gte("created_at", sevenIso).like("action", "elevenlabs_tool:%"),
       supabase.from("planipret_voicemails").select("id", { count: "exact", head: true }).eq("is_read", false),
       supabase.from("planipret_phone_calls").select("id, user_id, extension, direction, status, from_number, to_number, duration_seconds, started_at, created_at, ai_summary, metadata, planipret_profiles(full_name)").order("created_at", { ascending: false }).limit(20),
@@ -163,7 +162,7 @@ export default function PAOverview() {
       getPlanipretBrokerDirectory(),
       supabase.from("planipret_profiles").select("id", { count: "exact", head: true }).gte("updated_at", fiveMinAgo),
       supabase.from("planipret_reminders").select("id", { count: "exact", head: true }).eq("status", "pending").lt("scheduled_at", nowIsoEarly),
-      supabase.from("planipret_phone_calls").select("id", { count: "exact", head: true }).gte("created_at", sevenIso).gte("lead_score", 8),
+      supabase.from("planipret_phone_calls").select("id", { count: "exact", head: true }).gte("created_at", periodIso).gte("lead_score", 8),
     ]);
 
     const nsBrokerList = directory.brokers;
