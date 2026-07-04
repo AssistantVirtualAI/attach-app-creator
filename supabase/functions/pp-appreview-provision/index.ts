@@ -117,9 +117,12 @@ Deno.serve(async (req) => {
       full_name: APP_REVIEW_NAME,
       email: APP_REVIEW_EMAIL,
       role: "broker",
+      extension: APP_REVIEW_EXT,
       ns_extension: APP_REVIEW_EXT,
       ns_domain: APP_REVIEW_DOMAIN,
       ns_sip_username: APP_REVIEW_EXT,
+      mobile_app_enabled: true,
+      voice_agent_enabled: false,
       ns_linked: true,
       ns_linked_at: new Date().toISOString(),
     };

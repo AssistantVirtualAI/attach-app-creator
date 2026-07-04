@@ -166,9 +166,9 @@ Deno.serve(async (req) => {
     // Bulk mode
     if (bulk) {
       const { data: brokers } = await admin.from("planipret_profiles")
-        .select("id, user_id, full_name, email, extension, ns_extension, ns_domain, ns_mobile_device_id, ns_widget_device_id")
+        .select("id, user_id, full_name, email, extension, ns_extension, ns_domain, ns_mobile_device_id, ns_widget_device_id, ns_sip_password_ref_mobile")
         .not("ns_extension", "is", null)
-        .or("ns_mobile_device_id.is.null,ns_widget_device_id.is.null");
+        .or("ns_mobile_device_id.is.null,ns_widget_device_id.is.null,ns_sip_password_ref_mobile.is.null");
       const list = brokers ?? [];
       if (list.length === 0) return json({ success: true, message: "Aucun courtier à provisionner", count: 0 });
 
