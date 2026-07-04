@@ -445,6 +445,9 @@ async function syncCalls(admin: ReturnType<typeof createClient>, domain: string,
       duration_seconds: numVal(c, ["duration", "time-talking", "billsec", "talk_time", "call-total-duration-seconds", "call-batch-total-duration-seconds", "call-talking-duration-seconds"], 0),
       recording_url: recordingUrl(c),
       transcript_source: transcription ? "netsapiens" : null,
+      ns_callid: val(c, ["call-parent-cdr-id", "call-orig-call-id", "call-term-call-id", "call-parent-call-id", "id"]),
+      ns_orig_callid: val(c, ["call-orig-call-id", "orig-callid", "orig-call-id"]),
+      ns_term_callid: val(c, ["call-term-call-id", "term-callid", "term-call-id"]),
       metadata: { ...c, transcription_path: transcription, recording_api_path: recordingApiPath(domain, c) },
     });
   }
