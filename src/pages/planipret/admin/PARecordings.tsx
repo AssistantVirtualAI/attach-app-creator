@@ -224,20 +224,27 @@ export default function PARecordings() {
 
   const [coaching, setCoaching] = useState<string | null>(null);
   const runCoaching = async (callId: string) => {
+    // Guard: never call coaching without a transcript in local state
+    const cur = detail;
+    const hasT = cur && cur.id === callId && (Boolean(cur.transcript) || (Array.isArray(cur.transcript_segments) && cur.transcript_segments.length > 0));
+    if (!hasT) return;
     setCoaching(callId);
     try {
       const { data, error } = await supabase.functions.invoke("pp-coach-call", { body: { call_id: callId } });
-      if (error) throw error;
-      const d = data as any;
+      const d = (data as any) ?? {};
+      if (d?.error === "TRANSCRIPT_MISSING" || error) {
+        // Silent: transcript not ready yet on the server side
+        if (d?.error && d.error !== "TRANSCRIPT_MISSING") toast.error(d.error);
+        return;
+      }
       if (d?.success) {
         toast.success(`Coaching généré (score ${d.score ?? "—"}/100)`);
-        setDetail((cur: any) => cur && cur.id === callId ? { ...cur, ai_summary: d.summary, ai_coaching: d.coaching, transcript: d.corrected_transcript ?? cur.transcript, lead_score: d.score } : cur);
+        setDetail((c: any) => c && c.id === callId ? { ...c, ai_summary: d.summary, ai_coaching: d.coaching, transcript: d.corrected_transcript ?? c.transcript, lead_score: d.score } : c);
         await load(page, pageSize);
-      } else {
-        toast.error(d?.error ?? "Coaching indisponible");
       }
     } catch (e: any) {
-      toast.error(`Coaching échoué: ${e.message ?? e}`);
+      const msg = String(e?.message ?? e);
+      if (!msg.includes("TRANSCRIPT_MISSING")) toast.error(`Coaching échoué: ${msg}`);
     } finally {
       setCoaching(null);
     }
