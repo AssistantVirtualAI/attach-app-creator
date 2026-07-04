@@ -53,13 +53,15 @@ export default function ExtensionSyncBanner({
     toast.success(t("extSync.synced"));
   };
 
-  // Auto-hydrate once on mount when linked but no cached config
+  // Auto-hydrate on mount and auto-retry every 30s while offline (no manual button).
   useEffect(() => {
-    if (hasSip && !cachedMatch && !busy && lastCheck === 0) {
-      resync();
-    }
+    if (hasSip && !cachedMatch && !busy) resync();
+    const iv = setInterval(() => {
+      if (hasSip && !cachedMatch && !busy) resync();
+    }, 30000);
+    return () => clearInterval(iv);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasSip]);
+  }, [hasSip, cachedMatch]);
 
   if (!extension) {
     return (
@@ -74,28 +76,20 @@ export default function ExtensionSyncBanner({
   }
 
   const ok = hasSip && cachedMatch;
+  const dot = ok ? "var(--pp-color-success)" : busy ? "#F5A623" : "var(--pp-color-danger)";
+  const label = ok ? t("extSync.ready") : busy ? t("extSync.syncing") : t("extSync.needsResync");
   return (
     <div className="pp-card flex items-center gap-2" style={{ padding: 10 }}>
-      {ok ? <CheckCircle2 className="w-4 h-4" style={{ color: "var(--pp-color-success)" }} />
-          : <AlertTriangle className="w-4 h-4" style={{ color: "var(--pp-color-warning, #F59E0B)" }} />}
+      <span aria-hidden style={{ width: 8, height: 8, borderRadius: 999, background: dot, boxShadow: `0 0 0 3px ${dot}22` }} />
       <div className="flex-1 min-w-0">
         <div className="text-sm font-semibold truncate">
           {t("extSync.extLabel")} {extension}
         </div>
         <div className="text-xs truncate" style={{ color: "var(--pp-text-muted)" }}>
-          {ok ? t("extSync.ready") : t("extSync.needsResync")}
+          {label}
         </div>
       </div>
-      <button
-        onClick={resync}
-        disabled={busy}
-        className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium"
-        style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)" }}
-        aria-label={t("extSync.resync")}
-      >
-        <RefreshCw className={`w-3 h-3 ${busy ? "animate-spin" : ""}`} />
-        {busy ? t("extSync.syncing") : t("extSync.resync")}
-      </button>
+      {busy && <RefreshCw className="w-3.5 h-3.5 animate-spin" style={{ color: "var(--pp-text-muted)" }} />}
     </div>
   );
 }
