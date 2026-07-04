@@ -463,11 +463,13 @@ function EmptyState({ tab }: { tab: "recents" | "active" | "missed" }) {
 // ---------- Transcript view (chat bubbles + auto-fetch + Analyze CTA) ----------
 type Seg = { speaker: string; text: string; start?: number | null; end?: number | null };
 function TranscriptView({
-  segments, transcript, loading, onFetch, onAnalyze, aiLoading, analyzed, t, filenameHint,
+  segments, transcript, loading, preparing = false, attempt = 0, onFetch, onAnalyze, aiLoading, analyzed, t, filenameHint,
 }: {
   segments: Seg[] | null;
   transcript: string | null;
   loading: boolean;
+  preparing?: boolean;
+  attempt?: number;
   onFetch: () => Promise<void> | void;
   onAnalyze: () => Promise<void> | void;
   aiLoading: boolean;
@@ -479,25 +481,38 @@ function TranscriptView({
   const fetchedRef = useRef(false);
 
   useEffect(() => {
-    if (!has && !loading && !fetchedRef.current) {
+    if (!has && !loading && !preparing && !fetchedRef.current) {
       fetchedRef.current = true;
       void onFetch();
     }
-  }, [has, loading, onFetch]);
+  }, [has, loading, preparing, onFetch]);
 
   const isCourtier = (speaker: string) => {
     const s = (speaker || "").toLowerCase();
     return s.includes("courtier") || s.startsWith("agent") || s.startsWith("broker") || s === "speaker 1" || s === "1";
   };
 
-  if (loading && !has) {
+  if ((loading || preparing) && !has) {
     return (
-      <div className="space-y-2">
-        {[0, 1, 2, 3].map((i) => (
-          <div key={i} className={`flex ${i % 2 === 0 ? "justify-start" : "justify-end"}`}>
-            <div className="h-10 rounded-2xl animate-pulse" style={{ width: "60%", background: "var(--pp-bg-surface)" }} />
+      <div className="pp-card p-4 space-y-3">
+        <div className="flex items-center gap-2 text-xs" style={{ color: "var(--pp-text-primary)" }}>
+          <Loader2 className="w-4 h-4 animate-spin" style={{ color: "var(--pp-brand-accent)" }} />
+          {preparing
+            ? `⏳ Transcription en cours de préparation${attempt > 0 ? ` (tentative ${attempt + 1})` : ""}…`
+            : "Chargement de la transcription…"}
+        </div>
+        {preparing && (
+          <div className="text-[11px]" style={{ color: "var(--pp-text-secondary)" }}>
+            NetSapiens génère la transcription. Nouvelle vérification automatique dans quelques secondes.
           </div>
-        ))}
+        )}
+        <div className="space-y-2 pt-1">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className={`flex ${i % 2 === 0 ? "justify-start" : "justify-end"}`}>
+              <div className="h-10 rounded-2xl animate-pulse" style={{ width: "60%", background: "var(--pp-bg-surface)" }} />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
@@ -739,6 +754,10 @@ function CallDetailSheet({
   const [insight, setInsight] = useState<Insight | null>(null);
   const [recLoading, setRecLoading] = useState(false);
   const [txLoading, setTxLoading] = useState(false);
+  const [txPreparing, setTxPreparing] = useState(false);
+  const [txAttempt, setTxAttempt] = useState(0);
+  const txRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (txRetryTimerRef.current) clearTimeout(txRetryTimerRef.current); }, []);
   const [aiLoading, setAiLoading] = useState(false);
   const [taskState, setTaskState] = useState<Record<string, { creating?: boolean; createdId?: string }>>({});
   const [eventState, setEventState] = useState<Record<string, { creating?: boolean; createdId?: string }>>({});
@@ -832,22 +851,60 @@ function CallDetailSheet({
     toast.success(t("calls.recordingFetched"));
   };
 
-  const fetchTranscript = async () => {
-    setTxLoading(true);
-    const { data, error } = await supabase.functions.invoke("ns-transcription", { body: { call_id: call.ns_call_id ?? call.id } });
-    setTxLoading(false);
+  // Retry backoff (ms) for transient transcription failures (still being generated NS-side)
+  const TX_BACKOFF = [4000, 10000, 25000, 60000];
+
+  const isTransientTxError = (res: any): boolean => {
+    if (!res) return true;
+    const attempts: Array<{ status: number }> = Array.isArray(res.attempts) ? res.attempts : [];
+    // Retry when NS returned 404/202/425 or nothing usable yet — the CDR exists but transcript not ready.
+    if (attempts.length && attempts.every((a) => [0, 202, 404, 425, 408, 500, 502, 503, 504].includes(a.status))) return true;
+    // Explicit hints from the edge function
+    const hay = `${res.error ?? ""} ${res.hint ?? ""}`.toLowerCase();
+    if (hay.includes("en cours") || hay.includes("prépar") || hay.includes("processing")) return true;
+    return false;
+  };
+
+  const runTranscriptOnce = async () => {
+    const { data, error } = await supabase.functions.invoke("ns-transcription", {
+      body: { call_id: call.ns_call_id ?? call.id },
+    });
     const res = (data ?? {}) as any;
-    if (error || res.success === false || (!res.transcript && !(Array.isArray(res.segments) && res.segments.length))) {
-      const msg = res.error ?? error?.message ?? t("calls.transcriptUnavailable");
-      const hint = res.hint ?? res.action_required ?? "";
-      if (Array.isArray(res.attempts)) console.warn("ns-transcription attempts:", res.attempts);
-      toast.error(hint ? `${msg} — ${hint}` : msg);
+    const ok = !error && res.success !== false && (res.transcript || (Array.isArray(res.segments) && res.segments.length));
+    return { ok, res, error };
+  };
+
+  const fetchTranscript = async (attempt = 0): Promise<void> => {
+    if (txRetryTimerRef.current) { clearTimeout(txRetryTimerRef.current); txRetryTimerRef.current = null; }
+    setTxAttempt(attempt);
+    if (attempt === 0) setTxLoading(true); else setTxPreparing(true);
+
+    const { ok, res, error } = await runTranscriptOnce();
+
+    if (ok) {
+      setTxLoading(false); setTxPreparing(false); setTxAttempt(0);
+      onUpdated({ ...call, transcript: res.transcript ?? call.transcript, transcript_segments: res.segments ?? call.transcript_segments });
+      await refreshCall();
+      toast.success(t("calls.transcriptFetched"));
       return;
     }
-    // Optimistic UI update — the edge function already persists to DB.
-    onUpdated({ ...call, transcript: res.transcript ?? call.transcript, transcript_segments: res.segments ?? call.transcript_segments });
-    await refreshCall();
-    toast.success(t("calls.transcriptFetched"));
+
+    if (Array.isArray(res.attempts)) console.warn("ns-transcription attempts:", res.attempts);
+
+    const transient = isTransientTxError(res);
+    if (transient && attempt < TX_BACKOFF.length) {
+      setTxLoading(false);
+      setTxPreparing(true);
+      const delay = TX_BACKOFF[attempt];
+      txRetryTimerRef.current = setTimeout(() => { void fetchTranscript(attempt + 1); }, delay);
+      return;
+    }
+
+    // Give up — show real error
+    setTxLoading(false); setTxPreparing(false); setTxAttempt(0);
+    const msg = res.error ?? error?.message ?? t("calls.transcriptUnavailable");
+    const hint = res.hint ?? res.action_required ?? "";
+    toast.error(hint ? `${msg} — ${hint}` : msg);
   };
 
   const analyzeAI = async () => {
@@ -1010,7 +1067,9 @@ function CallDetailSheet({
               segments={Array.isArray(call.transcript_segments) ? call.transcript_segments : null}
               transcript={call.transcript}
               loading={txLoading}
-              onFetch={fetchTranscript}
+              preparing={txPreparing}
+              attempt={txAttempt}
+              onFetch={() => fetchTranscript(0)}
               onAnalyze={analyzeAI}
               aiLoading={aiLoading}
               analyzed={!!(call as any).ai_analysis_json}
@@ -1125,10 +1184,10 @@ function CallDetailSheet({
                     {aiLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Analyse en cours…</> : <><Sparkles className="w-4 h-4" /> Analyser avec l'IA</>}
                   </button>
                 ) : (
-                  <button onClick={async () => { await fetchTranscript(); }} disabled={txLoading}
+                  <button onClick={async () => { await fetchTranscript(); }} disabled={txLoading || txPreparing}
                     className="w-full py-3 rounded-xl text-sm font-semibold text-white disabled:opacity-50 flex items-center justify-center gap-2"
                     style={{ background: "linear-gradient(135deg, var(--pp-brand-accent-2), var(--pp-brand-accent))" }}>
-                    📝 Obtenir transcription + Analyse
+                    {txPreparing ? <><Loader2 className="w-4 h-4 animate-spin" /> Préparation…</> : <>📝 Obtenir transcription + Analyse</>}
                   </button>
                 )
               )}
