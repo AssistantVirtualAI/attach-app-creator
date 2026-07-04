@@ -65,7 +65,10 @@ export default function PARecordings() {
     let q: any = supabase
       .from("planipret_phone_calls")
       .select("*, planipret_profiles(full_name, extension)", { count: "exact" })
-      .not("ns_callid", "is", null)
+      .not("to_number", "ilike", "%vmail%")
+      .not("to_number", "ilike", "%voicemail%")
+      .not("to_number", "ilike", "%vm@%")
+      .or("has_recording.eq.true,ns_callid.not.is.null")
       .order("started_at", { ascending: false })
       .range(fromIdx, fromIdx + ps - 1);
     if (search) q = q.or(`from_number.ilike.%${search}%,to_number.ilike.%${search}%,extension.ilike.%${search}%`);
