@@ -72,10 +72,17 @@ Deno.serve(async (req) => {
   const headers = { Authorization: `Bearer ${NS_API_KEY}`, Accept: "audio/*, application/json" };
   const attempts: any[] = [];
 
+  // Generate callid variants: raw, encoded, before-@, encoded before-@
+  const rawId = ns_callid;
+  const beforeAt = rawId.split("@")[0];
+  const variants = Array.from(new Set([rawId, encodeURIComponent(rawId), beforeAt, encodeURIComponent(beforeAt)]));
+
   const paths: string[] = [];
-  if (ns_extension) paths.push(`/domains/${encodeURIComponent(NS_DOMAIN)}/users/${encodeURIComponent(ns_extension)}/recordings/${encodeURIComponent(ns_callid)}`);
-  paths.push(`/domains/~/users/~/recordings/${encodeURIComponent(ns_callid)}`);
-  paths.push(`/domains/${encodeURIComponent(NS_DOMAIN)}/recordings/${encodeURIComponent(ns_callid)}`);
+  for (const v of variants) {
+    if (ns_extension) paths.push(`/domains/${encodeURIComponent(NS_DOMAIN)}/users/${encodeURIComponent(ns_extension)}/recordings/${v}`);
+    paths.push(`/domains/${encodeURIComponent(NS_DOMAIN)}/recordings/${v}`);
+    paths.push(`/domains/~/users/~/recordings/${v}`);
+  }
 
   for (const p of paths) {
     const target = `${NS_API_BASE_URL}${p}`;
