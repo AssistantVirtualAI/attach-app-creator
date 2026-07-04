@@ -93,7 +93,7 @@ Deno.serve(async (req) => {
       message: "Transcription non disponible pour cet appel.",
       ns_callid, ns_extension, attempts,
       action_required: "Demandez à Clinton d'activer PORTAL_VOICE_TRANSCRIPTION_SENTIMENT = yes sur planipret.ca",
-    }, 404);
+    }, 200);
   }
 
   const segments = parseTranscript(transcript);
