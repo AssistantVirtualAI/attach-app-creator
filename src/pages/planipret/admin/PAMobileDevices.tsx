@@ -192,8 +192,12 @@ export default function PAMobileDevices() {
             {backfilling ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             Provisionner manquants
           </Button>
+          <Button size="sm" onClick={provisionAll} disabled={bulkProvisioning} variant="default">
+            {bulkProvisioning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            🔧 Provisionner tous
+          </Button>
           <Button size="sm" variant="secondary" onClick={provisionAppReview}>
-            Créer compte AppReview (2000)
+            🍎 App Review User
           </Button>
         </div>
       </div>
