@@ -255,7 +255,7 @@ export default function PAOverview() {
     const { data: hot } = await supabase
       .from("planipret_phone_calls")
       .select("id, user_id, extension, from_number, from_name, to_number, to_name, lead_score, started_at, created_at, planipret_profiles(full_name)")
-      .gte("created_at", todayIso)
+      .gte("created_at", periodIso)
       .gte("lead_score", 8)
       .order("lead_score", { ascending: false })
       .limit(8);
