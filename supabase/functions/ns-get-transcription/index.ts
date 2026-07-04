@@ -190,10 +190,72 @@ Deno.serve(async (req) => {
   }
 
   const D = encodeURIComponent(NS_DOMAIN);
+
+  // Direct CDR-by-callid fetch (in case datetime lookup missed the right CDR)
+  if (ns_callid) {
+    const base = String(ns_callid).split("@")[0];
+    for (const cid of Array.from(new Set([ns_callid, base]))) {
+      try {
+        const r = await nsJson(`/domains/${D}/cdrs/${encodeURIComponent(cid)}`);
+        attempts.push({ url: `/domains/${D}/cdrs/${cid}`, status: r.status, kind: "cdr_by_callid", fields_found: r.ok && r.data && typeof r.data === "object" ? Object.keys(Array.isArray(r.data) ? r.data[0] ?? {} : r.data) : [] });
+        if (r.ok) {
+          const items = asArray(r.data);
+          for (const cdr of items) {
+            cdrs.push(cdr);
+            addIds(ids, cdr);
+          }
+        }
+      } catch (e) {
+        attempts.push({ url: `/domains/${D}/cdrs/${cid}`, error: (e as Error).message, kind: "cdr_by_callid" });
+      }
+    }
+  }
+
+  // NEW: check "prefilled-transcription-api" (and siblings) directly on each matched CDR.
+  // Value may be a full URL, an NS-API path, or an inline transcript string.
+  const inlineFields = ["prefilled-transcription-api", "transcription-text", "transcript-text", "call-transcript", "sentiment-transcript", "asr-text"];
+  for (const cdr of cdrs) {
+    if (transcript) break;
+    for (const f of inlineFields) {
+      const v = cdr?.[f];
+      if (!v) continue;
+      const s = String(v).trim();
+      if (!s) continue;
+      if (s.startsWith("http") || s.startsWith("/")) {
+        const path = normalizeNsPath(s);
+        if (!path) continue;
+        try {
+          const r = await nsJson(path);
+          attempts.push({ url: path, status: r.status, kind: `prefilled:${f}`, body_preview: String(r.rawText).slice(0, 300) });
+          if (r.ok) {
+            const items = Array.isArray(r.data) ? r.data : [r.data];
+            for (const item of items) {
+              const found = extractTranscript(item);
+              if (found) { transcript = found; break; }
+            }
+          }
+        } catch (e) {
+          attempts.push({ url: path, error: (e as Error).message, kind: `prefilled:${f}` });
+        }
+      } else if (s.length > 10) {
+        transcript = s;
+        attempts.push({ kind: `cdr_field:${f}`, body_preview: s.slice(0, 300) });
+        break;
+      }
+    }
+  }
+
   const queries: string[] = [];
   const prefilled = normalizeNsPath(row?.metadata?.transcription_path ?? row?.metadata?.["prefilled-transcription-api"]);
   if (prefilled) queries.push(prefilled);
-  const jobId = String(row?.metadata?.["call-intelligence-job-id"] ?? "").replace(/\.0$/, "").trim();
+  // Pull jobId from row metadata OR any matched CDR
+  let jobId = String(row?.metadata?.["call-intelligence-job-id"] ?? "").replace(/\.0$/, "").trim();
+  if (!jobId) {
+    for (const cdr of cdrs) {
+      const j = String(cdr?.["call-intelligence-job-id"] ?? cdr?.id ?? cdr?.["cdr-id"] ?? "").replace(/\.0$/, "").trim();
+      if (j) { jobId = j; break; }
+    }
+  }
   const started = String(row?.metadata?.["call-start-datetime"] ?? row?.started_at ?? "");
   const yyyymm = started ? started.slice(0, 7).replace("-", "") : "";
   for (const cdr of cdrs) {
@@ -223,7 +285,7 @@ Deno.serve(async (req) => {
     queries.push(`/domains/${D}/transcriptions?orig-callid=${c}`);
   }
 
-  for (const q of Array.from(new Set(queries))) {
+  for (const q of transcript ? [] : Array.from(new Set(queries))) {
     try {
       const r = await nsJson(q);
       const data = r.data;
@@ -260,5 +322,17 @@ Deno.serve(async (req) => {
   }
 
   const segments = parseTranscript(transcript);
+  if (call_db_id && segments.length) {
+    try {
+      const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
+      const text = segments.map((s) => `${s.speaker}: ${s.text}`).join("\n");
+      await admin.from("planipret_phone_calls").update({
+        transcript: text,
+        transcript_segments: segments,
+        transcript_source: "ns-api",
+        has_transcript: true,
+      }).eq("id", call_db_id);
+    } catch { /* best-effort cache */ }
+  }
   return json({ success: true, ns_callid, segments, raw: transcript });
 });
