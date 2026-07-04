@@ -81,23 +81,50 @@ export default function PAMobileDevices() {
   }, [refresh]);
 
   const provisionAppReview = useCallback(async () => {
-    if (!confirm("Créer le compte de test appreview (poste 2000) sur NetSapiens ?")) return;
-    const { data, error } = await supabase.functions.invoke("pp-appreview-provision", {
-      body: {
-        domain: "appreview",
-        extension: "2000",
-        password: "Appreview2026!",
-        email: "appreview@planipret.ca",
-        first_name: "App",
-        last_name: "Review",
-      },
-    });
+    if (!confirm("Créer l'utilisateur App Review (demo@avastatistic.ca, ext 1999) ?")) return;
+    const { data, error } = await supabase.functions.invoke("pp-appreview-provision", { body: {} });
     if (error) { toast.error("Provision AppReview échouée", { description: error.message }); return; }
-    if (!data?.ok) { toast.error("Provision AppReview échouée", { description: JSON.stringify(data?.steps?.[0]?.data ?? data) }); return; }
-    toast.success("Compte AppReview prêt", {
-      description: `Ext ${data.extension} · Domaine ${data.domain} · Devices: ${data.devices?.mobile}, ${data.devices?.widget}`,
+    if (!data?.success) { toast.error("Provision AppReview échouée", { description: data?.error || data?.detail || JSON.stringify(data) }); return; }
+    const login = data.login;
+    toast.success("App Review prêt", {
+      description: `${login?.email} / ${login?.password} · ext ${login?.extension}@${login?.domain}`,
+      duration: 20000,
     });
+    try { await navigator.clipboard.writeText(`${login?.email} / ${login?.password}`); } catch { /* noop */ }
   }, []);
+
+  const [provisioningId, setProvisioningId] = useState<string | null>(null);
+  const provisionOne = useCallback(async (broker: Row) => {
+    setProvisioningId(broker.broker_id);
+    const { data, error } = await supabase.functions.invoke("ns-provision-broker-devices", {
+      body: { broker_id: broker.broker_id, bulk: false },
+    });
+    setProvisioningId(null);
+    if (error || !data?.success) {
+      const msg = data?.result?.error || data?.result?.db_error || data?.error || error?.message || "Erreur inconnue";
+      toast.error(`❌ ${broker.full_name}: ${msg}`);
+      return;
+    }
+    toast.success(`✅ ${broker.full_name}: appareils créés`);
+    refresh();
+  }, [refresh]);
+
+  const [bulkProvisioning, setBulkProvisioning] = useState(false);
+  const provisionAll = useCallback(async () => {
+    const missing = rows.filter((r) => r.state === "missing" || r.state === "partial").length;
+    if (!confirm(`Créer les appareils SIP pour ${missing || "tous les"} courtiers manquants ? Cela peut prendre plusieurs minutes.`)) return;
+    setBulkProvisioning(true);
+    const { data, error } = await supabase.functions.invoke("ns-provision-broker-devices", {
+      body: { bulk: true, batch_size: 8 },
+    });
+    setBulkProvisioning(false);
+    if (error || !data?.success) {
+      toast.error("Provisionnement bulk échoué", { description: data?.error || error?.message });
+      return;
+    }
+    toast.success(`Bulk terminé: ${data.succeeded}/${data.total} réussis · ${data.failed} échoués`);
+    refresh();
+  }, [rows, refresh]);
 
   const startTest = useCallback(async () => {
     if (!testBroker) return;
@@ -165,8 +192,12 @@ export default function PAMobileDevices() {
             {backfilling ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             Provisionner manquants
           </Button>
+          <Button size="sm" onClick={provisionAll} disabled={bulkProvisioning} variant="default">
+            {bulkProvisioning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            🔧 Provisionner tous
+          </Button>
           <Button size="sm" variant="secondary" onClick={provisionAppReview}>
-            Créer compte AppReview (2000)
+            🍎 App Review User
           </Button>
         </div>
       </div>
@@ -235,7 +266,17 @@ export default function PAMobileDevices() {
                     </div>
                   )}
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-right space-x-2">
+                  {(r.state === "missing" || r.state === "partial") && (
+                    <Button
+                      size="sm"
+                      variant="default"
+                      onClick={() => provisionOne(r)}
+                      disabled={provisioningId === r.broker_id || !r.ns_extension}
+                    >
+                      {provisioningId === r.broker_id ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : "⚡"} Provisionner
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     variant="outline"
