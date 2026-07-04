@@ -42,10 +42,12 @@ Deno.serve(async (req) => {
 
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
     const { data: callerProfile } = await admin
-      .from("planipret_profiles").select("role,user_id").eq("user_id", caller.id).maybeSingle();
-    const isAdmin = ["admin", "super_admin", "owner"].includes(String(callerProfile?.role ?? "").toLowerCase());
+      .from("planipret_profiles").select("role,user_id,id").or(`user_id.eq.${caller.id},id.eq.${caller.id}`).maybeSingle();
+    let isAdmin = ["admin", "super_admin", "owner", "planipret_admin"].includes(String(callerProfile?.role ?? "").toLowerCase());
+    if (!isAdmin) { try { const { data } = await admin.rpc("is_planipret_admin", { _user_id: caller.id }); if (data) isAdmin = true; } catch { /* ignore */ } }
+    if (!isAdmin) { try { const { data } = await admin.rpc("is_super_admin", { _user_id: caller.id }); if (data) isAdmin = true; } catch { /* ignore */ } }
     // Allow self-provisioning: caller may provision their OWN broker record without admin role
-    const selfOnly = !isAdmin && !bulk && broker_id && callerProfile?.user_id === caller.id;
+    const selfOnly = !isAdmin && !bulk && broker_id && (callerProfile?.user_id === caller.id || callerProfile?.id === caller.id);
     if (!isAdmin && !selfOnly) return json({ error: "forbidden", detail: "admin role required for this operation" }, 403);
 
     const nsHeaders = { Authorization: `Bearer ${NS_API_KEY}`, "Content-Type": "application/json", Accept: "application/json" };
