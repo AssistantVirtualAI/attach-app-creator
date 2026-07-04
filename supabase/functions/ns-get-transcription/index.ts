@@ -1,25 +1,96 @@
 // ns-get-transcription — official NS-API v2 transcription fetch (Bearer NS_API_KEY).
-// GET /domains/{d}/transcriptions?callid={callid} with variants.
+// Uses the prefilled NS transcription path when present, then hydrates CDR
+// orig/term call IDs because /transcriptions requires those for some calls.
 
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const NS_API_KEY = Deno.env.get("NS_API_KEY");
-const NS_API_BASE_URL = Deno.env.get("NS_API_BASE_URL") ?? "https://voice.ava-telecom.ca/ns-api/v2";
+const NS_API_BASE_URL = (Deno.env.get("NS_API_BASE_URL") ?? "https://voice.ava-telecom.ca/ns-api/v2").replace(/\/$/, "");
 const NS_DOMAIN = Deno.env.get("NS_DEFAULT_DOMAIN") ?? Deno.env.get("NS_API_DOMAIN") ?? "planipret.ca";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const json = (p: any, s = 200) => new Response(JSON.stringify(p), { status: s, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
+const val = (raw: any, keys: string[], fb: any = null) => {
+  for (const k of keys) {
+    const v = raw?.[k];
+    if (v !== undefined && v !== null && `${v}` !== "") return v;
+  }
+  return fb;
+};
+
+function normalizeNsPath(path: unknown): string | null {
+  const s = String(path ?? "").trim();
+  if (!s) return null;
+  if (s.startsWith("http")) {
+    try {
+      const u = new URL(s);
+      const idx = u.pathname.indexOf("/ns-api/v2");
+      return `${idx >= 0 ? u.pathname.slice(idx + "/ns-api/v2".length) : u.pathname}${u.search}`;
+    } catch { return s; }
+  }
+  return s.replace(/^\/?ns-api\/v2/i, "");
+}
+
+function normalizePhone(v: unknown): string {
+  return String(v ?? "").replace(/^sip:/i, "").split("@")[0].replace(/\D/g, "");
+}
+
+function pushId(out: string[], raw: unknown) {
+  const value = String(raw ?? "").trim();
+  if (!value || value === "null" || value === "undefined") return;
+  if (value.includes("sip:") || value.split(":").length > 3) return;
+  if (!out.includes(value)) out.push(value);
+}
+
+function addIds(out: string[], ...sources: any[]) {
+  const keys = [
+    "call-orig-call-id", "orig-callid", "orig-call-id", "orig_callid",
+    "call-term-call-id", "term-callid", "term-call-id", "term_callid",
+    "call-through-call-id", "by-callid", "by_callid",
+    "call-parent-call-id", "call-id", "call_id", "callid",
+    "call-parent-cdr-id", "cdr_id", "cdr-id", "id", "uuid",
+  ];
+  for (const source of sources) {
+    if (!source) continue;
+    for (const k of keys) pushId(out, source[k]);
+  }
+}
+
+function asArray(data: any): any[] {
+  if (Array.isArray(data)) return data;
+  if (!data || typeof data !== "object") return [];
+  for (const k of ["data", "cdrs", "items", "results"]) {
+    if (Array.isArray(data[k])) return data[k];
+  }
+  return [data];
+}
+
+async function nsJson(path: string) {
+  const r = await fetch(`${NS_API_BASE_URL}${path}`, {
+    headers: { Authorization: `Bearer ${NS_API_KEY}`, Accept: "application/json" },
+  });
+  const rawText = await r.text();
+  let data: any = null;
+  try { data = JSON.parse(rawText); } catch { data = rawText; }
+  return { ok: r.ok, status: r.status, data, rawText };
+}
+
 function extractTranscript(item: any): any {
   if (!item) return null;
   if (typeof item === "string") return item.length > 5 ? item : null;
   return item["transcription-text"]
+    ?? item["transcript-text"]
+    ?? item["call-intelligence-transcript"]
+    ?? item["call-transcript"]
     ?? item["transcript"]
     ?? item["text"]
+    ?? item["body"]
     ?? item["asr-text"]
     ?? item["sentiment-transcript"]
+    ?? item["call-intelligence-segments"]
     ?? item.segments
     ?? null;
 }
@@ -34,8 +105,8 @@ function parseTranscript(raw: any): Array<{ speaker: string; text: string }> {
   }
   if (Array.isArray(raw)) {
     return raw.map((s: any) => ({
-      speaker: s.speaker ?? s.speaker_label ?? s.role ?? "Speaker",
-      text: s.text ?? s.content ?? s.transcript ?? "",
+      speaker: s.speaker ?? s.speaker_label ?? s.role ?? s.channel ?? s.name ?? "Speaker",
+      text: s.text ?? s.content ?? s.transcript ?? s.comment ?? s["transcription-text"] ?? "",
     })).filter((s) => s.text);
   }
   if (raw.transcript) return parseTranscript(raw.transcript);
@@ -53,24 +124,75 @@ Deno.serve(async (req) => {
   const call_db_id = body.call_db_id ?? url.searchParams.get("call_db_id");
   let ns_callid: string | null = body.ns_callid ?? url.searchParams.get("ns_callid") ?? url.searchParams.get("call_id");
   let ns_extension: string | null = body.ns_extension ?? url.searchParams.get("ns_extension");
+  let row: any = null;
 
   if ((!ns_callid || !ns_extension) && call_db_id) {
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
-    const { data: row } = await admin
+    const { data } = await admin
       .from("planipret_phone_calls")
-      .select("ns_callid, ns_orig_callid, ns_term_callid, extension, metadata")
+      .select("id, ns_call_id, ns_callid, ns_orig_callid, ns_term_callid, extension, metadata, started_at, duration_seconds, from_number, to_number")
       .eq("id", call_db_id)
       .maybeSingle();
+    row = data;
     ns_callid = ns_callid || row?.ns_callid || row?.ns_orig_callid || row?.ns_term_callid || row?.metadata?.["call-parent-cdr-id"] || null;
     ns_extension = ns_extension || row?.extension || null;
   }
 
-  const headers = { Authorization: `Bearer ${NS_API_KEY}`, Accept: "application/json" };
   const attempts: any[] = [];
   let transcript: any = null;
+  const ids: string[] = [];
+  pushId(ids, ns_callid);
+  addIds(ids, row?.metadata, row);
+
+  const cdrs: any[] = [];
+  if (row?.started_at) {
+    const D = encodeURIComponent(NS_DOMAIN);
+    const start = new Date(new Date(row.started_at).getTime() - 180_000).toISOString();
+    const end = new Date(new Date(row.started_at).getTime() + (Number(row.duration_seconds ?? 0) + 180) * 1000).toISOString();
+    const qs = `datetime-start=${encodeURIComponent(start)}&datetime-end=${encodeURIComponent(end)}&limit=200`;
+    const paths = [`/domains/${D}/cdrs?${qs}`];
+    if (row.extension) paths.push(`/domains/${D}/users/${encodeURIComponent(row.extension)}/cdrs?${qs}`);
+    for (const p of paths) {
+      try {
+        const r = await nsJson(p);
+        attempts.push({ url: p, status: r.status, kind: "cdr_lookup", body_preview: String(r.rawText).slice(0, 160) });
+        if (!r.ok) continue;
+        const rows = asArray(r.data).map((cdr) => {
+          let score = 0;
+          const cIds: string[] = [];
+          addIds(cIds, cdr);
+          if (ids.some((id) => cIds.includes(id))) score += 100;
+          if (row.extension && ["call-orig-user", "call-term-user", "call-through-user"].some((k) => String(cdr?.[k] ?? "") === String(row.extension))) score += 20;
+          const dur = Number(row.duration_seconds ?? 0);
+          const cDur = Number(val(cdr, ["call-talking-duration-seconds", "call-total-duration-seconds", "duration"], 0));
+          if (dur && cDur && Math.abs(dur - cDur) <= 3) score += 20;
+          const from = normalizePhone(row.from_number);
+          const cFrom = normalizePhone(val(cdr, ["call-orig-from-uri", "from", "from_number"], ""));
+          if (from && cFrom && (from.endsWith(cFrom) || cFrom.endsWith(from))) score += 10;
+          return { score, cdr };
+        }).filter((x) => x.score >= 30).sort((a, b) => b.score - a.score);
+        for (const m of rows.slice(0, 3)) {
+          cdrs.push(m.cdr);
+          addIds(ids, m.cdr);
+        }
+      } catch (e) {
+        attempts.push({ url: p, error: (e as Error).message, kind: "cdr_lookup" });
+      }
+    }
+  }
 
   const D = encodeURIComponent(NS_DOMAIN);
   const queries: string[] = [];
+  const prefilled = normalizeNsPath(row?.metadata?.transcription_path ?? row?.metadata?.["prefilled-transcription-api"]);
+  if (prefilled) queries.push(prefilled);
+  const jobId = String(row?.metadata?.["call-intelligence-job-id"] ?? "").replace(/\.0$/, "").trim();
+  const started = String(row?.metadata?.["call-start-datetime"] ?? row?.started_at ?? "");
+  const yyyymm = started ? started.slice(0, 7).replace("-", "") : "";
+  for (const cdr of cdrs) {
+    const orig = String(val(cdr, ["call-orig-call-id", "orig-callid", "orig_callid"], "")).trim();
+    const term = String(val(cdr, ["call-term-call-id", "term-callid", "term_callid"], "")).trim();
+    if (jobId && (orig || term)) queries.push(`/domains/${D}/transcriptions?id=${encodeURIComponent(jobId)}${yyyymm ? `&date=${yyyymm}` : ""}&orig_callid=${encodeURIComponent(orig)}&term_callid=${encodeURIComponent(term)}`);
+  }
   if (ns_callid) {
     const c = encodeURIComponent(ns_callid);
     queries.push(`/domains/${D}/transcriptions?callid=${c}`);
@@ -78,18 +200,21 @@ Deno.serve(async (req) => {
     queries.push(`/domains/${D}/transcriptions?orig-callid=${c}`);
     if (ns_extension) queries.push(`/domains/${D}/users/${encodeURIComponent(ns_extension)}/transcriptions?callid=${c}`);
   }
+  for (const id of ids) {
+    const c = encodeURIComponent(id);
+    queries.push(`/domains/${D}/transcriptions?callid=${c}`);
+    queries.push(`/domains/${D}/transcriptions?orig-callid=${c}`);
+  }
 
-  for (const q of queries) {
+  for (const q of Array.from(new Set(queries))) {
     const target = `${NS_API_BASE_URL}${q}`;
     try {
-      const r = await fetch(target, { headers });
-      const rawText = await r.text();
-      let data: any = null;
-      try { data = JSON.parse(rawText); } catch { /* not json */ }
+      const r = await nsJson(q);
+      const data = r.data;
       attempts.push({
         url: q,
         status: r.status,
-        body_preview: rawText.slice(0, 200),
+        body_preview: String(r.rawText).slice(0, 200),
         has_data: !!data,
       });
       if (!r.ok || !data) continue;
