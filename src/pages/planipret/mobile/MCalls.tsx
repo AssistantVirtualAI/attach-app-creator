@@ -1184,10 +1184,10 @@ function CallDetailSheet({
                     {aiLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Analyse en cours…</> : <><Sparkles className="w-4 h-4" /> Analyser avec l'IA</>}
                   </button>
                 ) : (
-                  <button onClick={async () => { await fetchTranscript(); }} disabled={txLoading}
+                  <button onClick={async () => { await fetchTranscript(); }} disabled={txLoading || txPreparing}
                     className="w-full py-3 rounded-xl text-sm font-semibold text-white disabled:opacity-50 flex items-center justify-center gap-2"
                     style={{ background: "linear-gradient(135deg, var(--pp-brand-accent-2), var(--pp-brand-accent))" }}>
-                    📝 Obtenir transcription + Analyse
+                    {txPreparing ? <><Loader2 className="w-4 h-4 animate-spin" /> Préparation…</> : <>📝 Obtenir transcription + Analyse</>}
                   </button>
                 )
               )}
