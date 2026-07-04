@@ -98,13 +98,22 @@ export default function PAUsers() {
   const syncFromNs = async () => {
     setSyncing(true);
     const { data, error } = await supabase.functions.invoke("ns-sync-user", { body: { action: "sync_from_ns" } });
+    const toNs = !error && (data as any)?.success
+      ? await supabase.functions.invoke("ns-sync-user", { body: { action: "sync_to_ns" } })
+      : null;
     setSyncing(false);
     if (error || !(data as any)?.success) {
       toast.error((data as any)?.error ?? error?.message ?? "Erreur de synchronisation");
       return;
     }
+    if (toNs?.error || !(toNs?.data as any)?.success) {
+      toast.error("Sync téléphone partielle", { description: (toNs?.data as any)?.error ?? toNs?.error?.message ?? "Erreur sync sortante" });
+      await load();
+      return;
+    }
     const d = data as any;
-    toast.success(`✅ ${d.matched} liés · ${d.updated} mis à jour · ${d.unmatched} sans correspondance (sur ${d.total_ns_users})`);
+    const out = toNs?.data as any;
+    toast.success(`Sync OK · ${d.updated} depuis téléphone · ${out?.created ?? 0} créés / ${out?.updated ?? 0} mis à jour côté téléphone`);
     await load();
   };
 

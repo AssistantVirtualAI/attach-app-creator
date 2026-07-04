@@ -13,6 +13,35 @@ const cors = {
 const json = (b: unknown, s = 200) =>
   new Response(JSON.stringify(b), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
 
+const AVA_ORG_ID = "17d6507f-a9ca-409d-8e49-371d50332615";
+
+const pickNsUser = (u: any) => String(u?.user ?? u?.extension ?? u?.subscriber_login ?? u?.user_id ?? u?.id ?? "").trim();
+
+async function nsJson(url: string, init: RequestInit) {
+  const res = await fetch(url, init);
+  const text = await res.text();
+  let data: any = null;
+  try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+  return { ok: res.ok, status: res.status, data };
+}
+
+async function nsUserExists(baseUrl: string, headers: HeadersInit, domain: string, ext: string) {
+  const direct = await nsJson(`${baseUrl}/domains/${encodeURIComponent(domain)}/users/${encodeURIComponent(ext)}`, { headers });
+  if (direct.ok && direct.data) return { exists: true, status: direct.status, source: "direct", data: direct.data };
+
+  let offset = 0;
+  const limit = 200;
+  for (let page = 0; page < 20; page++) {
+    const listed = await nsJson(`${baseUrl}/domains/${encodeURIComponent(domain)}/users?limit=${limit}&offset=${offset}`, { headers });
+    if (!listed.ok) break;
+    const arr = Array.isArray(listed.data) ? listed.data : (listed.data?.users ?? []);
+    if (arr.some((u: any) => pickNsUser(u) === ext)) return { exists: true, status: listed.status, source: "list" };
+    if (!arr.length || arr.length < limit) break;
+    offset += limit;
+  }
+  return { exists: false, status: direct.status, source: "none", data: direct.data };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
@@ -44,7 +73,7 @@ Deno.serve(async (req) => {
 
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
     const { data: callerProfile } = await admin
-      .from("planipret_profiles").select("role").or(`user_id.eq.${caller.id},id.eq.${caller.id}`).maybeSingle();
+      .from("planipret_profiles").select("role,organization_id").or(`user_id.eq.${caller.id},id.eq.${caller.id}`).maybeSingle();
     const callerRole = (callerProfile?.role ?? "").toLowerCase();
     let isAdmin = ["admin", "super_admin", "owner", "planipret_admin"].includes(callerRole);
     if (!isAdmin) {
@@ -63,6 +92,7 @@ Deno.serve(async (req) => {
     const APP_REVIEW_DOMAIN = String(body?.domain ?? NS_DOMAIN);
 
     const results: Record<string, any> = {};
+    const organizationId = callerProfile?.organization_id ?? AVA_ORG_ID;
 
     // STEP A: Supabase auth user (idempotent)
     const { data: existingUsers } = await admin.auth.admin.listUsers();
@@ -87,12 +117,16 @@ Deno.serve(async (req) => {
     // STEP B: planipret_profiles insert-or-update (no unique constraint on user_id)
     const profilePayload = {
       user_id: authUserId,
+      organization_id: organizationId,
       full_name: APP_REVIEW_NAME,
       email: APP_REVIEW_EMAIL,
       role: "broker",
+      extension: APP_REVIEW_EXT,
       ns_extension: APP_REVIEW_EXT,
       ns_domain: APP_REVIEW_DOMAIN,
       ns_sip_username: APP_REVIEW_EXT,
+      mobile_app_enabled: true,
+      voice_agent_enabled: false,
       ns_linked: true,
       ns_linked_at: new Date().toISOString(),
     };
@@ -102,12 +136,20 @@ Deno.serve(async (req) => {
       .eq("user_id", authUserId)
       .maybeSingle();
     let pErr: any = null;
+    let profileId = existingProfile?.id ?? null;
     if (existingProfile?.id) {
       ({ error: pErr } = await admin.from("planipret_profiles").update(profilePayload).eq("id", existingProfile.id));
     } else {
-      ({ error: pErr } = await admin.from("planipret_profiles").insert(profilePayload));
+      const inserted = await admin.from("planipret_profiles").insert(profilePayload).select("id").maybeSingle();
+      pErr = inserted.error;
+      profileId = inserted.data?.id ?? null;
     }
     if (pErr) return json({ step: "B", error: "profile_upsert_failed", detail: pErr.message }, 500);
+    await admin.from("user_roles").upsert({
+      user_id: authUserId,
+      organization_id: organizationId,
+      role: "planipret_broker",
+    }, { onConflict: "user_id,organization_id" }).catch(() => null);
     results.profile = { upserted: true, user_id: authUserId };
 
     // STEP C: NS-API devices
@@ -119,30 +161,32 @@ Deno.serve(async (req) => {
       const hex = Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, "0")).join("");
       const sipPassword = `Pp${hex.substring(0, 12)}!`;
 
-      // C0: Ensure the NS-API user (extension) exists — otherwise devices creation fails silently.
-      const userUrl = `${NS_API_BASE_URL}/domains/${encodeURIComponent(APP_REVIEW_DOMAIN)}/users/${encodeURIComponent(APP_REVIEW_EXT)}`;
-      const userCheck = await fetch(userUrl, { headers: nsHeaders });
-      if (userCheck.status === 404) {
-        const createUserRes = await fetch(`${NS_API_BASE_URL}/domains/${encodeURIComponent(APP_REVIEW_DOMAIN)}/users`, {
+      // C0: Ensure the NS-API user (extension) exists — never return success until verified in the phone system.
+      let userCheck = await nsUserExists(NS_API_BASE_URL, nsHeaders, APP_REVIEW_DOMAIN, APP_REVIEW_EXT);
+      if (!userCheck.exists) {
+        const createUser = await nsJson(`${NS_API_BASE_URL}/domains/${encodeURIComponent(APP_REVIEW_DOMAIN)}/users`, {
           method: "POST",
           headers: nsHeaders,
           body: JSON.stringify({
             user: APP_REVIEW_EXT,
             "name-first-name": "Demo",
             "name-last-name": "Reviewer",
-            "user-scope": "Basic User",
-            "email-address": APP_REVIEW_EMAIL,
             "directory-name": APP_REVIEW_NAME,
+            "email-address": APP_REVIEW_EMAIL,
+            "user-scope": "Basic User",
             "user-password": sipPassword,
+            password: sipPassword,
           }),
         });
-        const createUserData = await createUserRes.json().catch(() => ({}));
-        results.ns_user = { created: createUserRes.ok, status: createUserRes.status, data: createUserData };
-        if (!createUserRes.ok) {
-          return json({ step: "C0", error: "ns_user_create_failed", status: createUserRes.status, detail: createUserData }, 500);
+        results.ns_user_create = { ok: createUser.ok, status: createUser.status, data: createUser.data };
+        if (!createUser.ok && createUser.status !== 409) {
+          return json({ step: "C0", error: "ns_user_create_failed", status: createUser.status, detail: createUser.data }, 500);
         }
-      } else {
-        results.ns_user = { existed: true, status: userCheck.status };
+        userCheck = await nsUserExists(NS_API_BASE_URL, nsHeaders, APP_REVIEW_DOMAIN, APP_REVIEW_EXT);
+      }
+      results.ns_user = userCheck;
+      if (!userCheck.exists) {
+        return json({ step: "C0_VERIFY", error: "ns_user_not_verified", detail: results.ns_user_create ?? userCheck }, 502);
       }
 
       const listRes = await fetch(`${NS_API_BASE_URL}/domains/${encodeURIComponent(APP_REVIEW_DOMAIN)}/users/${encodeURIComponent(APP_REVIEW_EXT)}/devices`, { headers: nsHeaders });
@@ -163,10 +207,21 @@ Deno.serve(async (req) => {
 
       results.mobile_device = await createDev("mobile", "Mobile Softphone");
       results.widget_device = await createDev("web", "Web Softphone");
+      if (!(results.mobile_device.created || results.mobile_device.existed) || !(results.widget_device.created || results.widget_device.existed)) {
+        return json({ step: "C1", error: "ns_device_create_failed", detail: { mobile: results.mobile_device, widget: results.widget_device } }, 502);
+      }
+
+      const secretName = profileId ? `pp_sip_${profileId}_mobile` : null;
+      if (secretName) {
+        try {
+          await admin.rpc("create_planipret_sip_secret", { _name: secretName, _value: sipPassword, _broker_id: profileId });
+        } catch { /* optional */ }
+      }
 
       await admin.from("planipret_profiles").update({
         ns_mobile_device_id: `${APP_REVIEW_EXT}_mobile`,
         ns_widget_device_id: `${APP_REVIEW_EXT}_web`,
+        ...(secretName ? { ns_sip_password_ref_mobile: secretName } : {}),
       }).eq("user_id", authUserId);
 
       results.sip_credentials = {
@@ -175,7 +230,7 @@ Deno.serve(async (req) => {
         sip_password: sipPassword,
       };
     } else {
-      results.ns_provisioning = { skipped: true, reason: "NS_API_KEY not set" };
+      return json({ error: "ns_api_key_missing", detail: "Impossible de confirmer la création dans le système téléphonique." }, 500);
     }
 
     return json({

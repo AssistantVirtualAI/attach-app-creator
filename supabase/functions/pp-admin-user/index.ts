@@ -21,6 +21,32 @@ async function nsFetch(path: string, init: RequestInit = {}) {
   return { ok: res.ok, status: res.status, data };
 }
 
+function nsUserPayload(fullName: string, email: string, extension: string, password?: string) {
+  const [firstName, ...rest] = String(fullName || extension).trim().split(/\s+/);
+  const lastName = rest.join(" ") || "Courtier";
+  return {
+    user: extension,
+    "name-first-name": firstName || extension,
+    "name-last-name": lastName,
+    "directory-name": fullName || extension,
+    "email-address": email,
+    "user-scope": "Basic User",
+    ...(password ? { "user-password": password, password } : {}),
+  };
+}
+
+async function ensureNsUser(fullName: string, email: string, extension: string, password?: string) {
+  const check = await nsFetch(`/domains/${encodeURIComponent(NS_DEFAULT_DOMAIN)}/users/${encodeURIComponent(extension)}`);
+  if (check.ok) return { ok: true, existed: true, status: check.status };
+  const created = await nsFetch(`/domains/${encodeURIComponent(NS_DEFAULT_DOMAIN)}/users`, {
+    method: "POST",
+    body: JSON.stringify(nsUserPayload(fullName, email, extension, password)),
+  });
+  if (!created.ok && created.status !== 409) return { ok: false, status: created.status, data: created.data };
+  const verify = await nsFetch(`/domains/${encodeURIComponent(NS_DEFAULT_DOMAIN)}/users/${encodeURIComponent(extension)}`);
+  return { ok: verify.ok || created.ok || created.status === 409, created: created.ok, status: verify.status || created.status, data: created.data };
+}
+
 function randomPassword(len = 22): string {
   const chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
   const buf = new Uint8Array(len);
@@ -111,32 +137,14 @@ Deno.serve(async (req) => {
       const { data: existing } = await admin.from("planipret_profiles").select("id").eq("extension", ns_extension).maybeSingle();
       if (existing) return jsonResponse({ success: false, error: "Extension déjà utilisée" }, 400);
 
-      const [firstName, ...rest] = String(full_name).trim().split(/\s+/);
-      const lastName = rest.join(" ");
-
       // 1) Provision the NetSapiens user (extension) so it exists in the
       //    phone system BEFORE we wire up the Supabase profile. That way,
       //    the widget + softphone can register immediately.
-      const nsUserRes = await nsFetch(
-        `/domains/${encodeURIComponent(NS_DEFAULT_DOMAIN)}/users`,
-        {
-          method: "POST",
-          body: JSON.stringify({
-            user: ns_extension,
-            extension: ns_extension,
-            first_name: firstName,
-            last_name: lastName,
-            email,
-            password,
-            "name-first-name": firstName,
-            "name-last-name": lastName,
-          }),
-        },
-      );
-      if (!nsUserRes.ok && nsUserRes.status !== 409) {
+      const nsUserRes = await ensureNsUser(full_name, email, ns_extension, password);
+      if (!nsUserRes.ok) {
         return jsonResponse({
           success: false,
-          error: `Échec création NS: ${nsUserRes.status} ${JSON.stringify(nsUserRes.data).slice(0, 200)}`,
+          error: `Échec création téléphone: ${nsUserRes.status} ${JSON.stringify(nsUserRes.data).slice(0, 200)}`,
         }, 200);
       }
 
@@ -230,36 +238,38 @@ Deno.serve(async (req) => {
       for (const k of ["full_name", "extension", "mobile_app_enabled", "voice_agent_enabled", "elevenlabs_agent_id"]) {
         if (k in (updates ?? {})) allowed[k] = updates[k];
       }
+      if ("extension" in allowed) {
+        allowed.ns_extension = allowed.extension;
+        allowed.ns_sip_username = allowed.extension;
+        allowed.ns_domain = current?.ns_domain || NS_DEFAULT_DOMAIN;
+      }
       const { error } = await admin.from("planipret_profiles").update(allowed).eq("user_id", user_id);
       if (error) return jsonResponse({ success: false, error: error.message }, 200);
 
-      // Propagate name / extension changes to NS.
+      // Propagate name / extension changes to NS and verify the user exists there.
       if (current) {
         const domain = current.ns_domain || NS_DEFAULT_DOMAIN;
         const oldExt = String(current.ns_extension || current.extension || "");
         const newExt = String(allowed.extension ?? oldExt);
-        const nameChanged = "full_name" in allowed && allowed.full_name !== current.full_name;
+        const nextName = String(allowed.full_name ?? current.full_name ?? newExt);
+        const nextEmail = String(current.email ?? "");
 
-        if (nameChanged && oldExt) {
-          const [firstName, ...rest] = String(allowed.full_name).trim().split(/\s+/);
-          const lastName = rest.join(" ");
-          await nsFetch(
-            `/domains/${encodeURIComponent(domain)}/users/${encodeURIComponent(oldExt)}`,
-            {
-              method: "PUT",
-              body: JSON.stringify({
-                first_name: firstName,
-                last_name: lastName,
-                "name-first-name": firstName,
-                "name-last-name": lastName,
-              }),
-            },
-          ).catch(() => null);
+        if (newExt) {
+          const ensured = await ensureNsUser(nextName, nextEmail, newExt);
+          if (ensured.ok) {
+            await nsFetch(
+              `/domains/${encodeURIComponent(domain)}/users/${encodeURIComponent(newExt)}`,
+              { method: "PUT", body: JSON.stringify(nsUserPayload(nextName, nextEmail, newExt)) },
+            ).catch(() => null);
+            if (oldExt && oldExt !== newExt) {
+              await nsFetch(`/domains/${encodeURIComponent(domain)}/users/${encodeURIComponent(oldExt)}`, { method: "DELETE" }).catch(() => null);
+            }
+          }
         }
 
         // If a new extension was assigned but no NS mobile device exists yet,
         // provision one so mobile keeps ringing.
-        if (newExt && newExt === oldExt) {
+        if (newExt) {
           const { data: prof } = await admin
             .from("planipret_profiles")
             .select("id, ns_mobile_device_id")

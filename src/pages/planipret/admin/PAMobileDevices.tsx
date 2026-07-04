@@ -2,17 +2,17 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Loader2, RefreshCw, PhoneCall, CheckCircle2, AlertTriangle, XCircle, Zap } from "lucide-react";
+import { Loader2, RefreshCw, PhoneCall, CheckCircle2, AlertTriangle, XCircle, Zap, Search, Smartphone, MonitorSmartphone, ShieldCheck } from "lucide-react";
 import Pagination from "@/components/planipret/admin/Pagination";
+
+const ACCENT = "#2E9BDC";
+const SUCCESS = "#00D4AA";
+const DANGER = "#E84C4C";
+const WARNING = "#F6B44B";
 
 type Row = {
   broker_id: string;
@@ -36,13 +36,19 @@ type Row = {
 type Stats = { total: number; ok: number; missing: number; error: number; partial: number };
 
 function StatePill({ state }: { state: Row["state"] }) {
-  if (state === "ok")
-    return <Badge className="bg-emerald-600 hover:bg-emerald-600"><CheckCircle2 className="mr-1 h-3 w-3" />OK</Badge>;
-  if (state === "missing")
-    return <Badge variant="destructive"><XCircle className="mr-1 h-3 w-3" />Manquant</Badge>;
-  if (state === "error")
-    return <Badge variant="destructive"><AlertTriangle className="mr-1 h-3 w-3" />Erreur</Badge>;
-  return <Badge variant="secondary"><AlertTriangle className="mr-1 h-3 w-3" />Partiel</Badge>;
+  const cfg = state === "ok"
+    ? { label: "OK", color: SUCCESS, icon: CheckCircle2 }
+    : state === "missing"
+      ? { label: "Manquant", color: DANGER, icon: XCircle }
+      : state === "error"
+        ? { label: "Erreur", color: DANGER, icon: AlertTriangle }
+        : { label: "Partiel", color: WARNING, icon: AlertTriangle };
+  const Icon = cfg.icon;
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium leading-none" style={{ background: `${cfg.color}18`, color: cfg.color, border: `1px solid ${cfg.color}33` }}>
+      <Icon className="h-3 w-3" /> {cfg.label}
+    </span>
+  );
 }
 
 export default function PAMobileDevices() {
@@ -57,6 +63,7 @@ export default function PAMobileDevices() {
   const [testState, setTestState] = useState<string | null>(null);
   const [answeredBy, setAnsweredBy] = useState<string | null>(null);
   const [backfilling, setBackfilling] = useState(false);
+  const [syncingDevices, setSyncingDevices] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
 
@@ -94,7 +101,8 @@ export default function PAMobileDevices() {
       duration: 20000,
     });
     try { await navigator.clipboard.writeText(`${login?.email} / ${login?.password}`); } catch { /* noop */ }
-  }, []);
+    refresh();
+  }, [refresh]);
 
   const [provisioningId, setProvisioningId] = useState<string | null>(null);
   const provisionOne = useCallback(async (broker: Row) => {
@@ -112,22 +120,25 @@ export default function PAMobileDevices() {
     refresh();
   }, [refresh]);
 
-  const [bulkProvisioning, setBulkProvisioning] = useState(false);
-  const provisionAll = useCallback(async () => {
-    const missing = rows.filter((r) => r.state === "missing" || r.state === "partial").length;
-    if (!confirm(`Créer les appareils SIP pour ${missing || "tous les"} courtiers manquants ? Cela peut prendre plusieurs minutes.`)) return;
-    setBulkProvisioning(true);
-    const { data, error } = await supabase.functions.invoke("ns-provision-broker-devices", {
-      body: { bulk: true, batch_size: 8 },
-    });
-    setBulkProvisioning(false);
-    if (error || !data?.success) {
-      toast.error("Provisionnement bulk échoué", { description: data?.error || error?.message });
+  const syncDevices = useCallback(async () => {
+    setSyncingDevices(true);
+    const report = await supabase.functions.invoke("pp-mobile-device-status", { body: { sync: true } });
+    if (report.error || !(report.data as any)?.ok) {
+      setSyncingDevices(false);
+      toast.error("Sync appareils échouée", { description: (report.data as any)?.error || report.error?.message });
       return;
     }
-    toast.success(`Bulk terminé: ${data.succeeded}/${data.total} réussis · ${data.failed} échoués`);
+    setRows((report.data as any).rows ?? []);
+    setStats((report.data as any).stats ?? { total: 0, ok: 0, missing: 0, error: 0, partial: 0 });
+    const provision = await supabase.functions.invoke("ns-provision-broker-devices", { body: { bulk: true, batch_size: 8 } });
+    setSyncingDevices(false);
+    if (provision.error || !(provision.data as any)?.success) {
+      toast.error("Provisionnement appareils échoué", { description: (provision.data as any)?.error || provision.error?.message });
+      return;
+    }
+    toast.success(`Sync terminée: ${(provision.data as any)?.succeeded ?? 0}/${(provision.data as any)?.total ?? 0} provisionnés`);
     refresh();
-  }, [rows, refresh]);
+  }, [refresh]);
 
   const startTest = useCallback(async () => {
     if (!testBroker) return;
@@ -185,152 +196,146 @@ export default function PAMobileDevices() {
 
 
   return (
-    <div className="space-y-5 p-4 md:p-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-1">
-          <h1 className="text-lg font-medium text-foreground">Devices mobiles</h1>
-          <p className="text-sm leading-relaxed text-muted-foreground">
-            État NetSapiens de <code className="rounded bg-muted px-1 text-xs">{"{ext}_mobile"}</code> pour chaque courtier.
-          </p>
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-center gap-3">
+          <h2 style={{ fontSize: 18, fontWeight: 600, color: "var(--pp-text-primary)" }}>Devices mobiles</h2>
+          <span className="rounded-full px-2 py-1" style={{ fontSize: 11, background: "var(--pp-bg-elevated)", color: "var(--pp-text-secondary)", border: "1px solid var(--pp-bg-border-2)" }}>
+            {stats.total} courtier{stats.total > 1 ? "s" : ""}
+          </span>
+          <span className="hidden rounded-full px-2 py-1 sm:inline-flex" style={{ fontSize: 11, background: `${ACCENT}12`, color: ACCENT, border: `1px solid ${ACCENT}33` }}>
+            Appareils SIP mobile + web
+          </span>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
-            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-            Rafraîchir
-          </Button>
-          <Button size="sm" variant="secondary" onClick={backfill} disabled={backfilling}>
-            {backfilling ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Provisionner manquants
-          </Button>
-          <Button size="sm" onClick={provisionAll} disabled={bulkProvisioning}>
-            {bulkProvisioning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Provisionner tous
-          </Button>
-          <Button size="sm" variant="secondary" onClick={provisionAppReview}>
+        <div className="flex flex-wrap items-center gap-2">
+          <button onClick={refresh} disabled={loading} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)", opacity: loading ? 0.65 : 1 }}>
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Rafraîchir
+          </button>
+          <button onClick={syncDevices} disabled={syncingDevices} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)", opacity: syncingDevices ? 0.65 : 1 }}>
+            {syncingDevices ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />} Synchroniser appareils
+          </button>
+          <button onClick={backfill} disabled={backfilling} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)", opacity: backfilling ? 0.65 : 1 }}>
+            {backfilling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />} Manquants
+          </button>
+          <button onClick={provisionAppReview} className="rounded-lg px-3 py-2 text-sm font-medium" style={{ background: ACCENT, color: "#fff" }}>
             App Review User
-          </Button>
+          </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
         {([
-          { k: "total", label: "Total", cls: "text-foreground" },
-          { k: "ok", label: "OK", cls: "text-emerald-700 dark:text-emerald-400" },
-          { k: "missing", label: "Manquants", cls: "text-destructive" },
-          { k: "partial", label: "Partiels", cls: "text-amber-700 dark:text-amber-400" },
-          { k: "error", label: "Erreurs", cls: "text-destructive" },
-        ] as const).map((s) => (
-          <Card key={s.k}>
-            <CardHeader className="pb-1 pt-3">
-              <CardTitle className="text-xs font-normal leading-relaxed text-muted-foreground">{s.label}</CardTitle>
-            </CardHeader>
-            <CardContent className="pb-3">
-              <div className={`text-xl font-medium leading-tight ${s.cls}`}>
-                {loading && !rows.length ? <span className="inline-block h-6 w-8 animate-pulse rounded bg-muted" /> : ((stats as any)[s.k] ?? 0)}
+          { k: "total", label: "Total", icon: MonitorSmartphone, color: "var(--pp-text-primary)" },
+          { k: "ok", label: "OK", icon: CheckCircle2, color: SUCCESS },
+          { k: "missing", label: "Manquants", icon: XCircle, color: DANGER },
+          { k: "partial", label: "Partiels", icon: AlertTriangle, color: WARNING },
+          { k: "error", label: "Erreurs", icon: AlertTriangle, color: DANGER },
+        ] as const).map((s) => {
+          const Icon = s.icon;
+          return (
+            <div key={s.k} className="pp-card p-3">
+              <div className="flex items-center justify-between gap-2">
+                <span style={{ fontSize: 11, color: "var(--pp-text-muted)", lineHeight: 1.5 }}>{s.label}</span>
+                <Icon className="h-3.5 w-3.5" style={{ color: s.color }} />
               </div>
-            </CardContent>
-          </Card>
-        ))}
+              <div className="mt-2 tabular-nums" style={{ fontSize: 20, lineHeight: 1.1, fontWeight: 600, color: s.color }}>
+                {loading && !rows.length ? <span className="inline-block h-5 w-10 animate-pulse rounded" style={{ background: "var(--pp-bg-elevated)" }} /> : ((stats as any)[s.k] ?? 0)}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
-      <Input
-        placeholder="Filtrer (nom, courriel, extension, device id)…"
-        value={filter}
-        onChange={(e) => setFilter(e.target.value)}
-        className="max-w-md"
-      />
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative w-full sm:max-w-md">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: "var(--pp-text-muted)" }} />
+          <Input
+            placeholder="Filtrer nom, courriel, extension, device id…"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            className="pl-9"
+            style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }}
+          />
+        </div>
+        {(loading || syncingDevices) && (
+          <span className="text-xs" style={{ color: "var(--pp-text-muted)" }}>
+            {syncingDevices ? "Synchronisation bidirectionnelle en cours…" : "Chargement des appareils…"}
+          </span>
+        )}
+      </div>
 
-      <div className="rounded-md border bg-card">
+      <div className="pp-card overflow-hidden">
         <div className="overflow-x-auto">
-          <Table className="min-w-[900px]">
-            <TableHeader>
-              <TableRow className="bg-muted/40 hover:bg-muted/40">
-                <TableHead className="w-[24%]">Courtier</TableHead>
-                <TableHead className="w-[8%]">Ext.</TableHead>
-                <TableHead className="w-[22%]">Device mobile</TableHead>
-                <TableHead className="w-[18%]">Widget</TableHead>
-                <TableHead className="w-[10%]">État</TableHead>
-                <TableHead className="w-[10%]">Provisionné</TableHead>
-                <TableHead className="w-[8%] text-right">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading && rows.length === 0 && Array.from({ length: 6 }).map((_, i) => (
-                <TableRow key={`sk-${i}`}>
+          <table className="w-full min-w-[980px] table-fixed text-sm">
+            <thead style={{ background: "var(--pp-bg-elevated)" }}>
+              <tr className="text-left" style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--pp-text-faint)" }}>
+                <th className="w-[24%] p-3">Courtier</th>
+                <th className="w-[8%] p-3">Ext.</th>
+                <th className="w-[22%] p-3">Device mobile</th>
+                <th className="w-[18%] p-3">Widget</th>
+                <th className="w-[10%] p-3">État</th>
+                <th className="w-[10%] p-3">Provisionné</th>
+                <th className="w-[8%] p-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading && rows.length === 0 && Array.from({ length: 7 }).map((_, i) => (
+                <tr key={`sk-${i}`} style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}>
                   {Array.from({ length: 7 }).map((_, j) => (
-                    <TableCell key={j}><div className="h-4 w-full animate-pulse rounded bg-muted" /></TableCell>
+                    <td key={j} className="p-3"><div className="h-3 w-4/5 animate-pulse rounded" style={{ background: "var(--pp-bg-elevated)" }} /></td>
                   ))}
-                </TableRow>
+                </tr>
               ))}
               {paged.map((r) => (
-                <TableRow key={r.broker_id} className="hover:bg-muted/30">
-                  <TableCell className="align-top">
-                    <div className="font-medium leading-snug break-words text-foreground">{r.full_name ?? "—"}</div>
-                    <div className="text-xs leading-snug text-muted-foreground break-all">{r.email}</div>
-                  </TableCell>
-                  <TableCell className="align-top font-mono text-xs text-foreground">{r.ns_extension}</TableCell>
-                  <TableCell className="align-top">
-                    <div className="font-mono text-xs break-all text-foreground">{r.target_mobile_id}</div>
-                    <div className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
-                      NS: {r.ns_mobile_exists ? "présent" : "absent"} · Vault: {r.has_vault_secret ? "oui" : "non"}
-                    </div>
-                  </TableCell>
-                  <TableCell className="align-top">
-                    <div className="font-mono text-xs break-all text-foreground">{r.ns_widget_device_id ?? "—"}</div>
-                    <div className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
-                      {r.ns_widget_exists ? "présent" : (r.ns_widget_device_id ? "absent" : "non lié")}
-                    </div>
-                  </TableCell>
-                  <TableCell className="align-top"><StatePill state={r.state} /></TableCell>
-                  <TableCell className="align-top text-xs leading-snug text-foreground/80">
-                    {r.provisioned_at ? new Date(r.provisioned_at).toLocaleString("fr-CA") : "—"}
-                    {r.last_error && (
-                      <div className="mt-0.5 text-[11px] text-destructive">
-                        Err: {new Date(r.last_error.at).toLocaleDateString("fr-CA")}
+                <tr key={r.broker_id} className="transition hover:bg-white/[0.02]" style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}>
+                  <td className="p-3 align-top">
+                    <div className="break-words" style={{ fontWeight: 500, lineHeight: 1.45, color: "var(--pp-text-primary)" }}>{r.full_name ?? "—"}</div>
+                    <div className="mt-1 break-all" style={{ fontSize: 11, lineHeight: 1.45, color: "var(--pp-text-muted)" }}>{r.email}</div>
+                  </td>
+                  <td className="p-3 align-top tabular-nums" style={{ fontSize: 12, color: "var(--pp-text-secondary)" }}>{r.ns_extension}</td>
+                  <td className="p-3 align-top">
+                    <div className="flex items-start gap-2">
+                      <Smartphone className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color: r.ns_mobile_exists ? SUCCESS : DANGER }} />
+                      <div className="min-w-0">
+                        <div className="break-all font-mono" style={{ fontSize: 12, lineHeight: 1.45, color: "var(--pp-text-primary)" }}>{r.ns_mobile_device_id ?? r.target_mobile_id}</div>
+                        <div style={{ fontSize: 11, lineHeight: 1.5, color: "var(--pp-text-muted)" }}>Téléphone: {r.ns_mobile_exists ? "présent" : "absent"} · Secret: {r.has_vault_secret ? "oui" : "non"}</div>
                       </div>
-                    )}
-                  </TableCell>
-                  <TableCell className="align-top text-right">
-                    <div className="flex flex-col items-end gap-1.5">
-                      {(r.state === "missing" || r.state === "partial") && (
-                        <Button
-                          size="sm"
-                          variant="default"
-                          className="w-full sm:w-auto"
-                          onClick={() => provisionOne(r)}
-                          disabled={provisioningId === r.broker_id || !r.ns_extension}
-                        >
-                          {provisioningId === r.broker_id
-                            ? <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
-                            : <Zap className="mr-1.5 h-3 w-3" />}
-                          Provisionner
-                        </Button>
-                      )}
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="w-full sm:w-auto"
-                        onClick={() => { setTestBroker(r); setTestSessionId(null); setTestState(null); setAnsweredBy(null); }}
-                        disabled={!r.ns_extension}
-                      >
-                        <PhoneCall className="mr-1.5 h-3 w-3" />
-                        Appel test
-                      </Button>
                     </div>
-                  </TableCell>
-                </TableRow>
+                  </td>
+                  <td className="p-3 align-top">
+                    <div className="break-all font-mono" style={{ fontSize: 12, lineHeight: 1.45, color: "var(--pp-text-primary)" }}>{r.ns_widget_device_id ?? "—"}</div>
+                    <div style={{ fontSize: 11, lineHeight: 1.5, color: "var(--pp-text-muted)" }}>{r.ns_widget_exists ? "présent" : (r.ns_widget_device_id ? "absent" : "non lié")}</div>
+                  </td>
+                  <td className="p-3 align-top"><StatePill state={r.state} /></td>
+                  <td className="p-3 align-top" style={{ fontSize: 11, lineHeight: 1.5, color: "var(--pp-text-secondary)" }}>
+                    {r.provisioned_at ? new Date(r.provisioned_at).toLocaleString("fr-CA", { dateStyle: "short", timeStyle: "short" }) : "—"}
+                    {r.last_error && <div style={{ color: DANGER }}>Err: {new Date(r.last_error.at).toLocaleDateString("fr-CA")}</div>}
+                  </td>
+                  <td className="p-3 align-top text-right">
+                    <div className="flex flex-col items-end gap-1.5">
+                      {(r.state === "missing" || r.state === "partial" || r.state === "error") && (
+                        <button onClick={() => provisionOne(r)} disabled={provisioningId === r.broker_id || !r.ns_extension} className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium" style={{ background: `${ACCENT}16`, color: ACCENT, border: `1px solid ${ACCENT}33`, opacity: provisioningId === r.broker_id ? 0.65 : 1 }}>
+                          {provisioningId === r.broker_id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />} Fix
+                        </button>
+                      )}
+                      <button onClick={() => { setTestBroker(r); setTestSessionId(null); setTestState(null); setAnsweredBy(null); }} disabled={!r.ns_extension} className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>
+                        <PhoneCall className="h-3.5 w-3.5" /> Test
+                      </button>
+                    </div>
+                  </td>
+                </tr>
               ))}
               {filtered.length === 0 && !loading && (
-                <TableRow><TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-10">Aucun courtier.</TableCell></TableRow>
+                <tr><td colSpan={7} className="p-8 text-center" style={{ color: "var(--pp-text-faint)" }}>Aucun courtier.</td></tr>
               )}
-            </TableBody>
-          </Table>
+            </tbody>
+          </table>
         </div>
         <Pagination
           page={page}
           pageSize={pageSize}
           total={filtered.length}
-          loading={loading}
+          loading={loading || syncingDevices}
           onPageChange={setPage}
           onPageSizeChange={setPageSize}
           unit="courtiers"

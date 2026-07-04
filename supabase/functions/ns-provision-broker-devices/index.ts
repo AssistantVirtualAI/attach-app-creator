@@ -12,6 +12,11 @@ const cors = {
 const json = (b: unknown, s = 200) =>
   new Response(JSON.stringify(b), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
 
+async function nsRead(res: Response) {
+  const text = await res.text();
+  try { return text ? JSON.parse(text) : null; } catch { return text; }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
@@ -59,8 +64,38 @@ Deno.serve(async (req) => {
       return `Pp${hex.substring(0, 12)}!`;
     };
 
+    const nsUserPayload = (broker: any, ext: string, password: string) => {
+      const [firstName, ...rest] = String(broker.full_name ?? "").trim().split(/\s+/);
+      const lastName = rest.join(" ");
+      return {
+        user: ext,
+        "name-first-name": firstName || ext,
+        "name-last-name": lastName || "Courtier",
+        "directory-name": String(broker.full_name ?? ext),
+        "email-address": String(broker.email ?? ""),
+        "user-scope": "Basic User",
+        "user-password": password,
+        password,
+      };
+    };
+
+    const ensureNsUser = async (broker: any, ext: string, domain: string, password: string) => {
+      const userUrl = `${NS_API_BASE_URL}/domains/${encodeURIComponent(domain)}/users/${encodeURIComponent(ext)}`;
+      const direct = await fetch(userUrl, { headers: nsHeaders });
+      if (direct.ok) return { ok: true, existed: true, status: direct.status };
+      const create = await fetch(`${NS_API_BASE_URL}/domains/${encodeURIComponent(domain)}/users`, {
+        method: "POST",
+        headers: nsHeaders,
+        body: JSON.stringify(nsUserPayload(broker, ext, password)),
+      });
+      const data = await nsRead(create);
+      if (!create.ok && create.status !== 409) return { ok: false, status: create.status, data };
+      const verify = await fetch(userUrl, { headers: nsHeaders });
+      return { ok: verify.ok || create.ok || create.status === 409, created: create.ok, status: verify.status || create.status, data };
+    };
+
     const provision = async (broker: any) => {
-      const ext = broker.ns_extension;
+      const ext = broker.ns_extension ?? broker.extension;
       const domain = broker.ns_domain || NS_DEFAULT_DOMAIN;
       if (!ext) return { broker_id: broker.user_id, success: false, error: "no_extension" };
 
@@ -68,6 +103,9 @@ Deno.serve(async (req) => {
       const mobileId = `${ext}_mobile`;
       const widgetId = `${ext}_web`;
       const base = `${NS_API_BASE_URL}/domains/${encodeURIComponent(domain)}/users/${encodeURIComponent(ext)}/devices`;
+
+      const nsUser = await ensureNsUser(broker, ext, domain, sipPassword);
+      if (!nsUser.ok) return { broker_id: broker.id ?? broker.user_id, success: false, error: "ns_user_create_failed", ns_user: nsUser };
 
       const listRes = await fetch(base, { headers: nsHeaders });
       const existing: any[] = listRes.ok ? (await listRes.json().catch(() => [])) : [];
@@ -80,27 +118,37 @@ Deno.serve(async (req) => {
           method: "POST", headers: nsHeaders,
           body: JSON.stringify({ device: id, "authentication-key": sipPassword, "device-provisioning-protocol": "sip", "device-model": model }),
         });
-        const data = await r.json().catch(() => ({}));
+        const data = await nsRead(r);
         return { created: r.ok, status: r.status, id, data };
       };
 
       const mobile = await create(mobileId, "Mobile Softphone", "_mobile");
       const widget = await create(widgetId, "Web Softphone", "_web");
 
+      const secretName = `pp_sip_${broker.id ?? broker.user_id}_mobile`;
+      try {
+        await admin.rpc("create_planipret_sip_secret", {
+          _name: secretName, _value: sipPassword, _broker_id: broker.id ?? broker.user_id,
+        });
+      } catch { /* optional */ }
+
       const { error: uErr } = await admin.from("planipret_profiles").update({
         ns_mobile_device_id: mobileId,
         ns_widget_device_id: widgetId,
+        ns_sip_password_ref_mobile: secretName,
+        ns_domain: domain,
+        ns_extension: ext,
         ns_linked: true,
         ns_linked_at: new Date().toISOString(),
-      }).eq("user_id", broker.user_id);
+      }).eq("id", broker.id ?? broker.user_id);
 
       return {
-        broker_id: broker.user_id,
+        broker_id: broker.id ?? broker.user_id,
         broker_name: broker.full_name,
         extension: ext,
         success: !uErr && (mobile.created || mobile.existed) && (widget.created || widget.existed),
         db_error: uErr?.message,
-        mobile, widget,
+        ns_user: nsUser, mobile, widget,
         sip_credentials: { mobile_device_id: mobileId, widget_device_id: widgetId, password: sipPassword },
       };
     };
@@ -108,7 +156,7 @@ Deno.serve(async (req) => {
     // Single mode
     if (broker_id && !bulk) {
       const { data: broker } = await admin.from("planipret_profiles")
-        .select("user_id, full_name, ns_extension, ns_domain")
+        .select("id, user_id, full_name, email, extension, ns_extension, ns_domain")
         .or(`user_id.eq.${broker_id},id.eq.${broker_id}`).maybeSingle();
       if (!broker) return json({ error: "broker_not_found", broker_id }, 404);
       const result = await provision(broker);
@@ -118,9 +166,9 @@ Deno.serve(async (req) => {
     // Bulk mode
     if (bulk) {
       const { data: brokers } = await admin.from("planipret_profiles")
-        .select("user_id, full_name, ns_extension, ns_domain, ns_mobile_device_id, ns_widget_device_id")
+        .select("id, user_id, full_name, email, extension, ns_extension, ns_domain, ns_mobile_device_id, ns_widget_device_id, ns_sip_password_ref_mobile")
         .not("ns_extension", "is", null)
-        .or("ns_mobile_device_id.is.null,ns_widget_device_id.is.null");
+        .or("ns_mobile_device_id.is.null,ns_widget_device_id.is.null,ns_sip_password_ref_mobile.is.null");
       const list = brokers ?? [];
       if (list.length === 0) return json({ success: true, message: "Aucun courtier à provisionner", count: 0 });
 
