@@ -246,7 +246,7 @@ export default function PARecordings() {
             ) : rows.map((c) => (
               <tr key={c.id} className="cursor-pointer hover:bg-white/[0.02]"
                 style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}
-                onClick={() => setDetail(c)}>
+                onClick={() => { setRecordingError(null); setDetail(c); }}>
                 <td className="p-3" style={{ color: "var(--pp-text-primary)" }}>{brokerName(c)}</td>
                 <td style={{ color: "var(--pp-text-secondary)" }}>{c.extension ?? c.planipret_profiles?.extension ?? "—"}</td>
                 <td style={{ color: "var(--pp-text-secondary)" }}>{c.from_number ?? "—"}</td>
@@ -291,7 +291,7 @@ export default function PARecordings() {
             onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h3 style={{ fontWeight: 600, color: "var(--pp-text-primary)" }}>Enregistrement</h3>
-              <button onClick={() => setDetail(null)}><X className="w-4 h-4" style={{ color: "var(--pp-text-muted)" }} /></button>
+              <button onClick={() => { setRecordingError(null); setDetail(null); }}><X className="w-4 h-4" style={{ color: "var(--pp-text-muted)" }} /></button>
             </div>
             <div className="space-y-3 text-sm" style={{ color: "var(--pp-text-secondary)" }}>
               <div>Courtier: <span style={{ color: "var(--pp-text-primary)" }}>{brokerName(detail)}</span></div>
