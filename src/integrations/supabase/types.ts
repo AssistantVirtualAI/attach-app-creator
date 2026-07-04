@@ -8831,7 +8831,10 @@ export type Database = {
           metadata: Json
           next_actions: Json | null
           ns_call_id: string | null
+          ns_callid: string | null
           ns_domain: string | null
+          ns_orig_callid: string | null
+          ns_term_callid: string | null
           organization_id: string
           pipeline_completed_at: string | null
           pipeline_error: string | null
@@ -8885,7 +8888,10 @@ export type Database = {
           metadata?: Json
           next_actions?: Json | null
           ns_call_id?: string | null
+          ns_callid?: string | null
           ns_domain?: string | null
+          ns_orig_callid?: string | null
+          ns_term_callid?: string | null
           organization_id?: string
           pipeline_completed_at?: string | null
           pipeline_error?: string | null
@@ -8939,7 +8945,10 @@ export type Database = {
           metadata?: Json
           next_actions?: Json | null
           ns_call_id?: string | null
+          ns_callid?: string | null
           ns_domain?: string | null
+          ns_orig_callid?: string | null
+          ns_term_callid?: string | null
           organization_id?: string
           pipeline_completed_at?: string | null
           pipeline_error?: string | null
