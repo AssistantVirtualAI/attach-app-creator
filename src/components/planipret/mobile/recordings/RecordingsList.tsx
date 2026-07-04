@@ -46,8 +46,9 @@ const fmtDate = (iso: string) => {
   const sameDay = d.toDateString() === today.toDateString();
   const hh = String(d.getHours()).padStart(2, "0");
   const mm = String(d.getMinutes()).padStart(2, "0");
-  if (sameDay) return `Aujourd'hui · ${hh}h${mm}`;
-  return `${d.toLocaleDateString("fr-CA", { day: "2-digit", month: "short" })} · ${hh}h${mm}`;
+  const isEn = typeof document !== "undefined" && document.documentElement.lang === "en";
+  if (sameDay) return `${isEn ? "Today" : "Aujourd'hui"} · ${hh}h${mm}`;
+  return `${d.toLocaleDateString(isEn ? "en-CA" : "fr-CA", { day: "2-digit", month: "short" })} · ${hh}h${mm}`;
 };
 const fmtDuration = (s: number | null) => {
   if (!s) return "—";
