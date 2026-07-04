@@ -19,41 +19,46 @@ export interface AllPermissions {
 
 /** Microphone + speaker output (WebRTC). Triggers OS prompt on native. */
 export async function requestMicrophone(): Promise<PermissionStatus> {
+  const platform = Capacitor.isNativePlatform() ? Capacitor.getPlatform() : 'web';
+  console.log('[permissions] requestMicrophone start', { platform });
   try {
     if (Capacitor.isNativePlatform()) {
-      const platform = Capacitor.getPlatform();
-      // iOS uses the custom PJSIP plugin (already wired to AVAudioSession).
       if (platform === 'ios') {
         try {
           const res = await CapacitorPjsip.requestMicrophonePermission();
+          console.log('[permissions] iOS PJSIP mic result', res);
           if (res?.granted) return 'granted';
-        } catch { /* fall through to Microphone plugin */ }
+        } catch (e) { console.warn('[permissions] PJSIP mic failed', e); }
       }
-      // Try @mozartec/capacitor-microphone (Android + iOS fallback).
       let pluginGranted = false;
       let pluginDenied = false;
       try {
-        const { Microphone } = await import('@mozartec/capacitor-microphone');
+        const mod = await import('@mozartec/capacitor-microphone');
+        const { Microphone } = mod;
         const check = await Microphone.checkPermissions();
+        console.log('[permissions] mozartec check', check);
         if (check?.microphone === 'granted') pluginGranted = true;
         if (!pluginGranted) {
           const req = await Microphone.requestPermissions();
+          console.log('[permissions] mozartec request', req);
           if (req?.microphone === 'granted') pluginGranted = true;
           else if (req?.microphone === 'denied') pluginDenied = true;
         }
       } catch (e) {
-        console.warn('[permissions] Microphone plugin unavailable, falling back to getUserMedia', e);
+        console.warn('[permissions] mozartec plugin import/exec failed', {
+          name: (e as any)?.name, message: (e as any)?.message, stack: (e as any)?.stack,
+        });
       }
       if (pluginGranted) return 'granted';
-      // Fallback: getUserMedia inside Capacitor WebView. On Android with
-      // RECORD_AUDIO in the manifest this triggers the OS runtime prompt.
       try {
         if (navigator.mediaDevices?.getUserMedia) {
+          console.log('[permissions] falling back to getUserMedia');
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
           stream.getTracks().forEach((t) => t.stop());
           return 'granted';
         }
       } catch (e: any) {
+        console.warn('[permissions] getUserMedia failed', { name: e?.name, message: e?.message });
         if (e?.name === 'NotAllowedError' || e?.name === 'SecurityError') return 'denied';
       }
       return pluginDenied ? 'denied' : 'prompt';
@@ -62,7 +67,8 @@ export async function requestMicrophone(): Promise<PermissionStatus> {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     stream.getTracks().forEach((t) => t.stop());
     return 'granted';
-  } catch {
+  } catch (e) {
+    console.error('[permissions] requestMicrophone fatal', e);
     return 'denied';
   }
 }
