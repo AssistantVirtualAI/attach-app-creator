@@ -102,15 +102,24 @@ export default function PARecordings() {
     setLoading(false);
   };
 
-  usePlanipretNsAutoSync({ onQueued: () => load(page, pageSize) });
+  usePlanipretNsAutoSync({ enabled: false });
 
   useEffect(() => { load(page, pageSize); /* eslint-disable-next-line */ }, [page, pageSize, search, broker, from, to, withTranscript]);
 
+  // Realtime: throttled reload (max once per 30s) to avoid flicker on our own AI writes
   useEffect(() => {
+    let last = 0;
+    let pending: ReturnType<typeof setTimeout> | null = null;
+    const trigger = () => {
+      const now = Date.now();
+      const wait = Math.max(0, 30_000 - (now - last));
+      if (pending) return;
+      pending = setTimeout(() => { last = Date.now(); pending = null; load(page, pageSize); }, wait);
+    };
     const ch = supabase.channel("admin-recordings")
-      .on("postgres_changes", { event: "*", schema: "public", table: "planipret_phone_calls" }, () => load(page, pageSize))
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "planipret_phone_calls" }, trigger)
       .subscribe();
-    return () => { supabase.removeChannel(ch); };
+    return () => { if (pending) clearTimeout(pending); supabase.removeChannel(ch); };
     // eslint-disable-next-line
   }, []);
 
