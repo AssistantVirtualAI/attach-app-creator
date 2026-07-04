@@ -86,6 +86,9 @@ async function processEvent(event: any) {
       await admin.from("planipret_phone_calls").upsert({
         user_id: userId,
         ns_call_id: String(callId),
+        ns_callid: data["call-parent-cdr-id"] ?? data["call-orig-call-id"] ?? data["call-term-call-id"] ?? data["call-parent-call-id"] ?? data.id ?? String(callId),
+        ns_orig_callid: data["call-orig-call-id"] ?? data["orig-callid"] ?? data["orig-call-id"] ?? null,
+        ns_term_callid: data["call-term-call-id"] ?? data["term-callid"] ?? data["term-call-id"] ?? null,
         direction: data.direction ?? null,
         from_number: data.from_number ?? data.caller_number ?? data.from ?? null,
         to_number: data.to_number ?? data.callee_number ?? data.to ?? null,
