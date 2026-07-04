@@ -60,6 +60,9 @@ export default function PAUsers() {
   const [callsByUser, setCallsByUser] = useState<Record<string, number>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
   const [highlightId, setHighlightId] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [appReviewExists, setAppReviewExists] = useState<boolean | null>(null);
+  const [creatingReview, setCreatingReview] = useState(false);
 
   const [nsError, setNsError] = useState<string | null>(null);
   const [nsDomain, setNsDomain] = useState<string | null>(null);
