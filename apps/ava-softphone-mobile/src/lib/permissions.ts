@@ -229,11 +229,6 @@ export async function openAppSettings(): Promise<void> {
       return;
     }
     if (platform === 'android') {
-      try {
-        const { App } = await import('@capacitor/app');
-        await App.openUrl({ url: 'package:com.lemtel.softphone' });
-        return;
-      } catch { /* ignore */ }
       window.open('package:com.lemtel.softphone', '_system');
     }
   } catch { /* ignore */ }
