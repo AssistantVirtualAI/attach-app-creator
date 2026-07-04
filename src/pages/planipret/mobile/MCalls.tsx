@@ -739,6 +739,10 @@ function CallDetailSheet({
   const [insight, setInsight] = useState<Insight | null>(null);
   const [recLoading, setRecLoading] = useState(false);
   const [txLoading, setTxLoading] = useState(false);
+  const [txPreparing, setTxPreparing] = useState(false);
+  const [txAttempt, setTxAttempt] = useState(0);
+  const txRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (txRetryTimerRef.current) clearTimeout(txRetryTimerRef.current); }, []);
   const [aiLoading, setAiLoading] = useState(false);
   const [taskState, setTaskState] = useState<Record<string, { creating?: boolean; createdId?: string }>>({});
   const [eventState, setEventState] = useState<Record<string, { creating?: boolean; createdId?: string }>>({});
