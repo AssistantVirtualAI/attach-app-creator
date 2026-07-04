@@ -30,10 +30,19 @@ const PERMISSION_STEPS: PermDef[] = [
     id: 'microphone',
     icon: '🎤',
     title: 'Microphone & Audio',
-    description: 'Lemtel Telecom needs your microphone and speaker to make and receive phone calls.',
-    why: '⚡ Required for all voice calls',
+    description: 'Lemtel Telecom uses your microphone and speaker to make and receive phone calls.',
+    why: 'Used for voice calls',
     required: true,
     color: '#10B981',
+  },
+  {
+    id: 'contacts',
+    icon: '👥',
+    title: 'Contacts',
+    description: 'Import your contacts to dial faster and see caller names. This is optional — you can continue without sharing your contacts.',
+    why: 'Optional — you can skip',
+    required: false,
+    color: '#3B82F6',
   },
 ];
 
