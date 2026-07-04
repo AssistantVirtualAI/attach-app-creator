@@ -249,7 +249,7 @@ export async function openAppSettings(): Promise<void> {
     if (platform === 'android') {
       // Try the native-settings plugin first (proper Android intent).
       try {
-        const mod: any = await import('capacitor-native-settings');
+        const mod: any = await import(/* @vite-ignore */ 'capacitor-native-settings');
         const NativeSettings = mod.NativeSettings ?? mod.default;
         if (NativeSettings?.openAndroid) {
           await NativeSettings.openAndroid({ option: 'application_details' });
