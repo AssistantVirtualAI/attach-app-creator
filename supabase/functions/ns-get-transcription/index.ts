@@ -166,12 +166,20 @@ Deno.serve(async (req) => {
           const dur = Number(row.duration_seconds ?? 0);
           const cDur = Number(val(cdr, ["call-talking-duration-seconds", "call-total-duration-seconds", "duration"], 0));
           if (dur && cDur && Math.abs(dur - cDur) <= 3) score += 20;
+          const started = row.started_at ? new Date(row.started_at).getTime() : 0;
+          const cStartRaw = val(cdr, ["call-start-datetime", "call-batch-start-datetime", "start-time", "time-start", "started_at"], null);
+          const cStart = cStartRaw ? new Date(cStartRaw).getTime() : 0;
+          if (started && cStart && Math.abs(started - cStart) <= 120_000) score += 25;
           const from = normalizePhone(row.from_number);
+          const to = normalizePhone(row.to_number);
           const cFrom = normalizePhone(val(cdr, ["call-orig-from-uri", "from", "from_number"], ""));
+          const cTo = normalizePhone(val(cdr, ["call-term-to-uri", "call-orig-to-uri", "to", "to_number", "destination"], ""));
           if (from && cFrom && (from.endsWith(cFrom) || cFrom.endsWith(from))) score += 10;
+          if (to && cTo && (to.endsWith(cTo) || cTo.endsWith(to))) score += 10;
           return { score, cdr };
-        }).filter((x) => x.score >= 30).sort((a, b) => b.score - a.score);
-        for (const m of rows.slice(0, 3)) {
+        }).filter((x) => x.score >= 40).sort((a, b) => b.score - a.score);
+        attempts.push({ url: p, kind: "cdr_matches", count: rows.length, top: rows.slice(0, 5).map((x) => ({ score: x.score, id: x.cdr?.id, orig: x.cdr?.["call-orig-call-id"], term: x.cdr?.["call-term-call-id"] })) });
+        for (const m of rows.slice(0, 8)) {
           cdrs.push(m.cdr);
           addIds(ids, m.cdr);
         }
