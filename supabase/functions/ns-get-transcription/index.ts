@@ -224,23 +224,26 @@ Deno.serve(async (req) => {
   }
 
   for (const q of Array.from(new Set(queries))) {
-    const target = `${NS_API_BASE_URL}${q}`;
     try {
       const r = await nsJson(q);
       const data = r.data;
+      const items = Array.isArray(data) ? data : (data && typeof data === "object" ? [data] : []);
+      const fields_found = items[0] && typeof items[0] === "object" ? Object.keys(items[0]) : [];
+      let transcript_found = false;
+      let localTranscript: any = null;
+      for (const item of items) {
+        const found = extractTranscript(item);
+        if (found) { localTranscript = found; transcript_found = true; break; }
+      }
       attempts.push({
         url: q,
         status: r.status,
-        body_preview: String(r.rawText).slice(0, 200),
-        has_data: !!data,
+        items_count: items.length,
+        fields_found,
+        transcript_found,
+        body_preview: String(r.rawText).slice(0, 300),
       });
-      if (!r.ok || !data) continue;
-      const items = Array.isArray(data) ? data : [data];
-      for (const item of items) {
-        const found = extractTranscript(item);
-        if (found) { transcript = found; break; }
-      }
-      if (transcript) break;
+      if (r.ok && localTranscript) { transcript = localTranscript; break; }
     } catch (e) {
       attempts.push({ url: q, error: (e as Error).message });
     }
