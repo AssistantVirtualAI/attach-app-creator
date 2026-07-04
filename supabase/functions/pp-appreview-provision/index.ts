@@ -136,10 +136,13 @@ Deno.serve(async (req) => {
       .eq("user_id", authUserId)
       .maybeSingle();
     let pErr: any = null;
+    let profileId = existingProfile?.id ?? null;
     if (existingProfile?.id) {
       ({ error: pErr } = await admin.from("planipret_profiles").update(profilePayload).eq("id", existingProfile.id));
     } else {
-      ({ error: pErr } = await admin.from("planipret_profiles").insert(profilePayload));
+      const inserted = await admin.from("planipret_profiles").insert(profilePayload).select("id").maybeSingle();
+      pErr = inserted.error;
+      profileId = inserted.data?.id ?? null;
     }
     if (pErr) return json({ step: "B", error: "profile_upsert_failed", detail: pErr.message }, 500);
     await admin.from("user_roles").upsert({
@@ -218,8 +221,26 @@ Deno.serve(async (req) => {
         sip_domain: APP_REVIEW_DOMAIN,
         sip_password: sipPassword,
       };
+      const secretName = profileId ? `pp_sip_${profileId}_mobile` : null;
+      if (secretName) {
+        try {
+          await admin.rpc("create_planipret_sip_secret", { _name: secretName, _value: sipPassword, _broker_id: profileId });
+        } catch { /* optional */ }
+      }
+
+      await admin.from("planipret_profiles").update({
+        ns_mobile_device_id: `${APP_REVIEW_EXT}_mobile`,
+        ns_widget_device_id: `${APP_REVIEW_EXT}_web`,
+        ...(secretName ? { ns_sip_password_ref_mobile: secretName } : {}),
+      }).eq("user_id", authUserId);
+
+      results.sip_credentials = {
+        sip_username: APP_REVIEW_EXT,
+        sip_domain: APP_REVIEW_DOMAIN,
+        sip_password: sipPassword,
+      };
     } else {
-      results.ns_provisioning = { skipped: true, reason: "NS_API_KEY not set" };
+      return json({ error: "ns_api_key_missing", detail: "Impossible de confirmer la création dans le système téléphonique." }, 500);
     }
 
     return json({
