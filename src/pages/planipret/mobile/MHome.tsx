@@ -146,6 +146,21 @@ export default function MHome() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.user_id, period]);
 
+  // Realtime: refresh KPIs when new calls / messages / voicemails land for this broker.
+  useEffect(() => {
+    if (!profile?.user_id) return;
+    const uid = profile.user_id;
+    const ch = supabase
+      .channel(`mhome-live-${uid}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "planipret_phone_calls", filter: `user_id=eq.${uid}` }, () => loadStats())
+      .on("postgres_changes", { event: "*", schema: "public", table: "planipret_phone_messages", filter: `user_id=eq.${uid}` }, () => loadStats())
+      .on("postgres_changes", { event: "*", schema: "public", table: "planipret_voicemails", filter: `user_id=eq.${uid}` }, () => loadStats())
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.user_id, period]);
+
+
   const reconnect = async () => {
     toast.loading(t("home.reconnecting"), { id: "sip-reconnect" });
     const { data, error, status } = await safeEdgeFunction("ns-auth", { body: {} });
