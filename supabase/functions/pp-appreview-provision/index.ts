@@ -145,11 +145,13 @@ Deno.serve(async (req) => {
       profileId = inserted.data?.id ?? null;
     }
     if (pErr) return json({ step: "B", error: "profile_upsert_failed", detail: pErr.message }, 500);
-    await admin.from("user_roles").upsert({
-      user_id: authUserId,
-      organization_id: organizationId,
-      role: "planipret_broker",
-    }, { onConflict: "user_id,organization_id" }).catch(() => null);
+    try {
+      await admin.from("user_roles").upsert({
+        user_id: authUserId,
+        organization_id: organizationId,
+        role: "planipret_broker",
+      }, { onConflict: "user_id,organization_id" });
+    } catch { /* ignore */ }
     results.profile = { upserted: true, user_id: authUserId };
 
     // STEP C: NS-API devices
