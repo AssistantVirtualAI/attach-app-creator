@@ -56,6 +56,9 @@ Deno.serve(async (req) => {
   const { data: isPpAdmin } = await admin.rpc("is_planipret_admin", { _user_id: user.id });
   if (!isSuper && !isPpAdmin) return json({ error: "forbidden" }, 403);
 
+  const body: any = await req.json().catch(() => ({}));
+  const syncLocal = !!body?.sync;
+
   const { data: profiles, error } = await admin
     .from("planipret_profiles")
     .select("id,full_name,email,ns_extension,ns_domain,ns_mobile_device_id,ns_widget_device_id,ns_sip_password_ref_mobile,ns_linked,ns_linked_at")
@@ -95,8 +98,19 @@ Deno.serve(async (req) => {
       const domain = p.ns_domain || NS_DEFAULT_DOMAIN;
       const targetMobile = p.ns_mobile_device_id || `${ext}_mobile`;
       const ns = await nsListDevices(domain, ext);
-      const nsMobileExists = ns.ok && ns.ids.includes(targetMobile);
-      const nsWidgetExists = ns.ok && !!p.ns_widget_device_id && ns.ids.includes(p.ns_widget_device_id);
+      const mobileFromNs = ns.ids.find((id) => id === targetMobile || id.toLowerCase().includes("_mobile")) ?? null;
+      const widgetTarget = p.ns_widget_device_id || `${ext}_web`;
+      const widgetFromNs = ns.ids.find((id) => id === widgetTarget || id.toLowerCase().includes("_web")) ?? null;
+      const nsMobileExists = ns.ok && !!mobileFromNs;
+      const nsWidgetExists = ns.ok && !!widgetFromNs;
+      if (syncLocal && ns.ok && (mobileFromNs || widgetFromNs)) {
+        const patch: Record<string, unknown> = { ns_linked: true, ns_linked_at: new Date().toISOString(), ns_domain: domain, ns_extension: ext };
+        if (mobileFromNs && p.ns_mobile_device_id !== mobileFromNs) patch.ns_mobile_device_id = mobileFromNs;
+        if (widgetFromNs && p.ns_widget_device_id !== widgetFromNs) patch.ns_widget_device_id = widgetFromNs;
+        if (Object.keys(patch).length > 4) {
+          await admin.from("planipret_profiles").update(patch).eq("id", p.id);
+        }
+      }
       const brokerLogs = logsByBroker.get(p.id) ?? [];
       const okLog = brokerLogs.find((l) => l.status === "ok");
       const errLog = brokerLogs.find((l) => l.status === "error");
@@ -108,8 +122,8 @@ Deno.serve(async (req) => {
       rows[i] = {
         broker_id: p.id, full_name: p.full_name, email: p.email,
         ns_extension: ext, ns_domain: domain,
-        ns_mobile_device_id: p.ns_mobile_device_id,
-        ns_widget_device_id: p.ns_widget_device_id,
+        ns_mobile_device_id: p.ns_mobile_device_id ?? mobileFromNs,
+        ns_widget_device_id: p.ns_widget_device_id ?? widgetFromNs,
         target_mobile_id: targetMobile,
         ns_mobile_exists: nsMobileExists,
         ns_widget_exists: nsWidgetExists,

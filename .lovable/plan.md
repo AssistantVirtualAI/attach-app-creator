@@ -1,42 +1,38 @@
-## Diagnostic
+Plan d’implémentation
 
-J'ai vérifié la base — les données existent, ce sont les filtres du dashboard qui sont mauvais :
+1. Corriger App Review pour qu’il soit réellement créé dans le système téléphonique
+- Modifier `pp-appreview-provision` pour ne plus retourner “prêt” tant que l’utilisateur `1999@planipret.ca` n’est pas confirmé côté système téléphonique.
+- Utiliser le format officiel des champs NS-API (`user`, `name-first-name`, `name-last-name`, `email-address`, `user-scope`, etc.).
+- Après création, refaire une vérification côté système téléphonique par liste/recherche; si l’utilisateur n’existe toujours pas, afficher une erreur claire au lieu d’un faux succès.
+- Créer ensuite les appareils mobile/web seulement après confirmation que l’utilisateur existe.
 
-| KPI | Cause du 0 |
-|---|---|
-| Appels aujourd'hui | Filtre sur `started_at ≥ minuit` — or les 6 appels d'aujourd'hui ont `started_at = NULL` (seulement `created_at` rempli). |
-| SMS aujourd'hui | Même problème : filtre `sent_at`, colonne vide sur les nouveaux messages. |
-| Appels manqués | Filtre `direction='missed'` — or `direction` ne contient que `inbound`/`outbound`. Le "missed" est dans la colonne `status`. |
-| Courtiers actifs | Lit `brokerStats.app_mobile_active` depuis le hook, mais `load()` capture la valeur au premier rendu (0) et ne se relance pas quand le hook finit de charger. |
-| Graphique 7 jours | Même bug `started_at`/`sent_at` que ci-dessus. |
+2. Rendre la page Courtiers bidirectionnelle avec le système téléphonique
+- Étendre `ns-sync-user` pour supporter :
+  - `sync_from_ns` : téléphone → base locale, avec mise à jour nom/email/extension/statut quand possible.
+  - `sync_to_ns` : base locale → téléphone, création/mise à jour des utilisateurs manquants.
+  - `sync_one` : synchroniser un courtier précis lors d’un ajout/modification/toggle.
+- Brancher `pp-admin-user` sur cette logique pour que :
+  - créer un courtier crée aussi l’utilisateur téléphone;
+  - modifier nom/email/extension met à jour le téléphone;
+  - supprimer un courtier supprime/désactive côté téléphone;
+  - les toggles restent cohérents localement et déclenchent la sync nécessaire.
+- Ajouter une vraie réponse détaillée au bouton “Sync NS-API” de la page Courtiers.
 
-Design, layout, textes, i18n : **rien ne change**. Uniquement les queries.
+3. Rendre Devices mobiles bidirectionnel
+- Dans `pp-mobile-device-status`, lire l’état réel des appareils côté téléphone et synchroniser la base locale quand un appareil existe déjà côté téléphone mais manque localement.
+- Ajouter une action “Synchroniser appareils” sur la page pour faire :
+  - téléphone → local : détecter et lier les appareils existants;
+  - local → téléphone : provisionner les appareils manquants.
+- Corriger `ns-provision-broker-devices` pour chercher le courtier par `id` ou `user_id`, créer l’utilisateur téléphone si absent, puis créer les appareils.
 
-## Changements (fichier unique : `src/pages/planipret/admin/PAOverview.tsx`)
+4. Refaire le visuel de Devices mobiles pour matcher les autres pages admin
+- Remplacer le style actuel trop shadcn/bold par le style Planiprêt existant : `pp-card`, variables `--pp-*`, header compact comme Courtiers.
+- Header plus petit, moins gras, meilleur interlignage et contrastes.
+- Statistiques en badges/cartes sobres alignées avec Courtiers.
+- Tableau responsive avec colonnes contrôlées, texte qui wrap proprement, actions en menu compact, pagination identique.
+- Améliorer le loading avec skeletons cohérents et message clair pendant la synchronisation.
 
-### 1. Basculer les filtres temporels sur `created_at`
-Dans `load()` :
-- `getPlanipretCallCount({ from: todayIso })` → nouvelle helper ou query directe utilisant `created_at`.
-- Idem pour `callsYest`, `callsPeriodStats`, `topCalls`, `callsByDir`, `callsP`.
-- `planipret_phone_messages` : remplacer `.gte("sent_at", …)` par `.gte("created_at", …)`.
-- Idem pour la série 7 jours : agrégation basée sur `created_at.slice(0,10)`.
-
-Pour ne pas casser les autres pages qui utilisent `getPlanipretCallCount`, j'ajoute un paramètre `dateField?: "started_at" | "created_at"` (défaut `started_at`) dans `src/lib/planipret/adminCounts.ts`, et je le passe à `"created_at"` depuis Overview.
-
-### 2. Corriger le filtre "appels manqués"
-- `getPlanipretCallCount({ direction: "missed", … })` → `{ status: "missed", … }`.
-- Distribution "direction" : construire la 3ᵉ tranche (Missed) à partir de `status='missed'` au lieu de `direction='missed'`, en excluant ces rows du décompte inbound/outbound pour éviter le double comptage.
-
-### 3. Faire réagir `load()` à `brokerStats`
-Ajouter `brokerStats` dans les dépendances du `useEffect` qui appelle `load`, avec debounce, pour que `stats.brokers` / `stats.brokersTotal` se mettent à jour dès que la vue `planipret_broker_stats` renvoie ses vraies valeurs.
-
-Fallback en attendant : si `brokerStats.app_mobile_active === 0` ET `brokerStats.total_courtiers === 0`, utiliser le count direct `planipret_profiles WHERE mobile_app_enabled = true` (déjà récupéré via `svcProfiles`) comme valeur affichée.
-
-### 4. Rien d'autre
-- Aucune modif visuelle, aucun composant renommé/supprimé.
-- Pas de changement à `/admin/reports` (PAReports.tsx) — la page overview seule est concernée par les symptômes rapportés.
-- Realtime, période 7/30/90, sync NS : intacts.
-
-## Vérification
-- Recharger `/admin/overview` : appels aujourd'hui = 6, SMS = 0 (réel), manqués corrects, courtiers actifs = valeur réelle du hook, graphique 7 jours peuplé.
-- Console : plus de "chart all zeros" quand il y a des données.
+5. Vérification
+- Tester le flux App Review : création utilisateur téléphone vérifiée avant succès.
+- Tester Courtiers : ajout/modification/sync depuis téléphone.
+- Tester Devices mobiles : scan, liaison locale, provisionnement manquant, pagination/lecture responsive.
