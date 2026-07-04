@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import { usePlanipretBrokerStats } from "@/lib/planipret/brokerStats";
+import { getPlanipretBrokerDirectory } from "@/lib/planipret/adminDirectory";
 import { ADMIN_REPORT_FILTERS_EVENT, periodLabel, periodToRange, rangeToPeriod, readAdminReportFilters, writeAdminReportFilters } from "@/lib/planipret/adminReportFilters";
 import { usePlanipretNsAutoSync } from "@/hooks/usePlanipretNsAutoSync";
 import NsSyncBar from "@/components/planipret/admin/NsSyncBar";
@@ -22,6 +23,8 @@ const DANGER = "#E84C4C";
 const GOLD = "#F5C842";
 const SILVER = "#C0C0C0";
 const BRONZE = "#CD7F32";
+
+const eventDate = (row: any) => row?.started_at ?? row?.sent_at ?? row?.created_at;
 
 const TooltipDark = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
@@ -47,6 +50,7 @@ export default function PAReports() {
   const [avaFeedback, setAvaFeedback] = useState<Array<{ rating: string }>>([]);
   const [reminders, setReminders] = useState<any[]>([]);
   const [brokers, setBrokers] = useState<Record<string, string>>({});
+  const [brokerSnapshot, setBrokerSnapshot] = useState({ total: 0, mobile: 0, ai: 0, maestro: 0, ms365: 0, ns: 0 });
   const [exporting, setExporting] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
@@ -88,11 +92,11 @@ export default function PAReports() {
     start.setHours(0, 0, 0, 0);
     (async () => {
       const startIso = start.toISOString();
-      const [{ data: c }, { data: p }, nsUsers, { data: m }, { data: fb }, { data: rem }] = await Promise.all([
-        supabase.from("planipret_phone_calls").select("*").gte("started_at", startIso),
+      const [{ data: c }, { data: p }, directory, { data: m }, { data: fb }, { data: rem }] = await Promise.all([
+        supabase.from("planipret_phone_calls").select("*").gte("created_at", startIso),
         supabase.from("planipret_profiles").select("user_id, full_name, extension, ns_extension"),
-        supabase.functions.invoke("pp-ns-users", { body: {} }).catch((error) => ({ data: null, error })),
-        supabase.from("planipret_phone_messages").select("id, sent_at, created_at, direction, user_id, extension").gte("sent_at", startIso),
+        getPlanipretBrokerDirectory(),
+        supabase.from("planipret_phone_messages").select("id, sent_at, created_at, direction, user_id, extension").gte("created_at", startIso),
         supabase.from("planipret_ava_feedback").select("rating").gte("created_at", startIso),
         supabase.from("planipret_reminders").select("id, user_id, status, scheduled_at, created_at").gte("created_at", startIso),
       ]);
@@ -106,15 +110,24 @@ export default function PAReports() {
         if (x.extension) map[`ext:${x.extension}`] = x.full_name;
         if (x.ns_extension) map[`ext:${x.ns_extension}`] = x.full_name;
       });
-      (((nsUsers as any)?.data?.brokers ?? []) as any[]).forEach((x: any) => {
+      ((directory as any).brokers ?? []).forEach((x: any) => {
         if (x.extension) map[`ext:${x.extension}`] = x.full_name || `Ext. ${x.extension}`;
         if (x.user_id && !String(x.user_id).startsWith("ns:")) map[x.user_id] = x.full_name || map[x.user_id];
       });
       setBrokers(map);
+      const rows = ((directory as any).brokers ?? []) as any[];
+      setBrokerSnapshot({
+        total: (directory as any).count ?? rows.length,
+        mobile: rows.filter((x) => x.mobile_app_enabled).length,
+        ai: rows.filter((x) => x.voice_agent_enabled).length,
+        maestro: rows.filter((x) => x.maestro_connected).length,
+        ms365: brokerStats.ms365_connected,
+        ns: brokerStats.ns_linked || ((directory as any).count ?? rows.length),
+      });
       setLoadedAt(new Date());
       setLoadingPeriod(false);
     })();
-  }, [range, refreshTick]);
+  }, [range, refreshTick, brokerStats.ms365_connected, brokerStats.ns_linked]);
 
 
 
@@ -135,7 +148,7 @@ export default function PAReports() {
   const byDay = useMemo(() => {
     const map: Record<string, number> = {};
     calls.forEach((c) => {
-      const d = new Date(c.started_at).toLocaleDateString(dateLocale, { day: "2-digit", month: "short" });
+      const d = new Date(eventDate(c)).toLocaleDateString(dateLocale, { day: "2-digit", month: "short" });
       map[d] = (map[d] ?? 0) + 1;
     });
     return Object.entries(map).map(([date, count]) => ({ date, count }));
@@ -143,7 +156,10 @@ export default function PAReports() {
 
   const byDirection = useMemo(() => {
     const m = { inbound: 0, outbound: 0, missed: 0 };
-    calls.forEach((c) => { if (c.direction in m) (m as any)[c.direction]++; });
+    calls.forEach((c) => {
+      if (c.status === "missed") m.missed++;
+      else if (c.direction in m) (m as any)[c.direction]++;
+    });
     return [
       { name: t("reports.dirInbound"), value: m.inbound, color: ACCENT },
       { name: t("reports.dirOutbound"), value: m.outbound, color: SUCCESS },
@@ -161,14 +177,14 @@ export default function PAReports() {
 
   const peakHour = useMemo(() => {
     const h: Record<number, number> = {};
-    calls.forEach((c) => { const hh = new Date(c.started_at).getHours(); h[hh] = (h[hh] ?? 0) + 1; });
+    calls.forEach((c) => { const hh = new Date(eventDate(c)).getHours(); h[hh] = (h[hh] ?? 0) + 1; });
     const top = Object.entries(h).sort((a, b) => b[1] - a[1])[0];
     return top ? `${top[0]}h–${+top[0] + 1}h` : "—";
   }, [calls]);
 
   const answerRate = useMemo(() => {
     if (!calls.length) return "—";
-    const answered = calls.filter((c) => c.direction !== "missed").length;
+    const answered = calls.filter((c) => c.status !== "missed").length;
     return Math.round((answered / calls.length) * 100) + "%";
   }, [calls]);
 
@@ -178,9 +194,9 @@ export default function PAReports() {
       const k = c.user_id ?? `ext:${c.extension ?? c.metadata?.extension ?? "unknown"}`;
       if (!m[k]) m[k] = { name: brokers[k] ?? (c.extension ? `Ext. ${c.extension}` : "—"), total: 0, in: 0, out: 0, missed: 0, totalDur: 0, durCount: 0 };
       m[k].total++;
-      if (c.direction === "inbound") m[k].in++;
+      if (c.status === "missed") m[k].missed++;
+      else if (c.direction === "inbound") m[k].in++;
       else if (c.direction === "outbound") m[k].out++;
-      else if (c.direction === "missed") m[k].missed++;
       if (c.duration_seconds) { m[k].totalDur += c.duration_seconds; m[k].durCount++; }
     });
     return Object.values(m).sort((a: any, b: any) => b.total - a.total);
@@ -190,10 +206,10 @@ export default function PAReports() {
 
   // Financial — same source of truth as /admin/vue-ensemble (planipret_broker_stats view).
   const finance = useMemo<ServiceFinance[]>(() => [
-    computeServiceFinance("mobile", brokerStats.app_mobile_active),
-    computeServiceFinance("widget", brokerStats.total_courtiers),
-    computeServiceFinance("ai", brokerStats.agent_ia_active),
-  ], [brokerStats.app_mobile_active, brokerStats.total_courtiers, brokerStats.agent_ia_active]);
+    computeServiceFinance("mobile", brokerStats.app_mobile_active || brokerSnapshot.mobile),
+    computeServiceFinance("widget", brokerStats.total_courtiers || brokerSnapshot.total),
+    computeServiceFinance("ai", brokerStats.agent_ia_active || brokerSnapshot.ai),
+  ], [brokerStats.app_mobile_active, brokerStats.total_courtiers, brokerStats.agent_ia_active, brokerSnapshot.mobile, brokerSnapshot.total, brokerSnapshot.ai]);
   const financeTotals = useMemo(() => computeTotals(finance), [finance]);
 
 
@@ -306,12 +322,12 @@ export default function PAReports() {
           </span>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          <StatTile icon={<Users className="w-3.5 h-3.5" />} label={t("reports.tileBrokers")} value={brokerStats.total_courtiers} color={ACCENT} />
-          <StatTile icon={<Smartphone className="w-3.5 h-3.5" />} label={t("reports.tileMobileActive")} value={brokerStats.app_mobile_active} color={SUCCESS} sub={`${t("reports.tileOutOf")} ${brokerStats.total_courtiers}`} />
-          <StatTile icon={<Bot className="w-3.5 h-3.5" />} label={t("reports.tileAiActive")} value={brokerStats.agent_ia_active} color="#9B7FE8" sub={`${t("reports.tileOutOf")} ${brokerStats.total_courtiers}`} />
-          <StatTile icon={<Plug className="w-3.5 h-3.5" />} label={t("reports.tileMaestro")} value={brokerStats.maestro_connected} color="#F5A623" />
-          <StatTile icon={<Mail className="w-3.5 h-3.5" />} label={t("reports.tileMs365")} value={brokerStats.ms365_connected} color="#2E9BDC" />
-          <StatTile icon={<Link2 className="w-3.5 h-3.5" />} label={t("reports.tileNs")} value={brokerStats.ns_linked} color={GOLD} />
+          <StatTile icon={<Users className="w-3.5 h-3.5" />} label={t("reports.tileBrokers")} value={brokerStats.total_courtiers || brokerSnapshot.total} color={ACCENT} />
+          <StatTile icon={<Smartphone className="w-3.5 h-3.5" />} label={t("reports.tileMobileActive")} value={brokerStats.app_mobile_active || brokerSnapshot.mobile} color={SUCCESS} sub={`${t("reports.tileOutOf")} ${brokerStats.total_courtiers || brokerSnapshot.total}`} />
+          <StatTile icon={<Bot className="w-3.5 h-3.5" />} label={t("reports.tileAiActive")} value={brokerStats.agent_ia_active || brokerSnapshot.ai} color="#9B7FE8" sub={`${t("reports.tileOutOf")} ${brokerStats.total_courtiers || brokerSnapshot.total}`} />
+          <StatTile icon={<Plug className="w-3.5 h-3.5" />} label={t("reports.tileMaestro")} value={brokerStats.maestro_connected || brokerSnapshot.maestro} color="#F5A623" />
+          <StatTile icon={<Mail className="w-3.5 h-3.5" />} label={t("reports.tileMs365")} value={brokerStats.ms365_connected || brokerSnapshot.ms365} color="#2E9BDC" />
+          <StatTile icon={<Link2 className="w-3.5 h-3.5" />} label={t("reports.tileNs")} value={brokerStats.ns_linked || brokerSnapshot.ns} color={GOLD} />
         </div>
       </div>
 
