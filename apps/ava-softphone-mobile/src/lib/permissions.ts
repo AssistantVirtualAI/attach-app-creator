@@ -238,11 +238,31 @@ export async function openAppSettings(): Promise<void> {
   const platform = Capacitor.getPlatform();
   try {
     if (platform === 'ios') {
-      window.open('app-settings:', '_system');
+      try {
+        const { App } = await import('@capacitor/app');
+        await (App as any).openUrl?.({ url: 'app-settings:' });
+      } catch {
+        window.open('app-settings:', '_system');
+      }
       return;
     }
     if (platform === 'android') {
-      window.open('package:com.lemtel.softphone', '_system');
+      // Try the native-settings plugin first (proper Android intent).
+      try {
+        const mod: any = await import('capacitor-native-settings');
+        const NativeSettings = mod.NativeSettings ?? mod.default;
+        if (NativeSettings?.openAndroid) {
+          await NativeSettings.openAndroid({ option: 'application_details' });
+          return;
+        }
+      } catch { /* plugin missing */ }
+      // Fallback: use App plugin with the correct package intent URI.
+      try {
+        const { App } = await import('@capacitor/app');
+        const info = await App.getInfo();
+        const pkg = info?.id ?? 'com.lemtel.softphone';
+        await (App as any).openUrl?.({ url: `package:${pkg}` });
+      } catch { /* ignore */ }
     }
   } catch { /* ignore */ }
 }
