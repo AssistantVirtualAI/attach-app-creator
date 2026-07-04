@@ -126,15 +126,24 @@ export default function PARecordings() {
   const transcribe = async (callId: string) => {
     setTranscribing(callId);
     try {
-      const { data, error } = await supabase.functions.invoke("pp-admin-transcribe", { body: { call_id: callId } });
+      // Phase 5: fetch via official NS-API endpoint
+      const { data, error } = await supabase.functions.invoke("ns-get-transcription", { body: { call_db_id: callId } });
       if (error) throw error;
-      if ((data as any)?.transcript) {
-        toast.success("Transcription complétée");
-        setDetail((d: any) => d && d.id === callId ? { ...d, transcript: (data as any).transcript } : d);
+      const d = data as any;
+      if (d?.success && Array.isArray(d.segments) && d.segments.length) {
+        const text = d.segments.map((s: any) => `${s.speaker}: ${s.text}`).join("\n");
+        await supabase.from("planipret_phone_calls").update({
+          transcript: text,
+          transcript_segments: d.segments,
+          transcript_source: "ns-api",
+          has_transcript: true,
+        }).eq("id", callId);
+        toast.success("Transcription récupérée depuis NS-API");
+        setDetail((cur: any) => cur && cur.id === callId ? { ...cur, transcript: text, transcript_segments: d.segments } : cur);
         await load(page, pageSize);
       } else {
-        const d = data as any;
-        throw new Error([d?.error ?? "transcription vide", d?.hint].filter(Boolean).join(" — "));
+        const msg = [d?.message ?? "Transcription non disponible", d?.action_required].filter(Boolean).join(" — ");
+        toast.error(msg);
       }
     } catch (e: any) {
       toast.error(`Transcription échouée: ${e.message ?? e}`);
@@ -144,26 +153,62 @@ export default function PARecordings() {
   };
 
   const [resolving, setResolving] = useState<string | null>(null);
-  const resolveRecording = async (row: any, force = false) => {
+  const resolveRecording = async (row: any, _force = false) => {
     setResolving(row.id);
     setRecordingError(null);
     try {
-      const { data, error } = await supabase.functions.invoke("pp-admin-recording-resolve", { body: { call_row_id: row.id, force } });
-      if (error) throw error;
-      if ((data as any)?.recording_url) {
-        toast.success("Enregistrement récupéré");
-        setDetail({ ...row, recording_url: (data as any).recording_url });
-        await load(page, pageSize);
+      // Phase 4: stream audio bytes from ns-get-recording
+      const projectId = (import.meta as any).env?.VITE_SUPABASE_PROJECT_ID ?? "gejxisrqtvxavbrfcoxz";
+      const anonKey = (import.meta as any).env?.VITE_SUPABASE_PUBLISHABLE_KEY ?? (import.meta as any).env?.VITE_SUPABASE_ANON_KEY;
+      const { data: { session } } = await supabase.auth.getSession();
+      const resp = await fetch(`https://${projectId}.supabase.co/functions/v1/ns-get-recording`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: anonKey ?? "",
+          Authorization: `Bearer ${session?.access_token ?? anonKey ?? ""}`,
+        },
+        body: JSON.stringify({ call_db_id: row.id }),
+      });
+      const ct = resp.headers.get("Content-Type") ?? "";
+      if (resp.ok && ct.includes("audio")) {
+        const blob = await resp.blob();
+        const objUrl = URL.createObjectURL(blob);
+        setDetail({ ...row, recording_url: objUrl });
+        toast.success("Enregistrement chargé");
       } else {
-        const d = data as any;
-        const msg = [d?.error ?? "Aucun enregistrement disponible côté NS-API", d?.hint].filter(Boolean).join(" — ");
+        const j = await resp.json().catch(() => ({}));
+        const msg = [j?.message ?? j?.error ?? "Aucun enregistrement disponible côté NS-API",
+          Array.isArray(j?.possible_causes) ? j.possible_causes[0] : null].filter(Boolean).join(" — ");
         setRecordingError(msg);
         toast.error(msg);
+        console.warn("[ns-get-recording] failure", j);
       }
     } catch (e: any) {
       toast.error(`Récupération échouée: ${e.message ?? e}`);
     } finally {
       setResolving(null);
+    }
+  };
+
+  const [coaching, setCoaching] = useState<string | null>(null);
+  const runCoaching = async (callId: string) => {
+    setCoaching(callId);
+    try {
+      const { data, error } = await supabase.functions.invoke("pp-coach-call", { body: { call_id: callId } });
+      if (error) throw error;
+      const d = data as any;
+      if (d?.success) {
+        toast.success(`Coaching généré (score ${d.score ?? "—"}/100)`);
+        setDetail((cur: any) => cur && cur.id === callId ? { ...cur, ai_summary: d.summary, ai_coaching: d.coaching, transcript: d.corrected_transcript ?? cur.transcript, lead_score: d.score } : cur);
+        await load(page, pageSize);
+      } else {
+        toast.error(d?.error ?? "Coaching indisponible");
+      }
+    } catch (e: any) {
+      toast.error(`Coaching échoué: ${e.message ?? e}`);
+    } finally {
+      setCoaching(null);
     }
   };
 
@@ -400,6 +445,38 @@ export default function PARecordings() {
                   <Play className="w-3.5 h-3.5" />
                   {transcribing === detail.id ? "Transcription en cours…" : "Lancer la transcription IA"}
                 </button>
+              )}
+              {detail.transcript && (
+                <button
+                  onClick={() => runCoaching(detail.id)}
+                  disabled={coaching === detail.id}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-white text-sm disabled:opacity-50"
+                  style={{ background: AGENT }}
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  {coaching === detail.id ? "Analyse Claude en cours…" : (detail.ai_coaching ? "Régénérer coaching IA" : "Analyser & coacher (Claude)")}
+                </button>
+              )}
+              {detail.ai_coaching && (
+                <div>
+                  <p style={{ fontSize: 11, color: "var(--pp-text-muted)", marginBottom: 4 }}>Coaching IA</p>
+                  <div className="p-3 rounded-lg space-y-2" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", fontSize: 12 }}>
+                    {typeof detail.ai_coaching === "object" && (
+                      <>
+                        {detail.lead_score != null && <div>Score : <b>{detail.lead_score}/100</b></div>}
+                        {(detail.ai_coaching as any).strengths?.length ? (
+                          <div><b>Points forts :</b><ul className="list-disc pl-4">{(detail.ai_coaching as any).strengths.map((s: string, i: number) => <li key={i}>{s}</li>)}</ul></div>
+                        ) : null}
+                        {(detail.ai_coaching as any).improvements?.length ? (
+                          <div><b>À améliorer :</b><ul className="list-disc pl-4">{(detail.ai_coaching as any).improvements.map((s: string, i: number) => <li key={i}>{s}</li>)}</ul></div>
+                        ) : null}
+                        {(detail.ai_coaching as any).next_steps?.length ? (
+                          <div><b>Prochaines étapes :</b><ul className="list-disc pl-4">{(detail.ai_coaching as any).next_steps.map((s: string, i: number) => <li key={i}>{s}</li>)}</ul></div>
+                        ) : null}
+                      </>
+                    )}
+                  </div>
+                </div>
               )}
               {detail.ai_summary && (
                 <div>
