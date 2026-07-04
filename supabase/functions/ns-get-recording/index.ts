@@ -5,6 +5,8 @@
 
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+// @ts-ignore npm package has no bundled TS declarations.
+import GSMDecoder from "npm:gsm-decoder@1.0.0";
 
 const NS_API_KEY = Deno.env.get("NS_API_KEY");
 const NS_API_BASE_URL = (Deno.env.get("NS_API_BASE_URL") ?? "https://voice.ava-telecom.ca/ns-api/v2").replace(/\/$/, "");
@@ -173,6 +175,123 @@ function recordingHeaders(upstream: Response, meta: any, extra: Record<string, s
   return h;
 }
 
+function readWavChunks(bytes: Uint8Array) {
+  if (bytes.length < 44 || String.fromCharCode(...bytes.slice(0, 4)) !== "RIFF" || String.fromCharCode(...bytes.slice(8, 12)) !== "WAVE") return null;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let p = 12;
+  let fmt: { offset: number; size: number } | null = null;
+  let data: { offset: number; size: number } | null = null;
+  while (p + 8 <= bytes.length) {
+    const id = String.fromCharCode(bytes[p], bytes[p + 1], bytes[p + 2], bytes[p + 3]);
+    const size = view.getUint32(p + 4, true);
+    const offset = p + 8;
+    if (id === "fmt ") fmt = { offset, size };
+    if (id === "data") { data = { offset, size: Math.min(size, bytes.length - offset) }; break; }
+    p = offset + size + (size % 2);
+  }
+  return fmt && data ? { fmt, data } : null;
+}
+
+function unpackWav49Block(c: Uint8Array, off: number): number[][] {
+  let i = off;
+  let sr: number;
+  const frames = [Array(76).fill(0), Array(76).fill(0)];
+  let p = frames[0];
+  let pi = 0;
+
+  sr = c[i++]; p[pi++] = sr & 0x3f; sr >>= 6; sr |= c[i++] << 2; p[pi++] = sr & 0x3f; sr >>= 6; sr |= c[i++] << 4; p[pi++] = sr & 0x1f; sr >>= 5; p[pi++] = sr & 0x1f; sr >>= 5; sr |= c[i++] << 2; p[pi++] = sr & 0x0f; sr >>= 4; p[pi++] = sr & 0x0f; sr >>= 4; sr |= c[i++] << 2; p[pi++] = sr & 0x07; sr >>= 3; p[pi++] = sr & 0x07; sr >>= 3;
+  for (let f = 0; f < 4; f++) {
+    sr |= c[i++] << 4; p[pi++] = sr & 0x7f; sr >>= 7; p[pi++] = sr & 0x03; sr >>= 2; p[pi++] = sr & 0x03; sr >>= 2; sr |= c[i++] << 1; p[pi++] = sr & 0x3f; sr >>= 6; p[pi++] = sr & 0x07;
+    sr = c[i++]; p[pi++] = sr & 0x07; sr >>= 3; p[pi++] = sr & 0x07; sr >>= 3; sr |= c[i++] << 2; p[pi++] = sr & 0x07; sr >>= 3; p[pi++] = sr & 0x07; sr >>= 3; p[pi++] = sr & 0x07; sr >>= 3; sr |= c[i++] << 1; p[pi++] = sr & 0x07; sr >>= 3; p[pi++] = sr & 0x07; sr >>= 3; p[pi++] = sr & 0x07;
+    sr = c[i++]; p[pi++] = sr & 0x07; sr >>= 3; p[pi++] = sr & 0x07; sr >>= 3; sr |= c[i++] << 2; p[pi++] = sr & 0x07; sr >>= 3; p[pi++] = sr & 0x07; sr >>= 3;
+  }
+
+  p = frames[1]; pi = 0;
+  sr |= c[i++] << 4; p[pi++] = sr & 0x3f; sr >>= 6; p[pi++] = sr & 0x3f; sr = c[i++]; p[pi++] = sr & 0x1f; sr >>= 5; sr |= c[i++] << 3; p[pi++] = sr & 0x1f; sr >>= 5; p[pi++] = sr & 0x0f; sr >>= 4; sr |= c[i++] << 2; p[pi++] = sr & 0x0f; sr >>= 4; p[pi++] = sr & 0x07; sr >>= 3; p[pi++] = sr & 0x07;
+  for (let f = 0; f < 4; f++) {
+    sr = c[i++]; p[pi++] = sr & 0x7f; sr >>= 7; sr |= c[i++] << 1; p[pi++] = sr & 0x03; sr >>= 2; p[pi++] = sr & 0x03; sr >>= 2; sr |= c[i++] << 5; p[pi++] = sr & 0x3f; sr >>= 6; p[pi++] = sr & 0x07; sr >>= 3; p[pi++] = sr & 0x07; sr >>= 3; sr |= c[i++] << 1; p[pi++] = sr & 0x07; sr >>= 3; p[pi++] = sr & 0x07; sr >>= 3; p[pi++] = sr & 0x07;
+    sr = c[i++]; p[pi++] = sr & 0x07; sr >>= 3; p[pi++] = sr & 0x07; sr >>= 3; sr |= c[i++] << 2; p[pi++] = sr & 0x07; sr >>= 3; p[pi++] = sr & 0x07; sr >>= 3; p[pi++] = sr & 0x07; sr >>= 3; sr |= c[i++] << 1; p[pi++] = sr & 0x07; sr >>= 3; p[pi++] = sr & 0x07; sr >>= 3; p[pi++] = sr & 0x07;
+  }
+  return frames;
+}
+
+function packVoipFrame(p: number[]) {
+  const b = new Uint8Array(33);
+  b[0] = 0xd0 | (p[0] >> 2);
+  b[1] = ((p[0] & 3) << 6) | p[1];
+  b[2] = (p[2] << 3) | (p[3] >> 2);
+  b[3] = ((p[3] & 3) << 6) | (p[4] << 2) | (p[5] >> 2);
+  b[4] = ((p[5] & 3) << 6) | (p[6] << 3) | p[7];
+  let bi = 5;
+  let pi = 8;
+  for (let f = 0; f < 4; f++) {
+    const nc = p[pi++], bc = p[pi++], mc = p[pi++], xm = p[pi++];
+    const x = Array.from({ length: 13 }, () => p[pi++]);
+    b[bi++] = (nc << 1) | (bc >> 1);
+    b[bi++] = ((bc & 1) << 7) | (mc << 5) | (xm >> 1);
+    b[bi++] = ((xm & 1) << 7) | (x[0] << 4) | (x[1] << 1) | (x[2] >> 2);
+    b[bi++] = ((x[2] & 3) << 6) | (x[3] << 3) | x[4];
+    b[bi++] = (x[5] << 5) | (x[6] << 2) | (x[7] >> 1);
+    b[bi++] = ((x[7] & 1) << 7) | (x[8] << 4) | (x[9] << 1) | (x[10] >> 2);
+    b[bi++] = ((x[10] & 3) << 6) | (x[11] << 3) | x[12];
+  }
+  return b;
+}
+
+function writePcmWav(pcm: Uint8Array, sampleRate: number) {
+  const out = new Uint8Array(44 + pcm.length);
+  const view = new DataView(out.buffer);
+  const put = (o: number, s: string) => { for (let i = 0; i < s.length; i++) out[o + i] = s.charCodeAt(i); };
+  put(0, "RIFF"); view.setUint32(4, 36 + pcm.length, true); put(8, "WAVE"); put(12, "fmt ");
+  view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true); view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true); view.setUint16(32, 2, true); view.setUint16(34, 16, true); put(36, "data"); view.setUint32(40, pcm.length, true);
+  out.set(pcm, 44);
+  return out;
+}
+
+function convertMsGsmWavToPcm(bytes: Uint8Array) {
+  const chunks = readWavChunks(bytes);
+  if (!chunks) return null;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const format = view.getUint16(chunks.fmt.offset, true);
+  if (format !== 0x31) return null;
+  const sampleRate = view.getUint32(chunks.fmt.offset + 4, true) || 8000;
+  const blockAlign = view.getUint16(chunks.fmt.offset + 12, true) || 65;
+  if (blockAlign < 65) return null;
+  const blocks = Math.floor(chunks.data.size / blockAlign);
+  const pcm = new Uint8Array(blocks * 640);
+  const decoder = new GSMDecoder();
+  decoder.decoderInit();
+  let outOffset = 0;
+  for (let b = 0; b < blocks; b++) {
+    const frames = unpackWav49Block(bytes, chunks.data.offset + b * blockAlign);
+    for (const params of frames) {
+      const frame = packVoipFrame(params);
+      const framePcm = new Uint8Array(320);
+      if (decoder.decodeFrame(frame, 0, framePcm, 0)) {
+        pcm.set(framePcm, outOffset);
+        outOffset += 320;
+      }
+    }
+  }
+  return writePcmWav(pcm.slice(0, outOffset), sampleRate);
+}
+
+async function audioResponse(upstream: Response, meta: any, extra: Record<string, string | null | undefined> = {}) {
+  const input = new Uint8Array(await upstream.arrayBuffer());
+  const converted = convertMsGsmWavToPcm(input);
+  const body = converted ?? input;
+  const headers = recordingHeaders(upstream, meta, {
+    ...extra,
+    "Content-Type": converted ? "audio/wav" : undefined,
+    "Content-Length": String(body.byteLength),
+    "X-NS-Transcoded": converted ? "gsm-ms-to-pcm" : null,
+  });
+  if (converted) headers["Content-Type"] = "audio/wav";
+  headers["Content-Length"] = String(body.byteLength);
+  return new Response(body, { status: 200, headers });
+}
+
 async function streamFromUrl(audioUrl: string, meta: any, extra: Record<string, string | null | undefined>, attempts: any[]) {
   const fullUrl = audioUrl.startsWith("http")
     ? audioUrl
@@ -185,7 +304,7 @@ async function streamFromUrl(audioUrl: string, meta: any, extra: Record<string, 
     attempts.push({ url: "audio-url-bearer", status: a.status, ct: a.headers.get("Content-Type") ?? "" });
   }
   if (!a.ok || !a.body) return null;
-  return new Response(a.body, { status: 200, headers: recordingHeaders(a, meta, extra) });
+  return audioResponse(a, meta, extra);
 }
 
 Deno.serve(async (req) => {
@@ -264,7 +383,7 @@ Deno.serve(async (req) => {
 
       if (r.ok && (ct.startsWith("audio") || ct.includes("octet-stream"))) {
         if (!r.body) continue;
-        return new Response(r.body, { status: 200, headers: recordingHeaders(r, recordingMeta, { "X-NS-CallID": lookupId, "X-NS-Source-Path": p }) });
+        return audioResponse(r, recordingMeta, { "X-NS-CallID": lookupId, "X-NS-Source-Path": p });
       }
       if (r.ok) {
         const parsed = await r.json().catch(() => null);
