@@ -187,9 +187,15 @@ export default function PAUsers() {
     if (error || !(data as any)?.success) {
       setRows((p) => p.map((r) => r.user_id === u.user_id ? { ...r, [field]: !next } : r));
       toast.error("Erreur de mise à jour");
-    } else {
-      toast.success("Mis à jour");
+      return;
     }
+    // Propagate to NS-API (recording config depends on voice_agent_enabled)
+    if (field === "voice_agent_enabled") {
+      supabase.functions.invoke("ns-sync-user", {
+        body: { action: "sync_one", broker_id: u.user_id },
+      }).catch(() => null);
+    }
+    toast.success("Mis à jour");
   };
 
   const bulkToggle = async (field: "mobile_app_enabled" | "voice_agent_enabled", value: boolean) => {
