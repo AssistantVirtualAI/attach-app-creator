@@ -149,8 +149,9 @@ export default function PARecordings() {
         setDetail((cur: any) => cur && cur.id === callId ? { ...cur, transcript: text, transcript_segments: d.segments, has_transcript: true } : cur);
         await load(page, pageSize);
       } else {
-        // Transcript simply doesn't exist yet — silent unavailable state, no technical error
+        // Transcript unavailable — capture full debug payload for the diagnostic panel
         setTranscriptionUnavailable(true);
+        setTranscriptionDebug(d);
       }
     } catch (e: any) {
       setTranscriptionError(e?.message ?? String(e));
