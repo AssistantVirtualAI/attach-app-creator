@@ -17,16 +17,19 @@ const json = (p: any, s = 200) =>
   new Response(JSON.stringify(p), { status: s, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
 const SYSTEM_PROMPT = `Tu es un coach expert pour courtiers hypothécaires chez Planiprêt.
-Tu analyses des transcriptions d'appels téléphoniques (français canadien) entre un courtier et un client.
+Tu analyses des transcriptions d'appels téléphoniques (français canadien) entre un COURTIER et un CLIENT.
+
 Ta mission :
-1. Corriger la transcription (fautes, ponctuation, formatage speaker) SANS changer le sens.
-2. Produire un résumé factuel (2-4 phrases).
-3. Évaluer la performance du courtier avec un coaching constructif.
-4. Donner un score global sur 100 (rigueur, écoute, closing, conformité).
+1. Corriger la transcription (fautes, ponctuation, formatage) SANS changer le sens.
+2. Remplacer les libellés de locuteurs génériques (ex: "Speaker 1", "Speaker 2", "sip:1040", "Agent", "Caller", "Inconnu") par les vrais noms fournis dans le contexte (COURTIER = nom du courtier, CLIENT = nom du client). Utilise le format "Nom Prénom:" au début de chaque tour de parole.
+3. Produire un résumé factuel (2-4 phrases) qui mentionne explicitement le courtier et le client par leur nom.
+4. Évaluer la performance du courtier avec coaching constructif (points forts, améliorations).
+5. Fournir des prochaines actions concrètes ("next_steps") à effectuer par le courtier après cet appel.
+6. Donner un score global sur 100 (rigueur, écoute, closing, conformité).
 
 Réponds STRICTEMENT en JSON valide, sans markdown, avec ce schéma:
 {
-  "corrected_transcript": "string",
+  "corrected_transcript": "string (avec vrais noms comme libellés de locuteurs)",
   "summary": "string",
   "coaching": {
     "strengths": ["string", ...],
@@ -56,8 +59,39 @@ Deno.serve(async (req) => {
     return json({ success: false, error: "TRANSCRIPT_MISSING", message: "Aucune transcription à analyser. Lancez d'abord la transcription NS-API." }, 200);
   }
 
-  const context = `Appel ${row.direction ?? "?"} · Ext ${row.extension ?? "?"} · ${row.duration_seconds ?? "?"}s · De ${row.from_number ?? "?"} vers ${row.to_number ?? "?"}`;
-  const userPrompt = `${context}\n\n--- TRANSCRIPTION BRUTE ---\n${row.transcript}\n--- FIN ---\n\nAnalyse cet appel et renvoie le JSON demandé.`;
+  // Enrich: broker (by extension) + client (by phone number)
+  let brokerName = "Courtier";
+  let clientName = "Client";
+  try {
+    const ext = String(row.extension ?? "").trim();
+    if (ext) {
+      const { data: prof } = await admin
+        .from("planipret_profiles")
+        .select("full_name, email, extension, ns_extension")
+        .or(`extension.eq.${ext},ns_extension.eq.${ext}`)
+        .maybeSingle();
+      if (prof?.full_name) brokerName = prof.full_name;
+      else if (prof?.email) brokerName = prof.email;
+    }
+    const clientPhone = String(row.direction === "outbound" ? row.to_number : row.from_number ?? "").replace(/[^\d+]/g, "");
+    if (clientPhone && clientPhone.length >= 7) {
+      const last10 = clientPhone.slice(-10);
+      const { data: contact } = await admin
+        .from("planipret_contacts")
+        .select("first_name, last_name, full_name, phone, mobile")
+        .or(`phone.ilike.%${last10}%,mobile.ilike.%${last10}%`)
+        .maybeSingle();
+      if (contact) {
+        const fn = [contact.first_name, contact.last_name].filter(Boolean).join(" ").trim();
+        clientName = contact.full_name || fn || clientName;
+      }
+    }
+  } catch (_) { /* enrichment is best-effort */ }
+
+  const context = `COURTIER: ${brokerName} (ext ${row.extension ?? "?"})
+CLIENT: ${clientName} (${row.direction === "outbound" ? row.to_number : row.from_number ?? "?"})
+Direction: ${row.direction ?? "?"} · Durée: ${row.duration_seconds ?? "?"}s`;
+  const userPrompt = `${context}\n\n--- TRANSCRIPTION BRUTE ---\n${row.transcript}\n--- FIN ---\n\nAnalyse cet appel et renvoie le JSON demandé. IMPORTANT: dans corrected_transcript, remplace TOUS les libellés génériques (Speaker 1, sip:xxxx, Agent, Caller...) par "${brokerName}" et "${clientName}".`;
 
   const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
