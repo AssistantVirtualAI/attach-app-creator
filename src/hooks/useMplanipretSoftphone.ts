@@ -201,15 +201,19 @@ export function useMplanipretSoftphone() {
   const registered = snap.status === "registered";
 
   const callViaPBX = useCallback(async (destination: string): Promise<OutboundResult> => {
-    // Primary: ns-make-call (canonical NS-API v2 outbound endpoint).
+    // Primary: ns-make-call (canonical NS-API v2 outbound endpoint, traced).
     const primary = await supabase.functions.invoke("ns-make-call", { body: { to_number: destination } });
-    if (!primary.error && (primary.data as any)?.success !== false) {
+    const pData = primary.data as any;
+    const traceId = pData?.trace_id;
+    if (!primary.error && pData?.success !== false) {
+      console.log("[softphone] ns-make-call ok", { trace_id: traceId, call_id: pData?.call_id, status: pData?.status });
       return { via: "pbx", ok: true };
     }
+    console.warn("[softphone] ns-make-call failed", { trace_id: traceId, error: pData?.error ?? primary.error?.message });
     // Fallback: ns-calls action:start (kept for backward compatibility).
     const { data, error } = await supabase.functions.invoke("ns-calls", { body: { action: "start", destination } });
     if (error || (data as any)?.success === false) {
-      const msg = (primary.data as any)?.error ?? (data as any)?.error ?? error?.message ?? primary.error?.message ?? "PBX call failed";
+      const msg = pData?.error ?? (data as any)?.error ?? error?.message ?? primary.error?.message ?? "PBX call failed";
       return { via: "none", ok: false, error: msg };
     }
     return { via: "pbx", ok: true };
