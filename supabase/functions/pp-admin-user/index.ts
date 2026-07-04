@@ -44,7 +44,7 @@ async function ensureNsUser(fullName: string, email: string, extension: string, 
   });
   if (!created.ok && created.status !== 409) return { ok: false, status: created.status, data: created.data };
   const verify = await nsFetch(`/domains/${encodeURIComponent(NS_DEFAULT_DOMAIN)}/users/${encodeURIComponent(extension)}`);
-  return { ok: verify.ok || created.status === 409, created: created.ok, status: verify.status || created.status, data: created.data };
+  return { ok: verify.ok || created.ok || created.status === 409, created: created.ok, status: verify.status || created.status, data: created.data };
 }
 
 function randomPassword(len = 22): string {
