@@ -8,7 +8,8 @@ import { ppSipProvider } from "@/lib/planipret/sip/ppSipProvider";
 
 export type HandoverEvent =
   | { kind: "network-change"; from: string; to: string; at: number }
-  | { kind: "ice-restart"; at: number; ok: boolean }
+  | { kind: "quality-drop"; from: string; to: string; at: number }
+  | { kind: "ice-restart"; at: number; ok: boolean; reason: "network-change" | "quality-drop" }
   | { kind: "reregister"; at: number };
 
 type Listener = (e: HandoverEvent) => void;
