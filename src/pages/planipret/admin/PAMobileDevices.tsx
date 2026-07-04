@@ -120,23 +120,6 @@ export default function PAMobileDevices() {
     refresh();
   }, [refresh]);
 
-  const [bulkProvisioning, setBulkProvisioning] = useState(false);
-  const provisionAll = useCallback(async () => {
-    const missing = rows.filter((r) => r.state === "missing" || r.state === "partial").length;
-    if (!confirm(`Créer les appareils SIP pour ${missing || "tous les"} courtiers manquants ? Cela peut prendre plusieurs minutes.`)) return;
-    setBulkProvisioning(true);
-    const { data, error } = await supabase.functions.invoke("ns-provision-broker-devices", {
-      body: { bulk: true, batch_size: 8 },
-    });
-    setBulkProvisioning(false);
-    if (error || !data?.success) {
-      toast.error("Provisionnement bulk échoué", { description: data?.error || error?.message });
-      return;
-    }
-    toast.success(`Bulk terminé: ${data.succeeded}/${data.total} réussis · ${data.failed} échoués`);
-    refresh();
-  }, [rows, refresh]);
-
   const syncDevices = useCallback(async () => {
     setSyncingDevices(true);
     const report = await supabase.functions.invoke("pp-mobile-device-status", { body: { sync: true } });
@@ -274,9 +257,9 @@ export default function PAMobileDevices() {
             style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }}
           />
         </div>
-        {(loading || syncingDevices || bulkProvisioning) && (
+        {(loading || syncingDevices) && (
           <span className="text-xs" style={{ color: "var(--pp-text-muted)" }}>
-            {syncingDevices ? "Synchronisation bidirectionnelle en cours…" : bulkProvisioning ? "Provisionnement en cours…" : "Chargement des appareils…"}
+            {syncingDevices ? "Synchronisation bidirectionnelle en cours…" : "Chargement des appareils…"}
           </span>
         )}
       </div>
