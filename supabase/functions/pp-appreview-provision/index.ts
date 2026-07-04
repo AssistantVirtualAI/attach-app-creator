@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
 
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
     const { data: callerProfile } = await admin
-      .from("planipret_profiles").select("role").or(`user_id.eq.${caller.id},id.eq.${caller.id}`).maybeSingle();
+      .from("planipret_profiles").select("role,organization_id").or(`user_id.eq.${caller.id},id.eq.${caller.id}`).maybeSingle();
     const callerRole = (callerProfile?.role ?? "").toLowerCase();
     let isAdmin = ["admin", "super_admin", "owner", "planipret_admin"].includes(callerRole);
     if (!isAdmin) {
@@ -114,6 +114,7 @@ Deno.serve(async (req) => {
     // STEP B: planipret_profiles insert-or-update (no unique constraint on user_id)
     const profilePayload = {
       user_id: authUserId,
+      organization_id: callerProfile?.organization_id ?? null,
       full_name: APP_REVIEW_NAME,
       email: APP_REVIEW_EMAIL,
       role: "broker",
