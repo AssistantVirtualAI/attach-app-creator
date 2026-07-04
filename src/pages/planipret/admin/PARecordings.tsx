@@ -44,6 +44,7 @@ export default function PARecordings() {
   const [transcribing, setTranscribing] = useState<string | null>(null);
   const [recordingError, setRecordingError] = useState<string | null>(null);
   const [transcriptionError, setTranscriptionError] = useState<string | null>(null);
+  const [transcriptionUnavailable, setTranscriptionUnavailable] = useState<boolean>(false);
 
   const hasFilters = !!(search || broker || from || to || withTranscript);
   const activeFilterCount = [search, broker, from, to, withTranscript].filter(Boolean).length;
