@@ -1,53 +1,42 @@
-## Goal
+## Diagnostic
 
-Make recordings play automatically by consuming the `file-access-url` field returned by NS-API v2, and improve the transcription endpoint to surface a clear status.
+J'ai vérifié la base — les données existent, ce sont les filtres du dashboard qui sont mauvais :
 
-## Current state
+| KPI | Cause du 0 |
+|---|---|
+| Appels aujourd'hui | Filtre sur `started_at ≥ minuit` — or les 6 appels d'aujourd'hui ont `started_at = NULL` (seulement `created_at` rempli). |
+| SMS aujourd'hui | Même problème : filtre `sent_at`, colonne vide sur les nouveaux messages. |
+| Appels manqués | Filtre `direction='missed'` — or `direction` ne contient que `inbound`/`outbound`. Le "missed" est dans la colonne `status`. |
+| Courtiers actifs | Lit `brokerStats.app_mobile_active` depuis le hook, mais `load()` capture la valeur au premier rendu (0) et ne se relance pas quand le hook finit de charger. |
+| Graphique 7 jours | Même bug `started_at`/`sent_at` que ci-dessus. |
 
-`ns-get-recording` already tries user/domain endpoints and calls `pickAudioUrl(parsed)` which reads `file-access-url`. Two real problems remain:
+Design, layout, textes, i18n : **rien ne change**. Uniquement les queries.
 
-1. When the parsed URL is absolute (ucstack signed URL with `?auth=...`), the code refetches it with the NS Bearer header. ucstack rejects/redirects extra auth in some cases and we lose diagnostic info.
-2. On failure we don't return the recording metadata (`call-recording-status`, `file-size-kilobytes`), so we can't tell "not recorded" from "still processing".
+## Changements (fichier unique : `src/pages/planipret/admin/PAOverview.tsx`)
 
-`ns-get-transcription` returns `TRANSCRIPT_NOT_AVAILABLE` because `PORTAL_VOICE_TRANSCRIPTION_SENTIMENT` is not enabled on the NS domain. The function itself needs to (a) not throw, (b) return a clear payload for the UI, (c) try a few more field names before giving up.
+### 1. Basculer les filtres temporels sur `created_at`
+Dans `load()` :
+- `getPlanipretCallCount({ from: todayIso })` → nouvelle helper ou query directe utilisant `created_at`.
+- Idem pour `callsYest`, `callsPeriodStats`, `topCalls`, `callsByDir`, `callsP`.
+- `planipret_phone_messages` : remplacer `.gte("sent_at", …)` par `.gte("created_at", …)`.
+- Idem pour la série 7 jours : agrégation basée sur `created_at.slice(0,10)`.
 
-## Changes
+Pour ne pas casser les autres pages qui utilisent `getPlanipretCallCount`, j'ajoute un paramètre `dateField?: "started_at" | "created_at"` (défaut `started_at`) dans `src/lib/planipret/adminCounts.ts`, et je le passe à `"created_at"` depuis Overview.
 
-### 1. `supabase/functions/ns-get-recording/index.ts`
+### 2. Corriger le filtre "appels manqués"
+- `getPlanipretCallCount({ direction: "missed", … })` → `{ status: "missed", … }`.
+- Distribution "direction" : construire la 3ᵉ tranche (Missed) à partir de `status='missed'` au lieu de `direction='missed'`, en excluant ces rows du décompte inbound/outbound pour éviter le double comptage.
 
-- When the JSON response contains `file-access-url` (or equivalent), fetch that URL:
-  - First attempt: **no Authorization header** (URL is already signed with `?auth=`).
-  - Fallback attempt: with NS `Authorization: Bearer` header.
-- Capture full recording metadata from the first successful JSON hit: `call-recording-status`, `file-size-kilobytes`, `file-duration-seconds`, `call-recording-remote-wav`.
-- On no-audio outcome, return status 200 with:
-  - `error: "NO_FILE_ACCESS_URL"` when metadata found but URL empty (include `recording_status`, `file_size_kb`, `duration_sec`, `recording_meta`).
-  - `error: "RECORDING_NOT_FOUND"` when nothing came back (existing payload, keep 200 so the frontend `invoke` doesn't throw).
-- Keep all existing endpoint cascade + callid variants; only the download step and error payload change.
+### 3. Faire réagir `load()` à `brokerStats`
+Ajouter `brokerStats` dans les dépendances du `useEffect` qui appelle `load`, avec debounce, pour que `stats.brokers` / `stats.brokersTotal` se mettent à jour dès que la vue `planipret_broker_stats` renvoie ses vraies valeurs.
 
-### 2. `supabase/functions/ns-get-transcription/index.ts`
+Fallback en attendant : si `brokerStats.app_mobile_active === 0` ET `brokerStats.total_courtiers === 0`, utiliser le count direct `planipret_profiles WHERE mobile_app_enabled = true` (déjà récupéré via `svcProfiles`) comme valeur affichée.
 
-- Broaden field extraction: accept `transcription-text`, `transcript`, `text`, `asr-text`, `sentiment-transcript`.
-- Return 200 with `{ success:false, error:"TRANSCRIPT_NOT_AVAILABLE", action_required, attempts }` (already partially done — verify no throw path remains).
-- Add a lightweight probe of `/domains/{domain}/transcriptions?callid=…` and `/users/{ext}/transcriptions?callid=…`, log status + first 200 chars of body for diagnosis.
+### 4. Rien d'autre
+- Aucune modif visuelle, aucun composant renommé/supprimé.
+- Pas de changement à `/admin/reports` (PAReports.tsx) — la page overview seule est concernée par les symptômes rapportés.
+- Realtime, période 7/30/90, sync NS : intacts.
 
-### 3. `src/pages/planipret/admin/PARecordings.tsx` (frontend)
-
-In `resolveRecording`, distinguish error codes to show a helpful message instead of a generic toast:
-
-- `MISSING_CALLID` → "Identifiant d'appel manquant — resynchroniser le CDR".
-- `NO_FILE_ACCESS_URL` → "Enregistrement en traitement (status: X, size: Y kB)".
-- `RECORDING_NOT_FOUND` → "Aucun enregistrement pour cet appel".
-- Other → existing message fallback.
-
-No change to CDR sync in this pass — we already store `ns_callid`, `ns_orig_callid`, `ns_term_callid` and the function tries all three.
-
-## Out of scope
-
-- Enabling `PORTAL_VOICE_TRANSCRIPTION_SENTIMENT` on the NS domain (server-side toggle by Clinton — not a code change).
-- CDR sync field mapping changes.
-
-## Test
-
-1. Open a recorded call (Jean-Eric Gagnon ext 1040, 6m54s) → modal auto-loads audio via `file-access-url`.
-2. Open a non-recorded call → toast shows "Aucun enregistrement" without runtime error.
-3. Open any call → transcription section shows either transcript or the "activation NS requise" notice, no runtime error.
+## Vérification
+- Recharger `/admin/overview` : appels aujourd'hui = 6, SMS = 0 (réel), manqués corrects, courtiers actifs = valeur réelle du hook, graphique 7 jours peuplé.
+- Console : plus de "chart all zeros" quand il y a des données.
