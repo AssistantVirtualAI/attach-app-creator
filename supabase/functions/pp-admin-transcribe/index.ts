@@ -53,17 +53,30 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({ call_row_id: callId, force: true }),
     });
-    if (resolveRes.ok) {
-      const j = await resolveRes.json().catch(() => ({}));
-      if (j?.recording_url) recUrl = j.recording_url;
+    const resolveJson = await resolveRes.json().catch(() => ({} as any));
+    if (resolveJson?.recording_url && /^https?:\/\//i.test(resolveJson.recording_url)) {
+      recUrl = resolveJson.recording_url;
     }
-    if (!recUrl) return json({ error: "no recording available" }, 422);
+    if (!recUrl || !/^https?:\/\//i.test(recUrl)) {
+      return json({
+        ok: false,
+        fallback: true,
+        error: "RECORDING_NOT_AVAILABLE",
+        hint: resolveJson?.hint ?? "Aucun enregistrement disponible pour cet appel.",
+        resolve_detail: resolveJson,
+      }, 200);
+    }
 
     // Fetch audio
-    const audioRes = await fetch(recUrl);
-    if (!audioRes.ok) return json({ error: `audio fetch failed (${audioRes.status})` }, 502);
+    let audioRes: Response;
+    try {
+      audioRes = await fetch(recUrl);
+    } catch (e) {
+      return json({ ok: false, fallback: true, error: "AUDIO_FETCH_FAILED", hint: (e as Error).message }, 200);
+    }
+    if (!audioRes.ok) return json({ ok: false, fallback: true, error: `AUDIO_FETCH_${audioRes.status}`, hint: "Impossible de télécharger l'audio." }, 200);
     const audioBuf = new Uint8Array(await audioRes.arrayBuffer());
-    if (audioBuf.length < 1024) return json({ error: "audio empty" }, 422);
+    if (audioBuf.length < 1024) return json({ ok: false, fallback: true, error: "AUDIO_EMPTY", hint: "Fichier audio vide." }, 200);
 
     // Call Lovable AI transcription
     const ct = audioRes.headers.get("content-type") ?? "audio/wav";
