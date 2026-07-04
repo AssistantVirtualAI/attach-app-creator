@@ -248,30 +248,55 @@ export default function PARecordings() {
 
       <NsSyncBar features={["recordings", "cdrs"]} onReload={() => load(page, pageSize)} />
 
-      <button
-        type="button"
-        onClick={async () => {
-          try {
-            const { data: recentCall } = await supabase
-              .from("planipret_phone_calls")
-              .select("*")
-              .order("created_at", { ascending: false })
-              .limit(1)
-              .maybeSingle();
-            const { data: rawCdr, error } = await supabase.functions.invoke("ns-debug-cdr", { body: {} });
-            const payload = { db_row_fields: recentCall ? Object.keys(recentCall) : [], db_row: recentCall, ns_debug: rawCdr, invoke_error: error?.message };
-            console.log("[CDR DEBUG]", payload);
-            setDebug((d) => [{ ts: new Date().toISOString(), label: "CDR fields debug", data: payload } as any, ...d]);
-            toast.success("Debug CDR — voir DebugPanel + console");
-          } catch (e: any) {
-            toast.error(`Debug échoué: ${e?.message ?? e}`);
-          }
-        }}
-        className="px-3 py-2 rounded-lg text-sm border"
-        style={{ borderColor: "var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }}
-      >
-        🔍 Debug CDR Fields
-      </button>
+      <div className="flex gap-2 flex-wrap">
+        <button
+          type="button"
+          onClick={async () => {
+            try {
+              const { data: recentCall } = await supabase
+                .from("planipret_phone_calls")
+                .select("*")
+                .order("created_at", { ascending: false })
+                .limit(1)
+                .maybeSingle();
+              const { data: rawCdr, error } = await supabase.functions.invoke("ns-debug-cdr", { body: {} });
+              const payload = { db_row_fields: recentCall ? Object.keys(recentCall) : [], db_row: recentCall, ns_debug: rawCdr, invoke_error: error?.message };
+              console.log("[CDR DEBUG]", payload);
+              setDebug((d) => [{ ts: new Date().toISOString(), label: "CDR fields debug", data: payload } as any, ...d]);
+              toast.success("Debug CDR — voir DebugPanel + console");
+            } catch (e: any) {
+              toast.error(`Debug échoué: ${e?.message ?? e}`);
+            }
+          }}
+          className="px-3 py-2 rounded-lg text-sm border"
+          style={{ borderColor: "var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }}
+        >
+          🔍 Debug CDR Fields
+        </button>
+
+        <button
+          type="button"
+          onClick={async () => {
+            try {
+              toast.message("Diagnostic en cours (peut prendre ~30s)…");
+              const { data, error } = await supabase.functions.invoke("ns-debug-real-cdr", { body: {} });
+              if (error) throw error;
+              console.log("[NS RECORDING DIAG]", data);
+              setDebug((d) => [{ ts: new Date().toISOString(), label: "Diagnostic enregistrements NS-API", data } as any, ...d]);
+              const successes = (data as any)?.successes ?? [];
+              if (successes.length) toast.success(`✅ ${successes.length} endpoint(s) audio trouvé(s) — voir DebugPanel`);
+              else toast.error("Aucun endpoint audio n'a répondu 200 — voir DebugPanel");
+            } catch (e: any) {
+              toast.error(`Diagnostic échoué: ${e?.message ?? e}`);
+            }
+          }}
+          className="px-3 py-2 rounded-lg text-sm border"
+          style={{ borderColor: "var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }}
+        >
+          🔬 Diagnostiquer les enregistrements
+        </button>
+      </div>
+
 
 
 
