@@ -534,19 +534,19 @@ export default function PARecordings() {
                 );
               })()}
 
-              {hasDetailTranscript ? (
+              {hasDetailTranscript && detail.ai_coaching ? (
+                <div>
+                  <p style={{ fontSize: 11, color: "var(--pp-text-muted)", marginBottom: 4 }}>Transcription corrigée (IA)</p>
+                  <div className="p-3 rounded-lg" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", fontSize: 12 }}>
+                    <div className="whitespace-pre-wrap">{detail.transcript}</div>
+                  </div>
+                </div>
+              ) : (hasDetailTranscript && !detail.ai_coaching) || coaching === detail.id ? (
                 <div>
                   <p style={{ fontSize: 11, color: "var(--pp-text-muted)", marginBottom: 4 }}>Transcription</p>
-                  <div className="p-3 rounded-lg space-y-2" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", fontSize: 12 }}>
-                    {detailSegments.length ? detailSegments.map((s: any, i: number) => (
-                      <div key={i}>
-                        <span style={{ color: "var(--pp-text-primary)", fontWeight: 600 }}>{s.speaker ?? "Speaker"}</span>
-                        <span style={{ color: "var(--pp-text-muted)" }}> — </span>
-                        <span>{s.text}</span>
-                      </div>
-                    )) : (
-                      <div className="whitespace-pre-wrap">{detail.transcript}</div>
-                    )}
+                  <div className="flex items-center gap-2 p-3 rounded-lg text-xs" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>
+                    <div className="w-3 h-3 rounded-full border-2 animate-spin" style={{ borderColor: "var(--pp-text-muted)", borderTopColor: "transparent" }} />
+                    AVA analyse et corrige la transcription (noms, résumé, coaching)…
                   </div>
                 </div>
               ) : transcribing === detail.id ? (
@@ -604,12 +604,6 @@ export default function PARecordings() {
                   </div>
                 </div>
               ) : null}
-              {hasDetailTranscript && !detail.ai_coaching && (
-                <div className="flex items-center gap-2 p-3 rounded-lg text-xs" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>
-                  <Sparkles className="w-3.5 h-3.5" style={{ color: AGENT }} />
-                  {coaching === detail.id ? "AVA analyse la transcription (correction, résumé, coaching)…" : "Analyse IA en attente…"}
-                </div>
-              )}
               {detail.ai_coaching && (
                 <div>
                   <p style={{ fontSize: 11, color: "var(--pp-text-muted)", marginBottom: 4 }}>Coaching IA</p>
