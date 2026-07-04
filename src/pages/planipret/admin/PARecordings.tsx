@@ -585,19 +585,50 @@ export default function PARecordings() {
 
               {hasDetailTranscript && detail.ai_coaching ? (
                 <div>
-                  <p style={{ fontSize: 11, color: "var(--pp-text-muted)", marginBottom: 4 }}>Transcription corrigée (IA)</p>
+                  <div className="flex items-center justify-between mb-1">
+                    <p style={{ fontSize: 11, color: "var(--pp-text-muted)" }}>Transcription corrigée (IA)</p>
+                    <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 999, background: "rgba(16,185,129,0.14)", color: "#10b981", border: "1px solid #10b98155", fontWeight: 700, letterSpacing: 0.4, textTransform: "uppercase" }}>● Terminé</span>
+                  </div>
                   <div className="p-3 rounded-lg" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", fontSize: 12 }}>
                     <div className="whitespace-pre-wrap">{detail.transcript}</div>
                   </div>
                 </div>
               ) : (hasDetailTranscript && !detail.ai_coaching) || coaching === detail.id ? (
-                <div>
-                  <p style={{ fontSize: 11, color: "var(--pp-text-muted)", marginBottom: 4 }}>Transcription</p>
-                  <div className="flex items-center gap-2 p-3 rounded-lg text-xs" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>
-                    <div className="w-3 h-3 rounded-full border-2 animate-spin" style={{ borderColor: "var(--pp-text-muted)", borderTopColor: "transparent" }} />
-                    AVA analyse et corrige la transcription (noms, résumé, coaching)…
-                  </div>
-                </div>
+                (() => {
+                  const st = coachStatus[detail.id] ?? "queued";
+                  const label = st === "queued" ? "En attente" : st === "running" ? "En cours" : st === "error" ? "Erreur" : "Terminé";
+                  const color = st === "queued" ? "#f59e0b" : st === "running" ? "#2E9BDC" : st === "error" ? "#ef4444" : "#10b981";
+                  const started = coachStartedAt[detail.id];
+                  const elapsed = started ? Math.max(0, Math.floor((Date.now() - started) / 1000)) + Math.min(coachElapsed, 0) : 0;
+                  // Estimation ~15s, barre progressive plafonnée à 92% tant que pas fini
+                  const pct = st === "error" ? 100 : Math.min(92, Math.round((elapsed / 15) * 100));
+                  return (
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <p style={{ fontSize: 11, color: "var(--pp-text-muted)" }}>Analyse coaching AVA</p>
+                        <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 999, background: `${color}22`, color, border: `1px solid ${color}55`, fontWeight: 700, letterSpacing: 0.4, textTransform: "uppercase" }}>● {label}</span>
+                      </div>
+                      <div className="p-3 rounded-lg space-y-2" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)" }}>
+                        <div className="flex items-center gap-2 text-xs" style={{ color: "var(--pp-text-secondary)" }}>
+                          {st !== "error" && <div className="w-3 h-3 rounded-full border-2 animate-spin" style={{ borderColor: color, borderTopColor: "transparent" }} />}
+                          <span>
+                            {st === "queued" && "En file — préparation du contexte…"}
+                            {st === "running" && `AVA analyse et corrige la transcription… (${elapsed}s)`}
+                            {st === "error" && "Analyse échouée — vous pouvez réessayer."}
+                          </span>
+                        </div>
+                        <div style={{ height: 4, borderRadius: 999, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
+                          <div style={{ height: "100%", width: `${pct}%`, background: color, transition: "width 0.6s linear" }} />
+                        </div>
+                        {st === "error" && (
+                          <button onClick={() => runCoaching(detail.id)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-xs" style={{ background: ACCENT }}>
+                            <RefreshCw className="w-3 h-3" /> Réessayer l'analyse
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()
               ) : transcribing === detail.id ? (
                 <div>
                   <p style={{ fontSize: 11, color: "var(--pp-text-muted)", marginBottom: 4 }}>Transcription</p>
