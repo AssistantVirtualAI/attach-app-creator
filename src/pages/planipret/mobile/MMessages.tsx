@@ -1258,6 +1258,7 @@ type RosterMember = {
 };
 
 function TeamRoster({ profile, openDialer, onSwitchTab }: { profile: any; openDialer: (n?: string) => void; onSwitchTab: (k: SubTab) => void }) {
+  const { t } = useMplanipretLang();
   const [members, setMembers] = useState<RosterMember[]>([]);
   const [lastSeen, setLastSeen] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -1301,11 +1302,11 @@ function TeamRoster({ profile, openDialer, onSwitchTab }: { profile: any; openDi
   const statusFor = (userId: string | null) => {
     if (!userId) return { color: "var(--pp-text-faint)", label: "—" };
     const ts = lastSeen[userId];
-    if (!ts) return { color: "var(--pp-text-faint)", label: "Hors ligne" };
+    if (!ts) return { color: "var(--pp-text-faint)", label: t("home.offline") };
     const age = Date.now() - +new Date(ts);
-    if (age < 2 * 60_000) return { color: "var(--pp-success)", label: "En ligne" };
-    if (age < 30 * 60_000) return { color: "var(--pp-warning, #F5A623)", label: "Inactif" };
-    return { color: "var(--pp-text-faint)", label: "Hors ligne" };
+    if (age < 2 * 60_000) return { color: "var(--pp-success)", label: t("home.online") };
+    if (age < 30 * 60_000) return { color: "var(--pp-warning, #F5A623)", label: t("common.inactive") };
+    return { color: "var(--pp-text-faint)", label: t("home.offline") };
   };
 
   const sendMention = async (m: RosterMember) => {
