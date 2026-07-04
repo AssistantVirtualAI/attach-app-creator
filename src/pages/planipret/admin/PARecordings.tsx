@@ -561,8 +561,37 @@ export default function PARecordings() {
                   </button>
                 </div>
               ) : transcriptionUnavailable ? (
-                <div className="p-3 rounded-lg text-xs text-center" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>
-                  📝 Transcription non disponible pour cet appel.
+                <div>
+                  <div className="p-3 rounded-lg text-xs text-center mb-2" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>
+                    ⚠️ Transcription non trouvée — Diagnostic
+                  </div>
+                  <div style={{ background: "#040B16", border: "1px solid #0E2A45", borderRadius: 10, padding: 10, fontSize: 10, fontFamily: "monospace", color: "#8FA8C0", maxHeight: 320, overflowY: "auto" }}>
+                    <div style={{ color: "#2E9BDC" }}>NS callid: {transcriptionDebug?.ns_callid ?? "null"}</div>
+                    <div style={{ color: "#2E9BDC", marginBottom: 6 }}>Extension: {transcriptionDebug?.ns_extension ?? "null"}</div>
+                    {(transcriptionDebug?.attempts ?? []).map((a: any, i: number) => (
+                      <div key={i} style={{ marginBottom: 6, paddingBottom: 6, borderBottom: "1px solid #0E2A45" }}>
+                        <div style={{ color: a.status === 200 ? "#00D4AA" : "#E84C4C", wordBreak: "break-all" }}>
+                          HTTP {a.status ?? "ERR"} — {String(a.url ?? "").slice(0, 120)}
+                        </div>
+                        {a.fields_found?.length > 0 && (
+                          <div style={{ color: "#9B7FE8" }}>Fields: {a.fields_found.join(", ")}</div>
+                        )}
+                        {a.items_count > 0 && (
+                          <div style={{ color: "#F5A623" }}>Items: {a.items_count}</div>
+                        )}
+                        {a.transcript_found && (
+                          <div style={{ color: "#00D4AA" }}>✅ Transcript field found</div>
+                        )}
+                        {a.body_preview && (
+                          <div style={{ color: "#6B8CAE", whiteSpace: "pre-wrap", wordBreak: "break-all" }}>{a.body_preview}</div>
+                        )}
+                        {a.error && <div style={{ color: "#E84C4C" }}>Error: {a.error}</div>}
+                      </div>
+                    ))}
+                    {transcriptionDebug?.action_required && (
+                      <div style={{ color: "#4A7FA5", marginTop: 6 }}>Note: {transcriptionDebug.action_required}</div>
+                    )}
+                  </div>
                 </div>
               ) : null}
               {hasDetailTranscript && !detail.ai_coaching && (
