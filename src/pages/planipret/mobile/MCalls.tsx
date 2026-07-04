@@ -836,22 +836,60 @@ function CallDetailSheet({
     toast.success(t("calls.recordingFetched"));
   };
 
-  const fetchTranscript = async () => {
-    setTxLoading(true);
-    const { data, error } = await supabase.functions.invoke("ns-transcription", { body: { call_id: call.ns_call_id ?? call.id } });
-    setTxLoading(false);
+  // Retry backoff (ms) for transient transcription failures (still being generated NS-side)
+  const TX_BACKOFF = [4000, 10000, 25000, 60000];
+
+  const isTransientTxError = (res: any): boolean => {
+    if (!res) return true;
+    const attempts: Array<{ status: number }> = Array.isArray(res.attempts) ? res.attempts : [];
+    // Retry when NS returned 404/202/425 or nothing usable yet — the CDR exists but transcript not ready.
+    if (attempts.length && attempts.every((a) => [0, 202, 404, 425, 408, 500, 502, 503, 504].includes(a.status))) return true;
+    // Explicit hints from the edge function
+    const hay = `${res.error ?? ""} ${res.hint ?? ""}`.toLowerCase();
+    if (hay.includes("en cours") || hay.includes("prépar") || hay.includes("processing")) return true;
+    return false;
+  };
+
+  const runTranscriptOnce = async () => {
+    const { data, error } = await supabase.functions.invoke("ns-transcription", {
+      body: { call_id: call.ns_call_id ?? call.id },
+    });
     const res = (data ?? {}) as any;
-    if (error || res.success === false || (!res.transcript && !(Array.isArray(res.segments) && res.segments.length))) {
-      const msg = res.error ?? error?.message ?? t("calls.transcriptUnavailable");
-      const hint = res.hint ?? res.action_required ?? "";
-      if (Array.isArray(res.attempts)) console.warn("ns-transcription attempts:", res.attempts);
-      toast.error(hint ? `${msg} — ${hint}` : msg);
+    const ok = !error && res.success !== false && (res.transcript || (Array.isArray(res.segments) && res.segments.length));
+    return { ok, res, error };
+  };
+
+  const fetchTranscript = async (attempt = 0): Promise<void> => {
+    if (txRetryTimerRef.current) { clearTimeout(txRetryTimerRef.current); txRetryTimerRef.current = null; }
+    setTxAttempt(attempt);
+    if (attempt === 0) setTxLoading(true); else setTxPreparing(true);
+
+    const { ok, res, error } = await runTranscriptOnce();
+
+    if (ok) {
+      setTxLoading(false); setTxPreparing(false); setTxAttempt(0);
+      onUpdated({ ...call, transcript: res.transcript ?? call.transcript, transcript_segments: res.segments ?? call.transcript_segments });
+      await refreshCall();
+      toast.success(t("calls.transcriptFetched"));
       return;
     }
-    // Optimistic UI update — the edge function already persists to DB.
-    onUpdated({ ...call, transcript: res.transcript ?? call.transcript, transcript_segments: res.segments ?? call.transcript_segments });
-    await refreshCall();
-    toast.success(t("calls.transcriptFetched"));
+
+    if (Array.isArray(res.attempts)) console.warn("ns-transcription attempts:", res.attempts);
+
+    const transient = isTransientTxError(res);
+    if (transient && attempt < TX_BACKOFF.length) {
+      setTxLoading(false);
+      setTxPreparing(true);
+      const delay = TX_BACKOFF[attempt];
+      txRetryTimerRef.current = setTimeout(() => { void fetchTranscript(attempt + 1); }, delay);
+      return;
+    }
+
+    // Give up — show real error
+    setTxLoading(false); setTxPreparing(false); setTxAttempt(0);
+    const msg = res.error ?? error?.message ?? t("calls.transcriptUnavailable");
+    const hint = res.hint ?? res.action_required ?? "";
+    toast.error(hint ? `${msg} — ${hint}` : msg);
   };
 
   const analyzeAI = async () => {
