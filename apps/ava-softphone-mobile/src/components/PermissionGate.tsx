@@ -260,19 +260,13 @@ export default function PermissionGate({ onComplete }: PermissionGateProps) {
         </button>
       )}
 
-      {status === 'denied' && (
-        <button onClick={requestCurrent} disabled={requesting} style={{ ...primaryBtnStyle, opacity: requesting ? 0.6 : 1 }}>
-          {requesting ? 'Requesting…' : 'Réessayer'}
-        </button>
-      )}
-
       {status === 'denied' && Capacitor.isNativePlatform() && (
-        <button onClick={() => { void openAppSettings(); }} style={{ ...ghostBtnStyle, marginTop: 8 }}>
-          Ouvrir les Réglages
+        <button onClick={() => { void openAppSettings(); }} style={primaryBtnStyle}>
+          Open Settings
         </button>
       )}
 
-      {status === 'denied' && step !== 'microphone' && (
+      {status === 'denied' && (
         <button
           onClick={() => advance(step)}
           style={{ ...ghostBtnStyle, marginTop: 8, color: colors.mutedSilver }}
