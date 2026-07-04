@@ -560,7 +560,7 @@ export default function PAOverview() {
                       <p className="truncate" style={{ fontSize: 11, color: "var(--pp-text-muted)" }}>{contact}</p>
                     </div>
                     <span style={{ fontSize: 11, fontWeight: 700, color: TEMP_COLORS.hot }}>{TEMP_EMOJI.hot} {l.lead_score}/10</span>
-                    <span style={{ fontSize: 10, color: "var(--pp-text-faint)" }}>{new Date(l.started_at).toLocaleTimeString(dateLocale, { hour: "2-digit", minute: "2-digit" })}</span>
+                    <span style={{ fontSize: 10, color: "var(--pp-text-faint)" }}>{new Date(l.started_at ?? l.created_at).toLocaleTimeString(dateLocale, { hour: "2-digit", minute: "2-digit" })}</span>
                   </li>
                 );
               })}
