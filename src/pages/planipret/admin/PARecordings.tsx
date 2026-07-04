@@ -224,15 +224,20 @@ export default function PARecordings() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detail?.id]);
 
-  // Auto-fetch audio via ns-get-recording when a recording detail opens without a playable URL
+  // Auto-fetch audio via ns-get-recording when a recording detail opens (skip voicemails)
   useEffect(() => {
     if (!detail?.id) return;
+    const to = String(detail.to_number ?? "").toLowerCase();
+    const isVoicemail = to.includes("vmail") || to.includes("voicemail") || to.includes("vm@");
+    if (isVoicemail) return;
+    if (detail.has_recording === false && !detail.ns_callid && !detail.ns_orig_callid) return;
     if (detail.recording_url && String(detail.recording_url).startsWith("blob:")) return;
     if (detail.recording_url && String(detail.recording_url).startsWith("http")) return;
     if (resolving === detail.id) return;
     resolveRecording(detail);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detail?.id]);
+
 
 
   const inputStyle = { background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" };
