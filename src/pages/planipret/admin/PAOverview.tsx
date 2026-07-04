@@ -371,9 +371,9 @@ export default function PAOverview() {
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         <MiniStat label={t("overview.miniAvgDuration")} value={stats.avgDurationSec > 0 ? `${Math.floor(stats.avgDurationSec / 60)}m ${stats.avgDurationSec % 60}s` : "—"} sub={`${t("overview.miniPeriod")} ${period} ${t("overview.days")}`} color={ACCENT} />
         <MiniStat label={t("overview.miniAnswerRate")} value={`${stats.answerRatePct}%`} sub={`${t("overview.miniPeriod")} ${period} ${t("overview.days")}`} color={SUCCESS} />
-        <MiniStat label={t("overview.miniMissedCalls")} value={stats.callsMissedToday} sub={t("overview.miniToday")} color={DANGER} />
+        <MiniStat label={t("overview.miniMissedCalls")} value={stats.callsMissedToday} sub={`${t("overview.miniPeriod")} ${period} ${t("overview.days")}`} color={DANGER} />
         <MiniStat label={t("overview.miniOverdue")} value={stats.overdueReminders} sub={t("overview.miniToProcess")} color={WARNING} />
-        <MiniStat label={t("overview.miniHotLeads")} value={stats.hotLeads7d} sub={`7 ${t("overview.miniLastDays")}`} color={AGENT} />
+        <MiniStat label={t("overview.miniHotLeads")} value={stats.hotLeads7d} sub={`${period} ${t("overview.miniLastDays")}`} color={AGENT} />
       </div>
 
 
