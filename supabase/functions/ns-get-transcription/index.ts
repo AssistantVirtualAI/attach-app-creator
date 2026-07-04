@@ -83,16 +83,22 @@ Deno.serve(async (req) => {
     const target = `${NS_API_BASE_URL}${q}`;
     try {
       const r = await fetch(target, { headers });
-      const data = await r.json().catch(() => null);
-      attempts.push({ url: q, status: r.status, has_data: !!data && (Array.isArray(data) ? data.length > 0 : Object.keys(data).length > 0) });
+      const rawText = await r.text();
+      let data: any = null;
+      try { data = JSON.parse(rawText); } catch { /* not json */ }
+      attempts.push({
+        url: q,
+        status: r.status,
+        body_preview: rawText.slice(0, 200),
+        has_data: !!data,
+      });
       if (!r.ok || !data) continue;
-      const hasContent = Array.isArray(data) ? data.length > 0
-        : typeof data === "string" ? data.length > 10
-        : Object.keys(data).length > 0 && !data.error;
-      if (hasContent) {
-        transcript = Array.isArray(data) ? data[0] : data;
-        break;
+      const items = Array.isArray(data) ? data : [data];
+      for (const item of items) {
+        const found = extractTranscript(item);
+        if (found) { transcript = found; break; }
       }
+      if (transcript) break;
     } catch (e) {
       attempts.push({ url: q, error: (e as Error).message });
     }
