@@ -181,8 +181,21 @@ export default function PARecordings() {
         toast.success("Enregistrement chargé");
       } else {
         const j = await resp.json().catch(() => ({}));
-        const msg = [j?.message ?? j?.error ?? "Aucun enregistrement disponible côté NS-API",
-          Array.isArray(j?.possible_causes) ? j.possible_causes[0] : null].filter(Boolean).join(" — ");
+        let msg: string;
+        switch (j?.error) {
+          case "MISSING_CALLID":
+            msg = "Identifiant d'appel manquant — resynchroniser le CDR";
+            break;
+          case "NO_FILE_ACCESS_URL":
+            msg = `Enregistrement en traitement (status: ${j.recording_status ?? "?"}, taille: ${j.file_size_kb ?? 0} kB)`;
+            break;
+          case "RECORDING_NOT_FOUND":
+            msg = "Aucun enregistrement disponible pour cet appel";
+            break;
+          default:
+            msg = [j?.message ?? j?.error ?? "Aucun enregistrement disponible côté NS-API",
+              Array.isArray(j?.possible_causes) ? j.possible_causes[0] : null].filter(Boolean).join(" — ");
+        }
         setRecordingError(msg);
         toast.error(msg);
         console.warn("[ns-get-recording] failure", j);
