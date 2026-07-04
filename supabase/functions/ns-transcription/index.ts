@@ -47,12 +47,31 @@ Deno.serve(async (req) => {
     if (!callId) return jsonResponse({ success: false, error: "call_id requis" }, 200);
     console.log("callId:", callId);
 
-    const attempts: Array<{ label: string; path: string }> = [
+    // Load the row to use NetSapiens' prefilled transcription URL directly.
+    const { data: row } = await admin
+      .from("planipret_phone_calls")
+      .select("id, ns_call_id, metadata")
+      .or(`id.eq.${callId},ns_call_id.eq.${callId}`)
+      .maybeSingle();
+    const meta: any = row?.metadata ?? {};
+
+    const stripBase = (p: string) => p.replace(/^https?:\/\/[^/]+/i, "").replace(/^\/?ns-api\/v2/i, "");
+    const prefilled = meta["prefilled-transcription-api"] ?? meta.transcription_path ?? null;
+    const jobId = String(meta["call-intelligence-job-id"] ?? "").trim();
+    const started = String(meta["call-start-datetime"] ?? meta["call-answer-datetime"] ?? "").trim();
+    const yyyymm = started ? started.slice(0, 7).replace("-", "") : "";
+    const origCallid = String(meta["call-orig-call-id"] ?? meta["orig-callid"] ?? "").trim();
+    const termCallid = String(meta["call-term-call-id"] ?? meta["term-callid"] ?? "").trim();
+
+    const attempts: Array<{ label: string; path: string }> = [];
+    if (prefilled) attempts.push({ label: "prefilled_transcription_api", path: stripBase(String(prefilled)) });
+    if (jobId) attempts.push({ label: "transcriptions_by_job", path: `/domains/${encodeURIComponent(env.domain)}/transcriptions?id=${encodeURIComponent(jobId)}${yyyymm ? `&date=${yyyymm}` : ""}&orig_callid=${encodeURIComponent(origCallid)}&term_callid=${encodeURIComponent(termCallid)}` });
+    attempts.push(
       { label: "cdr_transcription_endpoint", path: `/domains/${encodeURIComponent(env.domain)}/cdrs/${encodeURIComponent(callId)}/transcription` },
       { label: "user_recording_transcription", path: `/domains/${encodeURIComponent(env.domain)}/users/${encodeURIComponent(profile.extension)}/recordings/${encodeURIComponent(callId)}/transcription` },
-      { label: "transcriptions_collection", path: `/domains/${encodeURIComponent(env.domain)}/transcriptions?callId=${encodeURIComponent(callId)}` },
+      { label: "transcriptions_collection", path: `/domains/${encodeURIComponent(env.domain)}/transcriptions?callid=${encodeURIComponent(callId)}` },
       { label: "cdr_field", path: `/domains/${encodeURIComponent(env.domain)}/cdrs/${encodeURIComponent(callId)}` },
-    ];
+    );
 
     let source: string | null = null;
     let raw: any = null;
