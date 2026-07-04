@@ -262,9 +262,13 @@ export default function PermissionGate({ onComplete }: PermissionGateProps) {
       )}
       {status === 'denied' && (
         <div style={{ color: colors.danger, fontSize: font.xs, marginBottom: 16, textAlign: 'center', maxWidth: 320, lineHeight: 1.5 }}>
-          {Capacitor.getPlatform() === 'android'
-            ? 'Accès microphone refusé. Ouvrez Réglages → Applications → Lemtel → Autorisations → Microphone, puis revenez à l’application.'
-            : 'Accès microphone refusé. Ouvrez Réglages iOS → Lemtel → Microphone, puis revenez à l’application.'}
+          {current.id === 'microphone'
+            ? (Capacitor.getPlatform() === 'android'
+                ? 'Microphone access is off. To enable calling, open Settings → Apps → Lemtel → Permissions → Microphone.'
+                : 'Microphone access is off. To enable calling, open iOS Settings → Lemtel → Microphone.')
+            : (Capacitor.getPlatform() === 'android'
+                ? 'Contacts access is off. You can enable it later in Settings → Apps → Lemtel → Permissions → Contacts.'
+                : 'Contacts access is off. You can enable it later in iOS Settings → Lemtel → Contacts.')}
         </div>
       )}
       {error && (
@@ -285,12 +289,23 @@ export default function PermissionGate({ onComplete }: PermissionGateProps) {
         </button>
       )}
 
-      {status === 'denied' && (
+      {/* "Next" — always available for optional steps so the user is never blocked. */}
+      {!current.required && (
         <button
           onClick={() => advance(step)}
           style={{ ...ghostBtnStyle, marginTop: 8, color: colors.mutedSilver }}
         >
-          Continue without calls
+          Next
+        </button>
+      )}
+
+      {/* Microphone denied: allow user to proceed into the app without calls. */}
+      {status === 'denied' && current.required && (
+        <button
+          onClick={() => advance(step)}
+          style={{ ...ghostBtnStyle, marginTop: 8, color: colors.mutedSilver }}
+        >
+          Next
         </button>
       )}
 
