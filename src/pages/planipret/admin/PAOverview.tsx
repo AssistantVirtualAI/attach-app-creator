@@ -167,7 +167,7 @@ export default function PAOverview() {
     ]);
 
     const nsBrokerList = directory.brokers;
-    const brokerTotal = directory.count;
+    const brokerTotal = directory.count || brokerStats.total_courtiers || ((svcProfiles.data ?? []) as any[]).length;
 
     // Period duration + answer-rate stats
     let totalDur = 0, durCount = 0, answered = 0, totalCallsPeriod = 0;
@@ -179,10 +179,9 @@ export default function PAOverview() {
     const avgDur = durCount > 0 ? Math.round(totalDur / durCount) : 0;
     const answerPct = totalCallsPeriod > 0 ? Math.round((answered / totalCallsPeriod) * 100) : 0;
 
-    // Broker actives: prefer view, fall back to direct count if the view hasn't loaded yet
+    // Broker KPI = active broker directory count. Mobile adoption stays separate.
     const profilesAll = (svcProfiles.data ?? []) as Array<{ full_name: string | null; email: string | null; ns_domain: string | null; mobile_app_enabled: boolean | null; voice_agent_enabled: boolean | null }>;
-    const directMobileActive = profilesAll.filter((p) => p.mobile_app_enabled).length;
-    const brokersActive = brokerStats.app_mobile_active || directMobileActive;
+    const brokersActive = brokerTotal;
 
     setStats({
       calls: c1 ?? 0, callsYest: c2 ?? 0, callsMissedToday: missedToday ?? 0,
@@ -208,9 +207,9 @@ export default function PAOverview() {
     const isRealBroker = (p: { full_name: string | null; email: string | null; ns_domain: string | null }) =>
       p.ns_domain === "planipret.ca" && !isTest(p.full_name, p.email);
     const realBrokers = profilesAll.filter(isRealBroker);
-    const widgetN = brokerStats.total_courtiers || realBrokers.length;
-    const mobileN = brokerStats.app_mobile_active || realBrokers.filter((p) => p.mobile_app_enabled).length;
-    const aiN = brokerStats.agent_ia_active || realBrokers.filter((p) => p.voice_agent_enabled).length;
+    const widgetN = brokerStats.total_courtiers || brokerTotal || realBrokers.length;
+    const mobileN = brokerStats.app_mobile_active || realBrokers.filter((p) => p.mobile_app_enabled).length || profilesAll.filter((p) => p.mobile_app_enabled).length;
+    const aiN = brokerStats.agent_ia_active || realBrokers.filter((p) => p.voice_agent_enabled).length || profilesAll.filter((p) => p.voice_agent_enabled).length;
     setServiceCounts({ mobile: mobileN, widget: widgetN, ai: aiN });
     setRecent(rec.data ?? []);
     setBrokers(nsBrokerList.slice(0, 10));
@@ -320,7 +319,7 @@ export default function PAOverview() {
 
   // Engagement metrics
   const avgCallsPerBroker = stats.brokers > 0 ? (seriesData.reduce((s, d) => s + d.appels, 0) / stats.brokers).toFixed(1) : "0";
-  const adoptionPct = stats.brokersTotal > 0 ? Math.round((stats.brokers / stats.brokersTotal) * 100) : 0;
+  const mobileAdoptionPct = stats.brokersTotal > 0 ? Math.round((serviceCounts.mobile / stats.brokersTotal) * 100) : 0;
 
   return (
     <div className="space-y-5">
@@ -364,7 +363,7 @@ export default function PAOverview() {
       {/* KPI Hero Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard icon={<Phone className="w-5 h-5" />} title={t("overview.kpiCallsToday")} value={stats.calls} subtitle={`${stats.callsMissedToday} ${t("overview.kpiCallsSub")}`} trend={callsTrend} color={ACCENT} />
-        <KpiCard icon={<Users className="w-5 h-5" />} title={t("overview.kpiActiveBrokers")} value={stats.brokers} subtitle={`${adoptionPct}% ${t("overview.kpiActiveBrokersSub")} · ${stats.brokersOnline} ${t("overview.kpiOnline")}`} color={SUCCESS} />
+        <KpiCard icon={<Users className="w-5 h-5" />} title={t("overview.kpiActiveBrokers")} value={stats.brokers} subtitle={`${serviceCounts.mobile} ${t("overview.svcMobile")} · ${stats.brokersOnline} ${t("overview.kpiOnline")}`} color={SUCCESS} />
         <KpiCard icon={<MessageSquare className="w-5 h-5" />} title={t("overview.kpiSmsToday")} value={stats.sms} subtitle={t("overview.kpiSmsSub")} trend={smsTrend} color={WARNING} />
         <KpiCard icon={<Bot className="w-5 h-5" />} title={t("overview.kpiAvaToday")} value={stats.ava} subtitle={`${stats.avaWeek} ${t("overview.kpiAvaSubDays")} · ${stats.voicemailsUnread} ${t("overview.kpiAvaSubVm")}`} color={AGENT} />
       </div>
@@ -472,7 +471,7 @@ export default function PAOverview() {
 
       {/* Engagement strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <MiniStat label={t("overview.engagementMobileAdoption")} value={`${adoptionPct}%`} sub={`${stats.brokers}/${stats.brokersTotal} ${t("overview.engagementBrokers")}`} color={ACCENT} />
+        <MiniStat label={t("overview.engagementMobileAdoption")} value={`${mobileAdoptionPct}%`} sub={`${serviceCounts.mobile}/${stats.brokersTotal} ${t("overview.engagementBrokers")}`} color={ACCENT} />
         <MiniStat label={`${t("overview.engagementCallsPerBroker")} (${period}${t("overview.days")})`} value={avgCallsPerBroker} sub={t("overview.engagementAverage")} color={SUCCESS} />
         <MiniStat label={t("overview.engagementHotLeads")} value={hotLeads.length} sub={t("overview.engagementHotLeadsSub")} color={DANGER} />
         <MiniStat label={t("overview.engagementVoicemails")} value={stats.voicemailsUnread} sub={t("overview.engagementUnread")} color={WARNING} />
@@ -584,7 +583,7 @@ export default function PAOverview() {
               </thead>
               <tbody>
                 {recent.map((c) => {
-                  const inb = c.direction === "inbound", missed = c.direction === "missed";
+                  const inb = c.direction === "inbound", missed = c.status === "missed";
                   const Icon = missed ? X : inb ? ArrowDownLeft : ArrowUpRight;
                   const col = missed ? DANGER : inb ? ACCENT : SUCCESS;
                   const num = inb || missed ? c.from_number : c.to_number;

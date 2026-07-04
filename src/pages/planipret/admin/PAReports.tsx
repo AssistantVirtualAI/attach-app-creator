@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, CartesianGrid } from "recharts";
 import { Download, Trophy, FileText, RefreshCw, Smartphone, Bot, Plug, Mail, Link2, Users, DollarSign } from "lucide-react";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import { usePlanipretBrokerStats } from "@/lib/planipret/brokerStats";
+import { getPlanipretBrokerDirectory } from "@/lib/planipret/adminDirectory";
 import { ADMIN_REPORT_FILTERS_EVENT, periodLabel, periodToRange, rangeToPeriod, readAdminReportFilters, writeAdminReportFilters } from "@/lib/planipret/adminReportFilters";
 import { usePlanipretNsAutoSync } from "@/hooks/usePlanipretNsAutoSync";
 import NsSyncBar from "@/components/planipret/admin/NsSyncBar";
@@ -23,20 +23,7 @@ const GOLD = "#F5C842";
 const SILVER = "#C0C0C0";
 const BRONZE = "#CD7F32";
 
-const TooltipDark = ({ active, payload, label }: any) => {
-  if (!active || !payload?.length) return null;
-  return (
-    <div style={{ background: "var(--pp-bg-deep)", border: "1px solid var(--pp-bg-border-2)", borderRadius: 8, padding: "8px 12px", fontSize: 11, color: "var(--pp-text-primary)" }}>
-      {label && <div style={{ color: "var(--pp-text-muted)", marginBottom: 4 }}>{label}</div>}
-      {payload.map((p: any, i: number) => (
-        <div key={i} className="flex items-center gap-2">
-          <span style={{ width: 8, height: 8, borderRadius: "50%", background: p.color || p.fill }} />
-          <span>{p.name}: <strong>{p.value}</strong></span>
-        </div>
-      ))}
-    </div>
-  );
-};
+const eventDate = (row: any) => row?.started_at ?? row?.sent_at ?? row?.created_at;
 
 export default function PAReports() {
   const { t, lang } = useMplanipretLang();
@@ -47,6 +34,7 @@ export default function PAReports() {
   const [avaFeedback, setAvaFeedback] = useState<Array<{ rating: string }>>([]);
   const [reminders, setReminders] = useState<any[]>([]);
   const [brokers, setBrokers] = useState<Record<string, string>>({});
+  const [brokerSnapshot, setBrokerSnapshot] = useState({ total: 0, mobile: 0, ai: 0, maestro: 0, ms365: 0, ns: 0 });
   const [exporting, setExporting] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
@@ -88,11 +76,11 @@ export default function PAReports() {
     start.setHours(0, 0, 0, 0);
     (async () => {
       const startIso = start.toISOString();
-      const [{ data: c }, { data: p }, nsUsers, { data: m }, { data: fb }, { data: rem }] = await Promise.all([
-        supabase.from("planipret_phone_calls").select("*").gte("started_at", startIso),
+      const [{ data: c }, { data: p }, directory, { data: m }, { data: fb }, { data: rem }] = await Promise.all([
+        supabase.from("planipret_phone_calls").select("*").gte("created_at", startIso),
         supabase.from("planipret_profiles").select("user_id, full_name, extension, ns_extension"),
-        supabase.functions.invoke("pp-ns-users", { body: {} }).catch((error) => ({ data: null, error })),
-        supabase.from("planipret_phone_messages").select("id, sent_at, created_at, direction, user_id, extension").gte("sent_at", startIso),
+        getPlanipretBrokerDirectory(),
+        supabase.from("planipret_phone_messages").select("id, sent_at, created_at, direction, user_id, extension").gte("created_at", startIso),
         supabase.from("planipret_ava_feedback").select("rating").gte("created_at", startIso),
         supabase.from("planipret_reminders").select("id, user_id, status, scheduled_at, created_at").gte("created_at", startIso),
       ]);
@@ -106,15 +94,24 @@ export default function PAReports() {
         if (x.extension) map[`ext:${x.extension}`] = x.full_name;
         if (x.ns_extension) map[`ext:${x.ns_extension}`] = x.full_name;
       });
-      (((nsUsers as any)?.data?.brokers ?? []) as any[]).forEach((x: any) => {
+      ((directory as any).brokers ?? []).forEach((x: any) => {
         if (x.extension) map[`ext:${x.extension}`] = x.full_name || `Ext. ${x.extension}`;
         if (x.user_id && !String(x.user_id).startsWith("ns:")) map[x.user_id] = x.full_name || map[x.user_id];
       });
       setBrokers(map);
+      const rows = ((directory as any).brokers ?? []) as any[];
+      setBrokerSnapshot({
+        total: (directory as any).count ?? rows.length,
+        mobile: rows.filter((x) => x.mobile_app_enabled).length,
+        ai: rows.filter((x) => x.voice_agent_enabled).length,
+        maestro: rows.filter((x) => x.maestro_connected).length,
+        ms365: brokerStats.ms365_connected,
+        ns: brokerStats.ns_linked || ((directory as any).count ?? rows.length),
+      });
       setLoadedAt(new Date());
       setLoadingPeriod(false);
     })();
-  }, [range, refreshTick]);
+  }, [range, refreshTick, brokerStats.ms365_connected, brokerStats.ns_linked]);
 
 
 
@@ -135,7 +132,7 @@ export default function PAReports() {
   const byDay = useMemo(() => {
     const map: Record<string, number> = {};
     calls.forEach((c) => {
-      const d = new Date(c.started_at).toLocaleDateString(dateLocale, { day: "2-digit", month: "short" });
+      const d = new Date(eventDate(c)).toLocaleDateString(dateLocale, { day: "2-digit", month: "short" });
       map[d] = (map[d] ?? 0) + 1;
     });
     return Object.entries(map).map(([date, count]) => ({ date, count }));
@@ -143,7 +140,10 @@ export default function PAReports() {
 
   const byDirection = useMemo(() => {
     const m = { inbound: 0, outbound: 0, missed: 0 };
-    calls.forEach((c) => { if (c.direction in m) (m as any)[c.direction]++; });
+    calls.forEach((c) => {
+      if (c.status === "missed") m.missed++;
+      else if (c.direction in m) (m as any)[c.direction]++;
+    });
     return [
       { name: t("reports.dirInbound"), value: m.inbound, color: ACCENT },
       { name: t("reports.dirOutbound"), value: m.outbound, color: SUCCESS },
@@ -161,14 +161,14 @@ export default function PAReports() {
 
   const peakHour = useMemo(() => {
     const h: Record<number, number> = {};
-    calls.forEach((c) => { const hh = new Date(c.started_at).getHours(); h[hh] = (h[hh] ?? 0) + 1; });
+    calls.forEach((c) => { const hh = new Date(eventDate(c)).getHours(); h[hh] = (h[hh] ?? 0) + 1; });
     const top = Object.entries(h).sort((a, b) => b[1] - a[1])[0];
     return top ? `${top[0]}h–${+top[0] + 1}h` : "—";
   }, [calls]);
 
   const answerRate = useMemo(() => {
     if (!calls.length) return "—";
-    const answered = calls.filter((c) => c.direction !== "missed").length;
+    const answered = calls.filter((c) => c.status !== "missed").length;
     return Math.round((answered / calls.length) * 100) + "%";
   }, [calls]);
 
@@ -178,22 +178,26 @@ export default function PAReports() {
       const k = c.user_id ?? `ext:${c.extension ?? c.metadata?.extension ?? "unknown"}`;
       if (!m[k]) m[k] = { name: brokers[k] ?? (c.extension ? `Ext. ${c.extension}` : "—"), total: 0, in: 0, out: 0, missed: 0, totalDur: 0, durCount: 0 };
       m[k].total++;
-      if (c.direction === "inbound") m[k].in++;
+      if (c.status === "missed") m[k].missed++;
+      else if (c.direction === "inbound") m[k].in++;
       else if (c.direction === "outbound") m[k].out++;
-      else if (c.direction === "missed") m[k].missed++;
       if (c.duration_seconds) { m[k].totalDur += c.duration_seconds; m[k].durCount++; }
     });
     return Object.values(m).sort((a: any, b: any) => b.total - a.total);
   }, [calls, brokers]);
 
   const podium = (byBroker as any[]).slice(0, 3);
+  const maxDayCount = useMemo(() => Math.max(1, ...byDay.map((d) => d.count)), [byDay]);
+  const totalDirectionCalls = useMemo(() => byDirection.reduce((sum, d) => sum + d.value, 0), [byDirection]);
+  const inboundPct = totalDirectionCalls ? (byDirection[0].value / totalDirectionCalls) * 100 : 0;
+  const outboundPct = totalDirectionCalls ? (byDirection[1].value / totalDirectionCalls) * 100 : 0;
 
   // Financial — same source of truth as /admin/vue-ensemble (planipret_broker_stats view).
   const finance = useMemo<ServiceFinance[]>(() => [
-    computeServiceFinance("mobile", brokerStats.app_mobile_active),
-    computeServiceFinance("widget", brokerStats.total_courtiers),
-    computeServiceFinance("ai", brokerStats.agent_ia_active),
-  ], [brokerStats.app_mobile_active, brokerStats.total_courtiers, brokerStats.agent_ia_active]);
+    computeServiceFinance("mobile", brokerSnapshot.mobile || brokerStats.app_mobile_active),
+    computeServiceFinance("widget", brokerSnapshot.total || brokerStats.total_courtiers),
+    computeServiceFinance("ai", brokerSnapshot.ai || brokerStats.agent_ia_active),
+  ], [brokerStats.app_mobile_active, brokerStats.total_courtiers, brokerStats.agent_ia_active, brokerSnapshot.mobile, brokerSnapshot.total, brokerSnapshot.ai]);
   const financeTotals = useMemo(() => computeTotals(finance), [finance]);
 
 
@@ -306,12 +310,12 @@ export default function PAReports() {
           </span>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          <StatTile icon={<Users className="w-3.5 h-3.5" />} label={t("reports.tileBrokers")} value={brokerStats.total_courtiers} color={ACCENT} />
-          <StatTile icon={<Smartphone className="w-3.5 h-3.5" />} label={t("reports.tileMobileActive")} value={brokerStats.app_mobile_active} color={SUCCESS} sub={`${t("reports.tileOutOf")} ${brokerStats.total_courtiers}`} />
-          <StatTile icon={<Bot className="w-3.5 h-3.5" />} label={t("reports.tileAiActive")} value={brokerStats.agent_ia_active} color="#9B7FE8" sub={`${t("reports.tileOutOf")} ${brokerStats.total_courtiers}`} />
-          <StatTile icon={<Plug className="w-3.5 h-3.5" />} label={t("reports.tileMaestro")} value={brokerStats.maestro_connected} color="#F5A623" />
-          <StatTile icon={<Mail className="w-3.5 h-3.5" />} label={t("reports.tileMs365")} value={brokerStats.ms365_connected} color="#2E9BDC" />
-          <StatTile icon={<Link2 className="w-3.5 h-3.5" />} label={t("reports.tileNs")} value={brokerStats.ns_linked} color={GOLD} />
+          <StatTile icon={<Users className="w-3.5 h-3.5" />} label={t("reports.tileBrokers")} value={brokerSnapshot.total || brokerStats.total_courtiers} color={ACCENT} />
+          <StatTile icon={<Smartphone className="w-3.5 h-3.5" />} label={t("reports.tileMobileActive")} value={brokerSnapshot.mobile || brokerStats.app_mobile_active} color={SUCCESS} sub={`${t("reports.tileOutOf")} ${brokerSnapshot.total || brokerStats.total_courtiers}`} />
+          <StatTile icon={<Bot className="w-3.5 h-3.5" />} label={t("reports.tileAiActive")} value={brokerSnapshot.ai || brokerStats.agent_ia_active} color="#9B7FE8" sub={`${t("reports.tileOutOf")} ${brokerSnapshot.total || brokerStats.total_courtiers}`} />
+          <StatTile icon={<Plug className="w-3.5 h-3.5" />} label={t("reports.tileMaestro")} value={brokerSnapshot.maestro || brokerStats.maestro_connected} color="#F5A623" />
+          <StatTile icon={<Mail className="w-3.5 h-3.5" />} label={t("reports.tileMs365")} value={brokerSnapshot.ms365 || brokerStats.ms365_connected} color="#2E9BDC" />
+          <StatTile icon={<Link2 className="w-3.5 h-3.5" />} label={t("reports.tileNs")} value={brokerSnapshot.ns || brokerStats.ns_linked} color={GOLD} />
         </div>
       </div>
 
@@ -359,28 +363,44 @@ export default function PAReports() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="pp-card p-5">
           <h3 className="mb-3" style={{ fontWeight: 600, color: "var(--pp-text-primary)" }}>{t("reports.callsByDay")}</h3>
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={byDay}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-              <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#4A7FA5" }} />
-              <YAxis tick={{ fontSize: 11, fill: "#4A7FA5" }} />
-              <Tooltip content={<TooltipDark />} cursor={{ fill: "rgba(46,155,220,0.08)" }} />
-              <Bar dataKey="count" name={t("reports.thCalls")} fill={ACCENT} radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          <div className="h-[240px] flex items-end gap-2 overflow-x-auto px-1 pb-2" style={{ borderBottom: "1px solid var(--pp-bg-border-2)" }}>
+            {byDay.length === 0 ? (
+              <div className="w-full self-center text-center" style={{ fontSize: 12, color: "var(--pp-text-faint)" }}>{t("reports.empty")}</div>
+            ) : byDay.map((d) => (
+              <div key={d.date} className="flex-1 min-w-[28px] max-w-[56px] flex flex-col items-center justify-end gap-1">
+                <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT }}>{d.count}</div>
+                <div className="w-full rounded-t" style={{ height: Math.max(8, Math.round((d.count / maxDayCount) * 170)), background: `linear-gradient(180deg, ${ACCENT}, rgba(46,155,220,0.28))` }} />
+                <div className="truncate w-full text-center" style={{ fontSize: 10, color: "var(--pp-text-faint)" }}>{d.date}</div>
+              </div>
+            ))}
+          </div>
         </div>
 
         <div className="pp-card p-5">
           <h3 className="mb-3" style={{ fontWeight: 600, color: "var(--pp-text-primary)" }}>{t("reports.callsDistribution")}</h3>
-          <ResponsiveContainer width="100%" height={240}>
-            <PieChart>
-              <Pie data={byDirection} dataKey="value" nameKey="name" innerRadius={50} outerRadius={80} paddingAngle={4}>
-                {byDirection.map((e, i) => <Cell key={i} fill={e.color} stroke="var(--pp-bg-surface)" strokeWidth={2} />)}
-              </Pie>
-              <Tooltip content={<TooltipDark />} />
-              <Legend wrapperStyle={{ fontSize: 11, color: "#8FA8C0" }} />
-            </PieChart>
-          </ResponsiveContainer>
+          <div className="h-[240px] grid grid-cols-[160px_1fr] items-center gap-5">
+            <div className="w-36 h-36 rounded-full mx-auto grid place-items-center" style={{ background: totalDirectionCalls ? `conic-gradient(${ACCENT} 0 ${inboundPct}%, ${SUCCESS} ${inboundPct}% ${inboundPct + outboundPct}%, ${DANGER} ${inboundPct + outboundPct}% 100%)` : "var(--pp-bg-deep)" }}>
+              <div className="w-20 h-20 rounded-full grid place-items-center" style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)" }}>
+                <span style={{ fontSize: 22, fontWeight: 800, color: "var(--pp-text-primary)" }}>{totalDirectionCalls}</span>
+              </div>
+            </div>
+            <div className="space-y-3">
+              {byDirection.map((d) => {
+                const pct = totalDirectionCalls ? Math.round((d.value / totalDirectionCalls) * 100) : 0;
+                return (
+                  <div key={d.name}>
+                    <div className="flex items-center justify-between mb-1" style={{ fontSize: 11 }}>
+                      <span className="flex items-center gap-2" style={{ color: "var(--pp-text-secondary)" }}><i className="w-2 h-2 rounded-full" style={{ background: d.color }} />{d.name}</span>
+                      <span className="tabular-nums" style={{ color: d.color, fontWeight: 700 }}>{d.value} · {pct}%</span>
+                    </div>
+                    <div className="h-2 rounded-full overflow-hidden" style={{ background: "var(--pp-bg-deep)" }}>
+                      <div className="h-full rounded-full" style={{ width: `${pct}%`, background: d.color }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </div>
 
