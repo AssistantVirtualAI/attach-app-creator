@@ -249,7 +249,6 @@ export default function PARecordings() {
       if (d?.success) {
         toast.success(`Coaching généré (score ${d.score ?? "—"}/100)`);
         setDetail((c: any) => c && c.id === callId ? { ...c, ai_summary: d.summary, ai_coaching: d.coaching, transcript: d.corrected_transcript ?? c.transcript, lead_score: d.score } : c);
-        await load(page, pageSize);
       }
     } catch (e: any) {
       const msg = String(e?.message ?? e);
