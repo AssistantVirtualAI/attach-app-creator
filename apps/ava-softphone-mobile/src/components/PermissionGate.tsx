@@ -297,6 +297,26 @@ export default function PermissionGate({ onComplete }: PermissionGateProps) {
   );
 }
 
+function StatusChip({ label, state }: { label: string; state: PermissionStatus }) {
+  const map: Record<PermissionStatus, { bg: string; fg: string; icon: string }> = {
+    granted:     { bg: 'rgba(16,185,129,0.15)', fg: '#10B981', icon: '✅' },
+    denied:      { bg: 'rgba(239,68,68,0.15)',  fg: '#EF4444', icon: '⛔' },
+    prompt:      { bg: 'rgba(148,163,184,0.15)',fg: '#94A3B8', icon: '❔' },
+    unsupported: { bg: 'rgba(148,163,184,0.10)',fg: '#64748B', icon: '—'  },
+  };
+  const s = map[state] ?? map.prompt;
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 4,
+      padding: '4px 8px', borderRadius: 999,
+      background: s.bg, color: s.fg,
+      fontSize: 10, fontWeight: 700,
+    }}>
+      {s.icon} {label} <span style={{ opacity: 0.75 }}>{state}</span>
+    </span>
+  );
+}
+
 // ── Styling helpers ──────────────────────────────────────────────────────
 function Shell({ children }: { children: React.ReactNode }) {
   return (
