@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
     .maybeSingle();
   if (error || !row) return json({ error: "call not found", details: error?.message }, 404);
   if (!row.transcript || row.transcript.trim().length < 20) {
-    return json({ success: false, error: "TRANSCRIPT_MISSING", message: "Aucune transcription à analyser. Lancez d'abord la transcription NS-API." }, 400);
+    return json({ success: false, error: "TRANSCRIPT_MISSING", message: "Aucune transcription à analyser. Lancez d'abord la transcription NS-API." }, 200);
   }
 
   const context = `Appel ${row.direction ?? "?"} · Ext ${row.extension ?? "?"} · ${row.duration_seconds ?? "?"}s · De ${row.from_number ?? "?"} vers ${row.to_number ?? "?"}`;
