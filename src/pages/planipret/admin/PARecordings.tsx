@@ -232,31 +232,72 @@ export default function PARecordings() {
   };
 
   const [coaching, setCoaching] = useState<string | null>(null);
+  // Coaching status per call: 'queued' | 'running' | 'done' | 'error'
+  const [coachStatus, setCoachStatus] = useState<Record<string, "queued" | "running" | "done" | "error">>({});
+  const [coachStartedAt, setCoachStartedAt] = useState<Record<string, number>>({});
+  const [coachElapsed, setCoachElapsed] = useState<number>(0);
+
+  // Tick elapsed while any coaching is running
+  useEffect(() => {
+    const running = Object.values(coachStatus).some((s) => s === "queued" || s === "running");
+    if (!running) return;
+    const id = setInterval(() => setCoachElapsed((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, [coachStatus]);
+
   const runCoaching = async (callId: string) => {
     // Guard: never call coaching without a transcript in local state
     const cur = detail;
     const hasT = cur && cur.id === callId && (Boolean(cur.transcript) || (Array.isArray(cur.transcript_segments) && cur.transcript_segments.length > 0));
     if (!hasT) return;
+    // Cache: si déjà analysé, ne relance pas
+    if (cur.ai_coaching) {
+      setCoachStatus((s) => ({ ...s, [callId]: "done" }));
+      return;
+    }
     setCoaching(callId);
+    setCoachStatus((s) => ({ ...s, [callId]: "queued" }));
+    setCoachStartedAt((s) => ({ ...s, [callId]: Date.now() }));
+    setCoachElapsed(0);
+    // Bascule "en cours" après un court délai pour matérialiser la queue → running
+    setTimeout(() => setCoachStatus((s) => (s[callId] === "queued" ? { ...s, [callId]: "running" } : s)), 400);
     try {
       const { data, error } = await supabase.functions.invoke("pp-coach-call", { body: { call_id: callId } });
       const d = (data as any) ?? {};
       if (d?.error === "TRANSCRIPT_MISSING" || error) {
-        // Silent: transcript not ready yet on the server side
         if (d?.error && d.error !== "TRANSCRIPT_MISSING") toast.error(d.error);
+        setCoachStatus((s) => ({ ...s, [callId]: "error" }));
         return;
       }
       if (d?.success) {
         toast.success(`Coaching généré (score ${d.score ?? "—"}/100)`);
         setDetail((c: any) => c && c.id === callId ? { ...c, ai_summary: d.summary, ai_coaching: d.coaching, transcript: d.corrected_transcript ?? c.transcript, lead_score: d.score } : c);
+        setCoachStatus((s) => ({ ...s, [callId]: "done" }));
       }
     } catch (e: any) {
       const msg = String(e?.message ?? e);
       if (!msg.includes("TRANSCRIPT_MISSING")) toast.error(`Coaching échoué: ${msg}`);
+      setCoachStatus((s) => ({ ...s, [callId]: "error" }));
     } finally {
       setCoaching(null);
     }
   };
+
+  // Realtime: auto-refresh detail when ai_coaching lands (from any source)
+  useEffect(() => {
+    if (!detail?.id) return;
+    const callId = detail.id;
+    const ch = supabase
+      .channel(`pa-call-${callId}`)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "planipret_phone_calls", filter: `id=eq.${callId}` }, (payload: any) => {
+        const n = payload?.new;
+        if (!n) return;
+        setDetail((c: any) => (c && c.id === callId ? { ...c, ...n } : c));
+        if (n.ai_coaching) setCoachStatus((s) => ({ ...s, [callId]: "done" }));
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [detail?.id]);
 
   // Auto-fetch transcription via ns-get-transcription when a recording detail opens
   useEffect(() => {
