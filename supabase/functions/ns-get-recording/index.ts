@@ -132,5 +132,5 @@ Deno.serve(async (req) => {
       "Le fichier a expiré ou été purgé côté NetSapiens",
       "Le ns_callid stocké ne correspond à aucun enregistrement — vérifier la synchro CDR",
     ],
-  }, 404);
+  }, 200);
 });
