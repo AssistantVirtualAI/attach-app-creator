@@ -322,5 +322,17 @@ Deno.serve(async (req) => {
   }
 
   const segments = parseTranscript(transcript);
+  if (call_db_id && segments.length) {
+    try {
+      const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
+      const text = segments.map((s) => `${s.speaker}: ${s.text}`).join("\n");
+      await admin.from("planipret_phone_calls").update({
+        transcript: text,
+        transcript_segments: segments,
+        transcript_source: "ns-api",
+        has_transcript: true,
+      }).eq("id", call_db_id);
+    } catch { /* best-effort cache */ }
+  }
   return json({ success: true, ns_callid, segments, raw: transcript });
 });
