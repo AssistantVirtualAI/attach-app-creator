@@ -81,11 +81,31 @@ Deno.serve(async (req) => {
 
     const path = `/domains/${encodeURIComponent(domain)}/recordings/${encodeURIComponent(callId)}`;
     const r = await nsFetch(path);
-    if (!r.ok) return json({ error: `NS-API ${r.status}`, detail: r.data, ns_path: path }, 502);
+    if (!r.ok) {
+      const notFound = r.status === 404;
+      return json({
+        ok: false,
+        fallback: true,
+        error: notFound ? "RECORDING_NOT_FOUND" : `NS-API ${r.status}`,
+        hint: notFound
+          ? "Aucun enregistrement disponible pour cet appel côté NetSapiens (peut ne pas avoir été enregistré, ou déjà expiré)."
+          : "Le service d'enregistrement NetSapiens a retourné une erreur.",
+        ns_status: r.status,
+        ns_detail: r.data,
+        ns_path: path,
+      }, 200);
+    }
 
     const first = Array.isArray(r.data) ? r.data[0] : r.data;
     const url = val(first, ["file-access-url", "file_access_url", "recording_url", "recording-url", "url"], null);
-    if (!url) return json({ error: "no access url returned", ns_path: path, sample: first }, 422);
+    if (!url) return json({
+      ok: false,
+      fallback: true,
+      error: "NO_ACCESS_URL",
+      hint: "NetSapiens a répondu mais sans URL d'accès au fichier audio.",
+      ns_path: path,
+      sample: first,
+    }, 200);
 
     await admin.from("planipret_phone_calls").update({
       recording_url: url,
