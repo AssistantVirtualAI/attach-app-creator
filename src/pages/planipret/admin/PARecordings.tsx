@@ -43,6 +43,7 @@ export default function PARecordings() {
   const [detail, setDetail] = useState<any | null>(null);
   const [transcribing, setTranscribing] = useState<string | null>(null);
   const [recordingError, setRecordingError] = useState<string | null>(null);
+  const [transcriptionError, setTranscriptionError] = useState<string | null>(null);
 
   const hasFilters = !!(search || broker || from || to || withTranscript);
   const activeFilterCount = [search, broker, from, to, withTranscript].filter(Boolean).length;
@@ -128,6 +129,7 @@ export default function PARecordings() {
 
   const transcribe = async (callId: string) => {
     setTranscribing(callId);
+    setTranscriptionError(null);
     try {
       // Phase 5: fetch via official NS-API endpoint
       const { data, error } = await supabase.functions.invoke("ns-get-transcription", { body: { call_db_id: callId } });
@@ -142,14 +144,21 @@ export default function PARecordings() {
           has_transcript: true,
         }).eq("id", callId);
         toast.success("Transcription récupérée depuis NS-API");
-        setDetail((cur: any) => cur && cur.id === callId ? { ...cur, transcript: text, transcript_segments: d.segments } : cur);
+        setDetail((cur: any) => cur && cur.id === callId ? { ...cur, transcript: text, transcript_segments: d.segments, has_transcript: true } : cur);
         await load(page, pageSize);
       } else {
-        const msg = [d?.message ?? "Transcription non disponible", d?.action_required].filter(Boolean).join(" — ");
+        const msg = [
+          d?.message ?? "Aucune transcription trouvée pour cet appel.",
+          d?.action_required,
+        ].filter(Boolean).join(" — ");
+        setTranscriptionError(msg);
+        setDetail((cur: any) => cur && cur.id === callId ? { ...cur, __transcription_error: msg } : cur);
         toast.error(msg);
       }
     } catch (e: any) {
-      toast.error(`Transcription échouée: ${e.message ?? e}`);
+      const msg = `Transcription échouée: ${e.message ?? e}`;
+      setTranscriptionError(msg);
+      toast.error(msg);
     } finally {
       setTranscribing(null);
     }
@@ -177,7 +186,14 @@ export default function PARecordings() {
       if (resp.ok && ct.includes("audio")) {
         const blob = await resp.blob();
         const objUrl = URL.createObjectURL(blob);
-        setDetail({ ...row, recording_url: objUrl });
+        const recordingMeta = {
+          duration_sec: resp.headers.get("X-NS-Duration-Seconds"),
+          file_size_kb: resp.headers.get("X-NS-File-Size-KB"),
+          status: resp.headers.get("X-NS-Recording-Status"),
+          callid: resp.headers.get("X-NS-CallID"),
+          source_path: resp.headers.get("X-NS-Source-Path"),
+        };
+        setDetail({ ...row, recording_url: objUrl, __recording_meta: recordingMeta });
         toast.success("Enregistrement chargé");
       } else {
         const j = await resp.json().catch(() => ({}));
@@ -190,7 +206,10 @@ export default function PARecordings() {
             msg = `Enregistrement en traitement (status: ${j.recording_status ?? "?"}, taille: ${j.file_size_kb ?? 0} kB)`;
             break;
           case "RECORDING_NOT_FOUND":
-            msg = "Aucun enregistrement disponible pour cet appel";
+            msg = [
+              j?.message ?? "Aucun enregistrement disponible pour cet appel.",
+              Array.isArray(j?.attempted_ids) && j.attempted_ids.length ? `IDs testés: ${j.attempted_ids.slice(0, 3).join(", ")}` : null,
+            ].filter(Boolean).join(" ");
             break;
           default:
             msg = [j?.message ?? j?.error ?? "Aucun enregistrement disponible côté NS-API",
@@ -231,7 +250,7 @@ export default function PARecordings() {
   // Auto-fetch transcription via ns-get-transcription when a recording detail opens
   useEffect(() => {
     if (!detail?.id) return;
-    if (detail.transcript) return;
+    if (detail.transcript || (Array.isArray(detail.transcript_segments) && detail.transcript_segments.length)) return;
     if (transcribing === detail.id) return;
     transcribe(detail.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -254,6 +273,8 @@ export default function PARecordings() {
 
 
   const inputStyle = { background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" };
+  const detailSegments = Array.isArray(detail?.transcript_segments) ? detail.transcript_segments.filter((s: any) => s?.text) : [];
+  const hasDetailTranscript = Boolean(detail?.transcript) || detailSegments.length > 0;
 
   return (
     <div className="space-y-4">
@@ -382,7 +403,7 @@ export default function PARecordings() {
             ) : rows.map((c) => (
               <tr key={c.id} className="cursor-pointer hover:bg-white/[0.02]"
                 style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}
-                onClick={() => { setRecordingError(null); setDetail(c); }}>
+                onClick={() => { setRecordingError(null); setTranscriptionError(null); setDetail(c); }}>
                 <td className="p-3" style={{ color: "var(--pp-text-primary)" }}>{brokerName(c)}</td>
                 <td style={{ color: "var(--pp-text-secondary)" }}>{c.extension ?? c.planipret_profiles?.extension ?? "—"}</td>
                 <td style={{ color: "var(--pp-text-secondary)" }}>{c.from_number ?? "—"}</td>
@@ -390,7 +411,7 @@ export default function PARecordings() {
                 <td style={{ color: "var(--pp-text-muted)" }}>{c.duration_seconds ? `${Math.floor(c.duration_seconds / 60)}m${c.duration_seconds % 60}s` : "—"}</td>
                 <td style={{ fontSize: 11, color: "var(--pp-text-faint)" }}>{c.started_at ? new Date(c.started_at).toLocaleString("fr-CA", { dateStyle: "short", timeStyle: "short" }) : ""}</td>
                 <td>
-                  {c.transcript ? (
+                  {c.transcript || (Array.isArray(c.transcript_segments) && c.transcript_segments.length) ? (
                     <span style={{ fontSize: 10, color: "var(--pp-success)" }}>● Disponible</span>
                   ) : (
                     <button
@@ -427,7 +448,7 @@ export default function PARecordings() {
             onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h3 style={{ fontWeight: 600, color: "var(--pp-text-primary)" }}>Enregistrement</h3>
-              <button onClick={() => { setRecordingError(null); setDetail(null); }}><X className="w-4 h-4" style={{ color: "var(--pp-text-muted)" }} /></button>
+              <button onClick={() => { setRecordingError(null); setTranscriptionError(null); setDetail(null); }}><X className="w-4 h-4" style={{ color: "var(--pp-text-muted)" }} /></button>
             </div>
             <div className="space-y-3 text-sm" style={{ color: "var(--pp-text-secondary)" }}>
               <div>Courtier: <span style={{ color: "var(--pp-text-primary)" }}>{brokerName(detail)}</span></div>
@@ -437,6 +458,13 @@ export default function PARecordings() {
               <div style={{ fontSize: 10, color: "var(--pp-text-faint)", fontFamily: "monospace" }}>NS callid: {detail.ns_callid ?? detail.ns_orig_callid ?? "—"}</div>
               {String(detail.recording_url ?? "").startsWith("blob:") && resolving !== detail.id && (
                 <div style={{ fontSize: 10, color: "var(--pp-success)" }}>● Audio streamé depuis NS-API</div>
+              )}
+              {detail.__recording_meta && String(detail.recording_url ?? "").startsWith("blob:") && (
+                <div style={{ fontSize: 10, color: "var(--pp-text-faint)", fontFamily: "monospace" }}>
+                  Audio meta: {detail.__recording_meta.duration_sec ? `${detail.__recording_meta.duration_sec}s` : `${detail.duration_seconds ?? "?"}s`}
+                  {detail.__recording_meta.file_size_kb ? ` · ${detail.__recording_meta.file_size_kb} kB` : ""}
+                  {detail.__recording_meta.callid ? ` · ${detail.__recording_meta.callid}` : ""}
+                </div>
               )}
               {resolving === detail.id && (
                 <div style={{ fontSize: 11, color: "var(--pp-text-muted)" }}>Chargement de l'audio depuis NS-API…</div>
@@ -496,25 +524,40 @@ export default function PARecordings() {
                 );
               })()}
 
-              {detail.transcript ? (
+              {hasDetailTranscript ? (
                 <div>
                   <p style={{ fontSize: 11, color: "var(--pp-text-muted)", marginBottom: 4 }}>Transcription</p>
-                  <div className="p-3 rounded-lg whitespace-pre-wrap" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", fontSize: 12 }}>
-                    {detail.transcript}
+                  <div className="p-3 rounded-lg space-y-2" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", fontSize: 12 }}>
+                    {detailSegments.length ? detailSegments.map((s: any, i: number) => (
+                      <div key={i}>
+                        <span style={{ color: "var(--pp-text-primary)", fontWeight: 600 }}>{s.speaker ?? "Speaker"}</span>
+                        <span style={{ color: "var(--pp-text-muted)" }}> — </span>
+                        <span>{s.text}</span>
+                      </div>
+                    )) : (
+                      <div className="whitespace-pre-wrap">{detail.transcript}</div>
+                    )}
                   </div>
                 </div>
               ) : (
-                <button
-                  onClick={() => transcribe(detail.id)}
-                  disabled={transcribing === detail.id}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-white text-sm"
-                  style={{ background: ACCENT }}
-                >
-                  <Play className="w-3.5 h-3.5" />
-                  {transcribing === detail.id ? "Transcription en cours…" : "Lancer la transcription IA"}
-                </button>
+                <div className="space-y-2">
+                  {(transcriptionError || detail.__transcription_error) && (
+                    <div className="p-3 rounded-lg text-xs" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>
+                      {transcriptionError || detail.__transcription_error}
+                    </div>
+                  )}
+                  <button
+                    onClick={() => transcribe(detail.id)}
+                    disabled={transcribing === detail.id}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-white text-sm"
+                    style={{ background: ACCENT }}
+                  >
+                    <Play className="w-3.5 h-3.5" />
+                    {transcribing === detail.id ? "Transcription en cours…" : "Relancer la transcription"}
+                  </button>
+                </div>
               )}
-              {detail.transcript && (
+              {hasDetailTranscript && (
                 <button
                   onClick={() => runCoaching(detail.id)}
                   disabled={coaching === detail.id}
