@@ -29,18 +29,22 @@ const PERMISSION_STEPS: PermDef[] = [
   {
     id: 'microphone',
     icon: '🎤',
-    title: 'Microphone & Audio',
-    description: 'Lemtel Telecom uses your microphone and speaker to make and receive phone calls.',
-    why: 'Used for voice calls',
-    required: true,
+    title: 'Microphone & Audio · Microphone et audio',
+    description:
+      'To use the app properly, please allow microphone and speaker access — it lets you make and receive calls.\n\n' +
+      'Pour utiliser l’application correctement, veuillez autoriser l’accès au microphone et au haut-parleur — cela permet de passer et recevoir vos appels.',
+    why: 'Used for voice calls · Utilisé pour les appels',
+    required: false,
     color: '#10B981',
   },
   {
     id: 'contacts',
     icon: '👥',
     title: 'Contacts',
-    description: 'Import your contacts to dial faster and see caller names. This is optional — you can continue without sharing your contacts.',
-    why: 'Optional — you can skip',
+    description:
+      'Import your contacts to dial faster and see caller names. Optional — tap Next to skip.\n\n' +
+      'Importez vos contacts pour composer plus vite et voir les noms des appelants. Optionnel — appuyez sur Suivant pour passer.',
+    why: 'Optional · Optionnel',
     required: false,
     color: '#3B82F6',
   },
@@ -279,35 +283,23 @@ export default function PermissionGate({ onComplete }: PermissionGateProps) {
 
       {status !== 'denied' && (
         <button onClick={requestCurrent} disabled={requesting} style={{ ...primaryBtnStyle, opacity: requesting ? 0.6 : 1 }}>
-          {requesting ? 'Requesting…' : 'Continue'}
+          {requesting ? 'Requesting… · Demande en cours…' : 'Continue · Continuer'}
         </button>
       )}
 
       {status === 'denied' && Capacitor.isNativePlatform() && (
         <button onClick={() => { void openAppSettings(); }} style={primaryBtnStyle}>
-          Open Settings
+          Open Settings · Ouvrir les Réglages
         </button>
       )}
 
-      {/* "Next" — always available for optional steps so the user is never blocked. */}
-      {!current.required && (
-        <button
-          onClick={() => advance(step)}
-          style={{ ...ghostBtnStyle, marginTop: 8, color: colors.mutedSilver }}
-        >
-          Next
-        </button>
-      )}
-
-      {/* Microphone denied: allow user to proceed into the app without calls. */}
-      {status === 'denied' && current.required && (
-        <button
-          onClick={() => advance(step)}
-          style={{ ...ghostBtnStyle, marginTop: 8, color: colors.mutedSilver }}
-        >
-          Next
-        </button>
-      )}
+      {/* "Next" — ALWAYS visible so the user is never blocked. */}
+      <button
+        onClick={() => advance(step)}
+        style={{ ...ghostBtnStyle, marginTop: 8, color: colors.mutedSilver }}
+      >
+        Next · Suivant
+      </button>
 
 
       {/* Step dots */}
