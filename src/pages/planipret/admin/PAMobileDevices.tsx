@@ -177,6 +177,13 @@ export default function PAMobileDevices() {
     );
   }, [rows, filter]);
 
+  useEffect(() => { setPage(1); }, [filter, pageSize]);
+  const paged = useMemo(
+    () => filtered.slice((page - 1) * pageSize, page * pageSize),
+    [filtered, page, pageSize],
+  );
+
+
   return (
     <div className="space-y-5 p-4 md:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
