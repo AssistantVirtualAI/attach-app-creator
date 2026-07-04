@@ -5,6 +5,7 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { nsBrokerFetch } from "../_shared/ns-broker.ts";
 
 const NS_API_KEY = Deno.env.get("NS_API_KEY") ?? "";
 const NS_API_BASE_URL = (Deno.env.get("NS_API_BASE_URL") ?? "https://voice.ava-telecom.ca/ns-api/v2").replace(/\/$/, "");
@@ -55,6 +56,13 @@ async function nsFetch(path: string) {
   const r = await fetch(`${NS_API_BASE_URL}${path}`, {
     headers: { Authorization: `Bearer ${NS_API_KEY}`, Accept: "application/json" },
   });
+  const text = await r.text();
+  let data: any = null;
+  try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+  return { ok: r.ok, status: r.status, data };
+}
+
+async function responseJson(r: Response) {
   const text = await r.text();
   let data: any = null;
   try { data = text ? JSON.parse(text) : null; } catch { data = text; }
@@ -163,6 +171,26 @@ Deno.serve(async (req) => {
     let sourcePath: string | null = null;
     const D = encodeURIComponent(domain);
     const E = row.extension ? encodeURIComponent(String(row.extension)) : null;
+    const { data: brokerProfile } = row.extension ? await admin
+      .from("planipret_profiles")
+      .select("id, extension, ns_jwt, ns_refresh_token, ns_jwt_expires_at")
+      .eq("extension", String(row.extension))
+      .maybeSingle() : { data: null } as any;
+
+    const fetchWithFallbackAuth = async (path: string) => {
+      const out: Array<{ auth: string; ok: boolean; status: number; data: any }> = [];
+      const apiKeyRes = await nsFetch(path);
+      out.push({ auth: "api_key", ...apiKeyRes });
+      if (!apiKeyRes.ok && brokerProfile) {
+        try {
+          const brokerRes = await nsBrokerFetch(admin, brokerProfile, path, { method: "GET" });
+          out.push({ auth: "broker_jwt", ...(await responseJson(brokerRes)) });
+        } catch (e) {
+          out.push({ auth: "broker_jwt", ok: false, status: 0, data: { message: (e as Error).message } });
+        }
+      }
+      return out;
+    };
 
     for (const id of ids) {
       const paths = [
@@ -170,13 +198,15 @@ Deno.serve(async (req) => {
         ...(E ? [`/domains/${D}/users/${E}/recordings/${encodeURIComponent(id)}`] : []),
       ];
       for (const path of paths) {
-        const r = await nsFetch(path);
-        attempts.push({ path, status: r.status, ok: r.ok, detail: r.ok ? undefined : r.data });
-        if (r.ok) {
+        const results = await fetchWithFallbackAuth(path);
+        for (const r of results) {
+          attempts.push({ path: `${path} [${r.auth}]`, status: r.status, ok: r.ok, detail: r.ok ? undefined : r.data });
+          if (!r.ok) continue;
           url = accessUrl(r.data);
           sourcePath = path;
           if (url) break;
         }
+        if (url) break;
       }
       if (url) break;
     }
