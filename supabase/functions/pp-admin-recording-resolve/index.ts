@@ -83,6 +83,13 @@ function transcriptionPath(raw: any): string | null {
   return normalizeNsPath(val(raw, ["transcription_path", "prefilled-transcription-api", "transcription_url", "transcription-url", "transcript_url", "transcript-url"], null));
 }
 
+function withQueryParam(path: string, key: string, value: string): string {
+  const [base, query = ""] = path.split("?");
+  const qs = new URLSearchParams(query);
+  if (!qs.get(key)) qs.set(key, value);
+  return `${base}?${qs.toString()}`;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
@@ -130,15 +137,21 @@ Deno.serve(async (req) => {
 
     const transcriptionAttempts: Array<{ path: string; status: number; ok: boolean; detail?: any }> = [];
     const txPath = transcriptionPath(nsRaw) ?? transcriptionPath(meta);
+    const preliminaryIds = lookupCallIds(nsRaw, meta, { ns_call_id: row.ns_call_id });
     if (txPath) {
-      const tx = await nsFetch(txPath);
-      transcriptionAttempts.push({ path: txPath, status: tx.status, ok: tx.ok, detail: tx.ok ? undefined : tx.data });
-      if (tx.ok) {
-        const txData = Array.isArray(tx.data) ? tx.data[0] : tx.data;
-        nsRaw["call-id"] = nsRaw["call-id"] ?? txData?.["call-id"];
-        nsRaw["geo-call-id"] = nsRaw["geo-call-id"] ?? txData?.["geo-call-id"];
-        nsRaw["call-orig-call-id"] = nsRaw["call-orig-call-id"] ?? txData?.["call-orig-call-id"] ?? txData?.orig_callid;
-        nsRaw["call-term-call-id"] = nsRaw["call-term-call-id"] ?? txData?.["call-term-call-id"] ?? txData?.term_callid;
+      const txPaths = [txPath, ...preliminaryIds.map((id) => withQueryParam(txPath, "callid", id))];
+      for (const path of Array.from(new Set(txPaths))) {
+        const tx = await nsFetch(path);
+        transcriptionAttempts.push({ path, status: tx.status, ok: tx.ok, detail: tx.ok ? undefined : tx.data });
+        if (tx.ok) {
+          const txData = Array.isArray(tx.data) ? tx.data[0] : tx.data;
+          nsRaw["call-id"] = nsRaw["call-id"] ?? txData?.["call-id"];
+          nsRaw["geo-call-id"] = nsRaw["geo-call-id"] ?? txData?.["geo-call-id"];
+          nsRaw["call-orig-call-id"] = nsRaw["call-orig-call-id"] ?? txData?.["call-orig-call-id"] ?? txData?.orig_callid;
+          nsRaw["call-term-call-id"] = nsRaw["call-term-call-id"] ?? txData?.["call-term-call-id"] ?? txData?.term_callid;
+          nsRaw["call-through-call-id"] = nsRaw["call-through-call-id"] ?? txData?.["call-through-call-id"] ?? txData?.by_callid;
+          break;
+        }
       }
     }
 
