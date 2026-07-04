@@ -176,6 +176,32 @@ export default function PARecordings() {
 
       <NsSyncBar features={["recordings", "cdrs"]} onReload={() => load(page, pageSize)} />
 
+      <button
+        type="button"
+        onClick={async () => {
+          try {
+            const { data: recentCall } = await supabase
+              .from("planipret_phone_calls")
+              .select("*")
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            const { data: rawCdr, error } = await supabase.functions.invoke("ns-debug-cdr", { body: {} });
+            const payload = { db_row_fields: recentCall ? Object.keys(recentCall) : [], db_row: recentCall, ns_debug: rawCdr, invoke_error: error?.message };
+            console.log("[CDR DEBUG]", payload);
+            setDebug((d) => [{ ts: new Date().toISOString(), label: "CDR fields debug", data: payload } as any, ...d]);
+            toast.success("Debug CDR — voir DebugPanel + console");
+          } catch (e: any) {
+            toast.error(`Debug échoué: ${e?.message ?? e}`);
+          }
+        }}
+        className="px-3 py-2 rounded-lg text-sm border"
+        style={{ borderColor: "var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }}
+      >
+        🔍 Debug CDR Fields
+      </button>
+
+
 
 
       <div className="pp-card p-4 flex items-center gap-2 flex-wrap">
