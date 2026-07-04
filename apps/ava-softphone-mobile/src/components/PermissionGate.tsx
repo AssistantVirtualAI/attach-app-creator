@@ -103,7 +103,12 @@ export default function PermissionGate({ onComplete }: PermissionGateProps) {
         next = await requestMicrophone();
         setPerms((p) => ({ ...p, microphone: next, speaker: next === 'granted' ? 'granted' : p.speaker }));
         if (next !== 'granted') {
-          setError('Accès microphone refusé. Activez-le dans Réglages iOS → Lemtel → Microphone pour que les appels et l’audio bidirectionnel fonctionnent.');
+          const isAndroid = Capacitor.getPlatform() === 'android';
+          setError(
+            isAndroid
+              ? 'Accès microphone refusé. Ouvrez Réglages → Applications → Lemtel → Autorisations → Microphone, puis revenez à l’application.'
+              : 'Accès microphone refusé. Activez-le dans Réglages iOS → Lemtel → Microphone pour que les appels et l’audio bidirectionnel fonctionnent.'
+          );
           shouldAdvance = false;
         }
       } else if (step === 'contacts') {
