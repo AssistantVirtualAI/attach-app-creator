@@ -84,8 +84,8 @@ Deno.serve(async (req) => {
       results.auth_user = { created: true, id: authUserId };
     }
 
-    // STEP B: planipret_profiles upsert (SERVICE_ROLE — bypasses RLS)
-    const { error: pErr } = await admin.from("planipret_profiles").upsert({
+    // STEP B: planipret_profiles insert-or-update (no unique constraint on user_id)
+    const profilePayload = {
       user_id: authUserId,
       full_name: APP_REVIEW_NAME,
       email: APP_REVIEW_EMAIL,
@@ -95,7 +95,18 @@ Deno.serve(async (req) => {
       ns_sip_username: APP_REVIEW_EXT,
       ns_linked: true,
       ns_linked_at: new Date().toISOString(),
-    }, { onConflict: "user_id" });
+    };
+    const { data: existingProfile } = await admin
+      .from("planipret_profiles")
+      .select("id")
+      .eq("user_id", authUserId)
+      .maybeSingle();
+    let pErr: any = null;
+    if (existingProfile?.id) {
+      ({ error: pErr } = await admin.from("planipret_profiles").update(profilePayload).eq("id", existingProfile.id));
+    } else {
+      ({ error: pErr } = await admin.from("planipret_profiles").insert(profilePayload));
+    }
     if (pErr) return json({ step: "B", error: "profile_upsert_failed", detail: pErr.message }, 500);
     results.profile = { upserted: true, user_id: authUserId };
 
