@@ -8,7 +8,8 @@ import { ppSipProvider } from "@/lib/planipret/sip/ppSipProvider";
 
 export type HandoverEvent =
   | { kind: "network-change"; from: string; to: string; at: number }
-  | { kind: "ice-restart"; at: number; ok: boolean }
+  | { kind: "quality-drop"; from: string; to: string; at: number }
+  | { kind: "ice-restart"; at: number; ok: boolean; reason: "network-change" | "quality-drop" }
   | { kind: "reregister"; at: number };
 
 type Listener = (e: HandoverEvent) => void;
@@ -16,6 +17,7 @@ type Listener = (e: HandoverEvent) => void;
 class HandoverController {
   private listeners = new Set<Listener>();
   private lastType: string = "unknown";
+  private lastQuality: NetSample["quality"] = "good";
   private started = false;
   private unsubNet: (() => void) | null = null;
   private inFlight = false;
@@ -43,28 +45,47 @@ class HandoverController {
     catch { return true; }
   }
 
-  private async onNet(s: NetSample) {
-    const prev = this.lastType;
-    this.lastType = s.type;
-    if (prev === "unknown") return;
-    if (prev === s.type) return;
-    if (Date.now() - this.lastActionAt < 1500) return;
-    this.lastActionAt = Date.now();
-    this.emit({ kind: "network-change", from: prev, to: s.type, at: Date.now() });
-    if (!s.connected) return;
-    if (!this.autoEnabled()) return;
+  private async runHandover(reason: "network-change" | "quality-drop") {
     if (this.inFlight) return;
+    if (!this.autoEnabled()) return;
     this.inFlight = true;
+    this.lastActionAt = Date.now();
     try {
       if (ppSipProvider.hasActiveCall()) {
         const ok = await ppSipProvider.iceRestart();
-        this.emit({ kind: "ice-restart", at: Date.now(), ok });
-      } else {
+        this.emit({ kind: "ice-restart", at: Date.now(), ok, reason });
+      } else if (reason === "network-change") {
         await ppSipProvider.forceReregister();
         this.emit({ kind: "reregister", at: Date.now() });
       }
     } finally {
       this.inFlight = false;
+    }
+  }
+
+  private async onNet(s: NetSample) {
+    const prev = this.lastType;
+    const prevQ = this.lastQuality;
+    this.lastType = s.type;
+    this.lastQuality = s.quality;
+
+    // Interface change (Wi-Fi ↔ LTE ↔ none): trigger handover.
+    if (prev !== "unknown" && prev !== s.type && Date.now() - this.lastActionAt > 1500) {
+      this.emit({ kind: "network-change", from: prev, to: s.type, at: Date.now() });
+      if (s.connected) await this.runHandover("network-change");
+      return;
+    }
+
+    // Quality dropped to poor while on a call: try ICE restart to pick the best path.
+    if (
+      s.connected &&
+      ppSipProvider.hasActiveCall() &&
+      prevQ !== "poor" &&
+      s.quality === "poor" &&
+      Date.now() - this.lastActionAt > 5000
+    ) {
+      this.emit({ kind: "quality-drop", from: prevQ, to: s.quality, at: Date.now() });
+      await this.runHandover("quality-drop");
     }
   }
 
