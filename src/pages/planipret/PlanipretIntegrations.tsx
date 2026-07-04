@@ -19,6 +19,7 @@ import {
 } from "@/components/planipret/admin/integrations/IntegrationCard";
 import NsLiveTestPanel from "@/components/planipret/admin/integrations/NsLiveTestPanel";
 import NsRecordingsProbe from "@/components/planipret/admin/integrations/NsRecordingsProbe";
+import NsTranscriptionProbe from "@/components/planipret/admin/integrations/NsTranscriptionProbe";
 import CallE2ECheck from "@/components/planipret/admin/integrations/CallE2ECheck";
 import Ms365LiveTestPanel from "@/components/planipret/admin/integrations/Ms365LiveTestPanel";
 import NsMigrationPanel from "@/components/planipret/admin/integrations/NsMigrationPanel";
@@ -217,6 +218,7 @@ export default function PlanipretIntegrations() {
           <NsLiveTestPanel domain={getField("ns_api", "domain", "planipret.ca") || "planipret.ca"} />
           <div className="mt-4">
             <NsRecordingsProbe domain={getField("ns_api", "domain", "planipret.ca") || "planipret.ca"} />
+            <NsTranscriptionProbe />
           </div>
           <div className="mt-4">
             <CallE2ECheck />
