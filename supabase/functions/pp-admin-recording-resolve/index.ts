@@ -23,14 +23,32 @@ const val = (raw: any, keys: string[], fb: any = null) => {
   return fb;
 };
 
-function lookupCallId(c: any): string | null {
-  const id = String(val(c, [
-    "call-parent-cdr-id", "call-orig-call-id", "call-parent-call-id",
-    "orig-callid", "orig-call-id", "orig_callid",
-    "call-id", "call_id", "callid", "call-term-call-id",
-    "cdr_id", "cdr-id", "id",
-  ], "")).trim();
-  return id || null;
+function pushCandidate(out: string[], raw: any) {
+  const value = String(raw ?? "").trim();
+  if (!value || value === "null" || value === "undefined" || out.includes(value)) return;
+  // ns_call_id may be our local synthetic key: ext:start:from:to:duration.
+  if (value.includes("sip:") || value.split(":").length > 3) return;
+  out.push(value);
+}
+
+function lookupCallIds(...sources: any[]): string[] {
+  const ids: string[] = [];
+  const callIdKeys = [
+    // NetSapiens recording endpoint expects call-id, not the local UUID.
+    "call-id", "call_id", "callid",
+    "call-orig-call-id", "orig-callid", "orig-call-id", "orig_callid",
+    "call-term-call-id", "term-callid", "term-call-id", "term_callid",
+    "call-through-call-id", "by-callid", "by_callid",
+    "call-parent-call-id",
+    // Last resort only: CDR id often 404s for recordings, but keep it for installs
+    // where the recording API is keyed by CDR id.
+    "call-parent-cdr-id", "cdr_id", "cdr-id", "id", "uuid",
+  ];
+  for (const source of sources) {
+    if (!source) continue;
+    for (const key of callIdKeys) pushCandidate(ids, source[key]);
+  }
+  return ids;
 }
 
 async function nsFetch(path: string) {
@@ -41,6 +59,15 @@ async function nsFetch(path: string) {
   let data: any = null;
   try { data = text ? JSON.parse(text) : null; } catch { data = text; }
   return { ok: r.ok, status: r.status, data };
+}
+
+function accessUrl(raw: any): string | null {
+  const first = Array.isArray(raw) ? raw[0] : raw;
+  return val(first, ["file-access-url", "file_access_url", "recording_url", "recording-url", "url"], null);
+}
+
+function staleApiPath(v: unknown): boolean {
+  return typeof v === "string" && /^\/domains\/[^/]+\/recordings\//i.test(v.trim());
 }
 
 Deno.serve(async (req) => {
@@ -64,7 +91,7 @@ Deno.serve(async (req) => {
 
     const { data: row, error: rowErr } = await admin
       .from("planipret_phone_calls")
-      .select("id, ns_domain, extension, recording_url, metadata")
+      .select("id, ns_call_id, ns_domain, extension, recording_url, metadata")
       .eq("id", callRowId)
       .maybeSingle();
     if (rowErr || !row) return json({ error: "call not found" }, 404);
@@ -76,44 +103,60 @@ Deno.serve(async (req) => {
     const domain = row.ns_domain || NS_DEFAULT_DOMAIN;
     const meta: any = row.metadata ?? {};
     const nsRaw = meta.ns_recording ?? meta;
-    const callId = lookupCallId(nsRaw) || lookupCallId(meta);
-    if (!callId) return json({ error: "no NS call id available on this row" }, 422);
-
-    const path = `/domains/${encodeURIComponent(domain)}/recordings/${encodeURIComponent(callId)}`;
-    const r = await nsFetch(path);
-    if (!r.ok) {
-      const notFound = r.status === 404;
-      return json({
-        ok: false,
-        fallback: true,
-        error: notFound ? "RECORDING_NOT_FOUND" : `NS-API ${r.status}`,
-        hint: notFound
-          ? "Aucun enregistrement disponible pour cet appel côté NetSapiens (peut ne pas avoir été enregistré, ou déjà expiré)."
-          : "Le service d'enregistrement NetSapiens a retourné une erreur.",
-        ns_status: r.status,
-        ns_detail: r.data,
-        ns_path: path,
-      }, 200);
+    const directUrl = val(nsRaw, [
+      "file-access-url", "file_access_url", "recording_url", "recording-url",
+      "recording", "recording-file", "recording_file", "download_url", "url",
+    ], null);
+    if (directUrl && String(directUrl).startsWith("http")) {
+      await admin.from("planipret_phone_calls").update({
+        recording_url: directUrl,
+        metadata: { ...meta, recording_access_url_resolved: true, recording_resolution: { source: "metadata_direct_url" } },
+      }).eq("id", row.id);
+      return json({ ok: true, recording_url: directUrl, cached: false, source: "metadata_direct_url" });
     }
 
-    const first = Array.isArray(r.data) ? r.data[0] : r.data;
-    const url = val(first, ["file-access-url", "file_access_url", "recording_url", "recording-url", "url"], null);
+    const ids = lookupCallIds(nsRaw, meta, { ns_call_id: row.ns_call_id });
+    if (!ids.length) return json({ ok: false, fallback: true, error: "NO_NS_CALL_ID", hint: "Aucun identifiant NetSapiens exploitable sur cet appel." }, 200);
+
+    const attempts: Array<{ path: string; status: number; ok: boolean; detail?: any }> = [];
+    let url: string | null = null;
+    let sourcePath: string | null = null;
+    const D = encodeURIComponent(domain);
+    const E = row.extension ? encodeURIComponent(String(row.extension)) : null;
+
+    for (const id of ids) {
+      const paths = [
+        `/domains/${D}/recordings/${encodeURIComponent(id)}`,
+        ...(E ? [`/domains/${D}/users/${E}/recordings/${encodeURIComponent(id)}`] : []),
+      ];
+      for (const path of paths) {
+        const r = await nsFetch(path);
+        attempts.push({ path, status: r.status, ok: r.ok, detail: r.ok ? undefined : r.data });
+        if (r.ok) {
+          url = accessUrl(r.data);
+          sourcePath = path;
+          if (url) break;
+        }
+      }
+      if (url) break;
+    }
+
     if (!url) return json({
       ok: false,
       fallback: true,
-      error: "NO_ACCESS_URL",
-      hint: "NetSapiens a répondu mais sans URL d'accès au fichier audio.",
-      ns_path: path,
-      sample: first,
+      error: attempts.some((a) => a.status === 404) ? "RECORDING_NOT_FOUND" : "NO_ACCESS_URL",
+      hint: "Aucune URL audio valide n'a été retournée. L'appel peut être non enregistré, l'archive peut être expirée, ou l'identifiant CDR n'est pas accepté par l'endpoint d'enregistrement.",
+      attempted_ids: ids,
+      attempts,
     }, 200);
 
     await admin.from("planipret_phone_calls").update({
       recording_url: url,
-      metadata: { ...meta, recording_access_url_resolved: true, recording_api_path: path },
+      metadata: { ...meta, recording_access_url_resolved: true, recording_api_path: sourcePath, recording_resolution: { attempted_ids: ids, attempts } },
     }).eq("id", row.id);
 
-    return json({ ok: true, recording_url: url, cached: false });
+    return json({ ok: true, recording_url: url, cached: false, source: sourcePath });
   } catch (e) {
-    return json({ error: (e as Error).message }, 500);
+    return json({ ok: false, fallback: true, error: "RECORDING_RESOLVE_FAILED", hint: (e as Error).message }, 200);
   }
 });
