@@ -10,12 +10,12 @@ export type PlanipretCallFilters = {
   search?: string;
 };
 
-export function applyPlanipretCallFilters<T extends any>(query: T, filters: PlanipretCallFilters): T {
+export function applyPlanipretCallFilters<T extends any>(query: T, filters: PlanipretCallFilters, dateField: "started_at" | "created_at" = "started_at"): T {
   let q: any = query;
   if (filters.broker?.startsWith("ext:")) q = q.eq("extension", filters.broker.slice(4));
   else if (filters.broker?.startsWith("user:")) q = q.eq("user_id", filters.broker.slice(5));
-  if (filters.from) q = q.gte("started_at", filters.from);
-  if (filters.to) q = q.lte("started_at", filters.to);
+  if (filters.from) q = q.gte(dateField, filters.from);
+  if (filters.to) q = q.lte(dateField, filters.to);
   if (filters.direction) q = q.eq("direction", filters.direction);
   if (filters.status) q = q.eq("status", filters.status);
   if (filters.ai === "yes") q = q.not("ai_summary", "is", null);
@@ -24,10 +24,11 @@ export function applyPlanipretCallFilters<T extends any>(query: T, filters: Plan
   return q as T;
 }
 
-export async function getPlanipretCallCount(filters: PlanipretCallFilters = {}) {
+export async function getPlanipretCallCount(filters: PlanipretCallFilters = {}, dateField: "started_at" | "created_at" = "started_at") {
   const q = applyPlanipretCallFilters(
     supabase.from("planipret_phone_calls").select("id", { count: "exact", head: true }),
     filters,
+    dateField,
   );
   const { count, error } = await q;
   if (error) throw error;
