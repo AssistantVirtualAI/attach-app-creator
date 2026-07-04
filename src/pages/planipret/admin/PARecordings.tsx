@@ -536,34 +536,37 @@ export default function PARecordings() {
                     )}
                   </div>
                 </div>
-              ) : (
+              ) : transcribing === detail.id ? (
+                <div>
+                  <p style={{ fontSize: 11, color: "var(--pp-text-muted)", marginBottom: 4 }}>Transcription</p>
+                  <div className="flex items-center gap-2 p-3 rounded-lg text-xs" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>
+                    <div className="w-3 h-3 rounded-full border-2 animate-spin" style={{ borderColor: "var(--pp-text-muted)", borderTopColor: "transparent" }} />
+                    Chargement de la transcription depuis NS-API…
+                  </div>
+                </div>
+              ) : transcriptionError ? (
                 <div className="space-y-2">
-                  {(transcriptionError || detail.__transcription_error) && (
-                    <div className="p-3 rounded-lg text-xs" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>
-                      {transcriptionError || detail.__transcription_error}
-                    </div>
-                  )}
+                  <div className="p-3 rounded-lg text-xs" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-danger, #E84C4C)" }}>
+                    ❌ Impossible de charger la transcription
+                  </div>
                   <button
                     onClick={() => transcribe(detail.id)}
-                    disabled={transcribing === detail.id}
                     className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-white text-sm"
                     style={{ background: ACCENT }}
                   >
-                    <Play className="w-3.5 h-3.5" />
-                    {transcribing === detail.id ? "Transcription en cours…" : "Relancer la transcription"}
+                    <RefreshCw className="w-3.5 h-3.5" /> Réessayer
                   </button>
                 </div>
-              )}
-              {hasDetailTranscript && (
-                <button
-                  onClick={() => runCoaching(detail.id)}
-                  disabled={coaching === detail.id}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-white text-sm disabled:opacity-50"
-                  style={{ background: AGENT }}
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  {coaching === detail.id ? "Analyse Claude en cours…" : (detail.ai_coaching ? "Régénérer coaching IA" : "Analyser & coacher (Claude)")}
-                </button>
+              ) : transcriptionUnavailable ? (
+                <div className="p-3 rounded-lg text-xs text-center" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>
+                  📝 Transcription non disponible pour cet appel.
+                </div>
+              ) : null}
+              {hasDetailTranscript && !detail.ai_coaching && (
+                <div className="flex items-center gap-2 p-3 rounded-lg text-xs" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>
+                  <Sparkles className="w-3.5 h-3.5" style={{ color: AGENT }} />
+                  {coaching === detail.id ? "AVA analyse la transcription (correction, résumé, coaching)…" : "Analyse IA en attente…"}
+                </div>
               )}
               {detail.ai_coaching && (
                 <div>
