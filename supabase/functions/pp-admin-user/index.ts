@@ -31,6 +31,15 @@ function nsUserPayload(fullName: string, email: string, extension: string, passw
     "directory-name": fullName || extension,
     "email-address": email,
     "user-scope": "Basic User",
+    "time-zone": "America/Montreal",
+    "language-token": "fr_CA",
+    "voicemail-enabled": "yes",
+    "recording-configuration": "yes-with-transcription-and-sentiment",
+    "dial-policy": "US and Canada",
+    "voicemail-transcription-enabled": "Deepgram",
+    "email-send-alert-new-voicemail-enabled": "yes",
+    "email-send-alert-new-missed-call-enabled": "yes",
+    "ring-no-answer-timeout-seconds": 25,
     ...(password ? { "user-password": password, password } : {}),
   };
 }

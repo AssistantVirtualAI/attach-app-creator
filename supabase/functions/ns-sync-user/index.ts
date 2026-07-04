@@ -83,6 +83,17 @@ Deno.serve(async (req) => {
         "directory-name": String(p.full_name ?? ext),
         "email-address": String(p.email ?? ""),
         "user-scope": "Basic User",
+        "time-zone": "America/Montreal",
+        "language-token": "fr_CA",
+        "voicemail-enabled": "yes",
+        "recording-configuration": p.voice_agent_enabled
+          ? "yes-with-transcription-and-sentiment"
+          : "yes",
+        "dial-policy": "US and Canada",
+        "voicemail-transcription-enabled": "Deepgram",
+        "email-send-alert-new-voicemail-enabled": "yes",
+        "email-send-alert-new-missed-call-enabled": "yes",
+        "ring-no-answer-timeout-seconds": 25,
       };
     };
 

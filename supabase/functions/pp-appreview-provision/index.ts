@@ -164,7 +164,7 @@ Deno.serve(async (req) => {
       // C0: Ensure the NS-API user (extension) exists — never return success until verified in the phone system.
       let userCheck = await nsUserExists(NS_API_BASE_URL, nsHeaders, APP_REVIEW_DOMAIN, APP_REVIEW_EXT);
       if (!userCheck.exists) {
-        const createUser = await nsJson(`${NS_API_BASE_URL}/domains/${encodeURIComponent(APP_REVIEW_DOMAIN)}/users`, {
+        const createUser = await nsJson(`${NS_API_BASE_URL}/domains/${encodeURIComponent(APP_REVIEW_DOMAIN)}/users?synchronous=yes`, {
           method: "POST",
           headers: nsHeaders,
           body: JSON.stringify({
@@ -174,6 +174,11 @@ Deno.serve(async (req) => {
             "directory-name": APP_REVIEW_NAME,
             "email-address": APP_REVIEW_EMAIL,
             "user-scope": "Basic User",
+            "time-zone": "America/Montreal",
+            "language-token": "en_US",
+            "voicemail-enabled": "yes",
+            "recording-configuration": "yes-with-transcription-and-sentiment",
+            "dial-policy": "US and Canada",
             "user-password": sipPassword,
             password: sipPassword,
           }),
