@@ -726,6 +726,7 @@ export const MP_DICT = {
       search: "Search",
       today: "Today",
       yesterday: "Yesterday",
+      inactive: "Inactive",
       none: "None",
       new: "New",
       call: "Call",
