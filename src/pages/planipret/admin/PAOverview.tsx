@@ -594,7 +594,7 @@ export default function PAOverview() {
                       <td><Icon className="w-3.5 h-3.5" style={{ color: col }} /></td>
                       <td style={{ fontSize: 12, color: "var(--pp-text-secondary)" }}>{num ?? "—"}</td>
                       <td style={{ fontSize: 12, color: "var(--pp-text-muted)" }}>{c.duration_seconds ? `${Math.floor(c.duration_seconds / 60)}m${c.duration_seconds % 60}s` : "—"}</td>
-                      <td style={{ fontSize: 11, color: "var(--pp-text-faint)" }}>{c.started_at ? new Date(c.started_at).toLocaleTimeString(dateLocale, { hour: "2-digit", minute: "2-digit" }) : ""}</td>
+                      <td style={{ fontSize: 11, color: "var(--pp-text-faint)" }}>{(c.started_at || c.created_at) ? new Date(c.started_at || c.created_at).toLocaleTimeString(dateLocale, { hour: "2-digit", minute: "2-digit" }) : ""}</td>
                       <td>{c.ai_summary && <Sparkles className="w-3.5 h-3.5" style={{ color: AGENT }} />}</td>
                     </tr>
                   );
