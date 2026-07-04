@@ -55,7 +55,7 @@ function ensureGumProxy() {
       if (wantsAudioOnly && readNCEnabled()) {
         const cfg = getAudioConstraints(readNCMode());
         const merged: MediaStreamConstraints = {
-          audio: { ...(cfg.audio as any), ...(typeof constraints.audio === "object" ? constraints.audio : {}) },
+          audio: { ...(typeof constraints.audio === "object" ? constraints.audio : {}), ...(cfg.audio as any) },
           video: false,
         };
         return await gumOriginal!(merged);
