@@ -251,11 +251,33 @@ export default function PAUsers() {
               className="pl-9 pr-3 py-2 rounded-lg text-sm w-72"
               style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" }} />
           </div>
+          <button onClick={syncFromNs} disabled={syncing} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)", opacity: syncing ? 0.6 : 1 }}>
+            <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} /> {syncing ? "Sync..." : "Sync NS-API"}
+          </button>
           <button onClick={() => setAddOpen(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-white text-sm font-medium" style={{ background: ACCENT }}>
             <Plus className="w-4 h-4" /> Ajouter un courtier
           </button>
         </div>
       </div>
+
+      {/* App Review card */}
+      {appReviewExists === false && (
+        <div className="pp-card p-4 flex items-center justify-between" style={{ borderLeft: `3px solid ${ACCENT}` }}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--pp-text-primary)" }}>⚡ Utilisateur App Review non configuré</div>
+            <div style={{ fontSize: 11, color: "var(--pp-text-muted)" }} className="mt-0.5">Requis pour la review Apple/Google · demo@avastatistic.ca · Ext. 1999</div>
+          </div>
+          <button onClick={createAppReviewUser} disabled={creatingReview} className="px-3 py-2 rounded-lg text-white text-sm font-medium" style={{ background: ACCENT, opacity: creatingReview ? 0.6 : 1 }}>
+            {creatingReview ? "Création..." : "Créer l'utilisateur App Review"}
+          </button>
+        </div>
+      )}
+      {appReviewExists === true && (
+        <div className="pp-card p-3 flex items-center gap-3" style={{ borderLeft: `3px solid ${SUCCESS}` }}>
+          <span style={{ fontSize: 13, color: "var(--pp-text-primary)" }}>✅ App Review configuré</span>
+          <span style={{ fontSize: 11, color: "var(--pp-text-muted)" }}>demo@avastatistic.ca · DemoPass2026! · Ext. 1999</span>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex items-center gap-2">
