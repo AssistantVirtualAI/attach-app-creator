@@ -283,35 +283,23 @@ export default function PermissionGate({ onComplete }: PermissionGateProps) {
 
       {status !== 'denied' && (
         <button onClick={requestCurrent} disabled={requesting} style={{ ...primaryBtnStyle, opacity: requesting ? 0.6 : 1 }}>
-          {requesting ? 'Requesting…' : 'Continue'}
+          {requesting ? 'Requesting… · Demande en cours…' : 'Continue · Continuer'}
         </button>
       )}
 
       {status === 'denied' && Capacitor.isNativePlatform() && (
         <button onClick={() => { void openAppSettings(); }} style={primaryBtnStyle}>
-          Open Settings
+          Open Settings · Ouvrir les Réglages
         </button>
       )}
 
-      {/* "Next" — always available for optional steps so the user is never blocked. */}
-      {!current.required && (
-        <button
-          onClick={() => advance(step)}
-          style={{ ...ghostBtnStyle, marginTop: 8, color: colors.mutedSilver }}
-        >
-          Next
-        </button>
-      )}
-
-      {/* Microphone denied: allow user to proceed into the app without calls. */}
-      {status === 'denied' && current.required && (
-        <button
-          onClick={() => advance(step)}
-          style={{ ...ghostBtnStyle, marginTop: 8, color: colors.mutedSilver }}
-        >
-          Next
-        </button>
-      )}
+      {/* "Next" — ALWAYS visible so the user is never blocked. */}
+      <button
+        onClick={() => advance(step)}
+        style={{ ...ghostBtnStyle, marginTop: 8, color: colors.mutedSilver }}
+      >
+        Next · Suivant
+      </button>
 
 
       {/* Step dots */}
