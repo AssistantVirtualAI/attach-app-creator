@@ -57,6 +57,8 @@ export default function PAMobileDevices() {
   const [testState, setTestState] = useState<string | null>(null);
   const [answeredBy, setAnsweredBy] = useState<string | null>(null);
   const [backfilling, setBackfilling] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
 
   const refresh = useCallback(async () => {
     setLoading(true);
