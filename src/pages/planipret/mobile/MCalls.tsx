@@ -911,8 +911,8 @@ function CallDetailSheet({
     const segments = Array.isArray(call.transcript_segments) ? call.transcript_segments : null;
     if (!call.transcript && !segments) return;
     setAiLoading(true);
-    const { data, error } = await supabase.functions.invoke("ai-analyze-call", {
-      body: { call_id: call.id, transcript: call.transcript ?? null, segments },
+    const { data, error } = await supabase.functions.invoke("pp-coach-call", {
+      body: { call_id: call.id, transcript: call.transcript ?? null },
     });
     setAiLoading(false);
     if (error) { toast.error(error.message ?? t("common.failed")); return; }
