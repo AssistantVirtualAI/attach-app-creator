@@ -249,6 +249,17 @@ export default function PARecordings() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detail?.id]);
 
+  // Auto-run Claude coaching once transcript is available and no analysis yet
+  useEffect(() => {
+    if (!detail?.id) return;
+    const hasTranscript = Boolean(detail.transcript) || (Array.isArray(detail.transcript_segments) && detail.transcript_segments.length > 0);
+    if (!hasTranscript) return;
+    if (detail.ai_coaching || detail.ai_summary) return;
+    if (coaching === detail.id) return;
+    runCoaching(detail.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detail?.id, detail?.transcript, detail?.transcript_segments]);
+
   // Auto-fetch audio via ns-get-recording when a recording detail opens (skip voicemails)
   useEffect(() => {
     if (!detail?.id) return;
