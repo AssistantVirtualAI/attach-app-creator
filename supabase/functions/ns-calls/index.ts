@@ -22,31 +22,35 @@ Deno.serve(async (req) => {
         break;
       case "start": {
         if (!toNumber) {
-          return jsonResponse({ success: false, error: "to_number requis", code: 400 }, 400);
+          return jsonResponse({ success: false, error: "destination requise", code: 400 }, 400);
         }
+        // Normalize destination to E.164-ish (+1XXXXXXXXXX for NA)
+        let dest = String(toNumber).replace(/\D/g, "");
+        if (dest.length === 10) dest = "1" + dest;
+        if (!String(toNumber).startsWith("+")) dest = "+" + dest;
         res = await nsBrokerFetch(admin, profile, nsPath(env.domain, ext, "/calls"), {
           method: "POST",
           body: JSON.stringify({
-            to_number: toNumber,
-            caller_id_number: body.caller_id_number,
-            caller_id_name: body.caller_id_name,
+            destination: dest,
+            "caller-id-number": body.caller_id_number ?? ext,
+            "caller-id-name": body.caller_id_name ?? profile.full_name ?? "Courtier Planiprêt",
           }),
         });
         if (res.ok) {
           const data = await res.clone().json().catch(() => ({}));
-          const newCallId = data?.call_id ?? data?.id ?? null;
+          const newCallId = data?.["call-id"] ?? data?.call_id ?? data?.id ?? null;
           await admin.from("planipret_phone_calls").insert({
             user_id: userId,
             call_id: newCallId,
             direction: "outbound",
-            caller_number: body.caller_id_number ?? null,
-            callee_number: body.to_number,
+            caller_number: body.caller_id_number ?? ext,
+            callee_number: dest,
             status: "outbound_ringing",
           });
           await logAudit(admin, req, {
             user_id: profile.id, action: "CALL_START",
             resource_type: "call", resource_id: newCallId ? String(newCallId) : null,
-            metadata: { direction: "outbound", to: toNumber },
+            metadata: { direction: "outbound", to: dest },
           });
         }
         break;

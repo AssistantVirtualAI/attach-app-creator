@@ -35,73 +35,10 @@ function nsBase() {
 
 export async function getNsJwt(): Promise<string> {
   if (cachedToken && cachedToken.exp > Date.now() + 60_000) return cachedToken.token;
-  const env = getEnv();
-  const clientId = Deno.env.get("NS_API_CLIENT_ID") ?? "";
-  const clientSecret = Deno.env.get("NS_API_CLIENT_SECRET") ?? "";
   const staticKey = Deno.env.get("NS_API_KEY") ?? "";
-
-  // Fallback: if NS_API_KEY (static bearer) is configured and no OAuth client
-  // credentials, use it directly.
-  if (staticKey && (!clientId || !clientSecret)) {
-    cachedToken = { token: staticKey, exp: Date.now() + 3600_000 };
-    return staticKey;
-  }
-
-  // NetSapiens NS-API v2 standard auth: POST /ns-api/oauth2/token (form-encoded, grant_type=password).
-  // Fallback to legacy /ns-api/v2/jwt (JSON) for installs that expose it.
-  const attempts: Array<{ url: string; init: RequestInit; label: string }> = [
-    {
-      label: "oauth2/token",
-      url: `${nsBase()}/ns-api/oauth2/token`,
-      init: {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
-        body: new URLSearchParams({
-          grant_type: "password",
-          username: env.NS_API_USER,
-          password: env.NS_API_PASSWORD,
-          ...(clientId ? { client_id: clientId } : {}),
-          ...(clientSecret ? { client_secret: clientSecret } : {}),
-        }).toString(),
-      },
-    },
-    {
-      label: "v2/jwt",
-      url: `${nsBase()}/ns-api/v2/jwt`,
-      init: {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ username: env.NS_API_USER, password: env.NS_API_PASSWORD }),
-      },
-    },
-  ];
-
-  const errors: string[] = [];
-  for (const a of attempts) {
-    try {
-      const res = await fetch(a.url, a.init);
-      if (res.ok) {
-        const data = await res.json();
-        const token = data.access_token ?? data.token ?? data.jwt;
-        if (!token) {
-          errors.push(`${a.label}: no token in response`);
-          continue;
-        }
-        const ttlMs = (typeof data.expires_in === "number" ? data.expires_in : 3000) * 1000;
-        cachedToken = { token, exp: Date.now() + Math.max(60_000, ttlMs - 60_000) };
-        return token;
-      }
-      const txt = await res.text();
-      errors.push(`${a.label}: ${res.status} ${txt}`);
-    } catch (e) {
-      errors.push(`${a.label}: ${(e as Error).message}`);
-    }
-  }
-  if (staticKey) {
-    cachedToken = { token: staticKey, exp: Date.now() + 3600_000 };
-    return staticKey;
-  }
-  throw new Error(`NS-API auth failed: ${errors.join(" | ")}`);
+  if (!staticKey) throw new Error("NS_API_KEY not configured (NS-API v2 uses static Bearer key)");
+  cachedToken = { token: staticKey, exp: Date.now() + 3600_000 };
+  return staticKey;
 }
 
 export async function nsFetch(path: string, init: RequestInit = {}, opts: { functionName?: string } = {}) {
