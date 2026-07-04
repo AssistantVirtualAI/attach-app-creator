@@ -236,6 +236,14 @@ export default function PermissionGate({ onComplete }: PermissionGateProps) {
         {current.why}
       </div>
 
+      {/* Live status badge for all permissions */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap', justifyContent: 'center' }}>
+        <StatusChip label="🎤 Mic" state={perms.microphone} />
+        <StatusChip label="🔊 Speaker" state={perms.speaker} />
+        <StatusChip label="👥 Contacts" state={perms.contacts} />
+        <StatusChip label="🔔 Notif" state={perms.notifications} />
+      </div>
+
       {status === 'granted' && (
         <div style={{ color: '#10B981', fontSize: font.sm, marginBottom: 16 }}>
           ✅ Permission granted
