@@ -81,12 +81,19 @@ export function CallRecordingPlayer({ callId, duration = 0 }: Props) {
   }
 
   if (error || !audioUrl) {
+    const [errMain, ...errRest] = (error ?? "").split(" — ");
+    const errHint = errRest.join(" — ");
     return (
       <div className="pp-card p-4 space-y-3">
         <div className="text-xs" style={{ color: "var(--pp-danger, #E84C4C)" }}>
           ❌ {t("calls.recordingUnavailable") || "Enregistrement indisponible"}
-          {error ? ` — ${error}` : ""}
+          {errMain ? ` — ${errMain}` : ""}
         </div>
+        {errHint && (
+          <div className="text-[11px]" style={{ color: "var(--pp-text-secondary)" }}>
+            💡 {errHint}
+          </div>
+        )}
         <button
           onClick={load}
           className="w-full py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-2"

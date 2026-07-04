@@ -838,7 +838,10 @@ function CallDetailSheet({
     setTxLoading(false);
     const res = (data ?? {}) as any;
     if (error || res.success === false || (!res.transcript && !(Array.isArray(res.segments) && res.segments.length))) {
-      toast.error(res.hint ?? res.error ?? t("calls.transcriptUnavailable"));
+      const msg = res.error ?? error?.message ?? t("calls.transcriptUnavailable");
+      const hint = res.hint ?? res.action_required ?? "";
+      if (Array.isArray(res.attempts)) console.warn("ns-transcription attempts:", res.attempts);
+      toast.error(hint ? `${msg} — ${hint}` : msg);
       return;
     }
     // Optimistic UI update — the edge function already persists to DB.

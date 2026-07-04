@@ -112,15 +112,18 @@ export const recordingsApi = {
         apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string,
       },
     });
-    if (!res.ok) throw new Error(`Recording fetch failed (${res.status})`);
     const ct = res.headers.get("content-type") ?? "";
     // Edge function returns 200 + JSON when NS reports the recording is missing/forbidden.
     if (ct.includes("application/json")) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err?.error ?? "Enregistrement indisponible");
+      const err = await res.json().catch(() => ({} as any));
+      if (err?.attempts) console.warn("Recording fetch attempts:", err.attempts);
+      const msg = err?.error ?? "Enregistrement indisponible";
+      const hint = err?.hint ?? (err?.ns_status ? `NS-API HTTP ${err.ns_status}` : "");
+      throw new Error(hint ? `${msg} — ${hint}` : msg);
     }
+    if (!res.ok) throw new Error(`Recording fetch failed (HTTP ${res.status})`);
     const buf = await res.arrayBuffer();
-    if (buf.byteLength < 128) throw new Error("Empty recording");
+    if (buf.byteLength < 128) throw new Error("Fichier audio vide reçu");
     return new Blob([buf], { type: ct.startsWith("audio/") ? ct : "audio/wav" });
   },
   async fetchAudioUrl(callId: string): Promise<string> {

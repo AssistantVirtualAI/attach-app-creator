@@ -1,53 +1,41 @@
 
-## 1. Edge function `pp-mobile-device-status`
+## Goal
+Replace the generic "Edge Function returned a non-2xx status code" toast on the call detail (recording + transcription) with the real cause, and fix whatever the logs reveal.
 
-Retourne, pour chaque profil courtier avec `ns_extension`, un rapport :
-- `broker_id`, `full_name`, `email`, `ns_extension`
-- `ns_mobile_device_id` (colonne DB)
-- `ns_exists` : device présent sur NS-API pour cet id
-- `ns_widget_device_id` (colonne DB) et présence widget sur NS
-- `has_vault_secret` : booléen (via lookup Vault du secret `pp_sip_{id}_mobile`)
-- `provisioned_at` : date la plus récente de `planipret_ns_migration_log` avec `action='create_mobile_device'` et `status='ok'`
-- `last_error` : dernier log en erreur (le cas échéant)
-- `state` : `ok` | `missing` | `error` | `partial`
+## Note on function names
+The actual functions in this project are `ns-recordings` and `ns-transcription` (not `ns-get-recording` / `ns-get-transcription`). Existing functions already do most of what the pasted prompt asks (JSON-with-attempts on failure), so the fix is smaller and targeted, not a rewrite.
 
-Admin-gated (super_admin ou admin). Retourne aussi un compteur agrégé.
+## Steps
 
-## 2. Edge function `pp-mobile-testcall`
+### 1. Check what's actually failing (before editing code)
+- Read edge logs for `ns-recordings` and `ns-transcription` (last invocations for François Leblond's call, ext 1251, 2026-07-02 15:22:24).
+- Confirm whether the non-2xx is coming from `authBroker` (401/403 — missing profile/extension mapping), from `nsBrokerFetch` (NS API 4xx/5xx), or from an uncaught throw.
 
-- Input : `{ broker_id: uuid, from_number?: string }`
-- Admin-gated.
-- Lit `ns_extension` du profil ciblé.
-- Déclenche un appel de test via NS-API `POST /calls` (ou `ns-calls action:start`) sourcé depuis le numéro admin, destination = l'extension du courtier → NS forke sur **tous** ses devices enregistrés (`_web` widget + `_mobile`).
-- Génère un `test_call_id` (UUID) et l'insère dans `planipret_call_sessions` `(call_id, direction='inbound', broker_id, remote_number='TEST')`.
-- Retourne `{ ok, ns_call_id, test_session_id, tip: "Décroche depuis un des appareils; l'autre doit s'éteindre." }`.
-- Log dans `planipret_ns_migration_log` action=`test_call`.
+### 2. `supabase/functions/ns-recordings/index.ts`
+- Add verbose `console.log` (method, url, callId, NS status, byte size, auth outcome).
+- On NS non-ok, return `200` JSON with `{ success:false, error, ns_status, hint, attempts:[…] }` (currently returns raw NS text only).
+- Guarantee no uncaught throw hits the runtime (wrap `authBroker` errors in JSON 200 too, so the client always sees a parseable body instead of "non-2xx").
 
-## 3. Page admin `MobileDevicesVerification`
+### 3. `supabase/functions/ns-transcription/index.ts`
+- Add `console.log` for each attempt (path, status, keys of returned JSON).
+- Extend `parseSegments` field list already looks OK; keep. Expand `attempts` debug to include a small preview of the CDR keys when the `cdr_field` attempt succeeds but has no transcript.
+- Include `possible_reasons` array + `action_required` in the failure payload so the UI can show them.
 
-Route : `/planipret/admin/mobile-devices` (fr : « Vérification devices mobiles »).
+### 4. `src/lib/planipret/nsApi.ts` → `recordingsApi.fetchAudio`
+- When response is JSON (success or failure), read `error`, `hint`, `ns_status`, `attempts` and throw an `Error` whose message includes hint. Attach `attempts` to a `console.warn` for devs.
+- When network throws or `res.ok` is false and body isn't JSON, include the HTTP status in the thrown message.
 
-Contenu :
-- En-tête + bouton « Rafraîchir » qui appelle `pp-mobile-device-status`.
-- Cartes de compteurs (total, OK, manquants, erreurs).
-- Table triable/filtrable :
-  - Courtier, extension, device mobile (id), widget id, état (pill), provisionné le, dernière erreur, action « Appel test ».
-- « Appel test » ouvre un mini-modal : choix du numéro appelant (défaut : num admin/ligne test) puis lance `pp-mobile-testcall` avec le `broker_id` ; toast avec résultat + `test_session_id`.
-- Realtime : souscription sur `planipret_call_sessions` filtrée sur le `test_session_id` renvoyé → affiche en direct « sonne… → répondu par MOBILE / WIDGET → terminé » pour prouver que le fork parallèle fonctionne et que la sync CDR/état est correcte.
-- Section « CDR récents (test) » : lecture des 10 derniers `planipret_phone_calls` du courtier ciblé.
+### 5. `src/components/planipret/mobile/call/CallRecordingPlayer.tsx`
+- Store `errorHint` alongside `error` state; render both (error line + smaller hint line + Retry).
+- Continue calling with just `callId` (server derives extension from the broker profile — no extra props needed).
 
-Ajout d'une entrée dans la navigation admin Planipret (à côté du dashboard NS-API sync).
+### 6. Transcription caller (wherever `ns-transcription` is invoked in the mobile call detail — likely `MCalls.tsx`)
+- Parse the JSON response for `error`, `hint`, `possible_reasons`, `action_required` and show them under the "Lancer la transcription IA" button instead of a toast that only says "non-2xx".
 
-## 4. Fichiers touchés
+### 7. Verify
+- Retry the failing call in the mobile preview; confirm the UI now shows a specific error (e.g. "Recording 404 on NS-API", "PORTAL_VOICE_TRANSCRIPTION_SENTIMENT not enabled", or the exact upstream code).
+- Address the concrete cause the logs surface (usually one of: `authBroker` cannot resolve the broker profile/extension for the current user; NS returns 404 because the call was not recorded; NS key lacks recording scope).
 
-- `supabase/functions/pp-mobile-device-status/index.ts` (créé)
-- `supabase/functions/pp-mobile-testcall/index.ts` (créé)
-- `src/pages/planipret/admin/PAMobileDevices.tsx` (créé)
-- Route ajoutée dans le routeur admin Planipret (recherche du fichier de routes).
-- Petite entrée de navigation dans le menu admin Planipret.
-
-## Vérifications post-implémentation
-
-- Bouton « Appel test » sonne widget + mobile ensemble ; décrocher sur l'un stoppe l'autre.
-- Le CDR NS-API apparaît dans `planipret_phone_calls` après ~30s.
-- La page « Vérification devices mobiles » liste tous les courtiers, montre l'état par ligne.
+## Out of scope
+- Renaming functions to `ns-get-recording` / `ns-get-transcription` (pasted prompt uses different names — the project uses the existing ones).
+- Rewriting `ns-webhook-receiver` schema / adding `ns_cdr_id` columns unless step 1 shows the recording lookup fails because the `callId` we send is wrong. If that's the case, a follow-up plan will cover it.

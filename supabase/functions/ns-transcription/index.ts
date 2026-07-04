@@ -33,16 +33,19 @@ function parseSegments(input: any): Seg[] {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  console.log("=== ns-transcription called ===", req.method);
   try {
     const auth = await authBroker(req);
-    if ("error" in auth) return auth.error;
+    if ("error" in auth) { console.log("authBroker failed"); return auth.error; }
     const { admin, profile } = auth;
     const env = nsEnv();
+    console.log("auth ok — extension:", profile.extension, "domain:", env.domain);
 
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
     const url = new URL(req.url);
-    const callId: string = body.call_id ?? body.callId ?? url.searchParams.get("call_id") ?? "";
-    if (!callId) return jsonResponse({ success: false, error: "call_id requis" }, 400);
+    const callId: string = body.call_id ?? body.callId ?? body.cdr_id ?? url.searchParams.get("call_id") ?? "";
+    if (!callId) return jsonResponse({ success: false, error: "call_id requis" }, 200);
+    console.log("callId:", callId);
 
     const attempts: Array<{ label: string; path: string }> = [
       { label: "cdr_transcription_endpoint", path: `/domains/${encodeURIComponent(env.domain)}/cdrs/${encodeURIComponent(callId)}/transcription` },
@@ -54,14 +57,15 @@ Deno.serve(async (req) => {
     let source: string | null = null;
     let raw: any = null;
     let segments: Seg[] = [];
-    const debug: Array<{ label: string; status: number }> = [];
+    const debug: Array<{ label: string; status: number; keys?: string[] }> = [];
 
     for (const a of attempts) {
       const res = await nsBrokerFetch(admin, profile, a.path);
-      debug.push({ label: a.label, status: res.status });
-      if (!res.ok) continue;
-      const data = await res.json().catch(() => null);
-      if (!data) continue;
+      const data = res.ok ? await res.json().catch(() => null) : null;
+      const keys = data && typeof data === "object" && !Array.isArray(data) ? Object.keys(data).slice(0, 20) : undefined;
+      debug.push({ label: a.label, status: res.status, keys });
+      console.log(`attempt ${a.label} → ${res.status}`, keys ? `keys=${keys.join(",")}` : "");
+      if (!res.ok || !data) continue;
       let candidate: any = data;
       if (a.label === "cdr_field") {
         candidate = data.transcript ?? data.transcription ?? data["transcript-text"] ?? data["call-transcript"] ?? null;
@@ -78,10 +82,20 @@ Deno.serve(async (req) => {
     }
 
     if (segments.length === 0) {
+      console.log("no transcript found");
       return jsonResponse({
         success: false,
         error: "Transcription non disponible pour cet appel",
-        hint: "Vérifiez que PORTAL_VOICE_TRANSCRIPTION_SENTIMENT = yes est activé pour votre domaine NetSapiens.",
+        hint: "Contacter NetSapiens pour activer PORTAL_VOICE_TRANSCRIPTION_SENTIMENT = yes sur le domaine.",
+        possible_reasons: [
+          "PORTAL_VOICE_TRANSCRIPTION_SENTIMENT n'est pas activé sur le domaine NetSapiens.",
+          "L'appel n'a pas été enregistré (la transcription requiert un enregistrement).",
+          "La transcription est encore en cours (peut prendre 2-5 minutes après l'appel).",
+          "Le token NS-API n'a pas accès aux transcriptions pour ce domaine.",
+        ],
+        action_required: "Contacter l'admin NetSapiens pour activer la transcription.",
+        call_id: callId,
+        extension: profile.extension,
         attempts: debug,
       }, 200);
     }
