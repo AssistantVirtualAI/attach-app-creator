@@ -621,6 +621,9 @@ async function syncRecordings(admin: ReturnType<typeof createClient>, domain: st
       started_at: started,
       duration_seconds: numVal(rec, ["duration", "time-talking", "billsec", "talk_time", "recording_seconds", "call-total-duration-seconds", "call-batch-total-duration-seconds", "call-talking-duration-seconds"], 0),
       recording_url: url,
+      ns_callid: val(rec, ["call-parent-cdr-id", "call-orig-call-id", "call-term-call-id", "call-parent-call-id", "id"]),
+      ns_orig_callid: val(rec, ["call-orig-call-id", "orig-callid", "orig-call-id"]),
+      ns_term_callid: val(rec, ["call-term-call-id", "term-callid", "term-call-id"]),
       metadata: { ns_recording: rec, recording_api_path: apiPath },
     });
   }
