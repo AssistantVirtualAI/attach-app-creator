@@ -86,14 +86,40 @@ export default function PAUsers() {
     });
     setCallsByUser(map);
     setDebug(directory.debug as DebugEntry[]);
+    // Check if App Review user exists
+    const { count: reviewCount } = await supabase
+      .from("planipret_profiles")
+      .select("id", { count: "exact", head: true })
+      .eq("email", "demo@avastatistic.ca");
+    setAppReviewExists((reviewCount ?? 0) > 0);
     setLoading(false);
   };
 
-  useEffect(() => {
-    load();
-    const ch = supabase.channel("admin-users")
-      .on("postgres_changes", { event: "*", schema: "public", table: "planipret_profiles" }, () => load())
-      .subscribe();
+  const syncFromNs = async () => {
+    setSyncing(true);
+    const { data, error } = await supabase.functions.invoke("ns-sync-user", { body: { action: "sync_from_ns" } });
+    setSyncing(false);
+    if (error || !(data as any)?.success) {
+      toast.error((data as any)?.error ?? error?.message ?? "Erreur de synchronisation");
+      return;
+    }
+    const d = data as any;
+    toast.success(`✅ ${d.matched} liés · ${d.updated} mis à jour · ${d.unmatched} sans correspondance (sur ${d.total_ns_users})`);
+    await load();
+  };
+
+  const createAppReviewUser = async () => {
+    setCreatingReview(true);
+    const { data, error } = await supabase.functions.invoke("pp-appreview-provision", { body: {} });
+    setCreatingReview(false);
+    if (error || !(data as any)?.success) {
+      toast.error((data as any)?.error ?? (data as any)?.detail ?? error?.message ?? "Erreur");
+      console.error("appreview error:", data, error);
+      return;
+    }
+    toast.success("✅ Utilisateur App Review créé");
+    await load();
+  };
     return () => { supabase.removeChannel(ch); };
   }, []);
 
