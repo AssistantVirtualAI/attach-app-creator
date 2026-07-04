@@ -266,7 +266,17 @@ export default function PAMobileDevices() {
                     </div>
                   )}
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-right space-x-2">
+                  {(r.state === "missing" || r.state === "partial") && (
+                    <Button
+                      size="sm"
+                      variant="default"
+                      onClick={() => provisionOne(r)}
+                      disabled={provisioningId === r.broker_id || !r.ns_extension}
+                    >
+                      {provisioningId === r.broker_id ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : "⚡"} Provisionner
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     variant="outline"
