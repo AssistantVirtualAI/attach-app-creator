@@ -47,6 +47,7 @@ export default function PermissionGate({ onComplete }: PermissionGateProps) {
   });
   const [requesting, setRequesting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showDiag, setShowDiag] = useState(false);
 
   // Re-check permissions when the user comes back from the OS Settings page
   // (typical flow after they tap "Open Settings" following a denial).
