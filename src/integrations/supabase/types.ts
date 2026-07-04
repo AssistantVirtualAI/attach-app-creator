@@ -8814,6 +8814,8 @@ export type Database = {
           extension: string | null
           from_name: string | null
           from_number: string | null
+          has_recording: boolean | null
+          has_transcript: boolean | null
           id: string
           lead_score: number | null
           lead_score_reason: string | null
@@ -8866,6 +8868,8 @@ export type Database = {
           extension?: string | null
           from_name?: string | null
           from_number?: string | null
+          has_recording?: boolean | null
+          has_transcript?: boolean | null
           id?: string
           lead_score?: number | null
           lead_score_reason?: string | null
@@ -8918,6 +8922,8 @@ export type Database = {
           extension?: string | null
           from_name?: string | null
           from_number?: string | null
+          has_recording?: boolean | null
+          has_transcript?: boolean | null
           id?: string
           lead_score?: number | null
           lead_score_reason?: string | null
