@@ -119,6 +119,32 @@ Deno.serve(async (req) => {
       const hex = Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, "0")).join("");
       const sipPassword = `Pp${hex.substring(0, 12)}!`;
 
+      // C0: Ensure the NS-API user (extension) exists — otherwise devices creation fails silently.
+      const userUrl = `${NS_API_BASE_URL}/domains/${encodeURIComponent(APP_REVIEW_DOMAIN)}/users/${encodeURIComponent(APP_REVIEW_EXT)}`;
+      const userCheck = await fetch(userUrl, { headers: nsHeaders });
+      if (userCheck.status === 404) {
+        const createUserRes = await fetch(`${NS_API_BASE_URL}/domains/${encodeURIComponent(APP_REVIEW_DOMAIN)}/users`, {
+          method: "POST",
+          headers: nsHeaders,
+          body: JSON.stringify({
+            user: APP_REVIEW_EXT,
+            "name-first-name": "Demo",
+            "name-last-name": "Reviewer",
+            "user-scope": "Basic User",
+            "email-address": APP_REVIEW_EMAIL,
+            "directory-name": APP_REVIEW_NAME,
+            "user-password": sipPassword,
+          }),
+        });
+        const createUserData = await createUserRes.json().catch(() => ({}));
+        results.ns_user = { created: createUserRes.ok, status: createUserRes.status, data: createUserData };
+        if (!createUserRes.ok) {
+          return json({ step: "C0", error: "ns_user_create_failed", status: createUserRes.status, detail: createUserData }, 500);
+        }
+      } else {
+        results.ns_user = { existed: true, status: userCheck.status };
+      }
+
       const listRes = await fetch(`${NS_API_BASE_URL}/domains/${encodeURIComponent(APP_REVIEW_DOMAIN)}/users/${encodeURIComponent(APP_REVIEW_EXT)}/devices`, { headers: nsHeaders });
       const existingDevs = listRes.ok ? (await listRes.json().catch(() => [])) : [];
       const arr = Array.isArray(existingDevs) ? existingDevs : [];
