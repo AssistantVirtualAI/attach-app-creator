@@ -79,52 +79,52 @@ Deno.serve(async (req) => {
     logsByBroker.set(l.broker_id, arr);
   }
 
-  const rows: any[] = [];
   const stats = { total: 0, ok: 0, missing: 0, error: 0, partial: 0 };
 
-  for (const p of profiles ?? []) {
+  // Parallelize NS-API calls with bounded concurrency to keep the page fast.
+  const CONCURRENCY = 12;
+  const list = profiles ?? [];
+  const rows: any[] = new Array(list.length);
+  let cursor = 0;
+  const worker = async () => {
+    while (true) {
+      const i = cursor++;
+      if (i >= list.length) return;
+      const p = list[i];
+      const ext = String(p.ns_extension);
+      const domain = p.ns_domain || NS_DEFAULT_DOMAIN;
+      const targetMobile = p.ns_mobile_device_id || `${ext}_mobile`;
+      const ns = await nsListDevices(domain, ext);
+      const nsMobileExists = ns.ok && ns.ids.includes(targetMobile);
+      const nsWidgetExists = ns.ok && !!p.ns_widget_device_id && ns.ids.includes(p.ns_widget_device_id);
+      const brokerLogs = logsByBroker.get(p.id) ?? [];
+      const okLog = brokerLogs.find((l) => l.status === "ok");
+      const errLog = brokerLogs.find((l) => l.status === "error");
+      let state: "ok" | "missing" | "error" | "partial";
+      if (nsMobileExists && p.ns_mobile_device_id && p.ns_sip_password_ref_mobile) state = "ok";
+      else if (!ns.ok || errLog) state = "error";
+      else if (!nsMobileExists) state = "missing";
+      else state = "partial";
+      rows[i] = {
+        broker_id: p.id, full_name: p.full_name, email: p.email,
+        ns_extension: ext, ns_domain: domain,
+        ns_mobile_device_id: p.ns_mobile_device_id,
+        ns_widget_device_id: p.ns_widget_device_id,
+        target_mobile_id: targetMobile,
+        ns_mobile_exists: nsMobileExists,
+        ns_widget_exists: nsWidgetExists,
+        ns_reachable: ns.ok, ns_status: ns.status,
+        has_vault_secret: !!p.ns_sip_password_ref_mobile,
+        provisioned_at: okLog?.created_at ?? null,
+        last_error: errLog ? { at: errLog.created_at, details: errLog.details } : null,
+        state,
+      };
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, list.length) }, worker));
+  for (const r of rows) {
     stats.total++;
-    const ext = String(p.ns_extension);
-    const domain = p.ns_domain || NS_DEFAULT_DOMAIN;
-    const targetMobile = p.ns_mobile_device_id || `${ext}_mobile`;
-
-    const ns = await nsListDevices(domain, ext);
-    const nsMobileExists = ns.ok && ns.ids.includes(targetMobile);
-    const nsWidgetExists = ns.ok && !!p.ns_widget_device_id && ns.ids.includes(p.ns_widget_device_id);
-
-    const brokerLogs = logsByBroker.get(p.id) ?? [];
-    const okLog = brokerLogs.find((l) => l.status === "ok");
-    const errLog = brokerLogs.find((l) => l.status === "error");
-
-    let state: "ok" | "missing" | "error" | "partial";
-    if (nsMobileExists && p.ns_mobile_device_id && p.ns_sip_password_ref_mobile) state = "ok";
-    else if (!ns.ok || errLog) state = "error";
-    else if (!nsMobileExists) state = "missing";
-    else state = "partial";
-
-    if (state === "ok") stats.ok++;
-    else if (state === "missing") stats.missing++;
-    else if (state === "error") stats.error++;
-    else stats.partial++;
-
-    rows.push({
-      broker_id: p.id,
-      full_name: p.full_name,
-      email: p.email,
-      ns_extension: ext,
-      ns_domain: domain,
-      ns_mobile_device_id: p.ns_mobile_device_id,
-      ns_widget_device_id: p.ns_widget_device_id,
-      target_mobile_id: targetMobile,
-      ns_mobile_exists: nsMobileExists,
-      ns_widget_exists: nsWidgetExists,
-      ns_reachable: ns.ok,
-      ns_status: ns.status,
-      has_vault_secret: !!p.ns_sip_password_ref_mobile,
-      provisioned_at: okLog?.created_at ?? null,
-      last_error: errLog ? { at: errLog.created_at, details: errLog.details } : null,
-      state,
-    });
+    (stats as any)[r.state]++;
   }
 
   return json({ ok: true, stats, rows });
