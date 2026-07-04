@@ -11,7 +11,8 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Loader2, RefreshCw, PhoneCall, CheckCircle2, AlertTriangle, XCircle } from "lucide-react";
+import { Loader2, RefreshCw, PhoneCall, CheckCircle2, AlertTriangle, XCircle, Zap } from "lucide-react";
+import Pagination from "@/components/planipret/admin/Pagination";
 
 type Row = {
   broker_id: string;
@@ -56,6 +57,8 @@ export default function PAMobileDevices() {
   const [testState, setTestState] = useState<string | null>(null);
   const [answeredBy, setAnsweredBy] = useState<string | null>(null);
   const [backfilling, setBackfilling] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -174,12 +177,19 @@ export default function PAMobileDevices() {
     );
   }, [rows, filter]);
 
+  useEffect(() => { setPage(1); }, [filter, pageSize]);
+  const paged = useMemo(
+    () => filtered.slice((page - 1) * pageSize, page * pageSize),
+    [filtered, page, pageSize],
+  );
+
+
   return (
     <div className="space-y-5 p-4 md:p-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-1">
-          <h1 className="text-xl font-medium text-foreground">Devices mobiles</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-lg font-medium text-foreground">Devices mobiles</h1>
+          <p className="text-sm leading-relaxed text-muted-foreground">
             État NetSapiens de <code className="rounded bg-muted px-1 text-xs">{"{ext}_mobile"}</code> pour chaque courtier.
           </p>
         </div>
@@ -188,7 +198,7 @@ export default function PAMobileDevices() {
             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
             Rafraîchir
           </Button>
-          <Button size="sm" onClick={backfill} disabled={backfilling} variant="secondary">
+          <Button size="sm" variant="secondary" onClick={backfill} disabled={backfilling}>
             {backfilling ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             Provisionner manquants
           </Button>
@@ -205,22 +215,23 @@ export default function PAMobileDevices() {
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
         {([
           { k: "total", label: "Total", cls: "text-foreground" },
-          { k: "ok", label: "OK", cls: "text-emerald-600" },
+          { k: "ok", label: "OK", cls: "text-emerald-700 dark:text-emerald-400" },
           { k: "missing", label: "Manquants", cls: "text-destructive" },
-          { k: "partial", label: "Partiels", cls: "text-amber-600" },
+          { k: "partial", label: "Partiels", cls: "text-amber-700 dark:text-amber-400" },
           { k: "error", label: "Erreurs", cls: "text-destructive" },
         ] as const).map((s) => (
           <Card key={s.k}>
-            <CardHeader className="pb-1 pt-3"><CardTitle className="text-xs font-normal text-muted-foreground">{s.label}</CardTitle></CardHeader>
+            <CardHeader className="pb-1 pt-3">
+              <CardTitle className="text-xs font-normal leading-relaxed text-muted-foreground">{s.label}</CardTitle>
+            </CardHeader>
             <CardContent className="pb-3">
-              <div className={`text-xl font-medium ${s.cls}`}>
+              <div className={`text-xl font-medium leading-tight ${s.cls}`}>
                 {loading && !rows.length ? <span className="inline-block h-6 w-8 animate-pulse rounded bg-muted" /> : ((stats as any)[s.k] ?? 0)}
               </div>
             </CardContent>
           </Card>
         ))}
       </div>
-
 
       <Input
         placeholder="Filtrer (nom, courriel, extension, device id)…"
@@ -229,84 +240,103 @@ export default function PAMobileDevices() {
         className="max-w-md"
       />
 
-      <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-muted/50 hover:bg-muted/50">
-              <TableHead>Courtier</TableHead>
-              <TableHead>Ext.</TableHead>
-              <TableHead>Device mobile</TableHead>
-              <TableHead>Widget</TableHead>
-              <TableHead>État</TableHead>
-              <TableHead>Provisionné</TableHead>
-              <TableHead className="text-right">Action</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading && rows.length === 0 && Array.from({ length: 6 }).map((_, i) => (
-              <TableRow key={`sk-${i}`}>
-                {Array.from({ length: 7 }).map((_, j) => (
-                  <TableCell key={j}><div className="h-4 w-full animate-pulse rounded bg-muted" /></TableCell>
-                ))}
+      <div className="rounded-md border bg-card">
+        <div className="overflow-x-auto">
+          <Table className="min-w-[900px]">
+            <TableHeader>
+              <TableRow className="bg-muted/40 hover:bg-muted/40">
+                <TableHead className="w-[24%]">Courtier</TableHead>
+                <TableHead className="w-[8%]">Ext.</TableHead>
+                <TableHead className="w-[22%]">Device mobile</TableHead>
+                <TableHead className="w-[18%]">Widget</TableHead>
+                <TableHead className="w-[10%]">État</TableHead>
+                <TableHead className="w-[10%]">Provisionné</TableHead>
+                <TableHead className="w-[8%] text-right">Action</TableHead>
               </TableRow>
-            ))}
-            {filtered.map((r) => (
-              <TableRow key={r.broker_id} className="hover:bg-muted/30">
-                <TableCell>
-                  <div className="font-medium">{r.full_name ?? "—"}</div>
-                  <div className="text-xs text-muted-foreground">{r.email}</div>
-                </TableCell>
-                <TableCell className="font-mono text-xs">{r.ns_extension}</TableCell>
-                <TableCell className="font-mono text-xs">
-                  {r.target_mobile_id}
-                  <div className="text-[10px] text-muted-foreground">
-                    NS: {r.ns_mobile_exists ? "présent" : "absent"} · Vault: {r.has_vault_secret ? "oui" : "non"}
-                  </div>
-                </TableCell>
-                <TableCell className="font-mono text-xs">
-                  {r.ns_widget_device_id ?? "—"}
-                  <div className="text-[10px] text-muted-foreground">
-                    {r.ns_widget_exists ? "présent" : (r.ns_widget_device_id ? "absent" : "non lié")}
-                  </div>
-                </TableCell>
-                <TableCell><StatePill state={r.state} /></TableCell>
-                <TableCell className="text-xs">
-                  {r.provisioned_at ? new Date(r.provisioned_at).toLocaleString("fr-CA") : "—"}
-                  {r.last_error && (
-                    <div className="text-[10px] text-destructive">
-                      Err: {new Date(r.last_error.at).toLocaleDateString("fr-CA")}
+            </TableHeader>
+            <TableBody>
+              {loading && rows.length === 0 && Array.from({ length: 6 }).map((_, i) => (
+                <TableRow key={`sk-${i}`}>
+                  {Array.from({ length: 7 }).map((_, j) => (
+                    <TableCell key={j}><div className="h-4 w-full animate-pulse rounded bg-muted" /></TableCell>
+                  ))}
+                </TableRow>
+              ))}
+              {paged.map((r) => (
+                <TableRow key={r.broker_id} className="hover:bg-muted/30">
+                  <TableCell className="align-top">
+                    <div className="font-medium leading-snug break-words text-foreground">{r.full_name ?? "—"}</div>
+                    <div className="text-xs leading-snug text-muted-foreground break-all">{r.email}</div>
+                  </TableCell>
+                  <TableCell className="align-top font-mono text-xs text-foreground">{r.ns_extension}</TableCell>
+                  <TableCell className="align-top">
+                    <div className="font-mono text-xs break-all text-foreground">{r.target_mobile_id}</div>
+                    <div className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+                      NS: {r.ns_mobile_exists ? "présent" : "absent"} · Vault: {r.has_vault_secret ? "oui" : "non"}
                     </div>
-                  )}
-                </TableCell>
-                <TableCell className="text-right space-x-2">
-                  {(r.state === "missing" || r.state === "partial") && (
-                    <Button
-                      size="sm"
-                      variant="default"
-                      onClick={() => provisionOne(r)}
-                      disabled={provisioningId === r.broker_id || !r.ns_extension}
-                    >
-                      {provisioningId === r.broker_id ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : "⚡"} Provisionner
-                    </Button>
-                  )}
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => { setTestBroker(r); setTestSessionId(null); setTestState(null); setAnsweredBy(null); }}
-                    disabled={!r.ns_extension}
-                  >
-                    <PhoneCall className="mr-2 h-3 w-3" />
-                    Appel test
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-            {filtered.length === 0 && !loading && (
-              <TableRow><TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-10">Aucun courtier.</TableCell></TableRow>
-            )}
-          </TableBody>
-        </Table>
+                  </TableCell>
+                  <TableCell className="align-top">
+                    <div className="font-mono text-xs break-all text-foreground">{r.ns_widget_device_id ?? "—"}</div>
+                    <div className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+                      {r.ns_widget_exists ? "présent" : (r.ns_widget_device_id ? "absent" : "non lié")}
+                    </div>
+                  </TableCell>
+                  <TableCell className="align-top"><StatePill state={r.state} /></TableCell>
+                  <TableCell className="align-top text-xs leading-snug text-foreground/80">
+                    {r.provisioned_at ? new Date(r.provisioned_at).toLocaleString("fr-CA") : "—"}
+                    {r.last_error && (
+                      <div className="mt-0.5 text-[11px] text-destructive">
+                        Err: {new Date(r.last_error.at).toLocaleDateString("fr-CA")}
+                      </div>
+                    )}
+                  </TableCell>
+                  <TableCell className="align-top text-right">
+                    <div className="flex flex-col items-end gap-1.5">
+                      {(r.state === "missing" || r.state === "partial") && (
+                        <Button
+                          size="sm"
+                          variant="default"
+                          className="w-full sm:w-auto"
+                          onClick={() => provisionOne(r)}
+                          disabled={provisioningId === r.broker_id || !r.ns_extension}
+                        >
+                          {provisioningId === r.broker_id
+                            ? <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
+                            : <Zap className="mr-1.5 h-3 w-3" />}
+                          Provisionner
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full sm:w-auto"
+                        onClick={() => { setTestBroker(r); setTestSessionId(null); setTestState(null); setAnsweredBy(null); }}
+                        disabled={!r.ns_extension}
+                      >
+                        <PhoneCall className="mr-1.5 h-3 w-3" />
+                        Appel test
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {filtered.length === 0 && !loading && (
+                <TableRow><TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-10">Aucun courtier.</TableCell></TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+        <Pagination
+          page={page}
+          pageSize={pageSize}
+          total={filtered.length}
+          loading={loading}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+          unit="courtiers"
+        />
       </div>
+
 
       <Dialog open={!!testBroker} onOpenChange={(o) => { if (!o) setTestBroker(null); }}>
         <DialogContent>
