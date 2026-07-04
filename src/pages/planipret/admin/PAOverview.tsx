@@ -183,14 +183,14 @@ export default function PAOverview() {
     const brokersActive = brokerTotal;
 
     setStats({
-      calls: c1 ?? 0, callsYest: c2 ?? 0, callsMissedToday: missedToday ?? 0,
+      calls: c1 ?? 0, callsYest: c2 ?? 0, callsMissedToday: missedPeriod ?? 0,
       brokers: brokersActive, brokersTotal: brokerTotal,
       sms: sms.count ?? 0, smsYest: smsY.count ?? 0,
       ava: ava.count ?? 0, avaWeek: avaWeek.count ?? 0,
       voicemailsUnread: vm.count ?? 0,
       avgDurationSec: avgDur, answerRatePct: answerPct,
       overdueReminders: overdueRemC.count ?? 0,
-      hotLeads7d: hotLeadsWeekC.count ?? 0,
+      hotLeads7d: hotLeadsPeriodC.count ?? 0,
       brokersOnline: onlineC.count ?? 0,
     });
 
