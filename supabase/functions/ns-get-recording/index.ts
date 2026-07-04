@@ -84,6 +84,8 @@ Deno.serve(async (req) => {
     paths.push(`/domains/~/users/~/recordings/${v}`);
   }
 
+  let recordingMeta: any = null;
+
   for (const p of paths) {
     const target = `${NS_API_BASE_URL}${p}`;
     try {
@@ -101,10 +103,20 @@ Deno.serve(async (req) => {
       }
       if (r.ok) {
         const parsed = await r.json().catch(() => null);
-        const audioUrl = pickAudioUrl(parsed);
+        const recording = Array.isArray(parsed) ? parsed[0] : parsed;
+        if (recording && !recordingMeta) recordingMeta = recording;
+        const audioUrl = pickAudioUrl(recording);
         if (audioUrl) {
-          const fullUrl = audioUrl.startsWith("http") ? audioUrl : `${NS_API_BASE_URL}${audioUrl.startsWith("/") ? "" : "/"}${audioUrl.replace(/^\/?ns-api\/v2\/?/, "")}`;
-          const a = await fetch(fullUrl, { headers });
+          const fullUrl = audioUrl.startsWith("http")
+            ? audioUrl
+            : `${NS_API_BASE_URL}${audioUrl.startsWith("/") ? "" : "/"}${audioUrl.replace(/^\/?ns-api\/v2\/?/, "")}`;
+          // Signed ucstack URLs must be fetched WITHOUT the NS bearer header;
+          // fall back to bearer for relative/self-hosted URLs.
+          let a = await fetch(fullUrl);
+          if (!a.ok) {
+            attempts.push({ url: "audio-url-noauth", status: a.status });
+            a = await fetch(fullUrl, { headers });
+          }
           attempts.push({ url: "audio-url-follow", status: a.status });
           if (a.ok) {
             const act = a.headers.get("Content-Type") ?? "audio/mpeg";
@@ -121,6 +133,19 @@ Deno.serve(async (req) => {
     } catch (e) {
       attempts.push({ url: p, error: (e as Error).message });
     }
+  }
+
+  if (recordingMeta) {
+    return json({
+      error: "NO_FILE_ACCESS_URL",
+      message: "L'enregistrement existe mais l'URL d'accès n'est pas disponible (traitement en cours ou fichier vide).",
+      ns_callid, ns_extension, domain: NS_DOMAIN,
+      recording_status: recordingMeta["call-recording-status"] ?? null,
+      file_size_kb: recordingMeta["file-size-kilobytes"] ?? null,
+      duration_sec: recordingMeta["file-duration-seconds"] ?? null,
+      recording_meta: recordingMeta,
+      attempts,
+    }, 200);
   }
 
   return json({
