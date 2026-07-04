@@ -463,11 +463,13 @@ function EmptyState({ tab }: { tab: "recents" | "active" | "missed" }) {
 // ---------- Transcript view (chat bubbles + auto-fetch + Analyze CTA) ----------
 type Seg = { speaker: string; text: string; start?: number | null; end?: number | null };
 function TranscriptView({
-  segments, transcript, loading, onFetch, onAnalyze, aiLoading, analyzed, t, filenameHint,
+  segments, transcript, loading, preparing = false, attempt = 0, onFetch, onAnalyze, aiLoading, analyzed, t, filenameHint,
 }: {
   segments: Seg[] | null;
   transcript: string | null;
   loading: boolean;
+  preparing?: boolean;
+  attempt?: number;
   onFetch: () => Promise<void> | void;
   onAnalyze: () => Promise<void> | void;
   aiLoading: boolean;
@@ -479,25 +481,38 @@ function TranscriptView({
   const fetchedRef = useRef(false);
 
   useEffect(() => {
-    if (!has && !loading && !fetchedRef.current) {
+    if (!has && !loading && !preparing && !fetchedRef.current) {
       fetchedRef.current = true;
       void onFetch();
     }
-  }, [has, loading, onFetch]);
+  }, [has, loading, preparing, onFetch]);
 
   const isCourtier = (speaker: string) => {
     const s = (speaker || "").toLowerCase();
     return s.includes("courtier") || s.startsWith("agent") || s.startsWith("broker") || s === "speaker 1" || s === "1";
   };
 
-  if (loading && !has) {
+  if ((loading || preparing) && !has) {
     return (
-      <div className="space-y-2">
-        {[0, 1, 2, 3].map((i) => (
-          <div key={i} className={`flex ${i % 2 === 0 ? "justify-start" : "justify-end"}`}>
-            <div className="h-10 rounded-2xl animate-pulse" style={{ width: "60%", background: "var(--pp-bg-surface)" }} />
+      <div className="pp-card p-4 space-y-3">
+        <div className="flex items-center gap-2 text-xs" style={{ color: "var(--pp-text-primary)" }}>
+          <Loader2 className="w-4 h-4 animate-spin" style={{ color: "var(--pp-brand-accent)" }} />
+          {preparing
+            ? `⏳ Transcription en cours de préparation${attempt > 0 ? ` (tentative ${attempt + 1})` : ""}…`
+            : "Chargement de la transcription…"}
+        </div>
+        {preparing && (
+          <div className="text-[11px]" style={{ color: "var(--pp-text-secondary)" }}>
+            NetSapiens génère la transcription. Nouvelle vérification automatique dans quelques secondes.
           </div>
-        ))}
+        )}
+        <div className="space-y-2 pt-1">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className={`flex ${i % 2 === 0 ? "justify-start" : "justify-end"}`}>
+              <div className="h-10 rounded-2xl animate-pulse" style={{ width: "60%", background: "var(--pp-bg-surface)" }} />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
