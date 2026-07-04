@@ -1,5 +1,42 @@
 import { authBroker, corsHeaders, jsonResponse, logAudit, nsBrokerFetch, nsEnv, nsPath } from "../_shared/ns-broker.ts";
 
+const val = (raw: any, keys: string[], fb: any = null) => {
+  for (const k of keys) {
+    const v = raw?.[k];
+    if (v !== undefined && v !== null && `${v}` !== "") return v;
+  }
+  return fb;
+};
+
+function pushCandidate(out: string[], raw: any) {
+  const value = String(raw ?? "").trim();
+  if (!value || value === "null" || value === "undefined" || out.includes(value)) return;
+  if (value.includes("sip:") || value.split(":").length > 3) return;
+  out.push(value);
+}
+
+function lookupCallIds(...sources: any[]): string[] {
+  const ids: string[] = [];
+  const keys = [
+    "call-id", "call_id", "callid",
+    "call-orig-call-id", "orig-callid", "orig-call-id", "orig_callid",
+    "call-term-call-id", "term-callid", "term-call-id", "term_callid",
+    "call-through-call-id", "by-callid", "by_callid",
+    "call-parent-call-id",
+    "call-parent-cdr-id", "cdr_id", "cdr-id", "id", "uuid",
+  ];
+  for (const source of sources) {
+    if (!source) continue;
+    for (const key of keys) pushCandidate(ids, source[key]);
+  }
+  return ids;
+}
+
+function accessUrl(raw: any): string | null {
+  const first = Array.isArray(raw) ? raw[0] : raw;
+  return val(first, ["file-access-url", "file_access_url", "recording_url", "recording-url", "url"], null);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   console.log("=== ns-recordings called ===", req.method, req.url);
@@ -23,9 +60,60 @@ Deno.serve(async (req) => {
     }
     if (!callId) return jsonResponse({ success: false, error: "call_id requis", code: 400 }, 200);
 
-    const path = nsPath(env.domain, profile.extension, `/recordings/${encodeURIComponent(callId)}`);
-    console.log("NS-API GET", path);
-    const res = await nsBrokerFetch(admin, profile, path, { method: "GET", headers: { Accept: "audio/wav" } });
+    const { data: row } = await admin
+      .from("planipret_phone_calls")
+      .select("id, ns_call_id, recording_url, metadata, extension")
+      .or(`id.eq.${callId},ns_call_id.eq.${callId}`)
+      .maybeSingle();
+
+    const meta: any = row?.metadata ?? {};
+    const nsRaw = meta.ns_recording ?? meta;
+    let res: Response | null = null;
+    let path = "";
+    const attempts: Array<{ path: string; status: number }> = [];
+
+    const direct = row?.recording_url && String(row.recording_url).startsWith("http") ? String(row.recording_url) : null;
+    if (direct) {
+      path = direct;
+      console.log("NS-API direct audio GET", path);
+      res = await nsBrokerFetch(admin, profile, direct, { method: "GET", headers: { Accept: "audio/wav" } });
+      attempts.push({ path: "direct_recording_url", status: res.status });
+    }
+
+    const ids = lookupCallIds(nsRaw, meta, { call_id: callId, ns_call_id: row?.ns_call_id });
+    for (const id of ids) {
+      if (res?.ok) break;
+      const paths = [
+        `/domains/${encodeURIComponent(env.domain)}/recordings/${encodeURIComponent(id)}`,
+        nsPath(env.domain, profile.extension, `/recordings/${encodeURIComponent(id)}`),
+      ];
+      for (const p of paths) {
+        path = p;
+        console.log("NS-API recording metadata GET", path);
+        const metaRes = await nsBrokerFetch(admin, profile, path, { method: "GET" });
+        attempts.push({ path, status: metaRes.status });
+        if (!metaRes.ok) continue;
+        const data = await metaRes.json().catch(() => null);
+        const audioUrl = accessUrl(data);
+        if (!audioUrl) continue;
+        res = await nsBrokerFetch(admin, profile, audioUrl, { method: "GET", headers: { Accept: "audio/wav" } });
+        attempts.push({ path: "file-access-url", status: res.status });
+        if (res.ok && row?.id) {
+          admin.from("planipret_phone_calls").update({ recording_url: audioUrl }).eq("id", row.id).then(() => {}, () => {});
+        }
+        break;
+      }
+    }
+
+    if (!res) {
+      return jsonResponse({
+        success: false,
+        error: "Enregistrement non disponible pour cet appel",
+        hint: "Aucune URL audio valide n'a été retournée par NetSapiens.",
+        call_id: callId,
+        attempts,
+      }, 200);
+    }
     console.log("NS-API status:", res.status, "content-type:", res.headers.get("content-type"));
 
     if (!res.ok) {
@@ -45,7 +133,7 @@ Deno.serve(async (req) => {
         ns_response: txt.slice(0, 500),
         call_id: callId,
         extension: profile.extension,
-        attempts: [{ path, status: res.status }],
+        attempts,
       }, 200);
     }
 

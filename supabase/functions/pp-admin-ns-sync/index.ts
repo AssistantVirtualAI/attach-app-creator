@@ -124,18 +124,28 @@ function normalizeNsPath(path: string | null): string | null {
   return trimmed.replace(/^\/ns-api\/v2/i, "");
 }
 
-function recordingApiPath(domain: string, c: any): string | null {
-  const d = encodeURIComponent(domain || String(val(c, ["domain"], NS_DEFAULT_DOMAIN)));
-  const callId = recordingLookupCallId(c);
-  return callId ? `/domains/${d}/recordings/${encodeURIComponent(callId)}` : null;
+function recordingLookupCallIds(c: any): string[] {
+  const keys = [
+    "call-id", "call_id", "callid",
+    "call-orig-call-id", "orig-callid", "orig-call-id", "orig_callid",
+    "call-term-call-id", "term-callid", "term-call-id", "term_callid",
+    "call-through-call-id", "by-callid", "by_callid",
+    "call-parent-call-id",
+    "call-parent-cdr-id", "cdr_id", "cdr-id", "id", "uuid",
+  ];
+  const ids: string[] = [];
+  for (const key of keys) {
+    const id = String(c?.[key] ?? "").trim();
+    if (!id || id === "null" || id === "undefined" || id.includes("sip:") || id.split(":").length > 3 || ids.includes(id)) continue;
+    ids.push(id);
+  }
+  return ids;
 }
 
-function recordingLookupCallId(c: any): string | null {
-  const id = String(val(c, [
-    "call-parent-cdr-id", "call-orig-call-id", "call-parent-call-id", "orig-callid", "orig-call-id", "orig_callid",
-    "call-id", "call_id", "callid", "call-term-call-id", "cdr_id", "cdr-id", "id",
-  ], "")).trim();
-  return id || null;
+function recordingApiPath(domain: string, c: any): string | null {
+  const d = encodeURIComponent(domain || String(val(c, ["domain"], NS_DEFAULT_DOMAIN)));
+  const callId = recordingLookupCallIds(c)[0];
+  return callId ? `/domains/${d}/recordings/${encodeURIComponent(callId)}` : null;
 }
 
 function recordingAccessUrl(raw: any): string | null {
@@ -144,11 +154,21 @@ function recordingAccessUrl(raw: any): string | null {
 }
 
 async function fetchRecordingAccessUrl(domain: string, c: any): Promise<string | null> {
-  const path = recordingApiPath(domain, c);
-  if (!path) return null;
-  const r = await nsFetch(path);
-  if (!r.ok) return null;
-  return recordingAccessUrl(r.data);
+  const d = encodeURIComponent(domain || String(val(c, ["domain"], NS_DEFAULT_DOMAIN)));
+  const ext = String(val(c, ["user", "orig-user", "term-user", "extension", "subscriber", "call-orig-user", "call-term-user", "call-through-user"], "")).trim();
+  for (const id of recordingLookupCallIds(c)) {
+    const paths = [
+      `/domains/${d}/recordings/${encodeURIComponent(id)}`,
+      ...(ext ? [`/domains/${d}/users/${encodeURIComponent(ext)}/recordings/${encodeURIComponent(id)}`] : []),
+    ];
+    for (const path of paths) {
+      const r = await nsFetch(path);
+      if (!r.ok) continue;
+      const url = recordingAccessUrl(r.data);
+      if (url) return url;
+    }
+  }
+  return null;
 }
 
 function toIso(v: unknown): string | null {
@@ -423,7 +443,7 @@ async function syncCalls(admin: ReturnType<typeof createClient>, domain: string,
       answered_at: toIso(val(c, ["time-answer", "answer-time", "answer_time", "answered_at", "call-answer-datetime", "call-batch-answer-datetime"])),
       ended_at: toIso(val(c, ["time-release", "end-time", "end_time", "ended_at", "call-disconnect-datetime"])),
       duration_seconds: numVal(c, ["duration", "time-talking", "billsec", "talk_time", "call-total-duration-seconds", "call-batch-total-duration-seconds", "call-talking-duration-seconds"], 0),
-      recording_url: recordingUrl(c) ?? (transcription || val(c, ["call-intelligence-job-id"], null) ? recordingApiPath(domain, c) : null),
+      recording_url: recordingUrl(c),
       transcript_source: transcription ? "netsapiens" : null,
       metadata: { ...c, transcription_path: transcription, recording_api_path: recordingApiPath(domain, c) },
     });
@@ -581,7 +601,7 @@ async function syncRecordings(admin: ReturnType<typeof createClient>, domain: st
     if (!id) continue;
     const ext = String(val(rec, ["user", "extension", "orig-user", "term-user", "subscriber", "call-orig-user", "call-term-user", "call-through-user"], fallbackExt ?? "")).trim();
     const apiPath = recordingApiPath(domain, { ...rec, user: ext });
-    const url = recordingUrl(rec) ?? apiPath;
+    const url = recordingUrl(rec);
     const started = toIso(val(rec, ["time-start", "start-time", "start_time", "started_at", "date", "created_at", "recorded_at", "recorded-at", "call-start-datetime", "call-batch-start-datetime", "call-record-creation-datetime"]));
     rows.push({
       user_id: extToProfile.get(ext) ?? null,

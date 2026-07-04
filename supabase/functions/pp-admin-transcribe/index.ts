@@ -92,11 +92,11 @@ Deno.serve(async (req) => {
     });
     if (!sttRes.ok) {
       const t = await sttRes.text().catch(() => "");
-      return json({ error: `STT failed (${sttRes.status})`, detail: t.slice(0, 400) }, sttRes.status === 402 ? 402 : 502);
+      return json({ ok: false, fallback: true, error: `STT_FAILED_${sttRes.status}`, hint: t.slice(0, 400) || "La transcription IA est temporairement indisponible." }, 200);
     }
     const sttJson = await sttRes.json().catch(() => ({}));
     const transcript = String(sttJson?.text ?? "").trim();
-    if (!transcript) return json({ error: "empty transcript" }, 422);
+    if (!transcript) return json({ ok: false, fallback: true, error: "EMPTY_TRANSCRIPT", hint: "Aucun texte n'a été détecté dans l'audio." }, 200);
 
     await admin.from("planipret_phone_calls")
       .update({ transcript, recording_url: recUrl })
@@ -104,6 +104,6 @@ Deno.serve(async (req) => {
 
     return json({ ok: true, transcript });
   } catch (e) {
-    return json({ error: (e as Error).message }, 500);
+    return json({ ok: false, fallback: true, error: "TRANSCRIPTION_FAILED", hint: (e as Error).message }, 200);
   }
 });
