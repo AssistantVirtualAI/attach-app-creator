@@ -1,115 +1,151 @@
-// One-shot: provision a NetSapiens test SIP account for App Store / Play
-// Store review. Creates the user (extension) and a mobile device with the
-// supplied auth key. Admin-only.
+// pp-appreview-provision — creates the demo App Review Supabase user +
+// planipret_profiles row + NS-API SIP devices (mobile & widget).
+// All admin DB writes go through SERVICE_ROLE to bypass RLS.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
+const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const NS_API_KEY = Deno.env.get("NS_API_KEY") ?? "";
-const NS_API_BASE_URL = Deno.env.get("NS_API_BASE_URL") ?? "https://voice.ava-telecom.ca/ns-api/v2";
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-
 const json = (b: unknown, s = 200) =>
-  new Response(JSON.stringify(b), { status: s, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-
-async function ns(path: string, init: RequestInit = {}) {
-  const res = await fetch(`${NS_API_BASE_URL}${path}`, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${NS_API_KEY}`,
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      ...(init.headers ?? {}),
-    },
-  });
-  const text = await res.text();
-  let data: any = null;
-  try { data = text ? JSON.parse(text) : null; } catch { data = text; }
-  return { ok: res.ok, status: res.status, data };
-}
+  new Response(JSON.stringify(b), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
 
-  const authHeader = req.headers.get("Authorization") ?? "";
-  const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    global: { headers: { Authorization: authHeader } },
+  // Read all secrets INSIDE the handler (never at module scope)
+  const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+  const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
+  const NS_API_KEY = Deno.env.get("NS_API_KEY");
+  const NS_API_BASE_URL = Deno.env.get("NS_API_BASE_URL") ?? "https://voice.ava-telecom.ca/ns-api/v2";
+  const NS_DOMAIN = Deno.env.get("NS_DEFAULT_DOMAIN") ?? "planipret.ca";
+
+  console.log("=== pp-appreview-provision ===", {
+    SUPABASE_URL: !!SUPABASE_URL, SERVICE_ROLE: !!SERVICE_ROLE, ANON_KEY: !!ANON_KEY,
+    NS_API_KEY: !!NS_API_KEY, NS_API_BASE_URL, NS_DOMAIN,
   });
-  const { data: userData } = await userClient.auth.getUser();
-  const user = userData?.user;
-  if (!user) return json({ error: "not_authenticated" }, 401);
 
-  const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-  const { data: isAdmin } = await admin.rpc("has_role", { _user_id: user.id, _role: "admin" as any });
-  const { data: isSuper } = await admin.rpc("has_role", { _user_id: user.id, _role: "super_admin" as any });
-  if (!isAdmin && !isSuper) return json({ error: "forbidden" }, 403);
+  if (!SUPABASE_URL || !SERVICE_ROLE) {
+    return json({ error: "missing_service_role", detail: "SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not configured" }, 500);
+  }
 
-  const body: any = await req.json().catch(() => ({}));
-  const domain = String(body?.domain ?? "appreview");
-  const ext = String(body?.extension ?? "2000");
-  const password = String(body?.password ?? "Appreview2026!");
-  const email = String(body?.email ?? "appreview@planipret.ca");
-  const firstName = String(body?.first_name ?? "App");
-  const lastName = String(body?.last_name ?? "Review");
+  try {
+    // Verify caller is an authenticated admin
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const userClient = createClient(SUPABASE_URL, ANON_KEY ?? SERVICE_ROLE, { global: { headers: { Authorization: authHeader } } });
+    const { data: userData } = await userClient.auth.getUser();
+    const caller = userData?.user;
+    if (!caller) return json({ error: "not_authenticated" }, 401);
 
-  const steps: any[] = [];
+    const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
+    const { data: callerProfile } = await admin
+      .from("planipret_profiles").select("role").eq("user_id", caller.id).maybeSingle();
+    const callerRole = (callerProfile?.role ?? "").toLowerCase();
+    if (!["admin", "super_admin", "owner"].includes(callerRole)) {
+      // fallback via user_roles table
+      const { data: isSuper } = await admin.rpc("is_super_admin", { _user_id: caller.id }).single().then((r) => ({ data: r.data as any })).catch(() => ({ data: false }));
+      if (!isSuper) return json({ error: "forbidden", detail: "admin role required" }, 403);
+    }
 
-  // 1) Ensure the user (extension) exists on the domain.
-  const userRes = await ns(`/domains/${encodeURIComponent(domain)}/users`, {
-    method: "POST",
-    body: JSON.stringify({
-      user: ext,
-      extension: ext,
-      first_name: firstName,
-      last_name: lastName,
-      email,
-      password,
-      "name-first-name": firstName,
-      "name-last-name": lastName,
-    }),
-  });
-  steps.push({ step: "create_user", status: userRes.status, ok: userRes.ok, data: userRes.data });
+    const body: any = await req.json().catch(() => ({}));
+    const APP_REVIEW_EMAIL = String(body?.email ?? "demo@avastatistic.ca");
+    const APP_REVIEW_PASSWORD = String(body?.password ?? "DemoPass2026!");
+    const APP_REVIEW_NAME = String(body?.name ?? "Demo Reviewer");
+    const APP_REVIEW_EXT = String(body?.extension ?? "1999");
+    const APP_REVIEW_DOMAIN = String(body?.domain ?? NS_DOMAIN);
 
-  // 2) Create the mobile SIP device with the requested auth key.
-  const deviceId = `${ext}_mobile`;
-  const devRes = await ns(`/domains/${encodeURIComponent(domain)}/users/${encodeURIComponent(ext)}/devices`, {
-    method: "POST",
-    body: JSON.stringify({
-      device: deviceId,
-      "authentication-key": password,
-      "device-provisioning-protocol": "sip",
-      "device-model": "Mobile Softphone",
-    }),
-  });
-  steps.push({ step: "create_mobile_device", status: devRes.status, ok: devRes.ok, data: devRes.data });
+    const results: Record<string, any> = {};
 
-  // 3) Also create a widget device so both endpoints can ring during review.
-  const widgetId = `${ext}_web`;
-  const webRes = await ns(`/domains/${encodeURIComponent(domain)}/users/${encodeURIComponent(ext)}/devices`, {
-    method: "POST",
-    body: JSON.stringify({
-      device: widgetId,
-      "authentication-key": password,
-      "device-provisioning-protocol": "sip",
-      "device-model": "WebRTC",
-    }),
-  });
-  steps.push({ step: "create_widget_device", status: webRes.status, ok: webRes.ok, data: webRes.data });
+    // STEP A: Supabase auth user (idempotent)
+    const { data: existingUsers } = await admin.auth.admin.listUsers();
+    const existing = existingUsers?.users?.find((u) => u.email?.toLowerCase() === APP_REVIEW_EMAIL.toLowerCase());
+    let authUserId: string;
 
-  return json({
-    ok: userRes.ok || userRes.status === 409,
-    domain,
-    extension: ext,
-    devices: { mobile: deviceId, widget: widgetId },
-    credentials: { username: ext, domain, password },
-    steps,
-  });
+    if (existing) {
+      authUserId = existing.id;
+      results.auth_user = { existed: true, id: authUserId };
+    } else {
+      const { data: newUser, error: cErr } = await admin.auth.admin.createUser({
+        email: APP_REVIEW_EMAIL,
+        password: APP_REVIEW_PASSWORD,
+        email_confirm: true,
+        user_metadata: { full_name: APP_REVIEW_NAME, role: "broker" },
+      });
+      if (cErr || !newUser?.user) return json({ step: "A", error: "auth_create_failed", detail: cErr?.message }, 500);
+      authUserId = newUser.user.id;
+      results.auth_user = { created: true, id: authUserId };
+    }
+
+    // STEP B: planipret_profiles upsert (SERVICE_ROLE — bypasses RLS)
+    const { error: pErr } = await admin.from("planipret_profiles").upsert({
+      user_id: authUserId,
+      full_name: APP_REVIEW_NAME,
+      email: APP_REVIEW_EMAIL,
+      role: "broker",
+      ns_extension: APP_REVIEW_EXT,
+      ns_domain: APP_REVIEW_DOMAIN,
+      ns_sip_username: APP_REVIEW_EXT,
+      ns_linked: true,
+      ns_linked_at: new Date().toISOString(),
+    }, { onConflict: "user_id" });
+    if (pErr) return json({ step: "B", error: "profile_upsert_failed", detail: pErr.message }, 500);
+    results.profile = { upserted: true, user_id: authUserId };
+
+    // STEP C: NS-API devices
+    if (NS_API_KEY) {
+      const nsHeaders = { Authorization: `Bearer ${NS_API_KEY}`, "Content-Type": "application/json", Accept: "application/json" };
+      // Deterministic SIP password
+      const enc = new TextEncoder().encode(authUserId + "planipret-demo-2026");
+      const hash = await crypto.subtle.digest("SHA-256", enc);
+      const hex = Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, "0")).join("");
+      const sipPassword = `Pp${hex.substring(0, 12)}!`;
+
+      const listRes = await fetch(`${NS_API_BASE_URL}/domains/${encodeURIComponent(APP_REVIEW_DOMAIN)}/users/${encodeURIComponent(APP_REVIEW_EXT)}/devices`, { headers: nsHeaders });
+      const existingDevs = listRes.ok ? (await listRes.json().catch(() => [])) : [];
+      const arr = Array.isArray(existingDevs) ? existingDevs : [];
+
+      const createDev = async (suffix: string, model: string) => {
+        const id = `${APP_REVIEW_EXT}_${suffix}`;
+        const exists = arr.some((d: any) => (d?.device ?? d?.aor ?? "").toString().toLowerCase().includes(suffix));
+        if (exists) return { existed: true, id };
+        const r = await fetch(`${NS_API_BASE_URL}/domains/${encodeURIComponent(APP_REVIEW_DOMAIN)}/users/${encodeURIComponent(APP_REVIEW_EXT)}/devices`, {
+          method: "POST", headers: nsHeaders,
+          body: JSON.stringify({ device: id, "authentication-key": sipPassword, "device-provisioning-protocol": "sip", "device-model": model }),
+        });
+        const data = await r.json().catch(() => ({}));
+        return { created: r.ok, status: r.status, id, data };
+      };
+
+      results.mobile_device = await createDev("mobile", "Mobile Softphone");
+      results.widget_device = await createDev("web", "Web Softphone");
+
+      await admin.from("planipret_profiles").update({
+        ns_mobile_device_id: `${APP_REVIEW_EXT}_mobile`,
+        ns_widget_device_id: `${APP_REVIEW_EXT}_web`,
+      }).eq("user_id", authUserId);
+
+      results.sip_credentials = {
+        sip_username: APP_REVIEW_EXT,
+        sip_domain: APP_REVIEW_DOMAIN,
+        sip_password: sipPassword,
+      };
+    } else {
+      results.ns_provisioning = { skipped: true, reason: "NS_API_KEY not set" };
+    }
+
+    return json({
+      success: true,
+      auth_user_id: authUserId,
+      login: { email: APP_REVIEW_EMAIL, password: APP_REVIEW_PASSWORD, extension: APP_REVIEW_EXT, domain: APP_REVIEW_DOMAIN },
+      results,
+    });
+  } catch (e: any) {
+    console.error("RUNTIME ERROR", e?.message, e?.stack);
+    return json({ error: e?.message ?? String(e), stack: e?.stack, type: e?.constructor?.name }, 500);
+  }
 });
