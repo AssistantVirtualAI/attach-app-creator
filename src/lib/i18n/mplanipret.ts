@@ -18,6 +18,7 @@ export const MP_DICT = {
       search: "Rechercher",
       today: "Aujourd'hui",
       yesterday: "Hier",
+      inactive: "Inactif",
       none: "Aucune",
       new: "Nouveau",
       call: "Appeler",
