@@ -120,6 +120,12 @@ export default function PAUsers() {
     toast.success("✅ Utilisateur App Review créé");
     await load();
   };
+
+  useEffect(() => {
+    load();
+    const ch = supabase.channel("admin-users")
+      .on("postgres_changes", { event: "*", schema: "public", table: "planipret_profiles" }, () => load())
+      .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, []);
 
