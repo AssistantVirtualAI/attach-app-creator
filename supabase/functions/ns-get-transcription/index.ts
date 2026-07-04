@@ -12,6 +12,18 @@ const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const json = (p: any, s = 200) => new Response(JSON.stringify(p), { status: s, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
+function extractTranscript(item: any): any {
+  if (!item) return null;
+  if (typeof item === "string") return item.length > 5 ? item : null;
+  return item["transcription-text"]
+    ?? item["transcript"]
+    ?? item["text"]
+    ?? item["asr-text"]
+    ?? item["sentiment-transcript"]
+    ?? item.segments
+    ?? null;
+}
+
 function parseTranscript(raw: any): Array<{ speaker: string; text: string }> {
   if (!raw) return [];
   if (typeof raw === "string") {
