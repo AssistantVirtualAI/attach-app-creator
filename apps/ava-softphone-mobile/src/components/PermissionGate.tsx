@@ -103,7 +103,12 @@ export default function PermissionGate({ onComplete }: PermissionGateProps) {
         next = await requestMicrophone();
         setPerms((p) => ({ ...p, microphone: next, speaker: next === 'granted' ? 'granted' : p.speaker }));
         if (next !== 'granted') {
-          setError('Accès microphone refusé. Activez-le dans Réglages iOS → Lemtel → Microphone pour que les appels et l’audio bidirectionnel fonctionnent.');
+          const isAndroid = Capacitor.getPlatform() === 'android';
+          setError(
+            isAndroid
+              ? 'Accès microphone refusé. Ouvrez Réglages → Applications → Lemtel → Autorisations → Microphone, puis revenez à l’application.'
+              : 'Accès microphone refusé. Activez-le dans Réglages iOS → Lemtel → Microphone pour que les appels et l’audio bidirectionnel fonctionnent.'
+          );
           shouldAdvance = false;
         }
       } else if (step === 'contacts') {
@@ -255,13 +260,19 @@ export default function PermissionGate({ onComplete }: PermissionGateProps) {
         </button>
       )}
 
-      {status === 'denied' && Capacitor.isNativePlatform() && (
-        <button onClick={() => { void openAppSettings(); }} style={primaryBtnStyle}>
-          Open Settings
+      {status === 'denied' && (
+        <button onClick={requestCurrent} disabled={requesting} style={{ ...primaryBtnStyle, opacity: requesting ? 0.6 : 1 }}>
+          {requesting ? 'Requesting…' : 'Réessayer'}
         </button>
       )}
 
-      {status === 'denied' && (
+      {status === 'denied' && Capacitor.isNativePlatform() && (
+        <button onClick={() => { void openAppSettings(); }} style={{ ...ghostBtnStyle, marginTop: 8 }}>
+          Ouvrir les Réglages
+        </button>
+      )}
+
+      {status === 'denied' && step !== 'microphone' && (
         <button
           onClick={() => advance(step)}
           style={{ ...ghostBtnStyle, marginTop: 8, color: colors.mutedSilver }}

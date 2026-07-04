@@ -29,21 +29,34 @@ export async function requestMicrophone(): Promise<PermissionStatus> {
           if (res?.granted) return 'granted';
         } catch { /* fall through to Microphone plugin */ }
       }
-      // Android (and iOS fallback) — request RECORD_AUDIO via the
-      // @mozartec/capacitor-microphone plugin. This is what actually shows
-      // the native OS prompt on Android; getUserMedia alone will NOT trigger
-      // Android's runtime permission dialog inside a Capacitor WebView.
+      // Try @mozartec/capacitor-microphone (Android + iOS fallback).
+      let pluginGranted = false;
+      let pluginDenied = false;
       try {
         const { Microphone } = await import('@mozartec/capacitor-microphone');
         const check = await Microphone.checkPermissions();
-        if (check?.microphone === 'granted') return 'granted';
-        const req = await Microphone.requestPermissions();
-        if (req?.microphone === 'granted') return 'granted';
-        if (req?.microphone === 'denied') return 'denied';
-        return 'prompt';
+        if (check?.microphone === 'granted') pluginGranted = true;
+        if (!pluginGranted) {
+          const req = await Microphone.requestPermissions();
+          if (req?.microphone === 'granted') pluginGranted = true;
+          else if (req?.microphone === 'denied') pluginDenied = true;
+        }
       } catch (e) {
-        console.warn('[permissions] Microphone plugin failed, falling back to getUserMedia', e);
+        console.warn('[permissions] Microphone plugin unavailable, falling back to getUserMedia', e);
       }
+      if (pluginGranted) return 'granted';
+      // Fallback: getUserMedia inside Capacitor WebView. On Android with
+      // RECORD_AUDIO in the manifest this triggers the OS runtime prompt.
+      try {
+        if (navigator.mediaDevices?.getUserMedia) {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          stream.getTracks().forEach((t) => t.stop());
+          return 'granted';
+        }
+      } catch (e: any) {
+        if (e?.name === 'NotAllowedError' || e?.name === 'SecurityError') return 'denied';
+      }
+      return pluginDenied ? 'denied' : 'prompt';
     }
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) return 'unsupported';
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -225,11 +238,31 @@ export async function openAppSettings(): Promise<void> {
   const platform = Capacitor.getPlatform();
   try {
     if (platform === 'ios') {
-      window.open('app-settings:', '_system');
+      try {
+        const { App } = await import('@capacitor/app');
+        await (App as any).openUrl?.({ url: 'app-settings:' });
+      } catch {
+        window.open('app-settings:', '_system');
+      }
       return;
     }
     if (platform === 'android') {
-      window.open('package:com.lemtel.softphone', '_system');
+      // Try the native-settings plugin first (proper Android intent).
+      try {
+        const mod: any = await import('capacitor-native-settings');
+        const NativeSettings = mod.NativeSettings ?? mod.default;
+        if (NativeSettings?.openAndroid) {
+          await NativeSettings.openAndroid({ option: 'application_details' });
+          return;
+        }
+      } catch { /* plugin missing */ }
+      // Fallback: use App plugin with the correct package intent URI.
+      try {
+        const { App } = await import('@capacitor/app');
+        const info = await App.getInfo();
+        const pkg = info?.id ?? 'com.lemtel.softphone';
+        await (App as any).openUrl?.({ url: `package:${pkg}` });
+      } catch { /* ignore */ }
     }
   } catch { /* ignore */ }
 }
