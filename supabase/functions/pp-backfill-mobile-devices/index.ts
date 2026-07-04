@@ -71,10 +71,16 @@ Deno.serve(async (req) => {
 
   const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-  // Admin gate: super_admin OR admin
-  const { data: isAdmin } = await admin.rpc("has_role", { _user_id: user.id, _role: "admin" as any });
-  const { data: isSuper } = await admin.rpc("has_role", { _user_id: user.id, _role: "super_admin" as any });
-  if (!isAdmin && !isSuper) return json({ error: "forbidden" }, 403);
+  // Admin gate: check planipret_profiles.role OR user_roles has_role
+  const { data: callerProfile } = await admin
+    .from("planipret_profiles").select("role").eq("user_id", user.id).maybeSingle();
+  let isAdmin = ["admin", "super_admin", "owner"].includes(String(callerProfile?.role ?? "").toLowerCase());
+  if (!isAdmin) {
+    const { data: r1 } = await admin.rpc("has_role", { _user_id: user.id, _role: "admin" as any });
+    const { data: r2 } = await admin.rpc("has_role", { _user_id: user.id, _role: "super_admin" as any });
+    isAdmin = Boolean(r1 || r2);
+  }
+  if (!isAdmin) return json({ error: "forbidden" }, 403);
 
   const body: any = await req.json().catch(() => ({}));
   const dryRun = Boolean(body?.dry_run);
