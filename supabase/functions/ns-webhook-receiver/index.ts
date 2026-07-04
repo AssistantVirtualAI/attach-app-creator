@@ -71,17 +71,28 @@ async function processEvent(event: any) {
   }
 
   if (type === "cdr") {
-    const callId = data.call_id ?? data.id;
+    const callId = data.call_id ?? data.id ?? data["cdr-id"] ?? data.cdr_id;
     if (callId) {
+      // Extract recording URL from any of the possible NS-API field names
+      const recUrl =
+        data.recording_url ??
+        data.recording ??
+        data["recording-url"] ??
+        data["recording-file"] ??
+        data.media_url ??
+        data["media-url"] ??
+        null;
+
       await admin.from("planipret_phone_calls").upsert({
         user_id: userId,
-        call_id: callId,
+        ns_call_id: String(callId),
         direction: data.direction ?? null,
-        caller_number: data.caller_number ?? data.from ?? null,
-        callee_number: data.callee_number ?? data.to ?? null,
+        from_number: data.from_number ?? data.caller_number ?? data.from ?? null,
+        to_number: data.to_number ?? data.callee_number ?? data.to ?? null,
         duration_seconds: data.duration ?? data.duration_seconds ?? null,
+        recording_url: recUrl,
         status: "completed",
-      }, { onConflict: "call_id" });
+      }, { onConflict: "ns_call_id" });
 
       const authH = `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`;
       fetch(`${SUPABASE_URL}/functions/v1/ns-transcription?call_id=${encodeURIComponent(callId)}`, {
@@ -93,7 +104,7 @@ async function processEvent(event: any) {
       }).catch(() => {});
 
       // Maestro pipeline: resolve uuid by ns_call_id, then push CDR → transcript → AI.
-      admin.from("planipret_phone_calls").select("id").eq("ns_call_id", callId).maybeSingle()
+      admin.from("planipret_phone_calls").select("id").eq("ns_call_id", String(callId)).maybeSingle()
         .then(({ data: row }) => {
           if (row?.id) {
             fetch(`${SUPABASE_URL}/functions/v1/maestro-cdr`, {
@@ -108,9 +119,9 @@ async function processEvent(event: any) {
     const callId = data.call_id ?? data.id;
     const dndActive = isDndActive(brokerProfile);
     await admin.from("planipret_phone_calls").insert({
-      user_id: userId, call_id: callId, direction: "inbound",
-      caller_number: data.from_number ?? data.from ?? null,
-      callee_number: data.to_number ?? data.to ?? null,
+      user_id: userId, ns_call_id: callId ? String(callId) : null, direction: "inbound",
+      from_number: data.from_number ?? data.from ?? null,
+      to_number: data.to_number ?? data.to ?? null,
       status: dndActive ? "voicemail" : "inbound_ringing",
       metadata: dndActive ? { dnd_auto_voicemail: true, dnd_message: brokerProfile?.dnd_message_fr } : null,
     });
