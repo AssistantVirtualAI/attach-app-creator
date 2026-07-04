@@ -604,12 +604,6 @@ export default function PARecordings() {
                   </div>
                 </div>
               ) : null}
-              {hasDetailTranscript && !detail.ai_coaching && (
-                <div className="flex items-center gap-2 p-3 rounded-lg text-xs" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>
-                  <Sparkles className="w-3.5 h-3.5" style={{ color: AGENT }} />
-                  {coaching === detail.id ? "AVA analyse la transcription (correction, résumé, coaching)…" : "Analyse IA en attente…"}
-                </div>
-              )}
               {detail.ai_coaching && (
                 <div>
                   <p style={{ fontSize: 11, color: "var(--pp-text-muted)", marginBottom: 4 }}>Coaching IA</p>
