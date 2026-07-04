@@ -131,8 +131,8 @@ export default function PARecordings() {
   const transcribe = async (callId: string) => {
     setTranscribing(callId);
     setTranscriptionError(null);
+    setTranscriptionUnavailable(false);
     try {
-      // Phase 5: fetch via official NS-API endpoint
       const { data, error } = await supabase.functions.invoke("ns-get-transcription", { body: { call_db_id: callId } });
       if (error) throw error;
       const d = data as any;
@@ -144,22 +144,14 @@ export default function PARecordings() {
           transcript_source: "ns-api",
           has_transcript: true,
         }).eq("id", callId);
-        toast.success("Transcription récupérée depuis NS-API");
         setDetail((cur: any) => cur && cur.id === callId ? { ...cur, transcript: text, transcript_segments: d.segments, has_transcript: true } : cur);
         await load(page, pageSize);
       } else {
-        const msg = [
-          d?.message ?? "Aucune transcription trouvée pour cet appel.",
-          d?.action_required,
-        ].filter(Boolean).join(" — ");
-        setTranscriptionError(msg);
-        setDetail((cur: any) => cur && cur.id === callId ? { ...cur, __transcription_error: msg } : cur);
-        toast.error(msg);
+        // Transcript simply doesn't exist yet — silent unavailable state, no technical error
+        setTranscriptionUnavailable(true);
       }
     } catch (e: any) {
-      const msg = `Transcription échouée: ${e.message ?? e}`;
-      setTranscriptionError(msg);
-      toast.error(msg);
+      setTranscriptionError(e?.message ?? String(e));
     } finally {
       setTranscribing(null);
     }
