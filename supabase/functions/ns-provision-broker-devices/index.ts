@@ -109,7 +109,7 @@ Deno.serve(async (req) => {
     if (broker_id && !bulk) {
       const { data: broker } = await admin.from("planipret_profiles")
         .select("user_id, full_name, ns_extension, ns_domain")
-        .eq("user_id", broker_id).maybeSingle();
+        .or(`user_id.eq.${broker_id},id.eq.${broker_id}`).maybeSingle();
       if (!broker) return json({ error: "broker_not_found", broker_id }, 404);
       const result = await provision(broker);
       return json({ success: result.success, result });
