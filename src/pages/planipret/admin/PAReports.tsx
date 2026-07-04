@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, CartesianGrid } from "recharts";
 import { Download, Trophy, FileText, RefreshCw, Smartphone, Bot, Plug, Mail, Link2, Users, DollarSign } from "lucide-react";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
@@ -25,21 +24,6 @@ const SILVER = "#C0C0C0";
 const BRONZE = "#CD7F32";
 
 const eventDate = (row: any) => row?.started_at ?? row?.sent_at ?? row?.created_at;
-
-const TooltipDark = ({ active, payload, label }: any) => {
-  if (!active || !payload?.length) return null;
-  return (
-    <div style={{ background: "var(--pp-bg-deep)", border: "1px solid var(--pp-bg-border-2)", borderRadius: 8, padding: "8px 12px", fontSize: 11, color: "var(--pp-text-primary)" }}>
-      {label && <div style={{ color: "var(--pp-text-muted)", marginBottom: 4 }}>{label}</div>}
-      {payload.map((p: any, i: number) => (
-        <div key={i} className="flex items-center gap-2">
-          <span style={{ width: 8, height: 8, borderRadius: "50%", background: p.color || p.fill }} />
-          <span>{p.name}: <strong>{p.value}</strong></span>
-        </div>
-      ))}
-    </div>
-  );
-};
 
 export default function PAReports() {
   const { t, lang } = useMplanipretLang();
@@ -203,12 +187,16 @@ export default function PAReports() {
   }, [calls, brokers]);
 
   const podium = (byBroker as any[]).slice(0, 3);
+  const maxDayCount = useMemo(() => Math.max(1, ...byDay.map((d) => d.count)), [byDay]);
+  const totalDirectionCalls = useMemo(() => byDirection.reduce((sum, d) => sum + d.value, 0), [byDirection]);
+  const inboundPct = totalDirectionCalls ? (byDirection[0].value / totalDirectionCalls) * 100 : 0;
+  const outboundPct = totalDirectionCalls ? (byDirection[1].value / totalDirectionCalls) * 100 : 0;
 
   // Financial — same source of truth as /admin/vue-ensemble (planipret_broker_stats view).
   const finance = useMemo<ServiceFinance[]>(() => [
-    computeServiceFinance("mobile", brokerStats.app_mobile_active || brokerSnapshot.mobile),
-    computeServiceFinance("widget", brokerStats.total_courtiers || brokerSnapshot.total),
-    computeServiceFinance("ai", brokerStats.agent_ia_active || brokerSnapshot.ai),
+    computeServiceFinance("mobile", brokerSnapshot.mobile || brokerStats.app_mobile_active),
+    computeServiceFinance("widget", brokerSnapshot.total || brokerStats.total_courtiers),
+    computeServiceFinance("ai", brokerSnapshot.ai || brokerStats.agent_ia_active),
   ], [brokerStats.app_mobile_active, brokerStats.total_courtiers, brokerStats.agent_ia_active, brokerSnapshot.mobile, brokerSnapshot.total, brokerSnapshot.ai]);
   const financeTotals = useMemo(() => computeTotals(finance), [finance]);
 
@@ -322,12 +310,12 @@ export default function PAReports() {
           </span>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          <StatTile icon={<Users className="w-3.5 h-3.5" />} label={t("reports.tileBrokers")} value={brokerStats.total_courtiers || brokerSnapshot.total} color={ACCENT} />
-          <StatTile icon={<Smartphone className="w-3.5 h-3.5" />} label={t("reports.tileMobileActive")} value={brokerStats.app_mobile_active || brokerSnapshot.mobile} color={SUCCESS} sub={`${t("reports.tileOutOf")} ${brokerStats.total_courtiers || brokerSnapshot.total}`} />
-          <StatTile icon={<Bot className="w-3.5 h-3.5" />} label={t("reports.tileAiActive")} value={brokerStats.agent_ia_active || brokerSnapshot.ai} color="#9B7FE8" sub={`${t("reports.tileOutOf")} ${brokerStats.total_courtiers || brokerSnapshot.total}`} />
-          <StatTile icon={<Plug className="w-3.5 h-3.5" />} label={t("reports.tileMaestro")} value={brokerStats.maestro_connected || brokerSnapshot.maestro} color="#F5A623" />
-          <StatTile icon={<Mail className="w-3.5 h-3.5" />} label={t("reports.tileMs365")} value={brokerStats.ms365_connected || brokerSnapshot.ms365} color="#2E9BDC" />
-          <StatTile icon={<Link2 className="w-3.5 h-3.5" />} label={t("reports.tileNs")} value={brokerStats.ns_linked || brokerSnapshot.ns} color={GOLD} />
+          <StatTile icon={<Users className="w-3.5 h-3.5" />} label={t("reports.tileBrokers")} value={brokerSnapshot.total || brokerStats.total_courtiers} color={ACCENT} />
+          <StatTile icon={<Smartphone className="w-3.5 h-3.5" />} label={t("reports.tileMobileActive")} value={brokerSnapshot.mobile || brokerStats.app_mobile_active} color={SUCCESS} sub={`${t("reports.tileOutOf")} ${brokerSnapshot.total || brokerStats.total_courtiers}`} />
+          <StatTile icon={<Bot className="w-3.5 h-3.5" />} label={t("reports.tileAiActive")} value={brokerSnapshot.ai || brokerStats.agent_ia_active} color="#9B7FE8" sub={`${t("reports.tileOutOf")} ${brokerSnapshot.total || brokerStats.total_courtiers}`} />
+          <StatTile icon={<Plug className="w-3.5 h-3.5" />} label={t("reports.tileMaestro")} value={brokerSnapshot.maestro || brokerStats.maestro_connected} color="#F5A623" />
+          <StatTile icon={<Mail className="w-3.5 h-3.5" />} label={t("reports.tileMs365")} value={brokerSnapshot.ms365 || brokerStats.ms365_connected} color="#2E9BDC" />
+          <StatTile icon={<Link2 className="w-3.5 h-3.5" />} label={t("reports.tileNs")} value={brokerSnapshot.ns || brokerStats.ns_linked} color={GOLD} />
         </div>
       </div>
 
@@ -375,28 +363,44 @@ export default function PAReports() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="pp-card p-5">
           <h3 className="mb-3" style={{ fontWeight: 600, color: "var(--pp-text-primary)" }}>{t("reports.callsByDay")}</h3>
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={byDay}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-              <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#4A7FA5" }} />
-              <YAxis tick={{ fontSize: 11, fill: "#4A7FA5" }} />
-              <Tooltip content={<TooltipDark />} cursor={{ fill: "rgba(46,155,220,0.08)" }} />
-              <Bar dataKey="count" name={t("reports.thCalls")} fill={ACCENT} radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          <div className="h-[240px] flex items-end gap-2 overflow-x-auto px-1 pb-2" style={{ borderBottom: "1px solid var(--pp-bg-border-2)" }}>
+            {byDay.length === 0 ? (
+              <div className="w-full self-center text-center" style={{ fontSize: 12, color: "var(--pp-text-faint)" }}>{t("reports.empty")}</div>
+            ) : byDay.map((d) => (
+              <div key={d.date} className="flex-1 min-w-[28px] max-w-[56px] flex flex-col items-center justify-end gap-1">
+                <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT }}>{d.count}</div>
+                <div className="w-full rounded-t" style={{ height: Math.max(8, Math.round((d.count / maxDayCount) * 170)), background: `linear-gradient(180deg, ${ACCENT}, rgba(46,155,220,0.28))` }} />
+                <div className="truncate w-full text-center" style={{ fontSize: 10, color: "var(--pp-text-faint)" }}>{d.date}</div>
+              </div>
+            ))}
+          </div>
         </div>
 
         <div className="pp-card p-5">
           <h3 className="mb-3" style={{ fontWeight: 600, color: "var(--pp-text-primary)" }}>{t("reports.callsDistribution")}</h3>
-          <ResponsiveContainer width="100%" height={240}>
-            <PieChart>
-              <Pie data={byDirection} dataKey="value" nameKey="name" innerRadius={50} outerRadius={80} paddingAngle={4}>
-                {byDirection.map((e, i) => <Cell key={i} fill={e.color} stroke="var(--pp-bg-surface)" strokeWidth={2} />)}
-              </Pie>
-              <Tooltip content={<TooltipDark />} />
-              <Legend wrapperStyle={{ fontSize: 11, color: "#8FA8C0" }} />
-            </PieChart>
-          </ResponsiveContainer>
+          <div className="h-[240px] grid grid-cols-[160px_1fr] items-center gap-5">
+            <div className="w-36 h-36 rounded-full mx-auto grid place-items-center" style={{ background: totalDirectionCalls ? `conic-gradient(${ACCENT} 0 ${inboundPct}%, ${SUCCESS} ${inboundPct}% ${inboundPct + outboundPct}%, ${DANGER} ${inboundPct + outboundPct}% 100%)` : "var(--pp-bg-deep)" }}>
+              <div className="w-20 h-20 rounded-full grid place-items-center" style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)" }}>
+                <span style={{ fontSize: 22, fontWeight: 800, color: "var(--pp-text-primary)" }}>{totalDirectionCalls}</span>
+              </div>
+            </div>
+            <div className="space-y-3">
+              {byDirection.map((d) => {
+                const pct = totalDirectionCalls ? Math.round((d.value / totalDirectionCalls) * 100) : 0;
+                return (
+                  <div key={d.name}>
+                    <div className="flex items-center justify-between mb-1" style={{ fontSize: 11 }}>
+                      <span className="flex items-center gap-2" style={{ color: "var(--pp-text-secondary)" }}><i className="w-2 h-2 rounded-full" style={{ background: d.color }} />{d.name}</span>
+                      <span className="tabular-nums" style={{ color: d.color, fontWeight: 700 }}>{d.value} · {pct}%</span>
+                    </div>
+                    <div className="h-2 rounded-full overflow-hidden" style={{ background: "var(--pp-bg-deep)" }}>
+                      <div className="h-full rounded-full" style={{ width: `${pct}%`, background: d.color }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </div>
 

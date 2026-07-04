@@ -208,8 +208,8 @@ export default function PAOverview() {
       p.ns_domain === "planipret.ca" && !isTest(p.full_name, p.email);
     const realBrokers = profilesAll.filter(isRealBroker);
     const widgetN = brokerStats.total_courtiers || brokerTotal || realBrokers.length;
-    const mobileN = brokerStats.app_mobile_active || realBrokers.filter((p) => p.mobile_app_enabled).length;
-    const aiN = brokerStats.agent_ia_active || realBrokers.filter((p) => p.voice_agent_enabled).length;
+    const mobileN = brokerStats.app_mobile_active || realBrokers.filter((p) => p.mobile_app_enabled).length || profilesAll.filter((p) => p.mobile_app_enabled).length;
+    const aiN = brokerStats.agent_ia_active || realBrokers.filter((p) => p.voice_agent_enabled).length || profilesAll.filter((p) => p.voice_agent_enabled).length;
     setServiceCounts({ mobile: mobileN, widget: widgetN, ai: aiN });
     setRecent(rec.data ?? []);
     setBrokers(nsBrokerList.slice(0, 10));
