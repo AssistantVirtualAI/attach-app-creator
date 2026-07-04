@@ -189,7 +189,7 @@ export default function PARecordings() {
           callid: resp.headers.get("X-NS-CallID"),
           source_path: resp.headers.get("X-NS-Source-Path"),
         };
-        setDetail({ ...row, recording_url: objUrl, __recording_meta: recordingMeta });
+        setDetail((cur: any) => ({ ...(cur && cur.id === row.id ? cur : row), recording_url: objUrl, __recording_meta: recordingMeta }));
         toast.success("Enregistrement chargé");
       } else {
         const j = await resp.json().catch(() => ({}));
