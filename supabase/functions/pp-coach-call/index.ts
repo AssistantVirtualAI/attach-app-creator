@@ -134,7 +134,7 @@ Direction: ${row.direction ?? "?"} · Durée: ${row.duration_seconds ?? "?"}s`;
   if (corrected && corrected.length > 20) update.transcript = corrected;
   if (summary) { update.ai_summary = summary; update.ai_summary_short = summary.slice(0, 200); }
   if (coaching) update.ai_coaching = coaching;
-  if (score != null) update.lead_score = score;
+  if (score != null) update.lead_score = Math.max(1, Math.min(10, Math.round(score / 10)));
 
   const { error: upErr } = await admin.from("planipret_phone_calls").update(update).eq("id", call_id);
   if (upErr) return json({ error: "DB update failed", details: upErr.message }, 500);
