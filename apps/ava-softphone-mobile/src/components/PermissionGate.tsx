@@ -4,6 +4,7 @@ import { colors, gradients, radius, font } from '../lib/theme';
 import { LemtelMark } from './Brand';
 import { requestMicrophone, openAppSettings, checkAllPermissions } from '../lib/permissions';
 import type { AllPermissions, PermissionStatus } from '../lib/permissions';
+import PermissionDiagPanel from './PermissionDiagPanel';
 
 interface PermissionGateProps {
   onComplete: () => void;
