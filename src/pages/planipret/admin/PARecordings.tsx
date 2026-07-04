@@ -42,6 +42,7 @@ export default function PARecordings() {
   const [debug, setDebug] = useState<DebugEntry[]>([]);
   const [detail, setDetail] = useState<any | null>(null);
   const [transcribing, setTranscribing] = useState<string | null>(null);
+  const [recordingError, setRecordingError] = useState<string | null>(null);
 
   const hasFilters = !!(search || broker || from || to || withTranscript);
   const activeFilterCount = [search, broker, from, to, withTranscript].filter(Boolean).length;
@@ -132,7 +133,8 @@ export default function PARecordings() {
         setDetail((d: any) => d && d.id === callId ? { ...d, transcript: (data as any).transcript } : d);
         await load(page, pageSize);
       } else {
-        throw new Error((data as any)?.error ?? "transcription vide");
+        const d = data as any;
+        throw new Error([d?.error ?? "transcription vide", d?.hint].filter(Boolean).join(" — "));
       }
     } catch (e: any) {
       toast.error(`Transcription échouée: ${e.message ?? e}`);
@@ -144,6 +146,7 @@ export default function PARecordings() {
   const [resolving, setResolving] = useState<string | null>(null);
   const resolveRecording = async (row: any, force = false) => {
     setResolving(row.id);
+    setRecordingError(null);
     try {
       const { data, error } = await supabase.functions.invoke("pp-admin-recording-resolve", { body: { call_row_id: row.id, force } });
       if (error) throw error;
@@ -152,7 +155,10 @@ export default function PARecordings() {
         setDetail({ ...row, recording_url: (data as any).recording_url });
         await load(page, pageSize);
       } else {
-        toast.error((data as any)?.error ?? "Aucun enregistrement disponible côté NS-API");
+        const d = data as any;
+        const msg = [d?.error ?? "Aucun enregistrement disponible côté NS-API", d?.hint].filter(Boolean).join(" — ");
+        setRecordingError(msg);
+        toast.error(msg);
       }
     } catch (e: any) {
       toast.error(`Récupération échouée: ${e.message ?? e}`);
@@ -295,24 +301,37 @@ export default function PARecordings() {
               {detail.recording_url ? (
                 <div>
                   <p style={{ fontSize: 11, color: "var(--pp-text-muted)", marginBottom: 4 }}>Audio</p>
-                  <audio
-                    key={detail.recording_url}
-                    src={detail.recording_url}
-                    controls
-                    className="w-full"
-                    onError={() => {
-                      // Auto-refresh once when playback fails (usually expired signed URL).
-                      if (resolving !== detail.id && !(detail as any).__autoRefreshed) {
-                        (detail as any).__autoRefreshed = true;
-                        toast.message("URL expirée — rafraîchissement automatique…");
-                        resolveRecording(detail, true);
-                      }
-                    }}
-                  />
+                  {String(detail.recording_url).startsWith("http") ? (
+                    <audio
+                      key={detail.recording_url}
+                      src={detail.recording_url}
+                      controls
+                      className="w-full"
+                      onError={() => {
+                        // Auto-refresh once when playback fails (usually expired signed URL).
+                        if (resolving !== detail.id && !(detail as any).__autoRefreshed) {
+                          (detail as any).__autoRefreshed = true;
+                          toast.message("URL expirée — rafraîchissement automatique…");
+                          resolveRecording(detail, true);
+                        }
+                      }}
+                    />
+                  ) : (
+                    <div className="p-3 rounded-lg text-xs" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>
+                      URL audio à rafraîchir depuis NetSapiens.
+                    </div>
+                  )}
+                  {recordingError && (
+                    <div className="mt-2 p-2 rounded-lg text-xs" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-danger, #E84C4C)" }}>
+                      {recordingError}
+                    </div>
+                  )}
                   <div className="flex items-center gap-3 mt-2">
-                    <a href={detail.recording_url} download className="inline-flex items-center gap-1 text-xs" style={{ color: ACCENT }}>
-                      <Download className="w-3 h-3" /> Télécharger
-                    </a>
+                    {String(detail.recording_url).startsWith("http") && (
+                      <a href={detail.recording_url} download className="inline-flex items-center gap-1 text-xs" style={{ color: ACCENT }}>
+                        <Download className="w-3 h-3" /> Télécharger
+                      </a>
+                    )}
                     <button
                       onClick={() => resolveRecording(detail, true)}
                       disabled={resolving === detail.id}
