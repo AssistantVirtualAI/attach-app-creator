@@ -262,11 +262,19 @@ export default function PARecordings() {
     // Bascule "en cours" après un court délai pour matérialiser la queue → running
     setTimeout(() => setCoachStatus((s) => (s[callId] === "queued" ? { ...s, [callId]: "running" } : s)), 400);
     try {
-      const { data, error } = await supabase.functions.invoke("pp-coach-call", { body: { call_id: callId } });
+      // Fallback transcript: envoyer le texte local si la DB n'est pas encore synchro
+      const localTranscript = cur.transcript || (Array.isArray(cur.transcript_segments) ? cur.transcript_segments.map((s: any) => s?.text).filter(Boolean).join("\n") : "");
+      const { data, error } = await supabase.functions.invoke("pp-coach-call", { body: { call_id: callId, transcript: localTranscript } });
       const d = (data as any) ?? {};
-      if (d?.error === "TRANSCRIPT_MISSING" || error) {
-        if (d?.error && d.error !== "TRANSCRIPT_MISSING") toast.error(d.error);
+      if (d?.error === "TRANSCRIPT_MISSING") {
+        // Transcript pas encore prêt côté serveur — reste en "queued", retry dans 3s
+        setCoachStatus((s) => ({ ...s, [callId]: "queued" }));
+        setTimeout(() => runCoaching(callId), 3000);
+        return;
+      }
+      if (error) {
         setCoachStatus((s) => ({ ...s, [callId]: "error" }));
+        toast.error(`Coaching échoué: ${error.message ?? error}`);
         return;
       }
       if (d?.success) {
