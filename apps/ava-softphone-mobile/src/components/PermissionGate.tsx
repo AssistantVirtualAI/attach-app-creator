@@ -295,6 +295,19 @@ export default function PermissionGate({ onComplete }: PermissionGateProps) {
           }} />
         ))}
       </div>
+
+      <button
+        onClick={() => setShowDiag(true)}
+        style={{
+          marginTop: 18, background: 'transparent', color: '#94A3B8',
+          border: '1px dashed rgba(255,255,255,0.2)', borderRadius: 10,
+          padding: '8px 14px', fontSize: 11, fontWeight: 600, cursor: 'pointer',
+        }}
+      >
+        🔧 Run diagnostic
+      </button>
+
+      {showDiag && <PermissionDiagPanel onClose={() => setShowDiag(false)} />}
     </Shell>
   );
 }
