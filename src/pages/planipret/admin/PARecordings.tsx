@@ -221,6 +221,16 @@ export default function PARecordings() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detail?.id]);
 
+  // Auto-fetch audio via ns-get-recording when a recording detail opens without a playable URL
+  useEffect(() => {
+    if (!detail?.id) return;
+    if (detail.recording_url && String(detail.recording_url).startsWith("blob:")) return;
+    if (detail.recording_url && String(detail.recording_url).startsWith("http")) return;
+    if (resolving === detail.id) return;
+    resolveRecording(detail);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detail?.id]);
+
 
   const inputStyle = { background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" };
 
