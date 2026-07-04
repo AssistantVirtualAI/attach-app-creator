@@ -352,11 +352,14 @@ export default function PARecordings() {
         />
         <select value={broker} onChange={(e) => setFilterValue("broker", e.target.value)} className="px-3 py-2 rounded-lg text-sm" style={inputStyle as any}>
           <option value="">Tous courtiers</option>
-          {brokers.map((b: any) => (
-            <option key={b.user_id} value={b.ns_only ? `ext:${b.extension}` : `user:${b.user_id}`}>
-              {b.full_name}{b.extension ? ` · ${b.extension}` : ""}
-            </option>
-          ))}
+          {brokers.map((b: any, i: number) => {
+            const value = b.ns_only ? `ext:${b.extension}` : `user:${b.user_id}`;
+            return (
+              <option key={`${value}-${b.extension ?? "x"}-${i}`} value={value}>
+                {b.full_name}{b.extension ? ` · ${b.extension}` : ""}
+              </option>
+            );
+          })}
         </select>
         <input type="date" value={from} onChange={(e) => setFilterValue("from", e.target.value)} className="px-3 py-2 rounded-lg text-sm" style={inputStyle as any} />
         <input type="date" value={to} onChange={(e) => setFilterValue("to", e.target.value)} className="px-3 py-2 rounded-lg text-sm" style={inputStyle as any} />
