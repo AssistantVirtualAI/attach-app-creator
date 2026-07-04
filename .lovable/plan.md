@@ -1,52 +1,119 @@
-## Objectif
-Aligner tous les appels NS-API sur les endpoints officiels documentés (`docs.ns-api.com`) en utilisant l'authentification `Bearer NS_API_KEY`, corriger le mapping du `callid` NS pour que les enregistrements et transcriptions fonctionnent.
+# Plan multi-phases — Recordings, Transcriptions & Call Management (NS-API v2)
 
-## Prérequis (à confirmer avant build)
-1. **Secret `NS_API_KEY`** — Le stack actuel utilise `NS_API_USER` + `NS_API_PASSWORD` via JWT (`_shared/ns-broker.ts`, `_shared/planipret-ns.ts`). Le nouveau plan exige un `NS_API_KEY` (Bearer statique). **Confirmer** que ce secret existe et remplace bien la paire user/password, sinon les fonctions casseront en prod.
-2. **`NS_API_BASE_URL`** — actuellement `https://voice.ava-telecom.ca/ns-api/v2`. À conserver.
-3. **`NS_DEFAULT_DOMAIN`** = `planipret.ca`. À conserver.
+Objectif : aligner tout le stack sur les endpoints officiels `docs.ns-api.com` avec auth `Bearer NS_API_KEY`, corriger la racine du problème (`ns_callid` non persisté correctement) et restaurer la page recordings.
 
-## Étapes
+## Prérequis (à confirmer avant Phase 1)
+- **Secret `NS_API_KEY`** (Bearer statique) — nécessaire, à confirmer présent sinon `add_secret` requis.
+- `NS_API_BASE_URL` = `https://voice.ava-telecom.ca/ns-api/v2` ✅
+- `NS_DEFAULT_DOMAIN` = `planipret.ca` ✅
 
-### 1. Migration DB
-- `ALTER TABLE planipret_phone_calls ADD COLUMN IF NOT EXISTS ns_callid text, ns_orig_callid text, ns_term_callid text;`
-- Index sur `ns_callid`.
+---
 
-### 2. Sync CDR (`pp-admin-ns-sync`, `ns-webhook-receiver`)
-- Mapper depuis la réponse CDR :
-  - `ns_orig_callid ← cdr["orig-callid"]`
-  - `ns_term_callid ← cdr["term-callid"]`
-  - `ns_callid ← orig-callid ?? term-callid ?? id`
-- Conserver la logique existante multi-candidats mais persister explicitement les 3 nouveaux champs.
+## Phase 1 — Diagnostic (indispensable avant tout code)
+**But** : identifier le nom exact du champ CDR contenant le `callid` NS-API.
 
-### 3. Auth partagée
-- Créer `_shared/ns-api-key.ts` exposant `nsHeaders` = `{ Authorization: Bearer NS_API_KEY, Content-Type: application/json }` + `NS_API_BASE_URL` + `NS_DOMAIN`.
-- Ne PAS supprimer `_shared/ns-broker.ts` / `planipret-ns.ts` tout de suite (utilisés par ~15 autres fonctions). On migre uniquement les 3 fonctions ciblées dans ce plan.
+1. Créer Edge Function temporaire `ns-debug-cdr` :
+   - `GET {base}/domains/{domain}/cdrs?limit=1` avec Bearer.
+   - Retourne `Object.keys(cdr)` + `cdr_raw` + `http_status`.
+2. Ajouter bouton temporaire **[🔍 Debug CDR Fields]** sur `/planipret/admin/recordings` :
+   - Log la row la plus récente de `planipret_phone_calls`.
+   - Invoke `ns-debug-cdr` et affiche le JSON brut dans un `<pre>`.
+3. **Livrable** : capture des champs bruts → décision sur `ns_callid` mapping.
 
-### 4. Réécrire `ns-recordings` (et `pp-admin-recording-resolve`)
-Endpoints officiels dans l'ordre :
-1. `GET /domains/{domain}/recordings/{ns_callid}`
-2. `GET /domains/{domain}/users/{ext}/recordings/{ns_callid}`
-- Si `Content-Type: audio/*` → streamer.
-- Si JSON → suivre `url` / `recording-url` / `media-url` / `file-url` / `file-access-url` puis GET.
-- Sinon retourner 200 + `{ fallback:true, attempts, cdr_in_db, hint }` (pas de 502).
+---
 
-### 5. Réécrire `ns-transcription` (et `pp-admin-transcribe`)
-- Endpoint officiel : `GET /domains/{domain}/transcriptions?callid=...` avec variantes (`orig-callid`, `call-id`, combiné `user=` + `callid=`).
-- Parser en `segments[{speaker,text}]`.
-- 200 + `{ fallback:true, possible_causes }` si vide (mention `PORTAL_VOICE_TRANSCRIPTION_SENTIMENT`).
+## Phase 2 — Schema DB
+Migration :
+```sql
+ALTER TABLE planipret_phone_calls
+  ADD COLUMN IF NOT EXISTS ns_callid text,
+  ADD COLUMN IF NOT EXISTS ns_orig_callid text,
+  ADD COLUMN IF NOT EXISTS ns_term_callid text;
+CREATE INDEX IF NOT EXISTS idx_calls_ns_callid ON planipret_phone_calls(ns_callid);
+```
 
-### 6. Frontend (`MCalls.tsx`, `CallRecordingPlayer.tsx`, `PARecordings.tsx`)
-- Charger `ns_callid, ns_orig_callid, ns_extension` depuis la row.
-- Passer `{ ns_callid, ns_extension, call_db_id }` aux deux edge functions.
-- Afficher `possible_causes` / `hint` en UI (déjà partiellement en place).
+---
 
-### 7. Provisioning devices — HORS SCOPE de ce fix
-Le message initial concerne uniquement recordings + transcriptions. Je ne touche pas `ns-provision-broker-devices` sauf demande explicite.
+## Phase 3 — CDR sync
+Mettre à jour `pp-admin-ns-sync` + `ns-webhook-receiver` pour persister (avec les noms exacts confirmés en Phase 1, valeurs par défaut ci-dessous) :
+```
+ns_orig_callid ← cdr["orig-callid"]
+ns_term_callid ← cdr["term-callid"]
+ns_callid      ← orig-callid ?? term-callid ?? id
+```
+Backfill optionnel via update SQL sur `metadata->>'orig-callid'` pour les anciens appels.
 
-### 8. Tests
-- `supabase--curl_edge_functions` sur `ns-recordings` et `ns-transcription` avec le CDR de François Leblond (2026-07-02 15:22:24, ext 1251).
-- Vérifier logs edge et UI.
+---
+
+## Phase 4 — Recording endpoint
+Réécrire `ns-get-recording` (ou refondre `ns-recordings` existant) avec la cascade officielle :
+1. `GET /domains/{d}/users/{ext}/recordings/{callid}` — si `ns_extension` connu.
+2. `GET /domains/~/users/~/recordings/{callid}` — fallback tilde.
+3. `GET /domains/{d}/recordings/{callid}` — fallback domain-level.
+
+Comportement :
+- Résout `callid` depuis `call_db_id` via lookup DB si non fourni.
+- Si `Content-Type: audio/*|octet-stream` → stream direct (Accept-Ranges).
+- Si JSON → suit `url`/`recording-url`/`media-url`/`file`/`download-url` puis GET.
+- Sinon renvoie `404 { error:"RECORDING_NOT_FOUND", attempts, possible_causes }`.
+
+---
+
+## Phase 5 — Transcription endpoint
+Réécrire `ns-get-transcription` :
+- `GET /domains/{d}/transcriptions?callid=…` avec variantes (`call-id`, `orig-callid`).
+- Parse en `segments[{speaker,text}]` (string / array / object).
+- Si vide → `404 { action_required: "activer PORTAL_VOICE_TRANSCRIPTION_SENTIMENT" }`.
+
+---
+
+## Phase 6 — Call control (nouveau)
+Créer `ns-call-action` :
+- `hangup` / `reject` → `DELETE /domains/{d}/calls/{callid}`
+- `hold` / `unhold` / `answer` / `transfer` → `PUT /domains/{d}/calls/{callid}` avec `{ action, destination? }`
+- Validation Zod des actions ; retour `{ success, status, data }`.
+
+---
+
+## Phase 7 — Frontend `/planipret/admin/recordings`
+- Restaurer la liste : `planipret_phone_calls` où `ns_callid IS NOT NULL` OU `has_recording = true`.
+- Bouton **▶ Écouter** → `supabase.functions.invoke('ns-get-recording', { body: { call_db_id, ns_callid, ns_extension } })`.
+- Bouton **📝 Transcrire** → `ns-get-transcription` (mêmes params).
+- Player inline via `CallRecordingPlayer` (expand row, pas de modal).
+- États UI clairs :
+  - `ns_callid` manquant → "⚠️ Identifiant NS-API manquant" + [🔄 Sync CDR]
+  - 404 recording → "📵 Enregistrement non disponible"
+  - Transcript vide → "📝 Activez PORTAL_VOICE_TRANSCRIPTION_SENTIMENT" + [📧 Contacter Clinton]
+  - Recording OK + transcript KO → player + bouton Claude désactivé + tooltip
+
+---
+
+## Phase 8 — Couche Claude (post-transcript)
+Après un transcript NS-API valide, invoke `pp-admin-transcribe` (ou nouvelle `ai-call-coaching`) avec Lovable AI Gateway pour retourner JSON strict :
+```json
+{
+  "corrected_transcript": [{"speaker","text"}],
+  "call_notes": { "summary", "client_needs", "key_info", "outcome" },
+  "coaching": { "score", "strengths", "improvements", "coaching_message" }
+}
+```
+Affichage : transcript corrigé + card notes + score coaching.
+
+---
+
+## Phase 9 — Test end-to-end
+Cas de test : Scott He ext 110 (2026-04-03).
+- ✅ `ns_callid` présent en DB après re-sync.
+- ✅ `ns-get-recording` stream l'audio.
+- ✅ `ns-get-transcription` retourne segments.
+- ✅ Claude retourne coaching JSON valide.
+- Nettoyage : supprimer `ns-debug-cdr` + bouton diagnostic.
+
+---
 
 ## Question bloquante
-**Le secret `NS_API_KEY` (Bearer statique) est-il déjà configuré, ou dois-je continuer avec le JWT généré via `NS_API_USER`/`NS_API_PASSWORD` (stack actuel) ?** Si non configuré, l'étape 3 nécessite un `add_secret` avant de builder.
+Le secret **`NS_API_KEY`** (Bearer statique) est-il configuré ? Le stack actuel utilise `NS_API_USER`/`NS_API_PASSWORD` + JWT via `_shared/ns-broker.ts`. Deux options :
+1. **Ajouter `NS_API_KEY`** et utiliser Bearer direct dans les 4 nouvelles/refondues fonctions (recommandé, aligné doc).
+2. **Continuer avec le broker JWT existant** (`nsBrokerFetch`) — fonctionne aussi mais divergent de la spec.
+
+Merci de confirmer l'option avant de builder Phase 1.
