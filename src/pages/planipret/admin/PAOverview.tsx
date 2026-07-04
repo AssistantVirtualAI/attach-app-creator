@@ -133,24 +133,23 @@ export default function PAOverview() {
   const load = async () => {
     setRefreshing(true);
     const today = new Date(); today.setHours(0, 0, 0, 0);
-    const yest = new Date(today); yest.setDate(yest.getDate() - 1);
     const periodAgo = new Date(today); periodAgo.setDate(periodAgo.getDate() - (period - 1));
-    const todayIso = today.toISOString();
-    const yestIso = yest.toISOString();
+    const prevPeriodAgo = new Date(today); prevPeriodAgo.setDate(prevPeriodAgo.getDate() - (period * 2 - 1));
     const periodIso = periodAgo.toISOString();
+    const prevPeriodIso = prevPeriodAgo.toISOString();
 
     const sevenAgo = new Date(today); sevenAgo.setDate(sevenAgo.getDate() - 7);
     const sevenIso = sevenAgo.toISOString();
     const fiveMinAgo = new Date(Date.now() - 5 * 60_000).toISOString();
     const nowIsoEarly = new Date().toISOString();
 
-    const [c1, c2, missedToday, sms, smsY, ava, avaWeek, vm, rec, callsP, smsP, callsByDir, callsPeriodStats, topCalls, svcProfiles, directory, onlineC, overdueRemC, hotLeadsWeekC] = await Promise.all([
-      getPlanipretCallCount({ from: todayIso }, "created_at"),
-      getPlanipretCallCount({ from: yestIso, to: todayIso }, "created_at"),
-      getPlanipretCallCount({ status: "missed", from: todayIso }, "created_at"),
-      supabase.from("planipret_phone_messages").select("id", { count: "exact", head: true }).gte("created_at", todayIso),
-      supabase.from("planipret_phone_messages").select("id", { count: "exact", head: true }).gte("created_at", yestIso).lt("created_at", todayIso),
-      supabase.from("ai_request_audit_log").select("id", { count: "exact", head: true }).gte("created_at", todayIso).like("action", "elevenlabs_tool:%"),
+    const [c1, c2, missedPeriod, sms, smsY, ava, avaWeek, vm, rec, callsP, smsP, callsByDir, callsPeriodStats, topCalls, svcProfiles, directory, onlineC, overdueRemC, hotLeadsPeriodC] = await Promise.all([
+      getPlanipretCallCount({ from: periodIso }, "created_at"),
+      getPlanipretCallCount({ from: prevPeriodIso, to: periodIso }, "created_at"),
+      getPlanipretCallCount({ status: "missed", from: periodIso }, "created_at"),
+      supabase.from("planipret_phone_messages").select("id", { count: "exact", head: true }).gte("created_at", periodIso),
+      supabase.from("planipret_phone_messages").select("id", { count: "exact", head: true }).gte("created_at", prevPeriodIso).lt("created_at", periodIso),
+      supabase.from("ai_request_audit_log").select("id", { count: "exact", head: true }).gte("created_at", periodIso).like("action", "elevenlabs_tool:%"),
       supabase.from("ai_request_audit_log").select("id", { count: "exact", head: true }).gte("created_at", sevenIso).like("action", "elevenlabs_tool:%"),
       supabase.from("planipret_voicemails").select("id", { count: "exact", head: true }).eq("is_read", false),
       supabase.from("planipret_phone_calls").select("id, user_id, extension, direction, status, from_number, to_number, duration_seconds, started_at, created_at, ai_summary, metadata, planipret_profiles(full_name)").order("created_at", { ascending: false }).limit(20),
@@ -163,7 +162,7 @@ export default function PAOverview() {
       getPlanipretBrokerDirectory(),
       supabase.from("planipret_profiles").select("id", { count: "exact", head: true }).gte("updated_at", fiveMinAgo),
       supabase.from("planipret_reminders").select("id", { count: "exact", head: true }).eq("status", "pending").lt("scheduled_at", nowIsoEarly),
-      supabase.from("planipret_phone_calls").select("id", { count: "exact", head: true }).gte("created_at", sevenIso).gte("lead_score", 8),
+      supabase.from("planipret_phone_calls").select("id", { count: "exact", head: true }).gte("created_at", periodIso).gte("lead_score", 8),
     ]);
 
     const nsBrokerList = directory.brokers;
@@ -184,14 +183,14 @@ export default function PAOverview() {
     const brokersActive = brokerTotal;
 
     setStats({
-      calls: c1 ?? 0, callsYest: c2 ?? 0, callsMissedToday: missedToday ?? 0,
+      calls: c1 ?? 0, callsYest: c2 ?? 0, callsMissedToday: missedPeriod ?? 0,
       brokers: brokersActive, brokersTotal: brokerTotal,
       sms: sms.count ?? 0, smsYest: smsY.count ?? 0,
       ava: ava.count ?? 0, avaWeek: avaWeek.count ?? 0,
       voicemailsUnread: vm.count ?? 0,
       avgDurationSec: avgDur, answerRatePct: answerPct,
       overdueReminders: overdueRemC.count ?? 0,
-      hotLeads7d: hotLeadsWeekC.count ?? 0,
+      hotLeads7d: hotLeadsPeriodC.count ?? 0,
       brokersOnline: onlineC.count ?? 0,
     });
 
@@ -256,7 +255,7 @@ export default function PAOverview() {
     const { data: hot } = await supabase
       .from("planipret_phone_calls")
       .select("id, user_id, extension, from_number, from_name, to_number, to_name, lead_score, started_at, created_at, planipret_profiles(full_name)")
-      .gte("created_at", todayIso)
+      .gte("created_at", periodIso)
       .gte("lead_score", 8)
       .order("lead_score", { ascending: false })
       .limit(8);
@@ -362,19 +361,19 @@ export default function PAOverview() {
 
       {/* KPI Hero Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard icon={<Phone className="w-5 h-5" />} title={t("overview.kpiCallsToday")} value={stats.calls} subtitle={`${stats.callsMissedToday} ${t("overview.kpiCallsSub")}`} trend={callsTrend} color={ACCENT} />
+        <KpiCard icon={<Phone className="w-5 h-5" />} title={`${t("overview.seriesCalls")} · ${period}${t("overview.days")}`} value={stats.calls} subtitle={`${stats.callsMissedToday} ${t("overview.kpiCallsSub")}`} trend={callsTrend} color={ACCENT} />
         <KpiCard icon={<Users className="w-5 h-5" />} title={t("overview.kpiActiveBrokers")} value={stats.brokers} subtitle={`${serviceCounts.mobile} ${t("overview.svcMobile")} · ${stats.brokersOnline} ${t("overview.kpiOnline")}`} color={SUCCESS} />
-        <KpiCard icon={<MessageSquare className="w-5 h-5" />} title={t("overview.kpiSmsToday")} value={stats.sms} subtitle={t("overview.kpiSmsSub")} trend={smsTrend} color={WARNING} />
-        <KpiCard icon={<Bot className="w-5 h-5" />} title={t("overview.kpiAvaToday")} value={stats.ava} subtitle={`${stats.avaWeek} ${t("overview.kpiAvaSubDays")} · ${stats.voicemailsUnread} ${t("overview.kpiAvaSubVm")}`} color={AGENT} />
+        <KpiCard icon={<MessageSquare className="w-5 h-5" />} title={`${t("overview.seriesSms")} · ${period}${t("overview.days")}`} value={stats.sms} subtitle={t("overview.kpiSmsSub")} trend={smsTrend} color={WARNING} />
+        <KpiCard icon={<Bot className="w-5 h-5" />} title={`AVA · ${period}${t("overview.days")}`} value={stats.ava} subtitle={`${stats.avaWeek} ${t("overview.kpiAvaSubDays")} · ${stats.voicemailsUnread} ${t("overview.kpiAvaSubVm")}`} color={AGENT} />
       </div>
 
       {/* KPI Secondary Grid — call quality + follow-ups */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         <MiniStat label={t("overview.miniAvgDuration")} value={stats.avgDurationSec > 0 ? `${Math.floor(stats.avgDurationSec / 60)}m ${stats.avgDurationSec % 60}s` : "—"} sub={`${t("overview.miniPeriod")} ${period} ${t("overview.days")}`} color={ACCENT} />
         <MiniStat label={t("overview.miniAnswerRate")} value={`${stats.answerRatePct}%`} sub={`${t("overview.miniPeriod")} ${period} ${t("overview.days")}`} color={SUCCESS} />
-        <MiniStat label={t("overview.miniMissedCalls")} value={stats.callsMissedToday} sub={t("overview.miniToday")} color={DANGER} />
+        <MiniStat label={t("overview.miniMissedCalls")} value={stats.callsMissedToday} sub={`${t("overview.miniPeriod")} ${period} ${t("overview.days")}`} color={DANGER} />
         <MiniStat label={t("overview.miniOverdue")} value={stats.overdueReminders} sub={t("overview.miniToProcess")} color={WARNING} />
-        <MiniStat label={t("overview.miniHotLeads")} value={stats.hotLeads7d} sub={`7 ${t("overview.miniLastDays")}`} color={AGENT} />
+        <MiniStat label={t("overview.miniHotLeads")} value={stats.hotLeads7d} sub={`${period} ${t("overview.miniLastDays")}`} color={AGENT} />
       </div>
 
 
