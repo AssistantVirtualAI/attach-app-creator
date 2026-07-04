@@ -44,13 +44,16 @@ Deno.serve(async (req) => {
 
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
     const { data: callerProfile } = await admin
-      .from("planipret_profiles").select("role").eq("user_id", caller.id).maybeSingle();
+      .from("planipret_profiles").select("role").or(`user_id.eq.${caller.id},id.eq.${caller.id}`).maybeSingle();
     const callerRole = (callerProfile?.role ?? "").toLowerCase();
-    if (!["admin", "super_admin", "owner"].includes(callerRole)) {
-      // fallback via user_roles table
-      const { data: isSuper } = await admin.rpc("is_super_admin", { _user_id: caller.id }).single().then((r) => ({ data: r.data as any })).catch(() => ({ data: false }));
-      if (!isSuper) return json({ error: "forbidden", detail: "admin role required" }, 403);
+    let isAdmin = ["admin", "super_admin", "owner", "planipret_admin"].includes(callerRole);
+    if (!isAdmin) {
+      try { const { data } = await admin.rpc("is_planipret_admin", { _user_id: caller.id }); if (data) isAdmin = true; } catch { /* ignore */ }
     }
+    if (!isAdmin) {
+      try { const { data } = await admin.rpc("is_super_admin", { _user_id: caller.id }); if (data) isAdmin = true; } catch { /* ignore */ }
+    }
+    if (!isAdmin) return json({ error: "forbidden", detail: "admin role required" }, 403);
 
     const body: any = await req.json().catch(() => ({}));
     const APP_REVIEW_EMAIL = String(body?.email ?? "demo@avastatistic.ca");
