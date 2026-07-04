@@ -201,6 +201,15 @@ Deno.serve(async (req) => {
     const term = String(val(cdr, ["call-term-call-id", "term-callid", "term_callid"], "")).trim();
     if (jobId && (orig || term)) queries.push(`/domains/${D}/transcriptions?id=${encodeURIComponent(jobId)}${yyyymm ? `&date=${yyyymm}` : ""}&orig_callid=${encodeURIComponent(orig)}&term_callid=${encodeURIComponent(term)}`);
   }
+  if (jobId) {
+    for (const id of ids.slice(0, 10)) {
+      const c = encodeURIComponent(id);
+      const date = yyyymm ? `&date=${yyyymm}` : "";
+      queries.push(`/domains/${D}/transcriptions?id=${encodeURIComponent(jobId)}${date}&orig_callid=${c}&term_callid=`);
+      queries.push(`/domains/${D}/transcriptions?id=${encodeURIComponent(jobId)}${date}&orig_callid=&term_callid=${c}`);
+      queries.push(`/domains/${D}/transcriptions?id=${encodeURIComponent(jobId)}${date}&callid=${c}`);
+    }
+  }
   if (ns_callid) {
     const c = encodeURIComponent(ns_callid);
     queries.push(`/domains/${D}/transcriptions?callid=${c}`);
