@@ -418,14 +418,7 @@ export default function PARecordings() {
                   {c.transcript || (Array.isArray(c.transcript_segments) && c.transcript_segments.length) ? (
                     <span style={{ fontSize: 10, color: "var(--pp-success)" }}>● Disponible</span>
                   ) : (
-                    <button
-                      disabled={transcribing === c.id}
-                      onClick={(e) => { e.stopPropagation(); transcribe(c.id); }}
-                      className="px-2 py-1 rounded text-[10px]"
-                      style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}
-                    >
-                      {transcribing === c.id ? "…" : "Transcrire"}
-                    </button>
+                    <span style={{ fontSize: 10, color: "var(--pp-text-faint)" }}>—</span>
                   )}
                 </td>
                 <td>{c.ai_summary && <Sparkles className="w-3.5 h-3.5" style={{ color: AGENT }} />}</td>
