@@ -1052,7 +1052,9 @@ function CallDetailSheet({
               segments={Array.isArray(call.transcript_segments) ? call.transcript_segments : null}
               transcript={call.transcript}
               loading={txLoading}
-              onFetch={fetchTranscript}
+              preparing={txPreparing}
+              attempt={txAttempt}
+              onFetch={() => fetchTranscript(0)}
               onAnalyze={analyzeAI}
               aiLoading={aiLoading}
               analyzed={!!(call as any).ai_analysis_json}
