@@ -66,10 +66,6 @@ function accessUrl(raw: any): string | null {
   return val(first, ["file-access-url", "file_access_url", "recording_url", "recording-url", "url"], null);
 }
 
-function staleApiPath(v: unknown): boolean {
-  return typeof v === "string" && /^\/domains\/[^/]+\/recordings\//i.test(v.trim());
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
