@@ -205,10 +205,9 @@ export default function PAOverview() {
       const s = `${name ?? ""} ${email ?? ""}`.toLowerCase();
       return TEST_PATTERNS.some((p) => s.includes(p));
     };
-    const profs = (svcProfiles.data ?? []) as Array<{ full_name: string | null; email: string | null; ns_domain: string | null; mobile_app_enabled: boolean | null; voice_agent_enabled: boolean | null }>;
     const isRealBroker = (p: { full_name: string | null; email: string | null; ns_domain: string | null }) =>
       p.ns_domain === "planipret.ca" && !isTest(p.full_name, p.email);
-    const realBrokers = profs.filter(isRealBroker);
+    const realBrokers = profilesAll.filter(isRealBroker);
     const widgetN = brokerStats.total_courtiers || realBrokers.length;
     const mobileN = brokerStats.app_mobile_active || realBrokers.filter((p) => p.mobile_app_enabled).length;
     const aiN = brokerStats.agent_ia_active || realBrokers.filter((p) => p.voice_agent_enabled).length;
