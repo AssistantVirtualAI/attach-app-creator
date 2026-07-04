@@ -65,7 +65,10 @@ export default function PARecordings() {
     let q: any = supabase
       .from("planipret_phone_calls")
       .select("*, planipret_profiles(full_name, extension)", { count: "exact" })
-      .not("ns_callid", "is", null)
+      .not("to_number", "ilike", "%vmail%")
+      .not("to_number", "ilike", "%voicemail%")
+      .not("to_number", "ilike", "%vm@%")
+      .or("has_recording.eq.true,ns_callid.not.is.null")
       .order("started_at", { ascending: false })
       .range(fromIdx, fromIdx + ps - 1);
     if (search) q = q.or(`from_number.ilike.%${search}%,to_number.ilike.%${search}%,extension.ilike.%${search}%`);
@@ -221,15 +224,20 @@ export default function PARecordings() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detail?.id]);
 
-  // Auto-fetch audio via ns-get-recording when a recording detail opens without a playable URL
+  // Auto-fetch audio via ns-get-recording when a recording detail opens (skip voicemails)
   useEffect(() => {
     if (!detail?.id) return;
+    const to = String(detail.to_number ?? "").toLowerCase();
+    const isVoicemail = to.includes("vmail") || to.includes("voicemail") || to.includes("vm@");
+    if (isVoicemail) return;
+    if (detail.has_recording === false && !detail.ns_callid && !detail.ns_orig_callid) return;
     if (detail.recording_url && String(detail.recording_url).startsWith("blob:")) return;
     if (detail.recording_url && String(detail.recording_url).startsWith("http")) return;
     if (resolving === detail.id) return;
     resolveRecording(detail);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detail?.id]);
+
 
 
   const inputStyle = { background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-primary)" };
@@ -395,65 +403,61 @@ export default function PARecordings() {
               {resolving === detail.id && (
                 <div style={{ fontSize: 11, color: "var(--pp-text-muted)" }}>Chargement de l'audio depuis NS-API…</div>
               )}
-              {detail.recording_url ? (
-                <div>
-                  <p style={{ fontSize: 11, color: "var(--pp-text-muted)", marginBottom: 4 }}>Audio</p>
-                  {String(detail.recording_url).startsWith("http") ? (
-                    <audio
-                      key={detail.recording_url}
-                      src={detail.recording_url}
-                      controls
-                      className="w-full"
-                      onError={() => {
-                        // Auto-refresh once when playback fails (usually expired signed URL).
-                        if (resolving !== detail.id && !(detail as any).__autoRefreshed) {
-                          (detail as any).__autoRefreshed = true;
-                          toast.message("URL expirée — rafraîchissement automatique…");
-                          resolveRecording(detail, true);
-                        }
-                      }}
-                    />
-                  ) : (
+              {(() => {
+                const toLc = String(detail.to_number ?? "").toLowerCase();
+                const isVoicemail = toLc.includes("vmail") || toLc.includes("voicemail") || toLc.includes("vm@");
+                if (isVoicemail) {
+                  return (
                     <div className="p-3 rounded-lg text-xs" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>
-                      URL audio à rafraîchir depuis NetSapiens.
+                      📵 Appel non enregistré (VMail ou appel manqué)
                     </div>
-                  )}
-                  {recordingError && (
-                    <div className="mt-2 p-2 rounded-lg text-xs" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-danger, #E84C4C)" }}>
-                      {recordingError}
+                  );
+                }
+                if (resolving === detail.id) {
+                  return (
+                    <div>
+                      <p style={{ fontSize: 11, color: "var(--pp-text-muted)", marginBottom: 4 }}>Audio</p>
+                      <div className="h-10 w-full animate-pulse rounded" style={{ background: "var(--pp-bg-elevated)" }} />
                     </div>
-                  )}
-                  <div className="flex items-center gap-3 mt-2">
-                    {String(detail.recording_url).startsWith("http") && (
-                      <a href={detail.recording_url} download className="inline-flex items-center gap-1 text-xs" style={{ color: ACCENT }}>
+                  );
+                }
+                if (detail.recording_url && String(detail.recording_url).startsWith("blob:")) {
+                  return (
+                    <div>
+                      <p style={{ fontSize: 11, color: "var(--pp-text-muted)", marginBottom: 4 }}>Audio</p>
+                      <audio key={detail.recording_url} src={detail.recording_url} controls className="w-full" />
+                    </div>
+                  );
+                }
+                if (detail.recording_url && String(detail.recording_url).startsWith("http")) {
+                  return (
+                    <div>
+                      <p style={{ fontSize: 11, color: "var(--pp-text-muted)", marginBottom: 4 }}>Audio</p>
+                      <audio
+                        key={detail.recording_url}
+                        src={detail.recording_url}
+                        controls
+                        className="w-full"
+                        onError={() => {
+                          if (resolving !== detail.id && !(detail as any).__autoRefreshed) {
+                            (detail as any).__autoRefreshed = true;
+                            resolveRecording(detail, true);
+                          }
+                        }}
+                      />
+                      <a href={detail.recording_url} download className="inline-flex items-center gap-1 text-xs mt-2" style={{ color: ACCENT }}>
                         <Download className="w-3 h-3" /> Télécharger
                       </a>
-                    )}
-                    <button
-                      onClick={() => resolveRecording(detail, true)}
-                      disabled={resolving === detail.id}
-                      className="inline-flex items-center gap-1 text-xs disabled:opacity-50"
-                      style={{ color: ACCENT }}
-                    >
-                      <RefreshCw className={`w-3 h-3 ${resolving === detail.id ? "animate-spin" : ""}`} />
-                      Rafraîchir l'URL
-                    </button>
+                    </div>
+                  );
+                }
+                return (
+                  <div className="p-3 rounded-lg text-xs" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-danger, #E84C4C)" }}>
+                    {recordingError ?? "Enregistrement introuvable sur NS-API."}
                   </div>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <div style={{ color: "var(--pp-text-faint)" }}>Audio indisponible localement</div>
-                  <button
-                    onClick={() => resolveRecording(detail)}
-                    disabled={resolving === detail.id}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-white text-sm disabled:opacity-50"
-                    style={{ background: ACCENT }}
-                  >
-                    <RefreshCw className={`w-3.5 h-3.5 ${resolving === detail.id ? "animate-spin" : ""}`} />
-                    {resolving === detail.id ? "Récupération…" : "Récupérer l'enregistrement (NS-API)"}
-                  </button>
-                </div>
-              )}
+                );
+              })()}
+
               {detail.transcript ? (
                 <div>
                   <p style={{ fontSize: 11, color: "var(--pp-text-muted)", marginBottom: 4 }}>Transcription</p>
