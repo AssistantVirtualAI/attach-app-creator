@@ -361,10 +361,10 @@ export default function PAOverview() {
 
       {/* KPI Hero Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard icon={<Phone className="w-5 h-5" />} title={t("overview.kpiCallsToday")} value={stats.calls} subtitle={`${stats.callsMissedToday} ${t("overview.kpiCallsSub")}`} trend={callsTrend} color={ACCENT} />
+        <KpiCard icon={<Phone className="w-5 h-5" />} title={`${t("overview.seriesCalls")} · ${period}${t("overview.days")}`} value={stats.calls} subtitle={`${stats.callsMissedToday} ${t("overview.kpiCallsSub")}`} trend={callsTrend} color={ACCENT} />
         <KpiCard icon={<Users className="w-5 h-5" />} title={t("overview.kpiActiveBrokers")} value={stats.brokers} subtitle={`${serviceCounts.mobile} ${t("overview.svcMobile")} · ${stats.brokersOnline} ${t("overview.kpiOnline")}`} color={SUCCESS} />
-        <KpiCard icon={<MessageSquare className="w-5 h-5" />} title={t("overview.kpiSmsToday")} value={stats.sms} subtitle={t("overview.kpiSmsSub")} trend={smsTrend} color={WARNING} />
-        <KpiCard icon={<Bot className="w-5 h-5" />} title={t("overview.kpiAvaToday")} value={stats.ava} subtitle={`${stats.avaWeek} ${t("overview.kpiAvaSubDays")} · ${stats.voicemailsUnread} ${t("overview.kpiAvaSubVm")}`} color={AGENT} />
+        <KpiCard icon={<MessageSquare className="w-5 h-5" />} title={`${t("overview.seriesSms")} · ${period}${t("overview.days")}`} value={stats.sms} subtitle={t("overview.kpiSmsSub")} trend={smsTrend} color={WARNING} />
+        <KpiCard icon={<Bot className="w-5 h-5" />} title={`AVA · ${period}${t("overview.days")}`} value={stats.ava} subtitle={`${stats.avaWeek} ${t("overview.kpiAvaSubDays")} · ${stats.voicemailsUnread} ${t("overview.kpiAvaSubVm")}`} color={AGENT} />
       </div>
 
       {/* KPI Secondary Grid — call quality + follow-ups */}
