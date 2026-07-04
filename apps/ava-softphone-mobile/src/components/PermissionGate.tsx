@@ -262,8 +262,17 @@ export default function PermissionGate({ onComplete }: PermissionGateProps) {
       )}
 
       {status === 'denied' && Capacitor.isNativePlatform() && (
-        <button onClick={() => { void openAppSettings(); }} style={{ ...ghostBtnStyle }}>
+        <button onClick={() => { void openAppSettings(); }} style={ghostBtnStyle}>
           Ouvrir les Réglages
+        </button>
+      )}
+
+      {status === 'denied' && (
+        <button
+          onClick={() => advance(step)}
+          style={{ ...ghostBtnStyle, marginTop: 8, color: colors.mutedSilver }}
+        >
+          Continue without calls
         </button>
       )}
 
