@@ -211,16 +211,6 @@ Deno.serve(async (req) => {
         return json({ step: "C1", error: "ns_device_create_failed", detail: { mobile: results.mobile_device, widget: results.widget_device } }, 502);
       }
 
-      await admin.from("planipret_profiles").update({
-        ns_mobile_device_id: `${APP_REVIEW_EXT}_mobile`,
-        ns_widget_device_id: `${APP_REVIEW_EXT}_web`,
-      }).eq("user_id", authUserId);
-
-      results.sip_credentials = {
-        sip_username: APP_REVIEW_EXT,
-        sip_domain: APP_REVIEW_DOMAIN,
-        sip_password: sipPassword,
-      };
       const secretName = profileId ? `pp_sip_${profileId}_mobile` : null;
       if (secretName) {
         try {
