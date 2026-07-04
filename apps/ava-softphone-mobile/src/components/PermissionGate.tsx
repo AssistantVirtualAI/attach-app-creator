@@ -261,27 +261,12 @@ export default function PermissionGate({ onComplete }: PermissionGateProps) {
         </button>
       )}
 
-      {status === 'denied' && Capacitor.isNativePlatform() && (
-        <button onClick={() => { void openAppSettings(); }} style={ghostBtnStyle}>
-          Ouvrir les Réglages
-        </button>
-      )}
-
       {status === 'denied' && (
         <button
           onClick={() => advance(step)}
           style={{ ...ghostBtnStyle, marginTop: 8, color: colors.mutedSilver }}
         >
           Continue without calls
-        </button>
-      )}
-
-      {status === 'denied' && (
-        <button
-          onClick={() => advance(step)}
-          style={{ ...ghostBtnStyle, marginTop: 8, color: colors.mutedSilver }}
-        >
-          Continuer sans microphone (les appels ne fonctionneront pas)
         </button>
       )}
 
