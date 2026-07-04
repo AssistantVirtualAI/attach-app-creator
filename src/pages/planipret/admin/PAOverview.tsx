@@ -304,7 +304,7 @@ export default function PAOverview() {
     const t = window.setInterval(load, 30000);
     return () => { supabase.removeChannel(ch); window.clearInterval(t); if (deb) window.clearTimeout(deb); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [period]);
+  }, [period, brokerStats.app_mobile_active, brokerStats.total_courtiers, brokerStats.agent_ia_active]);
 
 
   const callsTrend = stats.callsYest > 0 ? Math.round(((stats.calls - stats.callsYest) / stats.callsYest) * 100) : undefined;
