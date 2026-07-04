@@ -72,12 +72,37 @@ Deno.serve(async (req) => {
     let path = "";
     const attempts: Array<{ path: string; status: number }> = [];
 
+    const stripBase = (p: string) => p.replace(/^https?:\/\/[^/]+/i, "").replace(/^\/?ns-api\/v2/i, "");
+
     const direct = row?.recording_url && String(row.recording_url).startsWith("http") ? String(row.recording_url) : null;
     if (direct) {
       path = direct;
       console.log("NS-API direct audio GET", path);
       res = await nsBrokerFetch(admin, profile, direct, { method: "GET", headers: { Accept: "audio/wav" } });
       attempts.push({ path: "direct_recording_url", status: res.status });
+    }
+
+    // Prefer NetSapiens' precomputed recording_api_path from sync metadata.
+    const preferredPaths: string[] = [];
+    if (meta.recording_api_path) preferredPaths.push(stripBase(String(meta.recording_api_path)));
+    if (nsRaw?.recording_api_path && nsRaw.recording_api_path !== meta.recording_api_path) {
+      preferredPaths.push(stripBase(String(nsRaw.recording_api_path)));
+    }
+    for (const p of preferredPaths) {
+      if (res?.ok) break;
+      path = p;
+      console.log("NS-API recording metadata GET (preferred)", path);
+      const metaRes = await nsBrokerFetch(admin, profile, path, { method: "GET" });
+      attempts.push({ path, status: metaRes.status });
+      if (!metaRes.ok) continue;
+      const data = await metaRes.json().catch(() => null);
+      const audioUrl = accessUrl(data);
+      if (!audioUrl) continue;
+      res = await nsBrokerFetch(admin, profile, audioUrl, { method: "GET", headers: { Accept: "audio/wav" } });
+      attempts.push({ path: "file-access-url", status: res.status });
+      if (res.ok && row?.id) {
+        admin.from("planipret_phone_calls").update({ recording_url: audioUrl }).eq("id", row.id).then(() => {}, () => {});
+      }
     }
 
     const ids = lookupCallIds(nsRaw, meta, { call_id: callId, ns_call_id: row?.ns_call_id });
@@ -104,6 +129,7 @@ Deno.serve(async (req) => {
         break;
       }
     }
+
 
     if (!res) {
       return jsonResponse({
