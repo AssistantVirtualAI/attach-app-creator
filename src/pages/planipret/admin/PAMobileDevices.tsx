@@ -175,10 +175,10 @@ export default function PAMobileDevices() {
   }, [rows, filter]);
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
-      <div className="flex flex-col gap-3 rounded-xl border bg-gradient-to-br from-primary/5 via-background to-background p-5 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-5 p-4 md:p-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Devices mobiles</h1>
+          <h1 className="text-xl font-medium text-foreground">Devices mobiles</h1>
           <p className="text-sm text-muted-foreground">
             État NetSapiens de <code className="rounded bg-muted px-1 text-xs">{"{ext}_mobile"}</code> pour chaque courtier.
           </p>
@@ -194,32 +194,33 @@ export default function PAMobileDevices() {
           </Button>
           <Button size="sm" onClick={provisionAll} disabled={bulkProvisioning}>
             {bulkProvisioning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            🔧 Provisionner tous
+            Provisionner tous
           </Button>
           <Button size="sm" variant="secondary" onClick={provisionAppReview}>
-            🍎 App Review User
+            App Review User
           </Button>
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
         {([
-          { k: "total", label: "Total", cls: "" },
+          { k: "total", label: "Total", cls: "text-foreground" },
           { k: "ok", label: "OK", cls: "text-emerald-600" },
           { k: "missing", label: "Manquants", cls: "text-destructive" },
           { k: "partial", label: "Partiels", cls: "text-amber-600" },
           { k: "error", label: "Erreurs", cls: "text-destructive" },
         ] as const).map((s) => (
-          <Card key={s.k} className="transition-shadow hover:shadow-md">
-            <CardHeader className="pb-2"><CardTitle className="text-xs font-medium text-muted-foreground">{s.label}</CardTitle></CardHeader>
-            <CardContent>
-              <div className={`text-2xl font-semibold ${s.cls}`}>
-                {loading && !rows.length ? <span className="inline-block h-7 w-10 animate-pulse rounded bg-muted" /> : ((stats as any)[s.k] ?? 0)}
+          <Card key={s.k}>
+            <CardHeader className="pb-1 pt-3"><CardTitle className="text-xs font-normal text-muted-foreground">{s.label}</CardTitle></CardHeader>
+            <CardContent className="pb-3">
+              <div className={`text-xl font-medium ${s.cls}`}>
+                {loading && !rows.length ? <span className="inline-block h-6 w-8 animate-pulse rounded bg-muted" /> : ((stats as any)[s.k] ?? 0)}
               </div>
             </CardContent>
           </Card>
         ))}
       </div>
+
 
       <Input
         placeholder="Filtrer (nom, courriel, extension, device id)…"
