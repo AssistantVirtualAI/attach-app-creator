@@ -8805,8 +8805,13 @@ export type Database = {
           ai_key_points: Json | null
           ai_summary: string | null
           ai_summary_short: string | null
+          analysis_in_progress: boolean | null
+          analysis_locked_at: string | null
+          analysis_locked_by: string | null
+          analyzed_at: string | null
           answered_at: string | null
           callback_reason: string | null
+          coaching_score: number | null
           created_at: string
           direction: string
           duration_seconds: number | null
@@ -8832,8 +8837,10 @@ export type Database = {
           next_actions: Json | null
           ns_call_id: string | null
           ns_callid: string | null
+          ns_cdr_id: string | null
           ns_domain: string | null
           ns_orig_callid: string | null
+          ns_recording_url: string | null
           ns_term_callid: string | null
           organization_id: string
           pipeline_completed_at: string | null
@@ -8849,7 +8856,9 @@ export type Database = {
           to_number: string | null
           transcript: string | null
           transcript_confidence: number | null
+          transcript_fetched_at: string | null
           transcript_language: string | null
+          transcript_raw: string | null
           transcript_segments: Json | null
           transcript_source: string | null
           updated_at: string
@@ -8862,8 +8871,13 @@ export type Database = {
           ai_key_points?: Json | null
           ai_summary?: string | null
           ai_summary_short?: string | null
+          analysis_in_progress?: boolean | null
+          analysis_locked_at?: string | null
+          analysis_locked_by?: string | null
+          analyzed_at?: string | null
           answered_at?: string | null
           callback_reason?: string | null
+          coaching_score?: number | null
           created_at?: string
           direction: string
           duration_seconds?: number | null
@@ -8889,8 +8903,10 @@ export type Database = {
           next_actions?: Json | null
           ns_call_id?: string | null
           ns_callid?: string | null
+          ns_cdr_id?: string | null
           ns_domain?: string | null
           ns_orig_callid?: string | null
+          ns_recording_url?: string | null
           ns_term_callid?: string | null
           organization_id?: string
           pipeline_completed_at?: string | null
@@ -8906,7 +8922,9 @@ export type Database = {
           to_number?: string | null
           transcript?: string | null
           transcript_confidence?: number | null
+          transcript_fetched_at?: string | null
           transcript_language?: string | null
+          transcript_raw?: string | null
           transcript_segments?: Json | null
           transcript_source?: string | null
           updated_at?: string
@@ -8919,8 +8937,13 @@ export type Database = {
           ai_key_points?: Json | null
           ai_summary?: string | null
           ai_summary_short?: string | null
+          analysis_in_progress?: boolean | null
+          analysis_locked_at?: string | null
+          analysis_locked_by?: string | null
+          analyzed_at?: string | null
           answered_at?: string | null
           callback_reason?: string | null
+          coaching_score?: number | null
           created_at?: string
           direction?: string
           duration_seconds?: number | null
@@ -8946,8 +8969,10 @@ export type Database = {
           next_actions?: Json | null
           ns_call_id?: string | null
           ns_callid?: string | null
+          ns_cdr_id?: string | null
           ns_domain?: string | null
           ns_orig_callid?: string | null
+          ns_recording_url?: string | null
           ns_term_callid?: string | null
           organization_id?: string
           pipeline_completed_at?: string | null
@@ -8963,7 +8988,9 @@ export type Database = {
           to_number?: string | null
           transcript?: string | null
           transcript_confidence?: number | null
+          transcript_fetched_at?: string | null
           transcript_language?: string | null
+          transcript_raw?: string | null
           transcript_segments?: Json | null
           transcript_source?: string | null
           updated_at?: string
