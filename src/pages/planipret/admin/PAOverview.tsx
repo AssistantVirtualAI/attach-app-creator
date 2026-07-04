@@ -174,14 +174,19 @@ export default function PAOverview() {
     (callsPeriodStats.data ?? []).forEach((c: any) => {
       totalCallsPeriod++;
       if (c.duration_seconds) { totalDur += c.duration_seconds; durCount++; }
-      if (c.direction !== "missed") answered++;
+      if (c.status !== "missed") answered++;
     });
     const avgDur = durCount > 0 ? Math.round(totalDur / durCount) : 0;
     const answerPct = totalCallsPeriod > 0 ? Math.round((answered / totalCallsPeriod) * 100) : 0;
 
+    // Broker actives: prefer view, fall back to direct count if the view hasn't loaded yet
+    const profilesAll = (svcProfiles.data ?? []) as Array<{ full_name: string | null; email: string | null; ns_domain: string | null; mobile_app_enabled: boolean | null; voice_agent_enabled: boolean | null }>;
+    const directMobileActive = profilesAll.filter((p) => p.mobile_app_enabled).length;
+    const brokersActive = brokerStats.app_mobile_active || directMobileActive;
+
     setStats({
       calls: c1 ?? 0, callsYest: c2 ?? 0, callsMissedToday: missedToday ?? 0,
-      brokers: brokerStats.app_mobile_active, brokersTotal: brokerTotal,
+      brokers: brokersActive, brokersTotal: brokerTotal,
       sms: sms.count ?? 0, smsYest: smsY.count ?? 0,
       ava: ava.count ?? 0, avaWeek: avaWeek.count ?? 0,
       voicemailsUnread: vm.count ?? 0,
