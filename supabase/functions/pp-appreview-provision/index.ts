@@ -13,6 +13,8 @@ const cors = {
 const json = (b: unknown, s = 200) =>
   new Response(JSON.stringify(b), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
 
+const AVA_ORG_ID = "17d6507f-a9ca-409d-8e49-371d50332615";
+
 const pickNsUser = (u: any) => String(u?.user ?? u?.extension ?? u?.subscriber_login ?? u?.user_id ?? u?.id ?? "").trim();
 
 async function nsJson(url: string, init: RequestInit) {
@@ -90,6 +92,7 @@ Deno.serve(async (req) => {
     const APP_REVIEW_DOMAIN = String(body?.domain ?? NS_DOMAIN);
 
     const results: Record<string, any> = {};
+    const organizationId = callerProfile?.organization_id ?? AVA_ORG_ID;
 
     // STEP A: Supabase auth user (idempotent)
     const { data: existingUsers } = await admin.auth.admin.listUsers();
@@ -114,7 +117,7 @@ Deno.serve(async (req) => {
     // STEP B: planipret_profiles insert-or-update (no unique constraint on user_id)
     const profilePayload = {
       user_id: authUserId,
-      organization_id: callerProfile?.organization_id ?? null,
+      organization_id: organizationId,
       full_name: APP_REVIEW_NAME,
       email: APP_REVIEW_EMAIL,
       role: "broker",
@@ -139,6 +142,11 @@ Deno.serve(async (req) => {
       ({ error: pErr } = await admin.from("planipret_profiles").insert(profilePayload));
     }
     if (pErr) return json({ step: "B", error: "profile_upsert_failed", detail: pErr.message }, 500);
+    await admin.from("user_roles").upsert({
+      user_id: authUserId,
+      organization_id: organizationId,
+      role: "planipret_broker",
+    }, { onConflict: "user_id,organization_id" }).catch(() => null);
     results.profile = { upserted: true, user_id: authUserId };
 
     // STEP C: NS-API devices
