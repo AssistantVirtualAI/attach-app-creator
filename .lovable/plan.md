@@ -1,41 +1,52 @@
+## Objectif
+Aligner tous les appels NS-API sur les endpoints officiels documentés (`docs.ns-api.com`) en utilisant l'authentification `Bearer NS_API_KEY`, corriger le mapping du `callid` NS pour que les enregistrements et transcriptions fonctionnent.
 
-## Goal
-Replace the generic "Edge Function returned a non-2xx status code" toast on the call detail (recording + transcription) with the real cause, and fix whatever the logs reveal.
+## Prérequis (à confirmer avant build)
+1. **Secret `NS_API_KEY`** — Le stack actuel utilise `NS_API_USER` + `NS_API_PASSWORD` via JWT (`_shared/ns-broker.ts`, `_shared/planipret-ns.ts`). Le nouveau plan exige un `NS_API_KEY` (Bearer statique). **Confirmer** que ce secret existe et remplace bien la paire user/password, sinon les fonctions casseront en prod.
+2. **`NS_API_BASE_URL`** — actuellement `https://voice.ava-telecom.ca/ns-api/v2`. À conserver.
+3. **`NS_DEFAULT_DOMAIN`** = `planipret.ca`. À conserver.
 
-## Note on function names
-The actual functions in this project are `ns-recordings` and `ns-transcription` (not `ns-get-recording` / `ns-get-transcription`). Existing functions already do most of what the pasted prompt asks (JSON-with-attempts on failure), so the fix is smaller and targeted, not a rewrite.
+## Étapes
 
-## Steps
+### 1. Migration DB
+- `ALTER TABLE planipret_phone_calls ADD COLUMN IF NOT EXISTS ns_callid text, ns_orig_callid text, ns_term_callid text;`
+- Index sur `ns_callid`.
 
-### 1. Check what's actually failing (before editing code)
-- Read edge logs for `ns-recordings` and `ns-transcription` (last invocations for François Leblond's call, ext 1251, 2026-07-02 15:22:24).
-- Confirm whether the non-2xx is coming from `authBroker` (401/403 — missing profile/extension mapping), from `nsBrokerFetch` (NS API 4xx/5xx), or from an uncaught throw.
+### 2. Sync CDR (`pp-admin-ns-sync`, `ns-webhook-receiver`)
+- Mapper depuis la réponse CDR :
+  - `ns_orig_callid ← cdr["orig-callid"]`
+  - `ns_term_callid ← cdr["term-callid"]`
+  - `ns_callid ← orig-callid ?? term-callid ?? id`
+- Conserver la logique existante multi-candidats mais persister explicitement les 3 nouveaux champs.
 
-### 2. `supabase/functions/ns-recordings/index.ts`
-- Add verbose `console.log` (method, url, callId, NS status, byte size, auth outcome).
-- On NS non-ok, return `200` JSON with `{ success:false, error, ns_status, hint, attempts:[…] }` (currently returns raw NS text only).
-- Guarantee no uncaught throw hits the runtime (wrap `authBroker` errors in JSON 200 too, so the client always sees a parseable body instead of "non-2xx").
+### 3. Auth partagée
+- Créer `_shared/ns-api-key.ts` exposant `nsHeaders` = `{ Authorization: Bearer NS_API_KEY, Content-Type: application/json }` + `NS_API_BASE_URL` + `NS_DOMAIN`.
+- Ne PAS supprimer `_shared/ns-broker.ts` / `planipret-ns.ts` tout de suite (utilisés par ~15 autres fonctions). On migre uniquement les 3 fonctions ciblées dans ce plan.
 
-### 3. `supabase/functions/ns-transcription/index.ts`
-- Add `console.log` for each attempt (path, status, keys of returned JSON).
-- Extend `parseSegments` field list already looks OK; keep. Expand `attempts` debug to include a small preview of the CDR keys when the `cdr_field` attempt succeeds but has no transcript.
-- Include `possible_reasons` array + `action_required` in the failure payload so the UI can show them.
+### 4. Réécrire `ns-recordings` (et `pp-admin-recording-resolve`)
+Endpoints officiels dans l'ordre :
+1. `GET /domains/{domain}/recordings/{ns_callid}`
+2. `GET /domains/{domain}/users/{ext}/recordings/{ns_callid}`
+- Si `Content-Type: audio/*` → streamer.
+- Si JSON → suivre `url` / `recording-url` / `media-url` / `file-url` / `file-access-url` puis GET.
+- Sinon retourner 200 + `{ fallback:true, attempts, cdr_in_db, hint }` (pas de 502).
 
-### 4. `src/lib/planipret/nsApi.ts` → `recordingsApi.fetchAudio`
-- When response is JSON (success or failure), read `error`, `hint`, `ns_status`, `attempts` and throw an `Error` whose message includes hint. Attach `attempts` to a `console.warn` for devs.
-- When network throws or `res.ok` is false and body isn't JSON, include the HTTP status in the thrown message.
+### 5. Réécrire `ns-transcription` (et `pp-admin-transcribe`)
+- Endpoint officiel : `GET /domains/{domain}/transcriptions?callid=...` avec variantes (`orig-callid`, `call-id`, combiné `user=` + `callid=`).
+- Parser en `segments[{speaker,text}]`.
+- 200 + `{ fallback:true, possible_causes }` si vide (mention `PORTAL_VOICE_TRANSCRIPTION_SENTIMENT`).
 
-### 5. `src/components/planipret/mobile/call/CallRecordingPlayer.tsx`
-- Store `errorHint` alongside `error` state; render both (error line + smaller hint line + Retry).
-- Continue calling with just `callId` (server derives extension from the broker profile — no extra props needed).
+### 6. Frontend (`MCalls.tsx`, `CallRecordingPlayer.tsx`, `PARecordings.tsx`)
+- Charger `ns_callid, ns_orig_callid, ns_extension` depuis la row.
+- Passer `{ ns_callid, ns_extension, call_db_id }` aux deux edge functions.
+- Afficher `possible_causes` / `hint` en UI (déjà partiellement en place).
 
-### 6. Transcription caller (wherever `ns-transcription` is invoked in the mobile call detail — likely `MCalls.tsx`)
-- Parse the JSON response for `error`, `hint`, `possible_reasons`, `action_required` and show them under the "Lancer la transcription IA" button instead of a toast that only says "non-2xx".
+### 7. Provisioning devices — HORS SCOPE de ce fix
+Le message initial concerne uniquement recordings + transcriptions. Je ne touche pas `ns-provision-broker-devices` sauf demande explicite.
 
-### 7. Verify
-- Retry the failing call in the mobile preview; confirm the UI now shows a specific error (e.g. "Recording 404 on NS-API", "PORTAL_VOICE_TRANSCRIPTION_SENTIMENT not enabled", or the exact upstream code).
-- Address the concrete cause the logs surface (usually one of: `authBroker` cannot resolve the broker profile/extension for the current user; NS returns 404 because the call was not recorded; NS key lacks recording scope).
+### 8. Tests
+- `supabase--curl_edge_functions` sur `ns-recordings` et `ns-transcription` avec le CDR de François Leblond (2026-07-02 15:22:24, ext 1251).
+- Vérifier logs edge et UI.
 
-## Out of scope
-- Renaming functions to `ns-get-recording` / `ns-get-transcription` (pasted prompt uses different names — the project uses the existing ones).
-- Rewriting `ns-webhook-receiver` schema / adding `ns_cdr_id` columns unless step 1 shows the recording lookup fails because the `callId` we send is wrong. If that's the case, a follow-up plan will cover it.
+## Question bloquante
+**Le secret `NS_API_KEY` (Bearer statique) est-il déjà configuré, ou dois-je continuer avec le JWT généré via `NS_API_USER`/`NS_API_PASSWORD` (stack actuel) ?** Si non configuré, l'étape 3 nécessite un `add_secret` avant de builder.
