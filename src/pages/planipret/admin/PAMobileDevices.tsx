@@ -175,24 +175,24 @@ export default function PAMobileDevices() {
   }, [rows, filter]);
 
   return (
-    <div className="space-y-4 p-4">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Vérification devices mobiles</h1>
+    <div className="space-y-6 p-4 md:p-6">
+      <div className="flex flex-col gap-3 rounded-xl border bg-gradient-to-br from-primary/5 via-background to-background p-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight">Devices mobiles</h1>
           <p className="text-sm text-muted-foreground">
-            État du device <code>{"{ext}_mobile"}</code> côté NetSapiens pour chaque courtier, indépendant du widget Maestro.
+            État NetSapiens de <code className="rounded bg-muted px-1 text-xs">{"{ext}_mobile"}</code> pour chaque courtier.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
             Rafraîchir
           </Button>
-          <Button size="sm" onClick={backfill} disabled={backfilling}>
+          <Button size="sm" onClick={backfill} disabled={backfilling} variant="secondary">
             {backfilling ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             Provisionner manquants
           </Button>
-          <Button size="sm" onClick={provisionAll} disabled={bulkProvisioning} variant="default">
+          <Button size="sm" onClick={provisionAll} disabled={bulkProvisioning}>
             {bulkProvisioning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             🔧 Provisionner tous
           </Button>
@@ -203,16 +203,20 @@ export default function PAMobileDevices() {
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-        {[
-          { k: "total", label: "Total" },
-          { k: "ok", label: "OK" },
-          { k: "missing", label: "Manquants" },
-          { k: "partial", label: "Partiels" },
-          { k: "error", label: "Erreurs" },
-        ].map((s) => (
-          <Card key={s.k}>
-            <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">{s.label}</CardTitle></CardHeader>
-            <CardContent><div className="text-2xl font-semibold">{(stats as any)[s.k] ?? 0}</div></CardContent>
+        {([
+          { k: "total", label: "Total", cls: "" },
+          { k: "ok", label: "OK", cls: "text-emerald-600" },
+          { k: "missing", label: "Manquants", cls: "text-destructive" },
+          { k: "partial", label: "Partiels", cls: "text-amber-600" },
+          { k: "error", label: "Erreurs", cls: "text-destructive" },
+        ] as const).map((s) => (
+          <Card key={s.k} className="transition-shadow hover:shadow-md">
+            <CardHeader className="pb-2"><CardTitle className="text-xs font-medium text-muted-foreground">{s.label}</CardTitle></CardHeader>
+            <CardContent>
+              <div className={`text-2xl font-semibold ${s.cls}`}>
+                {loading && !rows.length ? <span className="inline-block h-7 w-10 animate-pulse rounded bg-muted" /> : ((stats as any)[s.k] ?? 0)}
+              </div>
+            </CardContent>
           </Card>
         ))}
       </div>
@@ -224,10 +228,10 @@ export default function PAMobileDevices() {
         className="max-w-md"
       />
 
-      <div className="rounded-md border">
+      <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
         <Table>
           <TableHeader>
-            <TableRow>
+            <TableRow className="bg-muted/50 hover:bg-muted/50">
               <TableHead>Courtier</TableHead>
               <TableHead>Ext.</TableHead>
               <TableHead>Device mobile</TableHead>
@@ -238,8 +242,15 @@ export default function PAMobileDevices() {
             </TableRow>
           </TableHeader>
           <TableBody>
+            {loading && rows.length === 0 && Array.from({ length: 6 }).map((_, i) => (
+              <TableRow key={`sk-${i}`}>
+                {Array.from({ length: 7 }).map((_, j) => (
+                  <TableCell key={j}><div className="h-4 w-full animate-pulse rounded bg-muted" /></TableCell>
+                ))}
+              </TableRow>
+            ))}
             {filtered.map((r) => (
-              <TableRow key={r.broker_id}>
+              <TableRow key={r.broker_id} className="hover:bg-muted/30">
                 <TableCell>
                   <div className="font-medium">{r.full_name ?? "—"}</div>
                   <div className="text-xs text-muted-foreground">{r.email}</div>
@@ -290,7 +301,7 @@ export default function PAMobileDevices() {
               </TableRow>
             ))}
             {filtered.length === 0 && !loading && (
-              <TableRow><TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">Aucun courtier.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-10">Aucun courtier.</TableCell></TableRow>
             )}
           </TableBody>
         </Table>
