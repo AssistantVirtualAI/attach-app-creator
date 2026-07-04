@@ -285,7 +285,7 @@ Deno.serve(async (req) => {
     queries.push(`/domains/${D}/transcriptions?orig-callid=${c}`);
   }
 
-  for (const q of Array.from(new Set(queries))) {
+  for (const q of transcript ? [] : Array.from(new Set(queries))) {
     try {
       const r = await nsJson(q);
       const data = r.data;
