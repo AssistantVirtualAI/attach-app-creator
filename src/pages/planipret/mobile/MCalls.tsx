@@ -1541,10 +1541,14 @@ function fmtVmDate(iso: string) {
   const d = new Date(iso);
   const now = new Date();
   const yest = new Date(); yest.setDate(now.getDate() - 1);
-  const hh = `${String(d.getHours()).padStart(2, "0")}h${String(d.getMinutes()).padStart(2, "0")}`;
-  if (d.toDateString() === now.toDateString()) return `Aujourd'hui ${hh}`;
-  if (d.toDateString() === yest.toDateString()) return `Hier ${hh}`;
-  return d.toLocaleDateString("fr-CA", { day: "2-digit", month: "short" }) + ` ${hh}`;
+  const isEn = typeof document !== "undefined" && document.documentElement.lang === "en";
+  const locale = isEn ? "en-CA" : "fr-CA";
+  const hh = isEn
+    ? `${String(((d.getHours() + 11) % 12) + 1)}:${String(d.getMinutes()).padStart(2, "0")} ${d.getHours() < 12 ? "AM" : "PM"}`
+    : `${String(d.getHours()).padStart(2, "0")}h${String(d.getMinutes()).padStart(2, "0")}`;
+  if (d.toDateString() === now.toDateString()) return `${isEn ? "Today" : "Aujourd'hui"} ${hh}`;
+  if (d.toDateString() === yest.toDateString()) return `${isEn ? "Yesterday" : "Hier"} ${hh}`;
+  return d.toLocaleDateString(locale, { day: "2-digit", month: "short" }) + ` ${hh}`;
 }
 function fmtVmDur(s: number | null) {
   if (!s) return "—";
