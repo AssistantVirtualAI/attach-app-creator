@@ -76,8 +76,8 @@ Deno.serve(async (req) => {
     .from("planipret_profiles").select("role").eq("user_id", user.id).maybeSingle();
   let isAdmin = ["admin", "super_admin", "owner"].includes(String(callerProfile?.role ?? "").toLowerCase());
   if (!isAdmin) {
-    const { data: r1 } = await admin.rpc("has_role", { _user_id: user.id, _role: "admin" as any });
-    const { data: r2 } = await admin.rpc("has_role", { _user_id: user.id, _role: "super_admin" as any });
+    const { data: r1 } = await admin.rpc("is_super_admin", { _user_id: user.id });
+    const { data: r2 } = await admin.rpc("is_planipret_admin", { _user_id: user.id });
     isAdmin = Boolean(r1 || r2);
   }
   if (!isAdmin) return json({ error: "forbidden" }, 403);

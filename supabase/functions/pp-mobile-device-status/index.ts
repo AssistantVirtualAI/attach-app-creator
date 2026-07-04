@@ -52,9 +52,9 @@ Deno.serve(async (req) => {
   if (!user) return json({ error: "not_authenticated" }, 401);
 
   const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-  const { data: isAdmin } = await admin.rpc("has_role", { _user_id: user.id, _role: "admin" as any });
-  const { data: isSuper } = await admin.rpc("has_role", { _user_id: user.id, _role: "super_admin" as any });
-  if (!isAdmin && !isSuper) return json({ error: "forbidden" }, 403);
+  const { data: isSuper } = await admin.rpc("is_super_admin", { _user_id: user.id });
+  const { data: isPpAdmin } = await admin.rpc("is_planipret_admin", { _user_id: user.id });
+  if (!isSuper && !isPpAdmin) return json({ error: "forbidden" }, 403);
 
   const { data: profiles, error } = await admin
     .from("planipret_profiles")
