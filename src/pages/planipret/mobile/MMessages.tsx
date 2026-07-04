@@ -1258,6 +1258,7 @@ type RosterMember = {
 };
 
 function TeamRoster({ profile, openDialer, onSwitchTab }: { profile: any; openDialer: (n?: string) => void; onSwitchTab: (k: SubTab) => void }) {
+  const { t } = useMplanipretLang();
   const [members, setMembers] = useState<RosterMember[]>([]);
   const [lastSeen, setLastSeen] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
