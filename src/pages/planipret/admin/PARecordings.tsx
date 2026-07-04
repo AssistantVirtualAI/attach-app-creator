@@ -445,7 +445,7 @@ export default function PARecordings() {
             onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h3 style={{ fontWeight: 600, color: "var(--pp-text-primary)" }}>Enregistrement</h3>
-              <button onClick={() => { setRecordingError(null); setTranscriptionError(null); setDetail(null); }}><X className="w-4 h-4" style={{ color: "var(--pp-text-muted)" }} /></button>
+              <button onClick={() => { setRecordingError(null); setTranscriptionError(null); setTranscriptionUnavailable(false); setDetail(null); }}><X className="w-4 h-4" style={{ color: "var(--pp-text-muted)" }} /></button>
             </div>
             <div className="space-y-3 text-sm" style={{ color: "var(--pp-text-secondary)" }}>
               <div>Courtier: <span style={{ color: "var(--pp-text-primary)" }}>{brokerName(detail)}</span></div>
