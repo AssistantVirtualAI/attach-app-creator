@@ -28,7 +28,7 @@ import { ROUTES } from "@/lib/routes";
 import { recordRedirect } from "@/lib/debug/navDebug";
 import { useMplanipretSoftphone } from "@/hooks/useMplanipretSoftphone";
 import MicDeniedBanner from "@/components/planipret/mobile/MicDeniedBanner";
-import type { MicPermissionState } from "@/lib/planipret/audio/micPermission";
+
 
 const ACCENT = "#2E9BDC";
 
