@@ -104,7 +104,7 @@ const TooltipDark = ({ active, payload, label }: any) => {
   );
 };
 
-type Period = 7 | 30 | 90;
+type Period = 1 | 7 | 30 | 90;
 
 export default function PAOverview() {
   const { t, lang } = useMplanipretLang();
