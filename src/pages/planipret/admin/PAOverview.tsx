@@ -618,7 +618,7 @@ export default function PAOverview() {
             {brokers.map((b) => {
               const online = b.mobile_app_enabled;
               return (
-                <li key={b.user_id} className="flex items-center gap-3 py-2" style={{ borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
+                <li key={b.user_id ?? b.email ?? b.full_name} className="flex items-center gap-3 py-2" style={{ borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
                   <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: "linear-gradient(135deg, #1A4A8A, #2E9BDC)", color: "#fff", fontSize: 10, fontWeight: 700 }}>
                     {initials(b.full_name)}
                   </div>
