@@ -43,6 +43,18 @@ export default function DialerScreen({ sp, haptic, preferClickToCall: _preferCli
       : `🔴 SIP indisponible${sipError ? ` (${sipError})` : ''}`;
   const startCall = async () => {
     if (!num || dialing || !isRegistered) return;
+    // Hard guard: OS-level microphone state must be granted before we let
+    // the SIP stack activate AVAudioSession / AudioTrack. Anything else and
+    // we surface the neutral BlockedScreen with an Open Settings shortcut.
+    if (micStatus !== 'granted') {
+      if (micStatus === 'unknown' || micStatus === 'denied') {
+        const next = await requestMicrophonePermission();
+        if (next !== 'granted') { setShowMicBlocked(true); return; }
+      } else {
+        setShowMicBlocked(true);
+        return;
+      }
+    }
     await haptic(ImpactStyle.Medium);
     audit('call.originated', null, { destination: num, sipStatus: status });
     setDialing(true); setError(null);
