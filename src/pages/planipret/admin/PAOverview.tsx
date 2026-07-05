@@ -104,7 +104,7 @@ const TooltipDark = ({ active, payload, label }: any) => {
   );
 };
 
-type Period = 7 | 30 | 90;
+type Period = 1 | 7 | 30 | 90;
 
 export default function PAOverview() {
   const { t, lang } = useMplanipretLang();
@@ -332,7 +332,7 @@ export default function PAOverview() {
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center rounded-lg overflow-hidden" style={{ background: "var(--pp-bg-deep)", border: "1px solid var(--pp-bg-border-2)" }}>
-            {[7, 30, 90].map((p) => (
+            {[1, 7, 30, 90].map((p) => (
               <button
                 key={p}
                 onClick={() => setPeriod(p as Period)}
@@ -344,7 +344,7 @@ export default function PAOverview() {
                   background: period === p ? ACCENT : "transparent",
                 }}
               >
-                {p}{t("overview.days")}
+                {p === 1 ? (lang === "en" ? "Today" : "Aujourd'hui") : `${p}${t("overview.days")}`}
               </button>
             ))}
           </div>

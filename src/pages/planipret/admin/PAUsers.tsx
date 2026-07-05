@@ -57,6 +57,7 @@ export default function PAUsers() {
   const [editUser, setEditUser] = useState<Profile | null>(null);
   const [delUser, setDelUser] = useState<Profile | null>(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [addAdminOpen, setAddAdminOpen] = useState(false);
   const [callsByUser, setCallsByUser] = useState<Record<string, number>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
   const [highlightId, setHighlightId] = useState<string | null>(null);
@@ -233,7 +234,7 @@ export default function PAUsers() {
               Ajoutez un administrateur Planiprêt pour qu'il puisse gérer ses courtiers de façon autonome.
             </p>
           </div>
-          <button onClick={() => setAddOpen(true)} className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white" style={{ background: ACCENT }}>
+          <button onClick={() => setAddAdminOpen(true)} className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white" style={{ background: ACCENT }}>
             + Ajouter un admin
           </button>
         </div>
@@ -268,6 +269,9 @@ export default function PAUsers() {
           </div>
           <button onClick={syncFromNs} disabled={syncing} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)", opacity: syncing ? 0.6 : 1 }}>
             <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} /> {syncing ? "Sync..." : "Sync NS-API"}
+          </button>
+          <button onClick={() => setAddAdminOpen(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium" style={{ background: "var(--pp-bg-elevated)", border: `1px solid ${ACCENT}55`, color: ACCENT }}>
+            <Plus className="w-4 h-4" /> Ajouter un admin
           </button>
           <button onClick={() => setAddOpen(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-white text-sm font-medium" style={{ background: ACCENT }}>
             <Plus className="w-4 h-4" /> Ajouter un courtier
@@ -511,6 +515,7 @@ export default function PAUsers() {
       {addOpen && <UserModal mode="add" onClose={() => setAddOpen(false)} onSaved={async (id) => { setAddOpen(false); await load(); if (id) { setHighlightId(id); setTimeout(() => setHighlightId(null), 3000); } }} />}
       {editUser && <UserModal mode="edit" user={editUser} onClose={() => setEditUser(null)} onSaved={async () => { setEditUser(null); await load(); }} />}
       {delUser && <DeleteModal user={delUser} onClose={() => setDelUser(null)} onDeleted={async () => { setDelUser(null); await load(); }} />}
+      {addAdminOpen && <AdminModal onClose={() => setAddAdminOpen(false)} onSaved={async () => { setAddAdminOpen(false); await load(); }} />}
     </div>
   );
 }
@@ -722,6 +727,74 @@ function DeleteModal({ user, onClose, onDeleted }: { user: Profile; onClose: () 
             </button>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function AdminModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPwd, setShowPwd] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    if (!firstName || !lastName || !email || !password) { toast.error("Champs requis manquants"); return; }
+    if (/@lemtel\.com$/i.test(email.trim())) { toast.error("Les emails @lemtel.com ne sont pas autorisés."); return; }
+    setBusy(true);
+    const full_name = `${firstName} ${lastName}`.trim();
+    const { data, error } = await supabase.functions.invoke("pp-admin-user", {
+      body: { action: "create_admin", payload: { email, password, full_name } },
+    });
+    setBusy(false);
+    if (error || !(data as any)?.success) { toast.error((data as any)?.error ?? error?.message ?? "Erreur de création"); return; }
+    toast.success(`Admin ${full_name} créé ✅`);
+    onSaved();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="rounded-2xl w-full max-w-[520px]"
+        style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)" }}
+        onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-5" style={{ borderBottom: "1px solid var(--pp-bg-border-2)" }}>
+          <h2 style={{ fontSize: 16, fontWeight: 600, color: "var(--pp-text-primary)" }}>Ajouter un administrateur Planiprêt</h2>
+          <button onClick={onClose} className="p-1.5 rounded-full hover:bg-white/[0.05]"><X className="w-4 h-4" style={{ color: "var(--pp-text-muted)" }} /></button>
+        </div>
+        <div className="p-5 space-y-4">
+          <p style={{ fontSize: 12, color: "var(--pp-text-secondary)" }}>
+            Un admin a accès complet au portail /planipret/admin. Il n'a pas d'extension téléphonique NS.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Prénom *"><input value={firstName} onChange={(e) => setFirstName(e.target.value)} className="pp-input" /></Field>
+            <Field label="Nom *"><input value={lastName} onChange={(e) => setLastName(e.target.value)} className="pp-input" /></Field>
+          </div>
+          <Field label="Courriel *" hint="Ex: admin@planipret.ca">
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="pp-input" />
+          </Field>
+          <Field label="Mot de passe initial *">
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <input type={showPwd ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} className="pp-input pr-9" />
+                <button onClick={() => setShowPwd(!showPwd)} className="absolute right-2 top-1/2 -translate-y-1/2" style={{ color: "var(--pp-text-muted)" }}>
+                  {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              <button onClick={() => setPassword(genPassword())} className="px-3 py-2 rounded-lg text-xs flex items-center gap-1" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>
+                <RefreshCw className="w-3 h-3" /> Générer
+              </button>
+            </div>
+          </Field>
+        </div>
+        <div className="flex justify-end gap-2 p-5 rounded-b-2xl" style={{ borderTop: "1px solid var(--pp-bg-border-2)", background: "var(--pp-bg-elevated)" }}>
+          <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm" style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)" }}>Annuler</button>
+          <button onClick={submit} disabled={busy} className="px-4 py-2 rounded-lg text-white text-sm font-medium disabled:opacity-50" style={{ background: ACCENT }}>
+            {busy ? "…" : "Créer l'admin"}
+          </button>
+        </div>
+        <style>{`.pp-input{width:100%;padding:8px 12px;background:var(--pp-bg-elevated);border:1px solid var(--pp-bg-border-2);border-radius:8px;font-size:14px;color:var(--pp-text-primary)}.pp-input:focus{outline:none;border-color:${ACCENT}}`}</style>
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-export type AdminPeriod = 7 | 30 | 90;
+export type AdminPeriod = 1 | 7 | 30 | 90;
 
 export type AdminReportFilters = {
   period: AdminPeriod;
@@ -15,7 +15,7 @@ export const DEFAULT_ADMIN_REPORT_FILTERS: AdminReportFilters = {
 
 export function normalizePeriod(value: unknown): AdminPeriod {
   const n = Number(value);
-  return n === 30 || n === 90 ? n : 7;
+  return n === 1 || n === 30 || n === 90 ? n : 7;
 }
 
 export function readAdminReportFilters(): AdminReportFilters {
