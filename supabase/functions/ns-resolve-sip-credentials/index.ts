@@ -103,7 +103,7 @@ Deno.serve(async (req) => {
 
   const domain = profile.ns_domain || NS_DEFAULT_DOMAIN;
   const extension = String(profile.ns_extension);
-  const sipUsername = profile.ns_sip_username || extension;
+  const accountSipUsername = profile.ns_sip_username || extension;
 
   // Which device id do we own for this client_type?
   const storedDeviceId = clientType === "widget"
@@ -152,6 +152,7 @@ Deno.serve(async (req) => {
   }
 
   const resolvedDeviceId = device ? (deviceIdOf(device) ?? targetId) : targetId;
+  const sipUsername = resolvedDeviceId || accountSipUsername;
   let createDetails: any = null;
 
   if (!device) {

@@ -226,7 +226,8 @@ export function useMplanipretSoftphone() {
       try { await ppSipProvider.call(destination); return { via: "webrtc", ok: true }; }
       catch { /* fall through */ }
     }
-    return await callViaPBX(destination);
+    try { window.dispatchEvent(new CustomEvent("pp:sip-force-reregister", { detail: { at: Date.now() } })); } catch {}
+    return { via: "none", ok: false, error: "Téléphone hors ligne. Clique sur Hors ligne et attends Online avant d’appeler." };
   }, [registered, callViaPBX]);
 
   // Wrapped answer: race to claim the call before actually picking up. If we
