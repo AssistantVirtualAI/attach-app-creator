@@ -61,7 +61,10 @@ export function LemtelSoftphone() {
         });
         ua.on('connected', () => setStatus('registered'));
         ua.on('disconnected', () => setStatus('disconnected'));
-        ua.on('registered', () => setStatus('registered'));
+        ua.on('registered', () => {
+          setStatus('registered');
+          void import('@/lib/native/requestNotificationsOnce').then(m => m.requestNotificationsOnce());
+        });
         ua.on('registrationFailed', () => setStatus('failed'));
         ua.on('newRTCSession', (e: any) => {
           sessionRef.current = e.session;
