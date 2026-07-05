@@ -395,7 +395,8 @@ Deno.serve(async (req) => {
         user_id: userId,
         organization_id: existing?.organization_id ?? profile.organization_id,
         role: "planipret_admin",
-      }, { onConflict: "user_id,organization_id,role" });
+      }, { onConflict: "user_id,organization_id" });
+
 
       await logAudit(admin, req, {
         admin_id: profile.id, action: promoted ? "ADMIN_PROMOTE" : "ADMIN_CREATE",
