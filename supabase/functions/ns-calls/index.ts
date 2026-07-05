@@ -24,6 +24,7 @@ Deno.serve(async (req) => {
         if (!toNumber) {
           return jsonResponse({ success: false, error: "destination requise", code: 400 }, 400);
         }
+        const clientCallId = crypto.randomUUID();
         // Normalize destination to E.164-ish (+1XXXXXXXXXX for NA)
         let dest = String(toNumber).replace(/\D/g, "");
         if (dest.length === 10) dest = "1" + dest;
@@ -31,6 +32,8 @@ Deno.serve(async (req) => {
         res = await nsBrokerFetch(admin, profile, nsPath(env.domain, ext, "/calls"), {
           method: "POST",
           body: JSON.stringify({
+            callid: clientCallId,
+            "call-id": clientCallId,
             destination: dest,
             "caller-id-number": body.caller_id_number ?? ext,
             "caller-id-name": body.caller_id_name ?? profile.full_name ?? "Courtier Planiprêt",
@@ -38,14 +41,20 @@ Deno.serve(async (req) => {
         });
         if (res.ok) {
           const data = await res.clone().json().catch(() => ({}));
-          const newCallId = data?.["call-id"] ?? data?.call_id ?? data?.id ?? null;
+          const newCallId = data?.["call-id"] ?? data?.call_id ?? data?.id ?? clientCallId;
           await admin.from("planipret_phone_calls").insert({
             user_id: userId,
-            call_id: newCallId,
+            organization_id: profile.organization_id,
+            ns_call_id: newCallId,
+            ns_callid: newCallId,
+            ns_domain: env.domain,
+            extension: ext,
             direction: "outbound",
-            caller_number: body.caller_id_number ?? ext,
-            callee_number: dest,
+            from_number: String(body.caller_id_number ?? ext),
+            to_number: dest,
             status: "outbound_ringing",
+            started_at: new Date().toISOString(),
+            metadata: { client_call_id: clientCallId, ns_response: data },
           });
           await logAudit(admin, req, {
             user_id: profile.id, action: "CALL_START",
