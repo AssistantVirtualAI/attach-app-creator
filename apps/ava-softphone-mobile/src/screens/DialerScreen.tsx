@@ -14,6 +14,8 @@ export default function DialerScreen({ sp, haptic, preferClickToCall: _preferCli
   const [dialing, setDialing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [diagOpen, setDiagOpen] = useState(false);
+  const [showMicBlocked, setShowMicBlocked] = useState(false);
+  const { micStatus, requestMicrophonePermission } = usePermissions();
   // Contacts pre-permission + picker state
   const [contactsPrePrompt, setContactsPrePrompt] = useState(false);
   const [contactsPicker, setContactsPicker] = useState<DeviceContact[] | null>(null);
