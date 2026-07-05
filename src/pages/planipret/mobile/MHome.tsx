@@ -238,13 +238,13 @@ export default function MHome() {
           onClick={reconnect}
           className="pp-pill"
           style={{
-            background: sipOnline ? "rgba(13,122,95,0.10)" : "rgba(178,58,72,0.10)",
-            color: sipOnline ? "var(--pp-success)" : "var(--pp-danger)",
-            border: `1px solid ${sipOnline ? "rgba(13,122,95,0.30)" : "rgba(178,58,72,0.30)"}`,
+            background: phoneOnline ? "rgba(13,122,95,0.10)" : "rgba(178,58,72,0.10)",
+            color: phoneOnline ? "var(--pp-success)" : "var(--pp-danger)",
+            border: `1px solid ${phoneOnline ? "rgba(13,122,95,0.30)" : "rgba(178,58,72,0.30)"}`,
           }}
         >
           <span style={{ width: 6, height: 6, borderRadius: 999, background: "currentColor", boxShadow: "0 0 6px currentColor" }} />
-          {sipOnline ? t("home.online") : t("home.offline")}
+          {phoneConnecting ? "…" : phoneOnline ? t("home.online") : t("home.offline")}
         </button>
       </header>
 
