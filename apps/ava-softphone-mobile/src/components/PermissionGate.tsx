@@ -1,59 +1,84 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { colors, gradients, radius, font } from '../lib/theme';
 import { LemtelMark } from './Brand';
 import { useT } from '../lib/i18n';
 import { usePermissions } from '../hooks/usePermissions';
 import PermissionSoftPrompt from './PermissionSoftPrompt';
 import PermissionBlockedScreen from './PermissionBlockedScreen';
-import type { PermKey } from '../lib/permissionState';
+import type { PermKey, PermState } from '../lib/permissionState';
 
 interface PermissionGateProps {
   onComplete: () => void;
 }
 
+type Step = 'intro' | PermKey | 'done';
+
+const ORDER: PermKey[] = ['microphone', 'contacts', 'notifications'];
+
 /**
- * Just-in-time onboarding gate.
+ * Just-in-time onboarding gate — Apple 5.1.1 + Google UX compliant.
  *
- *   intro → microphone (required for calls, but never blocks) → done
+ *  intro → microphone → contacts → notifications → done → onComplete()
  *
- * Contacts and notifications are asked in-context later (dialer / post-login).
- * Design goals per Apple 5.1.1 + Google UX guidelines:
- *  - Show a soft in-app prompt BEFORE the OS request.
- *  - Distinguish denied (can re-prompt) from blocked (must go to Settings).
- *  - Never block navigation — always expose a "Not now" / "Continue without".
- *  - Non-alarming visual language — no red walls of text.
- *  - Copy follows the app language (FR/EN).
+ * Rules:
+ *  - One permission per screen, one language per screen (system-detected).
+ *  - `prompt` / `unknown` / `denied` → soft in-app prompt with Allow + skip.
+ *  - `blocked` → neutral gray screen with Open Settings + skip.
+ *  - `granted` / `unavailable` → skip to next automatically.
+ *  - Skip is ALWAYS available — the flow never blocks the user.
+ *  - No red text, no technical status badges, no diagnostic button in prod.
  */
 export default function PermissionGate({ onComplete }: PermissionGateProps) {
   const { lang } = useT();
   const fr = lang === 'fr';
-  const { micStatus, requestMicrophonePermission, refresh } = usePermissions();
-  const [step, setStep] = useState<'intro' | PermKey | 'done'>('intro');
+  const {
+    micStatus, contactsStatus, notifStatus,
+    requestMicrophonePermission, requestContactsPermission, requestNotificationsPermission,
+    refresh,
+  } = usePermissions();
+
+  const [step, setStep] = useState<Step>('intro');
   const [busy, setBusy] = useState(false);
 
-  // Auto-advance once mic is settled (granted or user chose to move on).
   useEffect(() => { void refresh(); }, [refresh]);
 
-  const finish = () => { setStep('done'); setTimeout(onComplete, 500); };
+  const finish = useCallback(() => { setStep('done'); setTimeout(onComplete, 400); }, [onComplete]);
+
+  const next = useCallback((from: PermKey) => {
+    const i = ORDER.indexOf(from);
+    if (i < 0 || i >= ORDER.length - 1) return finish();
+    setStep(ORDER[i + 1]);
+  }, [finish]);
+
+  const statusFor = (key: PermKey): PermState =>
+    key === 'microphone' ? micStatus : key === 'contacts' ? contactsStatus : notifStatus;
+
+  // Auto-skip granted / unavailable steps.
+  useEffect(() => {
+    if (step === 'intro' || step === 'done') return;
+    const s = statusFor(step);
+    if (s === 'granted' || s === 'unavailable') next(step);
+  }, [step, micStatus, contactsStatus, notifStatus, next]);
 
   const handleAllow = async (key: PermKey) => {
     setBusy(true);
     try {
       if (key === 'microphone') await requestMicrophonePermission();
+      else if (key === 'contacts') await requestContactsPermission();
+      else await requestNotificationsPermission();
     } finally {
       setBusy(false);
-      // Whatever the result, don't block: mic is the only step here.
-      finish();
+      next(key);
     }
   };
 
-  const previews = useMemo(() => ([
-    { icon: '🎤', label: fr ? 'Microphone' : 'Microphone', hint: fr ? 'pour passer des appels' : 'to make calls', required: true },
-    { icon: '👥', label: 'Contacts', hint: fr ? 'optionnel, plus tard' : 'optional, later', required: false },
-    { icon: '🔔', label: 'Notifications', hint: fr ? 'optionnel, plus tard' : 'optional, later', required: false },
-  ]), [fr]);
-
+  // ── INTRO ─────────────────────────────────────────────────────────────
   if (step === 'intro') {
+    const rows = [
+      { icon: '🎤', label: fr ? 'Microphone' : 'Microphone', hint: fr ? 'pour passer des appels' : 'to make calls' },
+      { icon: '👥', label: 'Contacts', hint: fr ? 'optionnel' : 'optional' },
+      { icon: '🔔', label: 'Notifications', hint: fr ? 'optionnel' : 'optional' },
+    ];
     return (
       <Shell>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
@@ -64,18 +89,16 @@ export default function PermissionGate({ onComplete }: PermissionGateProps) {
         <h1 style={titleStyle}>{fr ? 'Bienvenue' : 'Welcome'}</h1>
         <p style={subtitleStyle}>
           {fr
-            ? "Nous vous demanderons quelques autorisations quand vous en aurez besoin — jamais toutes d'un coup."
-            : "We'll ask for a few permissions as you need them — never all at once."}
+            ? "Nous vous demanderons quelques autorisations une par une — jamais toutes d'un coup."
+            : 'We\'ll ask for a few permissions one at a time — never all at once.'}
         </p>
         <div style={{ width: '100%', maxWidth: 360, margin: '4px 0 24px' }}>
-          {previews.map((p) => (
+          {rows.map((p) => (
             <div key={p.label} style={previewRow}>
               <div style={previewIcon}><span style={{ fontSize: 22 }}>{p.icon}</span></div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: font.base, fontWeight: 700, color: colors.textIce }}>{p.label}</div>
-                <div style={{ fontSize: font.xs, color: p.required ? colors.signalGold : colors.mutedSilver, marginTop: 2 }}>
-                  {p.hint}
-                </div>
+                <div style={{ fontSize: font.xs, color: colors.mutedSilver, marginTop: 2 }}>{p.hint}</div>
               </div>
             </div>
           ))}
@@ -83,7 +106,7 @@ export default function PermissionGate({ onComplete }: PermissionGateProps) {
         <button onClick={() => setStep('microphone')} style={primaryBtnStyle}>
           {fr ? 'Commencer' : 'Get started'} →
         </button>
-        <p style={{ fontSize: 11, color: colors.mutedSilver, marginTop: 14, textAlign: 'center' }}>
+        <p style={{ fontSize: 11, color: '#64748B', marginTop: 14, textAlign: 'center' }}>
           {fr ? 'Modifiable à tout moment dans les Réglages.' : 'Change anytime in Settings.'}
         </p>
       </Shell>
@@ -99,34 +122,39 @@ export default function PermissionGate({ onComplete }: PermissionGateProps) {
     );
   }
 
-  // Microphone step — the only up-front request.
-  if (step === 'microphone') {
-    if (micStatus === 'granted' || micStatus === 'unavailable') {
-      // Nothing to ask — advance immediately.
-      queueMicrotask(finish);
-      return <Shell />;
-    }
-    if (micStatus === 'blocked') {
-      return (
-        <Shell>
-          <PermissionBlockedScreen perm="microphone" onContinueWithout={finish} />
-        </Shell>
-      );
-    }
-    // 'unknown' or 'denied' → soft prompt.
+  // ── PER-PERMISSION STEP ──────────────────────────────────────────────
+  const key = step;
+  const s = statusFor(key);
+
+  const skipLabel =
+    key === 'microphone'
+      ? (fr ? 'Continuer sans appels' : 'Continue without calls')
+      : (fr ? 'Passer cette étape' : 'Skip this step');
+
+  if (s === 'granted' || s === 'unavailable') {
+    // Rendered while the effect above advances us.
+    return <Shell />;
+  }
+
+  if (s === 'blocked') {
     return (
       <Shell>
-        <PermissionSoftPrompt
-          perm="microphone"
-          busy={busy}
-          onAllow={() => void handleAllow('microphone')}
-          onLater={finish}
-        />
+        <PermissionBlockedScreen perm={key} onContinueWithout={() => next(key)} />
       </Shell>
     );
   }
 
-  return null;
+  return (
+    <Shell>
+      <PermissionSoftPrompt
+        perm={key}
+        busy={busy}
+        skipLabel={skipLabel}
+        onAllow={() => void handleAllow(key)}
+        onLater={() => next(key)}
+      />
+    </Shell>
+  );
 }
 
 function Shell({ children }: { children?: React.ReactNode }) {
