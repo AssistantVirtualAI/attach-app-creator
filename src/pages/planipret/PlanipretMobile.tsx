@@ -27,8 +27,8 @@ import { useMplanipretLang } from "@/hooks/useMplanipretLang";
 import { ROUTES } from "@/lib/routes";
 import { recordRedirect } from "@/lib/debug/navDebug";
 import { useMplanipretSoftphone } from "@/hooks/useMplanipretSoftphone";
-import MicPermissionDialog from "@/components/planipret/mobile/MicPermissionDialog";
-import type { MicPermissionState } from "@/lib/planipret/audio/micPermission";
+import MicDeniedBanner from "@/components/planipret/mobile/MicDeniedBanner";
+
 
 const ACCENT = "#2E9BDC";
 
@@ -85,7 +85,7 @@ function Dialer({ open, onClose, initial, openMessages, softphone }: { open: boo
   const [mode, setMode] = useState<"keypad" | "search">("keypad");
   const [number, setNumber] = useState("");
   const [calling, setCalling] = useState(false);
-  const [micDialog, setMicDialog] = useState<{ open: boolean; state: MicPermissionState; pending?: string }>({ open: false, state: "prompt" });
+  const [micDenied, setMicDenied] = useState(false);
   const [query, setQuery] = useState("");
   const [contacts, setContacts] = useState<DialerContact[]>([]);
   const [loadingContacts, setLoadingContacts] = useState(false);
@@ -101,12 +101,13 @@ function Dialer({ open, onClose, initial, openMessages, softphone }: { open: boo
   const startCall = async (destOverride?: string) => {
     const destination = destOverride ?? number;
     if (!destination) return;
+    setMicDenied(false);
     setCalling(true);
     const result = await softphone.placeCall(destination);
     setCalling(false);
     if (!result.ok) {
       if ("micState" in result && (result.micState === "denied" || result.micState === "unavailable")) {
-        setMicDialog({ open: true, state: result.micState, pending: destination });
+        setMicDenied(true);
         return;
       }
       toast.error(("error" in result && result.error) || t("dialer.callFailed"));
@@ -117,11 +118,6 @@ function Dialer({ open, onClose, initial, openMessages, softphone }: { open: boo
     onClose();
   };
 
-  const retryMic = async () => {
-    const pending = micDialog.pending;
-    setMicDialog({ open: false, state: "prompt" });
-    if (pending) await startCall(pending);
-  };
 
 
   // Load contacts (personal + shared + directory) once when opening Search mode
@@ -324,12 +320,11 @@ function Dialer({ open, onClose, initial, openMessages, softphone }: { open: boo
           </div>
         </motion.div>
       )}
-      <MicPermissionDialog
-        open={micDialog.open}
-        state={micDialog.state}
-        onRetry={retryMic}
-        onClose={() => setMicDialog({ open: false, state: "prompt" })}
-      />
+      {micDenied && (
+        <div className="absolute left-0 right-0 z-30 px-4" style={{ bottom: "calc(env(safe-area-inset-bottom,0px) + 96px)" }}>
+          <MicDeniedBanner onDismiss={() => setMicDenied(false)} />
+        </div>
+      )}
     </AnimatePresence>
   );
 }
@@ -498,6 +493,7 @@ export default function PlanipretMobile() {
       toast.error(error.message || t("home.connectionImpossible"));
       return;
     }
+    void import("@/lib/native/requestNotificationsOnce").then(m => m.requestNotificationsOnce());
     toast.success(t("auth.success"));
     setLoading(true);
     await loadProfile();

@@ -24,6 +24,7 @@ export default function MobileAuthScreen({ onLoggedIn }: { onLoggedIn: () => Pro
     setLoading(false);
     if (error) { toast.error(error.message || t("auth.failed")); return; }
     toast.success(t("auth.success"));
+    void import("@/lib/native/requestNotificationsOnce").then(m => m.requestNotificationsOnce());
     await onLoggedIn();
   };
 
