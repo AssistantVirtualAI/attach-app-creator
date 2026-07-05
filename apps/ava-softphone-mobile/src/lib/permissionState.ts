@@ -1,11 +1,11 @@
 /**
- * Permission state machine — 100 % backed by native OS APIs.
+ * Permission state — sourced from the OS, persisted via @capacitor/preferences.
  *
- * `denied` vs `blocked` is inferred from a `requestPermissions()` round-trip
- * combined with an `App.appStateChange` observer: when the OS shows a system
- * dialog the app briefly becomes inactive. If we ask again and the app never
- * loses foreground while the request resolves immediately to `denied`, the OS
- * refused to prompt → treat as `blocked`. No JS-side flag is persisted.
+ * No localStorage / sessionStorage anywhere: those get wiped by the OS/webview
+ * cache eviction and can't be trusted for a "have we ever asked?" signal.
+ * Persistent state lives in native SharedPreferences / NSUserDefaults through
+ * @capacitor/preferences; the current permission value comes from the plugin
+ * `checkPermissions()` (or `getUserMedia` on web).
  */
 import { Capacitor } from '@capacitor/core';
 import { requestMicrophone, requestContacts, requestNotifications, openAppSettings } from './permissions';
@@ -13,128 +13,121 @@ import { requestMicrophone, requestContacts, requestNotifications, openAppSettin
 export type PermKey = 'microphone' | 'contacts' | 'notifications';
 export type PermState = 'unknown' | 'granted' | 'denied' | 'blocked' | 'unavailable';
 
-type RawState = 'granted' | 'denied' | 'prompt' | 'unavailable' | 'unknown';
+const ASKED_KEY: Record<PermKey, string> = {
+  microphone: 'perm_microphone_asked',
+  contacts: 'perm_contacts_asked',
+  notifications: 'perm_notifications_asked',
+};
 
-async function rawCheck(key: PermKey): Promise<RawState> {
+async function getAsked(key: PermKey): Promise<boolean> {
+  try {
+    const { Preferences } = await import('@capacitor/preferences');
+    const { value } = await Preferences.get({ key: ASKED_KEY[key] });
+    return value === 'true';
+  } catch { return false; }
+}
+
+async function markAsked(key: PermKey): Promise<void> {
+  try {
+    const { Preferences } = await import('@capacitor/preferences');
+    await Preferences.set({ key: ASKED_KEY[key], value: 'true' });
+  } catch { /* ignore */ }
+}
+
+export async function markMicrophoneAsked(): Promise<void> { await markAsked('microphone'); }
+
+/**
+ * Non-prompting state probe.
+ *
+ * Microphone (native): call the plugin `checkPermissions` — if it says denied
+ * we cross-reference the "asked" flag stored in @capacitor/preferences to
+ * classify as `denied` (never asked yet, OS will still show a dialog) vs
+ * `blocked` (already asked; OS won't re-prompt).
+ *
+ * Web: `navigator.permissions.query`.
+ */
+export async function getPermState(key: PermKey): Promise<PermState> {
   const native = Capacitor.isNativePlatform();
+  if (!native) return webCheck(key);
+
   try {
     if (key === 'microphone') {
-      if (native) {
-        try {
-          const { Microphone } = await import('@mozartec/capacitor-microphone');
-          const r = await Microphone.checkPermissions();
-          if (r?.microphone === 'granted') return 'granted';
-          if (r?.microphone === 'denied') return 'denied';
-          if (r?.microphone === 'prompt' || (r?.microphone as string) === 'prompt-with-rationale') return 'prompt';
-          return 'unknown';
-        } catch { return 'unknown'; }
-      }
-      const p: any = (navigator as any).permissions;
-      if (p?.query) {
-        try {
-          const s = await p.query({ name: 'microphone' as PermissionName });
-          if (s.state === 'granted') return 'granted';
-          if (s.state === 'denied') return 'denied';
-          return 'prompt';
-        } catch { /* fall through */ }
-      }
+      const { Microphone } = await import('@mozartec/capacitor-microphone');
+      const r = await Microphone.checkPermissions();
+      if (r?.microphone === 'granted') return 'granted';
+      if (r?.microphone === 'denied') return (await getAsked('microphone')) ? 'blocked' : 'denied';
       return 'unknown';
     }
     if (key === 'contacts') {
-      if (!native) return 'unavailable';
-      try {
-        const { Contacts } = await import('@capacitor-community/contacts');
-        const r = await Contacts.checkPermissions();
-        if (r?.contacts === 'granted') return 'granted';
-        if (r?.contacts === 'denied') return 'denied';
-        if (r?.contacts === 'prompt' || (r?.contacts as string) === 'prompt-with-rationale') return 'prompt';
-        return 'unknown';
-      } catch { return 'unavailable'; }
+      const { Contacts } = await import('@capacitor-community/contacts');
+      const r = await Contacts.checkPermissions();
+      if (r?.contacts === 'granted') return 'granted';
+      if (r?.contacts === 'denied') return (await getAsked('contacts')) ? 'blocked' : 'denied';
+      return 'unknown';
     }
     if (key === 'notifications') {
-      if (native) {
-        try {
-          const { PushNotifications } = await import('@capacitor/push-notifications');
-          const r = await PushNotifications.checkPermissions();
-          if (r.receive === 'granted') return 'granted';
-          if (r.receive === 'denied') return 'denied';
-          if (r.receive === 'prompt' || (r.receive as string) === 'prompt-with-rationale') return 'prompt';
-          return 'unknown';
-        } catch { return 'unknown'; }
-      }
-      if (typeof Notification === 'undefined') return 'unavailable';
-      if (Notification.permission === 'granted') return 'granted';
-      if (Notification.permission === 'denied') return 'denied';
-      return 'prompt';
+      const { PushNotifications } = await import('@capacitor/push-notifications');
+      const r = await PushNotifications.checkPermissions();
+      if (r.receive === 'granted') return 'granted';
+      if (r.receive === 'denied') return (await getAsked('notifications')) ? 'blocked' : 'denied';
+      return 'unknown';
     }
-  } catch { /* ignore */ }
+  } catch {
+    if (key === 'contacts') return 'unavailable';
+    return 'unknown';
+  }
   return 'unknown';
 }
 
-function mapRaw(r: RawState): PermState {
-  if (r === 'granted') return 'granted';
-  if (r === 'denied') return 'denied';
-  if (r === 'prompt') return 'unknown';
-  if (r === 'unavailable') return 'unavailable';
+async function webCheck(key: PermKey): Promise<PermState> {
+  if (key === 'contacts') return 'unavailable';
+  if (key === 'microphone') {
+    const p: any = (navigator as any).permissions;
+    if (p?.query) {
+      try {
+        const s = await p.query({ name: 'microphone' as PermissionName });
+        if (s.state === 'granted') return 'granted';
+        // Web: denied means the site is blocked — user must flip it in the
+        // browser's site settings (there's no runtime prompt anymore).
+        if (s.state === 'denied') return 'blocked';
+        return 'denied';
+      } catch { return 'unknown'; }
+    }
+    return 'unknown';
+  }
+  if (key === 'notifications') {
+    if (typeof Notification === 'undefined') return 'unavailable';
+    if (Notification.permission === 'granted') return 'granted';
+    if (Notification.permission === 'denied') return 'blocked';
+    return 'denied';
+  }
   return 'unknown';
 }
 
 /**
- * Non-prompting check. Cannot distinguish denied from blocked on its own —
- * callers that need the distinction should call `requestPerm()` which runs
- * the app-state heuristic below.
- */
-export async function getPermState(key: PermKey): Promise<PermState> {
-  return mapRaw(await rawCheck(key));
-}
-
-/**
- * Attempt to request the permission and classify the outcome as
- * granted | denied | blocked | unavailable.
+ * Trigger the OS permission dialog and classify the result.
  *
- * The blocked detection observes `App.appStateChange`: an OS permission
- * dialog puts the app into the inactive state; if the request resolves
- * without the app ever leaving active state, the OS silently refused the
- * prompt (permanently denied).
+ * The `markAsked` write happens BEFORE the request so a subsequent
+ * `getPermState` call can flip `denied` → `blocked` even if the OS killed
+ * the dialog silently (permanent denial).
  */
 export async function requestPerm(key: PermKey): Promise<PermState> {
-  const before = await rawCheck(key);
-  if (before === 'granted') return 'granted';
-  if (before === 'unavailable') return 'unavailable';
-
-  let sawInactive = false;
-  let removeListener: (() => void) | undefined;
-  if (Capacitor.isNativePlatform()) {
-    try {
-      const { App } = await import('@capacitor/app');
-      const h = await App.addListener('appStateChange', ({ isActive }) => {
-        if (!isActive) sawInactive = true;
-      });
-      removeListener = () => { try { h.remove(); } catch {} };
-    } catch { /* ignore */ }
-  }
-
-  const t0 = performance.now();
+  await markAsked(key);
   let raw: string = 'denied';
   try {
     if (key === 'microphone') raw = await requestMicrophone();
     else if (key === 'contacts') raw = await requestContacts();
     else if (key === 'notifications') raw = await requestNotifications();
   } catch { raw = 'denied'; }
-  const elapsed = performance.now() - t0;
-  removeListener?.();
 
   if (raw === 'granted') return 'granted';
   if (raw === 'unsupported') return 'unavailable';
 
-  // Heuristic: the OS showed no dialog if the request resolved fast AND the
-  // app never went inactive. That means the permission is permanently denied.
-  const nativeSuppressedPrompt = Capacitor.isNativePlatform() && !sawInactive && elapsed < 400;
-  const post = await rawCheck(key);
+  // Post-request re-check: distinguishes "denied this time" from "was already
+  // blocked and OS silently returned denied without showing the dialog".
+  const post = await getPermState(key);
   if (post === 'granted') return 'granted';
-  if (before === 'denied' && nativeSuppressedPrompt) return 'blocked';
-  if (post === 'denied' && before === 'denied' && !sawInactive) return 'blocked';
-  return 'denied';
+  return post === 'blocked' ? 'blocked' : 'denied';
 }
 
 export { openAppSettings };
