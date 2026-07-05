@@ -379,7 +379,7 @@ export default function PAUsers() {
               ) : paged.length === 0 ? (
                 <tr><td colSpan={10} className="p-8 text-center" style={{ color: "var(--pp-text-faint)" }}>Aucun courtier</td></tr>
               ) : paged.map((u) => (
-                <tr key={u.user_id} className="hover:bg-white/[0.02] transition"
+                <tr key={u.user_id || u.email || u.extension} className="hover:bg-white/[0.02] transition"
                   style={{
                     borderTop: "1px solid rgba(255,255,255,0.04)",
                     background: highlightId === u.user_id ? `${ACCENT}15` : undefined,
