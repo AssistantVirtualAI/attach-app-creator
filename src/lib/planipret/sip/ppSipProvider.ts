@@ -137,14 +137,27 @@ class PpSipProvider {
         user_agent: "Planipret Softphone 1.0",
       });
 
-      ua.on("connecting", () => this.update({ status: "connecting" }));
-      ua.on("connected", () => this.update({ status: "connected" }));
-      ua.on("disconnected", () => { this.update({ status: "disconnected" }); this.emitRegistration(false, { reason: "disconnected" }); });
-      ua.on("registered", () => { this.update({ status: "registered", errorCause: undefined, lastRegistrationAt: Date.now() }); this.emitRegistration(true); });
+      this.log("info", "register init", {
+        uri: `sip:${uriUser}@${sip.domain}`,
+        authorization_user: sip.authUser || uriUser,
+        wss: urls,
+      });
+      ua.on("connecting", () => { this.log("info", "ws connecting"); this.update({ status: "connecting" }); });
+      ua.on("connected", () => { this.log("info", "ws connected"); this.update({ status: "connected" }); });
+      ua.on("disconnected", (e: any) => { this.log("warn", "ws disconnected", { code: e?.code, reason: e?.reason, error: e?.error?.message }); this.update({ status: "disconnected" }); this.emitRegistration(false, { reason: "disconnected" }); });
+      ua.on("registered", () => { this.log("info", "registered"); this.update({ status: "registered", errorCause: undefined, lastRegistrationAt: Date.now() }); this.emitRegistration(true); });
       ua.on("unregistered", () => this.log("warn", "unregistered"));
       ua.on("registrationFailed", (e: any) => {
-        const cause = e?.cause || e?.response?.reason_phrase || "registration_failed";
-        this.log("error", `registration failed: ${cause}`);
+        const code = e?.response?.status_code;
+        const reason = e?.response?.reason_phrase;
+        const cause = [code, reason, e?.cause].filter(Boolean).join(" ") || "registration_failed";
+        this.log("error", `registration failed: ${cause}`, {
+          status_code: code,
+          reason_phrase: reason,
+          cause: e?.cause,
+          authorization_user: sip.authUser || uriUser,
+          uri: `sip:${uriUser}@${sip.domain}`,
+        });
         this.update({ status: "error", errorCause: cause });
         this.emitRegistration(false, { reason: cause });
       });
