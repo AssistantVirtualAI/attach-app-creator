@@ -159,7 +159,7 @@ export default function MobileApp() {
 
 
   if (loading || booting) return <SplashAva />;
-  if (!creds) return <MobileI18nProvider><ThemeProvider><AuthScreen onAuthenticated={setCreds} /><PerfOverlay /><IceDiagnosticsOverlay /></ThemeProvider></MobileI18nProvider>;
+  if (!creds) return <MobileI18nProvider><ThemeProvider><AuthScreen onAuthenticated={(c) => { setCreds(c); requestPermissionsAfterLogin(); }} /><PerfOverlay /><IceDiagnosticsOverlay /></ThemeProvider></MobileI18nProvider>;
 
   return <MobileI18nProvider><ThemeProvider><AuthenticatedShell creds={creds} setCreds={setCreds} tab={tab} setTab={setTab} callsSub={callsSub} callsFilter={callsFilter} onSignOut={clearCreds} preferClickToCall={preferC2C} onTogglePreferC2C={() => {}} /><PerfOverlay /><IceDiagnosticsOverlay /></ThemeProvider></MobileI18nProvider>;
 }
