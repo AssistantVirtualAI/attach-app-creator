@@ -487,6 +487,15 @@ export default function PAUsers() {
                         {!u.ns_only && (
                           <>
                             <DropdownMenuSeparator />
+                            {u.role === "admin" ? (
+                              <DropdownMenuItem onClick={() => promoteOrDemote(u, false)}>
+                                <ChevronDown className="w-3.5 h-3.5 mr-2" /> Rétrograder en courtier
+                              </DropdownMenuItem>
+                            ) : (
+                              <DropdownMenuItem onClick={() => promoteOrDemote(u, true)}>
+                                <ChevronUp className="w-3.5 h-3.5 mr-2" /> Promouvoir en admin
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem
                               onClick={() => setDelUser(u)}
                               className="text-red-500 focus:text-red-500 focus:bg-red-500/10"
@@ -495,6 +504,7 @@ export default function PAUsers() {
                             </DropdownMenuItem>
                           </>
                         )}
+
                         {u.ns_only && (
                           <>
                             <DropdownMenuSeparator />
