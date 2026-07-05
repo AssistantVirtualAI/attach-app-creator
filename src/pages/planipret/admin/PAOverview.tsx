@@ -481,42 +481,50 @@ export default function PAOverview() {
         <div className="lg:col-span-2">
           <ChartCard title={`${t("overview.chartActivityTitle")} ${period} ${t("overview.miniLastDays")}`} subtitle={t("overview.chartActivitySubtitle")}>
             <div style={{ width: "100%", height: 240 }}>
-              <ResponsiveContainer>
-                <AreaChart data={seriesData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="gradCalls" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={ACCENT} stopOpacity={0.5} />
-                      <stop offset="100%" stopColor={ACCENT} stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="gradSms" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={WARNING} stopOpacity={0.4} />
-                      <stop offset="100%" stopColor={WARNING} stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                  <XAxis dataKey="day" stroke="#4A7FA5" fontSize={11} />
-                  <YAxis stroke="#4A7FA5" fontSize={11} />
-                  <Tooltip content={<TooltipDark />} />
-                  <Legend wrapperStyle={{ fontSize: 11, color: "#8FA8C0" }} />
-                  <Area type="monotone" dataKey="appels" name={t("overview.seriesCalls")} stroke={ACCENT} strokeWidth={2} fill="url(#gradCalls)" />
-                  <Area type="monotone" dataKey="sms" name={t("overview.seriesSms")} stroke={WARNING} strokeWidth={2} fill="url(#gradSms)" />
-                </AreaChart>
-              </ResponsiveContainer>
+              {seriesData.length === 0 || seriesData.every((d) => d.appels === 0 && d.sms === 0) ? (
+                <p style={{ fontSize: 12, color: "var(--pp-text-faint)" }} className="text-center py-20">{t("overview.noData")}</p>
+              ) : (
+                <ResponsiveContainer>
+                  <AreaChart data={seriesData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="gradCalls" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={ACCENT} stopOpacity={0.5} />
+                        <stop offset="100%" stopColor={ACCENT} stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="gradSms" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={WARNING} stopOpacity={0.4} />
+                        <stop offset="100%" stopColor={WARNING} stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                    <XAxis dataKey="day" stroke="#4A7FA5" fontSize={11} />
+                    <YAxis stroke="#4A7FA5" fontSize={11} />
+                    <Tooltip content={<TooltipDark />} />
+                    <Legend wrapperStyle={{ fontSize: 11, color: "#8FA8C0" }} />
+                    <Area type="monotone" dataKey="appels" name={t("overview.seriesCalls")} stroke={ACCENT} strokeWidth={2} fill="url(#gradCalls)" />
+                    <Area type="monotone" dataKey="sms" name={t("overview.seriesSms")} stroke={WARNING} strokeWidth={2} fill="url(#gradSms)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </ChartCard>
         </div>
 
         <ChartCard title={t("overview.chartDistTitle")} subtitle={`${t("overview.chartDistSubtitle")} ${period}${t("overview.days")}`}>
           <div style={{ width: "100%", height: 240 }}>
-            <ResponsiveContainer>
-              <PieChart>
-                <Pie data={directionDist} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={4}>
-                  {directionDist.map((d, i) => <Cell key={i} fill={d.color} stroke="var(--pp-bg-surface)" strokeWidth={2} />)}
-                </Pie>
-                <Tooltip content={<TooltipDark />} />
-                <Legend wrapperStyle={{ fontSize: 11, color: "#8FA8C0" }} />
-              </PieChart>
-            </ResponsiveContainer>
+            {directionDist.every((d) => d.value === 0) ? (
+              <p style={{ fontSize: 12, color: "var(--pp-text-faint)" }} className="text-center py-20">{t("overview.noData")}</p>
+            ) : (
+              <ResponsiveContainer>
+                <PieChart>
+                  <Pie data={directionDist} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={4}>
+                    {directionDist.map((d, i) => <Cell key={i} fill={d.color} stroke="var(--pp-bg-surface)" strokeWidth={2} />)}
+                  </Pie>
+                  <Tooltip content={<TooltipDark />} />
+                  <Legend wrapperStyle={{ fontSize: 11, color: "#8FA8C0" }} />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </ChartCard>
       </div>
