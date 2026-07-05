@@ -46,6 +46,16 @@ async function nsFetch(path: string, init: RequestInit = {}) {
   return { ok: res.ok, status: res.status, data };
 }
 
+async function nsFetchForm(path: string, fields: Record<string, string | number>) {
+  const body = new URLSearchParams();
+  for (const [k, v] of Object.entries(fields)) body.set(k, String(v));
+  return nsFetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body,
+  });
+}
+
 function randomPassword(len = 22): string {
   const chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
   const buf = new Uint8Array(len);
@@ -75,9 +85,9 @@ function sipDeviceUri(deviceId: string, domain: string): string {
   return `sip:${deviceId}@${domain}`;
 }
 
-function nsDevicePayload(deviceId: string, extension: string, domain: string, password: string, withModel: boolean, modelPref: string) {
+function nsDeviceFields(deviceId: string, extension: string, domain: string, password: string, withModel: boolean, modelPref: string) {
   const deviceUri = sipDeviceUri(deviceId, domain);
-  return JSON.stringify({
+  return {
     uid: `${extension}@${domain}`,
     device: deviceUri,
     aor: deviceUri,
@@ -88,7 +98,11 @@ function nsDevicePayload(deviceId: string, extension: string, domain: string, pa
     termination_allowed: "yes",
     origination_allowed: "yes",
     ...(withModel ? { "device-model": modelPref, device_model: modelPref } : {}),
-  });
+  };
+}
+
+function nsDevicePayload(deviceId: string, extension: string, domain: string, password: string, withModel: boolean, modelPref: string) {
+  return JSON.stringify(nsDeviceFields(deviceId, extension, domain, password, withModel, modelPref));
 }
 
 Deno.serve(async (req) => {
@@ -187,6 +201,8 @@ Deno.serve(async (req) => {
     // catalog), retry without it — device-model is optional on NS-API v2.
     const buildBody = (withModel: boolean) => nsDevicePayload(resolvedDeviceId, extension, domain, sipPassword!, withModel, modelPref);
 
+    const createFieldsWithModel = nsDeviceFields(resolvedDeviceId, extension, domain, sipPassword!, true, modelPref);
+    const createFields = nsDeviceFields(resolvedDeviceId, extension, domain, sipPassword!, false, modelPref);
     let createRes = await nsFetch(
       `/domains/${encodeURIComponent(domain)}/users/${encodeURIComponent(extension)}/devices`,
       { method: "POST", body: buildBody(true) },
@@ -198,7 +214,20 @@ Deno.serve(async (req) => {
       );
       createDetails = { first: { status: createRes.status, data: createRes.data }, retry: { status: retry.status, data: retry.data } };
       createRes = retry;
-    } else {
+    }
+    if (!createRes.ok) {
+      const formRetry = await nsFetchForm(
+        `/domains/${encodeURIComponent(domain)}/users/${encodeURIComponent(extension)}/devices`,
+        createFieldsWithModel,
+      );
+      const formRetry2 = formRetry.ok ? formRetry : await nsFetchForm(
+        `/domains/${encodeURIComponent(domain)}/users/${encodeURIComponent(extension)}/devices`,
+        createFields,
+      );
+      createDetails = { ...(createDetails ?? {}), form: { status: formRetry.status, data: formRetry.data }, form_retry: { status: formRetry2.status, data: formRetry2.data } };
+      createRes = formRetry2;
+    }
+    if (createRes.ok && !createDetails) {
       createDetails = { first: { status: createRes.status, data: createRes.data } };
     }
 
@@ -244,6 +273,7 @@ Deno.serve(async (req) => {
   // self-healing for existing devices, not only newly-created ones.
   if (sipPassword) {
     const repairBody = nsDevicePayload(resolvedDeviceId, extension, domain, sipPassword, false, clientType === "widget" ? "Web Softphone" : "Mobile Softphone");
+    const repairFields = nsDeviceFields(resolvedDeviceId, extension, domain, sipPassword, false, clientType === "widget" ? "Web Softphone" : "Mobile Softphone");
     let repairRes = await nsFetch(
       `/domains/${encodeURIComponent(domain)}/users/${encodeURIComponent(extension)}/devices/${encodeURIComponent(resolvedDeviceId)}`,
       { method: "PUT", body: repairBody },
@@ -255,7 +285,16 @@ Deno.serve(async (req) => {
       );
       repairDetails = { first: { status: repairRes.status, data: repairRes.data }, retry: { status: retry.status, data: retry.data } };
       repairRes = retry;
-    } else {
+    }
+    if (!repairRes.ok) {
+      const formRetry = await nsFetchForm(
+        `/domains/${encodeURIComponent(domain)}/users/${encodeURIComponent(extension)}/devices/${encodeURIComponent(resolvedDeviceId)}`,
+        repairFields,
+      );
+      repairDetails = { ...(repairDetails ?? {}), form: { status: formRetry.status, data: formRetry.data } };
+      repairRes = formRetry;
+    }
+    if (repairRes.ok && !repairDetails) {
       repairDetails = { first: { status: repairRes.status, data: repairRes.data } };
     }
   }
