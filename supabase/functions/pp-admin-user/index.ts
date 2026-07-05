@@ -336,6 +336,50 @@ Deno.serve(async (req) => {
       return jsonResponse({ success: true });
     }
 
+    if (action === "create_admin") {
+      const { email, password, full_name } = payload ?? {};
+      if (!email || !password || !full_name) {
+        return jsonResponse({ success: false, error: "Champs requis manquants (nom, courriel, mot de passe)" }, 400);
+      }
+      if (/@lemtel\.com$/i.test(String(email).trim())) {
+        return jsonResponse({ success: false, error: "Les emails @lemtel.com ne peuvent pas être admins Planiprêt." }, 422);
+      }
+      const { data: existing } = await admin.from("planipret_profiles").select("id").eq("email", email).maybeSingle();
+      if (existing) return jsonResponse({ success: false, error: "Un utilisateur avec ce courriel existe déjà" }, 400);
+
+      const { data: created, error: cErr } = await admin.auth.admin.createUser({
+        email, password, email_confirm: true,
+      });
+      if (cErr || !created.user) return jsonResponse({ success: false, error: cErr?.message ?? "Échec création auth" }, 200);
+
+      const { error: pErr } = await admin.from("planipret_profiles").insert({
+        user_id: created.user.id,
+        organization_id: profile.organization_id,
+        email,
+        full_name,
+        role: "admin",
+        ns_domain: NS_DEFAULT_DOMAIN,
+        mobile_app_enabled: false,
+        voice_agent_enabled: false,
+      });
+      if (pErr) {
+        await admin.auth.admin.deleteUser(created.user.id);
+        return jsonResponse({ success: false, error: pErr.message }, 200);
+      }
+      await admin.from("user_roles").upsert({
+        user_id: created.user.id,
+        organization_id: profile.organization_id,
+        role: "planipret_admin",
+      }, { onConflict: "user_id,organization_id" });
+
+      await logAudit(admin, req, {
+        admin_id: profile.id, action: "ADMIN_CREATE",
+        resource_type: "user", resource_id: created.user.id,
+        metadata: { email, full_name },
+      });
+      return jsonResponse({ success: true, user_id: created.user.id });
+    }
+
     return jsonResponse({ success: false, error: "Action inconnue" }, 400);
   } catch (e) {
     console.error("pp-admin-user", e);
