@@ -1,6 +1,7 @@
 import Foundation
 import CallKit
 import AVFoundation
+import UIKit
 
 /// Minimal CallKit bridge so PJSIP-driven calls show up as native iOS calls
 /// (lockscreen UI, audio session priming, background ringing). The plugin
