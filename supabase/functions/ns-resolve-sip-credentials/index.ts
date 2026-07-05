@@ -65,7 +65,30 @@ function defaultDeviceId(extension: string, clientType: ClientType): string {
 
 function deviceIdOf(d: any): string | null {
   const id = d?.device ?? d?.aor ?? d?.["device-aor"] ?? d?.["aor-user"] ?? null;
-  return id ? String(id) : null;
+  if (!id) return null;
+  const raw = String(id);
+  const cleaned = raw.replace(/^sip:/i, "");
+  return cleaned.split("@")[0] || raw;
+}
+
+function sipDeviceUri(deviceId: string, domain: string): string {
+  return `sip:${deviceId}@${domain}`;
+}
+
+function nsDevicePayload(deviceId: string, extension: string, domain: string, password: string, withModel: boolean, modelPref: string) {
+  const deviceUri = sipDeviceUri(deviceId, domain);
+  return JSON.stringify({
+    uid: `${extension}@${domain}`,
+    device: deviceUri,
+    aor: deviceUri,
+    authentication_key: password,
+    "authentication-key": password,
+    nat_wan: "automatic",
+    expires: 300,
+    termination_allowed: "yes",
+    origination_allowed: "yes",
+    ...(withModel ? { "device-model": modelPref, device_model: modelPref } : {}),
+  });
 }
 
 Deno.serve(async (req) => {
@@ -161,12 +184,7 @@ Deno.serve(async (req) => {
     const modelPref = clientType === "widget" ? "Web Softphone" : "Mobile Softphone";
     // Try with device-model first. If NS rejects (some tenants restrict the
     // catalog), retry without it — device-model is optional on NS-API v2.
-    const buildBody = (withModel: boolean) => JSON.stringify({
-      device: resolvedDeviceId,
-      "authentication-key": sipPassword,
-      "device-provisioning-protocol": "sip",
-      ...(withModel ? { "device-model": modelPref } : {}),
-    });
+    const buildBody = (withModel: boolean) => nsDevicePayload(resolvedDeviceId, extension, domain, sipPassword!, withModel, modelPref);
 
     let createRes = await nsFetch(
       `/domains/${encodeURIComponent(domain)}/users/${encodeURIComponent(extension)}/devices`,
@@ -218,7 +236,7 @@ Deno.serve(async (req) => {
     sipPassword = randomPassword(22);
     await nsFetch(
       `/domains/${encodeURIComponent(domain)}/users/${encodeURIComponent(extension)}/devices/${encodeURIComponent(resolvedDeviceId)}`,
-      { method: "PUT", body: JSON.stringify({ "authentication-key": sipPassword }) },
+      { method: "PUT", body: nsDevicePayload(resolvedDeviceId, extension, domain, sipPassword, false, "Mobile Softphone") },
     );
   }
 
