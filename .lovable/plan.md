@@ -1,38 +1,82 @@
-Plan d’implémentation
+## Objectif
+Refonte du `PermissionGate` mobile pour respecter les guidelines Apple/Google et les exigences App Store : **une seule langue à l'écran**, **une permission par étape**, **aucun texte rouge alarmant**, **aucun badge technique**, et flux avec 3 états clairs (prompt / denied / granted).
 
-1. Corriger App Review pour qu’il soit réellement créé dans le système téléphonique
-- Modifier `pp-appreview-provision` pour ne plus retourner “prêt” tant que l’utilisateur `1999@planipret.ca` n’est pas confirmé côté système téléphonique.
-- Utiliser le format officiel des champs NS-API (`user`, `name-first-name`, `name-last-name`, `email-address`, `user-scope`, etc.).
-- Après création, refaire une vérification côté système téléphonique par liste/recherche; si l’utilisateur n’existe toujours pas, afficher une erreur claire au lieu d’un faux succès.
-- Créer ensuite les appareils mobile/web seulement après confirmation que l’utilisateur existe.
+## État actuel
+Le tour précédent a déjà introduit `usePermissions`, `PermissionSoftPrompt`, `PermissionBlockedScreen` et refactoré `PermissionGate`. Il reste 5 écarts vs le prompt de spec :
 
-2. Rendre la page Courtiers bidirectionnelle avec le système téléphonique
-- Étendre `ns-sync-user` pour supporter :
-  - `sync_from_ns` : téléphone → base locale, avec mise à jour nom/email/extension/statut quand possible.
-  - `sync_to_ns` : base locale → téléphone, création/mise à jour des utilisateurs manquants.
-  - `sync_one` : synchroniser un courtier précis lors d’un ajout/modification/toggle.
-- Brancher `pp-admin-user` sur cette logique pour que :
-  - créer un courtier crée aussi l’utilisateur téléphone;
-  - modifier nom/email/extension met à jour le téléphone;
-  - supprimer un courtier supprime/désactive côté téléphone;
-  - les toggles restent cohérents localement et déclenchent la sync nécessaire.
-- Ajouter une vraie réponse détaillée au bouton “Sync NS-API” de la page Courtiers.
+1. Le gate ne demande **que** le microphone — les étapes Contacts et Notifications ont été retirées; le prompt exige un flux 3 étapes (mic requis, contacts optionnel, notifs optionnel).
+2. `PermissionSoftPrompt` mélange encore deux icônes/couleurs par permission — OK sauf que le libellé du bouton "Not now" doit devenir "Continue without calls" pour le mic (comme spec) et "Skip this step" pour contacts/notifs.
+3. `PermissionBlockedScreen` : le libellé du bouton fantôme doit être "Continue without calls" (mic) / "Skip this step" (autres). Déjà proche ; à harmoniser.
+4. La détection de langue passe par `useT()` (qui lit `localStorage`, avec fallback `navigator.language`). Ajouter un **fallback direct `navigator.language`** dans les composants si le contexte I18n n'est pas monté (sécurité).
+5. Vérifier qu'aucun composant amont ne réintroduit les badges de statut / boutons "Run diagnostic" en prod (le nouveau `PermissionGate` les a supprimés — à confirmer en lisant les usages).
 
-3. Rendre Devices mobiles bidirectionnel
-- Dans `pp-mobile-device-status`, lire l’état réel des appareils côté téléphone et synchroniser la base locale quand un appareil existe déjà côté téléphone mais manque localement.
-- Ajouter une action “Synchroniser appareils” sur la page pour faire :
-  - téléphone → local : détecter et lier les appareils existants;
-  - local → téléphone : provisionner les appareils manquants.
-- Corriger `ns-provision-broker-devices` pour chercher le courtier par `id` ou `user_id`, créer l’utilisateur téléphone si absent, puis créer les appareils.
+## Livrables
 
-4. Refaire le visuel de Devices mobiles pour matcher les autres pages admin
-- Remplacer le style actuel trop shadcn/bold par le style Planiprêt existant : `pp-card`, variables `--pp-*`, header compact comme Courtiers.
-- Header plus petit, moins gras, meilleur interlignage et contrastes.
-- Statistiques en badges/cartes sobres alignées avec Courtiers.
-- Tableau responsive avec colonnes contrôlées, texte qui wrap proprement, actions en menu compact, pagination identique.
-- Améliorer le loading avec skeletons cohérents et message clair pendant la synchronisation.
+### 1. `apps/ava-softphone-mobile/src/components/PermissionGate.tsx` — étendre le flux
+- Passer d'un flux 1 étape (mic seul) à **3 étapes séquentielles** :
+  1. `microphone` (requis, mais Skip disponible en denied → « Continue without calls »)
+  2. `contacts` (optionnel, Skip toujours disponible → « Skip this step »)
+  3. `notifications` (optionnel, Skip toujours disponible → « Skip this step »)
+- Auto-avance quand une permission passe à `granted` ou `unavailable`.
+- Si `blocked` → afficher `PermissionBlockedScreen`, sinon `PermissionSoftPrompt`.
+- Aucune barre de progression multi-étapes visible (petits dots discrets uniquement — ou rien).
+- Aucun badge de statut technique (`🎤 Mic denied` etc.) — supprimé.
+- Bouton "Run diagnostic" retiré ou conditionné à `import.meta.env.DEV`.
 
-5. Vérification
-- Tester le flux App Review : création utilisateur téléphone vérifiée avant succès.
-- Tester Courtiers : ajout/modification/sync depuis téléphone.
-- Tester Devices mobiles : scan, liaison locale, provisionnement manquant, pagination/lecture responsive.
+### 2. `PermissionSoftPrompt.tsx` — paramétrer le libellé "skip"
+- Ajouter une prop optionnelle `skipLabel?: string`.
+- Le composant utilise `useT().lang` pour choisir FR ou EN — jamais les deux.
+- Si `skipLabel` non fourni : défaut "Not now / Plus tard" selon la langue.
+
+### 3. `PermissionBlockedScreen.tsx` — harmoniser les libellés
+- Déjà OK côté monolingue et couleurs (`#94A3B8` neutres, pas de rouge).
+- S'assurer que le bouton "Continuer sans …" utilise la copie exacte : « Continue without calls » (mic), « Skip this step » (contacts, notifs).
+
+### 4. `hooks/usePermissions.ts` — inchangé
+Déjà expose `micStatus`, `contactsStatus`, `notifStatus` avec `granted | denied | blocked | unavailable | unknown`, plus `requestMicrophonePermission()`, `requestContactsPermission()`, `requestNotificationsPermission()`, `openSettings()`. Écoute déjà `App.appStateChange` pour re-check après retour des Réglages.
+
+### 5. `lib/permissionState.ts` — inchangé
+La distinction denied/blocked (via flag "asked" en localStorage) reste la source de vérité.
+
+### 6. Nettoyage
+- Retirer l'import de `PermissionDiagPanel` du gate (ou le gater derrière `import.meta.env.DEV`).
+- Rechercher et supprimer toute string bilingue résiduelle du type `"X · Y"` dans `PermissionGate.tsx` et composants voisins.
+
+## Détails techniques
+
+**Détection de langue (fallback direct, sans I18nProvider) :**
+```ts
+const detectLang = (): 'fr' | 'en' => {
+  try { const v = localStorage.getItem('ava-language'); if (v === 'fr' || v === 'en') return v; } catch {}
+  return (navigator.language || 'en').toLowerCase().startsWith('fr') ? 'fr' : 'en';
+};
+```
+Utilisé uniquement en fallback ; `useT()` reste la source primaire.
+
+**Palette autorisée pour les messages denied/blocked :**
+- Texte informatif : `#94A3B8` (slate-400)
+- Texte secondaire : `#64748B` (slate-500)
+- Warning éventuel : `#F59E0B` (ambre)
+- Jamais : `#EF4444`, `#DC2626`, `#F87171`
+
+**Structure finale du gate :**
+```
+intro → microphone → contacts → notifications → done → onComplete()
+        │            │          │
+        ├ prompt: SoftPrompt(Allow / Continue without calls)
+        ├ denied: SoftPrompt (re-prompt possible)
+        ├ blocked: BlockedScreen(Open Settings / Continue without calls)
+        └ granted|unavailable: skip auto
+```
+
+**Fichiers à NE PAS toucher** (rappel spec) :
+`CapacitorSip.swift`, `CallKitManager.swift`, `Main.storyboard`, `project.pbxproj`, `RTPAudioSession.swift`.
+
+## Vérification
+- Typecheck `npx tsgo --noEmit` sur `apps/ava-softphone-mobile`.
+- Grep `rg "·"` sur les composants Permission* → doit être vide (plus de séparateur bilingue).
+- Grep `rg "#EF4444|#DC2626|#F87171"` sur les composants Permission* → doit être vide.
+- Après merge : `git pull && npm i && npx cap sync && npx cap run android` (et `ios`) côté utilisateur pour valider sur device.
+
+## Hors-scope
+- Manifest Android (`RECORD_AUDIO`, `READ_CONTACTS`, `POST_NOTIFICATIONS`) et `Info.plist` iOS (`NSMicrophoneUsageDescription`, `NSContactsUsageDescription`, `NSUserNotificationsUsageDescription`) sont déjà présents dans `native-config/*.snippet` et fusionnés dans les projets natifs.

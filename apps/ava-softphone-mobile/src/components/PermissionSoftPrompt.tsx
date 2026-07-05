@@ -9,6 +9,7 @@ interface Props {
   onAllow: () => void;
   onLater: () => void;
   busy?: boolean;
+  skipLabel?: string;
 }
 
 const COPY: Record<PermKey, { icon: React.ReactNode; title: { fr: string; en: string }; body: { fr: string; en: string } }> = {
