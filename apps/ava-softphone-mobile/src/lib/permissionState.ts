@@ -1,18 +1,11 @@
 /**
- * Higher-level permission state machine for the onboarding gate.
+ * Permission state machine — 100 % backed by native OS APIs.
  *
- * Distinguishes:
- *   - 'unknown'  : never asked yet (fresh install)
- *   - 'granted'  : allowed
- *   - 'denied'   : user tapped Deny once, we can still show the OS prompt again
- *                  (Android before "Don't ask again", iOS first denial before the
- *                  system silently blocks re-prompts)
- *   - 'blocked'  : OS will no longer show the prompt; only Settings can flip it
- *   - 'unavailable' : platform doesn't expose the permission (e.g. web contacts)
- *
- * We remember whether we've already fired the OS request in this install so
- * that a second "denied" result maps to 'blocked' — matching the standard iOS
- * / Android UX (Zoom, WhatsApp, Google Voice).
+ * `denied` vs `blocked` is inferred from a `requestPermissions()` round-trip
+ * combined with an `App.appStateChange` observer: when the OS shows a system
+ * dialog the app briefly becomes inactive. If we ask again and the app never
+ * loses foreground while the request resolves immediately to `denied`, the OS
+ * refused to prompt → treat as `blocked`. No JS-side flag is persisted.
  */
 import { Capacitor } from '@capacitor/core';
 import { requestMicrophone, requestContacts, requestNotifications, openAppSettings } from './permissions';
@@ -20,20 +13,9 @@ import { requestMicrophone, requestContacts, requestNotifications, openAppSettin
 export type PermKey = 'microphone' | 'contacts' | 'notifications';
 export type PermState = 'unknown' | 'granted' | 'denied' | 'blocked' | 'unavailable';
 
-const STORAGE_KEY = 'lemtel.permissionAsked.v1';
+type RawState = 'granted' | 'denied' | 'prompt' | 'unavailable' | 'unknown';
 
-function loadAsked(): Record<PermKey, boolean> {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch { /* ignore */ }
-  return { microphone: false, contacts: false, notifications: false };
-}
-function saveAsked(v: Record<PermKey, boolean>) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(v)); } catch { /* ignore */ }
-}
-
-async function rawCheck(key: PermKey): Promise<PermState> {
+async function rawCheck(key: PermKey): Promise<RawState> {
   const native = Capacitor.isNativePlatform();
   try {
     if (key === 'microphone') {
@@ -43,6 +25,7 @@ async function rawCheck(key: PermKey): Promise<PermState> {
           const r = await Microphone.checkPermissions();
           if (r?.microphone === 'granted') return 'granted';
           if (r?.microphone === 'denied') return 'denied';
+          if (r?.microphone === 'prompt' || (r?.microphone as string) === 'prompt-with-rationale') return 'prompt';
           return 'unknown';
         } catch { return 'unknown'; }
       }
@@ -52,7 +35,7 @@ async function rawCheck(key: PermKey): Promise<PermState> {
           const s = await p.query({ name: 'microphone' as PermissionName });
           if (s.state === 'granted') return 'granted';
           if (s.state === 'denied') return 'denied';
-          return 'unknown';
+          return 'prompt';
         } catch { /* fall through */ }
       }
       return 'unknown';
@@ -64,6 +47,7 @@ async function rawCheck(key: PermKey): Promise<PermState> {
         const r = await Contacts.checkPermissions();
         if (r?.contacts === 'granted') return 'granted';
         if (r?.contacts === 'denied') return 'denied';
+        if (r?.contacts === 'prompt' || (r?.contacts as string) === 'prompt-with-rationale') return 'prompt';
         return 'unknown';
       } catch { return 'unavailable'; }
     }
@@ -74,41 +58,82 @@ async function rawCheck(key: PermKey): Promise<PermState> {
           const r = await PushNotifications.checkPermissions();
           if (r.receive === 'granted') return 'granted';
           if (r.receive === 'denied') return 'denied';
+          if (r.receive === 'prompt' || (r.receive as string) === 'prompt-with-rationale') return 'prompt';
           return 'unknown';
         } catch { return 'unknown'; }
       }
       if (typeof Notification === 'undefined') return 'unavailable';
       if (Notification.permission === 'granted') return 'granted';
       if (Notification.permission === 'denied') return 'denied';
-      return 'unknown';
+      return 'prompt';
     }
   } catch { /* ignore */ }
   return 'unknown';
 }
 
-export async function getPermState(key: PermKey): Promise<PermState> {
-  const raw = await rawCheck(key);
-  const asked = loadAsked();
-  // Denied AFTER we already asked → the OS will not re-prompt (blocked).
-  if (raw === 'denied' && asked[key]) return 'blocked';
-  return raw;
+function mapRaw(r: RawState): PermState {
+  if (r === 'granted') return 'granted';
+  if (r === 'denied') return 'denied';
+  if (r === 'prompt') return 'unknown';
+  if (r === 'unavailable') return 'unavailable';
+  return 'unknown';
 }
 
+/**
+ * Non-prompting check. Cannot distinguish denied from blocked on its own —
+ * callers that need the distinction should call `requestPerm()` which runs
+ * the app-state heuristic below.
+ */
+export async function getPermState(key: PermKey): Promise<PermState> {
+  return mapRaw(await rawCheck(key));
+}
+
+/**
+ * Attempt to request the permission and classify the outcome as
+ * granted | denied | blocked | unavailable.
+ *
+ * The blocked detection observes `App.appStateChange`: an OS permission
+ * dialog puts the app into the inactive state; if the request resolves
+ * without the app ever leaving active state, the OS silently refused the
+ * prompt (permanently denied).
+ */
 export async function requestPerm(key: PermKey): Promise<PermState> {
-  const asked = loadAsked();
-  asked[key] = true;
-  saveAsked(asked);
-  let status: string = 'denied';
-  if (key === 'microphone') status = await requestMicrophone();
-  else if (key === 'contacts') status = await requestContacts();
-  else if (key === 'notifications') status = await requestNotifications();
-  if (status === 'granted') return 'granted';
-  if (status === 'unsupported') return 'unavailable';
-  // After a request, a non-granted result is treated as blocked only if the
-  // OS won't re-prompt — re-check to differentiate.
+  const before = await rawCheck(key);
+  if (before === 'granted') return 'granted';
+  if (before === 'unavailable') return 'unavailable';
+
+  let sawInactive = false;
+  let removeListener: (() => void) | undefined;
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const { App } = await import('@capacitor/app');
+      const h = await App.addListener('appStateChange', ({ isActive }) => {
+        if (!isActive) sawInactive = true;
+      });
+      removeListener = () => { try { h.remove(); } catch {} };
+    } catch { /* ignore */ }
+  }
+
+  const t0 = performance.now();
+  let raw: string = 'denied';
+  try {
+    if (key === 'microphone') raw = await requestMicrophone();
+    else if (key === 'contacts') raw = await requestContacts();
+    else if (key === 'notifications') raw = await requestNotifications();
+  } catch { raw = 'denied'; }
+  const elapsed = performance.now() - t0;
+  removeListener?.();
+
+  if (raw === 'granted') return 'granted';
+  if (raw === 'unsupported') return 'unavailable';
+
+  // Heuristic: the OS showed no dialog if the request resolved fast AND the
+  // app never went inactive. That means the permission is permanently denied.
+  const nativeSuppressedPrompt = Capacitor.isNativePlatform() && !sawInactive && elapsed < 400;
   const post = await rawCheck(key);
   if (post === 'granted') return 'granted';
-  if (post === 'denied') return 'blocked';
+  if (before === 'denied' && nativeSuppressedPrompt) return 'blocked';
+  if (post === 'denied' && before === 'denied' && !sawInactive) return 'blocked';
   return 'denied';
 }
 

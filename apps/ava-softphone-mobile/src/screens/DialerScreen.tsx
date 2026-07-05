@@ -6,12 +6,16 @@ import WssDiagnostics from '../components/WssDiagnostics';
 import { audit } from '../lib/audit';
 import { showMobileToast } from '../lib/mobileToast';
 import { loadCachedContacts, syncDeviceContacts, type DeviceContact } from '../lib/contacts';
+import { usePermissions } from '../hooks/usePermissions';
+import PermissionBlockedScreen from '../components/PermissionBlockedScreen';
 
 export default function DialerScreen({ sp, haptic, preferClickToCall: _preferClickToCall = false }: { sp: any; haptic: (s?: ImpactStyle) => Promise<void>; preferClickToCall?: boolean }) {
   const [num, setNum] = useState('');
   const [dialing, setDialing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [diagOpen, setDiagOpen] = useState(false);
+  const [showMicBlocked, setShowMicBlocked] = useState(false);
+  const { micStatus, requestMicrophonePermission } = usePermissions();
   // Contacts pre-permission + picker state
   const [contactsPrePrompt, setContactsPrePrompt] = useState(false);
   const [contactsPicker, setContactsPicker] = useState<DeviceContact[] | null>(null);
@@ -39,6 +43,18 @@ export default function DialerScreen({ sp, haptic, preferClickToCall: _preferCli
       : `🔴 SIP indisponible${sipError ? ` (${sipError})` : ''}`;
   const startCall = async () => {
     if (!num || dialing || !isRegistered) return;
+    // Hard guard: OS-level microphone state must be granted before we let
+    // the SIP stack activate AVAudioSession / AudioTrack. Anything else and
+    // we surface the neutral BlockedScreen with an Open Settings shortcut.
+    if (micStatus !== 'granted') {
+      if (micStatus === 'unknown' || micStatus === 'denied') {
+        const next = await requestMicrophonePermission();
+        if (next !== 'granted') { setShowMicBlocked(true); return; }
+      } else {
+        setShowMicBlocked(true);
+        return;
+      }
+    }
     await haptic(ImpactStyle.Medium);
     audit('call.originated', null, { destination: num, sipStatus: status });
     setDialing(true); setError(null);
@@ -144,11 +160,22 @@ export default function DialerScreen({ sp, haptic, preferClickToCall: _preferCli
             aria-label="Contacts"
             onClick={openContactsFlow}
           >👤</button>
-          <button className="dialer-call-orb" disabled={!num || dialing || !isRegistered} onClick={startCall}>{dialing ? '…' : '☏'}</button>
+          <button
+            className="dialer-call-orb"
+            disabled={!num || dialing || !isRegistered || micStatus === 'blocked'}
+            title={micStatus !== 'granted' ? 'Microphone permission required' : undefined}
+            onClick={startCall}
+          >{dialing ? '…' : '☏'}</button>
           <button className="dialer-backspace" onClick={() => { haptic(); setNum((n) => n.slice(0, -1)); }} disabled={!num}>⌫</button>
         </div>
         {error && <div style={{ color: 'var(--danger)', textAlign: 'center', fontSize: 12, padding: '0 24px 10px' }}>{error}</div>}
       </div>
+
+      {showMicBlocked && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(10,20,41,0.94)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 22 }}>
+          <PermissionBlockedScreen perm="microphone" onContinueWithout={() => setShowMicBlocked(false)} />
+        </div>
+      )}
 
       {/* Contacts pre-permission sheet — single "Continue" action per Apple 5.1.1 */}
       {contactsPrePrompt && (

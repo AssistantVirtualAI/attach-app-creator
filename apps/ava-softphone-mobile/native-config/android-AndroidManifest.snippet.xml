@@ -39,3 +39,16 @@
 
 <!-- Biometric (future) -->
 <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+
+<!--
+  Inside the <application> block, declare the SIP foreground service.
+  Required Android 14+ so that RECORD_AUDIO stays granted while an active
+  call runs in the background. Copy SipForegroundService.kt.snippet into
+  android/app/src/main/java/com/lemtel/softphone/ after `npx cap add android`.
+-->
+<!--
+<service
+    android:name=".SipForegroundService"
+    android:exported="false"
+    android:foregroundServiceType="microphone|phoneCall" />
+-->
