@@ -59,13 +59,16 @@ Deno.serve(async (req) => {
     const callerIdName =
       body?.caller_id_name ?? body?.["caller-id-name"] ?? profile.full_name ?? "Courtier Planiprêt";
 
-    trace(traceId, "ns.request", { extension: ext, destination, caller_id_number: callerIdNumber });
+    // NS-API v2 requires a client-generated `callid` to originate the call.
+    const clientCallId = crypto.randomUUID();
+    trace(traceId, "ns.request", { extension: ext, destination, caller_id_number: callerIdNumber, callid: clientCallId });
 
     // NS-API v2 outbound — same path/verb/body as ns-calls action:"start".
     const path = nsPath(env.domain, ext, "/calls");
     const res = await nsBrokerFetch(admin, profile, path, {
       method: "POST",
       body: JSON.stringify({
+        callid: clientCallId,
         destination,
         "caller-id-number": callerIdNumber,
         "caller-id-name": callerIdName,
