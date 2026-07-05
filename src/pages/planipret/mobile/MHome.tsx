@@ -17,7 +17,6 @@ import { TEMP_EMOJI } from "@/components/planipret/leadHelpers";
 import { useMaestroPipelineToasts } from "@/hooks/useMaestroPipelineToasts";
 import { safeEdgeFunction } from "@/lib/safeEdgeFunction";
 import { useMplanipretLang } from "@/hooks/useMplanipretLang";
-import { useMplanipretSoftphone } from "@/hooks/useMplanipretSoftphone";
 
 type Period = "day" | "week" | "month" | "shift";
 
@@ -37,9 +36,8 @@ function Shimmer({ className = "" }: { className?: string }) {
 
 export default function MHome() {
   const { t, lang } = useMplanipretLang();
-  const { profile, registerRefresh, openDialer, openAva, reloadProfile } =
+  const { profile, registerRefresh, openDialer, openAva, reloadProfile, softphone } =
     useOutletContext<PlanipretMobileContext>();
-  const softphone = useMplanipretSoftphone();
   const navigate = useNavigate();
 
   const [period, setPeriod] = useState<Period>(() => {
