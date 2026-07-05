@@ -48,7 +48,18 @@ export async function getPlanipretBrokerDirectory() {
     const { data: nsRes, error: nsErr } = await supabase.functions.invoke("pp-ns-users", { body: {} });
     if (nsErr) throw new Error(nsErr.message);
     if ((nsRes as any)?.ok) {
-      const nsBrokers = (((nsRes as any).brokers ?? []) as PlanipretBrokerRow[]).filter(isPlanipretActiveBroker);
+      const nsBrokersRaw = (((nsRes as any).brokers ?? []) as PlanipretBrokerRow[]).filter(isPlanipretActiveBroker);
+      // Dedupe by user_id (pp-ns-users can emit the same broker twice — once
+      // from the NS device row and once from the joined DB profile with a
+      // different extension). Keep the first occurrence (NS device wins).
+      const seenUid = new Set<string>();
+      const nsBrokers = nsBrokersRaw.filter((b) => {
+        const uid = b.user_id ? String(b.user_id) : "";
+        if (!uid) return true;
+        if (seenUid.has(uid)) return false;
+        seenUid.add(uid);
+        return true;
+      });
       nsDomain = (nsRes as any).domain ?? null;
       debug.push({
         label: "pp-ns-users (source exacte Courtiers/KPI/sidebar)",
@@ -59,10 +70,34 @@ export async function getPlanipretBrokerDirectory() {
       });
 
       const byExt = new Map<string, PlanipretBrokerRow>();
-      nsBrokers.forEach((b) => byExt.set(extOf(b), b));
+      const byUid = new Map<string, string>();      // user_id -> ext key
+      const byEmail = new Map<string, string>();    // email  -> ext key
+      nsBrokers.forEach((b) => {
+        const k = extOf(b);
+        byExt.set(k, b);
+        if (b.user_id) byUid.set(String(b.user_id), k);
+        const em = String(b.email ?? "").toLowerCase().trim();
+        if (em) byEmail.set(em, k);
+      });
       localList.forEach((p) => {
-        const ext = extOf(p);
-        byExt.set(ext, { ...byExt.get(ext), ...p, extension: p.extension ?? p.ns_extension ?? byExt.get(ext)?.extension });
+        const em = String(p.email ?? "").toLowerCase().trim();
+        // If the same person already exists in NS (by user_id or email),
+        // merge into that NS entry instead of creating a new row at the
+        // (possibly stale) local extension.
+        const nsKey =
+          (p.user_id && byUid.get(String(p.user_id))) ||
+          (em && byEmail.get(em)) ||
+          extOf(p);
+        const prev = byExt.get(nsKey);
+        byExt.set(nsKey, {
+          ...prev,
+          ...p,
+          // Trust NS extension when we matched by identity, otherwise fall back to local.
+          extension: prev?.extension ?? p.extension ?? p.ns_extension ?? nsKey,
+          ns_extension: prev?.ns_extension ?? p.ns_extension ?? p.extension ?? nsKey,
+        });
+        if (p.user_id) byUid.set(String(p.user_id), nsKey);
+        if (em) byEmail.set(em, nsKey);
       });
       const merged = Array.from(byExt.values()).filter(isPlanipretActiveBroker)
         .sort((a, b) => String(a.full_name || "").localeCompare(String(b.full_name || "")));
