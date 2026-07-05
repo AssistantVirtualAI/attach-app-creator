@@ -32,11 +32,15 @@ Deno.serve(async (req) => {
         res = await nsBrokerFetch(admin, profile, nsPath(env.domain, ext, "/calls"), {
           method: "POST",
           body: JSON.stringify({
-            callid: clientCallId,
             "call-id": clientCallId,
+            callid: clientCallId,
+            synchronous: "no",
+            "call-orig-user": `${ext}@${env.domain}`,
+            "call-term-user": dest,
             destination: dest,
             "caller-id-number": body.caller_id_number ?? ext,
             "caller-id-name": body.caller_id_name ?? profile.full_name ?? "Courtier Planiprêt",
+            "callback-caller-id-number": body.caller_id_number ?? ext,
           }),
         });
         if (res.ok) {
