@@ -63,7 +63,7 @@ export function LemtelSoftphone() {
         ua.on('disconnected', () => setStatus('disconnected'));
         ua.on('registered', () => {
           setStatus('registered');
-          void import('@/lib/native/requestNotificationsOnce').then(m => m.requestNotificationsOnce());
+          void import('@/lib/native/requestPermissionsAfterLogin').then(m => m.requestPermissionsAfterLogin());
         });
         ua.on('registrationFailed', () => setStatus('failed'));
         ua.on('newRTCSession', (e: any) => {

@@ -493,7 +493,7 @@ export default function PlanipretMobile() {
       toast.error(error.message || t("home.connectionImpossible"));
       return;
     }
-    void import("@/lib/native/requestNotificationsOnce").then(m => m.requestNotificationsOnce());
+    void import("@/lib/native/requestPermissionsAfterLogin").then(m => m.requestPermissionsAfterLogin());
     toast.success(t("auth.success"));
     setLoading(true);
     await loadProfile();
