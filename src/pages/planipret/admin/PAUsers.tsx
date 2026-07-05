@@ -27,7 +27,9 @@ type Profile = PlanipretBrokerRow & {
   ns_only?: boolean;
   status?: string | null;
   maestro_connected?: boolean | null;
+  role?: string | null;
 };
+
 
 export default function PAUsers() {
   const navigate = useNavigate();
