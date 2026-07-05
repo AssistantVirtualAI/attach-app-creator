@@ -177,6 +177,7 @@ Deno.serve(async (req) => {
   const resolvedDeviceId = device ? (deviceIdOf(device) ?? targetId) : targetId;
   const sipUsername = resolvedDeviceId || accountSipUsername;
   let createDetails: any = null;
+  let repairDetails: any = null;
 
   if (!device) {
     // Create a dedicated device for this client_type. Do NOT touch other devices.
@@ -234,10 +235,29 @@ Deno.serve(async (req) => {
     // We own the device but lost the password (fresh Vault, migration, etc.).
     // Rotate ONLY this device's key.
     sipPassword = randomPassword(22);
-    await nsFetch(
+  }
+
+  // Always repair/update our owned device with the password we are returning.
+  // Older versions created devices with wrong field names, so NetSapiens kept a
+  // random auth key while the app stored a different one in Vault → REGISTER 401
+  // and the UI stayed "Téléphone non enregistré". This makes every resync
+  // self-healing for existing devices, not only newly-created ones.
+  if (sipPassword) {
+    const repairBody = nsDevicePayload(resolvedDeviceId, extension, domain, sipPassword, false, clientType === "widget" ? "Web Softphone" : "Mobile Softphone");
+    let repairRes = await nsFetch(
       `/domains/${encodeURIComponent(domain)}/users/${encodeURIComponent(extension)}/devices/${encodeURIComponent(resolvedDeviceId)}`,
-      { method: "PUT", body: nsDevicePayload(resolvedDeviceId, extension, domain, sipPassword, false, "Mobile Softphone") },
+      { method: "PUT", body: repairBody },
     );
+    if (!repairRes.ok) {
+      const retry = await nsFetch(
+        `/domains/${encodeURIComponent(domain)}/users/${encodeURIComponent(extension)}/devices/${encodeURIComponent(sipDeviceUri(resolvedDeviceId, domain))}`,
+        { method: "PUT", body: repairBody },
+      );
+      repairDetails = { first: { status: repairRes.status, data: repairRes.data }, retry: { status: retry.status, data: retry.data } };
+      repairRes = retry;
+    } else {
+      repairDetails = { first: { status: repairRes.status, data: repairRes.data } };
+    }
   }
 
   // Persist Vault secret + device id mapping.
@@ -290,6 +310,7 @@ Deno.serve(async (req) => {
     device_id: resolvedDeviceId,
     device_created: !device,
     ns_create: createDetails,
+    ns_repair: repairDetails,
     ns_devices: devicesNow,
     ns_devices_detail: devicesDetail,
     ns_registered_device_id: registeredDeviceId,
