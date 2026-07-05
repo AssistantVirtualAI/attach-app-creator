@@ -250,14 +250,16 @@ export default function PlanipretAdminLayout() {
         {/* Brand */}
         <div className="px-5 pt-5 pb-4" style={{ borderBottom: "1px solid var(--pp-bg-border)" }}>
           <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center flex-shrink-0"
+            <img
+              src={planipretLogo.url}
+              alt="Planiprêt"
               style={{
-                width: 38, height: 38, borderRadius: 10,
-                background: "linear-gradient(135deg, #1E3A5F, #3B6FA0)",
-                color: "#fff", fontFamily: "'Urbanist', sans-serif",
-                fontWeight: 700, fontSize: 16, letterSpacing: "0.02em",
+                width: 38, height: 38, borderRadius: 10, objectFit: "cover",
+                background: "#fff",
                 boxShadow: "0 4px 12px -4px rgba(30,58,95,0.4)",
-              }}>P</div>
+                border: "1px solid var(--pp-bg-border)",
+              }}
+            />
             <div className="min-w-0">
               <div className="pp-sidebar-brand" style={{ fontSize: 15 }}>Planiprêt</div>
               <div className="pp-sidebar-sub" style={{ fontSize: 11 }}>Admin Portal</div>
