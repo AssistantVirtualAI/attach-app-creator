@@ -234,7 +234,7 @@ export default function PAUsers() {
               Ajoutez un administrateur Planiprêt pour qu'il puisse gérer ses courtiers de façon autonome.
             </p>
           </div>
-          <button onClick={() => setAddOpen(true)} className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white" style={{ background: ACCENT }}>
+          <button onClick={() => setAddAdminOpen(true)} className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white" style={{ background: ACCENT }}>
             + Ajouter un admin
           </button>
         </div>
