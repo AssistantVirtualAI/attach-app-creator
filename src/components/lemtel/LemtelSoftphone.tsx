@@ -19,6 +19,7 @@ export function LemtelSoftphone() {
   const [extension, setExtension] = useState<string>('');
   const [number, setNumber] = useState('');
   const [muted, setMuted] = useState(false);
+  const [micDenied, setMicDenied] = useState(false);
   const uaRef = useRef<any>(null);
   const sessionRef = useRef<any>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -86,10 +87,26 @@ export function LemtelSoftphone() {
 
   const call = async () => {
     if (!uaRef.current || !number) return;
+    setMicDenied(false);
     try {
-      await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach(t => t.stop());
       uaRef.current.call(`sip:${number}@portal.lemtel.tel`, { mediaConstraints: { audio: true, video: false } });
-    } catch (e) { console.error(e); }
+    } catch (e: any) {
+      if (e?.name === 'NotAllowedError' || e?.name === 'SecurityError') setMicDenied(true);
+      else console.error(e);
+    }
+  };
+  const openMicSettings = async () => {
+    try {
+      const { Capacitor } = await import('@capacitor/core');
+      if (Capacitor.getPlatform() === 'ios') window.open('app-settings:', '_system');
+      else if (Capacitor.getPlatform() === 'android') {
+        const { App } = await import('@capacitor/app');
+        const info = await App.getInfo();
+        window.open(`package:${info.id}`, '_system');
+      }
+    } catch { /* web preview */ }
   };
   const hangup = () => sessionRef.current?.terminate?.();
   const toggleMute = () => {
