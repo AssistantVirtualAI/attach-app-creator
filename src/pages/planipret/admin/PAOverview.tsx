@@ -13,10 +13,6 @@ import { readAdminReportFilters, writeAdminReportFilters, type AdminPeriod } fro
 import { usePlanipretNsAutoSync } from "@/hooks/usePlanipretNsAutoSync";
 import NsSyncBar from "@/components/planipret/admin/NsSyncBar";
 import { useMplanipretLang } from "@/hooks/useMplanipretLang";
-import {
-  AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
-  PieChart, Pie, Cell, BarChart, Bar, Legend,
-} from "recharts";
 
 const ACCENT = "#2E9BDC";
 const SUCCESS = "#00D4AA";
@@ -103,6 +99,103 @@ const TooltipDark = ({ active, payload, label }: any) => {
     </div>
   );
 };
+
+function ActivityDailyChart({ data }: { data: Array<{ day: string; appels: number; sms: number }> }) {
+  const max = Math.max(1, ...data.map((d) => Math.max(d.appels, d.sms)));
+  const plot = { x: 34, y: 16, w: 492, h: 142 };
+  const point = (value: number, index: number) => {
+    const x = plot.x + (data.length <= 1 ? plot.w / 2 : (index / (data.length - 1)) * plot.w);
+    const y = plot.y + plot.h - (value / max) * plot.h;
+    return { x, y };
+  };
+  const calls = data.map((d, i) => point(d.appels, i));
+  const sms = data.map((d, i) => point(d.sms, i));
+  const path = (pts: Array<{ x: number; y: number }>) => pts.map((p, i) => `${i ? "L" : "M"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+  const area = (pts: Array<{ x: number; y: number }>) => `${path(pts)} L ${plot.x + plot.w},${plot.y + plot.h} L ${plot.x},${plot.y + plot.h} Z`;
+
+  return (
+    <div className="h-full w-full">
+      <svg viewBox="0 0 560 210" className="h-[180px] w-full overflow-visible" role="img" aria-label="Activité journalière">
+        {[0, 0.25, 0.5, 0.75, 1].map((n) => (
+          <g key={n}>
+            <line x1={plot.x} x2={plot.x + plot.w} y1={plot.y + plot.h * n} y2={plot.y + plot.h * n} stroke="rgba(74,127,165,0.18)" strokeDasharray="4 5" />
+            <text x={8} y={plot.y + plot.h * n + 4} fontSize="10" fill="var(--pp-text-faint)">{Math.round(max * (1 - n))}</text>
+          </g>
+        ))}
+        <path d={area(calls)} fill={ACCENT} opacity="0.14" />
+        <path d={area(sms)} fill={WARNING} opacity="0.12" />
+        <path d={path(calls)} fill="none" stroke={ACCENT} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        <path d={path(sms)} fill="none" stroke={WARNING} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        {data.map((d, i) => {
+          const c = calls[i];
+          const m = sms[i];
+          return (
+            <g key={`${d.day}-${i}`}>
+              <circle cx={c.x} cy={c.y} r="4" fill={ACCENT} />
+              <circle cx={m.x} cy={m.y} r="4" fill={WARNING} />
+              <text x={c.x} y="188" textAnchor="middle" fontSize="10" fill="var(--pp-text-muted)">{d.day}</text>
+              <text x={c.x} y="204" textAnchor="middle" fontSize="10" fill="var(--pp-text-faint)">{d.appels}/{d.sms}</text>
+            </g>
+          );
+        })}
+      </svg>
+      <div className="mt-1 flex items-center justify-center gap-4 text-[11px]" style={{ color: "var(--pp-text-muted)" }}>
+        <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: ACCENT }} /> Appels</span>
+        <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: WARNING }} /> SMS</span>
+      </div>
+    </div>
+  );
+}
+
+function DistributionDonut({ data }: { data: Array<{ name: string; value: number; color: string }> }) {
+  const total = data.reduce((s, d) => s + d.value, 0) || 1;
+  let offset = 25;
+  const radius = 44;
+  const circumference = 2 * Math.PI * radius;
+  return (
+    <div className="grid h-full grid-cols-[130px_1fr] items-center gap-3">
+      <svg viewBox="0 0 120 120" className="h-[130px] w-[130px] -rotate-90" role="img" aria-label="Distribution des appels">
+        <circle cx="60" cy="60" r={radius} fill="none" stroke="rgba(74,127,165,0.16)" strokeWidth="18" />
+        {data.map((d) => {
+          const dash = (d.value / total) * circumference;
+          const circle = <circle key={d.name} cx="60" cy="60" r={radius} fill="none" stroke={d.color} strokeWidth="18" strokeDasharray={`${dash} ${circumference - dash}`} strokeDashoffset={offset} strokeLinecap="round" />;
+          offset -= dash;
+          return circle;
+        })}
+      </svg>
+      <div className="space-y-2">
+        {data.map((d) => (
+          <div key={d.name} className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5" style={{ background: "var(--pp-bg-deep)" }}>
+            <span className="flex min-w-0 items-center gap-2 text-[11px]" style={{ color: "var(--pp-text-secondary)" }}>
+              <span className="h-2.5 w-2.5 rounded-sm" style={{ background: d.color }} />
+              <span className="truncate">{d.name}</span>
+            </span>
+            <strong className="tabular-nums text-[13px]" style={{ color: "var(--pp-text-primary)" }}>{d.value}</strong>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TopBrokerBars({ data }: { data: Array<{ name: string; calls: number }> }) {
+  const max = Math.max(1, ...data.map((d) => d.calls));
+  return (
+    <div className="space-y-3 pt-1">
+      {data.map((b, i) => (
+        <div key={`${b.name}-${i}`}>
+          <div className="mb-1 flex items-center justify-between gap-3">
+            <span className="truncate text-[12px] font-medium" style={{ color: "var(--pp-text-primary)" }}>{b.name}</span>
+            <span className="tabular-nums text-[12px] font-bold" style={{ color: ACCENT }}>{b.calls}</span>
+          </div>
+          <div className="h-3 overflow-hidden rounded-sm" style={{ background: "var(--pp-bg-deep)" }}>
+            <div className="h-full rounded-sm transition-all" style={{ width: `${Math.max(8, (b.calls / max) * 100)}%`, background: ACCENT }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 type Period = 1 | 7 | 30 | 90;
 
@@ -484,27 +577,7 @@ export default function PAOverview() {
               {seriesData.length === 0 || seriesData.every((d) => d.appels === 0 && d.sms === 0) ? (
                 <p style={{ fontSize: 12, color: "var(--pp-text-faint)" }} className="text-center py-20">{t("overview.noData")}</p>
               ) : (
-                <ResponsiveContainer>
-                  <AreaChart data={seriesData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="gradCalls" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor={ACCENT} stopOpacity={0.5} />
-                        <stop offset="100%" stopColor={ACCENT} stopOpacity={0} />
-                      </linearGradient>
-                      <linearGradient id="gradSms" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor={WARNING} stopOpacity={0.4} />
-                        <stop offset="100%" stopColor={WARNING} stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                    <XAxis dataKey="day" stroke="#4A7FA5" fontSize={11} />
-                    <YAxis stroke="#4A7FA5" fontSize={11} />
-                    <Tooltip content={<TooltipDark />} />
-                    <Legend wrapperStyle={{ fontSize: 11, color: "#8FA8C0" }} />
-                    <Area type="monotone" dataKey="appels" name={t("overview.seriesCalls")} stroke={ACCENT} strokeWidth={2} fill="url(#gradCalls)" />
-                    <Area type="monotone" dataKey="sms" name={t("overview.seriesSms")} stroke={WARNING} strokeWidth={2} fill="url(#gradSms)" />
-                  </AreaChart>
-                </ResponsiveContainer>
+                <ActivityDailyChart data={seriesData} />
               )}
             </div>
           </ChartCard>
@@ -515,15 +588,7 @@ export default function PAOverview() {
             {directionDist.every((d) => d.value === 0) ? (
               <p style={{ fontSize: 12, color: "var(--pp-text-faint)" }} className="text-center py-20">{t("overview.noData")}</p>
             ) : (
-              <ResponsiveContainer>
-                <PieChart>
-                  <Pie data={directionDist} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={4}>
-                    {directionDist.map((d, i) => <Cell key={i} fill={d.color} stroke="var(--pp-bg-surface)" strokeWidth={2} />)}
-                  </Pie>
-                  <Tooltip content={<TooltipDark />} />
-                  <Legend wrapperStyle={{ fontSize: 11, color: "#8FA8C0" }} />
-                </PieChart>
-              </ResponsiveContainer>
+              <DistributionDonut data={directionDist} />
             )}
           </div>
         </ChartCard>
@@ -536,15 +601,7 @@ export default function PAOverview() {
             {topBrokers.length === 0 ? (
               <p style={{ fontSize: 12, color: "var(--pp-text-faint)" }} className="text-center py-8">{t("overview.noData")}</p>
             ) : (
-              <ResponsiveContainer>
-                <BarChart data={topBrokers} layout="vertical" margin={{ top: 4, right: 16, left: 4, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" horizontal={false} />
-                  <XAxis type="number" stroke="#4A7FA5" fontSize={11} />
-                  <YAxis type="category" dataKey="name" stroke="#4A7FA5" fontSize={11} width={120} />
-                  <Tooltip content={<TooltipDark />} cursor={{ fill: "rgba(46,155,220,0.08)" }} />
-                  <Bar dataKey="calls" name={t("overview.seriesCalls")} fill={ACCENT} radius={[0, 6, 6, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <TopBrokerBars data={topBrokers} />
             )}
           </div>
         </ChartCard>
