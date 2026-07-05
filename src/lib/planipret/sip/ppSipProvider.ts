@@ -42,11 +42,10 @@ type Listener = (s: PpSipSnapshot) => void;
 function splitSipIdentity(username: string, fallbackDomain: string) {
   const raw = String(username || "").trim();
   const at = raw.indexOf("@");
-  const uriUser = at > -1 ? raw.slice(0, at) : raw;
+  const authUser = at > -1 ? raw.slice(0, at) : raw;
   const usernameDomain = at > -1 ? raw.slice(at + 1) : "";
   return {
-    uriUser,
-    authUser: raw || uriUser,
+    authUser,
     domain: usernameDomain || fallbackDomain,
   };
 }
@@ -117,17 +116,22 @@ class PpSipProvider {
     try {
       const urls = Array.from(new Set([cfg.wssUrl, ...(cfg.wssUrls || [])].filter(Boolean))) as string[];
       const sip = splitSipIdentity(cfg.sipUsername || cfg.extension, cfg.sipDomain);
+      const uriUser = String(cfg.extension).trim();
       const sockets = urls.map((u) => new (JsSIP as any).WebSocketInterface(u));
       const ua = new (JsSIP as any).UA({
         sockets,
-        uri: `sip:${sip.uriUser}@${sip.domain}`,
+        // The SIP Address-of-Record must remain the broker extension. The
+        // dedicated mobile device id is only the auth username; using it as the
+        // URI user makes NetSapiens try to register a non-existent user/device
+        // directly and leaves the app stuck offline.
+        uri: `sip:${uriUser}@${sip.domain}`,
         password: cfg.password,
-        authorization_user: sip.authUser,
+        authorization_user: sip.authUser || uriUser,
         realm: sip.domain,
-        contact_uri: `sip:${sip.uriUser}@${sip.domain};transport=wss`,
+        contact_uri: `sip:${uriUser}@${sip.domain};transport=wss;q=1.0`,
         register: true,
         session_timers: false,
-        register_expires: 120,
+        register_expires: 300,
         connection_recovery_min_interval: 2,
         connection_recovery_max_interval: 30,
         user_agent: "Planipret Softphone 1.0",
