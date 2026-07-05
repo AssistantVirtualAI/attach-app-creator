@@ -26,6 +26,8 @@ PODS:
     - Capacitor
   - CapacitorStatusBar (6.0.3):
     - Capacitor
+  - MozartecCapacitorMicrophone (6.0.0):
+    - Capacitor
   - pjsip (2.9.0.2)
 
 DEPENDENCIES:
@@ -43,6 +45,7 @@ DEPENDENCIES:
   - "CapacitorPushNotifications (from `../../node_modules/@capacitor/push-notifications`)"
   - "CapacitorSplashScreen (from `../../node_modules/@capacitor/splash-screen`)"
   - "CapacitorStatusBar (from `../../node_modules/@capacitor/status-bar`)"
+  - "MozartecCapacitorMicrophone (from `../../node_modules/@mozartec/capacitor-microphone`)"
   - pjsip (from `https://github.com/chebur/pjsip.git`, branch `master`)
 
 EXTERNAL SOURCES:
@@ -74,6 +77,8 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/@capacitor/splash-screen"
   CapacitorStatusBar:
     :path: "../../node_modules/@capacitor/status-bar"
+  MozartecCapacitorMicrophone:
+    :path: "../../node_modules/@mozartec/capacitor-microphone"
   pjsip:
     :branch: master
     :git: https://github.com/chebur/pjsip.git
@@ -98,8 +103,9 @@ SPEC CHECKSUMS:
   CapacitorPushNotifications: 83974a7be0f6829c26148f6ed65745b96a7d16bd
   CapacitorSplashScreen: f65292695df7d7b24a22954a6cfbaecadd1718a4
   CapacitorStatusBar: 38665f1a18c55677098367a29f6b42126b72dc65
+  MozartecCapacitorMicrophone: 43dd3a517756bbf909a5c47623b862fc518d92c4
   pjsip: faa8aa0e79b341155801b87c2ea3015003d05ed9
 
-PODFILE CHECKSUM: 842d3072dd318e7fb90924141362390ea83490c2
+PODFILE CHECKSUM: c4821ea470ffe36ae2bb8b08a2b6d0f88f7eadc1
 
 COCOAPODS: 1.16.2

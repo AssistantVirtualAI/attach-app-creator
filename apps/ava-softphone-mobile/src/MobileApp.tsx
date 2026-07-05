@@ -1,6 +1,7 @@
 import { Component, useEffect, useMemo, useRef, useState, Suspense, lazy, type ReactNode } from 'react';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { Capacitor } from '@capacitor/core';
+import { requestPermissionsAfterLogin } from './lib/requestPermissionsAfterLogin';
 // Re-use battle-tested SIP hook from the desktop app
 import { useSoftphone } from './hooks/useSoftphone';
 import AuthScreen from './screens/AuthScreen';
@@ -26,7 +27,6 @@ import { useT } from './lib/i18n';
 import { Bell, Sun, Moon, Globe } from 'lucide-react';
 import ActiveCallSheet from './components/ActiveCallSheet';
 import SplashAva from './components/SplashAva';
-import PermissionGate from './components/PermissionGate';
 import SyncIndicator from './components/SyncIndicator';
 import ProfileSheet from './components/ProfileSheet';
 import MicPermissionWarning from './components/MicPermissionWarning';
@@ -169,7 +169,7 @@ function AuthenticatedShell({
 }: { creds: Creds; setCreds: (c: Creds) => void; tab: Tab; setTab: (t: Tab) => void; callsSub?: 'recents' | 'recordings' | 'voicemail' | 'dial'; callsFilter?: 'all' | 'missed'; onSignOut: () => void; preferClickToCall: boolean; onTogglePreferC2C: () => void }) {
 
 
-  const [permsGateDone, setPermsGateDone] = useState<boolean | null>(isPreviewMode ? true : null);
+  // permissions handled natively after login
   const [profileOpen, setProfileOpen] = useState(false);
   useDeviceNotifications(creds);
   const [freshCredentialToken, setFreshCredentialToken] = useState('');
@@ -410,7 +410,6 @@ function AuthenticatedShell({
 
   // Once the permission gate is dismissed, finalize permissions + push.
   useEffect(() => {
-    if (!permsGateDone) return;
     let cancelled = false;
     (async () => {
       const perms = await requestAllPermissions();
@@ -451,7 +450,7 @@ function AuthenticatedShell({
 
     return () => { cancelled = true; unsub(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [creds.extension, permsGateDone]);
+  }, [creds.extension]);
 
 
   const inCall =
@@ -465,15 +464,6 @@ function AuthenticatedShell({
       try { await Haptics.impact({ style }); } catch {}
     }
   };
-  if (permsGateDone === null) return <SplashAva />;
-  if (permsGateDone === false) {
-    return (
-      <PermissionGate onComplete={() => {
-        try { localStorage.setItem('lemtel-permissions-onboarded', '1'); } catch {}
-        setPermsGateDone(true);
-      }} />
-    );
-  }
   if (authExpired) return <SessionExpired onSignOut={onSignOut} />;
 
 

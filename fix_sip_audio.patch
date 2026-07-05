@@ -1,0 +1,102 @@
+diff --git a/apps/ava-softphone-mobile/src/lib/sip/bootSipGuard.ts b/apps/ava-softphone-mobile/src/lib/sip/bootSipGuard.ts
+index 0a1a3c1..37b2879 100644
+--- a/apps/ava-softphone-mobile/src/lib/sip/bootSipGuard.ts
++++ b/apps/ava-softphone-mobile/src/lib/sip/bootSipGuard.ts
+@@ -70,8 +70,11 @@ export function installSipBootGuard() {
+     };
+   });
+ 
+-  // Validation: dispatcher must have loaded by the time the first render
+-  // tick happens. If not, the bundle is broken.
++  // Validation: dispatcher must have loaded by the time AuthenticatedShell
++  // finishes mounting (which requires: creds loaded + permsGateDone resolved +
++  // SIP credentials hydrated). On a cold launch this takes 3-6 s on device.
++  // We give 10 s before raising the alarm so we never fire a false-positive
++  // while the permission gate or the SplashAva screen is still showing.
+   setTimeout(() => {
+     if (!report.dispatcherLoaded) {
+       // eslint-disable-next-line no-console
+@@ -84,7 +87,7 @@ export function installSipBootGuard() {
+       console.log('[SipBootGuard] ✓ dispatcher loaded, provider =',
+         NATIVE_SIP_ENABLED ? 'native' : 'jssip');
+     }
+-  }, 2000);
++  }, 10000);
+ }
+ 
+ export function getSipBootReport(): Readonly<SipBootReport> {
+diff --git a/apps/ava-softphone-mobile/src/screens/RecordingsScreen.tsx b/apps/ava-softphone-mobile/src/screens/RecordingsScreen.tsx
+index 10964fd..20606aa 100644
+--- a/apps/ava-softphone-mobile/src/screens/RecordingsScreen.tsx
++++ b/apps/ava-softphone-mobile/src/screens/RecordingsScreen.tsx
+@@ -38,6 +38,10 @@ export default function RecordingsScreen({
+   const { lang } = useT();
+   const fr = lang === 'fr';
+   const audioRef = useRef<HTMLAudioElement | null>(null);
++  // Track which recording is currently loaded in the <audio> element so the
++  // onError handler can re-download it without needing closure state.
++  const currentPlaybackRef = useRef<RecordingEntry | null>(null);
++  const recoveringRef = useRef(false);
+ 
+   // Load recordings (real-time: refresh on focus + every 30s + after a call ends).
+   const reload = React.useCallback(() => {
+@@ -177,8 +181,11 @@ export default function RecordingsScreen({
+         );
+         setCachedIds((prev) => new Set(prev).add(rec.id));
+       }
++      currentPlaybackRef.current = rec;
++      recoveringRef.current = false;
+       if (audioRef.current) {
+         audioRef.current.src = url;
++        audioRef.current.load();
+         audioRef.current.play().catch(() => {});
+       }
+       setPlayingId(rec.id);
+@@ -245,7 +252,46 @@ export default function RecordingsScreen({
+         {([7, 30] as const).map((d) => <button key={d} onClick={() => onRangeDaysChange(d)} style={{ padding: '7px 9px', borderRadius: 10, border: `1px solid ${rangeDays === d ? colors.borderGold : colors.border}`, background: rangeDays === d ? colors.signalGold + '1a' : 'rgba(255,255,255,0.04)', color: rangeDays === d ? colors.signalGold : colors.mutedSilver, fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>{d}{fr ? 'j' : 'd'}</button>)}
+       </div>
+ 
+-      <audio ref={audioRef} onEnded={() => setPlayingId(null)} style={{ width: '100%', marginBottom: 10 }} controls />
++      <audio
++        ref={audioRef}
++        onEnded={() => {
++          recoveringRef.current = false;
++          currentPlaybackRef.current = null;
++          setPlayingId(null);
++        }}
++        onError={async () => {
++          // iOS evicts cached files from the Data directory when storage is
++          // low, or after an app update. When the <audio> element fires an
++          // error we silently re-download the file and resume playback.
++          const rec = currentPlaybackRef.current;
++          if (!rec || recoveringRef.current) return;
++          recoveringRef.current = true;
++          setLoadingId(rec.id);
++          try {
++            const freshUrl = await downloadRecording(
++              rec.id, recMeta(rec),
++              creds?.accessToken || null,
++              creds?.organizationId || null,
++              creds?.domainUuid || creds?.fusionpbxDomainUuid || fallbackDomainUuid || null,
++              { force: true },
++            );
++            setPlaybackErrors((prev) => { const n = { ...prev }; delete n[rec.id]; return n; });
++            setCachedIds((prev) => new Set(prev).add(rec.id));
++            if (audioRef.current) {
++              audioRef.current.src = freshUrl;
++              audioRef.current.load();
++              audioRef.current.play().catch(() => {});
++            }
++          } catch (e: any) {
++            captureError(rec, e, fr ? 'Impossible de recharger l\'enregistrement' : 'Unable to reload recording');
++          } finally {
++            recoveringRef.current = false;
++            setLoadingId(null);
++          }
++        }}
++        style={{ width: '100%', marginBottom: 10 }}
++        controls
++      />
+ 
+       {error && (
+         <Card accent="gold" style={{ marginBottom: 10 }}>
