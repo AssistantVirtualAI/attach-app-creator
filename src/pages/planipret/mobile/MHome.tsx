@@ -193,6 +193,7 @@ export default function MHome() {
       toast.error(sip?.error ?? sipRes.error?.message ?? t("home.connectionImpossible"));
       return;
     }
+    const registrationWait = waitForRegistration();
     try {
       sessionStorage.setItem("pp_sip_config", JSON.stringify({
         username: sip.sip_username, password: sip.sip_password,
@@ -202,7 +203,7 @@ export default function MHome() {
     } catch {}
     await reloadProfile();
     loadStats();
-    const registered = await waitForRegistration();
+    const registered = await registrationWait;
     toast.dismiss("sip-reconnect");
     if (registered) toast.success(t("home.phoneConnected"));
     else toast.error("Téléphone non enregistré. Réessaie dans quelques secondes.");
