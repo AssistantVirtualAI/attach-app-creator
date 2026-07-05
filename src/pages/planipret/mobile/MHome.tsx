@@ -17,6 +17,7 @@ import { TEMP_EMOJI } from "@/components/planipret/leadHelpers";
 import { useMaestroPipelineToasts } from "@/hooks/useMaestroPipelineToasts";
 import { safeEdgeFunction } from "@/lib/safeEdgeFunction";
 import { useMplanipretLang } from "@/hooks/useMplanipretLang";
+import { useMplanipretSoftphone } from "@/hooks/useMplanipretSoftphone";
 
 type Period = "day" | "week" | "month" | "shift";
 
@@ -38,6 +39,7 @@ export default function MHome() {
   const { t, lang } = useMplanipretLang();
   const { profile, registerRefresh, openDialer, openAva, reloadProfile } =
     useOutletContext<PlanipretMobileContext>();
+  const softphone = useMplanipretSoftphone();
   const navigate = useNavigate();
 
   const [period, setPeriod] = useState<Period>(() => {
@@ -161,17 +163,51 @@ export default function MHome() {
   }, [profile?.user_id, period]);
 
 
+  const waitForRegistration = (timeoutMs = 8000) => new Promise<boolean>((resolve) => {
+    let done = false;
+    const finish = (ok: boolean) => {
+      if (done) return;
+      done = true;
+      window.removeEventListener("pp:sip-registered", onReg as EventListener);
+      resolve(ok);
+    };
+    const onReg = (e: Event) => {
+      if ((e as CustomEvent).detail?.registered) finish(true);
+    };
+    window.addEventListener("pp:sip-registered", onReg as EventListener);
+    setTimeout(() => finish(false), timeoutMs);
+  });
+
   const reconnect = async () => {
     toast.loading(t("home.reconnecting"), { id: "sip-reconnect" });
-    const { data, error, status } = await safeEdgeFunction("ns-auth", { body: {} });
-    toast.dismiss("sip-reconnect");
+    const [{ data, error, status }, sipRes] = await Promise.all([
+      safeEdgeFunction("ns-auth", { body: {} }),
+      supabase.functions.invoke("ns-resolve-sip-credentials", { body: { client_type: "mobile" } }),
+    ]);
     if (error || (data as any)?.success === false) {
+      toast.dismiss("sip-reconnect");
       toast.error(status === 403 ? t("home.phoneUnauthorized") : ((data as any)?.error ?? error ?? t("home.connectionImpossible")));
       return;
     }
-    toast.success(t("home.phoneConnected"));
+    const sip = (sipRes.data ?? {}) as any;
+    if (sipRes.error || !sip?.ok) {
+      toast.dismiss("sip-reconnect");
+      toast.error(sip?.error ?? sipRes.error?.message ?? t("home.connectionImpossible"));
+      return;
+    }
+    try {
+      sessionStorage.setItem("pp_sip_config", JSON.stringify({
+        username: sip.sip_username, password: sip.sip_password,
+        domain: sip.sip_domain, proxy: sip.sip_proxy, extension: sip.sip_extension,
+      }));
+      window.dispatchEvent(new CustomEvent("pp:sip-ready", { detail: { extension: sip.sip_extension, force: true } }));
+    } catch {}
     await reloadProfile();
     loadStats();
+    const registered = await waitForRegistration();
+    toast.dismiss("sip-reconnect");
+    if (registered) toast.success(t("home.phoneConnected"));
+    else toast.error("Téléphone non enregistré. Réessaie dans quelques secondes.");
   };
 
   const handleSuggestion = (sug: { kind: string; number?: string; label: string }) => {
@@ -182,6 +218,8 @@ export default function MHome() {
   };
 
   const totalComms = useMemo(() => stats.calls + stats.sms + stats.outbound, [stats]);
+  const phoneOnline = softphone.snap.status === "registered";
+  const phoneConnecting = softphone.loading || softphone.snap.status === "connecting" || softphone.snap.status === "connected";
 
   return (
     <div className="p-4 space-y-4 pb-8" style={{ background: "var(--pp-bg-base)", minHeight: "100%" }}>
