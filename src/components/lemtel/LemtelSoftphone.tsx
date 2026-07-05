@@ -144,6 +144,15 @@ export function LemtelSoftphone() {
           </div>
           <div className="flex-1 p-4 flex flex-col gap-3">
             <Input value={number} onChange={(e) => setNumber(e.target.value)} placeholder="Enter number..." className="text-center text-lg" />
+            {micDenied && (
+              <div role="alert" className="flex items-start gap-2 rounded-md p-2 text-xs bg-destructive/10 border border-destructive/40">
+                <MicOff className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-destructive" />
+                <div className="flex-1">
+                  Microphone disabled. Enable it in Settings → AVA Softphone → Microphone.
+                  <button onClick={openMicSettings} className="ml-2 underline font-semibold text-primary">Open Settings</button>
+                </div>
+              </div>
+            )}
             <div className="grid grid-cols-3 gap-2">
               {['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'].map((k) => (
                 <Button key={k} variant="outline" onClick={() => setNumber(number + k)} className="h-12">{k}</Button>
