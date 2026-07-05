@@ -221,6 +221,21 @@ export default function PAUsers() {
     toast.success("Suppression terminée");
   };
 
+  const promoteOrDemote = async (u: Profile, promote: boolean) => {
+    const label = promote ? "promouvoir en admin" : "rétrograder en courtier";
+    if (!confirm(`Confirmer : ${label} ${u.full_name} ?`)) return;
+    const { data, error } = await supabase.functions.invoke("pp-admin-user", {
+      body: { action: promote ? "promote_broker" : "demote_admin", payload: { user_id: u.user_id } },
+    });
+    if (error || !(data as any)?.success) {
+      toast.error((data as any)?.error ?? "Échec");
+      return;
+    }
+    toast.success(promote ? "Promu admin" : "Rétrogradé courtier");
+    await load();
+  };
+
+
   const adminCount = rows.length;
   return (
     <div className="space-y-4">
