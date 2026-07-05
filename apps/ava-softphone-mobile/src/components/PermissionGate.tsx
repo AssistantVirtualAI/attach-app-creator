@@ -37,7 +37,7 @@ export default function PermissionGate({ onComplete }: PermissionGateProps) {
     refresh,
   } = usePermissions();
 
-  const [step, setStep] = useState<Step>('intro');
+  const [step, setStep] = useState<Step>('microphone');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => { void refresh(); }, [refresh]);
