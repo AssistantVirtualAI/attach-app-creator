@@ -741,18 +741,19 @@ function AdminModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => 
   const [busy, setBusy] = useState(false);
 
   const submit = async () => {
-    if (!firstName || !lastName || !email || !password) { toast.error("Champs requis manquants"); return; }
+    if (!firstName || !lastName || !email) { toast.error("Prénom, nom et courriel requis"); return; }
     if (/@lemtel\.com$/i.test(email.trim())) { toast.error("Les emails @lemtel.com ne sont pas autorisés."); return; }
     setBusy(true);
     const full_name = `${firstName} ${lastName}`.trim();
     const { data, error } = await supabase.functions.invoke("pp-admin-user", {
-      body: { action: "create_admin", payload: { email, password, full_name } },
+      body: { action: "create_admin", payload: { email, password: password || undefined, full_name } },
     });
     setBusy(false);
     if (error || !(data as any)?.success) { toast.error((data as any)?.error ?? error?.message ?? "Erreur de création"); return; }
-    toast.success(`Admin ${full_name} créé ✅`);
+    toast.success((data as any)?.promoted ? `${full_name} promu admin ✅` : `Admin ${full_name} créé ✅`);
     onSaved();
   };
+
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
