@@ -160,11 +160,22 @@ export default function DialerScreen({ sp, haptic, preferClickToCall: _preferCli
             aria-label="Contacts"
             onClick={openContactsFlow}
           >👤</button>
-          <button className="dialer-call-orb" disabled={!num || dialing || !isRegistered} onClick={startCall}>{dialing ? '…' : '☏'}</button>
+          <button
+            className="dialer-call-orb"
+            disabled={!num || dialing || !isRegistered || micStatus === 'blocked'}
+            title={micStatus !== 'granted' ? 'Microphone permission required' : undefined}
+            onClick={startCall}
+          >{dialing ? '…' : '☏'}</button>
           <button className="dialer-backspace" onClick={() => { haptic(); setNum((n) => n.slice(0, -1)); }} disabled={!num}>⌫</button>
         </div>
         {error && <div style={{ color: 'var(--danger)', textAlign: 'center', fontSize: 12, padding: '0 24px 10px' }}>{error}</div>}
       </div>
+
+      {showMicBlocked && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(10,20,41,0.94)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 22 }}>
+          <PermissionBlockedScreen perm="microphone" onContinueWithout={() => setShowMicBlocked(false)} />
+        </div>
+      )}
 
       {/* Contacts pre-permission sheet — single "Continue" action per Apple 5.1.1 */}
       {contactsPrePrompt && (
