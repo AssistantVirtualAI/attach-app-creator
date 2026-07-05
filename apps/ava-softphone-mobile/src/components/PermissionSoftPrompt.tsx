@@ -39,7 +39,7 @@ const COPY: Record<PermKey, { icon: React.ReactNode; title: { fr: string; en: st
   },
 };
 
-export default function PermissionSoftPrompt({ perm, onAllow, onLater, busy }: Props) {
+export default function PermissionSoftPrompt({ perm, onAllow, onLater, busy, skipLabel }: Props) {
   const { lang } = useT();
   const fr = lang === 'fr';
   const c = COPY[perm];
@@ -49,9 +49,9 @@ export default function PermissionSoftPrompt({ perm, onAllow, onLater, busy }: P
       <h1 style={titleStyle}>{fr ? c.title.fr : c.title.en}</h1>
       <p style={bodyStyle}>{fr ? c.body.fr : c.body.en}</p>
       <button onClick={onAllow} disabled={busy} style={{ ...primaryBtn, opacity: busy ? 0.6 : 1 }}>
-        {busy ? (fr ? 'Demande…' : 'Requesting…') : fr ? 'Autoriser' : 'Allow'}
+        {busy ? (fr ? 'Demande…' : 'Requesting…') : fr ? 'Continuer' : 'Continue'}
       </button>
-      <button onClick={onLater} style={ghostBtn}>{fr ? 'Plus tard' : 'Not now'}</button>
+      <button onClick={onLater} style={ghostBtn}>{skipLabel ?? (fr ? 'Plus tard' : 'Not now')}</button>
     </div>
   );
 }
