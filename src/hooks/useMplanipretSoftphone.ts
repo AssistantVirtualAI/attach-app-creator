@@ -136,12 +136,7 @@ export function useMplanipretSoftphone() {
           password: String(d.sip_password),
           displayName: String(d.sip_extension),
         });
-        // Broadcast our registered device id so any UI can highlight it.
-        try {
-          window.dispatchEvent(new CustomEvent("pp:sip-registered", {
-            detail: { registered: true, deviceId: d.device_id },
-          }));
-        } catch {}
+        try { window.dispatchEvent(new CustomEvent("pp:sip-provisioned", { detail: { deviceId: d.device_id } })); } catch {}
       } finally {
         if (!cancelled) setLoading(false);
       }

@@ -32,7 +32,7 @@ import type { MicPermissionState } from "@/lib/planipret/audio/micPermission";
 
 const ACCENT = "#2E9BDC";
 
-export type PlanipretMobileContext = { profile: any; reloadProfile: () => Promise<void>; openDialer: (number?: string) => void; openAva: () => void; registerRefresh: (fn: (() => Promise<void> | void) | null) => void };
+export type PlanipretMobileContext = { profile: any; reloadProfile: () => Promise<void>; openDialer: (number?: string) => void; openAva: () => void; registerRefresh: (fn: (() => Promise<void> | void) | null) => void; softphone: ReturnType<typeof useMplanipretSoftphone> };
 
 const TABS = [
   { to: "/mplanipret/home", labelKey: "tabs.home", Icon: Home },
@@ -80,9 +80,8 @@ function contactPrimaryPhone(c: DialerContact): string | undefined {
   return c.cell_phone || c.phone || c.work_phone || c.home_phone || c.extension;
 }
 
-function Dialer({ open, onClose, initial, openMessages }: { open: boolean; onClose: () => void; initial?: string; openMessages: (n?: string) => void }) {
+function Dialer({ open, onClose, initial, openMessages, softphone }: { open: boolean; onClose: () => void; initial?: string; openMessages: (n?: string) => void; softphone: ReturnType<typeof useMplanipretSoftphone> }) {
   const { t } = useMplanipretLang();
-  const softphone = useMplanipretSoftphone();
   const [mode, setMode] = useState<"keypad" | "search">("keypad");
   const [number, setNumber] = useState("");
   const [calling, setCalling] = useState(false);
@@ -341,7 +340,7 @@ export default function PlanipretMobile() {
   const { t, lang, setLang } = useMplanipretLang();
   // Boot the shared softphone engine (WebRTC + noise cancellation + auto handover).
   // Uses the exact same JsSIP stack as the Lemtel mobile app.
-  useMplanipretSoftphone();
+  const softphone = useMplanipretSoftphone();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [accessError, setAccessError] = useState<"unauthenticated" | "missing_profile" | "load_failed" | null>(null);
@@ -595,7 +594,7 @@ export default function PlanipretMobile() {
         <div ref={scrollRef} className="flex-1 overflow-y-auto pb-[110px]">
           <PullIndicator pullDist={pullDist} refreshing={refreshing} threshold={threshold} color={ACCENT} />
           <PlanipretErrorBoundary key={location.pathname}>
-            <Outlet context={{ profile, reloadProfile: loadProfile, openDialer, openAva, registerRefresh } satisfies PlanipretMobileContext} />
+            <Outlet context={{ profile, reloadProfile: loadProfile, openDialer, openAva, registerRefresh, softphone } satisfies PlanipretMobileContext} />
           </PlanipretErrorBoundary>
         </div>
         <SessionTimeoutModal />
@@ -687,7 +686,7 @@ export default function PlanipretMobile() {
         </div>
 
 
-        <Dialer open={dialerOpen} onClose={() => setDialerOpen(false)} initial={dialerInit} openMessages={(n) => { setDialerOpen(false); navigate(`/mplanipret/messages${n ? `?to=${encodeURIComponent(n)}` : ""}`); }} />
+        <Dialer open={dialerOpen} onClose={() => setDialerOpen(false)} initial={dialerInit} openMessages={(n) => { setDialerOpen(false); navigate(`/mplanipret/messages${n ? `?to=${encodeURIComponent(n)}` : ""}`); }} softphone={softphone} />
         <ActiveCallOverlay callId={activeCallId} onClosed={() => setActiveCallId(null)} />
         <InboundCallOverlay call={inbound} onClose={() => setInbound(null)} />
         {avaOpen && profile?.user_id && (

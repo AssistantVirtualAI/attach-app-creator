@@ -39,6 +39,18 @@ export interface PpSipSnapshot {
 
 type Listener = (s: PpSipSnapshot) => void;
 
+function splitSipIdentity(username: string, fallbackDomain: string) {
+  const raw = String(username || "").trim();
+  const at = raw.indexOf("@");
+  const uriUser = at > -1 ? raw.slice(0, at) : raw;
+  const usernameDomain = at > -1 ? raw.slice(at + 1) : "";
+  return {
+    uriUser,
+    authUser: raw || uriUser,
+    domain: usernameDomain || fallbackDomain,
+  };
+}
+
 class PpSipProvider {
   private ua: any = null;
   private session: any = null;
@@ -79,6 +91,15 @@ class PpSipProvider {
     (console as any)[fn](`[pp-sip] ${msg}`, detail ?? "");
   }
 
+  private emitRegistration(registered: boolean, detail: Record<string, unknown> = {}) {
+    if (typeof window === "undefined") return;
+    try {
+      window.dispatchEvent(new CustomEvent("pp:sip-registered", {
+        detail: { registered, extension: this.cfg?.extension, ...detail },
+      }));
+    } catch {}
+  }
+
   async init(cfg: PpSipConfig) {
     if (!cfg.extension || !cfg.sipDomain || !cfg.wssUrl || !cfg.password) {
       this.update({ status: "error", errorCause: "invalid_config" });
@@ -95,14 +116,15 @@ class PpSipProvider {
 
     try {
       const urls = Array.from(new Set([cfg.wssUrl, ...(cfg.wssUrls || [])].filter(Boolean))) as string[];
+      const sip = splitSipIdentity(cfg.sipUsername || cfg.extension, cfg.sipDomain);
       const sockets = urls.map((u) => new (JsSIP as any).WebSocketInterface(u));
       const ua = new (JsSIP as any).UA({
         sockets,
-        uri: `sip:${cfg.sipUsername}@${cfg.sipDomain}`,
+        uri: `sip:${sip.uriUser}@${sip.domain}`,
         password: cfg.password,
-        authorization_user: cfg.sipUsername,
-        realm: cfg.sipDomain,
-        contact_uri: `sip:${cfg.sipUsername}@${cfg.sipDomain};transport=wss`,
+        authorization_user: sip.authUser,
+        realm: sip.domain,
+        contact_uri: `sip:${sip.uriUser}@${sip.domain};transport=wss`,
         register: true,
         session_timers: false,
         register_expires: 120,
@@ -113,13 +135,14 @@ class PpSipProvider {
 
       ua.on("connecting", () => this.update({ status: "connecting" }));
       ua.on("connected", () => this.update({ status: "connected" }));
-      ua.on("disconnected", () => this.update({ status: "disconnected" }));
-      ua.on("registered", () => this.update({ status: "registered", errorCause: undefined, lastRegistrationAt: Date.now() }));
+      ua.on("disconnected", () => { this.update({ status: "disconnected" }); this.emitRegistration(false, { reason: "disconnected" }); });
+      ua.on("registered", () => { this.update({ status: "registered", errorCause: undefined, lastRegistrationAt: Date.now() }); this.emitRegistration(true); });
       ua.on("unregistered", () => this.log("warn", "unregistered"));
       ua.on("registrationFailed", (e: any) => {
         const cause = e?.cause || e?.response?.reason_phrase || "registration_failed";
         this.log("error", `registration failed: ${cause}`);
         this.update({ status: "error", errorCause: cause });
+        this.emitRegistration(false, { reason: cause });
       });
       ua.on("newRTCSession", (e: any) => this.attachSession(e.session, e.originator));
 

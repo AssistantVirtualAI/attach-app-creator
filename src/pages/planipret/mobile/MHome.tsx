@@ -36,7 +36,7 @@ function Shimmer({ className = "" }: { className?: string }) {
 
 export default function MHome() {
   const { t, lang } = useMplanipretLang();
-  const { profile, registerRefresh, openDialer, openAva, reloadProfile } =
+  const { profile, registerRefresh, openDialer, openAva, reloadProfile, softphone } =
     useOutletContext<PlanipretMobileContext>();
   const navigate = useNavigate();
 
@@ -161,17 +161,52 @@ export default function MHome() {
   }, [profile?.user_id, period]);
 
 
+  const waitForRegistration = (timeoutMs = 8000) => new Promise<boolean>((resolve) => {
+    let done = false;
+    const finish = (ok: boolean) => {
+      if (done) return;
+      done = true;
+      window.removeEventListener("pp:sip-registered", onReg as EventListener);
+      resolve(ok);
+    };
+    const onReg = (e: Event) => {
+      if ((e as CustomEvent).detail?.registered) finish(true);
+    };
+    window.addEventListener("pp:sip-registered", onReg as EventListener);
+    setTimeout(() => finish(false), timeoutMs);
+  });
+
   const reconnect = async () => {
     toast.loading(t("home.reconnecting"), { id: "sip-reconnect" });
-    const { data, error, status } = await safeEdgeFunction("ns-auth", { body: {} });
-    toast.dismiss("sip-reconnect");
+    const [{ data, error, status }, sipRes] = await Promise.all([
+      safeEdgeFunction("ns-auth", { body: {} }),
+      supabase.functions.invoke("ns-resolve-sip-credentials", { body: { client_type: "mobile" } }),
+    ]);
     if (error || (data as any)?.success === false) {
+      toast.dismiss("sip-reconnect");
       toast.error(status === 403 ? t("home.phoneUnauthorized") : ((data as any)?.error ?? error ?? t("home.connectionImpossible")));
       return;
     }
-    toast.success(t("home.phoneConnected"));
+    const sip = (sipRes.data ?? {}) as any;
+    if (sipRes.error || !sip?.ok) {
+      toast.dismiss("sip-reconnect");
+      toast.error(sip?.error ?? sipRes.error?.message ?? t("home.connectionImpossible"));
+      return;
+    }
+    const registrationWait = waitForRegistration();
+    try {
+      sessionStorage.setItem("pp_sip_config", JSON.stringify({
+        username: sip.sip_username, password: sip.sip_password,
+        domain: sip.sip_domain, proxy: sip.sip_proxy, extension: sip.sip_extension,
+      }));
+      window.dispatchEvent(new CustomEvent("pp:sip-ready", { detail: { extension: sip.sip_extension, force: true } }));
+    } catch {}
     await reloadProfile();
     loadStats();
+    const registered = await registrationWait;
+    toast.dismiss("sip-reconnect");
+    if (registered) toast.success(t("home.phoneConnected"));
+    else toast.error("Téléphone non enregistré. Réessaie dans quelques secondes.");
   };
 
   const handleSuggestion = (sug: { kind: string; number?: string; label: string }) => {
@@ -182,6 +217,8 @@ export default function MHome() {
   };
 
   const totalComms = useMemo(() => stats.calls + stats.sms + stats.outbound, [stats]);
+  const phoneOnline = softphone.snap.status === "registered";
+  const phoneConnecting = softphone.loading || softphone.snap.status === "connecting" || softphone.snap.status === "connected";
 
   return (
     <div className="p-4 space-y-4 pb-8" style={{ background: "var(--pp-bg-base)", minHeight: "100%" }}>
@@ -200,13 +237,13 @@ export default function MHome() {
           onClick={reconnect}
           className="pp-pill"
           style={{
-            background: sipOnline ? "rgba(13,122,95,0.10)" : "rgba(178,58,72,0.10)",
-            color: sipOnline ? "var(--pp-success)" : "var(--pp-danger)",
-            border: `1px solid ${sipOnline ? "rgba(13,122,95,0.30)" : "rgba(178,58,72,0.30)"}`,
+            background: phoneOnline ? "rgba(13,122,95,0.10)" : "rgba(178,58,72,0.10)",
+            color: phoneOnline ? "var(--pp-success)" : "var(--pp-danger)",
+            border: `1px solid ${phoneOnline ? "rgba(13,122,95,0.30)" : "rgba(178,58,72,0.30)"}`,
           }}
         >
           <span style={{ width: 6, height: 6, borderRadius: 999, background: "currentColor", boxShadow: "0 0 6px currentColor" }} />
-          {sipOnline ? t("home.online") : t("home.offline")}
+          {phoneConnecting ? "…" : phoneOnline ? t("home.online") : t("home.offline")}
         </button>
       </header>
 
