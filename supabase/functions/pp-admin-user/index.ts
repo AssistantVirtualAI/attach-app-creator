@@ -365,6 +365,24 @@ Deno.serve(async (req) => {
         if (password) {
           await admin.auth.admin.updateUserById(userId, { password }).catch(() => null);
         }
+      } else if (existing?.id) {
+        const initialPassword = password || randomPassword(24);
+        const { data: created, error: cErr } = await admin.auth.admin.createUser({
+          email, password: initialPassword, email_confirm: true,
+        });
+        if (cErr || !created.user) return jsonResponse({ success: false, error: cErr?.message ?? "Échec création auth" }, 200);
+        userId = created.user.id;
+        promoted = true;
+        const { error: pErr } = await admin.from("planipret_profiles")
+          .update({ user_id: userId, role: "admin", full_name })
+          .eq("id", existing.id);
+        if (pErr) {
+          await admin.auth.admin.deleteUser(userId).catch(() => null);
+          return jsonResponse({ success: false, error: pErr.message }, 200);
+        }
+        if (!password) {
+          await admin.auth.resetPasswordForEmail(email).catch(() => null);
+        }
       } else {
         if (!password) {
           return jsonResponse({ success: false, error: "Mot de passe requis pour un nouvel admin" }, 400);
