@@ -48,7 +48,18 @@ export async function getPlanipretBrokerDirectory() {
     const { data: nsRes, error: nsErr } = await supabase.functions.invoke("pp-ns-users", { body: {} });
     if (nsErr) throw new Error(nsErr.message);
     if ((nsRes as any)?.ok) {
-      const nsBrokers = (((nsRes as any).brokers ?? []) as PlanipretBrokerRow[]).filter(isPlanipretActiveBroker);
+      const nsBrokersRaw = (((nsRes as any).brokers ?? []) as PlanipretBrokerRow[]).filter(isPlanipretActiveBroker);
+      // Dedupe by user_id (pp-ns-users can emit the same broker twice — once
+      // from the NS device row and once from the joined DB profile with a
+      // different extension). Keep the first occurrence (NS device wins).
+      const seenUid = new Set<string>();
+      const nsBrokers = nsBrokersRaw.filter((b) => {
+        const uid = b.user_id ? String(b.user_id) : "";
+        if (!uid) return true;
+        if (seenUid.has(uid)) return false;
+        seenUid.add(uid);
+        return true;
+      });
       nsDomain = (nsRes as any).domain ?? null;
       debug.push({
         label: "pp-ns-users (source exacte Courtiers/KPI/sidebar)",
