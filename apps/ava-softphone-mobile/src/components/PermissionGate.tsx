@@ -1,359 +1,138 @@
-import React, { useEffect, useState } from 'react';
-import { Capacitor } from '@capacitor/core';
+import React, { useEffect, useMemo, useState } from 'react';
 import { colors, gradients, radius, font } from '../lib/theme';
 import { LemtelMark } from './Brand';
-import { requestMicrophone, openAppSettings, checkAllPermissions } from '../lib/permissions';
-import type { AllPermissions, PermissionStatus } from '../lib/permissions';
-import PermissionDiagPanel from './PermissionDiagPanel';
+import { useT } from '../lib/i18n';
+import { usePermissions } from '../hooks/usePermissions';
+import PermissionSoftPrompt from './PermissionSoftPrompt';
+import PermissionBlockedScreen from './PermissionBlockedScreen';
+import type { PermKey } from '../lib/permissionState';
 
 interface PermissionGateProps {
   onComplete: () => void;
 }
 
-type StepId = 'intro' | 'microphone' | 'contacts' | 'notifications' | 'done';
-
-interface PermDef {
-  id: 'microphone' | 'contacts' | 'notifications';
-  icon: string;
-  title: string;
-  description: string;
-  why: string;
-  required: boolean;
-  color: string;
-}
-
-// Only microphone is requested up-front (required for calls).
-// Contacts and notifications are requested just-in-time when the user
-// first engages the corresponding feature (per Apple Guideline 5.1.1).
-const PERMISSION_STEPS: PermDef[] = [
-  {
-    id: 'microphone',
-    icon: '🎤',
-    title: 'Microphone & Audio · Microphone et audio',
-    description:
-      'To use the app properly, please allow microphone and speaker access — it lets you make and receive calls.\n\n' +
-      'Pour utiliser l’application correctement, veuillez autoriser l’accès au microphone et au haut-parleur — cela permet de passer et recevoir vos appels.',
-    why: 'Used for voice calls · Utilisé pour les appels',
-    required: false,
-    color: '#10B981',
-  },
-  {
-    id: 'contacts',
-    icon: '👥',
-    title: 'Contacts',
-    description:
-      'Import your contacts to dial faster and see caller names. Optional — tap Next to skip.\n\n' +
-      'Importez vos contacts pour composer plus vite et voir les noms des appelants. Optionnel — appuyez sur Suivant pour passer.',
-    why: 'Optional · Optionnel',
-    required: false,
-    color: '#3B82F6',
-  },
-];
-
+/**
+ * Just-in-time onboarding gate.
+ *
+ *   intro → microphone (required for calls, but never blocks) → done
+ *
+ * Contacts and notifications are asked in-context later (dialer / post-login).
+ * Design goals per Apple 5.1.1 + Google UX guidelines:
+ *  - Show a soft in-app prompt BEFORE the OS request.
+ *  - Distinguish denied (can re-prompt) from blocked (must go to Settings).
+ *  - Never block navigation — always expose a "Not now" / "Continue without".
+ *  - Non-alarming visual language — no red walls of text.
+ *  - Copy follows the app language (FR/EN).
+ */
 export default function PermissionGate({ onComplete }: PermissionGateProps) {
-  const [step, setStep] = useState<StepId>('intro');
-  const [perms, setPerms] = useState<AllPermissions>({
-    microphone: 'prompt',
-    speaker: 'granted',
-    contacts: 'prompt',
-    notifications: 'prompt',
-    camera: 'prompt',
-  });
-  const [requesting, setRequesting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [showDiag, setShowDiag] = useState(false);
+  const { lang } = useT();
+  const fr = lang === 'fr';
+  const { micStatus, requestMicrophonePermission, refresh } = usePermissions();
+  const [step, setStep] = useState<'intro' | PermKey | 'done'>('intro');
+  const [busy, setBusy] = useState(false);
 
-  // Re-check permissions when the user comes back from the OS Settings page
-  // (typical flow after they tap "Open Settings" following a denial).
-  useEffect(() => {
-    if (!Capacitor.isNativePlatform()) return;
-    let mounted = true;
-    const recheck = async () => {
-      try {
-        const p = await checkAllPermissions();
-        if (!mounted) return;
-        setPerms((cur) => ({ ...cur, ...p }));
-        if (step === 'microphone' && p.microphone === 'granted') {
-          setError(null);
-          advance('microphone');
-        }
-      } catch { /* ignore */ }
-    };
-    const onVis = () => { if (document.visibilityState === 'visible') void recheck(); };
-    document.addEventListener('visibilitychange', onVis);
-    let removeApp: (() => void) | undefined;
-    (async () => {
-      try {
-        const { App } = await import('@capacitor/app');
-        const h = await App.addListener('appStateChange', ({ isActive }) => { if (isActive) void recheck(); });
-        removeApp = () => { try { h.remove(); } catch {} };
-      } catch { /* ignore */ }
-    })();
-    return () => {
-      mounted = false;
-      document.removeEventListener('visibilitychange', onVis);
-      removeApp?.();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step]);
+  // Auto-advance once mic is settled (granted or user chose to move on).
+  useEffect(() => { void refresh(); }, [refresh]);
 
-  const advance = (from: StepId) => {
-    const order: StepId[] = PERMISSION_STEPS.map((s) => s.id) as StepId[];
-    const i = order.indexOf(from as any);
-    if (i < order.length - 1) setStep(order[i + 1]);
-    else {
-      setStep('done');
-      setTimeout(onComplete, 800);
-    }
-  };
+  const finish = () => { setStep('done'); setTimeout(onComplete, 500); };
 
-  const requestCurrent = async () => {
-    if (step === 'intro' || step === 'done') return;
-    setRequesting(true);
-    setError(null);
-    let shouldAdvance = true;
+  const handleAllow = async (key: PermKey) => {
+    setBusy(true);
     try {
-      let next: PermissionStatus = 'denied';
-      if (step === 'microphone') {
-        next = await requestMicrophone();
-        setPerms((p) => ({ ...p, microphone: next, speaker: next === 'granted' ? 'granted' : p.speaker }));
-        if (next !== 'granted') {
-          const isAndroid = Capacitor.getPlatform() === 'android';
-          setError(
-            isAndroid
-              ? 'Accès microphone refusé. Ouvrez Réglages → Applications → Lemtel → Autorisations → Microphone, puis revenez à l’application.'
-              : 'Accès microphone refusé. Activez-le dans Réglages iOS → Lemtel → Microphone pour que les appels et l’audio bidirectionnel fonctionnent.'
-          );
-          shouldAdvance = false;
-        }
-      } else if (step === 'contacts') {
-        if (Capacitor.isNativePlatform()) {
-          try {
-            const { Contacts } = await import('@capacitor-community/contacts');
-            const r = await Contacts.requestPermissions();
-            next = r?.contacts === 'granted' ? 'granted' : 'denied';
-          } catch { next = 'denied'; }
-        } else {
-          next = 'granted'; // web — nothing to gate
-        }
-        setPerms((p) => ({ ...p, contacts: next }));
-      } else if (step === 'notifications') {
-        if (Capacitor.isNativePlatform()) {
-          try {
-            const { PushNotifications } = await import('@capacitor/push-notifications');
-            const r = await PushNotifications.requestPermissions();
-            next = r.receive === 'granted' ? 'granted' : 'denied';
-            try {
-              const { LocalNotifications } = await import('@capacitor/local-notifications');
-              await LocalNotifications.requestPermissions();
-            } catch { /* ignore */ }
-          } catch { next = 'denied'; }
-        } else if (typeof Notification !== 'undefined') {
-          try {
-            const r = await Notification.requestPermission();
-            next = r === 'granted' ? 'granted' : 'denied';
-          } catch { next = 'denied'; }
-        }
-        setPerms((p) => ({ ...p, notifications: next }));
-      }
+      if (key === 'microphone') await requestMicrophonePermission();
     } finally {
-      setRequesting(false);
-      if (shouldAdvance) advance(step);
+      setBusy(false);
+      // Whatever the result, don't block: mic is the only step here.
+      finish();
     }
   };
 
-  // ─── INTRO ────────────────────────────────────────────────────────────
+  const previews = useMemo(() => ([
+    { icon: '🎤', label: fr ? 'Microphone' : 'Microphone', hint: fr ? 'pour passer des appels' : 'to make calls', required: true },
+    { icon: '👥', label: 'Contacts', hint: fr ? 'optionnel, plus tard' : 'optional, later', required: false },
+    { icon: '🔔', label: 'Notifications', hint: fr ? 'optionnel, plus tard' : 'optional, later', required: false },
+  ]), [fr]);
+
   if (step === 'intro') {
     return (
       <Shell>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
           <LemtelMark size={64} />
-          <div style={{ fontSize: font.xl, fontWeight: 800, color: colors.signalGold, marginTop: 12, letterSpacing: 2 }}>
-            LEMTEL
-          </div>
+          <div style={{ fontSize: font.xl, fontWeight: 800, color: colors.signalGold, marginTop: 12, letterSpacing: 2 }}>LEMTEL</div>
           <div style={{ fontSize: font.xs, color: colors.mutedSilver, letterSpacing: 4 }}>COMMUNICATIONS</div>
         </div>
-
-        <h1 style={titleStyle}>A few quick permissions</h1>
+        <h1 style={titleStyle}>{fr ? 'Bienvenue' : 'Welcome'}</h1>
         <p style={subtitleStyle}>
-          Lemtel Telecom needs a few permissions to deliver the best calling experience.
+          {fr
+            ? "Nous vous demanderons quelques autorisations quand vous en aurez besoin — jamais toutes d'un coup."
+            : "We'll ask for a few permissions as you need them — never all at once."}
         </p>
-
-        <div style={{ width: '100%', maxWidth: 360, margin: '8px 0 24px' }}>
-          {PERMISSION_STEPS.map((p) => (
-            <div key={p.id} style={previewRow}>
-              <div style={{ ...previewIcon, background: `${p.color}22`, border: `1px solid ${p.color}55` }}>
-                <span style={{ fontSize: 22 }}>{p.icon}</span>
-              </div>
+        <div style={{ width: '100%', maxWidth: 360, margin: '4px 0 24px' }}>
+          {previews.map((p) => (
+            <div key={p.label} style={previewRow}>
+              <div style={previewIcon}><span style={{ fontSize: 22 }}>{p.icon}</span></div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: font.base, fontWeight: 700, color: colors.textIce }}>{p.title}</div>
+                <div style={{ fontSize: font.base, fontWeight: 700, color: colors.textIce }}>{p.label}</div>
                 <div style={{ fontSize: font.xs, color: p.required ? colors.signalGold : colors.mutedSilver, marginTop: 2 }}>
-                  {p.required ? '⚡ Required' : '✨ Optional'}
+                  {p.hint}
                 </div>
               </div>
             </div>
           ))}
         </div>
-
         <button onClick={() => setStep('microphone')} style={primaryBtnStyle}>
-          Get Started →
+          {fr ? 'Commencer' : 'Get started'} →
         </button>
-
         <p style={{ fontSize: 11, color: colors.mutedSilver, marginTop: 14, textAlign: 'center' }}>
-          You can change permissions anytime in Settings.
+          {fr ? 'Modifiable à tout moment dans les Réglages.' : 'Change anytime in Settings.'}
         </p>
       </Shell>
     );
   }
 
-  // ─── DONE ─────────────────────────────────────────────────────────────
   if (step === 'done') {
     return (
       <Shell>
-        <div style={{ fontSize: 72, marginBottom: 16 }}>✅</div>
-        <h1 style={titleStyle}>All set!</h1>
-        <p style={subtitleStyle}>Lemtel Telecom is ready to use.</p>
+        <div style={{ fontSize: 64, marginBottom: 12 }}>✅</div>
+        <h1 style={titleStyle}>{fr ? 'Prêt !' : 'All set!'}</h1>
       </Shell>
     );
   }
 
-  // ─── PER-STEP REQUEST ─────────────────────────────────────────────────
-  const current = PERMISSION_STEPS.find((s) => s.id === step)!;
-  const idx = PERMISSION_STEPS.findIndex((s) => s.id === step);
-  const progress = ((idx + 1) / PERMISSION_STEPS.length) * 100;
-  const status = perms[current.id];
+  // Microphone step — the only up-front request.
+  if (step === 'microphone') {
+    if (micStatus === 'granted' || micStatus === 'unavailable') {
+      // Nothing to ask — advance immediately.
+      queueMicrotask(finish);
+      return <Shell />;
+    }
+    if (micStatus === 'blocked') {
+      return (
+        <Shell>
+          <PermissionBlockedScreen perm="microphone" onContinueWithout={finish} />
+        </Shell>
+      );
+    }
+    // 'unknown' or 'denied' → soft prompt.
+    return (
+      <Shell>
+        <PermissionSoftPrompt
+          perm="microphone"
+          busy={busy}
+          onAllow={() => void handleAllow('microphone')}
+          onLater={finish}
+        />
+      </Shell>
+    );
+  }
 
-  return (
-    <Shell>
-      {/* Progress bar */}
-      <div style={{ width: '100%', maxWidth: 360, height: 4, borderRadius: 4, background: 'rgba(255,255,255,0.08)', marginBottom: 28 }}>
-        <div style={{ width: `${progress}%`, height: '100%', borderRadius: 4, background: gradients.call, transition: 'width .3s ease' }} />
-      </div>
-
-      <div style={{
-        width: 96, height: 96, borderRadius: '50%',
-        background: `${current.color}22`,
-        border: `2px solid ${current.color}66`,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 46, marginBottom: 22,
-      }}>
-        {current.icon}
-      </div>
-
-      <h1 style={titleStyle}>{current.title}</h1>
-      <p style={subtitleStyle}>{current.description}</p>
-
-      <div style={{
-        display: 'inline-block', padding: '6px 12px', borderRadius: 999,
-        background: `${current.color}1a`, border: `1px solid ${current.color}55`,
-        color: current.color, fontSize: font.xs, fontWeight: 700, marginBottom: 22,
-      }}>
-        {current.why}
-      </div>
-
-      {/* Live status badge for all permissions */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap', justifyContent: 'center' }}>
-        <StatusChip label="🎤 Mic" state={perms.microphone} />
-        <StatusChip label="🔊 Speaker" state={perms.speaker} />
-        <StatusChip label="👥 Contacts" state={perms.contacts} />
-        <StatusChip label="🔔 Notif" state={perms.notifications} />
-      </div>
-
-      {status === 'granted' && (
-        <div style={{ color: '#10B981', fontSize: font.sm, marginBottom: 16 }}>
-          ✅ Permission granted
-        </div>
-      )}
-      {status === 'denied' && (
-        <div style={{ color: colors.danger, fontSize: font.xs, marginBottom: 16, textAlign: 'center', maxWidth: 320, lineHeight: 1.5 }}>
-          {current.id === 'microphone'
-            ? (Capacitor.getPlatform() === 'android'
-                ? 'Microphone access is off. To enable calling, open Settings → Apps → Lemtel → Permissions → Microphone.'
-                : 'Microphone access is off. To enable calling, open iOS Settings → Lemtel → Microphone.')
-            : (Capacitor.getPlatform() === 'android'
-                ? 'Contacts access is off. You can enable it later in Settings → Apps → Lemtel → Permissions → Contacts.'
-                : 'Contacts access is off. You can enable it later in iOS Settings → Lemtel → Contacts.')}
-        </div>
-      )}
-      {error && (
-        <div style={{ color: colors.danger, fontSize: font.xs, marginBottom: 16, textAlign: 'center', maxWidth: 330, lineHeight: 1.45 }}>
-          {error}
-        </div>
-      )}
-
-      {status !== 'denied' && (
-        <button onClick={requestCurrent} disabled={requesting} style={{ ...primaryBtnStyle, opacity: requesting ? 0.6 : 1 }}>
-          {requesting ? 'Requesting… · Demande en cours…' : 'Continue · Continuer'}
-        </button>
-      )}
-
-      {status === 'denied' && Capacitor.isNativePlatform() && (
-        <button onClick={() => { void openAppSettings(); }} style={primaryBtnStyle}>
-          Open Settings · Ouvrir les Réglages
-        </button>
-      )}
-
-      {/* "Next" — ALWAYS visible so the user is never blocked. */}
-      <button
-        onClick={() => advance(step)}
-        style={{ ...ghostBtnStyle, marginTop: 8, color: colors.mutedSilver }}
-      >
-        Next · Suivant
-      </button>
-
-
-      {/* Step dots */}
-      <div style={{ display: 'flex', gap: 8, marginTop: 24 }}>
-        {PERMISSION_STEPS.map((s, i) => (
-          <span key={s.id} style={{
-            width: 8, height: 8, borderRadius: '50%',
-            background: i <= idx ? colors.signalGold : 'rgba(255,255,255,0.15)',
-          }} />
-        ))}
-      </div>
-
-      <button
-        onClick={() => setShowDiag(true)}
-        style={{
-          marginTop: 18, background: 'transparent', color: '#94A3B8',
-          border: '1px dashed rgba(255,255,255,0.2)', borderRadius: 10,
-          padding: '8px 14px', fontSize: 11, fontWeight: 600, cursor: 'pointer',
-        }}
-      >
-        🔧 Run diagnostic
-      </button>
-
-      {showDiag && <PermissionDiagPanel onClose={() => setShowDiag(false)} />}
-    </Shell>
-  );
+  return null;
 }
 
-function StatusChip({ label, state }: { label: string; state: PermissionStatus }) {
-  const map: Record<PermissionStatus, { bg: string; fg: string; icon: string }> = {
-    granted:     { bg: 'rgba(16,185,129,0.15)', fg: '#10B981', icon: '✅' },
-    denied:      { bg: 'rgba(239,68,68,0.15)',  fg: '#EF4444', icon: '⛔' },
-    prompt:      { bg: 'rgba(148,163,184,0.15)',fg: '#94A3B8', icon: '❔' },
-    unsupported: { bg: 'rgba(148,163,184,0.10)',fg: '#64748B', icon: '—'  },
-  };
-  const s = map[state] ?? map.prompt;
-  return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: 4,
-      padding: '4px 8px', borderRadius: 999,
-      background: s.bg, color: s.fg,
-      fontSize: 10, fontWeight: 700,
-    }}>
-      {s.icon} {label} <span style={{ opacity: 0.75 }}>{state}</span>
-    </span>
-  );
-}
-
-// ── Styling helpers ──────────────────────────────────────────────────────
-function Shell({ children }: { children: React.ReactNode }) {
+function Shell({ children }: { children?: React.ReactNode }) {
   return (
     <div style={{
-      position: 'fixed', inset: 0,
-      background: gradients.app,
+      position: 'fixed', inset: 0, background: gradients.app,
       paddingTop: 'var(--safe-top)', paddingBottom: 'var(--safe-bottom)',
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
       padding: '32px 22px', color: colors.textIce, zIndex: 9999, overflowY: 'auto',
@@ -363,33 +142,19 @@ function Shell({ children }: { children: React.ReactNode }) {
   );
 }
 
-const titleStyle: React.CSSProperties = {
-  fontSize: 26, fontWeight: 800, margin: '0 0 10px', textAlign: 'center', color: colors.textIce,
-};
-const subtitleStyle: React.CSSProperties = {
-  fontSize: font.sm, color: colors.mutedSilver, textAlign: 'center', maxWidth: 340, margin: '0 0 20px', lineHeight: 1.55,
-};
+const titleStyle: React.CSSProperties = { fontSize: 26, fontWeight: 800, margin: '0 0 10px', textAlign: 'center', color: colors.textIce };
+const subtitleStyle: React.CSSProperties = { fontSize: font.sm, color: colors.mutedSilver, textAlign: 'center', maxWidth: 340, margin: '0 0 20px', lineHeight: 1.55 };
 const primaryBtnStyle: React.CSSProperties = {
-  width: '100%', maxWidth: 320, height: 54,
-  background: gradients.call, color: '#fff',
+  width: '100%', maxWidth: 320, height: 54, background: gradients.call, color: '#fff',
   border: `1px solid ${colors.signalGold}55`, borderRadius: radius.lg,
   fontSize: font.md, fontWeight: 800, cursor: 'pointer',
   boxShadow: '0 8px 32px rgba(0,61,166,0.45)',
 };
-const ghostBtnStyle: React.CSSProperties = {
-  width: '100%', maxWidth: 320, height: 46, marginTop: 12,
-  background: 'transparent', color: colors.mutedSilver,
-  border: '1px solid rgba(255,255,255,0.12)', borderRadius: radius.md,
-  fontSize: font.sm, fontWeight: 600, cursor: 'pointer',
-};
 const previewRow: React.CSSProperties = {
-  display: 'flex', alignItems: 'center', gap: 12,
-  padding: 12, marginBottom: 10,
-  background: 'rgba(255,255,255,0.04)',
-  border: '1px solid rgba(255,255,255,0.08)',
-  borderRadius: radius.md,
+  display: 'flex', alignItems: 'center', gap: 12, padding: 12, marginBottom: 10,
+  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: radius.md,
 };
 const previewIcon: React.CSSProperties = {
-  width: 44, height: 44, borderRadius: 12,
-  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  width: 44, height: 44, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)',
 };
