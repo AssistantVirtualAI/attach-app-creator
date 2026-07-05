@@ -57,6 +57,7 @@ export default function PAUsers() {
   const [editUser, setEditUser] = useState<Profile | null>(null);
   const [delUser, setDelUser] = useState<Profile | null>(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [addAdminOpen, setAddAdminOpen] = useState(false);
   const [callsByUser, setCallsByUser] = useState<Record<string, number>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
   const [highlightId, setHighlightId] = useState<string | null>(null);
