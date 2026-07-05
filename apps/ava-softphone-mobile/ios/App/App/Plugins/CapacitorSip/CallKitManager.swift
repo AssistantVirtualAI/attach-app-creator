@@ -181,8 +181,51 @@ extension CallKitManager: CXProviderDelegate {
     /// NEVER call pjsua_set_snd_dev directly here: CallKit runs this on its own
     /// internal thread which is NOT registered in PJLIB → assertion crash.
     public func provider(_ provider: CXProvider, didActivate audioSession: AVAudioSession) {
-        print("[CallKitManager] ✅ AVAudioSession activated by CallKit")
-        onAudioActivated?()
+        // Check microphone permission BEFORE activating audio session
+        let micPermission = AVAudioSession.sharedInstance().recordPermission
+
+        switch micPermission {
+        case .granted:
+            // Safe to activate audio
+            do {
+                try audioSession.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetooth, .allowBluetoothA2DP])
+                try audioSession.setActive(true)
+                NSLog("[CallKit] ✅ AVAudioSession activated successfully")
+                onAudioActivated?()
+            } catch {
+                NSLog("[CallKit] ❌ AVAudioSession activation failed: \(error)")
+            }
+
+        case .denied:
+            // Microphone permission denied — cancel the call gracefully
+            NSLog("[CallKit] ❌ Microphone permission denied — cancelling call")
+            if let uuid = activeUUID {
+                provider.reportCall(with: uuid, endedAt: Date(), reason: .failed)
+            }
+            // Notify JS layer so UI can show permission screen
+            NotificationCenter.default.post(
+                name: NSNotification.Name("MicrophoneDeniedDuringCall"),
+                object: nil
+            )
+
+        case .undetermined:
+            // Permission not yet requested — request it now
+            AVAudioSession.sharedInstance().requestRecordPermission { [weak self] granted in
+                DispatchQueue.main.async {
+                    if granted {
+                        self?.onAudioActivated?()
+                    } else {
+                        NSLog("[CallKit] ❌ User denied microphone during call setup")
+                        if let uuid = self?.activeUUID {
+                            provider.reportCall(with: uuid, endedAt: Date(), reason: .failed)
+                        }
+                    }
+                }
+            }
+
+        @unknown default:
+            NSLog("[CallKit] ❓ Unknown microphone permission state")
+        }
     }
 
     public func provider(_ provider: CXProvider, didDeactivate audioSession: AVAudioSession) {
