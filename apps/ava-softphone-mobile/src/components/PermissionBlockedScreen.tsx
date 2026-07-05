@@ -23,19 +23,19 @@ const COPY: Record<PermKey, { icon: React.ReactNode; title: { fr: string; en: st
     icon: <Users size={48} color="#94A3B8" strokeWidth={1.6} />,
     title: { fr: 'Contacts bloqués', en: 'Contacts blocked' },
     body: {
-      fr: "L'accès aux contacts est désactivé. Ouvrez les Réglages pour l'activer, ou continuez sans.",
-      en: 'Contacts access is turned off. Open Settings to enable it, or continue without.',
+      fr: "L'accès aux contacts est désactivé. Ouvrez les Réglages pour l'activer, ou passez cette étape.",
+      en: 'Contacts access is turned off. Open Settings to enable it, or skip this step.',
     },
-    cont: { fr: 'Continuer sans contacts', en: 'Continue without contacts' },
+    cont: { fr: 'Passer cette étape', en: 'Skip this step' },
   },
   notifications: {
     icon: <Bell size={48} color="#94A3B8" strokeWidth={1.6} />,
     title: { fr: 'Notifications bloquées', en: 'Notifications blocked' },
     body: {
-      fr: "Vous ne recevrez pas d'alertes d'appels entrants. Ouvrez les Réglages, ou continuez sans.",
-      en: 'You won\'t receive incoming call alerts. Open Settings, or continue without.',
+      fr: "Vous ne recevrez pas d'alertes d'appels entrants. Ouvrez les Réglages, ou passez cette étape.",
+      en: 'You won\'t receive incoming call alerts. Open Settings, or skip this step.',
     },
-    cont: { fr: 'Continuer sans notifications', en: 'Continue without notifications' },
+    cont: { fr: 'Passer cette étape', en: 'Skip this step' },
   },
 };
 
