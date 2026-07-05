@@ -15,7 +15,7 @@ import SessionTimeoutModal from "@/components/planipret/SessionTimeoutModal";
 import PrivacyConsentGate from "@/components/planipret/PrivacyConsentGate";
 import UniversalSearchBar from "@/components/planipret/UniversalSearchBar";
 import { OnboardingTutorial } from "@/components/planipret/OnboardingTutorial";
-import MobilePermissionsOnboarding, { isPermOnboardingDone } from "@/components/planipret/mobile/MobilePermissionsOnboarding";
+
 import { useAvaNavigation } from "@/hooks/useAvaNavigation";
 import AvaVoiceAgent from "@/components/planipret/mobile/AvaVoiceAgent";
 import AvaChatSheet from "@/components/planipret/mobile/AvaChatSheet";
@@ -27,12 +27,12 @@ import { useMplanipretLang } from "@/hooks/useMplanipretLang";
 import { ROUTES } from "@/lib/routes";
 import { recordRedirect } from "@/lib/debug/navDebug";
 import { useMplanipretSoftphone } from "@/hooks/useMplanipretSoftphone";
-import MicPermissionDialog from "@/components/planipret/mobile/MicPermissionDialog";
-import type { MicPermissionState } from "@/lib/planipret/audio/micPermission";
+import MicDeniedBanner from "@/components/planipret/mobile/MicDeniedBanner";
+
 
 const ACCENT = "#2E9BDC";
 
-export type PlanipretMobileContext = { profile: any; reloadProfile: () => Promise<void>; openDialer: (number?: string) => void; openAva: () => void; registerRefresh: (fn: (() => Promise<void> | void) | null) => void };
+export type PlanipretMobileContext = { profile: any; reloadProfile: () => Promise<void>; openDialer: (number?: string) => void; openAva: () => void; registerRefresh: (fn: (() => Promise<void> | void) | null) => void; softphone: ReturnType<typeof useMplanipretSoftphone> };
 
 const TABS = [
   { to: "/mplanipret/home", labelKey: "tabs.home", Icon: Home },
@@ -80,13 +80,12 @@ function contactPrimaryPhone(c: DialerContact): string | undefined {
   return c.cell_phone || c.phone || c.work_phone || c.home_phone || c.extension;
 }
 
-function Dialer({ open, onClose, initial, openMessages }: { open: boolean; onClose: () => void; initial?: string; openMessages: (n?: string) => void }) {
+function Dialer({ open, onClose, initial, openMessages, softphone }: { open: boolean; onClose: () => void; initial?: string; openMessages: (n?: string) => void; softphone: ReturnType<typeof useMplanipretSoftphone> }) {
   const { t } = useMplanipretLang();
-  const softphone = useMplanipretSoftphone();
   const [mode, setMode] = useState<"keypad" | "search">("keypad");
   const [number, setNumber] = useState("");
   const [calling, setCalling] = useState(false);
-  const [micDialog, setMicDialog] = useState<{ open: boolean; state: MicPermissionState; pending?: string }>({ open: false, state: "prompt" });
+  const [micDenied, setMicDenied] = useState(false);
   const [query, setQuery] = useState("");
   const [contacts, setContacts] = useState<DialerContact[]>([]);
   const [loadingContacts, setLoadingContacts] = useState(false);
@@ -102,12 +101,13 @@ function Dialer({ open, onClose, initial, openMessages }: { open: boolean; onClo
   const startCall = async (destOverride?: string) => {
     const destination = destOverride ?? number;
     if (!destination) return;
+    setMicDenied(false);
     setCalling(true);
     const result = await softphone.placeCall(destination);
     setCalling(false);
     if (!result.ok) {
       if ("micState" in result && (result.micState === "denied" || result.micState === "unavailable")) {
-        setMicDialog({ open: true, state: result.micState, pending: destination });
+        setMicDenied(true);
         return;
       }
       toast.error(("error" in result && result.error) || t("dialer.callFailed"));
@@ -118,11 +118,6 @@ function Dialer({ open, onClose, initial, openMessages }: { open: boolean; onClo
     onClose();
   };
 
-  const retryMic = async () => {
-    const pending = micDialog.pending;
-    setMicDialog({ open: false, state: "prompt" });
-    if (pending) await startCall(pending);
-  };
 
 
   // Load contacts (personal + shared + directory) once when opening Search mode
@@ -325,12 +320,11 @@ function Dialer({ open, onClose, initial, openMessages }: { open: boolean; onClo
           </div>
         </motion.div>
       )}
-      <MicPermissionDialog
-        open={micDialog.open}
-        state={micDialog.state}
-        onRetry={retryMic}
-        onClose={() => setMicDialog({ open: false, state: "prompt" })}
-      />
+      {micDenied && (
+        <div className="absolute left-0 right-0 z-30 px-4" style={{ bottom: "calc(env(safe-area-inset-bottom,0px) + 96px)" }}>
+          <MicDeniedBanner onDismiss={() => setMicDenied(false)} />
+        </div>
+      )}
     </AnimatePresence>
   );
 }
@@ -341,7 +335,7 @@ export default function PlanipretMobile() {
   const { t, lang, setLang } = useMplanipretLang();
   // Boot the shared softphone engine (WebRTC + noise cancellation + auto handover).
   // Uses the exact same JsSIP stack as the Lemtel mobile app.
-  useMplanipretSoftphone();
+  const softphone = useMplanipretSoftphone();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [accessError, setAccessError] = useState<"unauthenticated" | "missing_profile" | "load_failed" | null>(null);
@@ -499,6 +493,7 @@ export default function PlanipretMobile() {
       toast.error(error.message || t("home.connectionImpossible"));
       return;
     }
+    void import("@/lib/native/requestPermissionsAfterLogin").then(m => m.requestPermissionsAfterLogin());
     toast.success(t("auth.success"));
     setLoading(true);
     await loadProfile();
@@ -595,15 +590,12 @@ export default function PlanipretMobile() {
         <div ref={scrollRef} className="flex-1 overflow-y-auto pb-[110px]">
           <PullIndicator pullDist={pullDist} refreshing={refreshing} threshold={threshold} color={ACCENT} />
           <PlanipretErrorBoundary key={location.pathname}>
-            <Outlet context={{ profile, reloadProfile: loadProfile, openDialer, openAva, registerRefresh } satisfies PlanipretMobileContext} />
+            <Outlet context={{ profile, reloadProfile: loadProfile, openDialer, openAva, registerRefresh, softphone } satisfies PlanipretMobileContext} />
           </PlanipretErrorBoundary>
         </div>
         <SessionTimeoutModal />
         {profile && <PrivacyConsentGate profile={profile} onAccepted={loadProfile} />}
-        {profile && profile.consent_accepted_at && !isPermOnboardingDone() && (
-          <MobilePermissionsOnboarding onDone={() => loadProfile()} />
-        )}
-        {profile && profile.consent_accepted_at && isPermOnboardingDone() && !profile.onboarding_completed && (
+        {profile && profile.consent_accepted_at && !profile.onboarding_completed && (
           <OnboardingTutorial profile={profile} onDone={loadProfile} />
         )}
 
@@ -687,7 +679,7 @@ export default function PlanipretMobile() {
         </div>
 
 
-        <Dialer open={dialerOpen} onClose={() => setDialerOpen(false)} initial={dialerInit} openMessages={(n) => { setDialerOpen(false); navigate(`/mplanipret/messages${n ? `?to=${encodeURIComponent(n)}` : ""}`); }} />
+        <Dialer open={dialerOpen} onClose={() => setDialerOpen(false)} initial={dialerInit} openMessages={(n) => { setDialerOpen(false); navigate(`/mplanipret/messages${n ? `?to=${encodeURIComponent(n)}` : ""}`); }} softphone={softphone} />
         <ActiveCallOverlay callId={activeCallId} onClosed={() => setActiveCallId(null)} />
         <InboundCallOverlay call={inbound} onClose={() => setInbound(null)} />
         {avaOpen && profile?.user_id && (

@@ -27,7 +27,9 @@ type Profile = PlanipretBrokerRow & {
   ns_only?: boolean;
   status?: string | null;
   maestro_connected?: boolean | null;
+  role?: string | null;
 };
+
 
 export default function PAUsers() {
   const navigate = useNavigate();
@@ -219,6 +221,21 @@ export default function PAUsers() {
     toast.success("Suppression terminée");
   };
 
+  const promoteOrDemote = async (u: Profile, promote: boolean) => {
+    const label = promote ? "promouvoir en admin" : "rétrograder en courtier";
+    if (!confirm(`Confirmer : ${label} ${u.full_name} ?`)) return;
+    const { data, error } = await supabase.functions.invoke("pp-admin-user", {
+      body: { action: promote ? "promote_broker" : "demote_admin", payload: { user_id: u.user_id } },
+    });
+    if (error || !(data as any)?.success) {
+      toast.error((data as any)?.error ?? "Échec");
+      return;
+    }
+    toast.success(promote ? "Promu admin" : "Rétrogradé courtier");
+    await load();
+  };
+
+
   const adminCount = rows.length;
   return (
     <div className="space-y-4">
@@ -362,7 +379,7 @@ export default function PAUsers() {
               ) : paged.length === 0 ? (
                 <tr><td colSpan={10} className="p-8 text-center" style={{ color: "var(--pp-text-faint)" }}>Aucun courtier</td></tr>
               ) : paged.map((u) => (
-                <tr key={u.user_id} className="hover:bg-white/[0.02] transition"
+                <tr key={u.user_id || u.email || u.extension} className="hover:bg-white/[0.02] transition"
                   style={{
                     borderTop: "1px solid rgba(255,255,255,0.04)",
                     background: highlightId === u.user_id ? `${ACCENT}15` : undefined,
@@ -470,6 +487,15 @@ export default function PAUsers() {
                         {!u.ns_only && (
                           <>
                             <DropdownMenuSeparator />
+                            {u.role === "admin" ? (
+                              <DropdownMenuItem onClick={() => promoteOrDemote(u, false)}>
+                                <ChevronDown className="w-3.5 h-3.5 mr-2" /> Rétrograder en courtier
+                              </DropdownMenuItem>
+                            ) : (
+                              <DropdownMenuItem onClick={() => promoteOrDemote(u, true)}>
+                                <ChevronUp className="w-3.5 h-3.5 mr-2" /> Promouvoir en admin
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem
                               onClick={() => setDelUser(u)}
                               className="text-red-500 focus:text-red-500 focus:bg-red-500/10"
@@ -478,6 +504,7 @@ export default function PAUsers() {
                             </DropdownMenuItem>
                           </>
                         )}
+
                         {u.ns_only && (
                           <>
                             <DropdownMenuSeparator />

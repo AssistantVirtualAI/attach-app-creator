@@ -27,15 +27,21 @@ Deno.serve(async (req) => {
 
   const { ctx, supabase } = guard;
   const url = new URL(req.url);
-  const action = url.searchParams.get("action") ?? "threads";
 
-  // Base path NS-API pour cet utilisateur (segmentation par extension)
+  // Parse body once (tolerant to invoke() which always POSTs JSON)
+  let body: Record<string, any> = {};
+  if (req.method !== "GET") {
+    body = await req.json().catch(() => ({})) ?? {};
+  }
+  const qp = url.searchParams;
+  const pick = (k: string) => body?.[k] ?? qp.get(k) ?? undefined;
+
+  const action = (pick("action") as string) ?? "threads";
   const userBase = `/domains/${encodeURIComponent(ctx.nsDomain)}/users/${encodeURIComponent(ctx.extension)}`;
 
   try {
-    // ── GET threads ─────────────────────────────────────────────────────────
-    if (req.method === "GET" && action === "threads") {
-      const limit = url.searchParams.get("limit") ?? "50";
+    if (action === "threads") {
+      const limit = (pick("limit") as string) ?? "50";
       const res = await nsFetch(`${userBase}/messagesessions?limit=${limit}`, { method: "GET" });
       if (!res.ok) {
         const txt = await res.text();
@@ -46,11 +52,10 @@ Deno.serve(async (req) => {
       return jsonResponse({ ok: true, count: threads.length, threads });
     }
 
-    // ── GET messages d'un thread ─────────────────────────────────────────────
-    if (req.method === "GET" && action === "messages") {
-      const threadId = url.searchParams.get("thread_id");
+    if (action === "messages") {
+      const threadId = pick("thread_id") as string | undefined;
       if (!threadId) return jsonResponse({ error: "thread_id requis" }, 400);
-      const limit = url.searchParams.get("limit") ?? "100";
+      const limit = (pick("limit") as string) ?? "100";
       const res = await nsFetch(
         `${userBase}/messagesessions/${encodeURIComponent(threadId)}/messages?limit=${limit}`,
         { method: "GET" }
@@ -64,12 +69,8 @@ Deno.serve(async (req) => {
       return jsonResponse({ ok: true, count: messages.length, messages });
     }
 
-    // ── GET numéros SMS ──────────────────────────────────────────────────────
-    if (req.method === "GET" && action === "sms-numbers") {
-      const res = await nsFetch(
-        `/domains/${encodeURIComponent(ctx.nsDomain)}/users/${encodeURIComponent(ctx.extension)}/smsnumbers`,
-        { method: "GET" }
-      );
+    if (action === "sms-numbers") {
+      const res = await nsFetch(`${userBase}/smsnumbers`, { method: "GET" });
       if (!res.ok) {
         const txt = await res.text();
         return jsonResponse({ error: "NS-API SMS numbers fetch failed", status: res.status, body: txt }, 502);
@@ -79,45 +80,30 @@ Deno.serve(async (req) => {
       return jsonResponse({ ok: true, numbers });
     }
 
-    // ── POST envoyer un message ──────────────────────────────────────────────
-    if (req.method === "POST" && action === "send") {
-      const payload = await req.json().catch(() => ({}));
-      const { to, message, type = "sms", thread_id } = payload ?? {};
+    if (action === "send") {
+      const to = pick("to") as string | undefined;
+      const message = pick("message") as string | undefined;
+      const type = (pick("type") as string) ?? "sms";
+      const thread_id = pick("thread_id") as string | undefined;
 
       if (!to || !message) {
         return jsonResponse({ error: "to et message sont requis" }, 400);
       }
 
-      let nsPath: string;
-      let nsBody: Record<string, unknown>;
+      const nsPath = thread_id
+        ? `${userBase}/messagesessions/${encodeURIComponent(thread_id)}/messages`
+        : `${userBase}/messagesessions`;
+      const nsBody: Record<string, unknown> = thread_id
+        ? { message, type }
+        : { type, destination: to, message };
 
-      if (thread_id) {
-        // Répondre dans un thread existant
-        nsPath = `${userBase}/messagesessions/${encodeURIComponent(thread_id)}/messages`;
-        nsBody = { message, type };
-      } else {
-        // Créer un nouveau thread
-        nsPath = `${userBase}/messagesessions`;
-        nsBody = {
-          type,
-          destination: to,
-          message,
-        };
-      }
-
-      const res = await nsFetch(nsPath, {
-        method: "POST",
-        body: JSON.stringify(nsBody),
-      });
-
+      const res = await nsFetch(nsPath, { method: "POST", body: JSON.stringify(nsBody) });
       if (!res.ok) {
         const txt = await res.text();
         return jsonResponse({ error: "NS-API send failed", status: res.status, body: txt }, 502);
       }
-
       const result = await res.json().catch(() => ({}));
 
-      // Persister dans Supabase pour l'historique local
       await supabase
         .from("planipret_phone_messages")
         .insert({
@@ -137,7 +123,6 @@ Deno.serve(async (req) => {
     }
 
     return jsonResponse({ error: `Action inconnue: ${action}` }, 400);
-
   } catch (e) {
     console.error("[pp-ns-sms] Erreur:", e);
     return jsonResponse({ error: (e as Error).message }, 500);

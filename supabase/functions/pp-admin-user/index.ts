@@ -336,6 +336,52 @@ Deno.serve(async (req) => {
       return jsonResponse({ success: true });
     }
 
+    if (action === "promote_broker" || action === "demote_admin") {
+      const { user_id } = payload ?? {};
+      if (!user_id) return jsonResponse({ success: false, error: "user_id requis" }, 400);
+      const newRole = action === "promote_broker" ? "admin" : "broker";
+
+      const { data: target } = await admin
+        .from("planipret_profiles")
+        .select("id, email, organization_id")
+        .eq("user_id", user_id)
+        .maybeSingle();
+      if (!target) return jsonResponse({ success: false, error: "Courtier introuvable" }, 404);
+
+      if (/@lemtel\.com$/i.test(String(target.email ?? ""))) {
+        return jsonResponse({ success: false, error: "Emails @lemtel.com non autorisés." }, 422);
+      }
+
+      const { error: upErr } = await admin
+        .from("planipret_profiles")
+        .update({ role: newRole })
+        .eq("id", target.id);
+      if (upErr) return jsonResponse({ success: false, error: upErr.message }, 200);
+
+      const orgId = target.organization_id ?? profile.organization_id;
+      if (action === "promote_broker") {
+        await admin.from("user_roles").upsert(
+          { user_id, organization_id: orgId, role: "planipret_admin" },
+          { onConflict: "user_id,organization_id" },
+        );
+      } else {
+        await admin
+          .from("user_roles")
+          .delete()
+          .eq("user_id", user_id)
+          .eq("role", "planipret_admin");
+      }
+
+      await logAudit(admin, req, {
+        admin_id: profile.id,
+        action: action === "promote_broker" ? "BROKER_PROMOTED_ADMIN" : "ADMIN_DEMOTED_BROKER",
+        resource_type: "user", resource_id: user_id,
+        metadata: { email: target.email },
+      });
+      return jsonResponse({ success: true, promoted: action === "promote_broker" });
+    }
+
+
     if (action === "create_admin") {
       const { email, password, full_name } = payload ?? {};
       if (!email || !full_name) {
@@ -364,6 +410,24 @@ Deno.serve(async (req) => {
           .eq("id", existing.id);
         if (password) {
           await admin.auth.admin.updateUserById(userId, { password }).catch(() => null);
+        }
+      } else if (existing?.id) {
+        const initialPassword = password || randomPassword(24);
+        const { data: created, error: cErr } = await admin.auth.admin.createUser({
+          email, password: initialPassword, email_confirm: true,
+        });
+        if (cErr || !created.user) return jsonResponse({ success: false, error: cErr?.message ?? "Échec création auth" }, 200);
+        userId = created.user.id;
+        promoted = true;
+        const { error: pErr } = await admin.from("planipret_profiles")
+          .update({ user_id: userId, role: "admin", full_name })
+          .eq("id", existing.id);
+        if (pErr) {
+          await admin.auth.admin.deleteUser(userId).catch(() => null);
+          return jsonResponse({ success: false, error: pErr.message }, 200);
+        }
+        if (!password) {
+          await admin.auth.resetPasswordForEmail(email).catch(() => null);
         }
       } else {
         if (!password) {

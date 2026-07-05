@@ -59,16 +59,24 @@ Deno.serve(async (req) => {
     const callerIdName =
       body?.caller_id_name ?? body?.["caller-id-name"] ?? profile.full_name ?? "Courtier Planiprêt";
 
-    trace(traceId, "ns.request", { extension: ext, destination, caller_id_number: callerIdNumber });
+    // NS-API v2 requires a client-generated `callid` to originate the call.
+    const clientCallId = crypto.randomUUID();
+    trace(traceId, "ns.request", { extension: ext, destination, caller_id_number: callerIdNumber, callid: clientCallId });
 
     // NS-API v2 outbound — same path/verb/body as ns-calls action:"start".
     const path = nsPath(env.domain, ext, "/calls");
     const res = await nsBrokerFetch(admin, profile, path, {
       method: "POST",
       body: JSON.stringify({
+        "call-id": clientCallId,
+        callid: clientCallId,
+        synchronous: "no",
+        "call-orig-user": `${ext}@${env.domain}`,
+        "call-term-user": destination,
         destination,
         "caller-id-number": callerIdNumber,
         "caller-id-name": callerIdName,
+        "callback-caller-id-number": callerIdNumber,
       }),
     });
 
@@ -87,19 +95,27 @@ Deno.serve(async (req) => {
       return jsonResponse({ success: false, error: errMsg, code: res.status, trace_id: traceId }, 200);
     }
 
-    const callId: string | null = data?.["call-id"] ?? data?.call_id ?? data?.id ?? null;
-    trace(traceId, "ns.ok", { call_id: callId, latency_ms: Date.now() - t0 });
+    const responseCallId: string | null = data?.["call-id"] ?? data?.call_id ?? data?.id ?? null;
+    const callId = responseCallId || clientCallId;
+    trace(traceId, "ns.ok", { call_id: callId, response_call_id: responseCallId, latency_ms: Date.now() - t0 });
 
     // CDR row so the Calls tab reflects the outbound attempt.
     try {
-      await admin.from("planipret_phone_calls").insert({
+      const { error: cdrError } = await admin.from("planipret_phone_calls").insert({
         user_id: userId,
-        call_id: callId,
+        organization_id: profile.organization_id,
+        ns_call_id: callId,
+        ns_callid: callId,
+        ns_domain: env.domain,
+        extension: ext,
         direction: "outbound",
-        caller_number: callerIdNumber,
-        callee_number: destination,
+        from_number: String(callerIdNumber),
+        to_number: destination,
         status: "outbound_ringing",
+        started_at: new Date().toISOString(),
+        metadata: { trace_id: traceId, ns_response: data, client_call_id: clientCallId, response_call_id: responseCallId },
       });
+      if (cdrError) throw cdrError;
       trace(traceId, "cdr.inserted", { call_id: callId });
     } catch (e) {
       trace(traceId, "cdr.insert_failed", { call_id: callId, error: (e as Error).message });

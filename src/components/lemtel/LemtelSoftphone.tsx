@@ -19,6 +19,7 @@ export function LemtelSoftphone() {
   const [extension, setExtension] = useState<string>('');
   const [number, setNumber] = useState('');
   const [muted, setMuted] = useState(false);
+  const [micDenied, setMicDenied] = useState(false);
   const uaRef = useRef<any>(null);
   const sessionRef = useRef<any>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -60,7 +61,10 @@ export function LemtelSoftphone() {
         });
         ua.on('connected', () => setStatus('registered'));
         ua.on('disconnected', () => setStatus('disconnected'));
-        ua.on('registered', () => setStatus('registered'));
+        ua.on('registered', () => {
+          setStatus('registered');
+          void import('@/lib/native/requestPermissionsAfterLogin').then(m => m.requestPermissionsAfterLogin());
+        });
         ua.on('registrationFailed', () => setStatus('failed'));
         ua.on('newRTCSession', (e: any) => {
           sessionRef.current = e.session;
@@ -86,10 +90,26 @@ export function LemtelSoftphone() {
 
   const call = async () => {
     if (!uaRef.current || !number) return;
+    setMicDenied(false);
     try {
-      await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach(t => t.stop());
       uaRef.current.call(`sip:${number}@portal.lemtel.tel`, { mediaConstraints: { audio: true, video: false } });
-    } catch (e) { console.error(e); }
+    } catch (e: any) {
+      if (e?.name === 'NotAllowedError' || e?.name === 'SecurityError') setMicDenied(true);
+      else console.error(e);
+    }
+  };
+  const openMicSettings = async () => {
+    try {
+      const { Capacitor } = await import('@capacitor/core');
+      if (Capacitor.getPlatform() === 'ios') window.open('app-settings:', '_system');
+      else if (Capacitor.getPlatform() === 'android') {
+        const { App } = await import('@capacitor/app');
+        const info = await App.getInfo();
+        window.open(`package:${info.id}`, '_system');
+      }
+    } catch { /* web preview */ }
   };
   const hangup = () => sessionRef.current?.terminate?.();
   const toggleMute = () => {
@@ -124,6 +144,15 @@ export function LemtelSoftphone() {
           </div>
           <div className="flex-1 p-4 flex flex-col gap-3">
             <Input value={number} onChange={(e) => setNumber(e.target.value)} placeholder="Enter number..." className="text-center text-lg" />
+            {micDenied && (
+              <div role="alert" className="flex items-start gap-2 rounded-md p-2 text-xs bg-destructive/10 border border-destructive/40">
+                <MicOff className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-destructive" />
+                <div className="flex-1">
+                  Microphone disabled. Enable it in Settings → AVA Softphone → Microphone.
+                  <button onClick={openMicSettings} className="ml-2 underline font-semibold text-primary">Open Settings</button>
+                </div>
+              </div>
+            )}
             <div className="grid grid-cols-3 gap-2">
               {['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'].map((k) => (
                 <Button key={k} variant="outline" onClick={() => setNumber(number + k)} className="h-12">{k}</Button>
