@@ -70,7 +70,74 @@ import UIKit
         }
     }
 
+    /// Returns true when the microphone permission has been granted at the OS
+    /// level. Callers MUST check this before letting PJSIP activate the audio
+    /// session — otherwise `pjsua_call_make_call` will fail silently and
+    /// AVAudioSession activation can crash the process.
+    @objc public static func hasRecordPermission() -> Bool {
+        return AVAudioSession.sharedInstance().recordPermission == .granted
+    }
+
+    /// Present a native alert steering the user to Settings when the mic is
+    /// blocked. Safe to call from any thread; hops to main.
+    private func presentMicDeniedAlert() {
+        DispatchQueue.main.async {
+            let alert = UIAlertController(
+                title: NSLocalizedString("Microphone access required", comment: ""),
+                message: NSLocalizedString(
+                    "Lemtel needs microphone access to place calls. Enable it in Settings → Lemtel → Microphone.",
+                    comment: ""
+                ),
+                preferredStyle: .alert
+            )
+            alert.addAction(UIAlertAction(
+                title: NSLocalizedString("Open Settings", comment: ""),
+                style: .default,
+                handler: { _ in
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        UIApplication.shared.open(url)
+                    }
+                }
+            ))
+            alert.addAction(UIAlertAction(
+                title: NSLocalizedString("Cancel", comment: ""),
+                style: .cancel
+            ))
+
+            guard let scene = UIApplication.shared.connectedScenes
+                .first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene,
+                  let root = scene.windows.first(where: { $0.isKeyWindow })?.rootViewController else {
+                return
+            }
+            var top: UIViewController = root
+            while let presented = top.presentedViewController { top = presented }
+            top.present(alert, animated: true)
+        }
+    }
+
     @objc public func reportOutgoing(to: String) {
+        // Guard: never let CallKit start an outbound call while the mic is denied.
+        switch AVAudioSession.sharedInstance().recordPermission {
+        case .granted:
+            break
+        case .undetermined:
+            AVAudioSession.sharedInstance().requestRecordPermission { [weak self] granted in
+                if granted {
+                    DispatchQueue.main.async { self?.reportOutgoing(to: to) }
+                } else {
+                    self?.presentMicDeniedAlert()
+                }
+            }
+            return
+        case .denied:
+            NSLog("[CallKitManager] ⛔ Outgoing call blocked: microphone permission denied")
+            presentMicDeniedAlert()
+            return
+        @unknown default:
+            presentMicDeniedAlert()
+            return
+        }
+
         let uuid = UUID()
         activeUUID = uuid
         let handle = CXHandle(type: .generic, value: to)
