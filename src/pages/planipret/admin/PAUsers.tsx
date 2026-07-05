@@ -270,6 +270,9 @@ export default function PAUsers() {
           <button onClick={syncFromNs} disabled={syncing} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-secondary)", opacity: syncing ? 0.6 : 1 }}>
             <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} /> {syncing ? "Sync..." : "Sync NS-API"}
           </button>
+          <button onClick={() => setAddAdminOpen(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium" style={{ background: "var(--pp-bg-elevated)", border: `1px solid ${ACCENT}55`, color: ACCENT }}>
+            <Plus className="w-4 h-4" /> Ajouter un admin
+          </button>
           <button onClick={() => setAddOpen(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-white text-sm font-medium" style={{ background: ACCENT }}>
             <Plus className="w-4 h-4" /> Ajouter un courtier
           </button>
