@@ -766,7 +766,7 @@ function AdminModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => 
         </div>
         <div className="p-5 space-y-4">
           <p style={{ fontSize: 12, color: "var(--pp-text-secondary)" }}>
-            Un admin a accès complet au portail /planipret/admin. Il n'a pas d'extension téléphonique NS.
+            Un admin a accès complet au portail /planipret/admin. Si le courriel appartient déjà à un courtier existant, il sera <strong>promu admin</strong> (le mot de passe est optionnel dans ce cas).
           </p>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Prénom *"><input value={firstName} onChange={(e) => setFirstName(e.target.value)} className="pp-input" /></Field>
@@ -775,7 +775,8 @@ function AdminModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => 
           <Field label="Courriel *" hint="Ex: admin@planipret.ca">
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="pp-input" />
           </Field>
-          <Field label="Mot de passe initial *">
+          <Field label="Mot de passe (optionnel si courtier existant)">
+
             <div className="flex gap-2">
               <div className="relative flex-1">
                 <input type={showPwd ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} className="pp-input pr-9" />
