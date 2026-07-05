@@ -46,6 +46,16 @@ async function nsFetch(path: string, init: RequestInit = {}) {
   return { ok: res.ok, status: res.status, data };
 }
 
+async function nsFetchForm(path: string, fields: Record<string, string | number>) {
+  const body = new URLSearchParams();
+  for (const [k, v] of Object.entries(fields)) body.set(k, String(v));
+  return nsFetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body,
+  });
+}
+
 function randomPassword(len = 22): string {
   const chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
   const buf = new Uint8Array(len);
@@ -65,7 +75,34 @@ function defaultDeviceId(extension: string, clientType: ClientType): string {
 
 function deviceIdOf(d: any): string | null {
   const id = d?.device ?? d?.aor ?? d?.["device-aor"] ?? d?.["aor-user"] ?? null;
-  return id ? String(id) : null;
+  if (!id) return null;
+  const raw = String(id);
+  const cleaned = raw.replace(/^sip:/i, "");
+  return cleaned.split("@")[0] || raw;
+}
+
+function sipDeviceUri(deviceId: string, domain: string): string {
+  return `sip:${deviceId}@${domain}`;
+}
+
+function nsDeviceFields(deviceId: string, extension: string, domain: string, password: string, withModel: boolean, modelPref: string) {
+  const deviceUri = sipDeviceUri(deviceId, domain);
+  return {
+    uid: `${extension}@${domain}`,
+    device: deviceUri,
+    aor: deviceUri,
+    authentication_key: password,
+    "authentication-key": password,
+    nat_wan: "automatic",
+    expires: 300,
+    termination_allowed: "yes",
+    origination_allowed: "yes",
+    ...(withModel ? { "device-model": modelPref, device_model: modelPref } : {}),
+  };
+}
+
+function nsDevicePayload(deviceId: string, extension: string, domain: string, password: string, withModel: boolean, modelPref: string) {
+  return JSON.stringify(nsDeviceFields(deviceId, extension, domain, password, withModel, modelPref));
 }
 
 Deno.serve(async (req) => {
@@ -154,6 +191,7 @@ Deno.serve(async (req) => {
   const resolvedDeviceId = device ? (deviceIdOf(device) ?? targetId) : targetId;
   const sipUsername = resolvedDeviceId || accountSipUsername;
   let createDetails: any = null;
+  let repairDetails: any = null;
 
   if (!device) {
     // Create a dedicated device for this client_type. Do NOT touch other devices.
@@ -161,13 +199,10 @@ Deno.serve(async (req) => {
     const modelPref = clientType === "widget" ? "Web Softphone" : "Mobile Softphone";
     // Try with device-model first. If NS rejects (some tenants restrict the
     // catalog), retry without it — device-model is optional on NS-API v2.
-    const buildBody = (withModel: boolean) => JSON.stringify({
-      device: resolvedDeviceId,
-      "authentication-key": sipPassword,
-      "device-provisioning-protocol": "sip",
-      ...(withModel ? { "device-model": modelPref } : {}),
-    });
+    const buildBody = (withModel: boolean) => nsDevicePayload(resolvedDeviceId, extension, domain, sipPassword!, withModel, modelPref);
 
+    const createFieldsWithModel = nsDeviceFields(resolvedDeviceId, extension, domain, sipPassword!, true, modelPref);
+    const createFields = nsDeviceFields(resolvedDeviceId, extension, domain, sipPassword!, false, modelPref);
     let createRes = await nsFetch(
       `/domains/${encodeURIComponent(domain)}/users/${encodeURIComponent(extension)}/devices`,
       { method: "POST", body: buildBody(true) },
@@ -179,7 +214,20 @@ Deno.serve(async (req) => {
       );
       createDetails = { first: { status: createRes.status, data: createRes.data }, retry: { status: retry.status, data: retry.data } };
       createRes = retry;
-    } else {
+    }
+    if (!createRes.ok) {
+      const formRetry = await nsFetchForm(
+        `/domains/${encodeURIComponent(domain)}/users/${encodeURIComponent(extension)}/devices`,
+        createFieldsWithModel,
+      );
+      const formRetry2 = formRetry.ok ? formRetry : await nsFetchForm(
+        `/domains/${encodeURIComponent(domain)}/users/${encodeURIComponent(extension)}/devices`,
+        createFields,
+      );
+      createDetails = { ...(createDetails ?? {}), form: { status: formRetry.status, data: formRetry.data }, form_retry: { status: formRetry2.status, data: formRetry2.data } };
+      createRes = formRetry2;
+    }
+    if (createRes.ok && !createDetails) {
       createDetails = { first: { status: createRes.status, data: createRes.data } };
     }
 
@@ -216,10 +264,39 @@ Deno.serve(async (req) => {
     // We own the device but lost the password (fresh Vault, migration, etc.).
     // Rotate ONLY this device's key.
     sipPassword = randomPassword(22);
-    await nsFetch(
+  }
+
+  // Always repair/update our owned device with the password we are returning.
+  // Older versions created devices with wrong field names, so NetSapiens kept a
+  // random auth key while the app stored a different one in Vault → REGISTER 401
+  // and the UI stayed "Téléphone non enregistré". This makes every resync
+  // self-healing for existing devices, not only newly-created ones.
+  if (sipPassword) {
+    const repairBody = nsDevicePayload(resolvedDeviceId, extension, domain, sipPassword, false, clientType === "widget" ? "Web Softphone" : "Mobile Softphone");
+    const repairFields = nsDeviceFields(resolvedDeviceId, extension, domain, sipPassword, false, clientType === "widget" ? "Web Softphone" : "Mobile Softphone");
+    let repairRes = await nsFetch(
       `/domains/${encodeURIComponent(domain)}/users/${encodeURIComponent(extension)}/devices/${encodeURIComponent(resolvedDeviceId)}`,
-      { method: "PUT", body: JSON.stringify({ "authentication-key": sipPassword }) },
+      { method: "PUT", body: repairBody },
     );
+    if (!repairRes.ok) {
+      const retry = await nsFetch(
+        `/domains/${encodeURIComponent(domain)}/users/${encodeURIComponent(extension)}/devices/${encodeURIComponent(sipDeviceUri(resolvedDeviceId, domain))}`,
+        { method: "PUT", body: repairBody },
+      );
+      repairDetails = { first: { status: repairRes.status, data: repairRes.data }, retry: { status: retry.status, data: retry.data } };
+      repairRes = retry;
+    }
+    if (!repairRes.ok) {
+      const formRetry = await nsFetchForm(
+        `/domains/${encodeURIComponent(domain)}/users/${encodeURIComponent(extension)}/devices/${encodeURIComponent(resolvedDeviceId)}`,
+        repairFields,
+      );
+      repairDetails = { ...(repairDetails ?? {}), form: { status: formRetry.status, data: formRetry.data } };
+      repairRes = formRetry;
+    }
+    if (repairRes.ok && !repairDetails) {
+      repairDetails = { first: { status: repairRes.status, data: repairRes.data } };
+    }
   }
 
   // Persist Vault secret + device id mapping.
@@ -272,6 +349,7 @@ Deno.serve(async (req) => {
     device_id: resolvedDeviceId,
     device_created: !device,
     ns_create: createDetails,
+    ns_repair: repairDetails,
     ns_devices: devicesNow,
     ns_devices_detail: devicesDetail,
     ns_registered_device_id: registeredDeviceId,
