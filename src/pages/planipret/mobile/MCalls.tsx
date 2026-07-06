@@ -786,6 +786,8 @@ function CallDetailSheet({
   const [eventState, setEventState] = useState<Record<string, { creating?: boolean; createdId?: string }>>({});
   const [activeTab, setActiveTab] = useState<"audio" | "transcript" | "coaching" | "maestro">("audio");
   const peerNumber = (call.direction === "outbound" ? call.to_number : call.from_number) ?? "";
+  const _resolvedNames = useCallerNames([peerNumber]);
+  const _callerLabel = displayLabelWith(call, _resolvedNames[peerNumber], lang as "fr" | "en");
 
   // Load insight
   useEffect(() => {
