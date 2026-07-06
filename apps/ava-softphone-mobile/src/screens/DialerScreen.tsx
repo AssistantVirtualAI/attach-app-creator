@@ -6,8 +6,11 @@ import WssDiagnostics from '../components/WssDiagnostics';
 import { audit } from '../lib/audit';
 import { showMobileToast } from '../lib/mobileToast';
 import { loadCachedContacts, syncDeviceContacts, type DeviceContact } from '../lib/contacts';
+import { hasConsent, loadConsent } from '../lib/contactsConsent';
+import ContactsConsentSheet from '../components/ContactsConsentSheet';
 import { usePermissions } from '../hooks/usePermissions';
 import PermissionBlockedScreen from '../components/PermissionBlockedScreen';
+
 
 export default function DialerScreen({ sp, haptic, preferClickToCall: _preferClickToCall = false }: { sp: any; haptic: (s?: ImpactStyle) => Promise<void>; preferClickToCall?: boolean }) {
   const [num, setNum] = useState('');
