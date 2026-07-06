@@ -85,23 +85,32 @@ Deno.serve(async (req) => {
         .maybeSingle();
       const runId = runRow?.id as string | undefined;
 
+      const pickFrom = (it: any) =>
+        it.from_number ?? it.caller_id_number ?? it.orig_from_user ?? it.orig_from_uri
+        ?? it.by_number ?? it.orig_callid_number ?? it.ani ?? null;
+      const pickTo = (it: any) =>
+        it.to_number ?? it.destination ?? it.term_to_user ?? it.orig_to_user
+        ?? it.dialed_number ?? it.dnis ?? null;
+      const pickFromName = (it: any) =>
+        it.from_name ?? it.caller_id_name ?? it.orig_from_name ?? it.by_name ?? null;
+
       const rows = items.map((it) => ({
         user_id: ctx.userId,
         organization_id: AVA_ORG_ID,
-        ns_call_id: it.id ?? it.call_id ?? it.uuid ?? null,
+        ns_call_id: it.id ?? it.call_id ?? it.uuid ?? it["cdr-id"] ?? null,
         ns_domain: ctx.nsDomain,
         extension: ctx.extension,
         direction: pickDirection(it),
         status: it.disposition ?? it.status ?? null,
-        from_number: it.from_number ?? it.caller_id_number ?? null,
-        from_name: it.from_name ?? it.caller_id_name ?? null,
-        to_number: it.to_number ?? it.destination ?? null,
-        to_name: it.to_name ?? null,
-        started_at: toIso(it.start_time ?? it.started_at),
-        answered_at: toIso(it.answer_time ?? it.answered_at),
-        ended_at: toIso(it.end_time ?? it.ended_at),
-        duration_seconds: Number(it.duration ?? it.billsec ?? 0) || 0,
-        recording_url: it.recording_url ?? null,
+        from_number: pickFrom(it),
+        from_name: pickFromName(it),
+        to_number: pickTo(it),
+        to_name: it.to_name ?? it.term_to_name ?? null,
+        started_at: toIso(it.start_time ?? it.started_at ?? it.time_start),
+        answered_at: toIso(it.answer_time ?? it.answered_at ?? it.time_answer),
+        ended_at: toIso(it.end_time ?? it.ended_at ?? it.time_release),
+        duration_seconds: Number(it.duration ?? it.billsec ?? it.time_talking ?? 0) || 0,
+        recording_url: it.recording_url ?? it.recording ?? it.record_url ?? null,
         metadata: it,
       }));
 
