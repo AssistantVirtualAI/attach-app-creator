@@ -129,7 +129,7 @@ export default function PASipDiagnostic() {
         <div>
           <h2 style={{ fontSize: 18, fontWeight: 600, color: "var(--pp-text-primary)" }}>Diagnostic SIP — 113_web (WSS)</h2>
           <p className="mt-1" style={{ fontSize: 12, color: "var(--pp-text-muted)" }}>
-            Teste l'enregistrement SIP.js sur le device web via wss://voice.ava-telecom.ca:9002.
+            Teste l'enregistrement SIP.js sur le device web via wss://core1.cluster1.ucstack.io:9002.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
