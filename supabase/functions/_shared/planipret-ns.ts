@@ -56,15 +56,36 @@ export async function nsFetch(path: string, init: RequestInit = {}, opts: { func
   const method = (init.method ?? "GET").toUpperCase();
   const t0 = Date.now();
   console.log(`[${opts.functionName ?? "nsFetch"}][NS] ${method} ${path}`);
-  let res = await fetch(url, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      Authorization: `Bearer ${token}`,
-      ...(init.headers ?? {}),
-    },
-  });
+  const doFetch = async (bearer: string) => {
+    let lastErr: unknown = null;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      try {
+        return await fetch(url, {
+          ...init,
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            Authorization: `Bearer ${bearer}`,
+            ...(init.headers ?? {}),
+          },
+        });
+      } catch (e) {
+        lastErr = e;
+        await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
+      }
+    }
+    throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
+  };
+  let res: Response;
+  try {
+    res = await doFetch(token);
+  } catch (e) {
+    return new Response(
+      JSON.stringify({ error: (e as Error).message, degraded: true }),
+      { status: 503, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
   if (res.status === 401) {
     cachedToken = null;
     try {
