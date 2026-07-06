@@ -267,7 +267,21 @@ export default function DialerScreen({ sp, haptic, preferClickToCall: _preferCli
           </div>
         </div>
       )}
+      <ContactsConsentSheet
+        open={consentOpen}
+        onClose={(result) => {
+          setConsentOpen(false);
+          if (result === 'allowed') {
+            (async () => {
+              let list = loadCachedContacts();
+              if (!list.length) list = await syncDeviceContacts();
+              setContactsPicker(list);
+            })().catch(() => {});
+          }
+        }}
+      />
     </div>
+
   );
 }
 
