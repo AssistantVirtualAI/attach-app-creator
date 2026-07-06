@@ -102,7 +102,7 @@ async function getNsRuntimeConfig() {
     configData = (cfg?.config_data ?? {}) as Record<string, string>;
     secretData = (((secrets ?? [])[0] as any)?.config ?? {}) as Record<string, string>;
   } catch { /* env fallback */ }
-  const baseUrl = (configData.base_url ?? secretData.base_url ?? FALLBACK_NS_API_BASE_URL).replace(/\/$/, "").replace(/\/ns-api\/v2$/, "") + "/ns-api/v2";
+  const baseUrl = (configData.base_url ?? secretData.base_url ?? FALLBACK_NS_API_BASE_URL).replace(/\/$/, "").replace(/\/ns-api(\/v2)?$/, "") + "/ns-api/v2";
   const apiKey = configData.api_key ?? secretData.api_key ?? Deno.env.get("NS_API_KEY") ?? "";
   if (!apiKey) throw new Error("NS_API_KEY not configured");
   return {

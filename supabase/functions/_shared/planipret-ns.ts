@@ -66,7 +66,7 @@ export function getEnv() {
 async function nsBase() {
   // Tolerate either form: with or without trailing /ns-api/v2
   const raw = (await getRuntimeConfig()).baseUrl.replace(/\/$/, "");
-  return raw.replace(/\/ns-api\/v2$/, "");
+  return raw.replace(/\/ns-api(\/v2)?$/, "");
 }
 
 export async function getNsJwt(): Promise<string> {
