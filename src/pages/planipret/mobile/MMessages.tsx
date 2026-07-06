@@ -101,7 +101,7 @@ export default function MMessages() {
       <div className="flex-1 overflow-hidden">
         {sub === "sms" && <SmsList profile={profile} openDialer={openDialer} registerRefresh={registerRefresh} />}
         {sub === "team" && <TeamChat profile={profile} />}
-        {sub === "teams365" && <Teams365Panel />}
+        {sub === "teams365" && <Teams365Panel profile={profile} />}
         {sub === "roster" && <TeamRoster profile={profile} openDialer={openDialer} onSwitchTab={setSub} />}
         {sub === "ava" && <AvaChat profile={profile} openAva={openAva} openDialer={openDialer} />}
         {sub === "emails" && <EmailsList profile={profile} openAva={openAva} />}
@@ -1437,7 +1437,7 @@ function ActionPill({ Icon, label, onClick, disabled }: { Icon: any; label: stri
 // ============================================================================
 // TEAMS 365 PANEL — Microsoft Teams chats + channels via MS Graph
 // ============================================================================
-function Teams365Panel() {
+function Teams365Panel({ profile }: { profile: any }) {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [chats, setChats] = useState<any[]>([]);
@@ -1448,19 +1448,31 @@ function Teams365Panel() {
     | null
   >(null);
 
+  const connected = !!profile?.ms365_access_token;
+
   const load = async () => {
+    if (!connected) { setLoading(false); setErr("ms365_not_connected"); return; }
     setLoading(true);
     setErr(null);
     const { data, error } = await supabase.functions.invoke("ms365-teams-list", { body: {} });
     setLoading(false);
-    if (error || (data as any)?.error) {
-      setErr((data as any)?.error || error?.message || "Erreur");
+    const payload = (data as any) ?? {};
+    if (error && !payload.chats) {
+      setErr(error.message || "Erreur");
       return;
     }
-    setChats((data as any).chats || []);
-    setTeams((data as any).teams || []);
+    if (payload.connected === false || payload.error === "ms365_not_connected") {
+      setErr("ms365_not_connected");
+      return;
+    }
+    if (payload.error) {
+      setErr(payload.error);
+      return;
+    }
+    setChats(payload.chats || []);
+    setTeams(payload.teams || []);
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [connected]);
 
   if (active) return <TeamsThreadView target={active} onClose={() => setActive(null)} />;
 
@@ -1475,8 +1487,19 @@ function Teams365Panel() {
       </div>
 
       {err === "ms365_not_connected" && (
-        <div className="text-xs p-3 rounded-lg" style={{ background: "var(--pp-bg-elevated)", color: "var(--pp-text-muted)" }}>
-          Microsoft 365 n'est pas connecté. Ouvrez Profil → Intégrations → Microsoft 365 pour vous connecter.
+        <div className="rounded-2xl p-6 text-center mt-4" style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)" }}>
+          <Users className="w-10 h-10 mx-auto mb-3" style={{ color: "var(--pp-brand-accent)" }} />
+          <p className="font-semibold" style={{ color: "var(--pp-text-primary)" }}>Microsoft 365 non connecté</p>
+          <p className="text-xs mt-1 mb-3" style={{ color: "var(--pp-text-muted)" }}>
+            Connectez votre compte Microsoft pour voir vos chats Teams, canaux et coéquipiers.
+          </p>
+          <a
+            href="/mplanipret/more"
+            className="inline-block text-xs px-4 py-2 rounded-full text-white font-semibold"
+            style={{ background: "linear-gradient(135deg, var(--pp-brand-accent), var(--pp-brand-accent-2))" }}
+          >
+            Connecter Microsoft 365
+          </a>
         </div>
       )}
       {err && err !== "ms365_not_connected" && (
@@ -1560,11 +1583,20 @@ function TeamsThreadView({ target, onClose }: {
       body: { action: "list", ...invokeBody, top: 40 },
     });
     setLoading(false);
-    if (error || (data as any)?.error) {
-      toast.error((data as any)?.error || error?.message || "Erreur");
+    let payload: any = data ?? {};
+    if (error && (error as any).context?.text) {
+      try { payload = JSON.parse(await (error as any).context.text()); } catch { /* ignore */ }
+    }
+    if (payload?.error === "ms365_not_connected") {
+      toast.error("Microsoft 365 non connecté. Ouvrez Plus → Microsoft 365.");
       return;
     }
-    setMessages(((data as any).messages || []).slice().reverse());
+    if (payload?.error) {
+      toast.error(payload.error + (payload.detail?.error?.message ? `: ${payload.detail.error.message}` : ""));
+      return;
+    }
+    if (error) { toast.error(error.message || "Erreur"); return; }
+    setMessages(((payload.messages) || []).slice().reverse());
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
 
@@ -1575,8 +1607,13 @@ function TeamsThreadView({ target, onClose }: {
       body: { action: "send", ...invokeBody, content, contentType: "text" },
     });
     setSending(false);
-    if (error || (data as any)?.error) {
-      const msg = (data as any)?.error || error?.message || "Envoi refusé";
+    let payload: any = data ?? {};
+    if (error && (error as any).context?.text) {
+      try { payload = JSON.parse(await (error as any).context.text()); } catch { /* ignore */ }
+    }
+    if (payload?.error || error) {
+      const detail = payload?.detail?.error?.message ? `: ${payload.detail.error.message}` : "";
+      const msg = (payload?.error ? payload.error + detail : (error?.message || "Envoi refusé"));
       setSendStatus({ kind: "err", message: msg, lastText: content });
       toast.error(msg);
       return;
