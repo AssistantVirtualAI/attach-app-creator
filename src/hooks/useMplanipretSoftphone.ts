@@ -31,6 +31,13 @@ type RestCall = {
   muted: boolean;
 };
 
+type AttachRestCallArgs = {
+  id: string;
+  other: string;
+  direction?: "in" | "out";
+  status?: RestCall["status"];
+};
+
 export function useMplanipretSoftphone() {
   const { user } = useAuth();
   const [sipSnap, setSipSnap] = useState<PpSipSnapshot>(() => ppSipProvider.getSnapshot());
@@ -124,6 +131,19 @@ export function useMplanipretSoftphone() {
     void pollActiveCalls();
   }, [pollActiveCalls]);
 
+  const attachRestCall = useCallback(({ id, other, direction = "in", status = "active" }: AttachRestCallArgs) => {
+    if (!id) return;
+    setRestCall((prev) => ({
+      id: String(id),
+      direction,
+      other: other || prev?.other || "—",
+      startedAt: prev?.startedAt ?? Date.now(),
+      status,
+      muted: prev?.muted ?? false,
+    }));
+    startPolling();
+  }, [startPolling]);
+
   const placeCall = useCallback(async (destination: string): Promise<OutboundResult> => {
     if (!destination) return { via: "none", ok: false, error: "empty destination" };
 
@@ -197,7 +217,16 @@ export function useMplanipretSoftphone() {
     ppSipProvider.hangup();
   }, [restMode, invokeRest, stopPolling]);
 
-  const answer = useCallback(async () => { await ppSipProvider.answer(); return true; }, []);
+  const answer = useCallback(async () => {
+    if (restMode) {
+      await invokeRest("answer");
+      setRestCall((c) => c ? { ...c, status: "active", startedAt: c.startedAt ?? Date.now() } : c);
+      startPolling();
+      return true;
+    }
+    await ppSipProvider.answer();
+    return true;
+  }, [restMode, invokeRest, startPolling]);
 
   const mute = useCallback(() => {
     if (restMode) { void invokeRest("mute", { muted: true }); setRestCall((c) => c ? { ...c, muted: true } : c); return; }
@@ -246,9 +275,10 @@ export function useMplanipretSoftphone() {
     unhold,
     sendDTMF,
     transfer,
+    attachRestCall,
     setAudioEl: (el: HTMLAudioElement | null) => { ppSipProvider.audioEl = el; },
     forceHandover: () => {/* handled by NS */},
-  }), [snap, loading, net, quality, placeCall, answer, hangup, hold, unhold, mute, unmute, transfer, sendDTMF, answeredElsewhere]);
+  }), [snap, loading, net, quality, placeCall, answer, hangup, hold, unhold, mute, unmute, transfer, sendDTMF, attachRestCall, answeredElsewhere]);
 }
 
 export type { PpSipSnapshot };
