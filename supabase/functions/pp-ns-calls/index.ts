@@ -94,14 +94,13 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (req.method === "PATCH") {
-      const payload = await req.json().catch(() => ({}));
+    // Call-control actions: accept either PATCH or POST-with-action-in-body
+    // (supabase.functions.invoke only issues POST).
+    const controlActions = ["answer", "hold", "unhold", "transfer", "disconnect", "reject"];
+    if (controlActions.includes(action)) {
+      const payload = cachedBody ?? (await req.json().catch(() => ({})));
       const callId = payload?.call_id;
       if (!callId) return jsonResponse({ error: "call_id required" }, 400);
-
-      const allowed = ["answer", "hold", "unhold", "transfer", "disconnect", "reject"];
-      if (!allowed.includes(action)) return jsonResponse({ error: "invalid action" }, 400);
-
       const path = `${base}/${encodeURIComponent(callId)}/${action}`;
       const body = action === "transfer" ? JSON.stringify({ destination: payload.destination }) : undefined;
       const res = await nsFetch(path, { method: "PATCH", body });
