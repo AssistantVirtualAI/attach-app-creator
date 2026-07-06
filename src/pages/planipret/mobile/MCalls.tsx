@@ -126,6 +126,7 @@ export default function MCalls() {
     ["recents", "active", "missed", "recordings", "voicemails"].includes(initialTab) ? initialTab : "recents"
   );
   const [calls, setCalls] = useState<Call[]>([]);
+  const [recordings, setRecordings] = useState<Call[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -157,25 +158,31 @@ export default function MCalls() {
       (local ?? []).forEach((r: any) => { if (r.ns_call_id) byNsId.set(r.ns_call_id, r); });
 
       const merged: Call[] = items.map((it, i) => {
-        const nsId = it.id ?? it.call_id ?? it.uuid ?? null;
+        const nsId = it.id ?? it.call_id ?? it.uuid ?? it["cdr-id"] ?? null;
         const enriched = nsId ? byNsId.get(nsId) : null;
         const dirRaw = String(it.direction ?? it.call_direction ?? "").toLowerCase();
         const direction = dirRaw.includes("in")
           ? (it.answered === false || it.disposition === "no-answer" ? "missed" : "inbound")
           : "outbound";
+        const from_number = it.from_number ?? it.caller_id_number ?? it.orig_from_user
+          ?? it.orig_from_uri ?? it.by_number ?? it.orig_callid_number ?? it.ani ?? enriched?.from_number ?? null;
+        const to_number = it.to_number ?? it.destination ?? it.term_to_user
+          ?? it.orig_to_user ?? it.dialed_number ?? it.dnis ?? enriched?.to_number ?? null;
+        const from_name = it.from_name ?? it.caller_id_name ?? it.orig_from_name
+          ?? it.by_name ?? enriched?.from_name ?? null;
         return {
           id: enriched?.id ?? nsId ?? `ns-${i}`,
           user_id: userId,
           ns_call_id: nsId,
           direction,
           status: it.disposition ?? it.status ?? null,
-          from_number: it.from_number ?? it.caller_id_number ?? null,
-          from_name: it.from_name ?? it.caller_id_name ?? null,
-          to_number: it.to_number ?? it.destination ?? null,
-          to_name: it.to_name ?? null,
-          started_at: (it.start_time ?? it.started_at ?? new Date().toISOString()) as string,
-          duration_seconds: Number(it.duration ?? it.billsec ?? 0) || 0,
-          recording_url: it.recording_url ?? enriched?.recording_url ?? null,
+          from_number,
+          from_name,
+          to_number,
+          to_name: it.to_name ?? it.term_to_name ?? enriched?.to_name ?? null,
+          started_at: (it.start_time ?? it.started_at ?? it.time_start ?? new Date().toISOString()) as string,
+          duration_seconds: Number(it.duration ?? it.billsec ?? it.time_talking ?? 0) || 0,
+          recording_url: it.recording_url ?? it.recording ?? it.record_url ?? enriched?.recording_url ?? null,
           transcript: enriched?.transcript ?? null,
           ai_summary: enriched?.ai_summary ?? null,
           metadata: it,
@@ -201,6 +208,21 @@ export default function MCalls() {
   }, [userId]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Fetch recordings list (per-extension) when tab is opened
+  useEffect(() => {
+    if (tab !== "recordings" || !userId) return;
+    (async () => {
+      try {
+        const { data } = await supabase.functions.invoke("pp-ns-recordings", { body: { action: "list" } });
+        const items = (data as any)?.items ?? [];
+        setRecordings(items as Call[]);
+      } catch (e) {
+        console.warn("[MCalls] recordings load failed", e);
+      }
+    })();
+  }, [tab, userId]);
+
   useEffect(() => {
     registerRefresh(() => load());
     return () => registerRefresh(null);
@@ -326,10 +348,10 @@ export default function MCalls() {
           <ActiveCallsTab userId={userId} openDialer={openDialer} />
         ) : tab === "recordings" ? (
           <RecordingsList
-            calls={calls as any}
+            calls={recordings as any}
             loading={loading}
             userId={userId}
-            onUpdated={(c) => setCalls((prev) => prev.map((p) => (p.id === c.id ? { ...p, ...c } as any : p)))}
+            onUpdated={(c) => setRecordings((prev) => prev.map((p) => (p.id === c.id ? { ...p, ...c } as any : p)))}
           />
         ) : tab === "voicemails" ? (
           <VoicemailsTab userId={userId} openDialer={openDialer} registerRefresh={registerRefresh} />

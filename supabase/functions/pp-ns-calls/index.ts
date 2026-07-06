@@ -150,13 +150,17 @@ Deno.serve(async (req) => {
 
     // Call-control actions: accept either PATCH or POST-with-action-in-body
     // (supabase.functions.invoke only issues POST).
-    const controlActions = ["answer", "hold", "unhold", "transfer", "disconnect", "reject"];
+    const controlActions = ["answer", "hold", "unhold", "resume", "transfer", "disconnect", "reject", "mute", "dtmf"];
     if (controlActions.includes(action)) {
       const payload = cachedBody ?? (await req.json().catch(() => ({})));
       const callId = payload?.call_id;
       if (!callId) return jsonResponse({ error: "call_id required" }, 400);
-      const path = `${base}/${encodeURIComponent(callId)}/${action}`;
-      const body = action === "transfer" ? JSON.stringify({ destination: payload.destination }) : undefined;
+      const nsAction = action === "resume" ? "unhold" : action;
+      const path = `${base}/${encodeURIComponent(callId)}/${nsAction}`;
+      const body = nsAction === "transfer" ? JSON.stringify({ destination: payload.destination ?? payload.target })
+        : nsAction === "mute" ? JSON.stringify({ muted: !!payload.muted })
+        : nsAction === "dtmf" ? JSON.stringify({ digit: payload.digit })
+        : undefined;
       const res = await nsFetch(path, { method: "PATCH", body });
       const txt = await res.text();
       return new Response(txt || "{}", {
