@@ -63,14 +63,8 @@ export function useMplanipretSoftphone() {
       if (call) {
         const cid = call["call-id"] ?? call.call_id ?? call.id ?? "";
         const remote = call["remote-uri"] ?? call["orig-to-uri"] ?? call["term-user"] ?? call.destination ?? "";
-        patch({
-          callState: "active",
-          callId: String(cid),
-          remoteNumber: String(remote),
-          remoteIdentity: String(remote),
-          startedAt: (prev) => prev, // no-op
-        } as any);
         setSnap((s) => ({ ...s, callState: "active", callId: String(cid), remoteNumber: String(remote), remoteIdentity: String(remote), startedAt: s.startedAt ?? Date.now() }));
+
       } else {
         // No active call — if we were ringing/active, mark ended.
         setSnap((s) => {
