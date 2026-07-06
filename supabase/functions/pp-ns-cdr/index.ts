@@ -108,14 +108,18 @@ Deno.serve(async (req) => {
   const end = body.end ?? url.searchParams.get("end") ?? new Date().toISOString();
   const start = body.start ?? url.searchParams.get("start") ??
     new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const limit = Math.min(Number(body.limit ?? url.searchParams.get("limit") ?? 200), 1000);
+  // Smaller pages by default to reduce NS-API pressure. Hard cap 200.
+  const rawLimit = Number(body.limit ?? url.searchParams.get("limit") ?? 50);
+  const limit = Math.max(1, Math.min(isNaN(rawLimit) ? 50 : rawLimit, 200));
+  const offset = Math.max(0, Number(body.offset ?? url.searchParams.get("offset") ?? 0) || 0);
 
   const nsPath =
     `/domains/${encodeURIComponent(ctx.nsDomain)}/users/${encodeURIComponent(ctx.extension)}/cdrs` +
-    `?start-time=${encodeURIComponent(start)}&end-time=${encodeURIComponent(end)}&limit=${limit}`;
+    `?start-time=${encodeURIComponent(start)}&end-time=${encodeURIComponent(end)}` +
+    `&limit=${limit}&offset=${offset}`;
 
-  // Fallback to cached DB rows if NS-API is unreachable / slow.
-  const dbFallback = async (reason: string) => {
+  // Fallback to cached DB rows if NS-API is unreachable / slow / breaker open.
+  const dbFallback = async (reason: string, extra: Record<string, unknown> = {}) => {
     const { data } = await supabase
       .from("planipret_phone_calls")
       .select("*")
@@ -123,14 +127,25 @@ Deno.serve(async (req) => {
       .gte("started_at", start)
       .lte("started_at", end)
       .order("started_at", { ascending: false })
-      .limit(limit);
-    return jsonResponse({ ok: true, count: (data ?? []).length, items: data ?? [], degraded: true, reason });
+      .range(offset, offset + limit - 1);
+    const items = data ?? [];
+    return jsonResponse({
+      ok: true,
+      count: items.length,
+      items,
+      degraded: true,
+      reason,
+      limit,
+      offset,
+      next_offset: items.length === limit ? offset + limit : null,
+      ...extra,
+    });
   };
 
   try {
     let res: Response | null = null;
     let lastErr: unknown = null;
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt < 2; attempt++) {
       try {
         res = await nsFetch(nsPath, { method: "GET" }, { functionName: "pp-ns-cdr" });
         break;
@@ -143,6 +158,14 @@ Deno.serve(async (req) => {
       if (action === "list") return await dbFallback(`NS-API unreachable: ${(lastErr as Error)?.message ?? "unknown"}`);
       return jsonResponse({ error: `NS-API unreachable: ${(lastErr as Error)?.message ?? "unknown"}` }, 502);
     }
+    // nsFetch returned a degraded 503 (network error or breaker open) — use cache
+    if (res.status === 503 && action === "list") {
+      const info = await res.clone().json().catch(() => ({} as any));
+      return await dbFallback(info?.error ?? "NS-API degraded", {
+        breaker_open: !!info?.breaker_open,
+        reopens_at: info?.reopens_at ?? null,
+      });
+    }
     if (!res.ok) {
       const txt = await res.text();
       if (action === "list" && res.status >= 500) return await dbFallback(`NS-API ${res.status}`);
@@ -153,7 +176,14 @@ Deno.serve(async (req) => {
     const items: any[] = (Array.isArray(raw) ? raw : raw?.cdrs ?? raw?.data ?? []).map((it: any) => normalizeCdr(it, ctx));
 
     if (action === "list") {
-      return jsonResponse({ ok: true, count: items.length, items });
+      return jsonResponse({
+        ok: true,
+        count: items.length,
+        items,
+        limit,
+        offset,
+        next_offset: items.length === limit ? offset + limit : null,
+      });
     }
 
 
