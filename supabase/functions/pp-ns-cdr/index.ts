@@ -66,7 +66,6 @@ function normalizeCdr(it: any, ctx: any) {
     duration_seconds: Number(val(it, ["duration", "billsec", "time_talking", "call-talking-duration-seconds", "call-total-duration-seconds"], 0)) || 0,
     recording_url: recordingUrl,
     ns_recording_url: recordingUrl,
-    has_recording: Boolean(recordingUrl || recordingStatus),
   };
 }
 
