@@ -43,38 +43,39 @@ Deno.serve(async (req) => {
     if (!row) return json({ error: "call not found" }, 404);
     if (row.transcript) return json({ ok: true, transcript: row.transcript, cached: true });
 
-    // Resolve fresh URL
+    // Resolve fresh URL (best-effort)
     let recUrl = row.recording_url as string | null;
     const resolveRes = await fetch(`${SUPABASE_URL}/functions/v1/pp-admin-recording-resolve`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: auth,
-      },
+      headers: { "Content-Type": "application/json", Authorization: auth },
       body: JSON.stringify({ call_row_id: callId, force: true }),
     });
     const resolveJson = await resolveRes.json().catch(() => ({} as any));
     if (resolveJson?.recording_url && /^https?:\/\//i.test(resolveJson.recording_url)) {
       recUrl = resolveJson.recording_url;
     }
-    if (!recUrl || !/^https?:\/\//i.test(recUrl)) {
-      return json({
-        ok: false,
-        fallback: true,
-        error: "RECORDING_NOT_AVAILABLE",
-        hint: resolveJson?.hint ?? "Aucun enregistrement disponible pour cet appel.",
-        resolve_detail: resolveJson,
-      }, 200);
-    }
 
-    // Fetch audio
-    let audioRes: Response;
+    // Fetch audio: prefer canonical ns-get-recording proxy (handles fresh NS-API auth + transcoding)
+    let audioRes: Response | null = null;
     try {
-      audioRes = await fetch(recUrl);
+      const proxyRes = await fetch(`${SUPABASE_URL}/functions/v1/ns-get-recording`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: auth },
+        body: JSON.stringify({ call_db_id: callId }),
+      });
+      const proxyCt = proxyRes.headers.get("content-type") ?? "";
+      if (proxyRes.ok && (proxyCt.startsWith("audio") || proxyCt.includes("octet-stream"))) {
+        audioRes = proxyRes;
+      } else if (recUrl && /^https?:\/\//i.test(recUrl)) {
+        audioRes = await fetch(recUrl);
+      } else {
+        const detail = await proxyRes.json().catch(() => ({}));
+        return json({ ok: false, fallback: true, error: "RECORDING_NOT_AVAILABLE", hint: detail?.message ?? resolveJson?.hint ?? "Aucun enregistrement disponible.", resolve_detail: resolveJson, proxy_detail: detail }, 200);
+      }
     } catch (e) {
       return json({ ok: false, fallback: true, error: "AUDIO_FETCH_FAILED", hint: (e as Error).message }, 200);
     }
-    if (!audioRes.ok) return json({ ok: false, fallback: true, error: `AUDIO_FETCH_${audioRes.status}`, hint: "Impossible de télécharger l'audio." }, 200);
+    if (!audioRes || !audioRes.ok) return json({ ok: false, fallback: true, error: `AUDIO_FETCH_${audioRes?.status ?? "NULL"}`, hint: "Impossible de télécharger l'audio." }, 200);
     const audioBuf = new Uint8Array(await audioRes.arrayBuffer());
     if (audioBuf.length < 1024) return json({ ok: false, fallback: true, error: "AUDIO_EMPTY", hint: "Fichier audio vide." }, 200);
 
