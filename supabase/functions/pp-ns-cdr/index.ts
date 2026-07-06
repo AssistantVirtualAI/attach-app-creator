@@ -255,6 +255,7 @@ Deno.serve(async (req) => {
 
     return jsonResponse({ error: "unsupported action/method" }, 400);
   } catch (e) {
+    if (action === "list") return await dbFallback((e as Error).message);
     return jsonResponse({ error: (e as Error).message }, 502);
   }
 });
