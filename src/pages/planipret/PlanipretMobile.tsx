@@ -352,6 +352,7 @@ export default function PlanipretMobile() {
   const [inbound, setInbound] = useState<InboundCall>(null);
   const [avaOpen, setAvaOpen] = useState(false);
   const [activeCallId, setActiveCallId] = useState<string | null>(null);
+  const [showPrimer, setShowPrimer] = useState(false);
   const openDialer = (n?: string) => { setDialerInit(n); setDialerOpen(true); };
   const openAva = () => setAvaOpen(true);
   const refreshFn = useRef<(() => Promise<void> | void) | null>(null);
