@@ -85,6 +85,7 @@ export async function authBroker(req: Request) {
   if (!profile || profile.organization_id !== AVA_ORG_ID) {
     return { error: jsonResponse({ success: false, error: "Profil introuvable", code: 404 }, 404) };
   }
+  profile.extension = profile.extension || profile.ns_extension;
   return { admin, userId, profile };
 }
 
