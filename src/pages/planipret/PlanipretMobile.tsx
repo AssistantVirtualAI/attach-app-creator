@@ -28,6 +28,9 @@ import { ROUTES } from "@/lib/routes";
 import { recordRedirect } from "@/lib/debug/navDebug";
 import { useMplanipretSoftphone } from "@/hooks/useMplanipretSoftphone";
 import MicDeniedBanner from "@/components/planipret/mobile/MicDeniedBanner";
+import PermissionsPrimer from "@/components/planipret/mobile/PermissionsPrimer";
+import { hasSeenPrimer } from "@/lib/native/permissions/orchestrator";
+import { bootstrapPushIfNative } from "@/lib/native/pushBootstrap";
 
 
 const ACCENT = "#2E9BDC";
@@ -349,6 +352,7 @@ export default function PlanipretMobile() {
   const [inbound, setInbound] = useState<InboundCall>(null);
   const [avaOpen, setAvaOpen] = useState(false);
   const [activeCallId, setActiveCallId] = useState<string | null>(null);
+  const [showPrimer, setShowPrimer] = useState(false);
   const openDialer = (n?: string) => { setDialerInit(n); setDialerOpen(true); };
   const openAva = () => setAvaOpen(true);
   const refreshFn = useRef<(() => Promise<void> | void) | null>(null);
@@ -508,7 +512,9 @@ export default function PlanipretMobile() {
       toast.error(error.message || t("home.connectionImpossible"));
       return;
     }
-    void import("@/lib/native/requestPermissionsAfterLogin").then(m => m.requestPermissionsAfterLogin());
+    // On native, show the VoIP rationale primer (which runs the permission flow).
+    // On web, this is a no-op.
+    void hasSeenPrimer().then((seen) => { if (!seen) setShowPrimer(true); });
     toast.success(t("auth.success"));
     setLoading(true);
     await loadProfile();
@@ -519,6 +525,14 @@ export default function PlanipretMobile() {
     if (location.pathname === ROUTES.MPLANIPRET) navigate(ROUTES.MPLANIPRET_HOME, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Bootstrap push listeners + prompt primer once the profile is loaded (native only).
+  useEffect(() => {
+    if (!profile?.user_id) return;
+    const ext = profile?.ns_extension || profile?.extension || "";
+    void bootstrapPushIfNative(ext);
+    void hasSeenPrimer().then((seen) => { if (!seen) setShowPrimer(true); });
+  }, [profile?.user_id, profile?.ns_extension, profile?.extension]);
 
   if (loading) return <div className="min-h-screen flex items-center justify-center" style={{ background: "#F7F9FC", color: "#5A6B85", fontFamily: "Urbanist,sans-serif" }}>{t("common.loading")}</div>;
 
@@ -573,7 +587,14 @@ export default function PlanipretMobile() {
 
   return (
     <Frame>
+      {showPrimer && (
+        <PermissionsPrimer
+          extension={profile?.ns_extension || profile?.extension || ""}
+          onDone={() => setShowPrimer(false)}
+        />
+      )}
       <div className="h-full flex flex-col relative overflow-hidden" style={{ background: "var(--pp-bg-base)" }}>
+
         {/* Top brand header — AVA (left) · Planiprêt (center) · Settings (right) */}
         <header
           className="relative flex items-center px-4 pp-mobile-header"

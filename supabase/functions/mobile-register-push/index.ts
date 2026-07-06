@@ -26,14 +26,33 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const token = String(body.token || "");
-    const platform = String(body.platform || "");
+    const platformRaw = String(body.platform || "").toLowerCase();
+    const platform = ["ios", "android", "web"].includes(platformRaw) ? platformRaw : "web";
     const extension = String(body.extension || "");
     if (!token || !platform) return json({ error: "missing_fields" }, 400);
+
+    const admin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
+
+    const { error: upErr } = await admin
+      .from("mobile_push_tokens")
+      .upsert(
+        {
+          user_id: u.user.id,
+          token,
+          platform,
+          extension: extension || null,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id,token" },
+      );
+    if (upErr) console.warn("[mobile-register-push] upsert failed", upErr.message);
 
     const { data: sp } = await sb.from("pbx_softphone_users")
       .select("organization_id").eq("portal_user_id", u.user.id).maybeSingle();
 
-    // Persist into raw_data on softphone user as best-effort if no dedicated table exists.
     await sb.from("audit_logs").insert({
       organization_id: sp?.organization_id || null,
       user_id: u.user.id,
