@@ -280,14 +280,13 @@ export default function MCalls() {
         .not("to_number", "ilike", "%vmail%")
         .not("to_number", "ilike", "%voicemail%")
         .not("to_number", "ilike", "%vm@%")
-        .or("has_recording.eq.true,ns_callid.not.is.null,ns_orig_callid.not.is.null,ns_term_callid.not.is.null,recording_url.not.is.null")
         .gte("started_at", start)
         .lte("started_at", end)
         .order("started_at", { ascending: false })
         .limit(150);
       if (phoneCallScopeFilter) localQuery = localQuery.or(phoneCallScopeFilter);
       const { data: local } = await localQuery;
-      setRecordings((local ?? []).map((r: any) => ({
+      setRecordings((local ?? []).filter((r: any) => r.has_recording || r.recording_url || r.ns_callid || r.ns_orig_callid || r.ns_term_callid || r.ns_call_id).map((r: any) => ({
         ...r,
         stream_via_proxy: true,
         proxy_call_db_id: r.id,
