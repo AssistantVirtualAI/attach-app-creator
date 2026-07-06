@@ -30,6 +30,7 @@ import MMessages from "./pages/planipret/mobile/MMessages";
 import MVoicemail from "./pages/planipret/mobile/MVoicemail";
 import MMore from "./pages/planipret/mobile/MMore";
 import MContacts from "./pages/planipret/mobile/MContacts";
+import MSipDiagnostics from "./pages/planipret/mobile/MSipDiagnostics";
 import MPipeline from "./pages/planipret/mobile/MPipeline";
 import MSearch from "./pages/planipret/mobile/MSearch";
 import MStats from "./pages/planipret/mobile/MStats";
