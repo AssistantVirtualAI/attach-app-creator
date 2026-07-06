@@ -308,7 +308,11 @@ export default function PlanipretIntegrations() {
             (ms?.present ?? []).includes("MICROSOFT_CLIENT_SECRET");
           const clientIdMissing = !clientIdVal;
           const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL ?? "";
-          const callbackUrl = `${supabaseUrl}/functions/v1/ms365-oauth-callback`;
+          const edgeCallbackUrl = `${supabaseUrl}/functions/v1/ms365-auth-callback`;
+          const origin = typeof window !== "undefined" ? window.location.origin : "";
+          const webCallbackUrl = `${origin}/auth/microsoft/callback`;
+          const iosScheme = "msauth.com.assistantvirtualai.softphone://auth";
+          const androidScheme = "msauth://com.assistantvirtualai.softphone/callback";
           return (
         <IntegrationCard
           integrationKey="ms365" name="Microsoft 365"
