@@ -1,56 +1,79 @@
-// Planipret mobile — REST-only phone-control hook.
+// Planipret mobile/web softphone hook.
 //
-// NS-API v2 does NOT expose a browser media endpoint. Calls are placed via the
-// official "Make a new Call" REST endpoint (`POST /calls`) through the
-// `pp-ns-calls` Edge Function, and NetSapiens rings the broker's registered
-// physical device (PJSIP over TCP). This app only CONTROLS the call.
+// Two audio paths:
+//   1. SIP.js UserAgent registering as `<ext>_web` over WSS (browser WebRTC audio).
+//   2. REST fallback via `pp-ns-calls` (NetSapiens dials the mobile device).
 //
-// Public API preserved so PlanipretMobile.tsx / ActiveCallOverlay still work.
+// The SIP path is preferred; REST is used only if SIP init fails or a `mobile`
+// call is explicitly requested.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { networkMonitor, type NetSample } from "@/lib/planipret/network/networkMonitor";
-import type { PpSipSnapshot } from "@/lib/planipret/sip/ppSipProvider";
+import { ppSipProvider, type PpSipSnapshot } from "@/lib/planipret/sip/ppSipProvider";
 import type { CallQualitySnapshot } from "@/lib/planipret/audio/callQualitySampler";
 
 type AnsweredBy = "mobile" | "widget" | "web" | null;
 
 export type OutboundResult =
-  | { via: "pbx"; ok: true }
+  | { via: "sip" | "pbx"; ok: true }
   | { via: "none"; ok: false; error: string };
-
-const emptySnap: PpSipSnapshot = {
-  status: "registered",
-  callState: "idle",
-  remoteIdentity: "",
-  remoteNumber: "",
-  direction: null,
-  callId: "",
-  muted: false,
-  onHold: false,
-  startedAt: null,
-  lastRegistrationAt: Date.now(),
-};
 
 export function useMplanipretSoftphone() {
   const { user } = useAuth();
-  const [snap, setSnap] = useState<PpSipSnapshot>(emptySnap);
-  const [loading] = useState(false);
+  const [snap, setSnap] = useState<PpSipSnapshot>(() => ppSipProvider.getSnapshot());
+  const [loading, setLoading] = useState(false);
   const [net, setNet] = useState<NetSample>(networkMonitor.current());
   const [quality] = useState<CallQualitySnapshot | null>(null);
   const [answeredElsewhere, setAnsweredElsewhere] = useState<AnsweredBy>(null);
+  const sipReadyRef = useRef(false);
   const activeCallRef = useRef<any>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const pendingStartedAtRef = useRef<number | null>(null);
-  const emptyPollsRef = useRef(0);
 
   useEffect(() => {
     const un = networkMonitor.subscribe(setNet);
     return () => { un(); };
   }, []);
 
-  const patch = (p: Partial<PpSipSnapshot>) => setSnap((s) => ({ ...s, ...p }));
+  useEffect(() => ppSipProvider.subscribe(setSnap), []);
+
+  // Bootstrap the SIP.js UA once we have an authenticated user.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase.functions.invoke("ns-resolve-sip-credentials", {
+          body: { client_type: "web" },
+        });
+        if (cancelled) return;
+        const d = data as any;
+        if (error || !d?.ok || !d?.sip_password || !d?.sip_ws_url) {
+          console.warn("[softphone] SIP creds unavailable, staying on REST", d?.error, error?.message);
+          return;
+        }
+        await ppSipProvider.init({
+          wsUrl: d.sip_ws_url,
+          domain: d.sip_domain,
+          username: d.sip_username,
+          authUser: d.sip_auth_user ?? d.sip_username,
+          password: d.sip_password,
+          extension: String(d.sip_extension),
+          displayName: user.email ?? undefined,
+        });
+        sipReadyRef.current = true;
+      } catch (e) {
+        console.warn("[softphone] SIP init error", e);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
+
+  useEffect(() => () => { void ppSipProvider.stop(); }, []);
 
   const stopPolling = useCallback(() => {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
@@ -60,96 +83,59 @@ export function useMplanipretSoftphone() {
     try {
       const { data } = await supabase.functions.invoke("pp-ns-calls", { body: { action: "list" } });
       const list: any[] = Array.isArray(data) ? data : Array.isArray((data as any)?.calls) ? (data as any).calls : [];
-      const call = list[0] || null;
-      activeCallRef.current = call;
-      if (call) {
-        emptyPollsRef.current = 0;
-        const cid = call["call-id"] ?? call.call_id ?? call.id ?? "";
-        const remote = call["remote-uri"] ?? call["orig-to-uri"] ?? call["term-user"] ?? call.destination ?? "";
-        setSnap((s) => ({ ...s, callState: "active", callId: String(cid), remoteNumber: String(remote), remoteIdentity: String(remote), startedAt: s.startedAt ?? Date.now() }));
-
-      } else {
-        emptyPollsRef.current += 1;
-        setSnap((s) => {
-          if (s.callState === "idle" || s.callState === "ended") return s;
-          const pendingMs = pendingStartedAtRef.current ? Date.now() - pendingStartedAtRef.current : 0;
-          if (s.callState === "ringing-out" && emptyPollsRef.current < 3 && pendingMs < 8_000) return s;
-          return { ...s, callState: "ended" };
-        });
-        setTimeout(() => {
-          setSnap((s) => (s.callState === "ended"
-            ? { ...s, callState: "idle", callId: "", remoteNumber: "", remoteIdentity: "", direction: null, startedAt: null, muted: false, onHold: false }
-            : s));
-        }, 2000);
-        if (emptyPollsRef.current >= 3) {
-          pendingStartedAtRef.current = null;
-          stopPolling();
-        }
-      }
-    } catch {
-      /* transient — keep polling */
-    }
+      activeCallRef.current = list[0] || null;
+      if (!activeCallRef.current) stopPolling();
+    } catch { /* transient */ }
   }, [stopPolling]);
 
   const startPolling = useCallback(() => {
     if (pollRef.current) return;
     pollRef.current = setInterval(() => { void pollActiveCalls(); }, 2000);
-    // Kick immediately.
     void pollActiveCalls();
   }, [pollActiveCalls]);
 
-  useEffect(() => () => stopPolling(), [stopPolling]);
-
   const placeCall = useCallback(async (destination: string): Promise<OutboundResult> => {
     if (!destination) return { via: "none", ok: false, error: "empty destination" };
-    pendingStartedAtRef.current = Date.now();
-    emptyPollsRef.current = 0;
-    patch({ callState: "ringing-out", direction: "out", remoteNumber: destination, remoteIdentity: destination, errorCause: undefined, startedAt: null });
+
+    // Preferred path: SIP.js from the browser (audio in the tab).
+    if (sipReadyRef.current && snap.status === "registered") {
+      try {
+        await ppSipProvider.call(destination);
+        return { via: "sip", ok: true };
+      } catch (e: any) {
+        console.warn("[softphone] SIP call failed, falling back to REST", e);
+      }
+    }
+
+    // Fallback: REST — NetSapiens rings the mobile device.
     const { data, error } = await supabase.functions.invoke("pp-ns-calls", {
       body: { action: "start", to_number: destination, client_type: "mobile" },
     });
-
     const d = data as any;
     if (error || d?.success === false || d?.error) {
       const msg = d?.error ?? error?.message ?? "Call failed";
-      pendingStartedAtRef.current = null;
-      patch({ callState: "ended", errorCause: msg });
-      setTimeout(() => setSnap((s) => ({ ...s, callState: "idle", direction: null, remoteNumber: "", remoteIdentity: "" })), 1500);
       return { via: "none", ok: false, error: msg };
     }
-    if (d?.call_id) patch({ callId: String(d.call_id) });
-    window.setTimeout(() => {
-      setSnap((s) => {
-        if (s.callState !== "ringing-out" || activeCallRef.current) return s;
-        pendingStartedAtRef.current = null;
-        stopPolling();
-        return { ...s, callState: "ended", errorCause: "Aucun appel actif détecté — le téléphone mobile n’est probablement pas enregistré." };
-      });
-      window.setTimeout(() => setSnap((s) => (s.callState === "ended" ? { ...s, callState: "idle", direction: null, remoteNumber: "", remoteIdentity: "" } : s)), 2500);
-    }, 12_000);
     startPolling();
     return { via: "pbx", ok: true };
-  }, [startPolling]);
-
-  const controlAction = useCallback(async (action: string, extra: Record<string, unknown> = {}) => {
-    const callId = activeCallRef.current?.["call-id"] ?? snap.callId;
-    if (!callId) return;
-    await supabase.functions.invoke("pp-ns-calls", { body: { action, call_id: callId, ...extra } });
-  }, [snap.callId]);
+  }, [snap.status, startPolling]);
 
   const hangup = useCallback(() => {
-    void controlAction("disconnect");
-    patch({ callState: "ended" });
-    setTimeout(() => setSnap((s) => ({ ...s, callState: "idle", callId: "", direction: null, remoteNumber: "", remoteIdentity: "", startedAt: null })), 1000);
+    ppSipProvider.hangup();
+    if (activeCallRef.current) {
+      const callId = activeCallRef.current?.["call-id"] ?? snap.callId;
+      if (callId) void supabase.functions.invoke("pp-ns-calls", { body: { action: "disconnect", call_id: callId } });
+    }
     stopPolling();
-  }, [controlAction, stopPolling]);
+  }, [snap.callId, stopPolling]);
 
-  const hold = useCallback(() => { void controlAction("hold"); patch({ onHold: true, callState: "held" }); }, [controlAction]);
-  const unhold = useCallback(() => { void controlAction("unhold"); patch({ onHold: false, callState: "active" }); }, [controlAction]);
-  const transfer = useCallback((target: string) => { void controlAction("transfer", { destination: target }); }, [controlAction]);
-  const answer = useCallback(async () => { await controlAction("answer"); return true; }, [controlAction]);
-  const mute = useCallback(() => patch({ muted: true }), []);
-  const unmute = useCallback(() => patch({ muted: false }), []);
+  const answer = useCallback(async () => { await ppSipProvider.answer(); return true; }, []);
+  const mute = useCallback(() => ppSipProvider.mute(), []);
+  const unmute = useCallback(() => ppSipProvider.unmute(), []);
+  const hold = useCallback(() => ppSipProvider.hold(), []);
+  const unhold = useCallback(() => ppSipProvider.unhold(), []);
+  const transfer = useCallback((target: string) => ppSipProvider.transfer(target), []);
+  const sendDTMF = useCallback((k: string) => ppSipProvider.sendDTMF(k), []);
 
   return useMemo(() => ({
     snap,
@@ -166,12 +152,11 @@ export function useMplanipretSoftphone() {
     unmute,
     hold,
     unhold,
-    sendDTMF: (_k: string) => {/* not supported via REST */},
+    sendDTMF,
     transfer,
-    setAudioEl: (_el: HTMLAudioElement | null) => {/* no local audio in REST mode */},
-    forceHandover: () => {/* REST-only call control */},
-  }), [snap, loading, net, quality, placeCall, answer, hangup, hold, unhold, mute, unmute, transfer, answeredElsewhere]);
+    setAudioEl: (el: HTMLAudioElement | null) => { ppSipProvider.audioEl = el; },
+    forceHandover: () => {/* handled by NS */},
+  }), [snap, loading, net, quality, placeCall, answer, hangup, hold, unhold, mute, unmute, transfer, sendDTMF, answeredElsewhere]);
 }
 
-// Silence unused import in strict TS if any consumer imports from here.
 export type { PpSipSnapshot };
