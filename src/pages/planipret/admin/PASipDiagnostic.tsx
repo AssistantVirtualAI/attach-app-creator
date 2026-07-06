@@ -64,13 +64,14 @@ export default function PASipDiagnostic() {
     setTesting(true);
     try {
       await ppSipProvider.stop();
-      const d = await resolveOnly();
-      if (!d?.ok || !d.sip_password || !(d.sip_wss_url ?? d.sip_ws_url)) {
+      const d = (await resolveOnly()) as any;
+      const wss = d?.sip_wss_url ?? d?.sip_ws_url;
+      if (!d?.ok || !d.sip_password || !wss) {
         toast.error(d?.error ?? "Credentials indisponibles");
         return;
       }
       await ppSipProvider.init({
-        wssUrl: String(d.sip_wss_url ?? d.sip_ws_url),
+        wssUrl: String(wss),
         wssUrls: Array.isArray(d.sip_wss_urls) ? d.sip_wss_urls : undefined,
         sipDomain: d.sip_domain!,
         sipUsername: d.sip_username!,
