@@ -1024,7 +1024,7 @@ function CallDetailSheet({
 
         {/* Caller header */}
         <div className="px-5 pb-3 shrink-0" style={{ borderBottom: "1px solid var(--pp-bg-border)" }}>
-          <div className="text-lg font-bold truncate" style={{ color: "var(--pp-text-primary)" }}>{displayLabel(call) === "Inconnu" ? t("common.unknown") : displayLabel(call)}</div>
+          <div className="text-lg font-bold truncate" style={{ color: "var(--pp-text-primary)" }}>{_callerLabel}</div>
           {otherName(call) && <div className="text-xs mt-0.5" style={{ color: "var(--pp-text-muted)" }}>{otherNumber(call)}</div>}
           <div className="mt-1.5 flex items-center gap-2 text-[11px]" style={{ color: "var(--pp-text-secondary)" }}>
             <span className="px-2 py-0.5 rounded-full font-semibold" style={{ background: `${dirColor}1F`, color: dirColor, border: `1px solid ${dirColor}55` }}>{direction}</span>
