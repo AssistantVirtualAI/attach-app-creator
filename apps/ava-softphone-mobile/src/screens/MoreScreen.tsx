@@ -86,7 +86,26 @@ export default function MoreScreen({
       <Card padded={false}>
         <SettingsRow label={tr.more.signOut} icon="⎋" onPress={onSignOut} />
         <SettingsRow label={tr.more.deleteAccount} icon="🗑" onPress={() => setSub('delete')} />
+        <SettingsRow
+          label={tx('Supprimer mes contacts du serveur', 'Delete my contacts from server')}
+          icon="🧹"
+          value={tx('Retire vos contacts téléversés', 'Removes your uploaded contacts')}
+          onPress={async () => {
+            const ok = window.confirm(tx(
+              'Ceci supprimera tous vos contacts téléversés de nos serveurs. L\'identification des appelants ne sera plus disponible. Continuer ?',
+              'This will delete all your uploaded contacts from our servers. Caller ID matching will no longer be available. Continue?'
+            ));
+            if (!ok) return;
+            const res = await deleteServerContacts(creds.userId);
+            await revokeConsent();
+            window.alert(res.ok
+              ? tx('✅ Vos contacts ont été supprimés de nos serveurs.', '✅ Your contacts have been deleted from our servers.')
+              : tx('Erreur : ', 'Error: ') + (res.error || 'unknown')
+            );
+          }}
+        />
       </Card>
+
 
       <div style={{ textAlign: 'center', marginTop: 18, fontSize: 10, color: colors.mutedSilver }}>
         AVA Softphone · v1.0.0
