@@ -399,18 +399,32 @@ export default function MCalls() {
         {tab === "active" ? (
           <ActiveCallsTab userId={userId} openDialer={openDialer} />
         ) : tab === "recordings" ? (
-          <RecordingsList
-            calls={recordings as any}
-            loading={loading}
-            userId={userId}
-            onUpdated={(c) => setRecordings((prev) => prev.map((p) => (p.id === c.id ? { ...p, ...c } as any : p)))}
-          />
+          <>
+            <div className="px-4 pt-2 flex items-center justify-end">
+              <button
+                onClick={loadRecordings}
+                className="text-xs flex items-center gap-1 px-2 py-1"
+                style={{ color: "var(--pp-text-muted)" }}
+              >
+                <RefreshCw className={`w-3 h-3 ${recordingsLoading ? "animate-spin" : ""}`} /> {t("common.refresh")}
+              </button>
+            </div>
+            <RecordingsList
+              calls={recordings as any}
+              loading={recordingsLoading}
+              userId={userId}
+              onUpdated={(c) => setRecordings((prev) => prev.map((p) => (p.id === c.id ? { ...p, ...c } as any : p)))}
+            />
+          </>
         ) : tab === "voicemails" ? (
           <VoicemailsTab userId={userId} openDialer={openDialer} registerRefresh={registerRefresh} />
         ) : (
           <>
             {/* Pull-to-refresh proxy */}
-            <div className="px-4 pt-2 flex items-center justify-end">
+            <div className="px-4 pt-2 flex items-center justify-between">
+              <span className="text-[11px]" style={{ color: "var(--pp-text-muted)" }}>
+                {filtered.length} {filtered.length > 1 ? (lang === "en" ? "calls" : "appels") : (lang === "en" ? "call" : "appel")}
+              </span>
               <button
                 onClick={onRefresh}
                 className="text-xs flex items-center gap-1 px-2 py-1"
@@ -438,11 +452,44 @@ export default function MCalls() {
             ) : filtered.length === 0 ? (
               <EmptyState tab={tab as any} />
             ) : (
-              <ul className="px-3 pb-4 space-y-1.5">
-                {filtered.map((c) => (
-                  <CallRow key={c.id} call={c} onTap={() => setSelected(c)} onCall={() => openDialer(otherNumber(c))} showCallBtn={tab === "missed"} />
-                ))}
-              </ul>
+              <>
+                <ul className="px-3 pb-2 space-y-1.5">
+                  {paged.map((c, idx) => {
+                    const prev = idx > 0 ? paged[idx - 1] : null;
+                    const header = dayHeader(c.started_at, lang as "fr" | "en", t("common.today"), t("common.yesterday"));
+                    const prevHeader = prev ? dayHeader(prev.started_at, lang as "fr" | "en", t("common.today"), t("common.yesterday")) : null;
+                    const showHeader = header !== prevHeader;
+                    return (
+                      <div key={c.id}>
+                        {showHeader && (
+                          <div
+                            className="px-2 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wide"
+                            style={{ color: "var(--pp-text-muted)" }}
+                          >
+                            {header}
+                          </div>
+                        )}
+                        <CallRow call={c} onTap={() => setSelected(c)} onCall={() => openDialer(otherNumber(c))} showCallBtn={tab === "missed"} />
+                      </div>
+                    );
+                  })}
+                </ul>
+                {visibleCount < filtered.length && (
+                  <div className="px-3 pb-4">
+                    <button
+                      onClick={() => setVisibleCount((n) => n + 25)}
+                      className="w-full py-2.5 rounded-xl text-xs font-semibold"
+                      style={{
+                        background: "var(--pp-bg-surface)",
+                        border: "1px solid var(--pp-bg-border-2)",
+                        color: "var(--pp-brand-accent)",
+                      }}
+                    >
+                      {lang === "en" ? "Load more" : "Charger plus"} ({filtered.length - visibleCount})
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </>
         )}
