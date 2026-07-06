@@ -14,6 +14,20 @@ import {
   nsFetch,
 } from "../_shared/planipret-ns.ts";
 
+function val(raw: any, keys: string[], fb: any = null) {
+  for (const k of keys) {
+    const v = raw?.[k];
+    if (v !== undefined && v !== null && `${v}` !== "") return v;
+  }
+  return fb;
+}
+
+function normalizeEndpoint(v: unknown): string | null {
+  const s = String(v ?? "").trim();
+  if (!s) return null;
+  return s.replace(/^sips?:/i, "").replace(/^tel:/i, "").split("@")[0] || s;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -98,42 +112,58 @@ Deno.serve(async (req) => {
       // 2) Merge with enriched local CDR rows (transcript, AI, etc.)
       const { data: local } = await supabase
         .from("planipret_phone_calls")
-        .select("id, ns_call_id, direction, from_number, from_name, to_number, to_name, started_at, duration_seconds, recording_url, ai_summary, transcript")
+        .select("id, ns_call_id, ns_callid, ns_orig_callid, ns_term_callid, extension, direction, from_number, from_name, to_number, to_name, started_at, duration_seconds, recording_url, has_recording, ai_summary, transcript, transcript_segments, transcript_language, ai_coaching, ai_key_points, ai_client_insights, maestro_synced, maestro_client_id, pipeline_state")
         .eq("user_id", ctx.userId)
         .gte("started_at", start)
         .lte("started_at", end)
         .order("started_at", { ascending: false })
         .limit(limit);
       const byNsId = new Map<string, any>();
-      (local ?? []).forEach((r: any) => { if (r.ns_call_id) byNsId.set(r.ns_call_id, r); });
+      (local ?? []).forEach((r: any) => {
+        [r.ns_call_id, r.ns_callid, r.ns_orig_callid, r.ns_term_callid].filter(Boolean).forEach((id: string) => byNsId.set(id, r));
+      });
 
       const items = nsItems.map((it: any, i: number) => {
-        const nsId = it.id ?? it.call_id ?? it.uuid ?? it["cdr-id"] ?? null;
-        const enriched = nsId ? byNsId.get(nsId) : null;
-        const dirRaw = String(it.direction ?? it.call_direction ?? "").toLowerCase();
+        const nsId = val(it, ["call-parent-cdr-id", "cdr-id", "cdr_id", "id", "uuid", "call_id", "call-id"]);
+        const nsCallId = val(it, ["call-id", "call_id", "callid", "call-parent-call-id", "orig_callid", "term_callid"]);
+        const nsOrigCallId = val(it, ["call-orig-call-id", "orig_callid", "orig-callid", "orig-call-id"]);
+        const nsTermCallId = val(it, ["call-term-call-id", "term_callid", "term-callid", "term-call-id"]);
+        const enriched = [nsId, nsCallId, nsOrigCallId, nsTermCallId].map((id) => id ? byNsId.get(id) : null).find(Boolean);
+        const dirRaw = String(val(it, ["direction", "call_direction", "call-direction"], enriched?.direction ?? "")).toLowerCase();
         const direction = dirRaw.includes("in") ? "inbound" : "outbound";
         return {
           id: enriched?.id ?? nsId ?? `rec-${i}`,
           ns_call_id: nsId,
+          ns_callid: nsCallId ?? enriched?.ns_callid ?? null,
+          ns_orig_callid: nsOrigCallId ?? enriched?.ns_orig_callid ?? null,
+          ns_term_callid: nsTermCallId ?? enriched?.ns_term_callid ?? null,
+          extension: enriched?.extension ?? ctx.extension,
           direction,
-          from_number: it.from_number ?? it.caller_id_number ?? it.orig_from_user
-            ?? it.by_number ?? enriched?.from_number ?? null,
-          from_name: it.from_name ?? it.caller_id_name ?? enriched?.from_name ?? null,
-          to_number: it.to_number ?? it.destination ?? it.term_to_user ?? enriched?.to_number ?? null,
-          to_name: it.to_name ?? enriched?.to_name ?? null,
-          started_at: it.start_time ?? it.started_at ?? it.time_start ?? enriched?.started_at ?? null,
-          duration_seconds: Number(it.duration ?? it.billsec ?? it.time_talking ?? 0) || enriched?.duration_seconds || 0,
-          recording_url: it.url ?? it.recording_url ?? it.recording ?? it.record_url
-            ?? (nsId ? `/functions/v1/pp-ns-recordings?call_id=${encodeURIComponent(nsId)}` : null)
+          from_number: normalizeEndpoint(val(it, ["from_number", "from", "caller_id_number", "caller-id-number", "orig_from_user", "orig-user", "call-orig-user", "call-orig-from-uri", "orig-from-uri", "by_number"])) ?? enriched?.from_number ?? null,
+          from_name: val(it, ["from_name", "caller_id_name", "caller-id-name", "orig_from_name", "orig-name"]) ?? enriched?.from_name ?? null,
+          to_number: normalizeEndpoint(val(it, ["to_number", "to", "destination", "dialed_number", "dnis", "term_to_user", "term-user", "call-term-user", "call-term-to-uri", "call-orig-to-uri"])) ?? enriched?.to_number ?? null,
+          to_name: val(it, ["to_name", "term_to_name", "term-name"]) ?? enriched?.to_name ?? null,
+          started_at: val(it, ["start_time", "started_at", "time_start", "time-start", "call-recording-started-datetime"]) ?? enriched?.started_at ?? null,
+          duration_seconds: Number(val(it, ["duration", "billsec", "time_talking", "file-duration-seconds"], 0)) || enriched?.duration_seconds || 0,
+          recording_url: val(it, ["file-access-url", "url", "recording_url", "recording", "record_url"])
             ?? enriched?.recording_url ?? null,
+          has_recording: true,
           ai_summary: enriched?.ai_summary ?? null,
           transcript: enriched?.transcript ?? null,
+          transcript_segments: enriched?.transcript_segments ?? null,
+          transcript_language: enriched?.transcript_language ?? null,
+          ai_coaching: enriched?.ai_coaching ?? null,
+          ai_key_points: enriched?.ai_key_points ?? null,
+          ai_client_insights: enriched?.ai_client_insights ?? null,
+          maestro_synced: enriched?.maestro_synced ?? null,
+          maestro_client_id: enriched?.maestro_client_id ?? null,
+          pipeline_state: enriched?.pipeline_state ?? null,
         };
       });
 
       // Fallback: local-only if NS returned nothing
       const finalItems = items.length ? items
-        : (local ?? []).filter((r: any) => r.recording_url);
+        : (local ?? []).filter((r: any) => r.recording_url || r.has_recording || r.ns_callid || r.ns_call_id);
 
       return jsonResponse({ ok: true, count: finalItems.length, items: finalItems });
     }

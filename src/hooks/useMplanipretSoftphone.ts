@@ -147,13 +147,17 @@ export function useMplanipretSoftphone() {
     });
 
     const { data, error } = await supabase.functions.invoke("pp-ns-calls", {
-      body: { action: "start", to_number: destination, client_type: "mobile" },
+      body: { action: "start", to_number: destination, client_type: "web" },
     });
     const d = data as any;
     if (error || d?.success === false || d?.error) {
       const msg = d?.error ?? error?.message ?? "Call failed";
       setRestCall(null);
       return { via: "none", ok: false, error: msg };
+    }
+    const nsCallId = d?.call_id ?? d?.["call-id"] ?? d?.id;
+    if (nsCallId) {
+      setRestCall((cur) => cur ? { ...cur, id: String(nsCallId), status: "ringing-out" } : cur);
     }
     startPolling();
     return { via: "pbx", ok: true };

@@ -17,6 +17,10 @@ export type RecordingCall = {
   id: string;
   user_id: string;
   ns_call_id: string | null;
+  ns_callid?: string | null;
+  ns_orig_callid?: string | null;
+  ns_term_callid?: string | null;
+  extension?: string | null;
   direction: string;
   from_number: string | null;
   from_name: string | null;
@@ -25,6 +29,7 @@ export type RecordingCall = {
   started_at: string;
   duration_seconds: number | null;
   recording_url: string | null;
+  has_recording?: boolean | null;
   transcript: string | null;
   transcript_segments?: any;
   transcript_language?: string | null;
@@ -79,7 +84,7 @@ export default function RecordingsList({
   onUpdated: (c: RecordingCall) => void;
 }) {
   const withRec = useMemo(
-    () => calls.filter((c) => !!c.recording_url || !!c.transcript || !!c.ai_summary),
+    () => calls.filter((c) => !!c.recording_url || !!c.has_recording || !!c.ns_call_id || !!c.ns_callid || !!c.transcript || !!c.ai_summary),
     [calls]
   );
 
@@ -260,16 +265,33 @@ function RecordingSection({ call, onUpdated }: { call: RecordingCall; onUpdated:
   const fetchRec = async () => {
     setLoading(true);
     try {
-      // Préféré : pp-ns-recordings (NS-API v2, segmenté par extension)
-      const targetId = call.ns_call_id ?? call.id;
-      const { data, error } = await supabase.functions.invoke("pp-ns-recordings", {
-        body: { action: "get", call_id: targetId },
+      const projectId = (import.meta as any).env?.VITE_SUPABASE_PROJECT_ID;
+      const anonKey = (import.meta as any).env?.VITE_SUPABASE_PUBLISHABLE_KEY ?? (import.meta as any).env?.VITE_SUPABASE_ANON_KEY;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!projectId) throw new Error("Backend URL indisponible");
+      const resp = await fetch(`https://${projectId}.supabase.co/functions/v1/ns-get-recording`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: anonKey ?? "",
+          Authorization: `Bearer ${session?.access_token ?? anonKey ?? ""}`,
+        },
+        body: JSON.stringify({
+          call_db_id: call.id,
+          ns_callid: call.ns_callid ?? call.ns_call_id,
+          ns_orig_callid: call.ns_orig_callid,
+          ns_term_callid: call.ns_term_callid,
+          ns_extension: call.extension,
+        }),
       });
-      if (error) throw error;
-      const url = (data as any)?.recording_url;
-      if (!url) throw new Error("URL non disponible");
-      await supabase.from("planipret_phone_calls").update({ recording_url: url }).eq("id", call.id);
-      onUpdated({ ...call, recording_url: url });
+      const ct = resp.headers.get("Content-Type") ?? "";
+      if (!resp.ok || !ct.includes("audio")) {
+        const j = await resp.json().catch(() => ({}));
+        throw new Error(j?.message ?? j?.error ?? "Audio non disponible");
+      }
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      onUpdated({ ...call, recording_url: url, has_recording: true });
       toast.success("Enregistrement chargé");
     } catch (e: any) {
       // Fallback : maestro-recording

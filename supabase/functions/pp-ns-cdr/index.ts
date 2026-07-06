@@ -12,12 +12,62 @@ import {
 } from "../_shared/planipret-ns.ts";
 
 function pickDirection(raw: any): "inbound" | "outbound" | "missed" {
-  const dir = (raw?.direction ?? raw?.call_direction ?? "").toString().toLowerCase();
-  if (dir.includes("in")) {
-    if (raw?.answered === false || raw?.disposition === "no-answer") return "missed";
+  const dir = String(val(raw, ["direction", "call_direction", "call-direction", "type", "call-type"], "")).toLowerCase();
+  const disposition = String(val(raw, ["disposition", "status", "call-status"], "")).toLowerCase();
+  if (dir.includes("in") || dir === "incoming" || dir === "received") {
+    if (raw?.answered === false || ["no-answer", "missed", "unanswered"].includes(disposition)) return "missed";
     return "inbound";
   }
+  if (["no-answer", "missed", "unanswered"].includes(disposition)) return "missed";
   return "outbound";
+}
+
+function val(raw: any, keys: string[], fb: any = null) {
+  for (const k of keys) {
+    const v = raw?.[k];
+    if (v !== undefined && v !== null && `${v}` !== "") return v;
+  }
+  return fb;
+}
+
+function normalizeEndpoint(v: unknown): string | null {
+  const s = String(v ?? "").trim();
+  if (!s) return null;
+  return s.replace(/^sips?:/i, "").replace(/^tel:/i, "").split("@")[0] || s;
+}
+
+function normalizeCdr(it: any, ctx: any) {
+  const nsCdrId = val(it, ["call-parent-cdr-id", "cdr-id", "cdr_id", "id", "uuid", "call_id", "call-id"]);
+  const nsCallId = val(it, ["call-id", "call_id", "callid", "call-parent-call-id", "orig_callid", "term_callid"]);
+  const nsOrigCallId = val(it, ["call-orig-call-id", "orig_callid", "orig-callid", "orig-call-id"]);
+  const nsTermCallId = val(it, ["call-term-call-id", "term_callid", "term-callid", "term-call-id"]);
+  const fromNumber = normalizeEndpoint(val(it, ["from_number", "from", "caller_id_number", "caller-id-number", "call-orig-from-uri", "orig-from-uri", "orig_from_uri", "call-orig-user", "orig-user", "orig_from_user", "ani", "by_number"]));
+  const toNumber = normalizeEndpoint(val(it, ["to_number", "to", "destination", "dialed_number", "dnis", "call-term-to-uri", "call-orig-to-uri", "term_to_user", "term-user", "call-term-user", "orig_to_user", "orig-to-user"]));
+  const recordingUrl = val(it, ["file-access-url", "recording_url", "recording-url", "record_url", "recording", "url"]);
+  const recordingStatus = val(it, ["call-recording-status", "recording_status"]);
+  return {
+    ...it,
+    ns_call_id: nsCdrId,
+    ns_callid: nsCallId,
+    ns_orig_callid: nsOrigCallId,
+    ns_term_callid: nsTermCallId,
+    ns_cdr_id: nsCdrId,
+    ns_domain: ctx.nsDomain,
+    extension: ctx.extension,
+    direction: pickDirection(it),
+    status: val(it, ["disposition", "status", "call-status"]),
+    from_number: fromNumber,
+    from_name: val(it, ["from_name", "caller_id_name", "caller-id-name", "orig_from_name", "orig-name", "by_name"]),
+    to_number: toNumber,
+    to_name: val(it, ["to_name", "term_to_name", "term-name"]),
+    started_at: toIso(val(it, ["start_time", "started_at", "time_start", "time-start", "call-start-datetime", "call-batch-start-datetime"])),
+    answered_at: toIso(val(it, ["answer_time", "answered_at", "time_answer", "time-answer", "call-answer-datetime"])),
+    ended_at: toIso(val(it, ["end_time", "ended_at", "time_release", "time-release", "call-end-datetime"])),
+    duration_seconds: Number(val(it, ["duration", "billsec", "time_talking", "call-talking-duration-seconds", "call-total-duration-seconds"], 0)) || 0,
+    recording_url: recordingUrl,
+    ns_recording_url: recordingUrl,
+    has_recording: Boolean(recordingUrl || recordingStatus),
+  };
 }
 
 function toIso(v: unknown): string | null {
@@ -66,7 +116,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "NS-API CDR fetch failed", status: res.status, body: txt }, 502);
     }
     const raw = await res.json();
-    const items: any[] = Array.isArray(raw) ? raw : raw?.cdrs ?? raw?.data ?? [];
+    const items: any[] = (Array.isArray(raw) ? raw : raw?.cdrs ?? raw?.data ?? []).map((it: any) => normalizeCdr(it, ctx));
 
     if (action === "list") {
       return jsonResponse({ ok: true, count: items.length, items });
@@ -85,32 +135,28 @@ Deno.serve(async (req) => {
         .maybeSingle();
       const runId = runRow?.id as string | undefined;
 
-      const pickFrom = (it: any) =>
-        it.from_number ?? it.caller_id_number ?? it.orig_from_user ?? it.orig_from_uri
-        ?? it.by_number ?? it.orig_callid_number ?? it.ani ?? null;
-      const pickTo = (it: any) =>
-        it.to_number ?? it.destination ?? it.term_to_user ?? it.orig_to_user
-        ?? it.dialed_number ?? it.dnis ?? null;
-      const pickFromName = (it: any) =>
-        it.from_name ?? it.caller_id_name ?? it.orig_from_name ?? it.by_name ?? null;
-
       const rows = items.map((it) => ({
         user_id: ctx.userId,
         organization_id: AVA_ORG_ID,
-        ns_call_id: it.id ?? it.call_id ?? it.uuid ?? it["cdr-id"] ?? null,
+        ns_call_id: it.ns_call_id ?? it.ns_cdr_id ?? null,
+        ns_callid: it.ns_callid ?? null,
+        ns_cdr_id: it.ns_cdr_id ?? null,
+        ns_orig_callid: it.ns_orig_callid ?? null,
+        ns_term_callid: it.ns_term_callid ?? null,
         ns_domain: ctx.nsDomain,
         extension: ctx.extension,
-        direction: pickDirection(it),
-        status: it.disposition ?? it.status ?? null,
-        from_number: pickFrom(it),
-        from_name: pickFromName(it),
-        to_number: pickTo(it),
-        to_name: it.to_name ?? it.term_to_name ?? null,
-        started_at: toIso(it.start_time ?? it.started_at ?? it.time_start),
-        answered_at: toIso(it.answer_time ?? it.answered_at ?? it.time_answer),
-        ended_at: toIso(it.end_time ?? it.ended_at ?? it.time_release),
-        duration_seconds: Number(it.duration ?? it.billsec ?? it.time_talking ?? 0) || 0,
-        recording_url: it.recording_url ?? it.recording ?? it.record_url ?? null,
+        direction: it.direction,
+        status: it.status,
+        from_number: it.from_number,
+        from_name: it.from_name,
+        to_number: it.to_number,
+        to_name: it.to_name,
+        started_at: it.started_at,
+        answered_at: it.answered_at,
+        ended_at: it.ended_at,
+        duration_seconds: it.duration_seconds,
+        recording_url: it.recording_url,
+        ns_recording_url: it.ns_recording_url,
         metadata: it,
       }));
 
