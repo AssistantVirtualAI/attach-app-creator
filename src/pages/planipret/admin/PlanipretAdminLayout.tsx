@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import {
   LayoutDashboard, Users, Phone, MessageSquare, Mic, Plug,
-  BarChart3, LogOut, ShieldCheck, CheckSquare, Search, ChevronRight, Sparkles, Smartphone,
+  BarChart3, LogOut, ShieldCheck, CheckSquare, Search, ChevronRight, Sparkles, Smartphone, PlugZap,
 } from "lucide-react";
 import SessionTimeoutModal from "@/components/planipret/SessionTimeoutModal";
 import { useAdminRealtime } from "@/hooks/useAdminRealtime";
@@ -49,6 +49,7 @@ const NAV: NavGroup[] = [
     items: [
       { to: "/planipret/admin/integrations",    label: "Intégrations", Icon: Plug,        badge: "integrations" },
       { to: "/planipret/admin/mobile-devices",  label: "Devices mobiles", Icon: Smartphone },
+      { to: "/planipret/admin/sip-diagnostic",  label: "Diagnostic SIP",  Icon: PlugZap },
       { to: "/planipret/admin/compliance",      label: "Conformité",   Icon: ShieldCheck },
       { to: "/planipret/admin/audit-checklist", label: "Audit",        Icon: CheckSquare, badge: "audit" },
     ],
@@ -67,6 +68,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/planipret/admin/compliance": "Conformité PIPEDA · Loi 25",
   "/planipret/admin/ava": "AVA — Analytics",
   "/planipret/admin/mobile-devices": "Vérification devices mobiles",
+  "/planipret/admin/sip-diagnostic": "Diagnostic SIP — 113_web",
 };
 
 const initials = (n?: string) =>
