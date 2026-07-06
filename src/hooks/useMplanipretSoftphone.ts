@@ -27,8 +27,15 @@ type RestCall = {
   direction: "in" | "out";
   other: string;
   startedAt: number;
-  status: "ringing-out" | "active" | "held";
+  status: "ringing-out" | "ringing-in" | "active" | "held";
   muted: boolean;
+};
+
+type AttachRestCallArgs = {
+  id: string;
+  other: string;
+  direction?: "in" | "out";
+  status?: RestCall["status"];
 };
 
 export function useMplanipretSoftphone() {
@@ -104,7 +111,7 @@ export function useMplanipretSoftphone() {
       const other = raw.remote_party ?? raw.remote_number ?? raw.other_party
         ?? (direction === "out" ? raw.to_number : raw.from_number) ?? raw.destination ?? "—";
       const status: RestCall["status"] = /hold/i.test(raw.state ?? raw.status ?? "") ? "held"
-        : /ring/i.test(raw.state ?? raw.status ?? "") ? "ringing-out" : "active";
+        : /ring/i.test(raw.state ?? raw.status ?? "") ? (direction === "in" ? "ringing-in" : "ringing-out") : "active";
       const startedAtIso = raw.answered_at ?? raw.started_at ?? raw.time_start;
       const startedAt = startedAtIso ? new Date(startedAtIso).getTime() : Date.now();
       setRestCall((prev) => ({
@@ -123,6 +130,19 @@ export function useMplanipretSoftphone() {
     pollRef.current = setInterval(() => { void pollActiveCalls(); }, 2000);
     void pollActiveCalls();
   }, [pollActiveCalls]);
+
+  const attachRestCall = useCallback(({ id, other, direction = "in", status = "active" }: AttachRestCallArgs) => {
+    if (!id) return;
+    setRestCall((prev) => ({
+      id: String(id),
+      direction,
+      other: other || prev?.other || "—",
+      startedAt: prev?.startedAt ?? Date.now(),
+      status,
+      muted: prev?.muted ?? false,
+    }));
+    startPolling();
+  }, [startPolling]);
 
   const placeCall = useCallback(async (destination: string): Promise<OutboundResult> => {
     if (!destination) return { via: "none", ok: false, error: "empty destination" };
@@ -197,7 +217,16 @@ export function useMplanipretSoftphone() {
     ppSipProvider.hangup();
   }, [restMode, invokeRest, stopPolling]);
 
-  const answer = useCallback(async () => { await ppSipProvider.answer(); return true; }, []);
+  const answer = useCallback(async () => {
+    if (restMode) {
+      await invokeRest("answer");
+      setRestCall((c) => c ? { ...c, status: "active", startedAt: c.startedAt ?? Date.now() } : c);
+      startPolling();
+      return true;
+    }
+    await ppSipProvider.answer();
+    return true;
+  }, [restMode, invokeRest, startPolling]);
 
   const mute = useCallback(() => {
     if (restMode) { void invokeRest("mute", { muted: true }); setRestCall((c) => c ? { ...c, muted: true } : c); return; }
@@ -246,9 +275,10 @@ export function useMplanipretSoftphone() {
     unhold,
     sendDTMF,
     transfer,
+    attachRestCall,
     setAudioEl: (el: HTMLAudioElement | null) => { ppSipProvider.audioEl = el; },
     forceHandover: () => {/* handled by NS */},
-  }), [snap, loading, net, quality, placeCall, answer, hangup, hold, unhold, mute, unmute, transfer, sendDTMF, answeredElsewhere]);
+  }), [snap, loading, net, quality, placeCall, answer, hangup, hold, unhold, mute, unmute, transfer, sendDTMF, attachRestCall, answeredElsewhere]);
 }
 
 export type { PpSipSnapshot };

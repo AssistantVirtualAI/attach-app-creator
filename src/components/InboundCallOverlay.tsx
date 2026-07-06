@@ -75,7 +75,7 @@ export default function InboundCallOverlay({ call, onClose }: { call: InboundCal
     if (busy) return;
     setBusy(true);
     try {
-      await supabase.functions.invoke("ns-calls", { body: { action, call_id: call?.call_id } });
+      await supabase.functions.invoke("pp-ns-calls", { body: { action, call_id: call?.call_id } });
       handleClose();
       if (action === "answer") navigate(`/mplanipret/calls?call=${call?.call_id ?? ""}`);
     } catch (e: any) {
@@ -89,7 +89,7 @@ export default function InboundCallOverlay({ call, onClose }: { call: InboundCal
     if (busy) return;
     setBusy(true);
     try {
-      await supabase.functions.invoke("ns-calls", { body: { action: "reject", call_id: call?.call_id, reason: "voicemail" } });
+      await supabase.functions.invoke("pp-ns-calls", { body: { action: "reject", call_id: call?.call_id, reason: "voicemail" } });
       toast.success("🤖 Renvoyé vers votre boîte vocale");
       handleClose();
     } catch (e: any) {

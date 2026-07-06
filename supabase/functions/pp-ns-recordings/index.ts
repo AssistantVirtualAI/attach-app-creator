@@ -112,7 +112,7 @@ Deno.serve(async (req) => {
       // 2) Merge with enriched local CDR rows (transcript, AI, etc.)
       const { data: local } = await supabase
         .from("planipret_phone_calls")
-        .select("id, ns_call_id, ns_callid, ns_orig_callid, ns_term_callid, extension, direction, from_number, from_name, to_number, to_name, started_at, duration_seconds, recording_url, has_recording, ai_summary, transcript, transcript_segments, transcript_language, ai_coaching, ai_key_points, ai_client_insights, maestro_synced, maestro_client_id, pipeline_state")
+        .select("id, ns_call_id, ns_callid, ns_orig_callid, ns_term_callid, extension, direction, status, from_number, from_name, to_number, to_name, started_at, duration_seconds, recording_url, has_recording, ai_summary, transcript, transcript_segments, transcript_language, ai_coaching, ai_key_points, ai_client_insights, maestro_synced, maestro_client_id, pipeline_state")
         .eq("user_id", ctx.userId)
         .gte("started_at", start)
         .lte("started_at", end)
@@ -170,7 +170,12 @@ Deno.serve(async (req) => {
       // (recordings may still be resolvable through ns-get-recording proxy).
       const nsSeen = new Set(items.map((r) => r.id));
       const localExtra = (local ?? [])
-        .filter((r: any) => !nsSeen.has(r.id) && (r.ns_callid || r.ns_orig_callid || r.ns_term_callid || r.ns_call_id || r.recording_url || r.has_recording))
+        .filter((r: any) => {
+          if (nsSeen.has(r.id)) return false;
+          if (r.ns_callid || r.ns_orig_callid || r.ns_term_callid || r.ns_call_id || r.recording_url || r.has_recording) return true;
+          const st = String(r.status ?? "").toLowerCase();
+          return ["completed", "answered", "active", "in_progress"].some((s) => st.includes(s)) || Number(r.duration_seconds ?? 0) > 0;
+        })
         .map((r: any) => ({
           id: r.id,
           ns_call_id: r.ns_call_id,
@@ -179,6 +184,7 @@ Deno.serve(async (req) => {
           ns_term_callid: r.ns_term_callid,
           extension: r.extension ?? ctx.extension,
           direction: r.direction ?? "outbound",
+          status: r.status ?? null,
           from_number: r.from_number,
           from_name: r.from_name,
           to_number: r.to_number,
@@ -186,7 +192,7 @@ Deno.serve(async (req) => {
           started_at: r.started_at,
           duration_seconds: r.duration_seconds ?? 0,
           recording_url: r.recording_url,
-          has_recording: !!(r.recording_url || r.has_recording),
+          has_recording: !!(r.recording_url || r.has_recording || r.ns_callid || r.ns_orig_callid || r.ns_term_callid || r.ns_call_id || r.started_at),
           stream_via_proxy: true,
           proxy_call_db_id: r.id,
           proxy_ns_callid: r.ns_callid ?? r.ns_orig_callid ?? r.ns_term_callid ?? r.ns_call_id ?? null,

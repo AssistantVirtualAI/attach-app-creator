@@ -335,6 +335,7 @@ export default function PlanipretMobile() {
   const { t, lang, setLang } = useMplanipretLang();
   // REST-only call control: outbound calls ring the broker's registered mobile device.
   const softphone = useMplanipretSoftphone();
+  const { attachRestCall } = softphone;
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [accessError, setAccessError] = useState<"unauthenticated" | "missing_profile" | "load_failed" | null>(null);
@@ -356,8 +357,14 @@ export default function PlanipretMobile() {
   const { ref: scrollRef, pullDist, refreshing, threshold } = usePullToRefresh(handlePull);
 
   const onInboundRinging = useCallback((row: any) => {
+    attachRestCall?.({
+      id: row.id ?? row.call_id,
+      direction: "in",
+      other: row.caller_name || row.from_name || row.from_number || row.number || "—",
+      status: "ringing-in",
+    });
     setInbound({ call_id: row.id, from_number: row.from_number, caller_name: row.caller_name });
-  }, []);
+  }, [attachRestCall]);
   const onAiInsight = useCallback((row: any) => {
     toast(t("toasts.aiAnalysisReady"), {
       description: String(row.ai_summary ?? "").slice(0, 80),
@@ -374,13 +381,23 @@ export default function PlanipretMobile() {
     const refreshActive = async () => {
       const { data } = await supabase
         .from("planipret_phone_calls")
-        .select("id,status")
+        .select("id,status,direction,from_number,to_number,from_name,to_name,started_at,answered_at")
         .eq("user_id", profile.user_id)
         .in("status", ["active", "in_progress", "answered", "ringing"])
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-      setActiveCallId((data as any)?.id ?? null);
+      const row = data as any;
+      setActiveCallId(row?.id ?? null);
+      if (row?.id) {
+        const out = row.direction === "outbound" || row.direction === "out";
+        attachRestCall?.({
+          id: row.id,
+          direction: out ? "out" : "in",
+          other: (out ? row.to_name || row.to_number : row.from_name || row.from_number) || "—",
+          status: String(row.status).includes("ring") ? (out ? "ringing-out" : "ringing-in") : "active",
+        });
+      }
     };
     refreshActive();
     const ch = supabase
@@ -388,10 +405,11 @@ export default function PlanipretMobile() {
       .on("postgres_changes", { event: "*", schema: "public", table: "planipret_phone_calls", filter: `user_id=eq.${profile.user_id}` }, refreshActive)
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [profile?.user_id]);
+  }, [profile?.user_id, attachRestCall]);
 
   const hangupActive = async () => {
     if (!activeCallId) return;
+    softphone.hangup();
     const { error } = await supabase.functions.invoke("pp-ns-calls", { body: { action: "disconnect", call_id: activeCallId } });
     if (error) toast.error(t("dialer.hangupFailed")); else toast.success(t("dialer.hungUp"));
   };

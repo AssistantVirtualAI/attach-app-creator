@@ -43,6 +43,9 @@ export type RecordingCall = {
   maestro_synced?: boolean | null;
   maestro_client_id?: string | null;
   pipeline_state?: Pipeline | null;
+  stream_via_proxy?: boolean | null;
+  proxy_call_db_id?: string | null;
+  proxy_ns_callid?: string | null;
 };
 
 const fmtDate = (iso: string) => {
@@ -64,6 +67,9 @@ const otherLabel = (c: RecordingCall) => {
   const out = c.direction === "outbound";
   return (out ? c.to_name : c.from_name) || (out ? c.to_number : c.from_number) || "Inconnu";
 };
+const hasResolvableAudio = (c: RecordingCall) => !!(
+  c.recording_url || c.has_recording || c.stream_via_proxy || c.proxy_call_db_id || c.proxy_ns_callid || c.ns_callid || c.ns_orig_callid || c.ns_term_callid || c.ns_call_id
+);
 const tempIcon = (t?: string | null) => {
   if (t === "hot") return { Icon: Flame, color: "var(--pp-danger)", label: "Chaud" };
   if (t === "warm") return { Icon: Thermometer, color: "var(--pp-warning, #f59e0b)", label: "Tiède" };
@@ -84,7 +90,7 @@ export default function RecordingsList({
   onUpdated: (c: RecordingCall) => void;
 }) {
   const withRec = useMemo(
-    () => calls.filter((c) => !!c.recording_url || !!c.has_recording || !!c.ns_call_id || !!c.ns_callid || !!c.transcript || !!c.ai_summary),
+    () => calls.filter((c) => hasResolvableAudio(c) || !!c.transcript || !!c.ai_summary),
     [calls]
   );
 
@@ -177,7 +183,7 @@ function RecordingCard({ call, onUpdated }: { call: RecordingCall; onUpdated: (c
 
       {/* Status pills */}
       <div className="flex items-center gap-1.5 mt-2.5">
-        <Pill active={open === "rec"} hasData={!!call.recording_url} onClick={() => setOpen(open === "rec" ? null : "rec")}
+        <Pill active={open === "rec"} hasData={hasResolvableAudio(call)} onClick={() => setOpen(open === "rec" ? null : "rec")}
               icon={<Play className="w-3.5 h-3.5" />} label="Audio" />
         <Pill active={open === "txt"} hasData={!!call.transcript} onClick={() => setOpen(open === "txt" ? null : "txt")}
               icon={<FileText className="w-3.5 h-3.5" />} label="Transcript" />
@@ -278,7 +284,7 @@ function RecordingSection({ call, onUpdated }: { call: RecordingCall; onUpdated:
         },
         body: JSON.stringify({
           call_db_id: call.id,
-          ns_callid: call.ns_callid ?? call.ns_call_id,
+          ns_callid: call.proxy_ns_callid ?? call.ns_callid ?? call.ns_orig_callid ?? call.ns_term_callid ?? call.ns_call_id,
           ns_orig_callid: call.ns_orig_callid,
           ns_term_callid: call.ns_term_callid,
           ns_extension: call.extension,
@@ -291,7 +297,7 @@ function RecordingSection({ call, onUpdated }: { call: RecordingCall; onUpdated:
       }
       const blob = await resp.blob();
       const url = URL.createObjectURL(blob);
-      onUpdated({ ...call, recording_url: url, has_recording: true });
+      onUpdated({ ...call, recording_url: url, has_recording: true, stream_via_proxy: true });
       toast.success("Enregistrement chargé");
     } catch (e: any) {
       // Fallback : maestro-recording
@@ -312,7 +318,7 @@ function RecordingSection({ call, onUpdated }: { call: RecordingCall; onUpdated:
   };
 
   const seek = (delta: number) => {
-    if (!audioRef.current) return;
+      if (!audioRef.current) return;
     audioRef.current.currentTime = Math.max(0, Math.min(dur, audioRef.current.currentTime + delta));
   };
   const togglePlay = () => {
@@ -341,6 +347,7 @@ function RecordingSection({ call, onUpdated }: { call: RecordingCall; onUpdated:
           <audio
             ref={audioRef}
             src={call.recording_url}
+            onError={() => { if (!loading && hasResolvableAudio(call)) void fetchRec(); }}
             onPlay={() => setPlaying(true)}
             onPause={() => setPlaying(false)}
             onTimeUpdate={(e) => setCur((e.target as HTMLAudioElement).currentTime)}
@@ -418,11 +425,12 @@ function TranscriptSection({ call, onUpdated }: { call: RecordingCall; onUpdated
   const run = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("maestro-transcript", {
-        body: { call_id: call.id },
+      const { data, error } = await supabase.functions.invoke("pp-admin-transcribe", {
+        body: { call_id: call.proxy_call_db_id ?? call.id },
       });
       if (error) throw error;
       const next = (data as any) ?? {};
+      if (next.ok === false && next.error) throw new Error(next.hint ?? next.error);
       onUpdated({
         ...call,
         transcript: next.transcript ?? call.transcript,
@@ -447,12 +455,12 @@ function TranscriptSection({ call, onUpdated }: { call: RecordingCall; onUpdated
     <div className="mt-3 p-3 rounded-xl space-y-2" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)" }}>
       {segments.length === 0 ? (
         <button
-          onClick={run} disabled={loading || !call.recording_url}
+          onClick={run} disabled={loading || !hasResolvableAudio(call)}
           className="w-full py-2.5 rounded-lg text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50"
           style={{ background: "var(--pp-bg-surface)", color: "var(--pp-text-primary)", border: "1px solid var(--pp-bg-border-2)" }}
         >
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
-          {call.recording_url ? "Transcrire l'appel" : "Audio requis"}
+          {hasResolvableAudio(call) ? "Transcrire l'appel" : "Audio requis"}
         </button>
       ) : (
         <>
@@ -516,10 +524,10 @@ function AISection({ call, onUpdated }: { call: RecordingCall; onUpdated: (c: Re
     setLoading(true);
     try {
       if (!call.transcript) {
-        await supabase.functions.invoke("maestro-transcript", { body: { call_id: call.id } });
+        await supabase.functions.invoke("pp-admin-transcribe", { body: { call_id: call.proxy_call_db_id ?? call.id } });
       }
-      const { data, error } = await supabase.functions.invoke("maestro-ai-analysis", {
-        body: { call_id: call.id },
+      const { data, error } = await supabase.functions.invoke("pp-coach-call", {
+        body: { call_id: call.proxy_call_db_id ?? call.id, force: true },
       });
       if (error) throw error;
       onUpdated({ ...call, ...(data as any) });
