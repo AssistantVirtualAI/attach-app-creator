@@ -526,6 +526,14 @@ export default function PlanipretMobile() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Bootstrap push listeners + prompt primer once the profile is loaded (native only).
+  useEffect(() => {
+    if (!profile?.user_id) return;
+    const ext = profile?.ns_extension || profile?.extension || "";
+    void bootstrapPushIfNative(ext);
+    void hasSeenPrimer().then((seen) => { if (!seen) setShowPrimer(true); });
+  }, [profile?.user_id, profile?.ns_extension, profile?.extension]);
+
   if (loading) return <div className="min-h-screen flex items-center justify-center" style={{ background: "#F7F9FC", color: "#5A6B85", fontFamily: "Urbanist,sans-serif" }}>{t("common.loading")}</div>;
 
   if (accessError === "unauthenticated") {
