@@ -1,38 +1,50 @@
-Je vais corriger exactement ces points sans toucher à la landing page.
+## Objectif
 
-## Plan d’implémentation
+Dans `/mplanipret` → Messagerie vocale, permettre au courtier de taper un texte, choisir une voix ElevenLabs, prévisualiser l'audio généré, puis le pousser comme greeting sur son extension via NS-API v2.
 
-1. **Appels sortants / web phone mobile**
-   - Remettre le démarrage d’appel dans la configuration qui fonctionnait: si le softphone WebRTC est enregistré, lancer réellement l’appel SIP et ne pas afficher seulement “call started”.
-   - Corriger le mapping du `wssUrl` venant de `ns-resolve-sip-credentials` (`sip_ws_url` vs `sip_wss_url`) pour éviter une initialisation invalide.
-   - Garder l’écran d’appel actif avec les boutons visibles: muet, attente, transfert, clavier, raccrocher.
-   - Ajouter un retour d’erreur plus clair si WebRTC échoue avant le fallback PBX.
+## Backend
 
-2. **Carte Identity / extension**
-   - Afficher le nom configuré sur l’extension quand l’identité NS est liée, pas seulement Microsoft 365 ou “—”.
-   - Priorité d’affichage: nom extension / profil courtier / nom Microsoft / email.
-   - Conserver l’extension, domaine et état “Linked”.
+Nouvelle Edge Function `pp-voicemail-tts` (`supabase/functions/pp-voicemail-tts/index.ts`) :
 
-3. **Popup “Configurer Microsoft 365” mobile**
-   - Transformer la bottom sheet actuelle en modal mobile lisible et scrollable correctement.
-   - Corriger les champs coupés: Tenant ID, Client ID, Client Secret.
-   - Garder les boutons accessibles en bas avec safe-area, sans débordement.
+1. `requirePlanipretBroker(req)` → ctx { extension, nsDomain }.
+2. Actions:
+   - `GET ?action=voices` → proxy `GET https://api.elevenlabs.io/v1/voices` (retourne liste id/name/preview_url). Cache en mémoire 5 min.
+   - `POST action=preview` body `{ text, voiceId, modelId? }` → appel ElevenLabs `/v1/text-to-speech/{voiceId}?output_format=mp3_44100_128` (model `eleven_multilingual_v2`) → renvoie `{ audio_base64, mime: "audio/mpeg" }`.
+   - `POST action=upload` body `{ text, voiceId, index=1, script?, modelId? }` → génère l'audio (comme preview) puis POST multipart vers `https://{ns}/ns-api/v2/domains/{nsDomain}/users/{extension}/greetings` avec champs `script`, `index`, `convert=yes`, `synchronous=yes`, `File=<mp3 blob>`. Utilise le helper `nsFetch` existant (à étendre pour supporter `FormData`, sinon fetch direct avec le token NS résolu comme dans `nsFetch`).
+3. CORS + logs dans `planipret_edge_function_runs`.
 
-4. **Recordings mobile alignés avec admin**
-   - Utiliser le même flux que `/planipret/admin/recordings`: `ns-get-recording` pour charger l’audio via proxy backend.
-   - Permettre de cliquer et écouter même quand l’URL directe manque, en envoyant `call_db_id`, `ns_callid`, `orig/term_callid`, extension.
-   - Ne plus masquer des appels qui ont un enregistrement résolvable côté NS même si `recording_url` est vide.
+Le secret `ELEVENLABS_API_KEY` est déjà présent (déjà utilisé par `elevenlabs-sync`, `ava-tool-executor`).
 
-5. **Transcription depuis le phone system, IA seulement pour correction/analyse**
-   - Sur mobile, appeler d’abord `ns-get-transcription` comme l’admin.
-   - Sauvegarder la transcription NS brute, puis lancer `pp-coach-call` pour corriger la transcription, générer résumé, note/score et coaching.
-   - Garder `pp-admin-transcribe` seulement comme fallback si NS ne retourne aucune transcription.
+## Frontend mobile
 
-6. **Synchronisation partout admin/mobile**
-   - Mettre à jour la carte mobile avec les champs retournés par `pp-coach-call`: transcription corrigée, résumé, coaching, score.
-   - Ajouter/aligner l’écoute realtime sur les updates `planipret_phone_calls` pour que les résultats IA faits depuis admin ou mobile apparaissent partout.
+Dans `src/pages/planipret/mobile/MVoicemail.tsx` (ou nouveau composant `VoicemailGreetingDialog.tsx`) :
 
-7. **Validation**
-   - Vérifier le typecheck ciblé.
-   - Tester le rendu mobile des écrans concernés avec Playwright: identité, modal Microsoft 365, page recordings.
-   - Vérifier les logs/erreurs du chemin d’appel si disponibles.
+- Bouton "Greeting IA" ouvrant un `Dialog` mobile-friendly (plein écran, scroll).
+- Champs :
+  - `Textarea` texte du message (max 500 car.)
+  - `Select` voix — chargé via `functions.invoke('pp-voicemail-tts', { body: { action:'voices' } })`, affiche nom + bouton play du preview_url.
+  - `Select` index greeting (1–9, défaut 1).
+- Boutons :
+  - "Prévisualiser" → action=preview → `<audio>` src = data URI.
+  - "Enregistrer sur ma messagerie" → action=upload → toast succès/erreur.
+
+Aucun changement admin: la fonction est réutilisable depuis l'admin plus tard.
+
+## Détails techniques
+
+- Multipart NS: construire `FormData` côté Deno; NS-API attend `File` (majuscule) + `script`, `index`, `convert`, `synchronous`.
+- Format audio: `mp3_44100_128` accepté par NS avec `convert=yes` (NS convertira en WAV interne).
+- Voix par défaut : `EXAVITQu4vr4xnSDxMaL` (Sarah).
+- Modèle par défaut : `eleven_multilingual_v2`.
+- Limite input 4000 car côté UI, validation Zod côté fonction.
+- Erreurs ElevenLabs / NS relayées telles quelles (status + body).
+
+## Fichiers touchés
+
+- `supabase/functions/pp-voicemail-tts/index.ts` (nouveau)
+- `src/pages/planipret/mobile/MVoicemail.tsx` (ajout dialog)
+- éventuellement `src/components/planipret/mobile/VoicemailGreetingDialog.tsx` (nouveau composant)
+
+## Validation
+
+- Deploy `pp-voicemail-tts`, test `action=voices` → 200, `action=preview` → audio jouable, `action=upload` → NS 200/202 et greeting visible dans le portail admin.
