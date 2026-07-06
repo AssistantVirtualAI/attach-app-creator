@@ -1437,7 +1437,7 @@ function ActionPill({ Icon, label, onClick, disabled }: { Icon: any; label: stri
 // ============================================================================
 // TEAMS 365 PANEL — Microsoft Teams chats + channels via MS Graph
 // ============================================================================
-function Teams365Panel() {
+function Teams365Panel({ profile }: { profile: any }) {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [chats, setChats] = useState<any[]>([]);
@@ -1448,19 +1448,31 @@ function Teams365Panel() {
     | null
   >(null);
 
+  const connected = !!profile?.ms365_access_token;
+
   const load = async () => {
+    if (!connected) { setLoading(false); setErr("ms365_not_connected"); return; }
     setLoading(true);
     setErr(null);
     const { data, error } = await supabase.functions.invoke("ms365-teams-list", { body: {} });
     setLoading(false);
-    if (error || (data as any)?.error) {
-      setErr((data as any)?.error || error?.message || "Erreur");
+    const payload = (data as any) ?? {};
+    if (error && !payload.chats) {
+      setErr(error.message || "Erreur");
       return;
     }
-    setChats((data as any).chats || []);
-    setTeams((data as any).teams || []);
+    if (payload.connected === false || payload.error === "ms365_not_connected") {
+      setErr("ms365_not_connected");
+      return;
+    }
+    if (payload.error) {
+      setErr(payload.error);
+      return;
+    }
+    setChats(payload.chats || []);
+    setTeams(payload.teams || []);
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [connected]);
 
   if (active) return <TeamsThreadView target={active} onClose={() => setActive(null)} />;
 
