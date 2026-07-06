@@ -6,8 +6,11 @@ import WssDiagnostics from '../components/WssDiagnostics';
 import { audit } from '../lib/audit';
 import { showMobileToast } from '../lib/mobileToast';
 import { loadCachedContacts, syncDeviceContacts, type DeviceContact } from '../lib/contacts';
+import { hasConsent, loadConsent } from '../lib/contactsConsent';
+import ContactsConsentSheet from '../components/ContactsConsentSheet';
 import { usePermissions } from '../hooks/usePermissions';
 import PermissionBlockedScreen from '../components/PermissionBlockedScreen';
+
 
 export default function DialerScreen({ sp, haptic, preferClickToCall: _preferClickToCall = false }: { sp: any; haptic: (s?: ImpactStyle) => Promise<void>; preferClickToCall?: boolean }) {
   const [num, setNum] = useState('');
@@ -21,6 +24,9 @@ export default function DialerScreen({ sp, haptic, preferClickToCall: _preferCli
   const [contactsPicker, setContactsPicker] = useState<DeviceContact[] | null>(null);
   const [contactsBusy, setContactsBusy] = useState(false);
   const [contactsQuery, setContactsQuery] = useState('');
+  const [consentOpen, setConsentOpen] = useState(false);
+  useEffect(() => { loadConsent().catch(() => {}); }, []);
+
   const status: string = sp.sipStatus || sp.snap?.status || 'connecting';
   const sipError: string = sp.sipError || sp.snap?.error || '';
   const isRegistered = status === 'registered';
@@ -100,6 +106,8 @@ export default function DialerScreen({ sp, haptic, preferClickToCall: _preferCli
 
   const openContactsFlow = async () => {
     await haptic(ImpactStyle.Light);
+    // App Store 5.1.2: require our own consent screen before iOS prompt.
+    if (!(await hasConsent())) { setConsentOpen(true); return; }
     // If already granted on native, skip the pre-prompt.
     if (Capacitor.isNativePlatform()) {
       try {
@@ -115,6 +123,7 @@ export default function DialerScreen({ sp, haptic, preferClickToCall: _preferCli
     }
     setContactsPrePrompt(true);
   };
+
 
   const pickContactNumber = (n: string) => {
     setNum(n.replace(/[^\d+*#]/g, ''));
@@ -258,7 +267,21 @@ export default function DialerScreen({ sp, haptic, preferClickToCall: _preferCli
           </div>
         </div>
       )}
+      <ContactsConsentSheet
+        open={consentOpen}
+        onClose={(result) => {
+          setConsentOpen(false);
+          if (result === 'allowed') {
+            (async () => {
+              let list = loadCachedContacts();
+              if (!list.length) list = await syncDeviceContacts();
+              setContactsPicker(list);
+            })().catch(() => {});
+          }
+        }}
+      />
     </div>
+
   );
 }
 

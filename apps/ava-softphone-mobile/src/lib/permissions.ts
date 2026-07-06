@@ -99,14 +99,18 @@ export async function unlockAudioOutput(): Promise<PermissionStatus> {
 /** Contacts permission via @capacitor-community/contacts. */
 export async function requestContacts(): Promise<PermissionStatus> {
   if (!Capacitor.isNativePlatform()) return 'unsupported';
+  // App Store 5.1.2: NEVER trigger the iOS contacts prompt automatically.
+  // The prompt is only requested from ContactsConsentSheet after the user
+  // explicitly agrees to server upload. Here we only report current status.
   try {
     const { Contacts } = await import('@capacitor-community/contacts');
-    const res = await Contacts.requestPermissions();
-    return (res?.contacts === 'granted' ? 'granted' : 'denied');
+    const check = await Contacts.checkPermissions();
+    return check?.contacts === 'granted' ? 'granted' : 'prompt';
   } catch {
-    return 'denied';
+    return 'prompt';
   }
 }
+
 
 /** Push + local notifications. */
 export async function requestNotifications(): Promise<PermissionStatus> {

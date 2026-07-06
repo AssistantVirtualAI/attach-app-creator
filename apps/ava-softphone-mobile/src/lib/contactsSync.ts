@@ -50,6 +50,13 @@ export async function runContactsSync(opts: { force?: boolean } = {}): Promise<S
   if (!Capacitor.isNativePlatform()) {
     return { ok: false, inserted: 0, total: 0, error: 'native-only', ranAt };
   }
+  // App Store 5.1.2: refuse to upload any contact to the server unless the
+  // user has given explicit in-app consent.
+  const { hasConsent } = await import('./contactsConsent');
+  if (!(await hasConsent())) {
+    return { ok: false, inserted: 0, total: 0, error: 'no-consent', ranAt };
+  }
+
 
   const device = await syncDeviceContacts();
   if (!device.length) {

@@ -5,10 +5,13 @@ import { EmptyState, SectionTitle, Skeleton } from '../components/ui/Primitives'
 import { useMobileCredentials } from '../hooks/useMobileCredentials';
 import { authedRealtime, restGet, restPost } from '../lib/mobileSupabase';
 import { loadCachedContacts, syncDeviceContacts } from '../lib/contacts';
+import { hasConsent, loadConsent } from '../lib/contactsConsent';
+import ContactsConsentSheet from '../components/ContactsConsentSheet';
 import ContactsSyncCard from '../components/ContactsSyncCard';
 import NumberPickerSheet, { NumberOption } from '../components/NumberPickerSheet';
 import { dialNumber } from '../lib/dialNumber';
 import { useT } from '../lib/i18n';
+
 
 type Kind = 'domain' | 'manual' | 'mobile';
 type Contact = { id: string; kind: Kind; user_id: string | null; extension: string; phone?: string | null; email?: string | null; display_name: string | null; sip_domain: string | null; status: string | null; last_seen_at: string | null; numbers?: { label: string; number: string }[] };
@@ -28,6 +31,10 @@ export default function ContactsScreen({ sp }: { sp: any }) {
   const [presence, setPresence] = useState<Record<string, Presence>>({});
   const [error, setError] = useState<string | null>(null);
   const [picker, setPicker] = useState<{ title: string; options: NumberOption[] } | null>(null);
+  const [consentOpen, setConsentOpen] = useState(false);
+  useEffect(() => { loadConsent().catch(() => {}); }, []);
+
+
 
   const loadPresence = useCallback(async (rows: Contact[] | null) => {
     if (!mobile.accessToken || !rows?.length) { setPresence({}); return; }
@@ -100,7 +107,12 @@ export default function ContactsScreen({ sp }: { sp: any }) {
     if (mobile.loading) return;
     if (!mobile.accessToken || (!mobile.domainUuid && !mobile.organizationId)) { setContacts([]); return; }
     let cancelled = false;
-    syncDeviceContacts().then(() => loadContacts()).catch(() => {});
+    // Only touch the device address book if the user has already consented.
+    (async () => {
+      if (await hasConsent()) syncDeviceContacts().then(() => loadContacts()).catch(() => {});
+      else setConsentOpen(true);
+    })();
+
     loadContacts().then(() => !cancelled && setError(null)).catch((e) => {
       if (!cancelled) { setContacts([]); setError(e?.message || 'Échec du chargement des contacts'); }
     });
@@ -186,6 +198,14 @@ export default function ContactsScreen({ sp }: { sp: any }) {
       </div>
       {addOpen && <AddContactSheet value={newContact} setValue={setNewContact} onClose={() => setAddOpen(false)} onSave={addContact} />}
       {picker && <NumberPickerSheet title={picker.title} options={picker.options} onPick={(n) => dialNumber(sp, n)} onClose={() => setPicker(null)} />}
+      <ContactsConsentSheet
+        open={consentOpen}
+        onClose={(result) => {
+          setConsentOpen(false);
+          if (result === 'allowed') syncDeviceContacts().then(() => loadContacts()).catch(() => {});
+        }}
+      />
+
       <div style={{ height: 80 }} />
     </div>
   );

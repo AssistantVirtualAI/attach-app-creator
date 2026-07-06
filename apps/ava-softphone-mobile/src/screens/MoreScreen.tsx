@@ -1,6 +1,8 @@
 import React, { useState, Suspense, lazy } from 'react';
 import type { ImpactStyle } from '@capacitor/haptics';
 import { colors, font } from '../lib/theme';
+import { deleteServerContacts, revokeConsent } from '../lib/contactsConsent';
+
 import type { Creds } from '../lib/creds';
 import { Card, SectionTitle, SettingsRow } from '../components/ui/Primitives';
 import { LemtelMark, AvaBadge } from '../components/Brand';
@@ -18,7 +20,7 @@ const AIAuditScreen = lazy(() => import('./AIAuditScreen'));
 const QueuesScreen  = lazy(() => import('./QueuesScreen'));
 const FeaturesScreen = lazy(() => import('./FeaturesScreen'));
 import ScreenSkeleton from '../components/ScreenSkeleton';
-import { useTr } from '../lib/i18n';
+import { useTr, useT } from '../lib/i18n';
 
 
 type Sub = null | 'voicemail' | 'messages' | 'contacts' | 'settings' | 'delete' | 'privacy' | 'datasafety' | 'permissions' | 'support' | 'aiaudit' | 'queues' | 'features';
@@ -27,7 +29,9 @@ export default function MoreScreen({
   creds, sp, onSignOut, haptic, 
 }: { creds: Creds; sp: any; onSignOut: () => void; haptic: (s?: ImpactStyle) => Promise<void>;  }) {
   const { tr } = useTr();
+  const { tx } = useT();
   const [sub, setSub] = useState<Sub>(null);
+
 
   if (sub === 'voicemail')   return <SubPage onBack={() => setSub(null)} title={tr.more.voicemail}><VoicemailScreen haptic={haptic} /></SubPage>;
   if (sub === 'messages')    return <SubPage onBack={() => setSub(null)} title={tr.more.messages}><MessagesScreen haptic={haptic} /></SubPage>;
@@ -84,7 +88,26 @@ export default function MoreScreen({
       <Card padded={false}>
         <SettingsRow label={tr.more.signOut} icon="⎋" onPress={onSignOut} />
         <SettingsRow label={tr.more.deleteAccount} icon="🗑" onPress={() => setSub('delete')} />
+        <SettingsRow
+          label={tx('Supprimer mes contacts du serveur', 'Delete my contacts from server')}
+          icon="🧹"
+          value={tx('Retire vos contacts téléversés', 'Removes your uploaded contacts')}
+          onPress={async () => {
+            const ok = window.confirm(tx(
+              'Ceci supprimera tous vos contacts téléversés de nos serveurs. L\'identification des appelants ne sera plus disponible. Continuer ?',
+              'This will delete all your uploaded contacts from our servers. Caller ID matching will no longer be available. Continue?'
+            ));
+            if (!ok) return;
+            const res = await deleteServerContacts(creds.userId);
+            await revokeConsent();
+            window.alert(res.ok
+              ? tx('✅ Vos contacts ont été supprimés de nos serveurs.', '✅ Your contacts have been deleted from our servers.')
+              : tx('Erreur : ', 'Error: ') + (res.error || 'unknown')
+            );
+          }}
+        />
       </Card>
+
 
       <div style={{ textAlign: 'center', marginTop: 18, fontSize: 10, color: colors.mutedSilver }}>
         AVA Softphone · v1.0.0

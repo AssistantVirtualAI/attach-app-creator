@@ -16,11 +16,11 @@ export async function requestPermissionsAfterLogin(): Promise<void> {
 
   await new Promise(r => setTimeout(r, 800));
 
-  // 2. Contacts
-  try {
-    const { Contacts } = await import('@capacitor-community/contacts');
-    await Contacts.requestPermissions();
-  } catch { }
+  // 2. Contacts — DO NOT auto-request. App Store Guideline 5.1.2 requires an
+  //    explicit in-app consent screen (ContactsConsentSheet) before the iOS
+  //    prompt is triggered, because we upload contacts to our server.
+  //    The sheet is shown the first time the user opens a contacts feature.
+
 
   await new Promise(r => setTimeout(r, 800));
 

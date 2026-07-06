@@ -422,10 +422,14 @@ function AuthenticatedShell({
         },
       });
 
-      // Contacts sync — for dialer autocomplete.
+      // Contacts sync — only when the user has explicitly consented
+      // (App Store 5.1.2). The consent sheet is shown on demand from the
+      // Contacts / Dialer screens; syncDeviceContacts() itself is a no-op
+      // without consent, so this call is safe.
       if (perms.contacts === 'granted') {
         syncDeviceContacts().catch(() => {});
       }
+
     })();
 
     // Re-register SIP when app comes back to foreground.
