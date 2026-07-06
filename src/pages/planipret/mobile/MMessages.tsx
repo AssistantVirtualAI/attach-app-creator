@@ -255,14 +255,14 @@ function SmsList({ profile, openDialer, registerRefresh }: any) {
         <EmptyState Icon={MessageSquare} title={t("messages.noMessages")} sub={t("messages.startNew")} />
       ) : (
         <ul className="space-y-1.5">
-          {threads.map((th) => {
+          {threads.map((th, index) => {
             const id = threadId(th);
             const peer = threadPeer(th);
             const unread = th.unread ?? th.unread_count ?? 0;
             const preview = th.last_message ?? th.preview ?? "";
             return (
               <ThreadRow
-                key={id || peer}
+                key={`${id || "noid"}-${peer || "nopeer"}-${index}`}
                 id={id}
                 peer={peer}
                 unread={unread}
@@ -596,7 +596,8 @@ function TeamChat({ profile }: { profile: any }) {
   const [sumOpen, setSumOpen] = useState(false);
 
   return (
-    <div className="absolute inset-x-0 top-[120px] bottom-0 flex flex-col">
+    <div className="h-full flex flex-col">
+
       <div
         className="px-4 py-2 text-[11px] uppercase tracking-wider flex items-center justify-between"
         style={{ color: "var(--pp-text-muted)", borderBottom: "1px solid var(--pp-bg-border)" }}
