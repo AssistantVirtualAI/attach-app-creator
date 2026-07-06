@@ -18,7 +18,7 @@ const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
 type ClientType = "mobile" | "web" | "widget";
 
-const NS_SIP_WSS_URL = Deno.env.get("NS_SIP_WSS_URL") ?? "wss://voice.ava-telecom.ca:8001";
+const NS_SIP_WSS_URL = Deno.env.get("NS_SIP_WSS_URL") ?? "wss://voice.ava-telecom.ca:9002";
 
 function json(b: unknown, s = 200) {
   return new Response(JSON.stringify(b), { status: s, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -56,6 +56,18 @@ async function nsGet(path: string) {
   let data: any = null;
   try { data = text ? JSON.parse(text) : null; } catch { data = text; }
   return { ok: res.ok, status: res.status, data };
+}
+
+async function nsPut(path: string, payload: Record<string, unknown>) {
+  const res = await fetch(`${NS_API_BASE_URL}${path}`, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${NS_API_KEY}`, Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const text = await res.text();
+  let data: any = null;
+  try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+  return { ok: res.ok || res.status === 202, status: res.status, data };
 }
 
 Deno.serve(async (req) => {
@@ -127,8 +139,20 @@ Deno.serve(async (req) => {
   const sipUri = device["device-sip-registration-uri"] ?? `sip:${resolvedId}@${domain}`;
   const sipState = device["device-sip-registration-state"] ?? device["registration-state"] ?? null;
 
-  // Provide SIP credentials so the browser SIP.js UA can register the _web device.
+  // Provide and enforce SIP credentials so SIP.js can register the _web device.
   const sipPassword = clientType === "web" ? await derivePassword(String(profile.user_id)) : undefined;
+  let repairStatus: any = null;
+  if (clientType === "web" && sipPassword) {
+    repairStatus = await nsPut(
+      `/domains/${encodeURIComponent(domain)}/users/${encodeURIComponent(ext)}/devices/${encodeURIComponent(resolvedId)}`,
+      {
+        "device-sip-registration-password": sipPassword,
+        "device-provisioning-registration-core-server": coreServer,
+        "device-srtp-enabled": "opportunistic",
+        "device-sip-allowed-user-agent": "SIP.js",
+      },
+    );
+  }
 
   return json({
     ok: true,
@@ -145,5 +169,6 @@ Deno.serve(async (req) => {
     sip_ws_url: NS_SIP_WSS_URL,
     sip_state: sipState,
     device_registered: sipState === "registered",
+    repair_status: repairStatus ? { ok: repairStatus.ok, status: repairStatus.status } : null,
   });
 });
