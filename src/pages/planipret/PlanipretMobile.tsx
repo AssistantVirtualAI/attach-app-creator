@@ -357,8 +357,14 @@ export default function PlanipretMobile() {
   const { ref: scrollRef, pullDist, refreshing, threshold } = usePullToRefresh(handlePull);
 
   const onInboundRinging = useCallback((row: any) => {
+    attachRestCall?.({
+      id: row.id ?? row.call_id,
+      direction: "in",
+      other: row.caller_name || row.from_name || row.from_number || row.number || "—",
+      status: "ringing-in",
+    });
     setInbound({ call_id: row.id, from_number: row.from_number, caller_name: row.caller_name });
-  }, []);
+  }, [attachRestCall]);
   const onAiInsight = useCallback((row: any) => {
     toast(t("toasts.aiAnalysisReady"), {
       description: String(row.ai_summary ?? "").slice(0, 80),
