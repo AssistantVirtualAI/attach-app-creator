@@ -17,6 +17,36 @@ export type NsContext = {
 
 let cachedToken: { token: string; exp: number } | null = null;
 
+// ---- Circuit breaker (per edge-function instance) ----
+type BreakerState = { failures: number; openedAt: number; lastError: string };
+const breaker: BreakerState = { failures: 0, openedAt: 0, lastError: "" };
+const BREAKER_THRESHOLD = 5;         // consecutive failures to trip
+const BREAKER_COOLDOWN_MS = 30_000;  // stay open for 30s
+export function nsBreakerStatus() {
+  const openUntil = breaker.openedAt ? breaker.openedAt + BREAKER_COOLDOWN_MS : 0;
+  return {
+    open: openUntil > Date.now(),
+    failures: breaker.failures,
+    reopens_at: openUntil,
+    last_error: breaker.lastError,
+  };
+}
+export function nsBreakerReset() {
+  breaker.failures = 0;
+  breaker.openedAt = 0;
+  breaker.lastError = "";
+}
+function breakerRecordFailure(msg: string) {
+  breaker.failures += 1;
+  breaker.lastError = msg;
+  if (breaker.failures >= BREAKER_THRESHOLD) breaker.openedAt = Date.now();
+}
+function breakerRecordSuccess() {
+  breaker.failures = 0;
+  breaker.openedAt = 0;
+  breaker.lastError = "";
+}
+
 type NsRuntimeConfig = {
   baseUrl: string;
   defaultDomain: string;
