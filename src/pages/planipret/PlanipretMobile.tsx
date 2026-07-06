@@ -513,6 +513,8 @@ export default function PlanipretMobile() {
       return;
     }
     void import("@/lib/native/requestPermissionsAfterLogin").then(m => m.requestPermissionsAfterLogin());
+    // Show the VoIP-standard rationale primer on first native launch after sign-in.
+    void hasSeenPrimer().then((seen) => { if (!seen) setShowPrimer(true); });
     toast.success(t("auth.success"));
     setLoading(true);
     await loadProfile();
