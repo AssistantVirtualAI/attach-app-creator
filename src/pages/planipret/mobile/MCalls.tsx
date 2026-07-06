@@ -348,10 +348,10 @@ export default function MCalls() {
           <ActiveCallsTab userId={userId} openDialer={openDialer} />
         ) : tab === "recordings" ? (
           <RecordingsList
-            calls={calls as any}
+            calls={recordings as any}
             loading={loading}
             userId={userId}
-            onUpdated={(c) => setCalls((prev) => prev.map((p) => (p.id === c.id ? { ...p, ...c } as any : p)))}
+            onUpdated={(c) => setRecordings((prev) => prev.map((p) => (p.id === c.id ? { ...p, ...c } as any : p)))}
           />
         ) : tab === "voicemails" ? (
           <VoicemailsTab userId={userId} openDialer={openDialer} registerRefresh={registerRefresh} />
