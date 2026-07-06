@@ -171,10 +171,10 @@ export default function ActiveCallOverlay({ callId, onClosed }: { callId: string
             <div className="grid grid-cols-3 gap-4">
               <CallBtn active={muted} onClick={toggleMute} icon={muted ? <MicOff /> : <Mic />} label={muted ? t("call.unmute") : t("call.mute")} />
               <CallBtn active={held} onClick={toggleHold} icon={held ? <Play /> : <Pause />} label={held ? t("call.resume") : t("call.hold")} />
-              <CallBtn onClick={() => setTransferOpen(true)} icon={<PhoneForwarded />} label={t("call.transfer")} />
+              <CallBtn onClick={() => openTransfer("transfer")} icon={<PhoneForwarded />} label={t("call.transfer")} />
+              <CallBtn onClick={() => openTransfer("forward")} icon={<CornerUpRight />} label={t("call.forward") ?? "Renvoyer"} />
               <CallBtn onClick={() => setKeypadOpen(true)} icon={<Grid3X3 />} label={t("call.keypad")} />
               <CallBtn active={speaker} onClick={toggleSpeaker} icon={speaker ? <Volume2 /> : <VolumeX />} label={t("call.speaker")} />
-              <div />
             </div>
           </div>
         )}
