@@ -17,27 +17,61 @@ export type NsContext = {
 
 let cachedToken: { token: string; exp: number } | null = null;
 
+type NsRuntimeConfig = {
+  baseUrl: string;
+  defaultDomain: string;
+  apiKey: string;
+};
+
+async function getAdminNsConfig(): Promise<Partial<NsRuntimeConfig>> {
+  try {
+    const url = Deno.env.get("SUPABASE_URL");
+    const service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!url || !service) return {};
+    const admin = createClient(url, service);
+    const [{ data: cfg }, { data: secrets }] = await Promise.all([
+      admin.from("planipret_integration_config").select("config_data").eq("integration_key", "ns_api").maybeSingle(),
+      admin.from("planipret_integration_secrets").select("provider, config").in("provider", ["nsapi", "ns_api"]).limit(2),
+    ]);
+    const configData = (cfg?.config_data ?? {}) as Record<string, string>;
+    const secretData = (((secrets ?? [])[0] as any)?.config ?? {}) as Record<string, string>;
+    return {
+      baseUrl: configData.base_url ?? secretData.base_url,
+      defaultDomain: configData.domain ?? configData.default_domain ?? secretData.domain ?? secretData.default_domain,
+      apiKey: configData.api_key ?? secretData.api_key,
+    };
+  } catch {
+    return {};
+  }
+}
+
+async function getRuntimeConfig(): Promise<NsRuntimeConfig> {
+  const adminCfg = await getAdminNsConfig();
+  const baseUrl = adminCfg.baseUrl ?? Deno.env.get("NS_API_BASE_URL") ?? "https://voice.ava-telecom.ca/ns-api/v2";
+  const defaultDomain = adminCfg.defaultDomain ?? Deno.env.get("NS_DEFAULT_DOMAIN") ?? Deno.env.get("NS_API_DOMAIN") ?? "planipret.ca";
+  const apiKey = adminCfg.apiKey ?? Deno.env.get("NS_API_KEY") ?? "";
+  if (!baseUrl) throw new Error("NS-API base URL not configured");
+  if (!apiKey) throw new Error("NS_API_KEY not configured (NS-API v2 uses static Bearer key)");
+  return { baseUrl, defaultDomain, apiKey };
+}
+
 export function getEnv() {
-  const NS_API_BASE_URL = Deno.env.get("NS_API_BASE_URL");
+  const NS_API_BASE_URL = Deno.env.get("NS_API_BASE_URL") ?? "https://voice.ava-telecom.ca/ns-api/v2";
   const NS_API_USER = Deno.env.get("NS_API_USER");
   const NS_API_PASSWORD = Deno.env.get("NS_API_PASSWORD");
-  const NS_DEFAULT_DOMAIN = Deno.env.get("NS_DEFAULT_DOMAIN") ?? "";
-  if (!NS_API_BASE_URL || !NS_API_USER || !NS_API_PASSWORD) {
-    throw new Error("NS-API secrets not configured");
-  }
+  const NS_DEFAULT_DOMAIN = Deno.env.get("NS_DEFAULT_DOMAIN") ?? Deno.env.get("NS_API_DOMAIN") ?? "planipret.ca";
   return { NS_API_BASE_URL, NS_API_USER, NS_API_PASSWORD, NS_DEFAULT_DOMAIN };
 }
 
-function nsBase() {
+async function nsBase() {
   // Tolerate either form: with or without trailing /ns-api/v2
-  const raw = getEnv().NS_API_BASE_URL.replace(/\/$/, "");
+  const raw = (await getRuntimeConfig()).baseUrl.replace(/\/$/, "");
   return raw.replace(/\/ns-api\/v2$/, "");
 }
 
 export async function getNsJwt(): Promise<string> {
   if (cachedToken && cachedToken.exp > Date.now() + 60_000) return cachedToken.token;
-  const staticKey = Deno.env.get("NS_API_KEY") ?? "";
-  if (!staticKey) throw new Error("NS_API_KEY not configured (NS-API v2 uses static Bearer key)");
+  const staticKey = (await getRuntimeConfig()).apiKey;
   cachedToken = { token: staticKey, exp: Date.now() + 3600_000 };
   return staticKey;
 }
@@ -52,7 +86,7 @@ export async function nsFetch(path: string, init: RequestInit = {}, opts: { func
       { status: 503, headers: { "Content-Type": "application/json" } },
     );
   }
-  const url = `${nsBase()}/ns-api/v2${path}`;
+  const url = `${await nsBase()}/ns-api/v2${path}`;
   const method = (init.method ?? "GET").toUpperCase();
   const t0 = Date.now();
   console.log(`[${opts.functionName ?? "nsFetch"}][NS] ${method} ${path}`);

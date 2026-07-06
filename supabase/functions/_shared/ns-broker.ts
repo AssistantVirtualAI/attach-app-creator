@@ -13,13 +13,10 @@ export function jsonResponse(body: unknown, status = 200) {
 }
 
 export function nsEnv() {
-  const NS_API_BASE_URL = Deno.env.get("NS_API_BASE_URL");
+  const NS_API_BASE_URL = Deno.env.get("NS_API_BASE_URL") ?? "https://voice.ava-telecom.ca/ns-api/v2";
   const NS_API_USER = Deno.env.get("NS_API_USER");
   const NS_API_PASSWORD = Deno.env.get("NS_API_PASSWORD");
-  const NS_DEFAULT_DOMAIN = Deno.env.get("NS_DEFAULT_DOMAIN") ?? Deno.env.get("NS_API_DOMAIN") ?? "";
-  if (!NS_API_BASE_URL || !NS_API_USER || !NS_API_PASSWORD) {
-    throw new Error("NS-API secrets not configured");
-  }
+  const NS_DEFAULT_DOMAIN = Deno.env.get("NS_DEFAULT_DOMAIN") ?? Deno.env.get("NS_API_DOMAIN") ?? "planipret.ca";
   // Tolerate base URL with or without trailing /ns-api/v2 or /ns-api
   const base = NS_API_BASE_URL.replace(/\/$/, "").replace(/\/ns-api(\/v2)?$/, "");
   return {
@@ -27,6 +24,29 @@ export function nsEnv() {
     user: NS_API_USER,
     password: NS_API_PASSWORD,
     domain: NS_DEFAULT_DOMAIN,
+  };
+}
+
+async function nsRuntimeConfig(admin?: ReturnType<typeof supaAdmin>) {
+  let configData: Record<string, string> = {};
+  let secretData: Record<string, string> = {};
+  try {
+    const db = admin ?? supaAdmin();
+    const [{ data: cfg }, { data: secrets }] = await Promise.all([
+      db.from("planipret_integration_config").select("config_data").eq("integration_key", "ns_api").maybeSingle(),
+      db.from("planipret_integration_secrets").select("provider, config").in("provider", ["nsapi", "ns_api"]).limit(2),
+    ]);
+    configData = (cfg?.config_data ?? {}) as Record<string, string>;
+    secretData = (((secrets ?? [])[0] as any)?.config ?? {}) as Record<string, string>;
+  } catch { /* env fallback */ }
+  const env = nsEnv();
+  const rawBase = (configData.base_url ?? secretData.base_url ?? env.base).replace(/\/$/, "").replace(/\/ns-api(\/v2)?$/, "");
+  const apiKey = configData.api_key ?? secretData.api_key ?? Deno.env.get("NS_API_KEY") ?? "";
+  if (!apiKey) throw new Error("NS_API_KEY not configured");
+  return {
+    base: rawBase,
+    domain: configData.domain ?? configData.default_domain ?? secretData.domain ?? secretData.default_domain ?? env.domain,
+    apiKey,
   };
 }
 
@@ -59,7 +79,7 @@ export async function authBroker(req: Request) {
   }
   const { data: profile } = await admin
     .from("planipret_profiles")
-    .select("id, extension, role, ns_jwt, ns_refresh_token, ns_jwt_expires_at, organization_id")
+    .select("id, extension, ns_extension, ns_domain, role, ns_jwt, ns_refresh_token, ns_jwt_expires_at, organization_id")
     .eq("user_id", userId)
     .maybeSingle();
   if (!profile || profile.organization_id !== AVA_ORG_ID) {
@@ -80,8 +100,7 @@ export async function requirePlanipretAdmin(req: Request) {
 // OAuth2 flows removed — NS-API v2 uses a static Bearer key (NS_API_KEY).
 // Kept as stubs so any legacy caller falls back to the static key.
 export async function obtainBrokerJwt(_extension: string): Promise<{ token: string; refresh: string | null; expiresIn: number }> {
-  const staticKey = Deno.env.get("NS_API_KEY");
-  if (!staticKey) throw new Error("NS_API_KEY not configured");
+  const staticKey = (await nsRuntimeConfig()).apiKey;
   return { token: staticKey, refresh: null, expiresIn: 3600 };
 }
 
@@ -93,9 +112,7 @@ export async function ensureBrokerJwt(
   _admin: ReturnType<typeof supaAdmin>,
   _profile: { id: string; extension: string; ns_jwt: string | null; ns_refresh_token: string | null; ns_jwt_expires_at: string | null },
 ): Promise<string> {
-  const staticKey = Deno.env.get("NS_API_KEY");
-  if (!staticKey) throw new Error("NS_API_KEY not configured");
-  return staticKey;
+  return (await nsRuntimeConfig(_admin)).apiKey;
 }
 
 export async function nsBrokerFetch(
@@ -104,7 +121,7 @@ export async function nsBrokerFetch(
   path: string,
   init: RequestInit = {},
 ): Promise<Response> {
-  const env = nsEnv();
+  const env = await nsRuntimeConfig(admin);
   const url = path.startsWith("http") ? path : `${env.base}/ns-api/v2${path.startsWith("/") ? path : `/${path}`}`;
   let token = await ensureBrokerJwt(admin, profile);
   const doFetch = (t: string) =>
