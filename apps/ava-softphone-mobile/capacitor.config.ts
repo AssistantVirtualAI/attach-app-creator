@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.lemtel.softphone',
+  appId: 'com.assistantvirtualai.softphone',
   appName: 'AVA Softphone',
   webDir: 'dist',
   server: {
