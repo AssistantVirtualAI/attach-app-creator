@@ -335,6 +335,7 @@ export default function PlanipretMobile() {
   const { t, lang, setLang } = useMplanipretLang();
   // REST-only call control: outbound calls ring the broker's registered mobile device.
   const softphone = useMplanipretSoftphone();
+  const { attachRestCall } = softphone;
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [accessError, setAccessError] = useState<"unauthenticated" | "missing_profile" | "load_failed" | null>(null);
@@ -384,7 +385,7 @@ export default function PlanipretMobile() {
       setActiveCallId(row?.id ?? null);
       if (row?.id) {
         const out = row.direction === "outbound" || row.direction === "out";
-        softphone.attachRestCall?.({
+        attachRestCall?.({
           id: row.id,
           direction: out ? "out" : "in",
           other: (out ? row.to_name || row.to_number : row.from_name || row.from_number) || "—",
@@ -398,7 +399,7 @@ export default function PlanipretMobile() {
       .on("postgres_changes", { event: "*", schema: "public", table: "planipret_phone_calls", filter: `user_id=eq.${profile.user_id}` }, refreshActive)
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [profile?.user_id, softphone]);
+  }, [profile?.user_id, attachRestCall]);
 
   const hangupActive = async () => {
     if (!activeCallId) return;
