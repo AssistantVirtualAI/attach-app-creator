@@ -262,7 +262,7 @@ function SmsList({ profile, openDialer, registerRefresh }: any) {
             const preview = th.last_message ?? th.preview ?? "";
             return (
               <ThreadRow
-                key={id || peer}
+                key={`${id || "noid"}-${peer || "nopeer"}-${index}`}
                 id={id}
                 peer={peer}
                 unread={unread}
