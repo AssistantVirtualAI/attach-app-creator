@@ -180,31 +180,34 @@ Deno.serve(async (req) => {
       const withoutId = rows.filter((r) => !r.ns_call_id);
 
       const withoutUserId = (payload: any[]) => payload.map(({ user_id: _userId, ...r }) => r);
-      const tryWrite = async (payload: any[], omitUserId: boolean) => {
+      const CHUNK = 50;
+      const chunk = <T,>(arr: T[]) => {
+        const out: T[][] = [];
+        for (let i = 0; i < arr.length; i += CHUNK) out.push(arr.slice(i, i + CHUNK));
+        return out;
+      };
+      const upsertChunk = async (payload: any[], omitUserId: boolean) => {
         const finalPayload = omitUserId ? withoutUserId(payload) : payload;
-        if (payload === withId) {
-          return await supabase
-            .from("planipret_phone_calls")
-            .upsert(finalPayload, { onConflict: "ns_call_id", count: "exact", ignoreDuplicates: false });
-        }
+        return await supabase
+          .from("planipret_phone_calls")
+          .upsert(finalPayload, { onConflict: "ns_call_id", count: "exact", ignoreDuplicates: false });
+      };
+      const insertChunk = async (payload: any[], omitUserId: boolean) => {
+        const finalPayload = omitUserId ? withoutUserId(payload) : payload;
         return await supabase.from("planipret_phone_calls").insert(finalPayload).select("id", { count: "exact" });
       };
 
       let upserted = 0;
       try {
-        if (withId.length) {
-          let { error, count } = await tryWrite(withId, false);
-          if (isProfileFkError(error)) {
-            ({ error, count } = await tryWrite(withId, true));
-          }
+        for (const batch of chunk(withId)) {
+          let { error, count } = await upsertChunk(batch, false);
+          if (isProfileFkError(error)) ({ error, count } = await upsertChunk(batch, true));
           if (error) throw new Error(error.message);
-          upserted = count ?? withId.length;
+          upserted += count ?? batch.length;
         }
-        if (withoutId.length) {
-          let { error } = await tryWrite(withoutId, false);
-          if (isProfileFkError(error)) {
-            ({ error } = await tryWrite(withoutId, true));
-          }
+        for (const batch of chunk(withoutId)) {
+          let { error } = await insertChunk(batch, false);
+          if (isProfileFkError(error)) ({ error } = await insertChunk(batch, true));
           if (error) throw new Error(error.message);
         }
       } catch (e) {
@@ -212,6 +215,7 @@ Deno.serve(async (req) => {
         if (runId) await supabase.from("planipret_edge_function_runs").update({ status: "error", finished_at: new Date().toISOString(), error: msg }).eq("id", runId);
         return jsonResponse({ error: msg }, 500);
       }
+
 
       const summary = { extension: ctx.extension, domain: ctx.nsDomain, start, end, fetched: items.length, upserted, inserted_no_id: withoutId.length };
       if (runId) await supabase.from("planipret_edge_function_runs").update({ status: "success", finished_at: new Date().toISOString(), summary }).eq("id", runId);
