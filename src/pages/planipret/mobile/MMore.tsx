@@ -33,6 +33,9 @@ export default function MMore() {
   const [darkMode, setDarkMode] = useState<boolean>(() => localStorage.getItem("planipret_dark") === "1");
   const [agentOn, setAgentOn] = useState<boolean>(() => localStorage.getItem("planipret_agent_on") !== "0");
   const [monthStats, setMonthStats] = useState<{ calls: number; leads: number; rate: number }>({ calls: 0, leads: 0, rate: 0 });
+  const [msSetupOpen, setMsSetupOpen] = useState(false);
+  const [msForm, setMsForm] = useState({ tenant_id: "", client_id: "", client_secret: "" });
+  const [msSaving, setMsSaving] = useState(false);
 
   useEffect(() => { if (params.get("ms365") === "ok") toast.success(t("more.msConnected")); }, [params, t]);
 
