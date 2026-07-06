@@ -99,7 +99,23 @@ class PpSipProvider {
     } catch {}
   }
 
+  private async probeWssCandidates(urls: string[], timeoutMs = 3000): Promise<string[]> {
+    const test = (url: string) => new Promise<string | null>((resolve) => {
+      let done = false;
+      const finish = (ok: boolean) => { if (done) return; done = true; try { ws.close(); } catch {} resolve(ok ? url : null); };
+      let ws: WebSocket;
+      try { ws = new WebSocket(url, ["sip"]); } catch { resolve(null); return; }
+      ws.onopen = () => finish(true);
+      ws.onerror = () => finish(false);
+      ws.onclose = () => finish(false);
+      setTimeout(() => finish(false), timeoutMs);
+    });
+    const results = await Promise.all(urls.map(test));
+    return results.filter((u): u is string => !!u);
+  }
+
   async init(cfg: PpSipConfig) {
+
     if (!cfg.extension || !cfg.sipDomain || !cfg.wssUrl || !cfg.password) {
       this.update({ status: "error", errorCause: "invalid_config" });
       return;
@@ -114,10 +130,18 @@ class PpSipProvider {
     this.update({ status: "connecting", errorCause: undefined });
 
     try {
-      const urls = Array.from(new Set([cfg.wssUrl, ...(cfg.wssUrls || [])].filter(Boolean))) as string[];
+      const rawUrls = Array.from(new Set([cfg.wssUrl, ...(cfg.wssUrls || [])].filter(Boolean))) as string[];
+      const urls = await this.probeWssCandidates(rawUrls);
+      if (urls.length === 0) {
+        this.log("error", "no reachable WSS endpoint", { candidates: rawUrls });
+        this.update({ status: "error", errorCause: "no_wss_reachable" });
+        return;
+      }
+      this.log("info", "wss reachable", urls);
       const sip = splitSipIdentity(cfg.sipUsername || cfg.extension, cfg.sipDomain);
       const uriUser = String(cfg.extension).trim();
       const sockets = urls.map((u) => new (JsSIP as any).WebSocketInterface(u));
+
       const ua = new (JsSIP as any).UA({
         sockets,
         // The SIP Address-of-Record must remain the broker extension. The
