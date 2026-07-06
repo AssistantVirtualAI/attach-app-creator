@@ -75,21 +75,24 @@ Deno.serve(async (req) => {
 });
 
 async function testNsApi(cfg: Record<string, string>): Promise<TestResult> {
-  const base = (cfg.base_url || "https://voice.ava-telecom.ca/ns-api/v2").replace(/\/$/, "");
-  const key = cfg.api_key;
-  if (!key) return { success: false, message: "Missing api_key" };
-  const r = await fetch(`${base}/`, { headers: { Authorization: `Bearer ${key}` } });
+  const base = (cfg.base_url || Deno.env.get("NS_API_BASE_URL") || "https://voice.ava-telecom.ca/ns-api/v2").replace(/\/$/, "");
+  const key = cfg.api_key || Deno.env.get("NS_API_KEY") || "";
+  const domain = cfg.domain || Deno.env.get("NS_DEFAULT_DOMAIN") || "";
+  if (!key) return { success: false, message: "Missing api_key (config ou NS_API_KEY)" };
+  // Ping a real authenticated endpoint. Root "/" returns 404 on many NS deployments.
+  const url = domain ? `${base}/domains/${encodeURIComponent(domain)}` : `${base}/domains`;
+  const r = await fetch(url, { headers: { Authorization: `Bearer ${key}`, Accept: "application/json" } });
   const txt = await r.text();
   return {
     success: r.ok,
-    message: r.ok ? `NS-API joignable (${r.status})` : `HTTP ${r.status}: ${txt.slice(0, 160)}`,
-    details: { status: r.status, base },
+    message: r.ok ? `NS-API OK (${r.status}) · ${domain || "domains"}` : `HTTP ${r.status}: ${txt.slice(0, 160)}`,
+    details: { status: r.status, base, domain },
   };
 }
 
 async function testAnthropic(cfg: Record<string, string>): Promise<TestResult> {
-  const key = cfg.api_key;
-  if (!key) return { success: false, message: "Missing api_key" };
+  const key = cfg.api_key || Deno.env.get("ANTHROPIC_API_KEY") || "";
+  if (!key) return { success: false, message: "Missing api_key (config ou ANTHROPIC_API_KEY)" };
   const model = cfg.model || "claude-sonnet-4-5";
   const t0 = Date.now();
   const r = await fetch("https://api.anthropic.com/v1/messages", {
@@ -104,8 +107,8 @@ async function testAnthropic(cfg: Record<string, string>): Promise<TestResult> {
 }
 
 async function testElevenLabs(cfg: Record<string, string>): Promise<TestResult> {
-  const key = cfg.api_key;
-  if (!key) return { success: false, message: "Missing api_key" };
+  const key = cfg.api_key || Deno.env.get("ELEVENLABS_API_KEY") || "";
+  if (!key) return { success: false, message: "Missing api_key (config ou ELEVENLABS_API_KEY)" };
   const r = await fetch("https://api.elevenlabs.io/v1/user", { headers: { "xi-api-key": key } });
   if (!r.ok) return { success: false, message: `HTTP ${r.status}` };
   const j = await r.json();
@@ -117,8 +120,10 @@ async function testElevenLabs(cfg: Record<string, string>): Promise<TestResult> 
 }
 
 async function testMs365(cfg: Record<string, string>): Promise<TestResult> {
-  const id = cfg.client_id, secret = cfg.client_secret, tenant = cfg.tenant_id || "common";
-  if (!id || !secret) return { success: false, message: "Missing client_id / client_secret" };
+  const id = cfg.client_id || Deno.env.get("MICROSOFT_CLIENT_ID") || "";
+  const secret = cfg.client_secret || Deno.env.get("MICROSOFT_CLIENT_SECRET") || "";
+  const tenant = cfg.tenant_id || Deno.env.get("MICROSOFT_TENANT_ID") || "common";
+  if (!id || !secret) return { success: false, message: "Missing client_id / client_secret (config ou MICROSOFT_*)" };
   if (tenant === "common") return { success: false, message: "Tenant must be a real tenant ID for client-credentials test" };
   const r = await fetch(`https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`, {
     method: "POST",
@@ -134,22 +139,32 @@ async function testMs365(cfg: Record<string, string>): Promise<TestResult> {
 }
 
 async function testMaestro(cfg: Record<string, string>): Promise<TestResult> {
-  const base = (cfg.api_url || "").replace(/\/$/, "");
-  const key = cfg.api_key;
-  if (!base || !key) return { success: false, message: "Missing api_url / api_key" };
+  const base = (cfg.api_url || Deno.env.get("MAESTRO_API_URL") || "").replace(/\/$/, "");
+  const key = cfg.api_key || Deno.env.get("MAESTRO_API_KEY") || "";
+  if (!base || !key) return { success: false, message: "Missing api_url / api_key (config ou MAESTRO_*)" };
   const r = await fetch(`${base}/health`, { headers: { Authorization: `Bearer ${key}` } });
-  return { success: r.ok, message: r.ok ? `Maestro joignable (${r.status})` : `HTTP ${r.status}` };
+  const txt = await r.text().catch(() => "");
+  return { success: r.ok, message: r.ok ? `Maestro joignable (${r.status})` : `HTTP ${r.status}: ${txt.slice(0, 120)}` };
 }
 
 async function testWebhooks(cfg: Record<string, string>): Promise<TestResult> {
   const url = cfg.endpoint_url;
+  const secret = cfg.secret || Deno.env.get("NS_WEBHOOK_SECRET") || "";
   if (!url) return { success: false, message: "Missing endpoint_url" };
-  if (!cfg.secret) return { success: false, message: "Missing secret (generate one)" };
+  if (!secret) return { success: false, message: "Missing secret (générer ou définir NS_WEBHOOK_SECRET)" };
   try {
+    // Sign the ping payload so receivers can validate the HMAC path.
+    const body = JSON.stringify({ type: "ping", source: "planipret", ts: Date.now() });
+    const enc = new TextEncoder();
+    const keyObj = await crypto.subtle.importKey(
+      "raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"],
+    );
+    const sig = await crypto.subtle.sign("HMAC", keyObj, enc.encode(body));
+    const hex = Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, "0")).join("");
     const r = await fetch(url, {
       method: "POST",
-      headers: { "content-type": "application/json", "x-pp-signature": "test", "x-pp-event": "ping" },
-      body: JSON.stringify({ type: "ping", source: "planipret", ts: Date.now() }),
+      headers: { "content-type": "application/json", "x-pp-signature": hex, "x-pp-event": "ping" },
+      body,
     });
     const txt = await r.text();
     return {

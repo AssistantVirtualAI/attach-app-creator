@@ -46,15 +46,47 @@ Deno.serve(async (req) => {
       out[key] = { configured: present.length > 0, present, missing };
     }
 
-    // Expose non-sensitive Microsoft 365 identifiers so the admin UI can
-    // auto-fill Tenant ID and Client ID from backend secrets. The client
-    // secret is NEVER returned — only its presence in `present`.
+    // Expose non-sensitive identifiers so the admin UI can auto-fill fields
+    // from backend secrets. Secrets/API keys are NEVER returned — only their
+    // presence in `present`.
     const msTenant = Deno.env.get("MICROSOFT_TENANT_ID");
     const msClientId = Deno.env.get("MICROSOFT_CLIENT_ID");
     if (msTenant || msClientId) {
       out.ms365.values = {
         ...(msTenant ? { tenant_id: msTenant } : {}),
         ...(msClientId ? { client_id: msClientId } : {}),
+      };
+    }
+    const nsBase = Deno.env.get("NS_API_BASE_URL");
+    const nsDomain = Deno.env.get("NS_DEFAULT_DOMAIN");
+    if (nsBase || nsDomain) {
+      out.ns_api.values = {
+        ...(nsBase ? { base_url: nsBase } : {}),
+        ...(nsDomain ? { domain: nsDomain } : {}),
+      };
+    }
+    const maestroUrl = Deno.env.get("MAESTRO_API_URL");
+    if (maestroUrl) {
+      out.maestro.values = { api_url: maestroUrl };
+    }
+    const telnyxProfile = Deno.env.get("TELNYX_MESSAGING_PROFILE_ID");
+    const telnyxPub = Deno.env.get("TELNYX_PUBLIC_KEY");
+    if (telnyxProfile || telnyxPub) {
+      out.telnyx.values = {
+        ...(telnyxProfile ? { messaging_profile_id: telnyxProfile } : {}),
+        ...(telnyxPub ? { public_key: telnyxPub } : {}),
+      };
+    }
+    const twilioSid = Deno.env.get("TWILIO_ACCOUNT_SID");
+    if (twilioSid) {
+      out.twilio.values = { account_sid: twilioSid };
+    }
+    const fpbxUrl = Deno.env.get("FUSIONPBX_API_URL");
+    const fpbxUser = Deno.env.get("FUSIONPBX_USERNAME");
+    if (fpbxUrl || fpbxUser) {
+      out.fusionpbx.values = {
+        ...(fpbxUrl ? { api_url: fpbxUrl } : {}),
+        ...(fpbxUser ? { username: fpbxUser } : {}),
       };
     }
 
