@@ -17,6 +17,36 @@ export type NsContext = {
 
 let cachedToken: { token: string; exp: number } | null = null;
 
+// ---- Circuit breaker (per edge-function instance) ----
+type BreakerState = { failures: number; openedAt: number; lastError: string };
+const breaker: BreakerState = { failures: 0, openedAt: 0, lastError: "" };
+const BREAKER_THRESHOLD = 5;         // consecutive failures to trip
+const BREAKER_COOLDOWN_MS = 30_000;  // stay open for 30s
+export function nsBreakerStatus() {
+  const openUntil = breaker.openedAt ? breaker.openedAt + BREAKER_COOLDOWN_MS : 0;
+  return {
+    open: openUntil > Date.now(),
+    failures: breaker.failures,
+    reopens_at: openUntil,
+    last_error: breaker.lastError,
+  };
+}
+export function nsBreakerReset() {
+  breaker.failures = 0;
+  breaker.openedAt = 0;
+  breaker.lastError = "";
+}
+function breakerRecordFailure(msg: string) {
+  breaker.failures += 1;
+  breaker.lastError = msg;
+  if (breaker.failures >= BREAKER_THRESHOLD) breaker.openedAt = Date.now();
+}
+function breakerRecordSuccess() {
+  breaker.failures = 0;
+  breaker.openedAt = 0;
+  breaker.lastError = "";
+}
+
 type NsRuntimeConfig = {
   baseUrl: string;
   defaultDomain: string;
@@ -77,10 +107,26 @@ export async function getNsJwt(): Promise<string> {
 }
 
 export async function nsFetch(path: string, init: RequestInit = {}, opts: { functionName?: string } = {}) {
+  // Short-circuit if breaker is open
+  const bs = nsBreakerStatus();
+  if (bs.open) {
+    return new Response(
+      JSON.stringify({
+        error: "NS-API circuit breaker open",
+        degraded: true,
+        breaker_open: true,
+        reopens_at: bs.reopens_at,
+        last_error: bs.last_error,
+      }),
+      { status: 503, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
   let token: string;
   try {
     token = await getNsJwt();
   } catch (e) {
+    breakerRecordFailure((e as Error).message);
     return new Response(
       JSON.stringify({ error: (e as Error).message, degraded: true }),
       { status: 503, headers: { "Content-Type": "application/json" } },
@@ -92,20 +138,27 @@ export async function nsFetch(path: string, init: RequestInit = {}, opts: { func
   console.log(`[${opts.functionName ?? "nsFetch"}][NS] ${method} ${path}`);
   const doFetch = async (bearer: string) => {
     let lastErr: unknown = null;
-    for (let attempt = 0; attempt < 4; attempt++) {
+    for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        return await fetch(url, {
-          ...init,
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-            Authorization: `Bearer ${bearer}`,
-            ...(init.headers ?? {}),
-          },
-        });
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 15_000);
+        try {
+          return await fetch(url, {
+            ...init,
+            signal: ctrl.signal,
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+              Authorization: `Bearer ${bearer}`,
+              ...(init.headers ?? {}),
+            },
+          });
+        } finally {
+          clearTimeout(timer);
+        }
       } catch (e) {
         lastErr = e;
-        await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
+        await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
       }
     }
     throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
@@ -114,24 +167,38 @@ export async function nsFetch(path: string, init: RequestInit = {}, opts: { func
   try {
     res = await doFetch(token);
   } catch (e) {
+    breakerRecordFailure((e as Error).message);
     return new Response(
       JSON.stringify({ error: (e as Error).message, degraded: true }),
       { status: 503, headers: { "Content-Type": "application/json" } },
     );
   }
 
+  // 401 → drop cached token, refresh once and retry
   if (res.status === 401) {
     cachedToken = null;
     try {
       const fresh = await getNsJwt();
       res = await doFetch(fresh);
     } catch (e) {
+      breakerRecordFailure((e as Error).message);
       return new Response(
-        JSON.stringify({ error: (e as Error).message, degraded: true }),
+        JSON.stringify({ error: (e as Error).message, degraded: true, unauthorized: true }),
         { status: 503, headers: { "Content-Type": "application/json" } },
       );
     }
+    // If still 401 after refresh, surface it as a hard 401 (do not trip breaker)
+    if (res.status === 401) {
+      return new Response(
+        JSON.stringify({ error: "NS-API unauthorized after token refresh", unauthorized: true }),
+        { status: 401, headers: { "Content-Type": "application/json" } },
+      );
+    }
   }
+
+  // Track breaker on 5xx / success
+  if (res.status >= 500) breakerRecordFailure(`HTTP ${res.status}`);
+  else if (res.ok) breakerRecordSuccess();
 
   // Fire & forget log to planipret_ns_request_log
   try {

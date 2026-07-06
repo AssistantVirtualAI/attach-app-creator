@@ -178,6 +178,7 @@ export default function MCalls() {
   const [refreshing, setRefreshing] = useState(false);
   const [selected, setSelected] = useState<Call | null>(null);
   const [visibleCount, setVisibleCount] = useState(25);
+  const [degraded, setDegraded] = useState<{ active: boolean; reason?: string; reopens_at?: number | null }>({ active: false });
 
   const userId = profile?.id ?? profile?.user_id;
   const profileAuthId = profile?.user_id;
@@ -194,10 +195,12 @@ export default function MCalls() {
     try {
       // 1) NS-API live CDRs via pp-ns-cdr (segmenté par extension côté serveur)
       const { data: ns, error: nsErr } = await supabase.functions.invoke("pp-ns-cdr", {
-        body: { action: "list" },
+        body: { action: "list", limit: 50, offset: 0 },
       });
       if (nsErr) throw nsErr;
-      const items: any[] = (ns as any)?.items ?? [];
+      const nsAny = ns as any;
+      setDegraded({ active: !!nsAny?.degraded, reason: nsAny?.reason, reopens_at: nsAny?.reopens_at ?? null });
+      const items: any[] = nsAny?.items ?? [];
 
       // 2) Données enrichies locales (transcripts, AI, lead scoring)
       let localQuery: any = supabase
@@ -293,7 +296,7 @@ export default function MCalls() {
         proxy_ns_callid: r.ns_callid ?? r.ns_orig_callid ?? r.ns_term_callid ?? r.ns_call_id ?? null,
         has_recording: !!(r.has_recording || r.recording_url || r.ns_callid || r.ns_orig_callid || r.ns_term_callid || r.ns_call_id),
       })) as Call[]);
-      supabase.functions.invoke("pp-ns-cdr", { body: { action: "sync", start, end, limit: 250 } }).catch(() => null);
+      supabase.functions.invoke("pp-ns-cdr", { body: { action: "sync", start, end, limit: 50 } }).catch(() => null);
     } catch (e) {
       console.warn("[MCalls] recordings load failed", e);
     } finally {
@@ -395,6 +398,29 @@ export default function MCalls() {
                 color: "var(--pp-text-primary)",
               }}
             />
+          </div>
+        )}
+        {degraded.active && (
+          <div
+            className="mt-3 flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs"
+            style={{
+              background: "rgba(245, 158, 11, 0.12)",
+              border: "1px solid rgba(245, 158, 11, 0.4)",
+              color: "var(--pp-text-primary)",
+            }}
+            role="status"
+          >
+            <span className="flex-1">
+              {lang === "en" ? "Degraded mode — showing cached data." : "Mode dégradé — données en cache affichées."}
+              {degraded.reason ? ` (${degraded.reason})` : ""}
+            </span>
+            <button
+              onClick={() => { setDegraded({ active: false }); load(); }}
+              className="px-3 py-1 rounded-full text-xs font-medium"
+              style={{ background: "var(--pp-primary)", color: "#fff" }}
+            >
+              {lang === "en" ? "Retry now" : "Réessayer"}
+            </button>
           </div>
         )}
         {/* Pill Tabs */}

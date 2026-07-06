@@ -42,16 +42,22 @@ async function invokeJson<T = any>(
  * Server enforces /users/{extension}/cdrs scoping.
  * ============================================================ */
 export const cdrsApi = {
-  list: (params: { start?: string; end?: string; limit?: number } = {}) =>
-    invokeJson<{ ok: boolean; count: number; items: any[] }>("pp-ns-cdr", {
+  list: (params: { start?: string; end?: string; limit?: number; offset?: number } = {}) =>
+    invokeJson<{ ok: boolean; count: number; items: any[]; degraded?: boolean; reason?: string; next_offset?: number | null; breaker_open?: boolean }>("pp-ns-cdr", {
       method: "GET",
-      query: { action: "list", start: params.start, end: params.end, limit: params.limit },
+      query: {
+        action: "list",
+        start: params.start,
+        end: params.end,
+        limit: params.limit ?? 50,
+        offset: params.offset ?? 0,
+      },
     }),
-  sync: (params: { start?: string; end?: string } = {}) =>
+  sync: (params: { start?: string; end?: string; limit?: number } = {}) =>
     invokeJson<{ ok: boolean; count: number }>("pp-ns-cdr", {
       method: "POST",
       query: { action: "sync" },
-      body: params,
+      body: { ...params, limit: params.limit ?? 50 },
     }),
 };
 
