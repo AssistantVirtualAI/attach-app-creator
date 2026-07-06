@@ -211,23 +211,7 @@ function AuthenticatedShell({
     return () => window.removeEventListener('mobile-auth-required', onAuthReq);
   }, []);
 
-  // Decide whether to show the onboarding permission gate.
-  useEffect(() => {
-    if (isPreviewMode) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const seen = localStorage.getItem('lemtel-permissions-onboarded') === '1';
-        const current = await checkAllPermissions();
-        if (cancelled) return;
-        if (seen || current.microphone === 'granted') setPermsGateDone(true);
-        else setPermsGateDone(false);
-      } catch {
-        if (!cancelled) setPermsGateDone(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
+  // Permissions are requested natively after login (see requestPermissionsAfterLogin).
 
   // Build SIP config from the same backend credentials used by desktop/portal.
   // Mobile pins SIP/TLS (port 5061) as the primary transport — no WebRTC required.
