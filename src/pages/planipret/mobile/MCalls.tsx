@@ -195,10 +195,12 @@ export default function MCalls() {
     try {
       // 1) NS-API live CDRs via pp-ns-cdr (segmenté par extension côté serveur)
       const { data: ns, error: nsErr } = await supabase.functions.invoke("pp-ns-cdr", {
-        body: { action: "list" },
+        body: { action: "list", limit: 50, offset: 0 },
       });
       if (nsErr) throw nsErr;
-      const items: any[] = (ns as any)?.items ?? [];
+      const nsAny = ns as any;
+      setDegraded({ active: !!nsAny?.degraded, reason: nsAny?.reason, reopens_at: nsAny?.reopens_at ?? null });
+      const items: any[] = nsAny?.items ?? [];
 
       // 2) Données enrichies locales (transcripts, AI, lead scoring)
       let localQuery: any = supabase
