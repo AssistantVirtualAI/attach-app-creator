@@ -194,7 +194,7 @@ export default function PlanipretAdminLayout() {
     setDialing(true);
     try {
       const res = await softphone.placeCall(destination);
-      if (!res.ok) {
+      if (res.via === "none") {
         toast.error(res.error || "Appel impossible");
         return;
       }
