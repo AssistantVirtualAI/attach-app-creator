@@ -100,8 +100,18 @@ Deno.serve(async (req) => {
     if (!transcript) return json({ ok: false, fallback: true, error: "EMPTY_TRANSCRIPT", hint: "Aucun texte n'a été détecté dans l'audio." }, 200);
 
     await admin.from("planipret_phone_calls")
-      .update({ transcript, recording_url: recUrl })
+      .update({ transcript, recording_url: recUrl ?? row.recording_url })
       .eq("id", callId);
+
+    // Chain to Claude-powered coaching (same config as /planipret/admin) so the record is
+    // instantly enriched with corrected transcript + summary + coaching + score.
+    try {
+      await fetch(`${SUPABASE_URL}/functions/v1/pp-coach-call`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: auth },
+        body: JSON.stringify({ call_id: callId, transcript, force: true }),
+      });
+    } catch (_) { /* best-effort */ }
 
     return json({ ok: true, transcript });
   } catch (e) {
