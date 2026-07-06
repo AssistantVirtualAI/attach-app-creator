@@ -16,19 +16,21 @@ const FALLBACK_PROXY = Deno.env.get("NS_SIP_PROXY") ?? "core1.cluster1.ucstack.i
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-type ClientType = "mobile" | "widget";
+type ClientType = "mobile" | "web" | "widget";
+
+const NS_SIP_WSS_URL = Deno.env.get("NS_SIP_WSS_URL") ?? "wss://voice.ava-telecom.ca:8001";
 
 function json(b: unknown, s = 200) {
   return new Response(JSON.stringify(b), { status: s, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
 
 function normalizeClientType(v: unknown): ClientType {
-  if (v === "widget") return "widget";
+  if (v === "web" || v === "widget") return "web";
   return "mobile";
 }
 
 function deviceNameFor(ext: string, ct: ClientType): string {
-  if (ct === "widget") return `${ext}x`;
+  if (ct === "web" || ct === "widget") return `${ext}_web`;
   return `${ext}_${ct}`;
 }
 
@@ -36,6 +38,14 @@ function deviceIdOf(d: any): string | null {
   const id = d?.device ?? d?.aor ?? d?.["device-aor"] ?? null;
   if (!id) return null;
   return String(id).replace(/^sip:/i, "").split("@")[0] || null;
+}
+
+// Must match the deterministic password generation in ns-provision-broker-devices.
+async function derivePassword(userId: string): Promise<string> {
+  const enc = new TextEncoder().encode(userId + "planipret-sip-2026");
+  const h = await crypto.subtle.digest("SHA-256", enc);
+  const hex = Array.from(new Uint8Array(h)).map((b) => b.toString(16).padStart(2, "0")).join("");
+  return `Pp${hex.substring(0, 12)}!`;
 }
 
 async function nsGet(path: string) {
