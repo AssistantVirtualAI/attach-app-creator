@@ -331,7 +331,7 @@ function RecordingSection({ call, onUpdated }: { call: RecordingCall; onUpdated:
   const [speed, setSpeed] = useState(1);
   const [cur, setCur] = useState(0);
   const [dur, setDur] = useState(0);
-  const playableUrl = !!call.recording_url && /^(blob:|data:)/i.test(String(call.recording_url)) ? call.recording_url : null;
+  const playableUrl = !!call.recording_url && (/^(blob:|data:)/i.test(String(call.recording_url)) || call.stream_via_proxy === false) ? call.recording_url : null;
 
   const fetchRec = async () => {
     setLoading(true);
@@ -372,7 +372,7 @@ function RecordingSection({ call, onUpdated }: { call: RecordingCall; onUpdated:
         });
         const url = (data as any)?.recording_url;
         if (!url) throw new Error("nope");
-        onUpdated({ ...call, recording_url: url });
+        onUpdated({ ...call, recording_url: url, stream_via_proxy: false });
         toast.success("Enregistrement chargé");
       } catch {
         toast.error("Enregistrement indisponible", { description: e?.message });
