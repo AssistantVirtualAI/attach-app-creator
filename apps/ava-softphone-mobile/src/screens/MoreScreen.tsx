@@ -29,7 +29,9 @@ export default function MoreScreen({
   creds, sp, onSignOut, haptic, 
 }: { creds: Creds; sp: any; onSignOut: () => void; haptic: (s?: ImpactStyle) => Promise<void>;  }) {
   const { tr } = useTr();
+  const { tx } = useT();
   const [sub, setSub] = useState<Sub>(null);
+
 
   if (sub === 'voicemail')   return <SubPage onBack={() => setSub(null)} title={tr.more.voicemail}><VoicemailScreen haptic={haptic} /></SubPage>;
   if (sub === 'messages')    return <SubPage onBack={() => setSub(null)} title={tr.more.messages}><MessagesScreen haptic={haptic} /></SubPage>;
