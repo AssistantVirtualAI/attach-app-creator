@@ -120,12 +120,15 @@ Deno.serve(async (req) => {
           method: "POST", headers: nsHeaders,
           body: JSON.stringify({
             device: id,
-            "authentication-key": sipPassword,
+            "device-sip-registration-password": sipPassword,
             "device-provisioning-protocol": "sip",
             "device-model": model,
             "core-server": "core1.cluster1.ucstack.io",
+            "device-provisioning-registration-core-server": "core1.cluster1.ucstack.io",
             "server-nat": isMobile ? "yes" : "no",
             "transport": isMobile ? "TCP" : "WSS",
+            "device-srtp-enabled": isMobile ? "no" : "opportunistic",
+            "device-sip-allowed-user-agent": isMobile ? undefined : "SIP.js",
             "device-push-enabled": isMobile ? "yes" : "no",
           }),
         });
