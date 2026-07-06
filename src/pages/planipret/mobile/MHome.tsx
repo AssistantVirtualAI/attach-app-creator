@@ -274,8 +274,10 @@ export default function MHome() {
   };
 
   const totalComms = useMemo(() => stats.calls + stats.sms + stats.outbound, [stats]);
-  const phoneOnline = softphone.snap.status === "registered";
-  const phoneConnecting = softphone.loading || softphone.snap.status === "connecting" || softphone.snap.status === "connected";
+  // Click-to-Call REST: no WebRTC registration required. The pill just shows
+  // that the broker profile has a linked NS extension.
+  const phoneOnline = !!profile?.extension;
+  const phoneConnecting = false;
 
   return (
     <div className="p-4 space-y-4 pb-8" style={{ background: "var(--pp-bg-base)", minHeight: "100%" }}>
