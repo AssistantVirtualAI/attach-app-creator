@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
-  Mic, MicOff, Pause, Play, PhoneForwarded, Grid3X3, Volume2, VolumeX, PhoneOff, User,
+  Mic, MicOff, Pause, Play, PhoneForwarded, Grid3X3, Volume2, VolumeX, PhoneOff, User, CornerUpRight,
 } from "lucide-react";
 import { useMplanipretLang } from "@/hooks/useMplanipretLang";
 import { useMplanipretSoftphone } from "@/hooks/useMplanipretSoftphone";
@@ -37,6 +37,7 @@ export default function ActiveCallOverlay({ callId, onClosed }: { callId: string
   const [keypadOpen, setKeypadOpen] = useState(false);
   const [dtmfBuffer, setDtmfBuffer] = useState("");
   const [transferOpen, setTransferOpen] = useState(false);
+  const [transferMode, setTransferMode] = useState<"transfer" | "forward">("transfer");
   const [transferTo, setTransferTo] = useState("");
   const [elapsed, setElapsed] = useState(0);
 
@@ -88,11 +89,13 @@ export default function ActiveCallOverlay({ callId, onClosed }: { callId: string
   const sendDtmf = async (d: string) => { setDtmfBuffer((b) => (b + d).slice(-16)); await invoke("dtmf", { digit: d }); };
   const doTransfer = async () => {
     if (!transferTo.trim()) return;
-    if (await invoke("transfer", { destination: transferTo.trim(), target: transferTo.trim() })) {
-      toast.success(t("call.transferSent"));
+    const action = transferMode === "forward" ? "forward" : "transfer";
+    if (await invoke(action, { destination: transferTo.trim(), target: transferTo.trim() })) {
+      toast.success(transferMode === "forward" ? t("call.forwardSent") ?? "Appel renvoyé" : t("call.transferSent"));
       setTransferOpen(false); setTransferTo("");
     }
   };
+  const openTransfer = (mode: "transfer" | "forward") => { setTransferMode(mode); setTransferOpen(true); };
   const hangup = async () => { await invoke("disconnect"); onClosed(); };
 
   const KEYS = ["1","2","3","4","5","6","7","8","9","*","0","#"];
@@ -159,7 +162,7 @@ export default function ActiveCallOverlay({ callId, onClosed }: { callId: string
               <button onClick={doTransfer} disabled={!transferTo.trim()}
                 className="flex-1 py-3 rounded-2xl text-sm font-semibold text-white disabled:opacity-50"
                 style={{ background: "linear-gradient(135deg, #1A4A8A, #2E9BDC)" }}>
-                {t("call.transfer")}
+                {transferMode === "forward" ? (t("call.forward") ?? "Renvoyer") : t("call.transfer")}
               </button>
             </div>
           </div>
@@ -168,10 +171,10 @@ export default function ActiveCallOverlay({ callId, onClosed }: { callId: string
             <div className="grid grid-cols-3 gap-4">
               <CallBtn active={muted} onClick={toggleMute} icon={muted ? <MicOff /> : <Mic />} label={muted ? t("call.unmute") : t("call.mute")} />
               <CallBtn active={held} onClick={toggleHold} icon={held ? <Play /> : <Pause />} label={held ? t("call.resume") : t("call.hold")} />
-              <CallBtn onClick={() => setTransferOpen(true)} icon={<PhoneForwarded />} label={t("call.transfer")} />
+              <CallBtn onClick={() => openTransfer("transfer")} icon={<PhoneForwarded />} label={t("call.transfer")} />
+              <CallBtn onClick={() => openTransfer("forward")} icon={<CornerUpRight />} label={t("call.forward") ?? "Renvoyer"} />
               <CallBtn onClick={() => setKeypadOpen(true)} icon={<Grid3X3 />} label={t("call.keypad")} />
               <CallBtn active={speaker} onClick={toggleSpeaker} icon={speaker ? <Volume2 /> : <VolumeX />} label={t("call.speaker")} />
-              <div />
             </div>
           </div>
         )}

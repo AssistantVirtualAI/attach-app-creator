@@ -165,22 +165,24 @@ export default function RecordingsList({
 
   return (
     <ul className="px-3 pt-3 pb-4 space-y-2">
-      {withRec.map((c) => (
-        <RecordingCard key={c.id} call={c} onUpdated={onUpdated} />
+      {withRec.map((c, idx) => (
+        <RecordingCard key={c.id} call={c} onUpdated={onUpdated} autoLoad={idx < 5} />
       ))}
     </ul>
   );
 }
 
 // ===================== Card =====================
-function RecordingCard({ call, onUpdated }: { call: RecordingCall; onUpdated: (c: RecordingCall) => void }) {
+function RecordingCard({ call, onUpdated, autoLoad = false }: { call: RecordingCall; onUpdated: (c: RecordingCall) => void; autoLoad?: boolean }) {
   const [open, setOpen] = useState<"rec" | "txt" | "ai" | "crm" | null>(null);
   const temp = tempIcon(call.lead_temperature);
   const autoPipelineRef = useRef<string | null>(null);
 
-  // Auto-pipeline runs ONLY when the user opens a section (avoids hammering NS-API on list mount).
+  // Auto-pipeline: runs when the user opens a section, OR when autoLoad is true
+  // (for the top-N most recent items so recordings/transcripts/AI preload).
   useEffect(() => {
-    if (!open) return;
+    const trigger = open || autoLoad;
+    if (!trigger) return;
     if (!hasResolvableAudio(call) || autoPipelineRef.current === call.id) return;
     if (call.transcript && call.ai_summary) return;
     autoPipelineRef.current = call.id;
@@ -212,7 +214,7 @@ function RecordingCard({ call, onUpdated }: { call: RecordingCall; onUpdated: (c
         console.warn("[RecordingsList] auto pipeline failed", e);
       }
     })();
-  }, [open, call, onUpdated]);
+  }, [open, autoLoad, call, onUpdated]);
 
 
   return (
