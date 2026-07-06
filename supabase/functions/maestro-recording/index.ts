@@ -13,7 +13,13 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
     const url = new URL(req.url);
-    const callId = url.searchParams.get("call_id");
+    let callId = url.searchParams.get("call_id");
+    if (!callId && req.method !== "GET") {
+      try {
+        const body = await req.json();
+        callId = body?.call_id ?? body?.callId ?? null;
+      } catch { /* ignore */ }
+    }
     if (!callId) return json({ error: "call_id_required" }, 400);
 
     const admin = adminClient();
