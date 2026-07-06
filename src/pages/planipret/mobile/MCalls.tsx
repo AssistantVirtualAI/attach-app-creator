@@ -28,6 +28,10 @@ type Call = {
   id: string;
   user_id: string;
   ns_call_id: string | null;
+  ns_callid?: string | null;
+  ns_orig_callid?: string | null;
+  ns_term_callid?: string | null;
+  extension?: string | null;
   direction: string;
   status: string | null;
   from_number: string | null;
@@ -37,6 +41,7 @@ type Call = {
   started_at: string;
   duration_seconds: number | null;
   recording_url: string | null;
+  has_recording?: boolean | null;
   transcript: string | null;
   ai_summary: string | null;
   metadata: any;
@@ -84,6 +89,14 @@ function cleanNumber(v: unknown): string | null {
   if (!s || /^(anonymous|unknown|restricted|private|unavailable)$/i.test(s)) return null;
   return s;
 }
+
+const pick = (raw: any, keys: string[]) => {
+  for (const k of keys) {
+    const v = raw?.[k];
+    if (v !== undefined && v !== null && String(v).trim() !== "") return v;
+  }
+  return null;
+};
 function fmtPhone(n: string | null): string | null {
   if (!n) return null;
   const d = n.replace(/\D/g, "");
@@ -190,26 +203,28 @@ export default function MCalls() {
       (local ?? []).forEach((r: any) => { if (r.ns_call_id) byNsId.set(r.ns_call_id, r); });
 
       const merged: Call[] = items.map((it, i) => {
-        const nsId = it.id ?? it.call_id ?? it.uuid ?? it["cdr-id"] ?? null;
+        const nsId = pick(it, ["ns_call_id", "call-parent-cdr-id", "cdr-id", "id", "uuid", "call_id", "call-id"]);
+        const nsCallId = pick(it, ["ns_callid", "call-id", "call_id", "callid", "call-parent-call-id", "orig_callid", "term_callid"]);
         const enriched = nsId ? byNsId.get(nsId) : null;
-        const dirRaw = String(it.direction ?? it.call_direction ?? it.type ?? "").toLowerCase();
-        const answeredFalse = it.answered === false || it.disposition === "no-answer" || it.disposition === "missed";
+        const dirRaw = String(pick(it, ["direction", "call_direction", "call-direction", "type", "call-type"]) ?? "").toLowerCase();
+        const answeredFalse = it.answered === false || ["no-answer", "missed", "unanswered"].includes(String(it.disposition ?? it.status ?? "").toLowerCase());
         const isIn = dirRaw.includes("in") || dirRaw === "incoming" || dirRaw === "received";
         const isOut = dirRaw.includes("out") || dirRaw === "outgoing" || dirRaw === "placed";
         const direction = isIn
           ? (answeredFalse ? "missed" : "inbound")
           : isOut ? "outbound"
           : (answeredFalse ? "missed" : "inbound");
-        const from_number = it.from_number ?? it.caller_id_number ?? it.orig_from_user
-          ?? it.orig_from_uri ?? it.by_number ?? it.orig_callid_number ?? it.ani ?? enriched?.from_number ?? null;
-        const to_number = it.to_number ?? it.destination ?? it.term_to_user
-          ?? it.orig_to_user ?? it.dialed_number ?? it.dnis ?? enriched?.to_number ?? null;
-        const from_name = it.from_name ?? it.caller_id_name ?? it.orig_from_name
-          ?? it.by_name ?? enriched?.from_name ?? null;
+        const from_number = pick(it, ["from_number", "from", "caller_id_number", "caller-id-number", "orig_from_user", "orig-user", "call-orig-user", "orig_from_uri", "orig-from-uri", "call-orig-from-uri", "by_number", "ani"]) ?? enriched?.from_number ?? null;
+        const to_number = pick(it, ["to_number", "to", "destination", "dialed_number", "dnis", "term_to_user", "term-user", "call-term-user", "orig_to_user", "orig-to-user", "call-orig-to-uri", "call-term-to-uri"]) ?? enriched?.to_number ?? null;
+        const from_name = pick(it, ["from_name", "caller_id_name", "caller-id-name", "orig_from_name", "orig-name", "by_name"]) ?? enriched?.from_name ?? null;
         return {
           id: enriched?.id ?? nsId ?? `ns-${i}`,
           user_id: userId,
           ns_call_id: nsId,
+          ns_callid: nsCallId ?? enriched?.ns_callid ?? null,
+          ns_orig_callid: pick(it, ["ns_orig_callid", "orig_callid", "orig-callid", "call-orig-call-id"]) ?? enriched?.ns_orig_callid ?? null,
+          ns_term_callid: pick(it, ["ns_term_callid", "term_callid", "term-callid", "call-term-call-id"]) ?? enriched?.ns_term_callid ?? null,
+          extension: pick(it, ["extension", "user", "call-orig-user", "orig-user", "call-term-user", "term-user"]) ?? enriched?.extension ?? null,
           direction,
           status: it.disposition ?? it.status ?? null,
           from_number,
@@ -218,7 +233,8 @@ export default function MCalls() {
           to_name: it.to_name ?? it.term_to_name ?? enriched?.to_name ?? null,
           started_at: (it.start_time ?? it.started_at ?? it.time_start ?? new Date().toISOString()) as string,
           duration_seconds: Number(it.duration ?? it.billsec ?? it.time_talking ?? 0) || 0,
-          recording_url: it.recording_url ?? it.recording ?? it.record_url ?? enriched?.recording_url ?? null,
+          recording_url: pick(it, ["recording_url", "ns_recording_url", "file-access-url", "recording", "record_url", "url"]) ?? enriched?.recording_url ?? null,
+          has_recording: Boolean(pick(it, ["recording_url", "ns_recording_url", "file-access-url", "call-recording-status", "recording", "record_url", "url"]) ?? enriched?.has_recording),
           transcript: enriched?.transcript ?? null,
           ai_summary: enriched?.ai_summary ?? null,
           metadata: it,
@@ -247,7 +263,10 @@ export default function MCalls() {
     if (!userId) return;
     setRecordingsLoading(true);
     try {
-      const { data } = await supabase.functions.invoke("pp-ns-recordings", { body: { action: "list" } });
+      const end = new Date().toISOString();
+      const start = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      await supabase.functions.invoke("pp-ns-cdr", { body: { action: "sync", start, end, limit: 250 } }).catch(() => null);
+      const { data } = await supabase.functions.invoke("pp-ns-recordings", { body: { action: "list", start, end, limit: 100 } });
       const items = (data as any)?.items ?? [];
       setRecordings(items as Call[]);
     } catch (e) {
@@ -283,6 +302,8 @@ export default function MCalls() {
         load();
         // A new CDR usually means a fresh recording is (or will be) available.
         loadRecordings();
+        window.setTimeout(() => { load(); loadRecordings(); }, 15_000);
+        window.setTimeout(() => { load(); loadRecordings(); }, 45_000);
       })
       .subscribe();
     return () => { supabase.removeChannel(ch); };

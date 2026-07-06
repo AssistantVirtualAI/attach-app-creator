@@ -15,7 +15,10 @@ import { getPlanipretBrokerDirectoryCount } from "@/lib/planipret/adminDirectory
 import { getPlanipretCallCount } from "@/lib/planipret/adminCounts";
 import { useMplanipretLang } from "@/hooks/useMplanipretLang";
 import { PlanipretLangSwitch } from "@/components/planipret/PlanipretLangSwitch";
+import { useMplanipretSoftphone } from "@/hooks/useMplanipretSoftphone";
+import PpActiveCallScreen from "@/components/planipret/PpActiveCallScreen";
 import planipretLogo from "@/assets/planipret-logo.png.asset.json";
+import { toast } from "sonner";
 
 type NavBadge = "brokers" | "missed" | "integrations" | "audit";
 type NavItem = { to: string; label: string; Icon: any; badge?: NavBadge };
@@ -85,8 +88,11 @@ export default function PlanipretAdminLayout() {
   const [brokerCount, setBrokerCount] = useState(0);
   const [auditScore, setAuditScore] = useState<number | null>(null);
   const { status: rtStatus } = useAdminRealtime();
+  const softphone = useMplanipretSoftphone();
   const realtimeOk = rtStatus === "live";
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [dialNumber, setDialNumber] = useState("");
+  const [dialing, setDialing] = useState(false);
 
   // Auto-sync NS-API in the background for every admin page. Idempotent via
   // module-level in-flight guard, safe to mount once at the layout.
@@ -181,6 +187,23 @@ export default function PlanipretAdminLayout() {
   }, [navigate]);
 
   const logout = async () => { await supabase.auth.signOut(); navigate("/login", { replace: true }); };
+
+  const startWebCall = async () => {
+    const destination = dialNumber.trim();
+    if (!destination || dialing) return;
+    setDialing(true);
+    try {
+      const res = await softphone.placeCall(destination);
+      if (res.via === "none") {
+        toast.error(res.error || "Appel impossible");
+        return;
+      }
+      setDialNumber("");
+      toast.success(res.via === "sip" ? "Appel web démarré" : "Appel lancé");
+    } finally {
+      setDialing(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -354,6 +377,30 @@ export default function PlanipretAdminLayout() {
               </span>
             </div>
 
+            <form
+              onSubmit={(e) => { e.preventDefault(); void startWebCall(); }}
+              className="flex items-center gap-1.5 rounded-full px-2 py-1"
+              style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)" }}
+            >
+              <Phone className="h-3.5 w-3.5" style={{ color: "var(--pp-brand-accent-2)" }} />
+              <input
+                value={dialNumber}
+                onChange={(e) => setDialNumber(e.target.value)}
+                placeholder="Composer…"
+                inputMode="tel"
+                className="w-28 bg-transparent text-xs outline-none"
+                style={{ color: "var(--pp-text-primary)" }}
+              />
+              <button
+                type="submit"
+                disabled={!dialNumber.trim() || dialing}
+                className="rounded-full px-2 py-1 text-[11px] font-semibold disabled:opacity-50"
+                style={{ background: "var(--pp-brand-accent-2)", color: "var(--pp-bg-base)" }}
+              >
+                {dialing ? "…" : "Appeler"}
+              </button>
+            </form>
+
             <NotificationsBell />
             <WorkspaceHeaderExtras />
 
@@ -370,10 +417,11 @@ export default function PlanipretAdminLayout() {
           </div>
         </header>
         <main className="flex-1 p-7 overflow-y-auto">
-          <Outlet context={{ profile }} />
+          <Outlet context={{ profile, softphone }} />
         </main>
       </div>
 
+      <PpActiveCallScreen softphone={softphone} />
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
       <SessionTimeoutModal />
     </div>
