@@ -96,8 +96,9 @@ export function useMplanipretSoftphone() {
     if (!destination) return { via: "none", ok: false, error: "empty destination" };
     patch({ callState: "ringing-out", direction: "out", remoteNumber: destination, remoteIdentity: destination, errorCause: undefined, startedAt: null });
     const { data, error } = await supabase.functions.invoke("pp-ns-calls", {
-      body: { action: "start", to_number: destination, client_type: "web" },
+      body: { action: "start", to_number: destination, client_type: "mobile" },
     });
+
     const d = data as any;
     if (error || d?.success === false || d?.error) {
       const msg = d?.error ?? error?.message ?? "Click-to-call failed";
