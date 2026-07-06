@@ -343,6 +343,42 @@ Deno.serve(async (req) => {
     }
   } catch { /* non fatal */ }
 
+  // Fetch dynamic SIP registration data from GET /devices/{device}.
+  // NetSapiens returns:
+  //   - device-sip-registration-core-server  → real proxy hostname
+  //   - device-sip-registration-password     → authoritative SIP password
+  // We prefer these values over env defaults so JsSIP registers against the
+  // correct SBC (never a hardcoded wss://voice.ava-telecom.ca:7443).
+  let coreServer: string | null = null;
+  let sipRegPassword: string | null = null;
+  try {
+    const detail = await nsFetch(
+      `/domains/${encodeURIComponent(domain)}/users/${encodeURIComponent(extension)}/devices/${encodeURIComponent(resolvedDeviceId)}`,
+    );
+    const d: any = Array.isArray(detail.data) ? detail.data[0] : detail.data;
+    if (d && typeof d === "object") {
+      coreServer = d["device-sip-registration-core-server"]
+        ?? d["sip-registration-core-server"]
+        ?? d["core-server"]
+        ?? null;
+      sipRegPassword = d["device-sip-registration-password"]
+        ?? d["sip-registration-password"]
+        ?? null;
+    }
+  } catch { /* non-fatal */ }
+
+  // If NetSapiens gave us the real password, prefer it over Vault/random.
+  const effectivePassword = sipRegPassword || sipPassword;
+
+  // Derive the WSS URL from the core-server when NS returned one. Standard
+  // NetSapiens deployments proxy WSS behind :443/ws. Env NS_SIP_WSS_URL stays
+  // as an override for tenants that publish a different path.
+  const derivedWss = coreServer
+    ? `wss://${coreServer.replace(/^https?:\/\//, "").replace(/\/+$/, "")}:443/ws`
+    : NS_SIP_WSS_URL;
+
+  const wssList = Array.from(new Set([derivedWss, NS_SIP_WSS_URL, ...NS_SIP_WSS_URLS].filter(Boolean)));
+
   return json({
     ok: true,
     client_type: clientType,
@@ -356,12 +392,14 @@ Deno.serve(async (req) => {
     sip_username: sipUsername,
     sip_extension: extension,
     sip_domain: domain,
-    sip_proxy: NS_SIP_PROXY,
-    sip_wss_url: NS_SIP_WSS_URL,
-    sip_wss_urls: Array.from(new Set([NS_SIP_WSS_URL, ...NS_SIP_WSS_URLS])),
-    sip_password: sipPassword,
+    sip_proxy: coreServer || NS_SIP_PROXY,
+    sip_core_server: coreServer,
+    sip_wss_url: derivedWss,
+    sip_wss_urls: wssList,
+    sip_password: effectivePassword,
     // never log this response
   });
 
 });
+
 
