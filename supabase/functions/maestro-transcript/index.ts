@@ -16,12 +16,12 @@ import {
 } from "../_shared/maestro.ts";
 
 
-async function transcribeViaLovable(audioUrl: string): Promise<{ text: string; segments: any[] } | null> {
+async function transcribeViaLovable(audioUrl: string, auth?: string): Promise<{ text: string; segments: any[] } | null> {
   const apiKey = Deno.env.get("LOVABLE_API_KEY");
   if (!apiKey || !audioUrl) return null;
 
   try {
-    const audioRes = await fetch(audioUrl);
+    const audioRes = await fetch(audioUrl, auth ? { headers: { Authorization: auth } } : undefined);
     if (!audioRes.ok) return null;
     const blob = await audioRes.blob();
     const form = new FormData();
@@ -30,7 +30,7 @@ async function transcribeViaLovable(audioUrl: string): Promise<{ text: string; s
 
     const res = await fetch("https://ai.gateway.lovable.dev/v1/audio/transcriptions", {
       method: "POST",
-      headers: { "Lovable-API-Key": apiKey },
+      headers: { Authorization: `Bearer ${apiKey}` },
       body: form,
     });
     if (!res.ok) {
@@ -81,7 +81,7 @@ Deno.serve(async (req) => {
     const admin = adminClient();
     const { data: call } = await admin
       .from("planipret_phone_calls")
-      .select("id, user_id, ns_call_id, maestro_call_id, recording_url, transcript, transcript_segments, transcript_language")
+      .select("id, user_id, ns_call_id, ns_callid, ns_orig_callid, ns_term_callid, extension, maestro_call_id, recording_url, transcript, transcript_segments, transcript_language")
       .eq("id", call_id)
       .maybeSingle();
     if (!call) return json({ success: false, error: "call_not_found" }, 404);
@@ -107,13 +107,48 @@ Deno.serve(async (req) => {
     let result = await tryNsTranscript(admin, call.ns_call_id);
     let source: "ns" | "lovable" | null = result ? "netsapiens" as any : null;
 
-    // 2. Fallback to Lovable AI Gateway (Whisper-style)
+    // 2. Fallback to the canonical NS recording proxy, then Lovable AI Gateway.
+    if (!result) {
+      const proxyRes = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/ns-get-recording`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: req.headers.get("Authorization") ?? "" },
+        body: JSON.stringify({
+          call_db_id: call.id,
+          ns_callid: call.ns_callid ?? call.ns_orig_callid ?? call.ns_term_callid ?? call.ns_call_id,
+          ns_orig_callid: call.ns_orig_callid,
+          ns_term_callid: call.ns_term_callid,
+          ns_extension: call.extension,
+        }),
+      });
+      const ct = proxyRes.headers.get("content-type") ?? "";
+      if (proxyRes.ok && (ct.startsWith("audio") || ct.includes("octet-stream"))) {
+        const apiKey = Deno.env.get("LOVABLE_API_KEY");
+        if (apiKey) {
+          const blob = await proxyRes.blob();
+          const form = new FormData();
+          form.append("file", blob, "call.wav");
+          form.append("model", "openai/gpt-4o-mini-transcribe");
+          const stt = await fetch("https://ai.gateway.lovable.dev/v1/audio/transcriptions", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${apiKey}` },
+            body: form,
+          });
+          if (stt.ok) {
+            const data = await stt.json().catch(() => ({}));
+            if (data?.text) result = { text: data.text, segments: data.segments ?? [] };
+          }
+        }
+      }
+      source = result ? "lovable" as any : source;
+    }
+
+    // 3. Fallback to stored URL.
     if (!result && call.recording_url) {
       result = await transcribeViaLovable(call.recording_url);
       source = result ? "lovable" as any : null;
     }
 
-    // 2b. Try fetching recording URL from Maestro if still nothing
+    // 4. Try fetching recording URL from Maestro if still nothing
     if (!result) {
       const cfg = await getMaestroConfig(admin);
       if (cfg.url && cfg.key) {
