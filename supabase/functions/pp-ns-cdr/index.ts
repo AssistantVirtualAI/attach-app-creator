@@ -115,11 +115,23 @@ Deno.serve(async (req) => {
     `?start-time=${encodeURIComponent(start)}&end-time=${encodeURIComponent(end)}&limit=${limit}`;
 
   try {
-    const res = await nsFetch(nsPath, { method: "GET" }, { functionName: "pp-ns-cdr" });
+    let res: Response | null = null;
+    let lastErr: unknown = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        res = await nsFetch(nsPath, { method: "GET" }, { functionName: "pp-ns-cdr" });
+        break;
+      } catch (e) {
+        lastErr = e;
+        await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
+      }
+    }
+    if (!res) return jsonResponse({ error: `NS-API unreachable: ${(lastErr as Error)?.message ?? "unknown"}` }, 502);
     if (!res.ok) {
       const txt = await res.text();
       return jsonResponse({ error: "NS-API CDR fetch failed", status: res.status, body: txt }, 502);
     }
+
     const raw = await res.json();
     const items: any[] = (Array.isArray(raw) ? raw : raw?.cdrs ?? raw?.data ?? []).map((it: any) => normalizeCdr(it, ctx));
 
