@@ -114,6 +114,19 @@ Deno.serve(async (req) => {
     `/domains/${encodeURIComponent(ctx.nsDomain)}/users/${encodeURIComponent(ctx.extension)}/cdrs` +
     `?start-time=${encodeURIComponent(start)}&end-time=${encodeURIComponent(end)}&limit=${limit}`;
 
+  // Fallback to cached DB rows if NS-API is unreachable / slow.
+  const dbFallback = async (reason: string) => {
+    const { data } = await supabase
+      .from("planipret_phone_calls")
+      .select("*")
+      .eq("extension", ctx.extension)
+      .gte("started_at", start)
+      .lte("started_at", end)
+      .order("started_at", { ascending: false })
+      .limit(limit);
+    return jsonResponse({ ok: true, count: (data ?? []).length, items: data ?? [], degraded: true, reason });
+  };
+
   try {
     let res: Response | null = null;
     let lastErr: unknown = null;
@@ -126,9 +139,13 @@ Deno.serve(async (req) => {
         await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
       }
     }
-    if (!res) return jsonResponse({ error: `NS-API unreachable: ${(lastErr as Error)?.message ?? "unknown"}` }, 502);
+    if (!res) {
+      if (action === "list") return await dbFallback(`NS-API unreachable: ${(lastErr as Error)?.message ?? "unknown"}`);
+      return jsonResponse({ error: `NS-API unreachable: ${(lastErr as Error)?.message ?? "unknown"}` }, 502);
+    }
     if (!res.ok) {
       const txt = await res.text();
+      if (action === "list" && res.status >= 500) return await dbFallback(`NS-API ${res.status}`);
       return jsonResponse({ error: "NS-API CDR fetch failed", status: res.status, body: txt }, 502);
     }
 
@@ -138,6 +155,7 @@ Deno.serve(async (req) => {
     if (action === "list") {
       return jsonResponse({ ok: true, count: items.length, items });
     }
+
 
     if (action === "sync") {
       const { data: runRow } = await supabase
@@ -237,6 +255,7 @@ Deno.serve(async (req) => {
 
     return jsonResponse({ error: "unsupported action/method" }, 400);
   } catch (e) {
+    if (action === "list") return await dbFallback((e as Error).message);
     return jsonResponse({ error: (e as Error).message }, 502);
   }
 });
