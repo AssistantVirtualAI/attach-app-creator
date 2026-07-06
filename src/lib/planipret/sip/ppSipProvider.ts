@@ -114,10 +114,18 @@ class PpSipProvider {
     this.update({ status: "connecting", errorCause: undefined });
 
     try {
-      const urls = Array.from(new Set([cfg.wssUrl, ...(cfg.wssUrls || [])].filter(Boolean))) as string[];
+      const rawUrls = Array.from(new Set([cfg.wssUrl, ...(cfg.wssUrls || [])].filter(Boolean))) as string[];
+      const urls = await this.probeWssCandidates(rawUrls);
+      if (urls.length === 0) {
+        this.log("error", "no reachable WSS endpoint", { candidates: rawUrls });
+        this.update({ status: "error", errorCause: "no_wss_reachable" });
+        return;
+      }
+      this.log("info", "wss reachable", urls);
       const sip = splitSipIdentity(cfg.sipUsername || cfg.extension, cfg.sipDomain);
       const uriUser = String(cfg.extension).trim();
       const sockets = urls.map((u) => new (JsSIP as any).WebSocketInterface(u));
+
       const ua = new (JsSIP as any).UA({
         sockets,
         // The SIP Address-of-Record must remain the broker extension. The
