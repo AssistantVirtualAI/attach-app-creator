@@ -1607,8 +1607,13 @@ function TeamsThreadView({ target, onClose }: {
       body: { action: "send", ...invokeBody, content, contentType: "text" },
     });
     setSending(false);
-    if (error || (data as any)?.error) {
-      const msg = (data as any)?.error || error?.message || "Envoi refusé";
+    let payload: any = data ?? {};
+    if (error && (error as any).context?.text) {
+      try { payload = JSON.parse(await (error as any).context.text()); } catch { /* ignore */ }
+    }
+    if (payload?.error || error) {
+      const detail = payload?.detail?.error?.message ? `: ${payload.detail.error.message}` : "";
+      const msg = (payload?.error ? payload.error + detail : (error?.message || "Envoi refusé"));
       setSendStatus({ kind: "err", message: msg, lastText: content });
       toast.error(msg);
       return;
