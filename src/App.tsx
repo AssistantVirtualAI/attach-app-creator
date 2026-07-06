@@ -419,6 +419,7 @@ const App = () => (
                   <Route path="ava" element={<MAvaChat />} />
                   <Route path="notifications" element={<MAvaNotifications />} />
                   <Route path="extension-sync" element={<MExtensionSync />} />
+                  <Route path="sip-diagnostics" element={<MSipDiagnostics />} />
                 </Route>
                 <Route path="/planipret/dashboard" element={<Navigate to="/planipret/admin/overview" replace />} />
                 <Route path="/planipret/integrations" element={<Navigate to="/planipret/admin/integrations" replace />} />
