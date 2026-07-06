@@ -1,9 +1,5 @@
-// Return SIP credentials for a Planiprêt broker based on client_type.
-// NEW APPROACH: credentials are FIXED and read from environment secrets — no
-// more per-user NS-API device lookups / provisioning. Mobile app and Web
-// widget map to two dedicated NetSapiens devices (113_mobile / 113_web) that
-// are pre-provisioned on the tenant. Each surface registers with its own
-// device so both can ring at the same time.
+// Resolve per-broker SIP credentials by querying NS-API for the real device.
+// Uses NS_API_KEY server-side; the browser never sees the NS token.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -12,18 +8,38 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+const NS_API_KEY = Deno.env.get("NS_API_KEY") ?? "";
+const NS_API_BASE_URL = Deno.env.get("NS_API_BASE_URL") ?? "https://voice.ava-telecom.ca/ns-api/v2";
+const NS_DEFAULT_DOMAIN = Deno.env.get("NS_DEFAULT_DOMAIN") ?? "planipret.ca";
+const FALLBACK_PROXY = Deno.env.get("NS_SIP_PROXY") ?? "core1.cluster1.ucstack.io";
+
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-type ClientType = "mobile" | "widget" | "web";
+type ClientType = "mobile" | "web";
 
 function json(b: unknown, s = 200) {
   return new Response(JSON.stringify(b), { status: s, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
 
 function normalizeClientType(v: unknown): ClientType {
-  if (v === "widget" || v === "web") return "widget";
-  return "mobile";
+  return (v === "web" || v === "widget") ? "web" : "mobile";
+}
+
+function deviceIdOf(d: any): string | null {
+  const id = d?.device ?? d?.aor ?? d?.["device-aor"] ?? null;
+  if (!id) return null;
+  return String(id).replace(/^sip:/i, "").split("@")[0] || null;
+}
+
+async function nsGet(path: string) {
+  const res = await fetch(`${NS_API_BASE_URL}${path}`, {
+    headers: { Authorization: `Bearer ${NS_API_KEY}`, Accept: "application/json" },
+  });
+  const text = await res.text();
+  let data: any = null;
+  try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+  return { ok: res.ok, status: res.status, data };
 }
 
 Deno.serve(async (req) => {
@@ -31,44 +47,86 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
 
   let body: any = {};
-  try { body = await req.json(); } catch { /* empty body allowed */ }
-  const clientType: ClientType = normalizeClientType(body?.client_type);
+  try { body = await req.json(); } catch { /* empty ok */ }
+  const clientType = normalizeClientType(body?.client_type);
 
-  // Auth check — brokers only.
   const authHeader = req.headers.get("Authorization") ?? "";
   const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     global: { headers: { Authorization: authHeader } },
   });
   const { data: userData } = await userClient.auth.getUser();
-  if (!userData?.user) return json({ error: "not_authenticated" }, 401);
+  const user = userData?.user;
+  if (!user) return json({ ok: false, error: "not_authenticated" }, 401);
 
-  const isMobile = clientType === "mobile";
-  const prefix = isMobile ? "NS_SIP_MOBILE_" : "NS_SIP_WEB_";
+  const { data: profile } = await userClient
+    .from("planipret_profiles")
+    .select("id, ns_extension, ns_domain")
+    .eq("user_id", user.id)
+    .maybeSingle();
 
-  const sipUsername = Deno.env.get(`${prefix}USERNAME`) ?? "";
-  const sipPassword = Deno.env.get(`${prefix}PASSWORD`) ?? "";
-  const sipDomain = Deno.env.get(`${prefix}DOMAIN`) ?? "planipret.ca";
-  const sipProxy = Deno.env.get(`${prefix}OUTBOUND_PROXY`) ?? "core1.cluster1.ucstack.io";
-  const sipWssUrl = Deno.env.get(`${prefix}WSS_URL`) ?? `wss://${sipProxy}:443/ws`;
-
-  if (!sipUsername || !sipPassword) {
-    return json({ ok: false, error: "sip_credentials_not_configured", client_type: clientType }, 500);
+  if (!profile?.ns_extension) {
+    return json({
+      ok: false,
+      error: "no_extension",
+      action: "Contactez votre administrateur pour lier votre extension NetSapiens.",
+    }, 200);
   }
+
+  const ext = String(profile.ns_extension);
+  const domain = profile.ns_domain || NS_DEFAULT_DOMAIN;
+  const deviceName = `${ext}_${clientType}`;
+
+  console.log(`[ns-resolve] client_type=${clientType} ext=${ext} device=${deviceName}`);
+
+  // Try the specific device first.
+  let detail = await nsGet(`/domains/${encodeURIComponent(domain)}/users/${encodeURIComponent(ext)}/devices/${encodeURIComponent(deviceName)}`);
+  let device: any = detail.ok ? (Array.isArray(detail.data) ? detail.data[0] : detail.data) : null;
+  let availableDevices: string[] = [];
+
+  if (!device) {
+    const list = await nsGet(`/domains/${encodeURIComponent(domain)}/users/${encodeURIComponent(ext)}/devices`);
+    const arr: any[] = Array.isArray(list.data) ? list.data : [];
+    availableDevices = arr.map(deviceIdOf).filter(Boolean) as string[];
+    device = arr.find((d) => {
+      const id = (deviceIdOf(d) || "").toLowerCase();
+      return id === deviceName.toLowerCase() || id.endsWith(`_${clientType}`);
+    }) ?? null;
+  }
+
+  if (!device) {
+    return json({
+      ok: false,
+      error: `device_not_found`,
+      device_name: deviceName,
+      available_devices: availableDevices,
+      extension: ext,
+      domain,
+      action: "Aucun device SIP trouvé. Lancez la provision (ns-provision-broker-devices) ou contactez votre administrateur.",
+    }, 200);
+  }
+
+  const resolvedId = deviceIdOf(device) || deviceName;
+  const sipPassword = device["device-sip-registration-password"] ?? device["sip-registration-password"] ?? null;
+  const coreServer = (device["device-sip-registration-core-server"] ?? device["sip-registration-core-server"] ?? FALLBACK_PROXY).toString().replace(/^https?:\/\//, "").replace(/\/+$/, "");
+  const sipUri = device["device-sip-registration-uri"] ?? `sip:${resolvedId}@${domain}`;
+  const sipState = device["device-sip-registration-state"] ?? device["registration-state"] ?? null;
+  const wssUrl = `wss://${coreServer}:443/ws`;
 
   return json({
     ok: true,
     client_type: clientType,
-    device_id: sipUsername,
-    sip_username: sipUsername,
-    sip_extension: sipUsername.replace(/_(web|mobile)$/i, ""),
-    sip_domain: sipDomain,
-    sip_proxy: sipProxy,
-    sip_core_server: sipProxy,
-    sip_wss_url: sipWssUrl,
-    sip_wss_urls: [sipWssUrl],
+    device_id: resolvedId,
+    sip_username: resolvedId,
+    sip_extension: ext,
+    sip_domain: domain,
+    sip_proxy: coreServer,
+    sip_core_server: coreServer,
+    sip_wss_url: wssUrl,
+    sip_wss_urls: [wssUrl],
     sip_password: sipPassword,
-    sip_uri: `sip:${sipUsername}@${sipDomain}`,
-    // legacy compat
     password: sipPassword,
+    sip_uri: sipUri,
+    sip_state: sipState,
+    device_registered: sipState === "registered",
   });
 });
