@@ -165,8 +165,8 @@ export default function RecordingsList({
 
   return (
     <ul className="px-3 pt-3 pb-4 space-y-2">
-      {withRec.map((c) => (
-        <RecordingCard key={c.id} call={c} onUpdated={onUpdated} />
+      {withRec.map((c, idx) => (
+        <RecordingCard key={c.id} call={c} onUpdated={onUpdated} autoLoad={idx < 5} />
       ))}
     </ul>
   );
