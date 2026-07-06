@@ -159,13 +159,14 @@ export default function MCalls() {
   const [calls, setCalls] = useState<Call[]>([]);
   const [recordings, setRecordings] = useState<Call[]>([]);
   const [loading, setLoading] = useState(true);
+  const [recordingsLoading, setRecordingsLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [selected, setSelected] = useState<Call | null>(null);
+  const [visibleCount, setVisibleCount] = useState(25);
 
   const userId = profile?.user_id;
-
 
   const load = useCallback(async () => {
     if (!userId) return;
@@ -191,10 +192,14 @@ export default function MCalls() {
       const merged: Call[] = items.map((it, i) => {
         const nsId = it.id ?? it.call_id ?? it.uuid ?? it["cdr-id"] ?? null;
         const enriched = nsId ? byNsId.get(nsId) : null;
-        const dirRaw = String(it.direction ?? it.call_direction ?? "").toLowerCase();
-        const direction = dirRaw.includes("in")
-          ? (it.answered === false || it.disposition === "no-answer" ? "missed" : "inbound")
-          : "outbound";
+        const dirRaw = String(it.direction ?? it.call_direction ?? it.type ?? "").toLowerCase();
+        const answeredFalse = it.answered === false || it.disposition === "no-answer" || it.disposition === "missed";
+        const isIn = dirRaw.includes("in") || dirRaw === "incoming" || dirRaw === "received";
+        const isOut = dirRaw.includes("out") || dirRaw === "outgoing" || dirRaw === "placed";
+        const direction = isIn
+          ? (answeredFalse ? "missed" : "inbound")
+          : isOut ? "outbound"
+          : (answeredFalse ? "missed" : "inbound");
         const from_number = it.from_number ?? it.caller_id_number ?? it.orig_from_user
           ?? it.orig_from_uri ?? it.by_number ?? it.orig_callid_number ?? it.ani ?? enriched?.from_number ?? null;
         const to_number = it.to_number ?? it.destination ?? it.term_to_user
@@ -238,26 +243,35 @@ export default function MCalls() {
     }
   }, [userId]);
 
+  const loadRecordings = useCallback(async () => {
+    if (!userId) return;
+    setRecordingsLoading(true);
+    try {
+      const { data } = await supabase.functions.invoke("pp-ns-recordings", { body: { action: "list" } });
+      const items = (data as any)?.items ?? [];
+      setRecordings(items as Call[]);
+    } catch (e) {
+      console.warn("[MCalls] recordings load failed", e);
+    } finally {
+      setRecordingsLoading(false);
+    }
+  }, [userId]);
+
   useEffect(() => { load(); }, [load]);
 
-  // Fetch recordings list (per-extension) when tab is opened
+  // Fetch recordings when tab is opened
   useEffect(() => {
     if (tab !== "recordings" || !userId) return;
-    (async () => {
-      try {
-        const { data } = await supabase.functions.invoke("pp-ns-recordings", { body: { action: "list" } });
-        const items = (data as any)?.items ?? [];
-        setRecordings(items as Call[]);
-      } catch (e) {
-        console.warn("[MCalls] recordings load failed", e);
-      }
-    })();
-  }, [tab, userId]);
+    loadRecordings();
+  }, [tab, userId, loadRecordings]);
+
+  // Reset pagination when tab or search changes
+  useEffect(() => { setVisibleCount(25); }, [tab, search]);
 
   useEffect(() => {
-    registerRefresh(() => load());
+    registerRefresh(() => { load(); loadRecordings(); });
     return () => registerRefresh(null);
-  }, [load, registerRefresh]);
+  }, [load, loadRecordings, registerRefresh]);
 
 
   // Realtime updates on phone_calls (for new entries)
