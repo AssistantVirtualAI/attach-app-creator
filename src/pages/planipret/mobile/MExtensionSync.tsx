@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
-import { ArrowLeft, RefreshCw, CheckCircle2, AlertTriangle, XCircle, Smartphone, Radio, Zap } from "lucide-react";
+import { ArrowLeft, RefreshCw, CheckCircle2, AlertTriangle, XCircle, Smartphone, Radio } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { PlanipretMobileContext } from "../PlanipretMobile";
@@ -15,7 +15,6 @@ export default function MExtensionSync() {
   const [busy, setBusy] = useState(false);
   const [state, setState] = useState<State>("idle");
   const [lastResult, setLastResult] = useState<any>(null);
-  const [registered, setRegistered] = useState<boolean | null>(null);
   const [devices, setDevices] = useState<string[] | null>(null);
   const [devicesDetail, setDevicesDetail] = useState<DeviceDetail[] | null>(null);
   const [registeredDeviceId, setRegisteredDeviceId] = useState<string | null>(null);
@@ -25,11 +24,6 @@ export default function MExtensionSync() {
   const domain = profile?.ns_domain || "planipret.ca";
   const linked = !!profile?.ns_linked;
   const mobileDeviceId = profile?.ns_mobile_device_id || (extension ? `${extension}_mobile` : null);
-  const cached = (() => {
-    try { return JSON.parse(sessionStorage.getItem("pp_sip_config") || "null"); } catch { return null; }
-  })();
-  const cachedMatch = cached?.extension && String(cached.extension) === String(extension);
-
   const runResync = async (opts?: { silent?: boolean }) => {
     if (!extension) {
       toast.error("Aucune extension associée à ce profil.");
@@ -37,9 +31,6 @@ export default function MExtensionSync() {
     }
     setBusy(true);
     setState("provisioning");
-    // Invalidate cached SIP config BEFORE fetching new creds so the softphone
-    // never re-registers on stale (widget) credentials after a resync.
-    try { sessionStorage.removeItem("pp_sip_config"); } catch {}
     const { data, error } = await supabase.functions.invoke("ns-resolve-sip-credentials", {
       body: { client_type: "mobile" },
     });
@@ -55,50 +46,20 @@ export default function MExtensionSync() {
       if (!opts?.silent) toast.error(res?.error ?? error?.message ?? "Échec du resync");
       return;
     }
-    sessionStorage.setItem("pp_sip_config", JSON.stringify({
-      username: res.sip_username, password: res.sip_password,
-      domain: res.sip_domain, proxy: res.sip_proxy, extension: res.sip_extension,
-    }));
-    window.dispatchEvent(new CustomEvent("pp:sip-ready", { detail: { extension: res.sip_extension, force: true } }));
     await reloadProfile();
     setState("ok");
     if (!opts?.silent) toast.success(`Extension ${res.sip_extension} synchronisée`);
   };
 
-  const forceReregister = () => {
-    try { sessionStorage.removeItem("pp_sip_config"); } catch {}
-    window.dispatchEvent(new CustomEvent("pp:sip-force-reregister", { detail: { at: Date.now() } }));
-    toast.success("Réinscription SIP demandée sur " + (mobileDeviceId ?? "l'appareil mobile"));
-    // Refresh device list shortly after so the UI reflects the new registration.
-    setTimeout(() => { void runResync({ silent: true }); }, 3500);
-  };
-
-
-  // Listen for SIP registration events fired by the softphone layer.
-  useEffect(() => {
-    const onReg = (e: any) => setRegistered(!!e?.detail?.registered);
-    window.addEventListener("pp:sip-registered", onReg as any);
-    return () => window.removeEventListener("pp:sip-registered", onReg as any);
-  }, []);
-
-  // Auto-heal on first mount when linked bit is missing but ext exists.
-  useEffect(() => {
-    if (extension && (!linked || !cachedMatch) && state === "idle") {
-      runResync({ silent: true });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const items: Array<{ label: string; value: string; ok: boolean | null; icon: any }> = [
     { label: "Extension NetSapiens", value: extension ?? "—", ok: !!extension, icon: Smartphone },
-    { label: "Domaine SIP", value: domain, ok: !!domain, icon: Radio },
+    { label: "Domaine NetSapiens", value: domain, ok: !!domain, icon: Radio },
     { label: "État lié (ns_linked)", value: linked ? "Oui" : "Non", ok: linked, icon: linked ? CheckCircle2 : AlertTriangle },
     { label: "Appareil mobile", value: mobileDeviceId ?? "—", ok: !!mobileDeviceId, icon: Smartphone },
-    { label: "Credentials en cache", value: cachedMatch ? "OK" : "Manquant", ok: cachedMatch, icon: cachedMatch ? CheckCircle2 : AlertTriangle },
-    { label: "Enregistrement SIP", value: registered === null ? "Inconnu" : registered ? "Enregistré" : "Non enregistré", ok: registered, icon: registered ? CheckCircle2 : AlertTriangle },
+    { label: "Mode d'appel", value: "REST seulement", ok: true, icon: CheckCircle2 },
   ];
 
-  const globalOk = !!extension && linked && cachedMatch;
+  const globalOk = !!extension && linked;
 
   return (
     <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 12 }}>
@@ -135,7 +96,7 @@ export default function MExtensionSync() {
               : <AlertTriangle className="w-5 h-5" style={{ color: "#F59E0B" }} />}
           <div className="flex-1">
             <div style={{ fontWeight: 700, fontSize: 15 }}>
-              {globalOk ? "Poste prêt à recevoir des appels" : "Synchronisation requise"}
+              {globalOk ? "Appels REST prêts" : "Synchronisation requise"}
             </div>
             <div style={{ fontSize: 12, color: "var(--pp-text-muted)" }}>
               {extension ? `Extension ${extension} · ${domain}` : "Aucune extension"}
@@ -195,31 +156,11 @@ export default function MExtensionSync() {
         {busy ? "Synchronisation en cours…" : "Forcer le resync"}
       </button>
 
-      <button
-        onClick={forceReregister}
-        disabled={!extension}
-        className="w-full flex items-center justify-center gap-2 active:scale-[0.99] transition"
-        style={{
-          padding: "12px 16px",
-          borderRadius: 12,
-          background: "var(--pp-bg-elevated)",
-          color: "var(--pp-text)",
-          fontFamily: "Inter,sans-serif",
-          fontWeight: 700,
-          fontSize: 13,
-          border: "1px solid var(--pp-bg-border-2)",
-          opacity: !extension ? 0.5 : 1,
-        }}
-      >
-        <Zap className="w-4 h-4" />
-        Forcer la réinscription {mobileDeviceId ? `(${mobileDeviceId})` : ""}
-      </button>
-
       {(devicesDetail || devices) && (
         <div className="pp-card" style={{ padding: 10 }}>
           <div className="flex items-center justify-between" style={{ marginBottom: 6 }}>
             <div style={{ fontSize: 12, fontWeight: 700 }}>
-              Appareils SIP ({(devicesDetail ?? devices ?? []).length})
+              Appareils NetSapiens ({(devicesDetail ?? devices ?? []).length})
             </div>
             <button
               onClick={() => runResync({ silent: true })}
@@ -280,11 +221,11 @@ export default function MExtensionSync() {
                       <div style={{ fontSize: 10.5, color: "var(--pp-text-muted)", marginTop: 4, lineHeight: 1.4 }}>
                         {d.user_agent && <div>UA · {d.user_agent}</div>}
                         {d.ip && <div>IP · {d.ip}</div>}
-                        {d.registered_at && <div>Registré · {d.registered_at}</div>}
+                        {d.registered_at && <div>Enregistré · {d.registered_at}</div>}
                       </div>
                     ) : (
                       <div style={{ fontSize: 10.5, color: "var(--pp-text-muted)", marginTop: 4 }}>
-                        Aucun REGISTER reçu — appareil créé mais non enregistré.
+                        Appareil créé mais non actif.
                       </div>
                     )}
                   </div>
@@ -307,7 +248,7 @@ export default function MExtensionSync() {
             margin: 0,
           }}>
 {JSON.stringify(
-  { ok: lastResult.ok, device_id: lastResult.device_id, sip_extension: lastResult.sip_extension, error: lastResult.error },
+  { ok: lastResult.ok, device_id: lastResult.device_id, extension: lastResult.sip_extension, error: lastResult.error },
   null,
   2,
 )}

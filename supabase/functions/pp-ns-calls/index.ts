@@ -1,5 +1,5 @@
-// pp-ns-calls — Active call control via NS-API v2.
-// AVA Planiprêt brokers only.
+// pp-ns-calls — REST-only active call control via NS-API v2.
+// AVA Planiprêt brokers only. Browser calls must never originate from _web.
 // GET    ?action=list                          → list active calls
 // POST   ?action=start  body { to_number, caller_id_number?, caller_id_name? }
 // PATCH  ?action=answer|hold|unhold|transfer|disconnect|reject  body { call_id, ... }
@@ -50,12 +50,9 @@ Deno.serve(async (req) => {
         dest = "+" + (digits.length === 10 ? "1" + digits : digits);
       }
 
-      const clientType = String(payload.client_type ?? "mobile").toLowerCase();
-      const deviceName = clientType === "widget"
-        ? `${ctx.extension}x`
-        : clientType === "web"
-        ? `${ctx.extension}_web`
-        : `${ctx.extension}_mobile`;
+      const requestedClientType = String(payload.client_type ?? "mobile").toLowerCase();
+      const clientType = "mobile";
+      const deviceName = `${ctx.extension}_mobile`;
 
       // Fetch device to build the exact call-orig-user SIP URI.
       let callOrigUser = payload.call_orig_user ?? `${deviceName}@${ctx.nsDomain}`;
@@ -80,7 +77,7 @@ Deno.serve(async (req) => {
         "auto-answer-enabled": "no",
       };
 
-      console.log(`[pp-ns-calls] start orig=${callOrigUser} term=${dest} ext=${ctx.extension}`);
+      console.log(`[pp-ns-calls] REST start requested_client=${requestedClientType} forced_client=${clientType} device=${deviceName} orig=${callOrigUser} term=${dest} ext=${ctx.extension}`);
 
       const res = await nsFetch(base, { method: "POST", body: JSON.stringify(nsBody) });
       const text = await res.text();
@@ -104,7 +101,7 @@ Deno.serve(async (req) => {
             to_number: dest,
             status: "outbound_ringing",
             started_at: new Date().toISOString(),
-            metadata: { click_to_call: true, client_call_id: clientCallId, call_orig_user: callOrigUser },
+            metadata: { rest_originated: true, requested_client_type: requestedClientType, forced_client_type: clientType, client_call_id: clientCallId, call_orig_user: callOrigUser, device_name: deviceName },
           });
         } catch { /* non-fatal */ }
 
@@ -112,6 +109,9 @@ Deno.serve(async (req) => {
           success: true,
           call_id: nsCallId,
           call_orig_user: callOrigUser,
+          requested_client_type: requestedClientType,
+          client_type: clientType,
+          device_name: deviceName,
           destination: dest,
           status: "initiated",
           message: "Votre téléphone va sonner — décrochez pour parler au client",

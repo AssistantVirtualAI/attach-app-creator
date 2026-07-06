@@ -333,8 +333,7 @@ export default function PlanipretMobile() {
   const navigate = useNavigate();
   const location = useLocation();
   const { t, lang, setLang } = useMplanipretLang();
-  // Boot the shared softphone engine (WebRTC + noise cancellation + auto handover).
-  // Uses the exact same JsSIP stack as the Lemtel mobile app.
+  // REST-only call control: outbound calls ring the broker's registered mobile device.
   const softphone = useMplanipretSoftphone();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -468,19 +467,6 @@ export default function PlanipretMobile() {
         await supabase.from("planipret_profiles").update({ language: fallback }).eq("user_id", user.id);
       } catch { /* non-blocking */ }
     }
-    // Silently resolve SIP credentials for the softphone (fire-and-forget).
-    if (data?.ns_linked) {
-      try {
-        const { data: sip } = await supabase.functions.invoke("ns-resolve-sip-credentials", { body: { client_type: "mobile" } });
-        if (sip?.ok) {
-          sessionStorage.setItem("pp_sip_config", JSON.stringify({
-            username: sip.sip_username, password: sip.sip_password,
-            domain: sip.sip_domain, proxy: sip.sip_proxy, extension: sip.sip_extension,
-          }));
-          (window as any).dispatchEvent(new CustomEvent("pp:sip-ready", { detail: { extension: sip.sip_extension } }));
-        }
-      } catch (_) { /* non-blocking */ }
-    }
   };
 
   const submitMobileLogin = async (event: FormEvent) => {
@@ -571,7 +557,7 @@ export default function PlanipretMobile() {
               style={{ boxShadow: "0 0 12px rgba(155,127,232,0.45)" }} />
             <span className="flex items-center gap-1.5">
               <span className="pp-live-dot" />
-              <span style={{ fontSize: 9, color: "var(--pp-success)", fontWeight: 700, letterSpacing: "0.05em" }}>SIP</span>
+              <span style={{ fontSize: 9, color: "var(--pp-success)", fontWeight: 700, letterSpacing: "0.05em" }}>REST</span>
             </span>
           </div>
 

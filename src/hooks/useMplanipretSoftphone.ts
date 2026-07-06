@@ -1,6 +1,6 @@
-// Planipret mobile — REST-only softphone hook.
+// Planipret mobile — REST-only phone-control hook.
 //
-// NS-API v2 does NOT expose a WebRTC/WSS endpoint. Calls are placed via the
+// NS-API v2 does NOT expose a browser media endpoint. Calls are placed via the
 // official "Make a new Call" REST endpoint (`POST /calls`) through the
 // `pp-ns-calls` Edge Function, and NetSapiens rings the broker's registered
 // physical device (PJSIP over TCP). This app only CONTROLS the call.
@@ -101,7 +101,7 @@ export function useMplanipretSoftphone() {
 
     const d = data as any;
     if (error || d?.success === false || d?.error) {
-      const msg = d?.error ?? error?.message ?? "Click-to-call failed";
+      const msg = d?.error ?? error?.message ?? "Call failed";
       patch({ callState: "ended", errorCause: msg });
       setTimeout(() => setSnap((s) => ({ ...s, callState: "idle", direction: null, remoteNumber: "", remoteIdentity: "" })), 1500);
       return { via: "none", ok: false, error: msg };
@@ -149,7 +149,7 @@ export function useMplanipretSoftphone() {
     sendDTMF: (_k: string) => {/* not supported via REST */},
     transfer,
     setAudioEl: (_el: HTMLAudioElement | null) => {/* no local audio in REST mode */},
-    forceHandover: () => {/* no WebRTC session to hand over */},
+    forceHandover: () => {/* REST-only call control */},
   }), [snap, loading, net, quality, placeCall, answer, hangup, hold, unhold, mute, unmute, transfer, answeredElsewhere]);
 }
 
