@@ -216,19 +216,18 @@ export function useMplanipretSoftphone() {
 
   const placeCall = useCallback(async (destination: string): Promise<OutboundResult> => {
     if (!destination) return { via: "none", ok: false, error: "empty destination" };
-    const mic = await ensureMicPermission();
-    if (mic.state !== "granted") {
-      try { mic.stream?.getTracks().forEach((tr) => tr.stop()); } catch {}
-      return { via: "none", ok: false, error: mic.error ?? "microphone unavailable", micState: mic.state };
+    // Click-to-Call REST (NS-API v2). The broker's registered device rings
+    // first; NetSapiens then dials the client and bridges both. No WebRTC,
+    // no microphone permission needed on this app.
+    const { data, error } = await supabase.functions.invoke("pp-ns-calls?action=start", {
+      body: { to_number: destination },
+    });
+    const d = data as any;
+    if (error || (d && d.error)) {
+      return { via: "none", ok: false, error: d?.error ?? error?.message ?? "Click-to-call failed" };
     }
-    try { mic.stream?.getTracks().forEach((tr) => tr.stop()); } catch {}
-    if (registered) {
-      try { await ppSipProvider.call(destination); return { via: "webrtc", ok: true }; }
-      catch { /* fall through */ }
-    }
-    try { window.dispatchEvent(new CustomEvent("pp:sip-force-reregister", { detail: { at: Date.now() } })); } catch {}
-    return { via: "none", ok: false, error: "Téléphone hors ligne. Clique sur Hors ligne et attends Online avant d’appeler." };
-  }, [registered, callViaPBX]);
+    return { via: "pbx", ok: true };
+  }, []);
 
   // Wrapped answer: race to claim the call before actually picking up. If we
   // lose (widget answered first), don't pick up — the winner already has audio.
