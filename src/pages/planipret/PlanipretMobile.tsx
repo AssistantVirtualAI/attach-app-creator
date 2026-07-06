@@ -575,8 +575,24 @@ export default function PlanipretMobile() {
             </span>
           </div>
 
+          {/* Settings button — between AVA (left) and Planiprêt (center) */}
+          <button
+            type="button"
+            onClick={() => navigate("/mplanipret/more")}
+            aria-label="Paramètres"
+            className="ml-3 flex items-center justify-center active:scale-95 transition"
+            style={{
+              width: 32, height: 32, borderRadius: 10,
+              background: "var(--pp-bg-elevated)",
+              border: "1px solid var(--pp-bg-border-2)",
+              color: "var(--pp-text-secondary)",
+            }}
+          >
+            <SettingsIcon className="w-4 h-4" />
+          </button>
+
           {/* Planiprêt centered logo */}
-          <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2">
+          <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2 pointer-events-none">
             <img src={planipretLogo.url} alt="Planiprêt" className="w-7 h-7 rounded-lg object-cover" />
             <span style={{ fontFamily: "Inter,sans-serif", fontWeight: 700, fontSize: 14, color: "var(--pp-text-primary)", letterSpacing: "-0.01em" }}>Planiprêt</span>
           </div>
