@@ -96,8 +96,10 @@ export default function MMore() {
   };
 
   const connectMs365 = async () => {
-    const { data } = await supabase.from("planipret_integration_secrets").select("config").eq("provider", "microsoft").maybeSingle();
-    const cfg = (data?.config ?? {}) as any;
+    const { data, error } = await supabase.functions.invoke("pp-integration-secrets");
+    if (error) { toast.error("Configuration Microsoft inaccessible", { description: error.message }); return; }
+    const microsoft = ((data as any)?.items ?? []).find((i: any) => i.provider === "microsoft");
+    const cfg = (microsoft?.public_config ?? {}) as any;
     if (!cfg.client_id && !cfg.client_secret_id) {
       setMsForm({ tenant_id: cfg.tenant_id ?? "", client_id: cfg.client_id ?? cfg.client_secret_id ?? "", client_secret: "" });
       setMsSetupOpen(true);
