@@ -52,21 +52,41 @@ Deno.serve(async (req) => {
 
       const requestedClientType = String(payload.client_type ?? "mobile").toLowerCase();
       const clientType = "mobile";
-      const deviceName = `${ctx.extension}_mobile`;
+      const { data: profileDevice } = await guard.supabase
+        .from("planipret_profiles")
+        .select("ns_mobile_device_id")
+        .eq("user_id", ctx.userId)
+        .maybeSingle();
+      const deviceName = String(profileDevice?.ns_mobile_device_id || `${ctx.extension}_mobile`);
 
       // Fetch device to build the exact call-orig-user SIP URI.
       let callOrigUser = payload.call_orig_user ?? `${deviceName}@${ctx.nsDomain}`;
+      let deviceRegistered = false;
+      let deviceState = "unknown";
       try {
         const devRes = await nsFetch(`/domains/${encodeURIComponent(ctx.nsDomain)}/users/${encodeURIComponent(ctx.extension)}/devices/${encodeURIComponent(deviceName)}`, { method: "GET" });
         if (devRes.ok) {
           const dd = await devRes.json().catch(() => null);
           const device = Array.isArray(dd) ? dd[0] : dd;
+          deviceState = String(device?.["device-sip-registration-state"] ?? device?.["registration-state"] ?? "unknown").toLowerCase();
+          deviceRegistered = deviceState === "registered";
           const uri = device?.["device-sip-registration-uri"];
           if (typeof uri === "string" && uri.length) {
             callOrigUser = uri.replace(/^sip:/i, "");
           }
         }
       } catch { /* fallback to constructed */ }
+
+      if (!deviceRegistered) {
+        return jsonResponse({
+          success: false,
+          error: "mobile_device_not_registered",
+          message: "Le téléphone mobile n’est pas enregistré. Ouvrez l’app SIP/mobile et assurez-vous que le device est en ligne avant d’appeler.",
+          client_type: clientType,
+          device_name: deviceName,
+          device_state: deviceState,
+        }, 200);
+      }
 
       const clientCallId = crypto.randomUUID();
       const nsBody = {
