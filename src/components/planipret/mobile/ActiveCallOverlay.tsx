@@ -89,11 +89,13 @@ export default function ActiveCallOverlay({ callId, onClosed }: { callId: string
   const sendDtmf = async (d: string) => { setDtmfBuffer((b) => (b + d).slice(-16)); await invoke("dtmf", { digit: d }); };
   const doTransfer = async () => {
     if (!transferTo.trim()) return;
-    if (await invoke("transfer", { destination: transferTo.trim(), target: transferTo.trim() })) {
-      toast.success(t("call.transferSent"));
+    const action = transferMode === "forward" ? "forward" : "transfer";
+    if (await invoke(action, { destination: transferTo.trim(), target: transferTo.trim() })) {
+      toast.success(transferMode === "forward" ? t("call.forwardSent") ?? "Appel renvoyé" : t("call.transferSent"));
       setTransferOpen(false); setTransferTo("");
     }
   };
+  const openTransfer = (mode: "transfer" | "forward") => { setTransferMode(mode); setTransferOpen(true); };
   const hangup = async () => { await invoke("disconnect"); onClosed(); };
 
   const KEYS = ["1","2","3","4","5","6","7","8","9","*","0","#"];
