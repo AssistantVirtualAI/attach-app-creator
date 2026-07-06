@@ -5,10 +5,13 @@ import { EmptyState, SectionTitle, Skeleton } from '../components/ui/Primitives'
 import { useMobileCredentials } from '../hooks/useMobileCredentials';
 import { authedRealtime, restGet, restPost } from '../lib/mobileSupabase';
 import { loadCachedContacts, syncDeviceContacts } from '../lib/contacts';
+import { hasConsent, loadConsent } from '../lib/contactsConsent';
+import ContactsConsentSheet from '../components/ContactsConsentSheet';
 import ContactsSyncCard from '../components/ContactsSyncCard';
 import NumberPickerSheet, { NumberOption } from '../components/NumberPickerSheet';
 import { dialNumber } from '../lib/dialNumber';
 import { useT } from '../lib/i18n';
+
 
 type Kind = 'domain' | 'manual' | 'mobile';
 type Contact = { id: string; kind: Kind; user_id: string | null; extension: string; phone?: string | null; email?: string | null; display_name: string | null; sip_domain: string | null; status: string | null; last_seen_at: string | null; numbers?: { label: string; number: string }[] };
