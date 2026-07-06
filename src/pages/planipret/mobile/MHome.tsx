@@ -293,7 +293,10 @@ export default function MHome() {
           </h1>
         </div>
         <button
-          onClick={reconnect}
+          onClick={() => {
+            if (phoneOnline) toast.success("Click-to-Call prêt — votre appareil sonnera quand vous appellerez.");
+            else toast.error("Aucune extension NetSapiens liée. Contacte un admin pour la synchroniser.");
+          }}
           className="pp-pill"
           style={{
             background: phoneOnline ? "rgba(13,122,95,0.10)" : "rgba(178,58,72,0.10)",
@@ -302,7 +305,7 @@ export default function MHome() {
           }}
         >
           <span style={{ width: 6, height: 6, borderRadius: 999, background: "currentColor", boxShadow: "0 0 6px currentColor" }} />
-          {phoneConnecting ? "…" : phoneOnline ? t("home.online") : t("home.offline")}
+          {phoneOnline ? "Click-to-Call" : t("home.offline")}
         </button>
       </header>
 
