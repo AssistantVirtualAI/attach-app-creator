@@ -1926,3 +1926,7 @@ All colors MUST be HSL.
 .planipret-mobile-scope[data-pp-theme="dark"] .pp-mobile-header,
 .planipret-mobile-scope[data-pp-theme="dark"] .pp-mobile-tabbar,
 .planipret-mobile-scope[data-pp-theme="dark"] .pp-mobile-footer { z-index: 5; }
+
+/* Hide scrollbar (used by horizontal tab bars) */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
