@@ -71,6 +71,15 @@ export type OutboundResult =
   | { via: "pbx"; ok: true }
   | { via: "none"; ok: false; error: string; micState?: MicPermissionState };
 
+type RestCallAttachment = {
+  id: string;
+  direction?: "in" | "out";
+  other?: string;
+  number?: string;
+  status?: PpSipSnapshot["callState"] | string;
+  startedAt?: number;
+};
+
 export function useMplanipretSoftphone() {
   const { user } = useAuth();
   const [snap, setSnap] = useState<PpSipSnapshot>(() => ppSipProvider.getSnapshot());
@@ -79,6 +88,7 @@ export function useMplanipretSoftphone() {
   const [quality, setQuality] = useState<CallQualitySnapshot | null>(null);
   const [brokerId, setBrokerId] = useState<string | null>(null);
   const [answeredElsewhere, setAnsweredElsewhere] = useState<AnsweredBy | null>(null);
+  const [restCall, setRestCall] = useState<RestCallAttachment | null>(null);
   const seenCallIds = useRef<Set<string>>(new Set());
 
   // Subscribe to the SIP snapshot.
@@ -210,6 +220,48 @@ export function useMplanipretSoftphone() {
 
   const registered = snap.status === "registered";
 
+  const normalizeRestState = useCallback((state?: string): PpSipSnapshot["callState"] => {
+    const s = String(state ?? "active").toLowerCase();
+    if (s.includes("ring") && (s.includes("out") || restCall?.direction === "out")) return "ringing-out";
+    if (s.includes("ring") || s === "inbound") return "ringing-in";
+    if (s.includes("hold")) return "held";
+    if (["ended", "completed", "cancelled", "failed", "no_answer", "disconnected"].some((x) => s.includes(x))) return "ended";
+    return "active";
+  }, [restCall?.direction]);
+
+  const effectiveSnap = useMemo<PpSipSnapshot>(() => {
+    if (!restCall?.id) return snap;
+    const state = normalizeRestState(restCall.status);
+    return {
+      ...snap,
+      callState: state,
+      callId: restCall.id,
+      remoteIdentity: restCall.other || restCall.number || "—",
+      remoteNumber: restCall.number || restCall.other || "",
+      direction: restCall.direction ?? null,
+      startedAt: restCall.startedAt ?? snap.startedAt ?? Date.now(),
+      onHold: state === "held",
+    };
+  }, [snap, restCall, normalizeRestState]);
+
+  const restControl = useCallback(async (action: string, extra: Record<string, unknown> = {}) => {
+    const id = restCall?.id;
+    if (!id) return false;
+    const { error } = await supabase.functions.invoke("pp-ns-calls", { body: { action, call_id: id, ...extra } });
+    if (error) return false;
+    if (action === "disconnect" || action === "reject") {
+      setRestCall((cur) => cur?.id === id ? { ...cur, status: "ended" } : cur);
+      window.setTimeout(() => setRestCall((cur) => cur?.id === id ? null : cur), 1200);
+    } else if (action === "answer") {
+      setRestCall((cur) => cur?.id === id ? { ...cur, status: "active", startedAt: Date.now() } : cur);
+    } else if (action === "hold") {
+      setRestCall((cur) => cur?.id === id ? { ...cur, status: "held" } : cur);
+    } else if (action === "unhold" || action === "resume") {
+      setRestCall((cur) => cur?.id === id ? { ...cur, status: "active" } : cur);
+    }
+    return true;
+  }, [restCall?.id]);
+
   const callViaPBX = useCallback(async (destination: string): Promise<OutboundResult> => {
     // Primary: ns-make-call (canonical NS-API v2 outbound endpoint, traced).
     const primary = await supabase.functions.invoke("ns-make-call", { body: { to_number: destination } });
@@ -251,6 +303,7 @@ export function useMplanipretSoftphone() {
   // Wrapped answer: race to claim the call before actually picking up. If we
   // lose (widget answered first), don't pick up — the winner already has audio.
   const answer = useCallback(async () => {
+    if (restCall?.id) return await restControl("answer");
     const callId = ppSipProvider.getSnapshot().callId;
     const won = await claimCall(callId, "mobile");
     if (!won) {
@@ -260,33 +313,45 @@ export function useMplanipretSoftphone() {
     }
     ppSipProvider.answer();
     return true;
-  }, []);
+  }, [restCall?.id, restControl]);
 
   const hangup = useCallback(() => {
+    if (restCall?.id) { void restControl("disconnect"); return; }
     const callId = ppSipProvider.getSnapshot().callId;
     ppSipProvider.hangup();
     if (callId) void endSession(callId, "hangup");
+  }, [restCall?.id, restControl]);
+
+  const attachRestCall = useCallback((attachment: RestCallAttachment | null) => {
+    if (!attachment?.id) { setRestCall(null); return; }
+    setRestCall({
+      ...attachment,
+      direction: attachment.direction ?? "out",
+      status: attachment.status ?? "active",
+      startedAt: attachment.startedAt ?? Date.now(),
+    });
   }, []);
 
   return useMemo(() => ({
-    snap,
+    snap: effectiveSnap,
     loading,
     net,
     quality,
     placeCall,
     answeredElsewhere,
     dismissAnsweredElsewhere: () => setAnsweredElsewhere(null),
+    attachRestCall,
     call: (n: string) => ppSipProvider.call(n),
     answer,
     hangup,
-    mute: () => ppSipProvider.mute(),
-    unmute: () => ppSipProvider.unmute(),
-    hold: () => ppSipProvider.hold(),
-    unhold: () => ppSipProvider.unhold(),
-    sendDTMF: (k: string) => ppSipProvider.sendDTMF(k),
-    transfer: (t: string) => ppSipProvider.transfer(t),
+    mute: () => restCall?.id ? void restControl("mute", { muted: true }) : ppSipProvider.mute(),
+    unmute: () => restCall?.id ? void restControl("mute", { muted: false }) : ppSipProvider.unmute(),
+    hold: () => restCall?.id ? void restControl("hold") : ppSipProvider.hold(),
+    unhold: () => restCall?.id ? void restControl("unhold") : ppSipProvider.unhold(),
+    sendDTMF: (k: string) => restCall?.id ? void restControl("dtmf", { digit: k }) : ppSipProvider.sendDTMF(k),
+    transfer: (t: string) => restCall?.id ? void restControl("transfer", { destination: t, target: t }) : ppSipProvider.transfer(t),
     setAudioEl: (el: HTMLAudioElement | null) => { ppSipProvider.audioEl = el; },
     forceHandover: () => handoverController.forceHandover(),
-  }), [snap, loading, net, quality, placeCall, answer, hangup, answeredElsewhere]);
+  }), [effectiveSnap, loading, net, quality, placeCall, answer, hangup, answeredElsewhere, attachRestCall, restCall?.id, restControl]);
 
 }

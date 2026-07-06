@@ -81,7 +81,7 @@ Deno.serve(async (req) => {
       report.recording = { ok: false, error: (e as Error).message };
     }
 
-    // 2) Transcript — first check DB, otherwise call ns-transcription
+    // 2) Transcript — first check DB, otherwise call ns-get-transcription
     const { data: callRow } = await admin
       .from("planipret_phone_calls")
       .select("id, transcript, transcript_segments, ai_summary, ai_analysis_json, next_actions, metadata")
@@ -100,11 +100,11 @@ Deno.serve(async (req) => {
       };
     } else {
       try {
-        const { res, ms, status } = await invoke("ns-transcription", { body: { call_id: callId } });
+        const { res, ms, status } = await invoke("ns-get-transcription", { body: { call_db_id: (callRow as any)?.id ?? callId, ns_callid: callId } });
         const j = await res.json().catch(() => ({}));
         report.transcript = {
           ok: !!j?.success && Array.isArray(j.segments) && j.segments.length > 0,
-          detail: { source: "ns-transcription", status, ms, segments: j?.segments?.length ?? 0, hint: j?.hint },
+          detail: { source: "ns-get-transcription", status, ms, segments: j?.segments?.length ?? 0, hint: j?.hint },
           error: j?.success === false ? j?.error : undefined,
         };
       } catch (e) {

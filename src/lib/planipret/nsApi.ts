@@ -102,15 +102,21 @@ function callPatch(action: string, callId: string) {
  * ============================================================ */
 export const recordingsApi = {
   async fetchAudio(callId: string): Promise<Blob> {
-    const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ns-recordings?call_id=${encodeURIComponent(callId)}`;
+    const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+    const url = projectId
+      ? `https://${projectId}.supabase.co/functions/v1/ns-get-recording`
+      : `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ns-get-recording`;
     const { data: session } = await supabase.auth.getSession();
     const token = session?.session?.access_token;
     if (!token) throw new Error("Not authenticated");
     const res = await fetch(url, {
+      method: "POST",
       headers: {
+        "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
         apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string,
       },
+      body: JSON.stringify({ call_db_id: callId, ns_callid: callId }),
     });
     const ct = res.headers.get("content-type") ?? "";
     // Edge function returns 200 + JSON when NS reports the recording is missing/forbidden.

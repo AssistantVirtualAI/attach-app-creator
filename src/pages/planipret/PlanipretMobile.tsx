@@ -395,7 +395,9 @@ export default function PlanipretMobile() {
           id: row.id,
           direction: out ? "out" : "in",
           other: (out ? row.to_name || row.to_number : row.from_name || row.from_number) || "—",
+          number: (out ? row.to_number : row.from_number) || "",
           status: String(row.status).includes("ring") ? (out ? "ringing-out" : "ringing-in") : "active",
+          startedAt: row.answered_at ? new Date(row.answered_at).getTime() : row.started_at ? new Date(row.started_at).getTime() : Date.now(),
         });
       }
     };

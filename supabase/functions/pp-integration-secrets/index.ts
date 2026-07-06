@@ -23,7 +23,10 @@ Deno.serve(async (req) => {
   });
   const { data: userRes } = await supaUser.auth.getUser();
   const user = userRes?.user;
-  if (!user || user.id !== OWNER_UUID) {
+  const { data: isPlanipretAdmin } = user
+    ? await supaUser.rpc("is_planipret_admin", { _user_id: user.id })
+    : { data: false } as any;
+  if (!user || (user.id !== OWNER_UUID && isPlanipretAdmin !== true)) {
     return new Response(JSON.stringify({ error: "forbidden" }), {
       status: 403,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -56,6 +59,11 @@ Deno.serve(async (req) => {
     const masked = (data ?? []).map((row: any) => ({
       provider: row.provider,
       updated_at: row.updated_at,
+      public_config: {
+        tenant_id: row.config?.tenant_id ?? null,
+        client_id: row.config?.client_id ?? row.config?.client_secret_id ?? null,
+        redirect_uri: row.config?.redirect_uri ?? null,
+      },
       config_masked: Object.fromEntries(
         Object.entries(row.config ?? {}).map(([k, v]) => [k, mask(v)])
       ),

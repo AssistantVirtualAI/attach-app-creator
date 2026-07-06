@@ -986,11 +986,12 @@ function CallDetailSheet({
       try {
         if (!hasTranscript) {
           setTxLoading(true);
-          const { data } = await supabase.functions.invoke("ns-transcription", { body: { call_id: call.ns_call_id ?? call.id } });
+          const { data } = await supabase.functions.invoke("ns-get-transcription", { body: { call_db_id: call.id, ns_callid: call.ns_callid ?? call.ns_call_id } });
           setTxLoading(false);
           const res = (data ?? {}) as any;
           if (res?.transcript || (Array.isArray(res?.segments) && res.segments.length)) {
-            onUpdated({ ...call, transcript: res.transcript ?? call.transcript, transcript_segments: res.segments ?? call.transcript_segments });
+            const transcript = res.transcript ?? (Array.isArray(res.segments) ? res.segments.map((s: any) => `${s.speaker ?? "Speaker"}: ${s.text}`).join("\n") : call.transcript);
+            onUpdated({ ...call, transcript, transcript_segments: res.segments ?? call.transcript_segments });
           }
         }
         // Reload latest call state before analyzing
@@ -1000,7 +1001,7 @@ function CallDetailSheet({
         if ((freshCall.transcript || segs) && !hasInsight) {
           setAiLoading(true);
           await supabase.functions.invoke("pp-coach-call", {
-            body: { call_id: call.id, transcript: freshCall.transcript ?? null },
+            body: { call_id: call.id, transcript: freshCall.transcript ?? null, force: true },
           });
           setAiLoading(false);
           const { data: ins } = await supabase.from("planipret_ai_insights").select("*").eq("call_id", call.id).maybeSingle();
@@ -1062,8 +1063,8 @@ function CallDetailSheet({
   };
 
   const runTranscriptOnce = async () => {
-    const { data, error } = await supabase.functions.invoke("ns-transcription", {
-      body: { call_id: call.ns_call_id ?? call.id },
+    const { data, error } = await supabase.functions.invoke("ns-get-transcription", {
+      body: { call_db_id: call.id, ns_callid: call.ns_callid ?? call.ns_call_id },
     });
     const res = (data ?? {}) as any;
     const ok = !error && res.success !== false && (res.transcript || (Array.isArray(res.segments) && res.segments.length));
@@ -1079,13 +1080,20 @@ function CallDetailSheet({
 
     if (ok) {
       setTxLoading(false); setTxPreparing(false); setTxAttempt(0);
-      onUpdated({ ...call, transcript: res.transcript ?? call.transcript, transcript_segments: res.segments ?? call.transcript_segments });
+      const transcript = res.transcript ?? (Array.isArray(res.segments) ? res.segments.map((s: any) => `${s.speaker ?? "Speaker"}: ${s.text}`).join("\n") : call.transcript);
+      onUpdated({ ...call, transcript, transcript_segments: res.segments ?? call.transcript_segments });
       await refreshCall();
+      if (transcript && !call.ai_summary) {
+        setAiLoading(true);
+        await supabase.functions.invoke("pp-coach-call", { body: { call_id: call.id, transcript, force: true } });
+        setAiLoading(false);
+        await refreshCall();
+      }
       toast.success(t("calls.transcriptFetched"));
       return;
     }
 
-    if (Array.isArray(res.attempts)) console.warn("ns-transcription attempts:", res.attempts);
+    if (Array.isArray(res.attempts)) console.warn("ns-get-transcription attempts:", res.attempts);
 
     const transient = isTransientTxError(res);
     if (transient && attempt < TX_BACKOFF.length) {
@@ -1108,7 +1116,7 @@ function CallDetailSheet({
     if (!call.transcript && !segments) return;
     setAiLoading(true);
     const { data, error } = await supabase.functions.invoke("pp-coach-call", {
-      body: { call_id: call.id, transcript: call.transcript ?? null },
+      body: { call_id: call.id, transcript: call.transcript ?? null, force: true },
     });
     setAiLoading(false);
     if (error) { toast.error(error.message ?? t("common.failed")); return; }
@@ -1252,7 +1260,7 @@ function CallDetailSheet({
           {/* ===== TAB AUDIO ===== */}
           {activeTab === "audio" && (
             <CallRecordingPlayer
-              callId={call.ns_call_id ?? call.id}
+              callId={call.id}
               duration={call.duration_seconds ?? 0}
             />
           )}

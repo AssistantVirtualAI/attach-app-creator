@@ -174,8 +174,43 @@ export default function RecordingsList({
 
 // ===================== Card =====================
 function RecordingCard({ call, onUpdated }: { call: RecordingCall; onUpdated: (c: RecordingCall) => void }) {
-  const [open, setOpen] = useState<"rec" | "txt" | "ai" | "crm" | null>(null);
+  const [open, setOpen] = useState<"rec" | "txt" | "ai" | "crm" | null>(() => hasResolvableAudio(call) ? "rec" : null);
   const temp = tempIcon(call.lead_temperature);
+  const autoPipelineRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!hasResolvableAudio(call) || autoPipelineRef.current === call.id) return;
+    if (call.transcript && call.ai_summary) return;
+    autoPipelineRef.current = call.id;
+    (async () => {
+      try {
+        let working = call;
+        if (!working.transcript) {
+          const { data, error } = await supabase.functions.invoke("pp-admin-transcribe", { body: { call_id: callDbId(working) } });
+          if (error) throw error;
+          const tx = (data as any) ?? {};
+          if (tx.transcript) {
+            working = {
+              ...working,
+              transcript: tx.transcript,
+              transcript_segments: tx.segments ?? working.transcript_segments,
+              transcript_language: tx.language ?? working.transcript_language,
+            };
+            onUpdated(working);
+          }
+        }
+        if (working.transcript && !working.ai_summary) {
+          const { data, error } = await supabase.functions.invoke("pp-coach-call", {
+            body: { call_id: callDbId(working), transcript: working.transcript, force: true },
+          });
+          if (error) throw error;
+          onUpdated(applyCoachPayload(working, data));
+        }
+      } catch (e) {
+        console.warn("[RecordingsList] auto pipeline failed", e);
+      }
+    })();
+  }, [call, onUpdated]);
 
   return (
     <li
@@ -288,6 +323,7 @@ function Pill({
 function RecordingSection({ call, onUpdated }: { call: RecordingCall; onUpdated: (c: RecordingCall) => void }) {
   const [loading, setLoading] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const fetchedRef = useRef(false);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [cur, setCur] = useState(0);
@@ -342,6 +378,13 @@ function RecordingSection({ call, onUpdated }: { call: RecordingCall; onUpdated:
     }
   };
 
+  useEffect(() => {
+    if (fetchedRef.current || loading || call.recording_url || !hasResolvableAudio(call)) return;
+    fetchedRef.current = true;
+    void fetchRec();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [call.id, call.recording_url, loading]);
+
   const seek = (delta: number) => {
       if (!audioRef.current) return;
     audioRef.current.currentTime = Math.max(0, Math.min(dur, audioRef.current.currentTime + delta));
@@ -365,7 +408,7 @@ function RecordingSection({ call, onUpdated }: { call: RecordingCall; onUpdated:
           style={{ background: "var(--pp-bg-surface)", color: "var(--pp-text-primary)", border: "1px solid var(--pp-bg-border-2)" }}
         >
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-          Charger l'enregistrement
+          {loading ? "Chargement…" : "Écouter"}
         </button>
       ) : (
         <>

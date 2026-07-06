@@ -16,7 +16,7 @@ Deno.serve(async (req) => {
 
     const { data: ms } = await admin.from("planipret_integration_secrets").select("config").eq("provider", "microsoft").maybeSingle();
     const c = (ms?.config ?? {}) as Record<string, string>;
-    const clientId = c.client_id ?? Deno.env.get("MICROSOFT_CLIENT_ID");
+    const clientId = c.client_id ?? c.client_secret_id ?? Deno.env.get("MICROSOFT_CLIENT_ID");
     const clientSecret = c.client_secret ?? Deno.env.get("MICROSOFT_CLIENT_SECRET");
     const tenant = c.tenant_id ?? Deno.env.get("MICROSOFT_TENANT_ID") ?? "common";
     if (!clientId || !clientSecret) return new Response(JSON.stringify({ success: false, error: "MS365 non configuré côté admin" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
