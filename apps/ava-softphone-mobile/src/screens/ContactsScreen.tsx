@@ -198,6 +198,14 @@ export default function ContactsScreen({ sp }: { sp: any }) {
       </div>
       {addOpen && <AddContactSheet value={newContact} setValue={setNewContact} onClose={() => setAddOpen(false)} onSave={addContact} />}
       {picker && <NumberPickerSheet title={picker.title} options={picker.options} onPick={(n) => dialNumber(sp, n)} onClose={() => setPicker(null)} />}
+      <ContactsConsentSheet
+        open={consentOpen}
+        onClose={(result) => {
+          setConsentOpen(false);
+          if (result === 'allowed') syncDeviceContacts().then(() => loadContacts()).catch(() => {});
+        }}
+      />
+
       <div style={{ height: 80 }} />
     </div>
   );
