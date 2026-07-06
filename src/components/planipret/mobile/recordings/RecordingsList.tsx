@@ -39,6 +39,7 @@ export type RecordingCall = {
   ai_client_insights?: any;
   ai_tasks?: any;
   lead_score?: number | null;
+  coaching_score?: number | null;
   lead_temperature?: string | null;
   maestro_synced?: boolean | null;
   maestro_client_id?: string | null;
@@ -70,6 +71,30 @@ const otherLabel = (c: RecordingCall) => {
 const hasResolvableAudio = (c: RecordingCall) => !!(
   c.recording_url || c.has_recording || c.stream_via_proxy || c.proxy_call_db_id || c.proxy_ns_callid || c.ns_callid || c.ns_orig_callid || c.ns_term_callid || c.ns_call_id
 );
+const callDbId = (c: RecordingCall) => c.proxy_call_db_id ?? c.id;
+const recordingLookupBody = (c: RecordingCall) => ({
+  call_db_id: callDbId(c),
+  ns_callid: c.proxy_ns_callid ?? c.ns_callid ?? c.ns_orig_callid ?? c.ns_term_callid ?? c.ns_call_id,
+  ns_orig_callid: c.ns_orig_callid,
+  ns_term_callid: c.ns_term_callid,
+  ns_extension: c.extension,
+});
+const applyCoachPayload = (call: RecordingCall, payload: any): RecordingCall => ({
+  ...call,
+  transcript: payload?.corrected_transcript ?? payload?.transcript ?? call.transcript,
+  ai_summary: payload?.summary ?? payload?.ai_summary ?? call.ai_summary,
+  ai_coaching: payload?.coaching ?? payload?.ai_coaching ?? call.ai_coaching,
+  lead_score: payload?.score ?? call.lead_score,
+  coaching_score: payload?.coaching_score ?? call.coaching_score,
+});
+async function fetchNsTranscript(call: RecordingCall) {
+  const { data, error } = await supabase.functions.invoke("ns-get-transcription", { body: recordingLookupBody(call) });
+  if (error) throw error;
+  const d = (data as any) ?? {};
+  if (!d?.success || !Array.isArray(d.segments) || d.segments.length === 0) return null;
+  const text = d.segments.map((s: any) => `${s.speaker ?? "Speaker"}: ${s.text}`).join("\n");
+  return { text, segments: d.segments, language: d.language ?? null };
+}
 const tempIcon = (t?: string | null) => {
   if (t === "hot") return { Icon: Flame, color: "var(--pp-danger)", label: "Chaud" };
   if (t === "warm") return { Icon: Thermometer, color: "var(--pp-warning, #f59e0b)", label: "Tiède" };
@@ -283,7 +308,7 @@ function RecordingSection({ call, onUpdated }: { call: RecordingCall; onUpdated:
           Authorization: `Bearer ${session?.access_token ?? anonKey ?? ""}`,
         },
         body: JSON.stringify({
-          call_db_id: call.id,
+          call_db_id: callDbId(call),
           ns_callid: call.proxy_ns_callid ?? call.ns_callid ?? call.ns_orig_callid ?? call.ns_term_callid ?? call.ns_call_id,
           ns_orig_callid: call.ns_orig_callid,
           ns_term_callid: call.ns_term_callid,
@@ -303,7 +328,7 @@ function RecordingSection({ call, onUpdated }: { call: RecordingCall; onUpdated:
       // Fallback : maestro-recording
       try {
         const { data } = await supabase.functions.invoke("maestro-recording", {
-          body: { call_id: call.id, ns_call_id: call.ns_call_id },
+          body: { call_id: callDbId(call), ns_call_id: call.ns_call_id },
         });
         const url = (data as any)?.recording_url;
         if (!url) throw new Error("nope");
@@ -425,19 +450,34 @@ function TranscriptSection({ call, onUpdated }: { call: RecordingCall; onUpdated
   const run = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("pp-admin-transcribe", {
-        body: { call_id: call.proxy_call_db_id ?? call.id },
-      });
-      if (error) throw error;
-      const next = (data as any) ?? {};
-      if (next.ok === false && next.error) throw new Error(next.hint ?? next.error);
-      onUpdated({
-        ...call,
-        transcript: next.transcript ?? call.transcript,
-        transcript_segments: next.segments ?? call.transcript_segments,
-        transcript_language: next.language ?? call.transcript_language,
-      });
-      toast.success("Transcription terminée");
+      let text: string | null = null;
+      let segmentsNext = call.transcript_segments;
+      let languageNext = call.transcript_language;
+      const nsTranscript = await fetchNsTranscript(call);
+      if (nsTranscript) {
+        text = nsTranscript.text;
+        segmentsNext = nsTranscript.segments;
+        languageNext = nsTranscript.language;
+      } else {
+        const { data, error } = await supabase.functions.invoke("pp-admin-transcribe", {
+          body: { call_id: callDbId(call) },
+        });
+        if (error) throw error;
+        const next = (data as any) ?? {};
+        if (next.ok === false && next.error) throw new Error(next.hint ?? next.error);
+        text = next.transcript ?? null;
+        segmentsNext = next.segments ?? segmentsNext;
+        languageNext = next.language ?? languageNext;
+      }
+      const updated = { ...call, transcript: text ?? call.transcript, transcript_segments: segmentsNext, transcript_language: languageNext };
+      onUpdated(updated);
+      if (text) {
+        const { data: coached } = await supabase.functions.invoke("pp-coach-call", {
+          body: { call_id: callDbId(call), transcript: text, force: true },
+        });
+        onUpdated(applyCoachPayload(updated, coached));
+      }
+      toast.success("Transcription et analyse terminées");
     } catch (e: any) {
       toast.error("Échec transcription", { description: e?.message });
     } finally {
@@ -523,14 +563,30 @@ function AISection({ call, onUpdated }: { call: RecordingCall; onUpdated: (c: Re
   const run = async () => {
     setLoading(true);
     try {
-      if (!call.transcript) {
-        await supabase.functions.invoke("pp-admin-transcribe", { body: { call_id: call.proxy_call_db_id ?? call.id } });
+      let transcriptForAi = call.transcript;
+      let baseCall = call;
+      if (!transcriptForAi) {
+        const nsTranscript = await fetchNsTranscript(call);
+        if (nsTranscript) {
+          transcriptForAi = nsTranscript.text;
+          baseCall = { ...call, transcript: nsTranscript.text, transcript_segments: nsTranscript.segments, transcript_language: nsTranscript.language };
+          onUpdated(baseCall);
+        } else {
+          const { data: tx, error: txErr } = await supabase.functions.invoke("pp-admin-transcribe", { body: { call_id: callDbId(call) } });
+          if (txErr) throw txErr;
+          const t = (tx as any)?.transcript;
+          if (t) {
+            transcriptForAi = t;
+            baseCall = { ...call, transcript: t, transcript_segments: (tx as any)?.segments ?? call.transcript_segments, transcript_language: (tx as any)?.language ?? call.transcript_language };
+            onUpdated(baseCall);
+          }
+        }
       }
       const { data, error } = await supabase.functions.invoke("pp-coach-call", {
-        body: { call_id: call.proxy_call_db_id ?? call.id, force: true },
+        body: { call_id: callDbId(call), transcript: transcriptForAi, force: true },
       });
       if (error) throw error;
-      onUpdated({ ...call, ...(data as any) });
+      onUpdated(applyCoachPayload(baseCall, data));
       toast.success("Analyse IA terminée");
     } catch (e: any) {
       toast.error("Échec analyse IA", { description: e?.message });
@@ -553,7 +609,7 @@ function AISection({ call, onUpdated }: { call: RecordingCall; onUpdated: (c: Re
   }
 
   const coaching = call.ai_coaching || {};
-  const coachingScore: number | undefined = coaching.score ?? coaching.global_score;
+  const coachingScore: number | undefined = call.coaching_score ?? coaching.score ?? coaching.global_score ?? (call.lead_score != null ? call.lead_score : undefined);
   const insights = call.ai_client_insights || {};
   const objections: string[] = insights.objections || coaching.objections || [];
   const buyingSignals: string[] = insights.buying_signals || [];

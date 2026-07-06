@@ -37,11 +37,53 @@ Deno.serve(async (req) => {
 
     const { data: row } = await admin
       .from("planipret_phone_calls")
-      .select("id, recording_url, transcript")
+      .select("id, recording_url, transcript, ai_summary")
       .eq("id", callId)
       .maybeSingle();
     if (!row) return json({ error: "call not found" }, 404);
-    if (row.transcript) return json({ ok: true, transcript: row.transcript, cached: true });
+    if (row.transcript) {
+      if (!row.ai_summary) {
+        try {
+          await fetch(`${SUPABASE_URL}/functions/v1/pp-coach-call`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: auth },
+            body: JSON.stringify({ call_id: callId, transcript: row.transcript, force: true }),
+          });
+        } catch (_) { /* best-effort */ }
+      }
+      return json({ ok: true, transcript: row.transcript, cached: true });
+    }
+
+    // Preferred source: the phone system transcription endpoint. AI is only a fallback
+    // and coaching/correction runs after the phone-system transcript is stored.
+    try {
+      const nsTxRes = await fetch(`${SUPABASE_URL}/functions/v1/ns-get-transcription`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: auth },
+        body: JSON.stringify({ call_db_id: callId }),
+      });
+      const nsTx = await nsTxRes.json().catch(() => ({} as any));
+      if (nsTx?.success && Array.isArray(nsTx.segments) && nsTx.segments.length) {
+        const transcript = nsTx.segments.map((s: any) => `${s.speaker ?? "Speaker"}: ${s.text}`).join("\n");
+        await admin.from("planipret_phone_calls")
+          .update({
+            transcript,
+            transcript_segments: nsTx.segments,
+            transcript_language: nsTx.language ?? null,
+            transcript_source: "ns-api",
+            has_transcript: true,
+          })
+          .eq("id", callId);
+        try {
+          await fetch(`${SUPABASE_URL}/functions/v1/pp-coach-call`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: auth },
+            body: JSON.stringify({ call_id: callId, transcript, force: true }),
+          });
+        } catch (_) { /* best-effort */ }
+        return json({ ok: true, transcript, segments: nsTx.segments, source: "ns-api" });
+      }
+    } catch (_) { /* fallback to audio STT below */ }
 
     // Resolve fresh URL (best-effort)
     let recUrl = row.recording_url as string | null;

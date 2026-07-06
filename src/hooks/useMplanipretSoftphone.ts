@@ -126,15 +126,25 @@ export function useMplanipretSoftphone() {
         if (cancelled) return;
         if (error || !data || (data as any)?.error) return;
         const d = data as any;
+        const wssUrl = String(d.sip_wss_url ?? d.sip_ws_url ?? "").trim();
+        const wssUrls = Array.isArray(d.sip_wss_urls)
+          ? d.sip_wss_urls
+          : Array.isArray(d.sip_ws_urls)
+            ? d.sip_ws_urls
+            : undefined;
+        if (!wssUrl || !/^wss?:\/\//i.test(wssUrl)) {
+          console.error("[softphone] invalid SIP WSS URL", { wssUrl, device_id: d.device_id });
+          return;
+        }
         await ppSipProvider.init({
           extension: String(d.sip_extension),
           sipUsername: String(d.sip_username || d.sip_extension),
           sipDomain: String(d.sip_domain),
           sipProxy: d.sip_proxy,
-          wssUrl: String(d.sip_wss_url),
-          wssUrls: Array.isArray(d.sip_wss_urls) ? d.sip_wss_urls : undefined,
+          wssUrl,
+          wssUrls,
           password: String(d.sip_password),
-          displayName: String(d.sip_extension),
+          displayName: String(d.display_name || d.sip_display_name || d.sip_extension),
         });
         // Broadcast our registered device id so any UI can highlight it.
         try {
@@ -228,8 +238,12 @@ export function useMplanipretSoftphone() {
     }
     try { mic.stream?.getTracks().forEach((tr) => tr.stop()); } catch {}
     if (registered) {
-      try { await ppSipProvider.call(destination); return { via: "webrtc", ok: true }; }
-      catch { /* fall through */ }
+      try {
+        await ppSipProvider.call(destination);
+        return { via: "webrtc", ok: true };
+      } catch (e: any) {
+        console.warn("[softphone] WebRTC call failed, falling back to PBX", e?.message ?? e);
+      }
     }
     return await callViaPBX(destination);
   }, [registered, callViaPBX]);

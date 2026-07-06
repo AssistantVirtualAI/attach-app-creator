@@ -10,6 +10,7 @@ export { corsHeaders };
 
 export type NsContext = {
   userId: string;
+  profileId: string;
   extension: string;
   nsDomain: string;
 };
@@ -163,7 +164,7 @@ export async function requirePlanipretBroker(
 
   const { data: profile, error: profErr } = await supabase
     .from("planipret_profiles")
-    .select("extension, ns_domain, organization_id")
+    .select("id, extension, ns_domain, organization_id")
     .eq("user_id", userId)
     .maybeSingle();
 
@@ -196,7 +197,7 @@ export async function requirePlanipretBroker(
   }
 
   return {
-    ctx: { userId, extension: profile.extension, nsDomain: profile.ns_domain },
+    ctx: { userId, profileId: profile.id, extension: profile.extension, nsDomain: profile.ns_domain },
     supabase,
     userClient,
   };

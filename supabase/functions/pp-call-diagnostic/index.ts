@@ -42,14 +42,14 @@ Deno.serve(async (req) => {
       .from("planipret_phone_calls")
       .select("*")
       .eq("id", callDbId)
-      .eq("user_id", ctx.userId)
+      .eq("user_id", ctx.profileId)
       .limit(1);
     rows = data ?? [];
   } else if (recent || !callDbId) {
     const { data } = await supabase
       .from("planipret_phone_calls")
       .select("*")
-      .eq("user_id", ctx.userId)
+      .eq("user_id", ctx.profileId)
       .order("started_at", { ascending: false })
       .limit(limit);
     rows = data ?? [];

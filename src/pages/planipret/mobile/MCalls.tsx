@@ -179,7 +179,14 @@ export default function MCalls() {
   const [selected, setSelected] = useState<Call | null>(null);
   const [visibleCount, setVisibleCount] = useState(25);
 
-  const userId = profile?.user_id;
+  const userId = profile?.id ?? profile?.user_id;
+  const profileAuthId = profile?.user_id;
+  const profileExtension = profile?.ns_extension ?? profile?.extension;
+  const phoneCallScopeFilter = useMemo(() => {
+    const filters = [userId ? `user_id.eq.${userId}` : null, profileAuthId ? `user_id.eq.${profileAuthId}` : null, profileExtension ? `extension.eq.${profileExtension}` : null]
+      .filter(Boolean);
+    return filters.join(",");
+  }, [userId, profileAuthId, profileExtension]);
 
   const load = useCallback(async () => {
     if (!userId) return;
@@ -193,12 +200,13 @@ export default function MCalls() {
       const items: any[] = (ns as any)?.items ?? [];
 
       // 2) Données enrichies locales (transcripts, AI, lead scoring)
-      const { data: local } = await supabase
+      let localQuery: any = supabase
         .from("planipret_phone_calls")
         .select("*")
-        .eq("user_id", userId)
         .order("started_at", { ascending: false })
         .limit(200);
+      if (phoneCallScopeFilter) localQuery = localQuery.or(phoneCallScopeFilter);
+      const { data: local } = await localQuery;
       const byNsId = new Map<string, any>();
       (local ?? []).forEach((r: any) => { if (r.ns_call_id) byNsId.set(r.ns_call_id, r); });
 
@@ -219,7 +227,7 @@ export default function MCalls() {
         const from_name = pick(it, ["from_name", "caller_id_name", "caller-id-name", "orig_from_name", "orig-name", "by_name"]) ?? enriched?.from_name ?? null;
         return {
           id: enriched?.id ?? nsId ?? `ns-${i}`,
-          user_id: userId,
+          user_id: enriched?.user_id ?? userId,
           ns_call_id: nsId,
           ns_callid: nsCallId ?? enriched?.ns_callid ?? null,
           ns_orig_callid: pick(it, ["ns_orig_callid", "orig_callid", "orig-callid", "call-orig-call-id"]) ?? enriched?.ns_orig_callid ?? null,
@@ -247,17 +255,18 @@ export default function MCalls() {
     } catch (e: any) {
       console.error("[pp-ns-cdr] list failed", e);
       toast.error(e?.message ?? "Échec chargement CDR");
-      const { data } = await supabase
+      let fallbackQuery: any = supabase
         .from("planipret_phone_calls")
         .select("*")
-        .eq("user_id", userId)
         .order("started_at", { ascending: false })
         .limit(100);
+      if (phoneCallScopeFilter) fallbackQuery = fallbackQuery.or(phoneCallScopeFilter);
+      const { data } = await fallbackQuery;
       setCalls((data ?? []) as Call[]);
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [userId, phoneCallScopeFilter]);
 
   const loadRecordings = useCallback(async () => {
     if (!userId) return;
@@ -298,7 +307,9 @@ export default function MCalls() {
     if (!userId) return;
     const ch = supabase
       .channel(`planipret-calls:${userId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "planipret_phone_calls", filter: `user_id=eq.${userId}` }, () => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "planipret_phone_calls" }, (payload: any) => {
+        const row = payload?.new ?? payload?.old ?? {};
+        if (row.user_id && row.user_id !== userId && row.user_id !== profileAuthId && row.extension !== profileExtension) return;
         load();
         // A new CDR usually means a fresh recording is (or will be) available.
         loadRecordings();
@@ -307,7 +318,7 @@ export default function MCalls() {
       })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [userId, load, loadRecordings]);
+  }, [userId, profileAuthId, profileExtension, load, loadRecordings]);
 
   const missedCount = useMemo(() => calls.filter(isMissed).length, [calls]);
 

@@ -115,7 +115,7 @@ Deno.serve(async (req) => {
       const { data: local } = await supabase
         .from("planipret_phone_calls")
         .select("id, user_id, ns_call_id, ns_callid, ns_orig_callid, ns_term_callid, extension, direction, status, from_number, from_name, to_number, to_name, started_at, duration_seconds, recording_url, has_recording, ai_summary, transcript, transcript_segments, transcript_language, ai_coaching, ai_key_points, ai_client_insights, maestro_synced, maestro_client_id, pipeline_state")
-        .or(`user_id.eq.${ctx.userId},extension.eq.${ctx.extension}`)
+        .or(`user_id.eq.${ctx.profileId},extension.eq.${ctx.extension}`)
         .gte("started_at", start)
         .lte("started_at", end)
         .order("started_at", { ascending: false })
@@ -136,6 +136,7 @@ Deno.serve(async (req) => {
         const recordingUrl = val(it, ["file-access-url", "url", "recording_url", "recording", "record_url"]) ?? enriched?.recording_url ?? null;
         return {
           id: enriched?.id ?? nsId ?? `rec-${i}`,
+          user_id: enriched?.user_id ?? ctx.profileId,
           ns_call_id: nsId,
           ns_callid: nsCallId ?? enriched?.ns_callid ?? null,
           ns_orig_callid: nsOrigCallId ?? enriched?.ns_orig_callid ?? null,
@@ -180,6 +181,7 @@ Deno.serve(async (req) => {
         })
         .map((r: any) => ({
           id: r.id,
+          user_id: r.user_id ?? ctx.profileId,
           ns_call_id: r.ns_call_id,
           ns_callid: r.ns_callid,
           ns_orig_callid: r.ns_orig_callid,

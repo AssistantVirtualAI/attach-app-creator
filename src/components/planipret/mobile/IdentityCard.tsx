@@ -5,6 +5,10 @@ import { Link2, CheckCircle2, AlertCircle, Phone, Mail } from "lucide-react";
 import { useMplanipretLang } from "@/hooks/useMplanipretLang";
 
 type Profile = {
+  full_name?: string | null;
+  display_name?: string | null;
+  ns_display_name?: string | null;
+  extension_name?: string | null;
   ms365_email?: string | null;
   ms365_display_name?: string | null;
   ms365_access_token?: string | null;
@@ -25,6 +29,8 @@ export default function IdentityCard({ profile, onLinked }: { profile: Profile |
   const msConnected = !!profile.ms365_access_token;
   const nsLinked = !!profile.ns_linked && !!(profile.ns_extension || profile.extension);
   const ext = profile.ns_extension || profile.extension;
+  const displayName = profile.ns_display_name || profile.extension_name || profile.display_name || profile.full_name || profile.ms365_display_name || profile.ms365_email || "—";
+  const avatarLetter = (displayName || profile.ms365_email || "?").slice(0, 1).toUpperCase();
 
   const autoLink = async () => {
     setLinking(true);
@@ -64,11 +70,11 @@ export default function IdentityCard({ profile, onLinked }: { profile: Profile |
       <div className="flex items-center gap-3">
         <div className="w-11 h-11 rounded-full flex items-center justify-center font-bold text-white"
              style={{ background: "linear-gradient(135deg,#0078D4,#005A9E)" }}>
-          {(profile.ms365_display_name || profile.ms365_email || "?").slice(0, 1).toUpperCase()}
+          {avatarLetter}
         </div>
         <div className="min-w-0 flex-1">
           <p className="font-semibold truncate" style={{ color: "var(--pp-text-primary)" }}>
-            {profile.ms365_display_name || profile.ms365_email || "—"}
+            {displayName}
           </p>
           {msConnected && profile.ms365_email && (
             <p className="text-xs flex items-center gap-1" style={{ color: "var(--pp-text-secondary)" }}>

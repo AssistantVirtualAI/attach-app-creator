@@ -59,7 +59,7 @@ Deno.serve(async (req) => {
       // Sync dans Supabase pour l'historique local
       if (items.length > 0) {
         const rows = items.map((v: any) => ({
-          user_id: ctx.userId,
+          user_id: ctx.profileId,
           vm_id: v.vm_id ?? v.id ?? null,
           from_number: v.from_number ?? v.caller ?? null,
           from_name: v.from_name ?? v.caller_name ?? null,
@@ -130,7 +130,7 @@ Deno.serve(async (req) => {
         .from("planipret_voicemails")
         .update({ is_read: true })
         .eq("vm_id", vmId)
-        .eq("user_id", ctx.userId);
+        .eq("user_id", ctx.profileId);
 
       return jsonResponse({ ok: true });
     }
@@ -155,7 +155,7 @@ Deno.serve(async (req) => {
         .from("planipret_voicemails")
         .update({ folder })
         .eq("vm_id", vm_id)
-        .eq("user_id", ctx.userId);
+        .eq("user_id", ctx.profileId);
 
       return jsonResponse({ ok: true });
     }
@@ -179,7 +179,7 @@ Deno.serve(async (req) => {
         .from("planipret_voicemails")
         .delete()
         .eq("vm_id", vmId)
-        .eq("user_id", ctx.userId);
+        .eq("user_id", ctx.profileId);
 
       return jsonResponse({ ok: true });
     }
