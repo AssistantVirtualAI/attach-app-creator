@@ -84,17 +84,53 @@ export default function MMore() {
     await reloadProfile();
   };
 
+  const startMs365OAuth = (cfg: { client_id: string; tenant_id?: string }) => {
+    const clientId = cfg.client_id;
+    const tenant = cfg.tenant_id || "common";
+    const redirect = `${window.location.origin}/auth/ms365/callback`;
+    const scope = encodeURIComponent("openid profile email offline_access User.Read Mail.ReadWrite Mail.Send Calendars.ReadWrite Chat.ReadWrite ChannelMessage.Send Team.ReadBasic.All Channel.ReadBasic.All");
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      const state = user?.id ?? "";
+      window.location.href = `https://login.microsoftonline.com/${tenant}/oauth2/v2.0/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirect)}&response_mode=query&scope=${scope}&state=${state}`;
+    });
+  };
+
   const connectMs365 = async () => {
     const { data } = await supabase.from("planipret_integration_secrets").select("config").eq("provider", "microsoft").maybeSingle();
     const cfg = (data?.config ?? {}) as any;
-    const clientId = cfg.client_id;
-    const tenant = cfg.tenant_id ?? "common";
-    if (!clientId) { toast.error(t("more.msNotConfigured")); return; }
-    const redirect = `${window.location.origin}/auth/ms365/callback`;
-    const scope = encodeURIComponent("openid profile email offline_access User.Read Mail.ReadWrite Mail.Send Calendars.ReadWrite Chat.ReadWrite ChannelMessage.Send Team.ReadBasic.All Channel.ReadBasic.All");
-    const { data: { user } } = await supabase.auth.getUser();
-    const state = user?.id ?? "";
-    window.location.href = `https://login.microsoftonline.com/${tenant}/oauth2/v2.0/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirect)}&response_mode=query&scope=${scope}&state=${state}`;
+    if (!cfg.client_id) {
+      setMsForm({ tenant_id: cfg.tenant_id ?? "", client_id: cfg.client_id ?? "", client_secret: "" });
+      setMsSetupOpen(true);
+      return;
+    }
+    startMs365OAuth(cfg);
+  };
+
+  const saveMsCredentials = async () => {
+    if (!msForm.client_id.trim() || !msForm.tenant_id.trim() || !msForm.client_secret.trim()) {
+      toast.error("Tenant ID, Client ID et Client Secret requis");
+      return;
+    }
+    setMsSaving(true);
+    const { data, error } = await supabase.functions.invoke("pp-integration-secrets", {
+      body: {
+        provider: "microsoft",
+        config: {
+          tenant_id: msForm.tenant_id.trim(),
+          client_id: msForm.client_id.trim(),
+          client_secret: msForm.client_secret.trim(),
+          redirect_uri: `${window.location.origin}/auth/ms365/callback`,
+        },
+      },
+    });
+    setMsSaving(false);
+    if (error || (data as any)?.error) {
+      toast.error((data as any)?.error ?? error?.message ?? "Échec de l'enregistrement");
+      return;
+    }
+    toast.success("Credentials enregistrés");
+    setMsSetupOpen(false);
+    startMs365OAuth({ client_id: msForm.client_id.trim(), tenant_id: msForm.tenant_id.trim() });
   };
 
   const disconnectMs365 = async () => {
