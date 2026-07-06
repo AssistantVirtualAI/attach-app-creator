@@ -1,262 +1,258 @@
-// Planipret mobile/web softphone hook.
+// Planipret mobile — softphone hook bound to the NS-API PBX.
 //
-// Two audio paths:
-//   1. SIP.js UserAgent registering as `<ext>_web` over WSS (browser WebRTC audio).
-//   2. REST fallback via `pp-ns-calls` (NetSapiens dials the mobile device).
-//
-// Whichever path is active, we expose a UNIFIED `snap` so PpActiveCallScreen
-// (used on web AND mobile) renders the full-screen in-call UI with mute /
-// hold / transfer / keypad / hangup. REST-path actions are routed to
-// `pp-ns-calls`; SIP-path actions go through ppSipProvider.
+// This is fully independent from the Lemtel softphone: registration uses the
+// NS-API SIP credentials returned by the `ns-resolve-sip-credentials` edge
+// function, and RTP flows through NS-API. Layered on top:
+//   - Stronger microphone constraints (getAudioConstraints) with a
+//     `navigator.mediaDevices.getUserMedia` proxy scoped to Planipret calls.
+//   - Auto network handover (Wi-Fi ↔ LTE) via handoverController.
+//   - Live call-quality sampling via callQualitySampler.
+//   - Outbound fallback to `ns-calls action:start` when WebRTC is not registered
+//     ("both, with fallback" policy).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { networkMonitor, type NetSample } from "@/lib/planipret/network/networkMonitor";
 import { ppSipProvider, type PpSipSnapshot } from "@/lib/planipret/sip/ppSipProvider";
-import type { CallQualitySnapshot } from "@/lib/planipret/audio/callQualitySampler";
+import { networkMonitor, type NetSample } from "@/lib/planipret/network/networkMonitor";
+import { handoverController } from "@/lib/planipret/net/handoverController";
+import { callQualitySampler, type CallQualitySnapshot } from "@/lib/planipret/audio/callQualitySampler";
+import { getAudioConstraints, type NCMode } from "@/lib/planipret/audio/audioConstraints";
+import { ensureMicPermission, type MicPermissionState } from "@/lib/planipret/audio/micPermission";
+import {
+  upsertRingingSession,
+  claimCall,
+  endSession,
+  subscribeToCall,
+  type CallSessionRow,
+  type AnsweredBy,
+} from "@/lib/planipret/calls/callSessionSync";
 
-type AnsweredBy = "mobile" | "widget" | "web" | null;
+
+
+let gumProxyInstalled = false;
+let gumOriginal: typeof navigator.mediaDevices.getUserMedia | null = null;
+
+function readNCMode(): NCMode {
+  try { return (localStorage.getItem("pp_nc_mode") as NCMode) || "standard"; }
+  catch { return "standard"; }
+}
+function readNCEnabled(): boolean {
+  try { const v = localStorage.getItem("pp_nc_enabled"); return v === null ? true : v === "1"; }
+  catch { return true; }
+}
+
+/** Install a one-time getUserMedia proxy that upgrades audio-only requests with
+ *  the Planipret NC constraints. Idempotent and safe to call multiple times. */
+function ensureGumProxy() {
+  if (gumProxyInstalled || typeof navigator === "undefined") return;
+  const md: any = navigator.mediaDevices;
+  if (!md?.getUserMedia) return;
+  gumOriginal = md.getUserMedia.bind(md);
+  md.getUserMedia = async (constraints: MediaStreamConstraints) => {
+    try {
+      const wantsAudioOnly = constraints && constraints.audio && !constraints.video;
+      if (wantsAudioOnly && readNCEnabled()) {
+        const cfg = getAudioConstraints(readNCMode());
+        const merged: MediaStreamConstraints = {
+          audio: { ...(typeof constraints.audio === "object" ? constraints.audio : {}), ...(cfg.audio as any) },
+          video: false,
+        };
+        return await gumOriginal!(merged);
+      }
+    } catch { /* fall through */ }
+    return gumOriginal!(constraints);
+  };
+  gumProxyInstalled = true;
+}
 
 export type OutboundResult =
-  | { via: "sip" | "pbx"; ok: true }
-  | { via: "none"; ok: false; error: string };
-
-type RestCall = {
-  id: string;
-  direction: "in" | "out";
-  other: string;
-  startedAt: number;
-  status: "ringing-out" | "ringing-in" | "active" | "held";
-  muted: boolean;
-};
-
-type AttachRestCallArgs = {
-  id: string;
-  other: string;
-  direction?: "in" | "out";
-  status?: RestCall["status"];
-};
+  | { via: "webrtc"; ok: true }
+  | { via: "pbx"; ok: true }
+  | { via: "none"; ok: false; error: string; micState?: MicPermissionState };
 
 export function useMplanipretSoftphone() {
   const { user } = useAuth();
-  const [sipSnap, setSipSnap] = useState<PpSipSnapshot>(() => ppSipProvider.getSnapshot());
+  const [snap, setSnap] = useState<PpSipSnapshot>(() => ppSipProvider.getSnapshot());
   const [loading, setLoading] = useState(false);
   const [net, setNet] = useState<NetSample>(networkMonitor.current());
-  const [quality] = useState<CallQualitySnapshot | null>(null);
-  const [answeredElsewhere, setAnsweredElsewhere] = useState<AnsweredBy>(null);
-  const [restCall, setRestCall] = useState<RestCall | null>(null);
-  const sipReadyRef = useRef(false);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [quality, setQuality] = useState<CallQualitySnapshot | null>(null);
+  const [brokerId, setBrokerId] = useState<string | null>(null);
+  const [answeredElsewhere, setAnsweredElsewhere] = useState<AnsweredBy | null>(null);
+  const seenCallIds = useRef<Set<string>>(new Set());
 
+  // Subscribe to the SIP snapshot.
+  useEffect(() => ppSipProvider.subscribe(setSnap), []);
+
+  // Boot audio proxy + network monitor + handover once.
   useEffect(() => {
+    ensureGumProxy();
+    handoverController.start();
     const un = networkMonitor.subscribe(setNet);
     return () => { un(); };
   }, []);
 
-  useEffect(() => ppSipProvider.subscribe(setSipSnap), []);
+  // Load broker id (planipret_profiles.id) once.
+  useEffect(() => {
+    if (!user) { setBrokerId(null); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from("planipret_profiles")
+          .select("id")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (!cancelled) setBrokerId((data?.id as string) ?? null);
+      } catch { /* ignore */ }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id]);
 
+  // Resolve NS-API SIP credentials and register the softphone per user.
+  // Re-runs whenever the ExtensionSync page dispatches `pp:sip-ready`, so a
+  // freshly-created `{ext}_mobile` device actually REGISTERs and shows up in
+  // NetSapiens with IP/User-Agent instead of empty columns.
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
-    (async () => {
+    const doInit = async (opts?: { force?: boolean }) => {
       setLoading(true);
       try {
-        const { data, error } = await supabase.functions.invoke("ns-resolve-sip-credentials", {
-          body: { client_type: "web" },
-        });
-        if (cancelled) return;
-        const d = data as any;
-        if (error || !d?.ok || !d?.sip_password || !d?.sip_ws_url) {
-          console.warn("[softphone] SIP creds unavailable, staying on REST", d?.error, error?.message);
-          return;
+        if (opts?.force) {
+          try { ppSipProvider.stop(); } catch {}
         }
+        const { data, error } = await supabase.functions.invoke("ns-resolve-sip-credentials", { body: { client_type: "mobile" } });
+        if (cancelled) return;
+        if (error || !data || (data as any)?.error) return;
+        const d = data as any;
         await ppSipProvider.init({
-          wsUrl: d.sip_ws_url,
-          domain: d.sip_domain,
-          username: d.sip_username,
-          authUser: d.sip_auth_user ?? d.sip_username,
-          password: d.sip_password,
           extension: String(d.sip_extension),
-          displayName: user.email ?? undefined,
+          sipUsername: String(d.sip_username || d.sip_extension),
+          sipDomain: String(d.sip_domain),
+          sipProxy: d.sip_proxy,
+          wssUrl: String(d.sip_wss_url),
+          wssUrls: Array.isArray(d.sip_wss_urls) ? d.sip_wss_urls : undefined,
+          password: String(d.sip_password),
+          displayName: String(d.sip_extension),
         });
-        sipReadyRef.current = true;
-      } catch (e) {
-        console.warn("[softphone] SIP init error", e);
+        // Broadcast our registered device id so any UI can highlight it.
+        try {
+          window.dispatchEvent(new CustomEvent("pp:sip-registered", {
+            detail: { registered: true, deviceId: d.device_id },
+          }));
+        } catch {}
       } finally {
         if (!cancelled) setLoading(false);
       }
-    })();
-    return () => { cancelled = true; };
-  }, [user]);
+    };
+    void doInit();
+    const onReady = (e: any) => { void doInit({ force: !!e?.detail?.force }); };
+    const onForce = () => { void doInit({ force: true }); };
+    window.addEventListener("pp:sip-ready", onReady as any);
+    window.addEventListener("pp:sip-force-reregister", onForce as any);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("pp:sip-ready", onReady as any);
+      window.removeEventListener("pp:sip-force-reregister", onForce as any);
+    };
+  }, [user?.id]);
 
-  useEffect(() => () => { void ppSipProvider.stop(); }, []);
 
-  const stopPolling = useCallback(() => {
-    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
-  }, []);
+  // Live call quality only while a call is active.
+  useEffect(() => {
+    const active = snap.callState === "active" || snap.callState === "held";
+    if (!active) { setQuality(null); return; }
+    const un = callQualitySampler.subscribe(setQuality);
+    return () => { un(); };
+  }, [snap.callState]);
 
-  const pollActiveCalls = useCallback(async () => {
-    try {
-      const { data } = await supabase.functions.invoke("pp-ns-calls", { body: { action: "list" } });
-      const list: any[] = Array.isArray(data) ? data : Array.isArray((data as any)?.calls) ? (data as any).calls : [];
-      const raw = list[0];
-      if (!raw) {
-        setRestCall(null);
-        stopPolling();
-        return;
+  // Cross-device call session sync (mobile ↔ widget via SIP Call-ID).
+  useEffect(() => {
+    const callId = snap.callId;
+    if (!callId || !brokerId) return;
+    const ringing = snap.callState === "ringing-in" || snap.callState === "ringing-out";
+    if (!ringing) return;
+    if (seenCallIds.current.has(callId)) return;
+    seenCallIds.current.add(callId);
+    setAnsweredElsewhere(null);
+    void upsertRingingSession({
+      callId,
+      brokerId,
+      direction: snap.direction === "in" ? "inbound" : "outbound",
+      remoteNumber: snap.remoteNumber || undefined,
+    });
+    const unsub = subscribeToCall(callId, (row: CallSessionRow) => {
+      // Another device answered while we were still ringing — dismiss locally.
+      if (row.state === "active" && row.answered_by && row.answered_by !== "mobile") {
+        setAnsweredElsewhere(row.answered_by);
+        try { ppSipProvider.hangup(); } catch {}
       }
-      const id = raw["call-id"] ?? raw.call_id ?? raw.id ?? "";
-      const direction: "in" | "out" = /out/i.test(raw.direction ?? "") ? "out" : "in";
-      const other = raw.remote_party ?? raw.remote_number ?? raw.other_party
-        ?? (direction === "out" ? raw.to_number : raw.from_number) ?? raw.destination ?? "—";
-      const status: RestCall["status"] = /hold/i.test(raw.state ?? raw.status ?? "") ? "held"
-        : /ring/i.test(raw.state ?? raw.status ?? "") ? (direction === "in" ? "ringing-in" : "ringing-out") : "active";
-      const startedAtIso = raw.answered_at ?? raw.started_at ?? raw.time_start;
-      const startedAt = startedAtIso ? new Date(startedAtIso).getTime() : Date.now();
-      setRestCall((prev) => ({
-        id: String(id),
-        direction,
-        other: String(other),
-        startedAt: prev?.startedAt ?? startedAt,
-        status,
-        muted: prev?.muted ?? false,
-      }));
-    } catch { /* transient */ }
-  }, [stopPolling]);
+    });
+    return () => { unsub(); };
+  }, [snap.callId, snap.callState, snap.direction, snap.remoteNumber, brokerId]);
 
-  const startPolling = useCallback(() => {
-    if (pollRef.current) return;
-    pollRef.current = setInterval(() => { void pollActiveCalls(); }, 2000);
-    void pollActiveCalls();
-  }, [pollActiveCalls]);
+  // Mark session ended when local call ends.
+  useEffect(() => {
+    if (snap.callState !== "ended" || !snap.callId) return;
+    void endSession(snap.callId, snap.errorCause || "hangup");
+  }, [snap.callState, snap.callId, snap.errorCause]);
 
-  const attachRestCall = useCallback(({ id, other, direction = "in", status = "active" }: AttachRestCallArgs) => {
-    if (!id) return;
-    setRestCall((prev) => ({
-      id: String(id),
-      direction,
-      other: other || prev?.other || "—",
-      startedAt: prev?.startedAt ?? Date.now(),
-      status,
-      muted: prev?.muted ?? false,
-    }));
-    startPolling();
-  }, [startPolling]);
+  const registered = snap.status === "registered";
+
+  const callViaPBX = useCallback(async (destination: string): Promise<OutboundResult> => {
+    // Primary: ns-make-call (canonical NS-API v2 outbound endpoint, traced).
+    const primary = await supabase.functions.invoke("ns-make-call", { body: { to_number: destination } });
+    const pData = primary.data as any;
+    const traceId = pData?.trace_id;
+    if (!primary.error && pData?.success !== false) {
+      console.log("[softphone] ns-make-call ok", { trace_id: traceId, call_id: pData?.call_id, status: pData?.status });
+      return { via: "pbx", ok: true };
+    }
+    console.warn("[softphone] ns-make-call failed", { trace_id: traceId, error: pData?.error ?? primary.error?.message });
+    // Fallback: ns-calls action:start (kept for backward compatibility).
+    const { data, error } = await supabase.functions.invoke("ns-calls", { body: { action: "start", destination } });
+    if (error || (data as any)?.success === false) {
+      const msg = pData?.error ?? (data as any)?.error ?? error?.message ?? primary.error?.message ?? "PBX call failed";
+      return { via: "none", ok: false, error: msg };
+    }
+    return { via: "pbx", ok: true };
+  }, []);
 
   const placeCall = useCallback(async (destination: string): Promise<OutboundResult> => {
     if (!destination) return { via: "none", ok: false, error: "empty destination" };
-
-    if (sipReadyRef.current && sipSnap.status === "registered") {
-      try {
-        await ppSipProvider.call(destination);
-        return { via: "sip", ok: true };
-      } catch (e: any) {
-        console.warn("[softphone] SIP call failed, falling back to REST", e);
-      }
+    const mic = await ensureMicPermission();
+    if (mic.state !== "granted") {
+      try { mic.stream?.getTracks().forEach((tr) => tr.stop()); } catch {}
+      return { via: "none", ok: false, error: mic.error ?? "microphone unavailable", micState: mic.state };
     }
-
-    // Optimistic REST call state so PpActiveCallScreen opens immediately
-    setRestCall({
-      id: `pending-${Date.now()}`,
-      direction: "out",
-      other: destination,
-      startedAt: Date.now(),
-      status: "ringing-out",
-      muted: false,
-    });
-
-    const { data, error } = await supabase.functions.invoke("pp-ns-calls", {
-      body: { action: "start", to_number: destination, client_type: "web" },
-    });
-    const d = data as any;
-    if (error || d?.success === false || d?.error) {
-      const msg = d?.error ?? error?.message ?? "Call failed";
-      setRestCall(null);
-      return { via: "none", ok: false, error: msg };
+    try { mic.stream?.getTracks().forEach((tr) => tr.stop()); } catch {}
+    if (registered) {
+      try { await ppSipProvider.call(destination); return { via: "webrtc", ok: true }; }
+      catch { /* fall through */ }
     }
-    const nsCallId = d?.call_id ?? d?.["call-id"] ?? d?.id;
-    if (nsCallId) {
-      setRestCall((cur) => cur ? { ...cur, id: String(nsCallId), status: "ringing-out" } : cur);
+    return await callViaPBX(destination);
+  }, [registered, callViaPBX]);
+
+  // Wrapped answer: race to claim the call before actually picking up. If we
+  // lose (widget answered first), don't pick up — the winner already has audio.
+  const answer = useCallback(async () => {
+    const callId = ppSipProvider.getSnapshot().callId;
+    const won = await claimCall(callId, "mobile");
+    if (!won) {
+      setAnsweredElsewhere("widget");
+      try { ppSipProvider.hangup(); } catch {}
+      return false;
     }
-    startPolling();
-    return { via: "pbx", ok: true };
-  }, [sipSnap.status, startPolling]);
-
-  // ---------- Unified snapshot exposed to PpActiveCallScreen ----------
-  const snap: PpSipSnapshot = useMemo(() => {
-    const sipActive = sipSnap.callState !== "idle" && sipSnap.callState !== "ended";
-    if (sipActive || !restCall) return sipSnap;
-    return {
-      ...sipSnap,
-      callState: restCall.status,
-      remoteIdentity: restCall.other,
-      remoteNumber: restCall.other,
-      direction: restCall.direction,
-      callId: restCall.id,
-      muted: restCall.muted,
-      onHold: restCall.status === "held",
-      startedAt: restCall.startedAt,
-    };
-  }, [sipSnap, restCall]);
-
-  const restMode = !!restCall && (sipSnap.callState === "idle" || sipSnap.callState === "ended");
-
-  const invokeRest = useCallback(async (action: string, extra: Record<string, unknown> = {}) => {
-    if (!restCall) return;
-    await supabase.functions.invoke("pp-ns-calls", { body: { action, call_id: restCall.id, ...extra } });
-  }, [restCall]);
+    ppSipProvider.answer();
+    return true;
+  }, []);
 
   const hangup = useCallback(() => {
-    if (restMode) {
-      void invokeRest("disconnect");
-      setRestCall(null);
-      stopPolling();
-      return;
-    }
+    const callId = ppSipProvider.getSnapshot().callId;
     ppSipProvider.hangup();
-  }, [restMode, invokeRest, stopPolling]);
-
-  const answer = useCallback(async () => {
-    if (restMode) {
-      await invokeRest("answer");
-      setRestCall((c) => c ? { ...c, status: "active", startedAt: c.startedAt ?? Date.now() } : c);
-      startPolling();
-      return true;
-    }
-    await ppSipProvider.answer();
-    return true;
-  }, [restMode, invokeRest, startPolling]);
-
-  const mute = useCallback(() => {
-    if (restMode) { void invokeRest("mute", { muted: true }); setRestCall((c) => c ? { ...c, muted: true } : c); return; }
-    ppSipProvider.mute();
-  }, [restMode, invokeRest]);
-
-  const unmute = useCallback(() => {
-    if (restMode) { void invokeRest("mute", { muted: false }); setRestCall((c) => c ? { ...c, muted: false } : c); return; }
-    ppSipProvider.unmute();
-  }, [restMode, invokeRest]);
-
-  const hold = useCallback(() => {
-    if (restMode) { void invokeRest("hold"); setRestCall((c) => c ? { ...c, status: "held" } : c); return; }
-    ppSipProvider.hold();
-  }, [restMode, invokeRest]);
-
-  const unhold = useCallback(() => {
-    if (restMode) { void invokeRest("unhold"); setRestCall((c) => c ? { ...c, status: "active" } : c); return; }
-    ppSipProvider.unhold();
-  }, [restMode, invokeRest]);
-
-  const transfer = useCallback((target: string) => {
-    if (restMode) { void invokeRest("transfer", { destination: target, target }); return; }
-    ppSipProvider.transfer(target);
-  }, [restMode, invokeRest]);
-
-  const sendDTMF = useCallback((k: string) => {
-    if (restMode) { void invokeRest("dtmf", { digit: k }); return; }
-    ppSipProvider.sendDTMF(k);
-  }, [restMode, invokeRest]);
+    if (callId) void endSession(callId, "hangup");
+  }, []);
 
   return useMemo(() => ({
     snap,
@@ -266,19 +262,17 @@ export function useMplanipretSoftphone() {
     placeCall,
     answeredElsewhere,
     dismissAnsweredElsewhere: () => setAnsweredElsewhere(null),
-    call: (n: string) => placeCall(n),
+    call: (n: string) => ppSipProvider.call(n),
     answer,
     hangup,
-    mute,
-    unmute,
-    hold,
-    unhold,
-    sendDTMF,
-    transfer,
-    attachRestCall,
+    mute: () => ppSipProvider.mute(),
+    unmute: () => ppSipProvider.unmute(),
+    hold: () => ppSipProvider.hold(),
+    unhold: () => ppSipProvider.unhold(),
+    sendDTMF: (k: string) => ppSipProvider.sendDTMF(k),
+    transfer: (t: string) => ppSipProvider.transfer(t),
     setAudioEl: (el: HTMLAudioElement | null) => { ppSipProvider.audioEl = el; },
-    forceHandover: () => {/* handled by NS */},
-  }), [snap, loading, net, quality, placeCall, answer, hangup, hold, unhold, mute, unmute, transfer, sendDTMF, attachRestCall, answeredElsewhere]);
-}
+    forceHandover: () => handoverController.forceHandover(),
+  }), [snap, loading, net, quality, placeCall, answer, hangup, answeredElsewhere]);
 
-export type { PpSipSnapshot };
+}

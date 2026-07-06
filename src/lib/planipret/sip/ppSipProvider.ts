@@ -1,29 +1,24 @@
-// Planiprêt web softphone — real SIP.js UserAgent for the _web device.
-// Registers as `<ext>_web` over WSS so NetSapiens sees it as SIP.js/0.21 and
-// audio flows through WebRTC in the browser.
+// Planipret mobile — dedicated JsSIP UA bound to the NS-API PBX.
+//
+// This is intentionally independent from the Lemtel `sipProvider` in
+// `@/lib/softphone/jssipProvider` so /mplanipret talks only to the NS-API
+// (NetSapiens) telephony backend. It re-uses the JsSIP browser library and
+// wires the same media pipeline: NC-aware getUserMedia, RTCPeerConnection
+// stats sampling, and ICE-restart support for Wi-Fi ↔ LTE handover.
 
-import {
-  Inviter,
-  Invitation,
-  Registerer,
-  RegistererState,
-  Session,
-  SessionState,
-  UserAgent,
-  UserAgentOptions,
-  URI,
-} from "sip.js";
+import JsSIP from "jssip";
 
 export type PpSipStatus = "idle" | "connecting" | "connected" | "registered" | "disconnected" | "error";
 export type PpCallState = "idle" | "ringing-out" | "ringing-in" | "active" | "held" | "ended";
 
 export interface PpSipConfig {
-  wsUrl: string;             // wss://core1.cluster1.ucstack.io:9002
-  domain: string;            // planipret.ca
-  username: string;          // <ext>_web
-  authUser: string;          // <ext>_web
+  extension: string;
+  sipUsername: string;
+  sipDomain: string;
+  sipProxy?: string;
+  wssUrl: string;
+  wssUrls?: string[];
   password: string;
-  extension: string;         // 113
   displayName?: string;
 }
 
@@ -41,205 +36,240 @@ export interface PpSipSnapshot {
   lastRegistrationAt: number | null;
 }
 
+
 type Listener = (s: PpSipSnapshot) => void;
 
-const snap: PpSipSnapshot = {
-  status: "idle",
-  callState: "idle",
-  remoteIdentity: "",
-  remoteNumber: "",
-  direction: null,
-  callId: "",
-  muted: false,
-  onHold: false,
-  startedAt: null,
-  lastRegistrationAt: null,
-};
+class PpSipProvider {
+  private ua: any = null;
+  private session: any = null;
+  private cfg: PpSipConfig | null = null;
+  private listeners = new Set<Listener>();
+  private snap: PpSipSnapshot = {
+    status: "idle",
+    callState: "idle",
+    remoteIdentity: "",
+    remoteNumber: "",
+    direction: null,
+    callId: "",
+    muted: false,
+    onHold: false,
+    startedAt: null,
+    lastRegistrationAt: null,
+  };
 
-const listeners = new Set<Listener>();
-let ua: UserAgent | null = null;
-let registerer: Registerer | null = null;
-let session: Session | null = null;
-let cfg: PpSipConfig | null = null;
-let audioEl: HTMLAudioElement | null = null;
-
-function emit() {
-  const s = { ...snap };
-  listeners.forEach((l) => { try { l(s); } catch { /* ignore */ } });
-}
-function patch(p: Partial<PpSipSnapshot>) { Object.assign(snap, p); emit(); }
-
-function attachRemoteMedia(sess: Session) {
-  const pc = (sess as any).sessionDescriptionHandler?.peerConnection as RTCPeerConnection | undefined;
-  if (!pc || !audioEl) return;
-  const remoteStream = new MediaStream();
-  pc.getReceivers().forEach((r) => { if (r.track) remoteStream.addTrack(r.track); });
-  audioEl.srcObject = remoteStream;
-  audioEl.play().catch(() => { /* user gesture required — ignored */ });
-}
-
-function wireSession(sess: Session, direction: "in" | "out") {
-  session = sess;
-  patch({
-    direction,
-    remoteIdentity: sess.remoteIdentity?.displayName || sess.remoteIdentity?.uri?.user || "",
-    remoteNumber: sess.remoteIdentity?.uri?.user || "",
-    callId: (sess as any).id ?? "",
-  });
-  sess.stateChange.addListener((state) => {
-    switch (state) {
-      case SessionState.Establishing:
-        patch({ callState: direction === "out" ? "ringing-out" : "ringing-in" });
-        break;
-      case SessionState.Established:
-        attachRemoteMedia(sess);
-        patch({ callState: "active", startedAt: Date.now() });
-        break;
-      case SessionState.Terminated:
-        patch({ callState: "ended" });
-        session = null;
-        setTimeout(() => patch({
-          callState: "idle", callId: "", remoteNumber: "", remoteIdentity: "",
-          direction: null, startedAt: null, muted: false, onHold: false,
-        }), 800);
-        break;
-    }
-  });
-}
-
-export const ppSipProvider = {
-  get audioEl() { return audioEl; },
-  set audioEl(el: HTMLAudioElement | null) { audioEl = el; },
+  audioEl: HTMLAudioElement | null = null;
+  private lastSig = "";
 
   subscribe(fn: Listener): () => void {
-    listeners.add(fn);
-    fn({ ...snap });
-    return () => { listeners.delete(fn); };
-  },
-  getSnapshot(): PpSipSnapshot { return { ...snap }; },
-  getConfig(): PpSipConfig | null { return cfg; },
+    this.listeners.add(fn);
+    fn(this.snap);
+    return () => { this.listeners.delete(fn); };
+  }
+  getSnapshot(): PpSipSnapshot { return this.snap; }
+  getConfig(): PpSipConfig | null { return this.cfg; }
 
-  async init(config: PpSipConfig): Promise<void> {
-    if (ua && cfg && cfg.username === config.username && cfg.wsUrl === config.wsUrl) return;
-    await this.stop();
-    cfg = config;
-    patch({ status: "connecting", errorCause: undefined });
+  private update(patch: Partial<PpSipSnapshot>) {
+    this.snap = { ...this.snap, ...patch };
+    this.listeners.forEach((l) => { try { l(this.snap); } catch {} });
+  }
 
-    const uri = UserAgent.makeURI(`sip:${config.username}@${config.domain}`);
-    if (!uri) { patch({ status: "error", errorCause: "invalid_uri" }); return; }
+  private log(level: "info" | "warn" | "error", msg: string, detail?: any) {
+    const fn = level === "error" ? "error" : level === "warn" ? "warn" : "log";
+    // eslint-disable-next-line no-console
+    (console as any)[fn](`[pp-sip] ${msg}`, detail ?? "");
+  }
 
-    const options: UserAgentOptions = {
-      uri,
-      transportOptions: { server: config.wsUrl },
-      authorizationUsername: config.authUser,
-      authorizationPassword: config.password,
-      displayName: config.displayName ?? config.extension,
-      userAgentString: "SIP.js/0.21.2 Planipret-Web",
-      logBuiltinEnabled: false,
-      sessionDescriptionHandlerFactoryOptions: {
-        constraints: { audio: true, video: false },
-        peerConnectionConfiguration: {
-          iceServers: [{ urls: ["stun:stun.l.google.com:19302"] }],
-        },
-      },
-      delegate: {
-        onInvite(inv: Invitation) {
-          wireSession(inv, "in");
-          patch({ callState: "ringing-in" });
-        },
-      },
-    };
-
-    ua = new UserAgent(options);
-    try {
-      await ua.start();
-      patch({ status: "connected" });
-      registerer = new Registerer(ua, { expires: 300 });
-      registerer.stateChange.addListener((s) => {
-        if (s === RegistererState.Registered) {
-          patch({ status: "registered", lastRegistrationAt: Date.now(), errorCause: undefined });
-        } else if (s === RegistererState.Unregistered) {
-          patch({ status: "disconnected" });
-        }
-      });
-      await registerer.register();
-    } catch (e: any) {
-      console.error("[ppSip] init failed", e);
-      patch({ status: "error", errorCause: e?.message || String(e) });
+  async init(cfg: PpSipConfig) {
+    if (!cfg.extension || !cfg.sipDomain || !cfg.wssUrl || !cfg.password) {
+      this.update({ status: "error", errorCause: "invalid_config" });
+      return;
     }
-  },
+    const sig = `${cfg.extension}|${cfg.sipDomain}|${cfg.wssUrl}|${cfg.password}`;
+    if (this.ua && sig === this.lastSig && (this.snap.status === "registered" || this.snap.status === "connected")) {
+      return;
+    }
+    if (this.ua) this.stop();
+    this.cfg = cfg;
+    this.lastSig = sig;
+    this.update({ status: "connecting", errorCause: undefined });
 
-  async call(number: string): Promise<void> {
-    if (!ua || !cfg) throw new Error("SIP not ready");
-    const target = UserAgent.makeURI(`sip:${number}@${cfg.domain}`);
-    if (!target) throw new Error("invalid target");
-    const inv = new Inviter(ua, target, {
-      sessionDescriptionHandlerOptions: { constraints: { audio: true, video: false } as any },
+    try {
+      const urls = Array.from(new Set([cfg.wssUrl, ...(cfg.wssUrls || [])].filter(Boolean))) as string[];
+      const sockets = urls.map((u) => new (JsSIP as any).WebSocketInterface(u));
+      const ua = new (JsSIP as any).UA({
+        sockets,
+        uri: `sip:${cfg.sipUsername}@${cfg.sipDomain}`,
+        password: cfg.password,
+        authorization_user: cfg.sipUsername,
+        realm: cfg.sipDomain,
+        contact_uri: `sip:${cfg.sipUsername}@${cfg.sipDomain};transport=wss`,
+        register: true,
+        session_timers: false,
+        register_expires: 120,
+        connection_recovery_min_interval: 2,
+        connection_recovery_max_interval: 30,
+        user_agent: "Planipret Softphone 1.0",
+      });
+
+      ua.on("connecting", () => this.update({ status: "connecting" }));
+      ua.on("connected", () => this.update({ status: "connected" }));
+      ua.on("disconnected", () => this.update({ status: "disconnected" }));
+      ua.on("registered", () => this.update({ status: "registered", errorCause: undefined, lastRegistrationAt: Date.now() }));
+      ua.on("unregistered", () => this.log("warn", "unregistered"));
+      ua.on("registrationFailed", (e: any) => {
+        const cause = e?.cause || e?.response?.reason_phrase || "registration_failed";
+        this.log("error", `registration failed: ${cause}`);
+        this.update({ status: "error", errorCause: cause });
+      });
+      ua.on("newRTCSession", (e: any) => this.attachSession(e.session, e.originator));
+
+      ua.start();
+      this.ua = ua;
+    } catch (err: any) {
+      const msg = String(err?.message || err);
+      this.log("error", `UA init failed: ${msg}`);
+      this.update({ status: "error", errorCause: msg });
+    }
+  }
+
+  private attachSession(session: any, originator: string) {
+    this.session = session;
+    const incoming = originator === "remote";
+    const remoteUri = session.remote_identity?.uri?.user || "";
+    const remoteName = session.remote_identity?.display_name || remoteUri;
+    // SIP Call-ID is the shared identifier between mobile and widget for the
+    // same call — used to coordinate collision handling via Supabase.
+    const callId: string = session?.request?.call_id
+      || session?.request?.getHeader?.("Call-ID")
+      || session?.id
+      || "";
+    this.update({
+      callState: incoming ? "ringing-in" : "ringing-out",
+      remoteIdentity: remoteName,
+      remoteNumber: remoteUri,
+      direction: incoming ? "in" : "out",
+      callId,
+      muted: false,
+      onHold: false,
     });
-    wireSession(inv, "out");
-    patch({ callState: "ringing-out", remoteNumber: number, remoteIdentity: number });
-    await inv.invite();
-  },
 
-  async answer(): Promise<void> {
-    if (session instanceof Invitation) {
-      await session.accept({
-        sessionDescriptionHandlerOptions: { constraints: { audio: true, video: false } as any },
+    session.on("progress", () => { if (!incoming) this.update({ callState: "ringing-out" }); });
+    session.on("confirmed", () => this.update({ callState: "active", startedAt: Date.now() }));
+    session.on("failed", (e: any) => {
+      this.update({ callState: "ended", errorCause: e?.cause || "failed" });
+      setTimeout(() => this.resetCall(), 2000);
+    });
+    session.on("ended", () => {
+      this.update({ callState: "ended" });
+      setTimeout(() => this.resetCall(), 2000);
+    });
+    session.on("hold", () => this.update({ onHold: true, callState: "held" }));
+    session.on("unhold", () => this.update({ onHold: false, callState: "active" }));
+    session.on("muted", () => this.update({ muted: true }));
+    session.on("unmuted", () => this.update({ muted: false }));
+
+    const pc: RTCPeerConnection | undefined = session.connection;
+    if (pc) {
+      pc.addEventListener("track", (ev: any) => {
+        if (this.audioEl && ev.streams[0]) {
+          this.audioEl.srcObject = ev.streams[0];
+          this.audioEl.play().catch(() => {});
+        }
       });
     }
-  },
+  }
 
-  hangup(): void {
-    if (!session) return;
+  private resetCall() {
+    this.session = null;
+    this.update({
+      callState: "idle",
+      remoteIdentity: "",
+      remoteNumber: "",
+      direction: null,
+      callId: "",
+      startedAt: null,
+      muted: false,
+      onHold: false,
+    });
+  }
+
+
+  async call(number: string) {
+    if (!this.cfg || !this.ua) return;
+    this.update({ callState: "ringing-out", remoteIdentity: number, remoteNumber: number, direction: "out", errorCause: undefined });
     try {
-      if (session instanceof Inviter) {
-        if (session.state === SessionState.Establishing || session.state === SessionState.Initial) {
-          void session.cancel();
-        } else {
-          void session.bye();
-        }
-      } else if (session instanceof Invitation) {
-        if (session.state === SessionState.Established) void session.bye();
-        else void session.reject();
-      } else {
-        void (session as any).bye?.();
-      }
-    } catch { /* ignore */ }
-  },
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        video: false,
+      });
+      const target = `sip:${number}@${this.cfg.sipDomain}`;
+      this.ua.call(target, {
+        mediaStream,
+        mediaConstraints: { audio: true, video: false },
+        rtcOfferConstraints: { offerToReceiveAudio: true, offerToReceiveVideo: false },
+      });
+    } catch (err: any) {
+      const msg = String(err?.message || err);
+      this.log("error", `call failed: ${msg}`);
+      this.update({ callState: "ended", errorCause: msg });
+      setTimeout(() => this.resetCall(), 1500);
+    }
+  }
 
-  mute(): void {
-    const pc = (session as any)?.sessionDescriptionHandler?.peerConnection as RTCPeerConnection | undefined;
-    pc?.getSenders().forEach((s) => { if (s.track && s.track.kind === "audio") s.track.enabled = false; });
-    patch({ muted: true });
-  },
-  unmute(): void {
-    const pc = (session as any)?.sessionDescriptionHandler?.peerConnection as RTCPeerConnection | undefined;
-    pc?.getSenders().forEach((s) => { if (s.track && s.track.kind === "audio") s.track.enabled = true; });
-    patch({ muted: false });
-  },
-  hold(): void { patch({ onHold: true, callState: "held" }); },
-  unhold(): void { patch({ onHold: false, callState: "active" }); },
-  sendDTMF(k: string): void {
-    const sdh: any = (session as any)?.sessionDescriptionHandler;
-    try { sdh?.sendDtmf?.(k); } catch { /* ignore */ }
-  },
-  transfer(target: string): void {
-    if (!session || !cfg) return;
-    const uri = UserAgent.makeURI(`sip:${target}@${cfg.domain}`);
-    if (uri) { try { (session as any).refer?.(uri); } catch { /* ignore */ } }
-  },
+  answer() {
+    if (!this.session) return;
+    this.session.answer({
+      mediaConstraints: { audio: true, video: false },
+      rtcAnswerConstraints: { offerToReceiveAudio: true, offerToReceiveVideo: false },
+    });
+  }
+  hangup() { try { this.session?.terminate(); } catch {} }
+  mute() { this.session?.mute({ audio: true }); }
+  unmute() { this.session?.unmute({ audio: true }); }
+  hold() { this.session?.hold(); }
+  unhold() { this.session?.unhold(); }
+  sendDTMF(k: string) { this.session?.sendDTMF(k, { duration: 100, interToneGap: 70 }); }
+  transfer(target: string) {
+    if (!this.session || !this.cfg) return;
+    this.session.refer(`sip:${target}@${this.cfg.sipDomain}`);
+  }
+
+  // ---- Quality/handover helpers used by the audio & network modules ----
   getActivePeerConnection(): RTCPeerConnection | null {
-    return ((session as any)?.sessionDescriptionHandler?.peerConnection as RTCPeerConnection) ?? null;
-  },
-  hasActiveCall(): boolean { return !!session; },
-  async iceRestart(): Promise<boolean> { return false; },
+    return (this.session as any)?.connection ?? null;
+  }
+  hasActiveCall(): boolean {
+    return !!this.session && (this.snap.callState === "active" || this.snap.callState === "held");
+  }
+  async iceRestart(): Promise<boolean> {
+    const s = this.session;
+    if (!s) return false;
+    try {
+      if (typeof s.renegotiate === "function") {
+        s.renegotiate({ rtcOfferConstraints: { iceRestart: true } });
+        return true;
+      }
+      const pc: RTCPeerConnection | undefined = s.connection;
+      if (pc && typeof pc.restartIce === "function") { pc.restartIce(); return true; }
+    } catch (e: any) {
+      this.log("error", `ice restart failed: ${e?.message || e}`);
+    }
+    return false;
+  }
+  async forceReregister() {
+    try {
+      if (!this.ua) return;
+      try { this.ua.unregister({ all: true }); } catch {}
+      setTimeout(() => { try { this.ua?.register(); } catch {} }, 250);
+    } catch {}
+  }
 
-  async stop(): Promise<void> {
-    try { if (registerer) await registerer.unregister(); } catch { /* ignore */ }
-    try { if (ua) await ua.stop(); } catch { /* ignore */ }
-    registerer = null;
-    ua = null;
-    session = null;
-    patch({ status: "disconnected" });
-  },
-};
+  stop() {
+    try { this.ua?.stop(); } catch {}
+    this.ua = null;
+    this.session = null;
+    this.update({ status: "disconnected", callState: "idle", direction: null, startedAt: null });
+  }
+}
+
+export const ppSipProvider = new PpSipProvider();
