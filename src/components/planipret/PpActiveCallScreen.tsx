@@ -166,8 +166,12 @@ export default function PpActiveCallScreen({
           <div className="text-xs text-white/60 uppercase tracking-widest">
             {view === "keypad" ? "Clavier" : view === "transfer" ? "Transférer" : (isIncoming ? "Entrant" : isOutgoingRinging ? "Sortant" : "En cours")}
           </div>
-          <div className="w-9" />
+          <button onClick={() => setDiagOpen(true)} aria-label="Diagnostic" className="p-2 rounded-full" style={{ background: "rgba(255,255,255,0.08)" }}>
+            <Activity className="w-4 h-4" />
+          </button>
         </div>
+
+        <PpCallDiagnosticPanel open={diagOpen} onClose={() => setDiagOpen(false)} snap={snap} />
 
         {/* Identity */}
         {view === "main" && (
