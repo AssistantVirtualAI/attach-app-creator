@@ -19,7 +19,13 @@ Deno.serve(async (req) => {
   const { ctx } = guard;
 
   const url = new URL(req.url);
-  const action = url.searchParams.get("action") ?? "list";
+  let action = url.searchParams.get("action") ?? "list";
+  // Also accept action from JSON body (supabase.functions.invoke can't pass ?query)
+  let cachedBody: any = null;
+  if (req.method !== "GET") {
+    try { cachedBody = await req.clone().json(); } catch { cachedBody = null; }
+    if (cachedBody?.action) action = cachedBody.action;
+  }
   const base = `/domains/${encodeURIComponent(ctx.nsDomain)}/users/${encodeURIComponent(ctx.extension)}/calls`;
 
   try {
