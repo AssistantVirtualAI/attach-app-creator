@@ -4,8 +4,11 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 const GRAPH = "https://graph.microsoft.com/v1.0";
 
 async function getMsConfig(admin: any) {
-  const { data } = await admin.from("planipret_integration_secrets").select("config").eq("provider", "microsoft").maybeSingle();
-  const c = (data?.config ?? {}) as Record<string, string>;
+  const [{ data: secret }, { data: cfg }] = await Promise.all([
+    admin.from("planipret_integration_secrets").select("config").in("provider", ["microsoft", "ms365"]).limit(1).maybeSingle(),
+    admin.from("planipret_integration_config").select("config_data").eq("integration_key", "ms365").maybeSingle(),
+  ]);
+  const c = { ...((cfg?.config_data ?? {}) as Record<string, string>), ...((secret?.config ?? {}) as Record<string, string>) };
   return {
     clientId: c.client_id ?? Deno.env.get("MICROSOFT_CLIENT_ID") ?? "",
     clientSecret: c.client_secret ?? Deno.env.get("MICROSOFT_CLIENT_SECRET") ?? "",
@@ -16,6 +19,7 @@ async function getMsConfig(admin: any) {
 async function refreshToken(admin: any, profile: any) {
   const cfg = await getMsConfig(admin);
   if (!profile.ms365_refresh_token) return null;
+  if (!cfg.clientId || !cfg.clientSecret) return null;
   const body = new URLSearchParams({
     client_id: cfg.clientId,
     client_secret: cfg.clientSecret,
@@ -72,7 +76,7 @@ Deno.serve(async (req) => {
         const filter = payload.folder === "unread" ? "&$filter=isRead%20eq%20false" : "";
         const r = await graph(admin, profile, `/me/messages?$top=${top}&$orderby=receivedDateTime%20desc&$select=id,subject,from,receivedDateTime,bodyPreview,isRead,hasAttachments,importance${filter}`);
         const d = await r.json();
-        return j({ success: r.ok, emails: d.value ?? [] }, r.ok ? 200 : 500);
+        return j({ success: r.ok, emails: d.value ?? [], error: d?.error?.message, code: r.status }, 200);
       }
       case "read_email_detail": {
         const id = String(payload.message_id ?? "");

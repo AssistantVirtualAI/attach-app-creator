@@ -274,16 +274,32 @@ export default function MCalls() {
     try {
       const end = new Date().toISOString();
       const start = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-      await supabase.functions.invoke("pp-ns-cdr", { body: { action: "sync", start, end, limit: 250 } }).catch(() => null);
-      const { data } = await supabase.functions.invoke("pp-ns-recordings", { body: { action: "list", start, end, limit: 100 } });
-      const items = (data as any)?.items ?? [];
-      setRecordings(items as Call[]);
+      let localQuery: any = supabase
+        .from("planipret_phone_calls")
+        .select("*")
+        .not("to_number", "ilike", "%vmail%")
+        .not("to_number", "ilike", "%voicemail%")
+        .not("to_number", "ilike", "%vm@%")
+        .gte("started_at", start)
+        .lte("started_at", end)
+        .order("started_at", { ascending: false })
+        .limit(150);
+      if (phoneCallScopeFilter) localQuery = localQuery.or(phoneCallScopeFilter);
+      const { data: local } = await localQuery;
+      setRecordings((local ?? []).filter((r: any) => r.has_recording || r.recording_url || r.ns_callid || r.ns_orig_callid || r.ns_term_callid || r.ns_call_id).map((r: any) => ({
+        ...r,
+        stream_via_proxy: true,
+        proxy_call_db_id: r.id,
+        proxy_ns_callid: r.ns_callid ?? r.ns_orig_callid ?? r.ns_term_callid ?? r.ns_call_id ?? null,
+        has_recording: !!(r.has_recording || r.recording_url || r.ns_callid || r.ns_orig_callid || r.ns_term_callid || r.ns_call_id),
+      })) as Call[]);
+      supabase.functions.invoke("pp-ns-cdr", { body: { action: "sync", start, end, limit: 250 } }).catch(() => null);
     } catch (e) {
       console.warn("[MCalls] recordings load failed", e);
     } finally {
       setRecordingsLoading(false);
     }
-  }, [userId]);
+  }, [userId, phoneCallScopeFilter]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -1538,14 +1554,15 @@ function ActiveCallsTab({ userId, openDialer }: { userId: string; openDialer: (n
   const fetchActive = async () => {
     const { data, error } = await supabase.functions.invoke("pp-ns-calls", { body: { action: "list" } });
     if (error) return;
-    const list = ((data as any)?.calls ?? []) as any[];
+    const raw = data as any;
+    const list = (Array.isArray(raw) ? raw : raw?.calls ?? raw?.items ?? raw?.data ?? []) as any[];
     setActive(list.map((c: any) => ({
-      id: c.id ?? c.call_id,
-      number: c.remote_number ?? c.number ?? "",
-      name: c.remote_name ?? c.name,
+      id: c["call-id"] ?? c.call_id ?? c.callid ?? c.id,
+      number: c.remote_number ?? c.number ?? c["call-term-user"] ?? c["call-orig-user"] ?? "",
+      name: c.remote_name ?? c.name ?? c["caller-id-name"],
       status: (c.state ?? c.status ?? "active") as any,
       startedAt: c.started_at ? new Date(c.started_at).getTime() : Date.now(),
-    })));
+    })).filter((c: ActiveCall) => !!c.id));
   };
 
   useEffect(() => {

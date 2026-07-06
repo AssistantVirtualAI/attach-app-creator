@@ -331,6 +331,7 @@ function RecordingSection({ call, onUpdated }: { call: RecordingCall; onUpdated:
   const [speed, setSpeed] = useState(1);
   const [cur, setCur] = useState(0);
   const [dur, setDur] = useState(0);
+  const playableUrl = !!call.recording_url && (/^(blob:|data:)/i.test(String(call.recording_url)) || call.stream_via_proxy === false) ? call.recording_url : null;
 
   const fetchRec = async () => {
     setLoading(true);
@@ -371,7 +372,7 @@ function RecordingSection({ call, onUpdated }: { call: RecordingCall; onUpdated:
         });
         const url = (data as any)?.recording_url;
         if (!url) throw new Error("nope");
-        onUpdated({ ...call, recording_url: url });
+        onUpdated({ ...call, recording_url: url, stream_via_proxy: false });
         toast.success("Enregistrement chargé");
       } catch {
         toast.error("Enregistrement indisponible", { description: e?.message });
@@ -382,11 +383,11 @@ function RecordingSection({ call, onUpdated }: { call: RecordingCall; onUpdated:
   };
 
   useEffect(() => {
-    if (fetchedRef.current || loading || call.recording_url || !hasResolvableAudio(call)) return;
+    if (fetchedRef.current || loading || playableUrl || !hasResolvableAudio(call)) return;
     fetchedRef.current = true;
     void fetchRec();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [call.id, call.recording_url, loading]);
+  }, [call.id, playableUrl, loading]);
 
   const seek = (delta: number) => {
       if (!audioRef.current) return;
@@ -403,7 +404,7 @@ function RecordingSection({ call, onUpdated }: { call: RecordingCall; onUpdated:
 
   return (
     <div className="mt-3 p-3 rounded-xl space-y-2" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)" }}>
-      {!call.recording_url ? (
+      {!playableUrl ? (
         <button
           onClick={fetchRec}
           disabled={loading}
@@ -417,7 +418,7 @@ function RecordingSection({ call, onUpdated }: { call: RecordingCall; onUpdated:
         <>
           <audio
             ref={audioRef}
-            src={call.recording_url}
+            src={playableUrl}
             onError={() => { if (!loading && hasResolvableAudio(call)) void fetchRec(); }}
             onPlay={() => setPlaying(true)}
             onPause={() => setPlaying(false)}
@@ -463,7 +464,7 @@ function RecordingSection({ call, onUpdated }: { call: RecordingCall; onUpdated:
                 </button>
               ))}
             </div>
-            <a href={call.recording_url} download
+            <a href={playableUrl} download
                className="text-[11px] flex items-center gap-1 px-2 py-1 rounded-md"
                style={{ background: "var(--pp-bg-surface)", color: "var(--pp-text-secondary)" }}>
               <Download className="w-3 h-3" /> MP3

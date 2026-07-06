@@ -357,13 +357,14 @@ export default function PlanipretMobile() {
   const { ref: scrollRef, pullDist, refreshing, threshold } = usePullToRefresh(handlePull);
 
   const onInboundRinging = useCallback((row: any) => {
+    const controlId = row.ns_callid ?? row.ns_call_id ?? row.call_id ?? row.id;
     attachRestCall?.({
-      id: row.id ?? row.call_id,
+      id: controlId,
       direction: "in",
       other: row.caller_name || row.from_name || row.from_number || row.number || "—",
       status: "ringing-in",
     });
-    setInbound({ call_id: row.id, from_number: row.from_number, caller_name: row.caller_name });
+    setInbound({ call_id: controlId, from_number: row.from_number, caller_name: row.caller_name });
   }, [attachRestCall]);
   const onAiInsight = useCallback((row: any) => {
     toast(t("toasts.aiAnalysisReady"), {
@@ -381,7 +382,7 @@ export default function PlanipretMobile() {
     const refreshActive = async () => {
       let q: any = supabase
         .from("planipret_phone_calls")
-        .select("id,status,direction,from_number,to_number,from_name,to_name,started_at,answered_at")
+        .select("id,ns_call_id,ns_callid,status,direction,from_number,to_number,from_name,to_name,started_at,answered_at")
         .in("status", ["active", "in_progress", "answered", "ringing", "outbound_ringing"])
         .order("created_at", { ascending: false })
         .limit(1);
@@ -394,12 +395,13 @@ export default function PlanipretMobile() {
       if (filters) q = q.or(filters);
       const { data } = await q.maybeSingle();
       const row = data as any;
-      setActiveCallId(row?.id ?? null);
+      const controlId = row?.ns_callid ?? row?.ns_call_id ?? row?.id ?? null;
+      setActiveCallId(controlId);
       if (!row?.id) attachRestCall?.(null);
       if (row?.id) {
         const out = row.direction === "outbound" || row.direction === "out";
         attachRestCall?.({
-          id: row.id,
+          id: controlId,
           direction: out ? "out" : "in",
           other: (out ? row.to_name || row.to_number : row.from_name || row.from_number) || "—",
           number: (out ? row.to_number : row.from_number) || "",

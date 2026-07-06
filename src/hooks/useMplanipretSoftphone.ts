@@ -7,7 +7,7 @@
 //     `navigator.mediaDevices.getUserMedia` proxy scoped to Planipret calls.
 //   - Auto network handover (Wi-Fi ↔ LTE) via handoverController.
 //   - Live call-quality sampling via callQualitySampler.
-//   - Outbound fallback to `ns-calls action:start` when WebRTC is not registered
+//   - Outbound fallback to `pp-ns-calls action:start` when WebRTC is not registered
 //     ("both, with fallback" policy).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -263,19 +263,9 @@ export function useMplanipretSoftphone() {
   }, [restCall?.id]);
 
   const callViaPBX = useCallback(async (destination: string): Promise<OutboundResult> => {
-    // Primary: ns-make-call (canonical NS-API v2 outbound endpoint, traced).
-    const primary = await supabase.functions.invoke("ns-make-call", { body: { to_number: destination } });
-    const pData = primary.data as any;
-    const traceId = pData?.trace_id;
-    if (!primary.error && pData?.success !== false) {
-      console.log("[softphone] ns-make-call ok", { trace_id: traceId, call_id: pData?.call_id, status: pData?.status });
-      return { via: "pbx", ok: true };
-    }
-    console.warn("[softphone] ns-make-call failed", { trace_id: traceId, error: pData?.error ?? primary.error?.message });
-    // Fallback: ns-calls action:start (kept for backward compatibility).
-    const { data, error } = await supabase.functions.invoke("ns-calls", { body: { action: "start", destination } });
+    const { data, error } = await supabase.functions.invoke("pp-ns-calls", { body: { action: "start", to_number: destination } });
     if (error || (data as any)?.success === false) {
-      const msg = pData?.error ?? (data as any)?.error ?? error?.message ?? primary.error?.message ?? "PBX call failed";
+      const msg = (data as any)?.message ?? (data as any)?.error ?? error?.message ?? "PBX call failed";
       return { via: "none", ok: false, error: msg };
     }
     return { via: "pbx", ok: true };

@@ -51,9 +51,10 @@ Deno.serve(async (req) => {
   const action = url.searchParams.get("action") ?? "get";
 
   if (req.method === "GET" || action === "get") {
-    const { data, error } = await admin
-      .from("planipret_integration_secrets")
-      .select("provider, config, updated_at");
+    const [{ data, error }, { data: cfgRows }] = await Promise.all([
+      admin.from("planipret_integration_secrets").select("provider, config, updated_at"),
+      admin.from("planipret_integration_config").select("integration_key, config_data, updated_at").in("integration_key", ["ms365", "ns_api"]),
+    ]);
     if (error) {
       return new Response(JSON.stringify({ error: error.message }), {
         status: 500,
@@ -61,7 +62,7 @@ Deno.serve(async (req) => {
       });
     }
     // Mask all values before returning to the browser.
-    const masked = (data ?? []).map((row: any) => ({
+    const secretRows = (data ?? []).map((row: any) => ({
       provider: row.provider,
       updated_at: row.updated_at,
       public_config: {
@@ -74,6 +75,22 @@ Deno.serve(async (req) => {
       ),
       has_keys: Object.keys(row.config ?? {}),
     }));
+    const configRows = (cfgRows ?? []).map((row: any) => ({
+      provider: row.integration_key === "ms365" ? "microsoft" : "nsapi",
+      updated_at: row.updated_at,
+      public_config: {
+        tenant_id: row.config_data?.tenant_id ?? null,
+        client_id: row.config_data?.client_id ?? null,
+        redirect_uri: row.config_data?.redirect_uri ?? null,
+        base_url: row.config_data?.base_url ?? null,
+        domain: row.config_data?.domain ?? row.config_data?.default_domain ?? null,
+      },
+      config_masked: Object.fromEntries(
+        Object.entries(row.config_data ?? {}).map(([k, v]) => [k, mask(v)])
+      ),
+      has_keys: Object.keys(row.config_data ?? {}),
+    }));
+    const masked = [...configRows, ...secretRows];
     return new Response(JSON.stringify({ items: masked }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
