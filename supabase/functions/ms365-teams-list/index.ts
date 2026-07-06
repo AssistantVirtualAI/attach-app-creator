@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
       .select("id, user_id, ms365_access_token, ms365_refresh_token")
       .eq("user_id", userId)
       .maybeSingle();
-    if (!profile?.ms365_access_token) return j({ error: "ms365_not_connected" }, 400);
+    if (!profile?.ms365_access_token) return j({ connected: false, chats: [], teams: [], error: "ms365_not_connected" });
 
     // Chats récents
     const chatsRes = await graph(admin, profile, "/me/chats?$top=25&$expand=members&$orderby=lastMessagePreview/createdDateTime desc");
