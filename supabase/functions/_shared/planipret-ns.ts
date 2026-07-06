@@ -90,15 +90,7 @@ export async function nsFetch(path: string, init: RequestInit = {}, opts: { func
     cachedToken = null;
     try {
       const fresh = await getNsJwt();
-      res = await fetch(url, {
-        ...init,
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          Authorization: `Bearer ${fresh}`,
-          ...(init.headers ?? {}),
-        },
-      });
+      res = await doFetch(fresh);
     } catch (e) {
       return new Response(
         JSON.stringify({ error: (e as Error).message, degraded: true }),
@@ -106,6 +98,7 @@ export async function nsFetch(path: string, init: RequestInit = {}, opts: { func
       );
     }
   }
+
   // Fire & forget log to planipret_ns_request_log
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
