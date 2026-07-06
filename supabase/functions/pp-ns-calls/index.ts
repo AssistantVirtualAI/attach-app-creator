@@ -150,14 +150,14 @@ Deno.serve(async (req) => {
 
     // Call-control actions: accept either PATCH or POST-with-action-in-body
     // (supabase.functions.invoke only issues POST).
-    const controlActions = ["answer", "hold", "unhold", "resume", "transfer", "disconnect", "reject", "mute", "dtmf"];
+    const controlActions = ["answer", "hold", "unhold", "resume", "transfer", "forward", "disconnect", "reject", "mute", "dtmf"];
     if (controlActions.includes(action)) {
       const payload = cachedBody ?? (await req.json().catch(() => ({})));
       const callId = payload?.call_id;
       if (!callId) return jsonResponse({ error: "call_id required" }, 400);
       const nsAction = action === "resume" ? "unhold" : action === "hangup" ? "disconnect" : action;
       const path = `${base}/${encodeURIComponent(callId)}/${nsAction}`;
-      const body = nsAction === "transfer" ? JSON.stringify({ destination: payload.destination ?? payload.target })
+      const body = (nsAction === "transfer" || nsAction === "forward") ? JSON.stringify({ destination: payload.destination ?? payload.target })
         : nsAction === "mute" ? JSON.stringify({ muted: !!payload.muted })
         : nsAction === "dtmf" ? JSON.stringify({ digit: payload.digit })
         : undefined;
@@ -165,7 +165,7 @@ Deno.serve(async (req) => {
       if (!res.ok && nsAction === "disconnect") {
         res = await nsFetch(`${base}/${encodeURIComponent(callId)}`, { method: "DELETE" });
       }
-      if (!res.ok && nsAction === "transfer") {
+      if (!res.ok && (nsAction === "transfer" || nsAction === "forward")) {
         res = await nsFetch(path, { method: "PATCH", body: JSON.stringify({ transfer_to: payload.destination ?? payload.target }) });
       }
       const txt = await res.text();
