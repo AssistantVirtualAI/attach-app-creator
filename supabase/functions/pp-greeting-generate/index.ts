@@ -6,6 +6,8 @@ import {
   corsHeaders,
   jsonResponse,
   nsBrokerFetch,
+  nsEnv,
+  ensureBrokerJwt,
 } from "../_shared/ns-broker.ts";
 
 const DOMAIN = "planipret.ca";
