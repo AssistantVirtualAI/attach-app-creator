@@ -118,19 +118,6 @@ Deno.serve(async (req) => {
   const coreServer = (rawCore || FALLBACK_PROXY).replace(/^https?:\/\//, "").replace(/\/+$/, "");
   const sipUri = device["device-sip-registration-uri"] ?? `sip:${resolvedId}@${domain}`;
   const sipState = device["device-sip-registration-state"] ?? device["registration-state"] ?? null;
-  // Build a list of WSS candidates. Port 443 is implicit (path /ws). NS-API
-  // UCStack sometimes serves WSS on the portal host rather than the core, and
-  // some carriers front it with their own SBC hostname. The frontend probes
-  // each candidate and uses the first one that opens successfully.
-  const coreHost = coreServer;
-  const portalHost = coreHost.replace(/^core(\d*)\./, "portal$1.");
-  const wssCandidates = Array.from(new Set([
-    `wss://${coreHost}/ws`,
-    `wss://${portalHost}/ws`,
-    `wss://voice.ava-telecom.ca/ws`,
-  ]));
-  const wssUrl = wssCandidates[0];
-
   return json({
     ok: true,
     client_type: clientType,
@@ -140,9 +127,6 @@ Deno.serve(async (req) => {
     sip_domain: domain,
     sip_proxy: coreServer,
     sip_core_server: coreServer,
-    sip_wss_url: wssUrl,
-    sip_wss_urls: wssCandidates,
-
     sip_password: sipPassword,
     password: sipPassword,
     sip_uri: sipUri,

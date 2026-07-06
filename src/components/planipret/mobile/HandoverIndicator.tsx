@@ -1,9 +1,7 @@
-// In-call "network handover" indicator with short history.
-// Subscribes to handoverController events so the user sees when the call was
-// migrated (Wi-Fi → LTE, LTE → Wi-Fi, ICE restart, re-register).
+// In-call REST-control network indicator with short history.
 
 import { useEffect, useState } from "react";
-import { Wifi, Signal, RefreshCw, ArrowRightLeft } from "lucide-react";
+import { RefreshCw, ArrowRightLeft } from "lucide-react";
 import { handoverController, type HandoverEvent } from "@/lib/planipret/net/handoverController";
 import { useMplanipretLang } from "@/hooks/useMplanipretLang";
 
@@ -17,7 +15,7 @@ function label(t: string) {
 }
 
 export default function HandoverIndicator() {
-  const { t } = useMplanipretLang();
+  useMplanipretLang();
   const [events, setEvents] = useState<HandoverEvent[]>([]);
   useEffect(() => {
     const un = handoverController.subscribe((e) => {
@@ -36,15 +34,10 @@ export default function HandoverIndicator() {
             <ArrowRightLeft className="w-3.5 h-3.5" />
             <span className="font-medium">{label(last.from)} → {label(last.to)}</span>
           </>
-        ) : last.kind === "ice-restart" ? (
-          <>
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span className="font-medium">{last.ok ? t("handover.iceOk") : t("handover.iceFail")}</span>
-          </>
         ) : (
           <>
-            <Signal className="w-3.5 h-3.5" />
-            <span className="font-medium">{t("handover.reregistered")}</span>
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span className="font-medium">Contrôle REST actif</span>
           </>
         )}
       </div>
@@ -53,7 +46,7 @@ export default function HandoverIndicator() {
           {events.slice(1).map((e, i) => (
             <span key={i} className="text-[10px] px-2 py-0.5 rounded-full text-white/60"
                   style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>
-              {e.kind === "network-change" ? `${label(e.from)}→${label(e.to)}` : e.kind === "ice-restart" ? "ICE" : "REG"}
+              {e.kind === "network-change" ? `${label(e.from)}→${label(e.to)}` : "REST"}
             </span>
           ))}
         </div>

@@ -1,16 +1,11 @@
-// Planipret mobile — handover controller.
-// Reacts to network changes (Wi-Fi ↔ LTE ↔ none) via the shared networkMonitor and
-// triggers either a fast SIP re-registration when idle, or an ICE restart when a call
-// is active, so RTP resumes on the new interface without dropping the call.
+// Planipret mobile — REST-only network change observer.
 
 import { networkMonitor, type NetSample } from "@/lib/planipret/network/networkMonitor";
-import { ppSipProvider } from "@/lib/planipret/sip/ppSipProvider";
 
 export type HandoverEvent =
   | { kind: "network-change"; from: string; to: string; at: number }
   | { kind: "quality-drop"; from: string; to: string; at: number }
-  | { kind: "ice-restart"; at: number; ok: boolean; reason: "network-change" | "quality-drop" }
-  | { kind: "reregister"; at: number };
+  | { kind: "rest-control"; at: number; ok: boolean; reason: "network-change" | "quality-drop" };
 
 type Listener = (e: HandoverEvent) => void;
 
@@ -20,7 +15,6 @@ class HandoverController {
   private lastQuality: NetSample["quality"] = "good";
   private started = false;
   private unsubNet: (() => void) | null = null;
-  private inFlight = false;
   private lastActionAt = 0;
 
   async start() {
@@ -45,22 +39,10 @@ class HandoverController {
     catch { return true; }
   }
 
-  private async runHandover(reason: "network-change" | "quality-drop") {
-    if (this.inFlight) return;
+  private runHandover(reason: "network-change" | "quality-drop") {
     if (!this.autoEnabled()) return;
-    this.inFlight = true;
     this.lastActionAt = Date.now();
-    try {
-      if (ppSipProvider.hasActiveCall()) {
-        const ok = await ppSipProvider.iceRestart();
-        this.emit({ kind: "ice-restart", at: Date.now(), ok, reason });
-      } else if (reason === "network-change") {
-        await ppSipProvider.forceReregister();
-        this.emit({ kind: "reregister", at: Date.now() });
-      }
-    } finally {
-      this.inFlight = false;
-    }
+    this.emit({ kind: "rest-control", at: Date.now(), ok: true, reason });
   }
 
   private async onNet(s: NetSample) {
@@ -72,26 +54,24 @@ class HandoverController {
     // Interface change (Wi-Fi ↔ LTE ↔ none): trigger handover.
     if (prev !== "unknown" && prev !== s.type && Date.now() - this.lastActionAt > 1500) {
       this.emit({ kind: "network-change", from: prev, to: s.type, at: Date.now() });
-      if (s.connected) await this.runHandover("network-change");
+      if (s.connected) this.runHandover("network-change");
       return;
     }
 
-    // Quality dropped to poor while on a call: try ICE restart to pick the best path.
+    // Quality dropped to poor: keep the indicator REST-only.
     if (
       s.connected &&
-      ppSipProvider.hasActiveCall() &&
       prevQ !== "poor" &&
       s.quality === "poor" &&
       Date.now() - this.lastActionAt > 5000
     ) {
       this.emit({ kind: "quality-drop", from: prevQ, to: s.quality, at: Date.now() });
-      await this.runHandover("quality-drop");
+      this.runHandover("quality-drop");
     }
   }
 
   async forceHandover(): Promise<boolean> {
-    if (ppSipProvider.hasActiveCall()) return ppSipProvider.iceRestart();
-    await ppSipProvider.forceReregister();
+    this.runHandover("network-change");
     return true;
   }
 }

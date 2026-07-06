@@ -170,32 +170,6 @@ export const smsApi = {
     invokeJson("pp-ns-sms", { method: "POST", query: { action: "send" }, body: { to: toNumber, message: text } }),
 };
 
-/* ============================================================
- * SIP / WebRTC dialer credentials — softphone-credentials
- * Returns wss URL, extension, sip_password, sip_domain for the
- * authenticated user. The JsSIP UA in src/lib/softphone consumes this.
- * ============================================================ */
-export type SipCredentials = {
-  extension: string;
-  sip_domain: string;
-  sip_password: string;
-  wss_url: string;
-  display_name?: string;
-};
-
-export const sipApi = {
-  async getCredentials(): Promise<SipCredentials> {
-    const { data, error } = await supabase.functions.invoke("softphone-credentials", { method: "POST" });
-    if (error) throw new Error(error.message);
-    if (!data) throw new Error("No credentials returned");
-    return data as SipCredentials;
-  },
-  async healthCheck() {
-    const { data } = await supabase.functions.invoke("softphone-credentials-health", { method: "GET" });
-    return data;
-  },
-};
-
 /* Single namespaced export consumed by /mplanipret screens. */
 export const nsApi = {
   cdrs: cdrsApi,
@@ -203,7 +177,6 @@ export const nsApi = {
   recordings: recordingsApi,
   voicemail: voicemailApi,
   sms: smsApi,
-  sip: sipApi,
 };
 
 export default nsApi;

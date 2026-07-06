@@ -1,7 +1,4 @@
-// Planipret mobile — live audio quality sampler.
-// Polls RTCPeerConnection.getStats() every 2s and derives jitter, loss and RTT.
-
-import { ppSipProvider } from "@/lib/planipret/sip/ppSipProvider";
+// Planipret mobile — REST-only call-control quality placeholder.
 
 export type QualityLabel = "excellent" | "good" | "poor" | "unknown";
 
@@ -55,42 +52,9 @@ class CallQualitySampler {
   }
 
   private async sample() {
-    const pc = ppSipProvider.getActivePeerConnection();
-    if (!pc) {
-      this.emit({ jitterMs: null, lossPct: null, rttMs: null });
-      this.lastPacketsLost = 0;
-      this.lastPacketsReceived = 0;
-      return;
-    }
-    try {
-      const stats = await pc.getStats();
-      let jitterMs: number | null = null;
-      let rttMs: number | null = null;
-      let lostDelta = 0;
-      let recvDelta = 0;
-      stats.forEach((r: any) => {
-        if (r.type === "inbound-rtp" && (r.kind === "audio" || r.mediaType === "audio")) {
-          if (typeof r.jitter === "number") jitterMs = Math.round(r.jitter * 1000);
-          const lost = r.packetsLost ?? 0;
-          const recv = r.packetsReceived ?? 0;
-          lostDelta = Math.max(0, lost - this.lastPacketsLost);
-          recvDelta = Math.max(0, recv - this.lastPacketsReceived);
-          this.lastPacketsLost = lost;
-          this.lastPacketsReceived = recv;
-        }
-        if (r.type === "candidate-pair" && r.state === "succeeded" && typeof r.currentRoundTripTime === "number") {
-          rttMs = Math.round(r.currentRoundTripTime * 1000);
-        }
-        if (r.type === "remote-inbound-rtp" && typeof r.roundTripTime === "number" && rttMs == null) {
-          rttMs = Math.round(r.roundTripTime * 1000);
-        }
-      });
-      const total = lostDelta + recvDelta;
-      const lossPct = total > 0 ? +(100 * lostDelta / total).toFixed(1) : 0;
-      this.emit({ jitterMs, lossPct, rttMs });
-    } catch {
-      // ignore — will retry
-    }
+    this.emit({ jitterMs: null, lossPct: null, rttMs: null });
+    this.lastPacketsLost = 0;
+    this.lastPacketsReceived = 0;
   }
 }
 

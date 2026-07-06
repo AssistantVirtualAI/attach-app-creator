@@ -15,9 +15,7 @@ import PWAInstallBanner from "@/components/planipret/PWAInstallBanner";
 import ExtensionSyncBanner from "@/components/planipret/mobile/ExtensionSyncBanner";
 import { TEMP_EMOJI } from "@/components/planipret/leadHelpers";
 import { useMaestroPipelineToasts } from "@/hooks/useMaestroPipelineToasts";
-import { safeEdgeFunction } from "@/lib/safeEdgeFunction";
 import { useMplanipretLang } from "@/hooks/useMplanipretLang";
-import { sipDiagnostics } from "@/lib/planipret/sipDiagnostics";
 
 type Period = "day" | "week" | "month" | "shift";
 
@@ -37,7 +35,7 @@ function Shimmer({ className = "" }: { className?: string }) {
 
 export default function MHome() {
   const { t, lang } = useMplanipretLang();
-  const { profile, registerRefresh, openDialer, openAva, reloadProfile, softphone } =
+  const { profile, registerRefresh, openDialer, openAva, reloadProfile } =
     useOutletContext<PlanipretMobileContext>();
   const navigate = useNavigate();
 
@@ -52,8 +50,6 @@ export default function MHome() {
   const [dueReminders, setDueReminders] = useState<any[]>([]);
   const [meetings, setMeetings] = useState<any[]>([]);
   const [statsLoading, setStatsLoading] = useState(true);
-  const [sipOnline, setSipOnline] = useState(false);
-
   const [brief, setBrief] = useState<any | null>(null);
   const [briefLoading, setBriefLoading] = useState(false);
   const [briefErr, setBriefErr] = useState<string | null>(null);
@@ -124,7 +120,6 @@ export default function MHome() {
     setHotLeads(hotRes.data ?? []);
     setDueReminders(remRes.data ?? []);
     setMeetings(meetingsRes.data ?? []);
-    setSipOnline(!!profile.ns_jwt && (!profile.ns_jwt_expires_at || new Date(profile.ns_jwt_expires_at) > new Date()));
     setStatsLoading(false);
   };
 
@@ -161,111 +156,6 @@ export default function MHome() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.user_id, period]);
 
-
-  // Wait for a `registered` status. Resolves via:
-  //   – pp:sip-registered event with detail.registered === true
-  //   – existing softphone status becoming "registered" (polled every 250ms)
-  //   – timeout (default 20s — mobile networks + double NS round-trip can take
-  //     >10s from a cold reconnect).
-  const waitForRegistration = (timeoutMs = 20000) => new Promise<{ ok: boolean; ms: number; reason: string }>((resolve) => {
-    let done = false;
-    const startedAt = performance.now();
-    const cleanup = () => {
-      window.removeEventListener("pp:sip-registered", onReg as EventListener);
-      window.clearInterval(poll);
-      window.clearTimeout(timer);
-    };
-    const finish = (ok: boolean, reason: string) => {
-      if (done) return;
-      done = true;
-      const ms = Math.round(performance.now() - startedAt);
-      cleanup();
-      resolve({ ok, ms, reason });
-    };
-    const onReg = (e: Event) => {
-      const detail = (e as CustomEvent).detail;
-      // Only resolve early on success. Transient ws "disconnected" events fire
-      // repeatedly during (re)connection while the UA is still trying to reach
-      // the PBX — treating them as terminal makes the waiter give up after a
-      // few ms even though registration would succeed a moment later. Let the
-      // poller / timeout decide failure.
-      if (detail?.registered) finish(true, "event");
-    };
-    const poll = window.setInterval(() => {
-      if (softphone?.snap?.status === "registered") finish(true, "poll");
-    }, 250);
-    const timer = window.setTimeout(() => finish(false, "timeout"), timeoutMs);
-    window.addEventListener("pp:sip-registered", onReg as EventListener);
-  });
-
-  const reconnect = async () => {
-    const traceId = `rc-${Date.now().toString(36)}`;
-    sipDiagnostics.start(traceId);
-    const log = (level: "info" | "warn" | "error", msg: string, data?: any) => sipDiagnostics.log(traceId, level, msg, data);
-    const online = typeof navigator !== "undefined" ? navigator.onLine : true;
-    log("info", "reconnect start", { online, connection: (navigator as any)?.connection?.effectiveType, currentStatus: softphone.snap.status });
-    toast.loading(t("home.reconnecting"), { id: "sip-reconnect" });
-
-    if (!online) {
-      log("error", "aborted: offline");
-      sipDiagnostics.finish(traceId, "aborted");
-      toast.dismiss("sip-reconnect");
-      toast.error("Aucune connexion réseau détectée.");
-      return;
-    }
-
-    const t0 = performance.now();
-    const [{ data, error, status }, sipRes] = await Promise.all([
-      safeEdgeFunction("ns-auth", { body: {} }),
-      supabase.functions.invoke("ns-resolve-sip-credentials", { body: { client_type: "mobile" } }),
-    ]);
-    log("info", `edge functions returned in ${Math.round(performance.now() - t0)}ms`, {
-      nsAuth: { status, hasData: !!data, error: error ?? null, dataError: (data as any)?.error, success: (data as any)?.success },
-      nsSip: { hasData: !!sipRes.data, ok: (sipRes.data as any)?.ok, error: sipRes.error?.message, sipError: (sipRes.data as any)?.error },
-    });
-
-    if (error || (data as any)?.success === false) {
-      log("error", "ns-auth failed", { status, error: (error as any)?.message ?? error, data });
-      sipDiagnostics.finish(traceId, "failed");
-      toast.dismiss("sip-reconnect");
-      toast.error(status === 403 ? t("home.phoneUnauthorized") : ((data as any)?.error ?? error ?? t("home.connectionImpossible")));
-      return;
-    }
-    const sip = (sipRes.data ?? {}) as any;
-    if (sipRes.error || !sip?.ok) {
-      log("error", "ns-resolve-sip-credentials failed", { sipError: sipRes.error?.message, sip });
-      sipDiagnostics.finish(traceId, "failed");
-      toast.dismiss("sip-reconnect");
-      toast.error(sip?.error ?? sipRes.error?.message ?? t("home.connectionImpossible"));
-      return;
-    }
-    log("info", "SIP creds resolved", {
-      extension: sip.sip_extension, domain: sip.sip_domain, proxy: sip.sip_proxy, hasPassword: !!sip.sip_password,
-    });
-
-    const registrationWait = waitForRegistration();
-    try {
-      sessionStorage.setItem("pp_sip_config", JSON.stringify({
-        username: sip.sip_username, password: sip.sip_password,
-        domain: sip.sip_domain, proxy: sip.sip_proxy, extension: sip.sip_extension,
-      }));
-      log("info", "dispatching pp:sip-ready (force=true)");
-      window.dispatchEvent(new CustomEvent("pp:sip-ready", { detail: { extension: sip.sip_extension, force: true } }));
-    } catch (e: any) {
-      log("error", "failed to store SIP config", { message: e?.message });
-    }
-    await reloadProfile();
-    loadStats();
-    const { ok: registered, ms: waitedMs, reason } = await registrationWait;
-    log(registered ? "info" : "warn", "registration wait finished", { registered, waitedMs, reason, softphoneStatus: softphone.snap.status });
-    sipDiagnostics.finish(traceId, registered ? "success" : "failed");
-    toast.dismiss("sip-reconnect");
-    if (registered) toast.success(t("home.phoneConnected"));
-    else toast.error(`Téléphone non enregistré après ${Math.round(waitedMs / 1000)}s (${reason}). Consulte Diagnostics SIP dans Plus.`);
-  };
-
-
-
   const handleSuggestion = (sug: { kind: string; number?: string; label: string }) => {
     if (sug.kind === "call" && sug.number) { openDialer(sug.number); return; }
     if (sug.kind === "sms") { navigate("/mplanipret/messages"); return; }
@@ -274,10 +164,8 @@ export default function MHome() {
   };
 
   const totalComms = useMemo(() => stats.calls + stats.sms + stats.outbound, [stats]);
-  // Click-to-Call REST: no WebRTC registration required. The pill just shows
-  // that the broker profile has a linked NS extension.
+  // REST-only calls: the browser controls NS-API, the physical mobile device handles audio.
   const phoneOnline = !!profile?.extension;
-  const phoneConnecting = false;
 
   return (
     <div className="p-4 space-y-4 pb-8" style={{ background: "var(--pp-bg-base)", minHeight: "100%" }}>
@@ -294,7 +182,7 @@ export default function MHome() {
         </div>
         <button
           onClick={() => {
-            if (phoneOnline) toast.success("Click-to-Call prêt — votre appareil sonnera quand vous appellerez.");
+            if (phoneOnline) toast.success("Appels REST prêts — votre téléphone mobile sonnera quand vous appellerez.");
             else toast.error("Aucune extension NetSapiens liée. Contacte un admin pour la synchroniser.");
           }}
           className="pp-pill"
@@ -305,7 +193,7 @@ export default function MHome() {
           }}
         >
           <span style={{ width: 6, height: 6, borderRadius: 999, background: "currentColor", boxShadow: "0 0 6px currentColor" }} />
-          {phoneOnline ? "Click-to-Call" : t("home.offline")}
+          {phoneOnline ? "Appels REST" : "Non lié"}
         </button>
       </header>
 
