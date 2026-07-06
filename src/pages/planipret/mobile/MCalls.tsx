@@ -424,7 +424,7 @@ function CallRow({ call, onTap, onCall, showCallBtn }: { call: Call; onTap: () =
               className="font-semibold text-[15px] truncate"
               style={{ color: missed ? "var(--pp-danger)" : "var(--pp-text-primary)" }}
             >
-              {displayLabel(call) === "Inconnu" ? t("common.unknown") : displayLabel(call)}
+              {label}
             </div>
             <div className="text-xs truncate" style={{ color: "var(--pp-text-muted)" }}>
               {localizedDateTime(call.started_at, lang, t("common.today"), t("common.yesterday"))} · {localizedDuration(call.duration_seconds, lang)}
