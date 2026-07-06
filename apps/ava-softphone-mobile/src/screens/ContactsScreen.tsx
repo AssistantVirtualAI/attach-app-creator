@@ -107,7 +107,12 @@ export default function ContactsScreen({ sp }: { sp: any }) {
     if (mobile.loading) return;
     if (!mobile.accessToken || (!mobile.domainUuid && !mobile.organizationId)) { setContacts([]); return; }
     let cancelled = false;
-    syncDeviceContacts().then(() => loadContacts()).catch(() => {});
+    // Only touch the device address book if the user has already consented.
+    (async () => {
+      if (await hasConsent()) syncDeviceContacts().then(() => loadContacts()).catch(() => {});
+      else setConsentOpen(true);
+    })();
+
     loadContacts().then(() => !cancelled && setError(null)).catch((e) => {
       if (!cancelled) { setContacts([]); setError(e?.message || 'Échec du chargement des contacts'); }
     });
