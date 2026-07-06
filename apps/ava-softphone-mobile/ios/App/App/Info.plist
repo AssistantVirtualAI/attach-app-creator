@@ -48,7 +48,8 @@
 	<key>NSMicrophoneUsageDescription</key>
 	<string>AVA Softphone uses the microphone so you can speak during phone calls. / AVA Softphone utilise le microphone pour vous permettre de parler pendant vos appels.</string>
 	<key>NSContactsUsageDescription</key>
-	<string>AVA Softphone shows your contacts so you can quickly call or message them. / AVA Softphone affiche vos contacts pour vous permettre de les appeler ou de leur écrire rapidement.</string>
+	<string>Planiprêt / AVA Softphone accède à vos contacts pour identifier vos appelants et les associer à vos dossiers clients. Vos contacts sont téléversés de façon sécurisée sur nos serveurs uniquement à cette fin et ne sont jamais partagés avec des tiers. Vous pouvez révoquer cet accès en tout temps dans les Réglages de votre iPhone ou depuis « Plus → Supprimer mes contacts du serveur ». / Planiprêt / AVA Softphone accesses your contacts to identify incoming callers and match them with your client files. Your contacts are securely uploaded to our servers for this purpose only and are never shared with third parties. You can revoke this access at any time in iPhone Settings or from "More → Delete my contacts from server".</string>
+
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>AVA Softphone uses photos only when you choose a profile picture. / AVA Softphone accède aux photos uniquement lorsque vous choisissez une photo de profil.</string>
 	<key>NSLocalNetworkUsageDescription</key>
