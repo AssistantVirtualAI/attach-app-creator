@@ -519,12 +519,17 @@ function CallRow({ call, onTap, onCall, showCallBtn }: { call: Call; onTap: () =
   const out = isOutbound(call);
   const dirColor = missed ? "var(--pp-danger)" : out ? "var(--pp-success)" : "var(--pp-brand-accent)";
   const Icon = missed ? PhoneMissed : out ? PhoneOutgoing : PhoneIncoming;
-  const names = useCallerNames([otherNumber(call)]);
-  const label = displayLabelWith(call, names[otherNumber(call)], lang as "fr" | "en");
+  const num = otherNumber(call);
+  const names = useCallerNames([num]);
+  const resolved = names[num];
+  const label = displayLabelWith(call, resolved, lang as "fr" | "en");
+  const numberSub = fmtPhone(num);
+  const showNumberSub = !!numberSub && numberSub !== label;
+  const st = statusInfo(call, lang as "fr" | "en");
   const hasAi = !!call.ai_summary;
 
   return (
-    <li>
+    <li className="list-none">
       <div
         className="rounded-2xl px-3 py-3 flex items-center gap-3 active:opacity-80"
         style={{
@@ -541,12 +546,25 @@ function CallRow({ call, onTap, onCall, showCallBtn }: { call: Call; onTap: () =
             <Icon className="w-5 h-5" />
           </div>
           <div className="flex-1 min-w-0">
-            <div
-              className="font-semibold text-[15px] truncate"
-              style={{ color: missed ? "var(--pp-danger)" : "var(--pp-text-primary)" }}
-            >
-              {label}
+            <div className="flex items-center gap-2 min-w-0">
+              <div
+                className="font-semibold text-[15px] truncate"
+                style={{ color: missed ? "var(--pp-danger)" : "var(--pp-text-primary)" }}
+              >
+                {label}
+              </div>
+              <span
+                className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0"
+                style={{ background: `${st.color}22`, color: st.color }}
+              >
+                {st.label}
+              </span>
             </div>
+            {showNumberSub && (
+              <div className="text-[11px] truncate" style={{ color: "var(--pp-text-muted)" }}>
+                {numberSub}
+              </div>
+            )}
             <div className="text-xs truncate" style={{ color: "var(--pp-text-muted)" }}>
               {localizedDateTime(call.started_at, lang, t("common.today"), t("common.yesterday"))} · {localizedDuration(call.duration_seconds, lang)}
             </div>
