@@ -6,6 +6,8 @@ import {
   corsHeaders,
   jsonResponse,
   nsBrokerFetch,
+  nsEnv,
+  ensureBrokerJwt,
 } from "../_shared/ns-broker.ts";
 
 const DOMAIN = "planipret.ca";
@@ -100,21 +102,39 @@ Deno.serve(async (req) => {
 
   if (body.push_to_ns && profile.extension) {
     const ext = encodeURIComponent(profile.extension);
-    const endpoint = `/domains/${DOMAIN}/users/${ext}/voicemails/greeting`;
+    // NS-API v2 correct endpoint: POST greetings (multipart)
+    const endpoint = `/domains/${DOMAIN}/users/${ext}/greetings`;
 
-    // Attempt 1: multipart upload
     try {
+      const env = nsEnv();
+      const token = await ensureBrokerJwt(admin, profile);
       const fd = new FormData();
-      fd.append("file", new Blob([audioBytes], { type: "audio/mpeg" }), fileName);
-      const r = await nsBrokerFetch(admin, profile, endpoint, { method: "PUT", body: fd as any });
+      fd.append("script", text.slice(0, 200));
+      fd.append("index", "1");
+      fd.append("convert", "yes");
+      fd.append("synchronous", "yes");
+      // NS-API expects capital "File"
+      fd.append("File", new Blob([audioBytes], { type: "audio/mpeg" }), fileName);
+
+      const r = await fetch(`${env.base}/ns-api/v2${endpoint}`, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: fd,
+      });
       if (r.ok) { pushedToNs = true; pushMethod = "multipart"; }
-      else pushError = `multipart_${r.status}`;
+      else {
+        const detail = await r.text().catch(() => "");
+        pushError = `multipart_${r.status}:${detail.slice(0, 200)}`;
+      }
     } catch (e) { pushError = `multipart_exception: ${String(e)}`; }
 
-    // Attempt 2: JSON with URL
+    // Fallback: JSON with URL on the legacy voicemails/greeting path
     if (!pushedToNs && audioUrl) {
       try {
-        const r = await nsBrokerFetch(admin, profile, endpoint, {
+        const r = await nsBrokerFetch(admin, profile, `/domains/${DOMAIN}/users/${ext}/voicemails/greeting`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ greeting_url: audioUrl }),
