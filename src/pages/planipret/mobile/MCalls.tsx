@@ -69,31 +69,44 @@ type Insight = {
 
 // ---------- helpers ----------
 const isOutbound = (c: Call) => c.direction === "outbound";
-const isMissed = (c: Call) => c.direction === "missed" || c.status === "missed";
+const isMissed = (c: Call) => c.direction === "missed" || c.status === "missed" || c.status === "no-answer";
 
-const otherNumber = (c: Call) => (isOutbound(c) ? c.to_number : c.from_number) || "";
+// Normalize NS values like "sip:15145551234@planipret.ca", "tel:+1...",
+// "anonymous", "1000@planipret.ca", or empty strings.
+function cleanNumber(v: unknown): string | null {
+  if (v == null) return null;
+  let s = String(v).trim();
+  if (!s) return null;
+  s = s.replace(/^sips?:/i, "").replace(/^tel:/i, "");
+  const at = s.indexOf("@");
+  if (at !== -1) s = s.slice(0, at);
+  s = s.replace(/^\+?1(\d{10})$/, "$1");
+  if (!s || /^(anonymous|unknown|restricted|private|unavailable)$/i.test(s)) return null;
+  return s;
+}
+function fmtPhone(n: string | null): string | null {
+  if (!n) return null;
+  const d = n.replace(/\D/g, "");
+  if (d.length === 10) return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
+  if (d.length === 11 && d.startsWith("1")) return `(${d.slice(1, 4)}) ${d.slice(4, 7)}-${d.slice(7)}`;
+  return n;
+}
+
+const otherNumber = (c: Call) => cleanNumber(isOutbound(c) ? c.to_number : c.from_number) || "";
 const otherName = (c: Call) => (isOutbound(c) ? c.to_name : c.from_name) || "";
 // Label priority: NS caller_id_name → resolved (Maestro/MS/contacts) → phone
-// number → localized "Numéro non résolu" fallback. When the CDR is missing BOTH
-// name and number we log the record so the source can be inspected.
+// number → localized "Numéro non résolu" fallback.
 const UNRESOLVED_FR = "Numéro non résolu";
 const UNRESOLVED_EN = "Unresolved number";
 function displayLabelWith(c: Call, resolved?: string | null, lang: "fr" | "en" = "fr"): string {
   const name = otherName(c);
   if (name) return name;
   if (resolved) return resolved;
-  const num = otherNumber(c);
+  const num = fmtPhone(otherNumber(c));
   if (num) return num;
-  console.warn("[MCalls] unresolved caller — no name and no number", {
-    id: c.id,
-    ns_call_id: c.ns_call_id,
-    direction: c.direction,
-    started_at: c.started_at,
-    metadata: c.metadata,
-  });
   return lang === "en" ? UNRESOLVED_EN : UNRESOLVED_FR;
 }
-const displayLabel = (c: Call) => otherName(c) || otherNumber(c) || UNRESOLVED_FR;
+const displayLabel = (c: Call) => otherName(c) || fmtPhone(otherNumber(c)) || UNRESOLVED_FR;
 
 const localizedDateTime = (iso: string, lang: "fr" | "en", todayLabel: string, yesterdayLabel: string) => {
   const d = new Date(iso);
@@ -106,7 +119,15 @@ const localizedDateTime = (iso: string, lang: "fr" | "en", todayLabel: string, y
   const sep = lang === "en" ? ":" : "h";
   if (sameDay) return `${todayLabel}, ${hh}${sep}${mm}`;
   if (isYest) return `${yesterdayLabel}, ${hh}${sep}${mm}`;
-  return `${d.toLocaleDateString(lang === "en" ? "en-CA" : "fr-CA", { day: "2-digit", month: "short" })}, ${hh}${sep}${mm}`;
+  return `${d.toLocaleDateString(lang === "en" ? "en-CA" : "fr-CA", { day: "2-digit", month: "short", year: "numeric" })}, ${hh}${sep}${mm}`;
+};
+const dayHeader = (iso: string, lang: "fr" | "en", todayLabel: string, yesterdayLabel: string) => {
+  const d = new Date(iso);
+  const today = new Date();
+  const yest = new Date(); yest.setDate(today.getDate() - 1);
+  if (d.toDateString() === today.toDateString()) return todayLabel;
+  if (d.toDateString() === yest.toDateString()) return yesterdayLabel;
+  return d.toLocaleDateString(lang === "en" ? "en-CA" : "fr-CA", { weekday: "long", day: "2-digit", month: "long" });
 };
 const localizedDuration = (s: number | null, lang: "fr" | "en") => {
   if (!s) return "—";
@@ -115,6 +136,16 @@ const localizedDuration = (s: number | null, lang: "fr" | "en") => {
   if (m === 0) return `${sec} ${lang === "en" ? "sec" : "sec"}`;
   return `${m} min ${sec} sec`;
 };
+const statusInfo = (c: Call, lang: "fr" | "en") => {
+  const s = String(c.status ?? "").toLowerCase();
+  if (isMissed(c)) return { label: lang === "en" ? "Missed" : "Manqué", color: "var(--pp-danger)" };
+  if (s.includes("voicemail") || s.includes("vm")) return { label: lang === "en" ? "Voicemail" : "Messagerie", color: "var(--pp-agent)" };
+  if (s.includes("busy") || s.includes("occup")) return { label: lang === "en" ? "Busy" : "Occupé", color: "var(--pp-warning, #f59e0b)" };
+  if (s.includes("fail") || s.includes("cancel")) return { label: lang === "en" ? "Failed" : "Échoué", color: "var(--pp-danger)" };
+  if ((c.duration_seconds ?? 0) > 0) return { label: lang === "en" ? "Answered" : "Répondu", color: "var(--pp-success)" };
+  return { label: lang === "en" ? "—" : "—", color: "var(--pp-text-muted)" };
+};
+
 
 // ---------- main ----------
 export default function MCalls() {
@@ -128,13 +159,14 @@ export default function MCalls() {
   const [calls, setCalls] = useState<Call[]>([]);
   const [recordings, setRecordings] = useState<Call[]>([]);
   const [loading, setLoading] = useState(true);
+  const [recordingsLoading, setRecordingsLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [selected, setSelected] = useState<Call | null>(null);
+  const [visibleCount, setVisibleCount] = useState(25);
 
   const userId = profile?.user_id;
-
 
   const load = useCallback(async () => {
     if (!userId) return;
@@ -160,10 +192,14 @@ export default function MCalls() {
       const merged: Call[] = items.map((it, i) => {
         const nsId = it.id ?? it.call_id ?? it.uuid ?? it["cdr-id"] ?? null;
         const enriched = nsId ? byNsId.get(nsId) : null;
-        const dirRaw = String(it.direction ?? it.call_direction ?? "").toLowerCase();
-        const direction = dirRaw.includes("in")
-          ? (it.answered === false || it.disposition === "no-answer" ? "missed" : "inbound")
-          : "outbound";
+        const dirRaw = String(it.direction ?? it.call_direction ?? it.type ?? "").toLowerCase();
+        const answeredFalse = it.answered === false || it.disposition === "no-answer" || it.disposition === "missed";
+        const isIn = dirRaw.includes("in") || dirRaw === "incoming" || dirRaw === "received";
+        const isOut = dirRaw.includes("out") || dirRaw === "outgoing" || dirRaw === "placed";
+        const direction = isIn
+          ? (answeredFalse ? "missed" : "inbound")
+          : isOut ? "outbound"
+          : (answeredFalse ? "missed" : "inbound");
         const from_number = it.from_number ?? it.caller_id_number ?? it.orig_from_user
           ?? it.orig_from_uri ?? it.by_number ?? it.orig_callid_number ?? it.ani ?? enriched?.from_number ?? null;
         const to_number = it.to_number ?? it.destination ?? it.term_to_user
@@ -207,37 +243,50 @@ export default function MCalls() {
     }
   }, [userId]);
 
+  const loadRecordings = useCallback(async () => {
+    if (!userId) return;
+    setRecordingsLoading(true);
+    try {
+      const { data } = await supabase.functions.invoke("pp-ns-recordings", { body: { action: "list" } });
+      const items = (data as any)?.items ?? [];
+      setRecordings(items as Call[]);
+    } catch (e) {
+      console.warn("[MCalls] recordings load failed", e);
+    } finally {
+      setRecordingsLoading(false);
+    }
+  }, [userId]);
+
   useEffect(() => { load(); }, [load]);
 
-  // Fetch recordings list (per-extension) when tab is opened
+  // Fetch recordings when tab is opened
   useEffect(() => {
     if (tab !== "recordings" || !userId) return;
-    (async () => {
-      try {
-        const { data } = await supabase.functions.invoke("pp-ns-recordings", { body: { action: "list" } });
-        const items = (data as any)?.items ?? [];
-        setRecordings(items as Call[]);
-      } catch (e) {
-        console.warn("[MCalls] recordings load failed", e);
-      }
-    })();
-  }, [tab, userId]);
+    loadRecordings();
+  }, [tab, userId, loadRecordings]);
+
+  // Reset pagination when tab or search changes
+  useEffect(() => { setVisibleCount(25); }, [tab, search]);
 
   useEffect(() => {
-    registerRefresh(() => load());
+    registerRefresh(() => { load(); loadRecordings(); });
     return () => registerRefresh(null);
-  }, [load, registerRefresh]);
+  }, [load, loadRecordings, registerRefresh]);
 
 
-  // Realtime updates on phone_calls (for new entries)
+  // Realtime updates on phone_calls (for new entries + auto-refresh recordings)
   useEffect(() => {
     if (!userId) return;
     const ch = supabase
       .channel(`planipret-calls:${userId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "planipret_phone_calls", filter: `user_id=eq.${userId}` }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "planipret_phone_calls", filter: `user_id=eq.${userId}` }, () => {
+        load();
+        // A new CDR usually means a fresh recording is (or will be) available.
+        loadRecordings();
+      })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [userId, load]);
+  }, [userId, load, loadRecordings]);
 
   const missedCount = useMemo(() => calls.filter(isMissed).length, [calls]);
 
@@ -251,11 +300,14 @@ export default function MCalls() {
     );
   }, [calls, tab, search]);
 
+  const paged = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
+
   const onRefresh = async () => {
     setRefreshing(true);
-    await load();
+    await Promise.all([load(), tab === "recordings" ? loadRecordings() : Promise.resolve()]);
     setTimeout(() => setRefreshing(false), 300);
   };
+
 
   return (
     <div className="h-full flex flex-col" style={{ background: "var(--pp-bg-base)" }}>
@@ -347,18 +399,32 @@ export default function MCalls() {
         {tab === "active" ? (
           <ActiveCallsTab userId={userId} openDialer={openDialer} />
         ) : tab === "recordings" ? (
-          <RecordingsList
-            calls={recordings as any}
-            loading={loading}
-            userId={userId}
-            onUpdated={(c) => setRecordings((prev) => prev.map((p) => (p.id === c.id ? { ...p, ...c } as any : p)))}
-          />
+          <>
+            <div className="px-4 pt-2 flex items-center justify-end">
+              <button
+                onClick={loadRecordings}
+                className="text-xs flex items-center gap-1 px-2 py-1"
+                style={{ color: "var(--pp-text-muted)" }}
+              >
+                <RefreshCw className={`w-3 h-3 ${recordingsLoading ? "animate-spin" : ""}`} /> {t("common.refresh")}
+              </button>
+            </div>
+            <RecordingsList
+              calls={recordings as any}
+              loading={recordingsLoading}
+              userId={userId}
+              onUpdated={(c) => setRecordings((prev) => prev.map((p) => (p.id === c.id ? { ...p, ...c } as any : p)))}
+            />
+          </>
         ) : tab === "voicemails" ? (
           <VoicemailsTab userId={userId} openDialer={openDialer} registerRefresh={registerRefresh} />
         ) : (
           <>
             {/* Pull-to-refresh proxy */}
-            <div className="px-4 pt-2 flex items-center justify-end">
+            <div className="px-4 pt-2 flex items-center justify-between">
+              <span className="text-[11px]" style={{ color: "var(--pp-text-muted)" }}>
+                {filtered.length} {filtered.length > 1 ? (lang === "en" ? "calls" : "appels") : (lang === "en" ? "call" : "appel")}
+              </span>
               <button
                 onClick={onRefresh}
                 className="text-xs flex items-center gap-1 px-2 py-1"
@@ -386,11 +452,44 @@ export default function MCalls() {
             ) : filtered.length === 0 ? (
               <EmptyState tab={tab as any} />
             ) : (
-              <ul className="px-3 pb-4 space-y-1.5">
-                {filtered.map((c) => (
-                  <CallRow key={c.id} call={c} onTap={() => setSelected(c)} onCall={() => openDialer(otherNumber(c))} showCallBtn={tab === "missed"} />
-                ))}
-              </ul>
+              <>
+                <ul className="px-3 pb-2 space-y-1.5">
+                  {paged.map((c, idx) => {
+                    const prev = idx > 0 ? paged[idx - 1] : null;
+                    const header = dayHeader(c.started_at, lang as "fr" | "en", t("common.today"), t("common.yesterday"));
+                    const prevHeader = prev ? dayHeader(prev.started_at, lang as "fr" | "en", t("common.today"), t("common.yesterday")) : null;
+                    const showHeader = header !== prevHeader;
+                    return (
+                      <div key={c.id}>
+                        {showHeader && (
+                          <div
+                            className="px-2 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wide"
+                            style={{ color: "var(--pp-text-muted)" }}
+                          >
+                            {header}
+                          </div>
+                        )}
+                        <CallRow call={c} onTap={() => setSelected(c)} onCall={() => openDialer(otherNumber(c))} showCallBtn={tab === "missed"} />
+                      </div>
+                    );
+                  })}
+                </ul>
+                {visibleCount < filtered.length && (
+                  <div className="px-3 pb-4">
+                    <button
+                      onClick={() => setVisibleCount((n) => n + 25)}
+                      className="w-full py-2.5 rounded-xl text-xs font-semibold"
+                      style={{
+                        background: "var(--pp-bg-surface)",
+                        border: "1px solid var(--pp-bg-border-2)",
+                        color: "var(--pp-brand-accent)",
+                      }}
+                    >
+                      {lang === "en" ? "Load more" : "Charger plus"} ({filtered.length - visibleCount})
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </>
         )}
@@ -420,12 +519,17 @@ function CallRow({ call, onTap, onCall, showCallBtn }: { call: Call; onTap: () =
   const out = isOutbound(call);
   const dirColor = missed ? "var(--pp-danger)" : out ? "var(--pp-success)" : "var(--pp-brand-accent)";
   const Icon = missed ? PhoneMissed : out ? PhoneOutgoing : PhoneIncoming;
-  const names = useCallerNames([otherNumber(call)]);
-  const label = displayLabelWith(call, names[otherNumber(call)], lang as "fr" | "en");
+  const num = otherNumber(call);
+  const names = useCallerNames([num]);
+  const resolved = names[num];
+  const label = displayLabelWith(call, resolved, lang as "fr" | "en");
+  const numberSub = fmtPhone(num);
+  const showNumberSub = !!numberSub && numberSub !== label;
+  const st = statusInfo(call, lang as "fr" | "en");
   const hasAi = !!call.ai_summary;
 
   return (
-    <li>
+    <li className="list-none">
       <div
         className="rounded-2xl px-3 py-3 flex items-center gap-3 active:opacity-80"
         style={{
@@ -442,12 +546,25 @@ function CallRow({ call, onTap, onCall, showCallBtn }: { call: Call; onTap: () =
             <Icon className="w-5 h-5" />
           </div>
           <div className="flex-1 min-w-0">
-            <div
-              className="font-semibold text-[15px] truncate"
-              style={{ color: missed ? "var(--pp-danger)" : "var(--pp-text-primary)" }}
-            >
-              {label}
+            <div className="flex items-center gap-2 min-w-0">
+              <div
+                className="font-semibold text-[15px] truncate"
+                style={{ color: missed ? "var(--pp-danger)" : "var(--pp-text-primary)" }}
+              >
+                {label}
+              </div>
+              <span
+                className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0"
+                style={{ background: `${st.color}22`, color: st.color }}
+              >
+                {st.label}
+              </span>
             </div>
+            {showNumberSub && (
+              <div className="text-[11px] truncate" style={{ color: "var(--pp-text-muted)" }}>
+                {numberSub}
+              </div>
+            )}
             <div className="text-xs truncate" style={{ color: "var(--pp-text-muted)" }}>
               {localizedDateTime(call.started_at, lang, t("common.today"), t("common.yesterday"))} · {localizedDuration(call.duration_seconds, lang)}
             </div>
