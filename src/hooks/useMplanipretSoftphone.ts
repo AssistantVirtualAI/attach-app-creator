@@ -27,7 +27,7 @@ type RestCall = {
   direction: "in" | "out";
   other: string;
   startedAt: number;
-  status: "ringing-out" | "active" | "held";
+  status: "ringing-out" | "ringing-in" | "active" | "held";
   muted: boolean;
 };
 
@@ -111,7 +111,7 @@ export function useMplanipretSoftphone() {
       const other = raw.remote_party ?? raw.remote_number ?? raw.other_party
         ?? (direction === "out" ? raw.to_number : raw.from_number) ?? raw.destination ?? "—";
       const status: RestCall["status"] = /hold/i.test(raw.state ?? raw.status ?? "") ? "held"
-        : /ring/i.test(raw.state ?? raw.status ?? "") ? "ringing-out" : "active";
+        : /ring/i.test(raw.state ?? raw.status ?? "") ? (direction === "in" ? "ringing-in" : "ringing-out") : "active";
       const startedAtIso = raw.answered_at ?? raw.started_at ?? raw.time_start;
       const startedAt = startedAtIso ? new Date(startedAtIso).getTime() : Date.now();
       setRestCall((prev) => ({
