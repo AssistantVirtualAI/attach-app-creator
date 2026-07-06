@@ -196,7 +196,7 @@ export default function MHome() {
 
   const reconnect = async () => {
     const traceId = `rc-${Date.now().toString(36)}`;
-    const trace = sipDiagnostics.start(traceId);
+    sipDiagnostics.start(traceId);
     const log = (level: "info" | "warn" | "error", msg: string, data?: any) => sipDiagnostics.log(traceId, level, msg, data);
     const online = typeof navigator !== "undefined" ? navigator.onLine : true;
     log("info", "reconnect start", { online, connection: (navigator as any)?.connection?.effectiveType, currentStatus: softphone.snap.status });
