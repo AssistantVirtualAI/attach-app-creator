@@ -75,6 +75,12 @@ function toIso(v: unknown): string | null {
   return isNaN(d.getTime()) ? null : d.toISOString();
 }
 
+function isProfileFkError(error: { message?: string; code?: string; details?: string } | null) {
+  if (!error) return false;
+  const text = `${error.code ?? ""} ${error.message ?? ""} ${error.details ?? ""}`;
+  return error.code === "23503" || /fk_phone_calls_profile|foreign key/i.test(text);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -134,8 +140,19 @@ Deno.serve(async (req) => {
         .maybeSingle();
       const runId = runRow?.id as string | undefined;
 
+      // Only attach calls to planipret_profiles.id when that exact profile exists.
+      // If the profile link is stale, leave user_id undefined so Postgres keeps the
+      // existing value during upsert instead of trying to write a broken FK.
+      let safeUserId: string | null = null;
+      const { data: profileCheck } = await supabase
+        .from("planipret_profiles")
+        .select("id")
+        .eq("id", ctx.profileId)
+        .maybeSingle();
+      if (profileCheck?.id) safeUserId = ctx.profileId;
+
       const rows = items.map((it) => ({
-        user_id: ctx.profileId,
+        ...(safeUserId ? { user_id: safeUserId } : {}),
         organization_id: AVA_ORG_ID,
         ns_call_id: it.ns_call_id ?? it.ns_cdr_id ?? null,
         ns_callid: it.ns_callid ?? null,
@@ -162,22 +179,9 @@ Deno.serve(async (req) => {
       const withId = rows.filter((r) => r.ns_call_id);
       const withoutId = rows.filter((r) => !r.ns_call_id);
 
-      // Ensure user_id still references a valid planipret_profiles row.
-      // Under concurrent invocations the profile can momentarily be missing —
-      // fall back to null (FK is ON DELETE SET NULL) rather than 500.
-      let safeUserId: string | null = ctx.profileId;
-      const { data: profileCheck } = await supabase
-        .from("planipret_profiles")
-        .select("id")
-        .eq("id", ctx.profileId)
-        .maybeSingle();
-      if (!profileCheck?.id) safeUserId = null;
-      for (const r of rows) (r as any).user_id = safeUserId;
-
-      const tryWrite = async (payload: any[], useNullUser: boolean) => {
-        const finalPayload = useNullUser
-          ? payload.map((r) => ({ ...r, user_id: null }))
-          : payload;
+      const withoutUserId = (payload: any[]) => payload.map(({ user_id: _userId, ...r }) => r);
+      const tryWrite = async (payload: any[], omitUserId: boolean) => {
+        const finalPayload = omitUserId ? withoutUserId(payload) : payload;
         if (payload === withId) {
           return await supabase
             .from("planipret_phone_calls")
@@ -190,7 +194,7 @@ Deno.serve(async (req) => {
       try {
         if (withId.length) {
           let { error, count } = await tryWrite(withId, false);
-          if (error && /foreign key/i.test(error.message)) {
+          if (isProfileFkError(error)) {
             ({ error, count } = await tryWrite(withId, true));
           }
           if (error) throw new Error(error.message);
@@ -198,7 +202,7 @@ Deno.serve(async (req) => {
         }
         if (withoutId.length) {
           let { error } = await tryWrite(withoutId, false);
-          if (error && /foreign key/i.test(error.message)) {
+          if (isProfileFkError(error)) {
             ({ error } = await tryWrite(withoutId, true));
           }
           if (error) throw new Error(error.message);
