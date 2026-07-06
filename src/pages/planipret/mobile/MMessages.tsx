@@ -596,7 +596,8 @@ function TeamChat({ profile }: { profile: any }) {
   const [sumOpen, setSumOpen] = useState(false);
 
   return (
-    <div className="absolute inset-x-0 top-[120px] bottom-0 flex flex-col">
+    <div className="h-full flex flex-col">
+
       <div
         className="px-4 py-2 text-[11px] uppercase tracking-wider flex items-center justify-between"
         style={{ color: "var(--pp-text-muted)", borderBottom: "1px solid var(--pp-bg-border)" }}
