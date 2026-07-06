@@ -255,7 +255,7 @@ function SmsList({ profile, openDialer, registerRefresh }: any) {
         <EmptyState Icon={MessageSquare} title={t("messages.noMessages")} sub={t("messages.startNew")} />
       ) : (
         <ul className="space-y-1.5">
-          {threads.map((th) => {
+          {threads.map((th, index) => {
             const id = threadId(th);
             const peer = threadPeer(th);
             const unread = th.unread ?? th.unread_count ?? 0;
