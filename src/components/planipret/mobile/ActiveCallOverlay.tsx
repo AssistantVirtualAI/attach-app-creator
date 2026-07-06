@@ -162,7 +162,7 @@ export default function ActiveCallOverlay({ callId, onClosed }: { callId: string
               <button onClick={doTransfer} disabled={!transferTo.trim()}
                 className="flex-1 py-3 rounded-2xl text-sm font-semibold text-white disabled:opacity-50"
                 style={{ background: "linear-gradient(135deg, #1A4A8A, #2E9BDC)" }}>
-                {t("call.transfer")}
+                {transferMode === "forward" ? (t("call.forward") ?? "Renvoyer") : t("call.transfer")}
               </button>
             </div>
           </div>
