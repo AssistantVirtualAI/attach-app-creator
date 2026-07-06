@@ -400,6 +400,29 @@ export default function MCalls() {
             />
           </div>
         )}
+        {degraded.active && (
+          <div
+            className="mt-3 flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs"
+            style={{
+              background: "rgba(245, 158, 11, 0.12)",
+              border: "1px solid rgba(245, 158, 11, 0.4)",
+              color: "var(--pp-text-primary)",
+            }}
+            role="status"
+          >
+            <span className="flex-1">
+              {lang === "en" ? "Degraded mode — showing cached data." : "Mode dégradé — données en cache affichées."}
+              {degraded.reason ? ` (${degraded.reason})` : ""}
+            </span>
+            <button
+              onClick={() => { setDegraded({ active: false }); load(); }}
+              className="px-3 py-1 rounded-full text-xs font-medium"
+              style={{ background: "var(--pp-primary)", color: "#fff" }}
+            >
+              {lang === "en" ? "Retry now" : "Réessayer"}
+            </button>
+          </div>
+        )}
         {/* Pill Tabs */}
         <div
           className="mt-3 flex rounded-full p-1"
