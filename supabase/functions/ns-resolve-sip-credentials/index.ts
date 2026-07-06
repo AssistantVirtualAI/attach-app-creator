@@ -114,7 +114,8 @@ Deno.serve(async (req) => {
 
   const resolvedId = deviceIdOf(device) || deviceName;
   const sipPassword = device["device-sip-registration-password"] ?? device["sip-registration-password"] ?? null;
-  const coreServer = (device["device-sip-registration-core-server"] ?? device["sip-registration-core-server"] ?? FALLBACK_PROXY).toString().replace(/^https?:\/\//, "").replace(/\/+$/, "");
+  const rawCore = (device["core-server"] ?? device["device-sip-registration-core-server"] ?? device["sip-registration-core-server"] ?? "").toString().trim();
+  const coreServer = (rawCore || FALLBACK_PROXY).replace(/^https?:\/\//, "").replace(/\/+$/, "");
   const sipUri = device["device-sip-registration-uri"] ?? `sip:${resolvedId}@${domain}`;
   const sipState = device["device-sip-registration-state"] ?? device["registration-state"] ?? null;
   const wssUrl = `wss://${coreServer}:443/ws`;
