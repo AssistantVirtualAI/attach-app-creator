@@ -72,6 +72,8 @@ Deno.serve(async (req) => {
       const nsBody = {
         "synchronous": "yes",
         "call-id": clientCallId,
+        "destination": dest,
+        "origination": callOrigUser,
         "call-orig-user": callOrigUser,
         "call-term-user": dest,
         "auto-answer-enabled": "no",
