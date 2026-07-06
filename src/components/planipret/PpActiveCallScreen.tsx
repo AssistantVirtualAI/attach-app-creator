@@ -150,9 +150,14 @@ export default function PpActiveCallScreen({
     <AnimatePresence>
       <motion.div
         key="pp-in-call"
-        className="fixed inset-0 z-[80] flex flex-col"
+        className="fixed inset-0 z-[80] flex flex-col overflow-hidden"
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        style={{ background: "linear-gradient(160deg, #060D1A 0%, #0A1425 55%, #0D2540 100%)", color: "white" }}
+        style={{
+          background: "linear-gradient(160deg, #060D1A 0%, #0A1425 55%, #0D2540 100%)",
+          color: "white",
+          paddingTop: "env(safe-area-inset-top, 0px)",
+          paddingBottom: "env(safe-area-inset-bottom, 0px)",
+        }}
       >
         <audio ref={audioRef} autoPlay style={{ display: "none" }} />
 
@@ -175,7 +180,7 @@ export default function PpActiveCallScreen({
 
         {/* Identity */}
         {view === "main" && (
-          <div className="flex-1 flex flex-col items-center justify-center px-6">
+          <div className="flex-1 min-h-0 flex flex-col items-center justify-center px-6 pb-4">
             <div className="w-28 h-28 rounded-full flex items-center justify-center mb-5"
               style={{ background: "linear-gradient(135deg, #1A4A8A, #2E9BDC)", boxShadow: "0 10px 40px rgba(46,155,220,0.5)" }}>
               <User className="w-12 h-12" />
@@ -271,14 +276,16 @@ export default function PpActiveCallScreen({
 
         {/* Action bar (main view) — market-standard: all controls visible together */}
         {view === "main" && !isIncoming && (
-          <div className="px-6 pb-8">
-            <div className="grid grid-cols-3 gap-4">
+          <div className="shrink-0 px-4 pb-6">
+            <div
+              className="grid grid-cols-5 gap-2 rounded-[28px] px-3 py-3"
+              style={{ background: "rgba(3,10,22,0.72)", border: "1px solid rgba(255,255,255,0.10)", boxShadow: "0 18px 48px rgba(0,0,0,0.42)", backdropFilter: "blur(18px)" }}
+            >
               <CallBtn active={snap.muted} onClick={() => (snap.muted ? unmute() : mute())} icon={snap.muted ? <MicOff /> : <Mic />} label={snap.muted ? "Activer" : "Muet"} />
               <CallBtn active={isHeld} onClick={() => (isHeld ? unhold() : hold())} icon={isHeld ? <Play /> : <Pause />} label={isHeld ? "Reprendre" : "Attente"} />
               <CallBtn onClick={() => setView("transfer")} icon={<PhoneForwarded />} label="Transférer" />
               <CallBtn onClick={() => setView("keypad")} icon={<Grid3X3 />} label="Clavier" />
               <CallBtn danger onClick={() => hangup()} icon={<PhoneOff />} label="Raccrocher" />
-              <div />
             </div>
           </div>
         )}
@@ -306,16 +313,16 @@ export default function PpActiveCallScreen({
 function CallBtn({ icon, label, onClick, active, danger }: { icon: React.ReactNode; label: string; onClick: () => void; active?: boolean; danger?: boolean }) {
   return (
     <button onClick={onClick} className="flex flex-col items-center gap-1.5 active:scale-95 transition">
-      <div className="w-14 h-14 rounded-full flex items-center justify-center"
+      <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center"
         style={{
           background: danger ? "linear-gradient(135deg, #B91C1C, #E84C4C)" : active ? "rgba(46,155,220,0.25)" : "rgba(255,255,255,0.08)",
           border: `1px solid ${danger ? "rgba(232,76,76,0.55)" : active ? "rgba(46,155,220,0.5)" : "rgba(255,255,255,0.15)"}`,
           boxShadow: danger ? "0 8px 22px rgba(232,76,76,0.45)" : undefined,
           color: "white",
         }}>
-        <span className="w-6 h-6 flex items-center justify-center [&>svg]:w-6 [&>svg]:h-6">{icon}</span>
+        <span className="w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center [&>svg]:w-5 [&>svg]:h-5 sm:[&>svg]:w-6 sm:[&>svg]:h-6">{icon}</span>
       </div>
-      <span className="text-[11px] text-white/70">{label}</span>
+      <span className="text-[10px] sm:text-[11px] leading-none text-white/80 max-w-[64px] truncate">{label}</span>
     </button>
   );
 }
