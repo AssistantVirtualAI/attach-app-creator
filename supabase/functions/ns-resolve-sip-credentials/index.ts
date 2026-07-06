@@ -140,20 +140,18 @@ Deno.serve(async (req) => {
   const sipUri = device["device-sip-registration-uri"] ?? `sip:${resolvedId}@${domain}`;
   const sipState = device["device-sip-registration-state"] ?? device["registration-state"] ?? null;
 
-  // Provide and enforce SIP credentials so SIP.js can register the _web device.
-  const sipPassword = clientType === "web" ? await derivePassword(String(profile.user_id)) : undefined;
+  // Provide and enforce SIP credentials so SIP.js (web + mobile) can register the device.
+  const sipPassword = await derivePassword(String(profile.user_id));
   let repairStatus: any = null;
-  if (clientType === "web" && sipPassword) {
-    repairStatus = await nsPut(
-      `/domains/${encodeURIComponent(domain)}/users/${encodeURIComponent(ext)}/devices/${encodeURIComponent(resolvedId)}`,
-      {
-        "device-sip-registration-password": sipPassword,
-        "device-provisioning-registration-core-server": coreServer,
-        "device-srtp-enabled": "opportunistic",
-        "device-sip-allowed-user-agent": "SIP.js",
-      },
-    );
-  }
+  repairStatus = await nsPut(
+    `/domains/${encodeURIComponent(domain)}/users/${encodeURIComponent(ext)}/devices/${encodeURIComponent(resolvedId)}`,
+    {
+      "device-sip-registration-password": sipPassword,
+      "device-provisioning-registration-core-server": coreServer,
+      "device-srtp-enabled": "opportunistic",
+      "device-sip-allowed-user-agent": "SIP.js",
+    },
+  );
 
   return json({
     ok: true,
