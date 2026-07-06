@@ -582,10 +582,12 @@ function AISection({ call, onUpdated }: { call: RecordingCall; onUpdated: (c: Re
           }
         }
       }
+      if (!transcriptForAi) throw new Error("Transcription indisponible côté système téléphonique");
       const { data, error } = await supabase.functions.invoke("pp-coach-call", {
         body: { call_id: callDbId(call), transcript: transcriptForAi, force: true },
       });
       if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any)?.message ?? (data as any)?.error);
       onUpdated(applyCoachPayload(baseCall, data));
       toast.success("Analyse IA terminée");
     } catch (e: any) {
