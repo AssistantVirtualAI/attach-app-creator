@@ -26,12 +26,17 @@ Deno.serve(async (req) => {
   const { data: isPlanipretAdmin } = user
     ? await supaUser.rpc("is_planipret_admin", { _user_id: user.id })
     : { data: false } as any;
-  if (!user || (user.id !== OWNER_UUID && isPlanipretAdmin !== true)) {
+  const { data: isPlanipretMember } = user
+    ? await supaUser.rpc("is_planipret_member", { _user_id: user.id })
+    : { data: false } as any;
+  if (!user || (user.id !== OWNER_UUID && isPlanipretAdmin !== true && isPlanipretMember !== true)) {
     return new Response(JSON.stringify({ error: "forbidden" }), {
       status: 403,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
+
+  const canManageSecrets = user.id === OWNER_UUID || isPlanipretAdmin === true;
 
   const { data: lemtelOnly } = await supaUser.rpc("is_lemtel_only", { _user_id: user.id });
   if (lemtelOnly === true) {
@@ -75,6 +80,12 @@ Deno.serve(async (req) => {
   }
 
   if (req.method === "POST") {
+    if (!canManageSecrets) {
+      return new Response(JSON.stringify({ error: "forbidden_admin_required" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     const body = await req.json().catch(() => null);
     if (!body?.provider || !ALLOWED.has(body.provider) || typeof body.config !== "object") {
       return new Response(JSON.stringify({ error: "invalid_body" }), {
