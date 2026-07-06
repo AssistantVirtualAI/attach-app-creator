@@ -157,7 +157,6 @@ Deno.serve(async (req) => {
         duration_seconds: it.duration_seconds,
         recording_url: it.recording_url,
         ns_recording_url: it.ns_recording_url,
-        has_recording: it.has_recording,
         metadata: it,
       }));
 
