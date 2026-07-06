@@ -296,7 +296,7 @@ export default function MCalls() {
         proxy_ns_callid: r.ns_callid ?? r.ns_orig_callid ?? r.ns_term_callid ?? r.ns_call_id ?? null,
         has_recording: !!(r.has_recording || r.recording_url || r.ns_callid || r.ns_orig_callid || r.ns_term_callid || r.ns_call_id),
       })) as Call[]);
-      supabase.functions.invoke("pp-ns-cdr", { body: { action: "sync", start, end, limit: 250 } }).catch(() => null);
+      supabase.functions.invoke("pp-ns-cdr", { body: { action: "sync", start, end, limit: 50 } }).catch(() => null);
     } catch (e) {
       console.warn("[MCalls] recordings load failed", e);
     } finally {
