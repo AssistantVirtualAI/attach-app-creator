@@ -81,7 +81,7 @@ Deno.serve(async (req) => {
 
   const ext = String(profile.ns_extension);
   const domain = profile.ns_domain || NS_DEFAULT_DOMAIN;
-  const deviceName = `${ext}_${clientType}`;
+  const deviceName = deviceNameFor(ext, clientType);
 
   console.log(`[ns-resolve] client_type=${clientType} ext=${ext} device=${deviceName}`);
 
@@ -96,7 +96,7 @@ Deno.serve(async (req) => {
     availableDevices = arr.map(deviceIdOf).filter(Boolean) as string[];
     device = arr.find((d) => {
       const id = (deviceIdOf(d) || "").toLowerCase();
-      return id === deviceName.toLowerCase() || id.endsWith(`_${clientType}`);
+      return id === deviceName.toLowerCase();
     }) ?? null;
   }
 
