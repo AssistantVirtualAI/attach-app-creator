@@ -126,16 +126,23 @@ Deno.serve(async (req) => {
   const coreServer = (rawCore || FALLBACK_PROXY).replace(/^https?:\/\//, "").replace(/\/+$/, "");
   const sipUri = device["device-sip-registration-uri"] ?? `sip:${resolvedId}@${domain}`;
   const sipState = device["device-sip-registration-state"] ?? device["registration-state"] ?? null;
+
+  // Provide SIP credentials so the browser SIP.js UA can register the _web device.
+  const sipPassword = clientType === "web" ? await derivePassword(String(profile.user_id)) : undefined;
+
   return json({
     ok: true,
     client_type: clientType,
     device_id: resolvedId,
     sip_username: resolvedId,
+    sip_auth_user: resolvedId,
+    sip_password: sipPassword,
     sip_extension: ext,
     sip_domain: domain,
     sip_proxy: coreServer,
     sip_core_server: coreServer,
     sip_uri: sipUri,
+    sip_ws_url: NS_SIP_WSS_URL,
     sip_state: sipState,
     device_registered: sipState === "registered",
   });
