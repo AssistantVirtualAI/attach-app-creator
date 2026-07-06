@@ -8,10 +8,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Mic, MicOff, Pause, Play, PhoneForwarded, Grid3X3, PhoneOff, Phone,
-  User, Search, X, ChevronLeft,
+  User, Search, X, ChevronLeft, Activity,
 } from "lucide-react";
 import { useMplanipretLang } from "@/hooks/useMplanipretLang";
 import type { useMplanipretSoftphone } from "@/hooks/useMplanipretSoftphone";
+import PpCallDiagnosticPanel from "./PpCallDiagnosticPanel";
 
 type Contact = {
   id?: string;
@@ -56,6 +57,7 @@ export default function PpActiveCallScreen({
   const [transferQuery, setTransferQuery] = useState("");
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loadingContacts, setLoadingContacts] = useState(false);
+  const [diagOpen, setDiagOpen] = useState(false);
 
   useEffect(() => { setAudioEl(audioRef.current); return () => setAudioEl(null); }, [setAudioEl]);
 
@@ -164,8 +166,12 @@ export default function PpActiveCallScreen({
           <div className="text-xs text-white/60 uppercase tracking-widest">
             {view === "keypad" ? "Clavier" : view === "transfer" ? "Transférer" : (isIncoming ? "Entrant" : isOutgoingRinging ? "Sortant" : "En cours")}
           </div>
-          <div className="w-9" />
+          <button onClick={() => setDiagOpen(true)} aria-label="Diagnostic" className="p-2 rounded-full" style={{ background: "rgba(255,255,255,0.08)" }}>
+            <Activity className="w-4 h-4" />
+          </button>
         </div>
+
+        <PpCallDiagnosticPanel open={diagOpen} onClose={() => setDiagOpen(false)} snap={snap} />
 
         {/* Identity */}
         {view === "main" && (

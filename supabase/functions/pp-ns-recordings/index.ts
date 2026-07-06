@@ -131,6 +131,7 @@ Deno.serve(async (req) => {
         const enriched = [nsId, nsCallId, nsOrigCallId, nsTermCallId].map((id) => id ? byNsId.get(id) : null).find(Boolean);
         const dirRaw = String(val(it, ["direction", "call_direction", "call-direction"], enriched?.direction ?? "")).toLowerCase();
         const direction = dirRaw.includes("in") ? "inbound" : "outbound";
+        const recordingUrl = val(it, ["file-access-url", "url", "recording_url", "recording", "record_url"]) ?? enriched?.recording_url ?? null;
         return {
           id: enriched?.id ?? nsId ?? `rec-${i}`,
           ns_call_id: nsId,
@@ -145,9 +146,13 @@ Deno.serve(async (req) => {
           to_name: val(it, ["to_name", "term_to_name", "term-name"]) ?? enriched?.to_name ?? null,
           started_at: val(it, ["start_time", "started_at", "time_start", "time-start", "call-recording-started-datetime"]) ?? enriched?.started_at ?? null,
           duration_seconds: Number(val(it, ["duration", "billsec", "time_talking", "file-duration-seconds"], 0)) || enriched?.duration_seconds || 0,
-          recording_url: val(it, ["file-access-url", "url", "recording_url", "recording", "record_url"])
-            ?? enriched?.recording_url ?? null,
+          recording_url: recordingUrl,
           has_recording: true,
+          // Always give the UI a proxy stream endpoint so audio can be fetched
+          // even when the raw file-access-url is unavailable/expired.
+          stream_via_proxy: !!(enriched?.id || nsCallId || nsOrigCallId || nsTermCallId),
+          proxy_call_db_id: enriched?.id ?? null,
+          proxy_ns_callid: nsCallId ?? nsOrigCallId ?? nsTermCallId ?? nsId ?? null,
           ai_summary: enriched?.ai_summary ?? null,
           transcript: enriched?.transcript ?? null,
           transcript_segments: enriched?.transcript_segments ?? null,
@@ -161,9 +166,46 @@ Deno.serve(async (req) => {
         };
       });
 
-      // Fallback: local-only if NS returned nothing
-      const finalItems = items.length ? items
-        : (local ?? []).filter((r: any) => r.recording_url || r.has_recording || r.ns_callid || r.ns_call_id);
+      // Fallback + merge: include local rows that NS didn't return but have any NS id
+      // (recordings may still be resolvable through ns-get-recording proxy).
+      const nsSeen = new Set(items.map((r) => r.id));
+      const localExtra = (local ?? [])
+        .filter((r: any) => !nsSeen.has(r.id) && (r.ns_callid || r.ns_orig_callid || r.ns_term_callid || r.ns_call_id || r.recording_url || r.has_recording))
+        .map((r: any) => ({
+          id: r.id,
+          ns_call_id: r.ns_call_id,
+          ns_callid: r.ns_callid,
+          ns_orig_callid: r.ns_orig_callid,
+          ns_term_callid: r.ns_term_callid,
+          extension: r.extension ?? ctx.extension,
+          direction: r.direction ?? "outbound",
+          from_number: r.from_number,
+          from_name: r.from_name,
+          to_number: r.to_number,
+          to_name: r.to_name,
+          started_at: r.started_at,
+          duration_seconds: r.duration_seconds ?? 0,
+          recording_url: r.recording_url,
+          has_recording: !!(r.recording_url || r.has_recording),
+          stream_via_proxy: true,
+          proxy_call_db_id: r.id,
+          proxy_ns_callid: r.ns_callid ?? r.ns_orig_callid ?? r.ns_term_callid ?? r.ns_call_id ?? null,
+          ai_summary: r.ai_summary,
+          transcript: r.transcript,
+          transcript_segments: r.transcript_segments,
+          transcript_language: r.transcript_language,
+          ai_coaching: r.ai_coaching,
+          ai_key_points: r.ai_key_points,
+          ai_client_insights: r.ai_client_insights,
+          maestro_synced: r.maestro_synced,
+          maestro_client_id: r.maestro_client_id,
+          pipeline_state: r.pipeline_state,
+        }));
+      const finalItems = [...items, ...localExtra].sort((a: any, b: any) => {
+        const ta = a.started_at ? new Date(a.started_at).getTime() : 0;
+        const tb = b.started_at ? new Date(b.started_at).getTime() : 0;
+        return tb - ta;
+      });
 
       return jsonResponse({ ok: true, count: finalItems.length, items: finalItems });
     }
