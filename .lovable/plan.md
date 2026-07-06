@@ -1,52 +1,60 @@
-## État actuel
+## Objectif
 
-Après audit du codebase Lovable, la plupart des fichiers listés dans le prompt **n'existent pas** ici :
-- ❌ `PermissionGate.tsx`, `PermissionSoftPrompt.tsx`, `PermissionBlockedScreen.tsx`, `permissionState.ts`, `MobileApp.tsx`, `nativeBoot.ts` → **absents**.
-- ⚠️ `src/hooks/usePermissions.ts` existe mais c'est **RBAC org** (rôles admin/moderator), pas des permissions device — **ne pas supprimer**, ça casserait 15+ pages.
-- ✅ `MobilePermissionsOnboarding.tsx` (Planipret) → déjà supprimé au tour précédent.
-- ✅ Micro demandé au moment de l'appel dans Lemtel (`LemtelSoftphone.tsx` L90 `getUserMedia`) et Planipret (`useMplanipretSoftphone.ts` L219 `ensureMicPermission`).
+Abandonner l'approche WebRTC/WSS (port 7443 fermé) sur le mobile Planiprêt et adopter le **Click-to-Call REST NS-API v2** comme mode d'appel par défaut. Garder la porte ouverte pour un vrai WebPhone plus tard, mais uniquement via credentials dynamiques (jamais d'URL WSS en dur).
 
-## Ce qui reste à faire dans le web Lovable
+## Ce qui change
 
-### 1. Remplacer `MicPermissionDialog` (Planipret) par une bannière inline
+### 1. `supabase/functions/pp-ns-calls/index.ts` — payload conforme NS-API
 
-Actuellement `MicPermissionDialog.tsx` est un **modal plein écran** monté depuis `PlanipretMobile.tsx` (L327-329) — non conforme au standard demandé (« simple inline banner in dialer only, NOT a full screen »).
+Actuellement le POST `?action=start` envoie `{ destination, caller_id_number, caller_id_name }`. On le remplace par le payload officiel NetSapiens :
 
-- Créer `src/components/planipret/mobile/MicDeniedBanner.tsx` : bandeau slim sous le dialer avec message FR/EN + bouton « Ouvrir les réglages » (deep-link `app-settings:` sur iOS, `package:<id>` sur Android via `@capacitor/app`).
-- Dans `PlanipretMobile.tsx` : remplacer `<MicPermissionDialog>` par `<MicDeniedBanner>`, garder l'état `micDialog` mais retirer la logique « retry pending call » (l'utilisateur retapera Appeler après avoir activé le micro).
-- Supprimer `MicPermissionDialog.tsx`.
+```json
+{
+  "synchronous": "yes",
+  "call-id": "<uuid>",
+  "call-orig-user": "<extension>@<domain>",
+  "call-term-user": "<numéro client normalisé E.164>",
+  "auto-answer-enabled": "no"
+}
+```
 
-### 2. Ajouter une bannière `micDenied` inline dans le softphone Lemtel
+- Génération d'un `call-id` UUID côté edge function.
+- Normalisation E.164 du numéro (déjà faite dans `ns-calls`, on la remonte ici).
+- Insertion d'une ligne `planipret_phone_calls` avec `direction=outbound`, `status=outbound_ringing`, `ns_call_id`, comme fait `ns-calls`.
+- Audit log `CALL_START`.
 
-Dans `src/components/lemtel/LemtelSoftphone.tsx` : capturer `NotAllowedError` dans `call()` (L87-93), setter `micDenied` et afficher la même bannière compacte au-dessus du clavier. Ne pas bloquer l'UI.
+Le poste de l'agent sonne d'abord, puis NetSapiens rappelle le client — plus besoin de SIP dans le navigateur.
 
-### 3. Créer `src/lib/native/requestNotificationsOnce.ts`
+### 2. `src/pages/planipret/mobile/MHome.tsx` — désactiver le softphone WebRTC
 
-Helper partagé (idempotent via `@capacitor/preferences` clé `notif_permission_asked`) qui appelle `PushNotifications.requestPermissions()` **une seule fois** sur natif. No-op sur web.
+- Retirer le bouton "reconnect" SIP et l'attente d'événement `pp:sip-ready` (source des timeouts 20s dans les logs).
+- Remplacer le bloc "statut téléphone" par un simple indicateur "Prêt à appeler (mode Click-to-Call)".
+- L'appel se déclenche par `pp-ns-calls?action=start` → toast "Votre téléphone va sonner…".
 
-### 4. L'appeler après login réussi dans les deux apps
+### 3. `src/pages/planipret/mobile/MCalls.tsx` — même flux
 
-- `src/components/planipret/mobile/MobileAuthScreen.tsx` (après `signInWithPassword` OK).
-- `src/pages/planipret/PlanipretMobile.tsx` L495 (même endroit).
-- Point d'entrée Lemtel équivalent (à confirmer — le softphone Lemtel n'a pas d'écran de login séparé ; à appeler lors du premier montage authentifié dans `LemtelSoftphone.tsx` si `user` présent).
+- Le dialer envoie `to_number` à `pp-ns-calls start`. Aucun changement UI majeur, juste s'assurer que le toast dit "sonne votre appareil".
+- Les actions `answer/hold/transfer/disconnect` restent (PATCH REST déjà en place).
 
-## Ce qui NE doit PAS être modifié depuis Lovable
+### 4. Softphone JsSIP — mis en veille (pas supprimé)
 
-Ces fichiers vivent dans le **repo GitHub natif exporté**, pas dans ce projet Lovable :
-- `SipConnectionService.kt` (Step 6) → à créer dans `android/app/src/main/java/com/lemtel/softphone/` du repo exporté.
-- `AndroidManifest.xml` (permissions + `<service>`) → dans le repo exporté.
-- `Info.plist` → dans le repo exporté (déjà OK selon Step 7).
-- `CapacitorSip.swift`, `CallKitManager.swift`, `Main.storyboard`, `project.pbxproj`, `RTPAudioSession.swift`, `AppBridgeViewController.swift` → non touchés.
+- `src/lib/softphone/jssipProvider.ts` et `ns-resolve-sip-credentials` restent en place mais ne sont plus câblés dans `MHome`. On garde le code pour l'Option 2 future.
+- Suppression des `dispatchEvent("pp:sip-ready")` depuis les écrans mobiles.
+- Aucun code d'URL WSS en dur ne sera ajouté (les fallbacks `pbxnode.lemtel.tel:7443` existants restent commentés/désactivés).
 
-Je peux vous fournir les snippets prêts à coller pour ces fichiers natifs, mais le commit doit se faire dans votre repo GitHub, pas ici.
+### 5. Push entrants (préparation, pas d'implémentation cette itération)
 
-## Fichiers modifiés (web Lovable)
+- Ajouter un TODO documenté dans `pp-ns-users` pour, lors du provisioning d'un device, poser `device-push-enabled: "yes"`. Pas d'appel FCM/APNs dans cette itération — juste préparer le terrain.
 
-- **Créés** : `src/lib/native/requestNotificationsOnce.ts`, `src/components/planipret/mobile/MicDeniedBanner.tsx`
-- **Modifiés** : `src/pages/planipret/PlanipretMobile.tsx`, `src/components/planipret/mobile/MobileAuthScreen.tsx`, `src/components/lemtel/LemtelSoftphone.tsx`
-- **Supprimés** : `src/components/planipret/mobile/MicPermissionDialog.tsx`
+## Ce qui ne change PAS
 
-## Vérification
+- Toutes les autres edge functions NS-API (`pp-ns-cdr`, `pp-ns-voicemail`, `pp-ns-sms`, `pp-ns-contacts`, `pp-ns-recordings`, `pp-ns-users`).
+- Les pages `MVoicemail`, `MMessages`, `MContacts`, `MPipeline`, `MStats`.
+- La garde `MplanipretGuard` et le routage `/mplanipret/*`.
+- Le secret `NS_SIP_WSS_URL` reste — il sera réutilisé le jour où l'Option 2 (WebPhone in-app avec credentials dynamiques) sera activée.
 
-- `tsgo` doit passer.
-- Preview : `/planipret/mobile` → l'écran login s'affiche direct, pas de pré-écran permissions ; taper un numéro puis Appeler → dialog OS micro natif ; refuser → bannière inline (pas de modal plein écran).
+## Vérification après build
+
+1. Depuis `/mplanipret/calls`, taper un numéro → cliquer Appeler → attendre le toast "votre appareil va sonner".
+2. Vérifier dans `planipret_phone_calls` qu'une ligne `outbound_ringing` est créée avec un `ns_call_id`.
+3. Vérifier que `/mplanipret/home` ne déclenche plus de tentative de reconnexion SIP (plus de log `registration wait finished timeout 20003ms`).
