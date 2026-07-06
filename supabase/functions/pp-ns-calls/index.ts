@@ -155,16 +155,22 @@ Deno.serve(async (req) => {
       const payload = cachedBody ?? (await req.json().catch(() => ({})));
       const callId = payload?.call_id;
       if (!callId) return jsonResponse({ error: "call_id required" }, 400);
-      const nsAction = action === "resume" ? "unhold" : action;
+      const nsAction = action === "resume" ? "unhold" : action === "hangup" ? "disconnect" : action;
       const path = `${base}/${encodeURIComponent(callId)}/${nsAction}`;
       const body = nsAction === "transfer" ? JSON.stringify({ destination: payload.destination ?? payload.target })
         : nsAction === "mute" ? JSON.stringify({ muted: !!payload.muted })
         : nsAction === "dtmf" ? JSON.stringify({ digit: payload.digit })
         : undefined;
-      const res = await nsFetch(path, { method: "PATCH", body });
+      let res = await nsFetch(path, { method: "PATCH", body });
+      if (!res.ok && nsAction === "disconnect") {
+        res = await nsFetch(`${base}/${encodeURIComponent(callId)}`, { method: "DELETE" });
+      }
+      if (!res.ok && nsAction === "transfer") {
+        res = await nsFetch(path, { method: "PATCH", body: JSON.stringify({ transfer_to: payload.destination ?? payload.target }) });
+      }
       const txt = await res.text();
-      return new Response(txt || "{}", {
-        status: res.status,
+      return new Response(txt || JSON.stringify({ success: res.ok, status: res.status }), {
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
