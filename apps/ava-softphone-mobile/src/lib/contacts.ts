@@ -4,6 +4,7 @@
  * in sessionStorage so the dialer stays fast.
  */
 import { Capacitor } from '@capacitor/core';
+import { hasConsent, hasConsentSync } from './contactsConsent';
 
 export interface PhoneEntry { number: string; label?: string }
 export interface DeviceContact {
@@ -20,6 +21,9 @@ const CACHE_KEY = 'lemtel-device-contacts';
 
 export async function syncDeviceContacts(): Promise<DeviceContact[]> {
   if (!Capacitor.isNativePlatform()) return [];
+  // App Store 5.1.2: never read the device address book unless the user has
+  // given explicit in-app consent via the ContactsConsentSheet.
+  if (!(await hasConsent())) return loadCachedContacts();
   try {
     const { Contacts } = await import('@capacitor-community/contacts');
     const perm = await Contacts.checkPermissions();
@@ -27,6 +31,7 @@ export async function syncDeviceContacts(): Promise<DeviceContact[]> {
       const req = await Contacts.requestPermissions();
       if (req.contacts !== 'granted') return [];
     }
+
     const result = await Contacts.getContacts({
       projection: { name: true, phones: true, emails: true },
     });
