@@ -76,7 +76,7 @@ Deno.serve(async (req) => {
 
   const { data: profile } = await userClient
     .from("planipret_profiles")
-    .select("id, ns_extension, ns_domain")
+    .select("id, user_id, ns_extension, ns_domain")
     .eq("user_id", user.id)
     .maybeSingle();
 
