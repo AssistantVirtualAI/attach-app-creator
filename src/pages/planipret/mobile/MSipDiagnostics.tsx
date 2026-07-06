@@ -69,26 +69,28 @@ export default function MSipDiagnostics() {
             const duration = tr.finishedAt ? tr.finishedAt - tr.startedAt : Date.now() - tr.startedAt;
             return (
               <div key={tr.traceId} className="rounded-2xl overflow-hidden" style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)" }}>
-                <button
-                  onClick={() => setOpenId(open ? null : tr.traceId)}
-                  className="w-full px-3 py-3 flex items-center gap-3 text-left"
-                >
-                  <Icon className="w-5 h-5 shrink-0" style={{ color: iconColor }} />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold truncate" style={{ color: "var(--pp-text-primary)" }}>
-                      {tr.traceId}
-                      <span className="ml-2 text-[11px] font-normal" style={{ color: "var(--pp-text-muted)" }}>
-                        {tr.outcome ?? "en cours"} · {fmtDur(duration)}
-                      </span>
+                <div className="w-full px-3 py-3 flex items-center gap-3">
+                  <button
+                    onClick={() => setOpenId(open ? null : tr.traceId)}
+                    className="flex items-center gap-3 text-left flex-1 min-w-0"
+                  >
+                    <Icon className="w-5 h-5 shrink-0" style={{ color: iconColor }} />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-semibold truncate" style={{ color: "var(--pp-text-primary)" }}>
+                        {tr.traceId}
+                        <span className="ml-2 text-[11px] font-normal" style={{ color: "var(--pp-text-muted)" }}>
+                          {tr.outcome ?? "en cours"} · {fmtDur(duration)}
+                        </span>
+                      </div>
+                      <div className="text-[11px]" style={{ color: "var(--pp-text-muted)" }}>
+                        {new Date(tr.startedAt).toLocaleString()} · {tr.entries.length} entrées
+                      </div>
                     </div>
-                    <div className="text-[11px]" style={{ color: "var(--pp-text-muted)" }}>
-                      {new Date(tr.startedAt).toLocaleString()} · {tr.entries.length} entrées
-                    </div>
-                  </div>
-                  <button onClick={(e) => { e.stopPropagation(); copy(tr.traceId); }} className="p-1.5 rounded-full" style={{ color: "var(--pp-text-muted)" }} aria-label="Copier">
+                  </button>
+                  <button onClick={() => copy(tr.traceId)} className="p-1.5 rounded-full" style={{ color: "var(--pp-text-muted)" }} aria-label="Copier">
                     <Copy className="w-4 h-4" />
                   </button>
-                </button>
+                </div>
                 {open && (
                   <div className="px-3 pb-3">
                     <pre className="text-[11px] font-mono whitespace-pre-wrap break-words p-3 rounded-lg overflow-x-auto" style={{ background: "var(--pp-bg-elevated)", color: "var(--pp-text-primary)", border: "1px solid var(--pp-bg-border-2)", maxHeight: 400 }}>
