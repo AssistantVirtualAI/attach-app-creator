@@ -56,6 +56,7 @@ const PATemplates = lazyWithRetry(() => import("./pages/planipret/admin/PATempla
 const PADebug = lazyWithRetry(() => import("./pages/planipret/admin/PADebug"));
 const PAAva = lazyWithRetry(() => import("./pages/planipret/admin/PAAva"));
 const PAMobileDevices = lazyWithRetry(() => import("./pages/planipret/admin/PAMobileDevices"));
+const PASipDiagnostic = lazyWithRetry(() => import("./pages/planipret/admin/PASipDiagnostic"));
 const PlanipretPrivacy = lazyWithRetry(() => import("./pages/planipret/PlanipretPrivacy"));
 const PlanipretIntegrationsLazy = lazyWithRetry(() => import("./pages/planipret/PlanipretIntegrations"));
 import { AdminPageSkeleton } from "./components/planipret/Skeletons";
