@@ -8,9 +8,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // @ts-ignore npm package has no bundled TS declarations.
 import GSMDecoder from "npm:gsm-decoder@1.0.0";
 
-const NS_API_KEY = Deno.env.get("NS_API_KEY");
-const NS_API_BASE_URL = (Deno.env.get("NS_API_BASE_URL") ?? "https://voice.ava-telecom.ca/ns-api/v2").replace(/\/$/, "");
-const NS_DOMAIN = Deno.env.get("NS_DEFAULT_DOMAIN") ?? Deno.env.get("NS_API_DOMAIN") ?? "planipret.ca";
+const FALLBACK_NS_API_BASE_URL = (Deno.env.get("NS_API_BASE_URL") ?? "https://voice.ava-telecom.ca/ns-api/v2").replace(/\/$/, "");
+const FALLBACK_NS_DOMAIN = Deno.env.get("NS_DEFAULT_DOMAIN") ?? Deno.env.get("NS_API_DOMAIN") ?? "planipret.ca";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
@@ -81,13 +80,36 @@ function addIdsFromPath(out: string[], path: unknown) {
 }
 
 async function nsJson(path: string) {
-  const r = await fetch(`${NS_API_BASE_URL}${path}`, {
-    headers: { Authorization: `Bearer ${NS_API_KEY}`, Accept: "application/json" },
+  const cfg = await getNsRuntimeConfig();
+  const r = await fetch(`${cfg.baseUrl}${path}`, {
+    headers: { Authorization: `Bearer ${cfg.apiKey}`, Accept: "application/json" },
   });
   const text = await r.text();
   let data: any = null;
   try { data = text ? JSON.parse(text) : null; } catch { data = text; }
   return { ok: r.ok, status: r.status, ct: r.headers.get("Content-Type") ?? "", data, text };
+}
+
+async function getNsRuntimeConfig() {
+  let configData: Record<string, string> = {};
+  let secretData: Record<string, string> = {};
+  try {
+    const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
+    const [{ data: cfg }, { data: secrets }] = await Promise.all([
+      admin.from("planipret_integration_config").select("config_data").eq("integration_key", "ns_api").maybeSingle(),
+      admin.from("planipret_integration_secrets").select("provider, config").in("provider", ["nsapi", "ns_api"]).limit(2),
+    ]);
+    configData = (cfg?.config_data ?? {}) as Record<string, string>;
+    secretData = (((secrets ?? [])[0] as any)?.config ?? {}) as Record<string, string>;
+  } catch { /* env fallback */ }
+  const baseUrl = (configData.base_url ?? secretData.base_url ?? FALLBACK_NS_API_BASE_URL).replace(/\/$/, "").replace(/\/ns-api\/v2$/, "") + "/ns-api/v2";
+  const apiKey = configData.api_key ?? secretData.api_key ?? Deno.env.get("NS_API_KEY") ?? "";
+  if (!apiKey) throw new Error("NS_API_KEY not configured");
+  return {
+    baseUrl,
+    apiKey,
+    domain: configData.domain ?? configData.default_domain ?? secretData.domain ?? secretData.default_domain ?? FALLBACK_NS_DOMAIN,
+  };
 }
 
 function asArray(data: any): any[] {
@@ -293,14 +315,15 @@ async function audioResponse(upstream: Response, meta: any, extra: Record<string
 }
 
 async function streamFromUrl(audioUrl: string, meta: any, extra: Record<string, string | null | undefined>, attempts: any[]) {
+  const cfg = await getNsRuntimeConfig();
   const fullUrl = audioUrl.startsWith("http")
     ? audioUrl
-    : `${NS_API_BASE_URL}${audioUrl.startsWith("/") ? "" : "/"}${audioUrl.replace(/^\/?ns-api\/v2\/?/, "")}`;
+    : `${cfg.baseUrl}${audioUrl.startsWith("/") ? "" : "/"}${audioUrl.replace(/^\/?ns-api\/v2\/?/, "")}`;
   // Signed ucstack/file-access-url URLs must be fetched without NS bearer.
   let a = await fetch(fullUrl);
   attempts.push({ url: audioUrl.startsWith("http") ? "file-access-url-noauth" : fullUrl, status: a.status, ct: a.headers.get("Content-Type") ?? "" });
   if (!a.ok && !audioUrl.startsWith("http")) {
-    a = await fetch(fullUrl, { headers: { Authorization: `Bearer ${NS_API_KEY}`, Accept: "audio/*" } });
+    a = await fetch(fullUrl, { headers: { Authorization: `Bearer ${cfg.apiKey}`, Accept: "audio/*" } });
     attempts.push({ url: "audio-url-bearer", status: a.status, ct: a.headers.get("Content-Type") ?? "" });
   }
   if (!a.ok || !a.body) return null;
@@ -309,7 +332,8 @@ async function streamFromUrl(audioUrl: string, meta: any, extra: Record<string, 
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  if (!NS_API_KEY) return json({ error: "NS_API_KEY not configured" }, 500);
+  let cfg;
+  try { cfg = await getNsRuntimeConfig(); } catch (e) { return json({ error: (e as Error).message }, 500); }
 
   let body: any = {};
   try { body = await req.json(); } catch { /* GET/empty */ }
@@ -318,7 +342,7 @@ Deno.serve(async (req) => {
   let ns_callid: string | null = body.ns_callid ?? url.searchParams.get("ns_callid");
   let ns_extension: string | null = body.ns_extension ?? url.searchParams.get("ns_extension");
   let row: any = null;
-  let domain = String(body.domain ?? url.searchParams.get("domain") ?? NS_DOMAIN);
+  let domain = String(body.domain ?? url.searchParams.get("domain") ?? cfg.domain);
   const attempts: any[] = [];
 
   if ((!ns_callid || !ns_extension) && call_db_id) {
@@ -358,7 +382,7 @@ Deno.serve(async (req) => {
     }, 200);
   }
 
-  const headers = { Authorization: `Bearer ${NS_API_KEY}`, Accept: "audio/*, application/json" };
+  const headers = { Authorization: `Bearer ${cfg.apiKey}`, Accept: "audio/*, application/json" };
   const D = encodeURIComponent(domain);
   const E = ns_extension ? encodeURIComponent(ns_extension) : null;
 
@@ -375,7 +399,7 @@ Deno.serve(async (req) => {
   let recordingMeta: any = null;
 
   for (const { path: p, lookupId } of Array.from(new Map(paths.map((x) => [`${x.path}|${x.lookupId}`, x])).values())) {
-    const target = `${NS_API_BASE_URL}${p}`;
+    const target = `${cfg.baseUrl}${p}`;
     try {
       const r = await fetch(target, { headers });
       const ct = r.headers.get("Content-Type") ?? "";
