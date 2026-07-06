@@ -398,6 +398,8 @@ function CallRow({ call, onTap, onCall, showCallBtn }: { call: Call; onTap: () =
   const out = isOutbound(call);
   const dirColor = missed ? "var(--pp-danger)" : out ? "var(--pp-success)" : "var(--pp-brand-accent)";
   const Icon = missed ? PhoneMissed : out ? PhoneOutgoing : PhoneIncoming;
+  const names = useCallerNames([otherNumber(call)]);
+  const label = displayLabelWith(call, names[otherNumber(call)], lang as "fr" | "en");
   const hasAi = !!call.ai_summary;
 
   return (
