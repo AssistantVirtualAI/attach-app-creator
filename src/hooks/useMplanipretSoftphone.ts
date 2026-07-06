@@ -122,7 +122,10 @@ export function useMplanipretSoftphone() {
         if (opts?.force) {
           try { ppSipProvider.stop(); } catch {}
         }
-        const { data, error } = await supabase.functions.invoke("ns-resolve-sip-credentials", { body: { client_type: "mobile" } });
+        // /mplanipret/* is the WEB softphone (browser WebRTC). It MUST use
+        // the `{ext}_web` device — the `{ext}_mobile` device is reserved for
+        // the native iOS/Android app in apps/ava-softphone-mobile.
+        const { data, error } = await supabase.functions.invoke("ns-resolve-sip-credentials", { body: { client_type: "widget" } });
         if (cancelled) return;
         if (error || !data || (data as any)?.error) return;
         const d = data as any;
@@ -220,7 +223,7 @@ export function useMplanipretSoftphone() {
     // first; NetSapiens then dials the client and bridges both. No WebRTC,
     // no microphone permission needed on this app.
     const { data, error } = await supabase.functions.invoke("pp-ns-calls", {
-      body: { action: "start", to_number: destination, client_type: "mobile" },
+      body: { action: "start", to_number: destination, client_type: "web" },
 
     });
     const d = data as any;
