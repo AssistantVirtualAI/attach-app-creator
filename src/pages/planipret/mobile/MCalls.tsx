@@ -178,6 +178,7 @@ export default function MCalls() {
   const [refreshing, setRefreshing] = useState(false);
   const [selected, setSelected] = useState<Call | null>(null);
   const [visibleCount, setVisibleCount] = useState(25);
+  const [degraded, setDegraded] = useState<{ active: boolean; reason?: string; reopens_at?: number | null }>({ active: false });
 
   const userId = profile?.id ?? profile?.user_id;
   const profileAuthId = profile?.user_id;
