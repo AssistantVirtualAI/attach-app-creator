@@ -24,6 +24,9 @@ export default function DialerScreen({ sp, haptic, preferClickToCall: _preferCli
   const [contactsPicker, setContactsPicker] = useState<DeviceContact[] | null>(null);
   const [contactsBusy, setContactsBusy] = useState(false);
   const [contactsQuery, setContactsQuery] = useState('');
+  const [consentOpen, setConsentOpen] = useState(false);
+  useEffect(() => { loadConsent().catch(() => {}); }, []);
+
   const status: string = sp.sipStatus || sp.snap?.status || 'connecting';
   const sipError: string = sp.sipError || sp.snap?.error || '';
   const isRegistered = status === 'registered';
