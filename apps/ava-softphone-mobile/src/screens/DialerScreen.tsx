@@ -106,6 +106,8 @@ export default function DialerScreen({ sp, haptic, preferClickToCall: _preferCli
 
   const openContactsFlow = async () => {
     await haptic(ImpactStyle.Light);
+    // App Store 5.1.2: require our own consent screen before iOS prompt.
+    if (!(await hasConsent())) { setConsentOpen(true); return; }
     // If already granted on native, skip the pre-prompt.
     if (Capacitor.isNativePlatform()) {
       try {
@@ -121,6 +123,7 @@ export default function DialerScreen({ sp, haptic, preferClickToCall: _preferCli
     }
     setContactsPrePrompt(true);
   };
+
 
   const pickContactNumber = (n: string) => {
     setNum(n.replace(/[^\d+*#]/g, ''));
