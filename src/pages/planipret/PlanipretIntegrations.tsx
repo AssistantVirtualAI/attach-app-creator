@@ -308,7 +308,11 @@ export default function PlanipretIntegrations() {
             (ms?.present ?? []).includes("MICROSOFT_CLIENT_SECRET");
           const clientIdMissing = !clientIdVal;
           const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL ?? "";
-          const callbackUrl = `${supabaseUrl}/functions/v1/ms365-oauth-callback`;
+          const edgeCallbackUrl = `${supabaseUrl}/functions/v1/ms365-auth-callback`;
+          const origin = typeof window !== "undefined" ? window.location.origin : "";
+          const webCallbackUrl = `${origin}/auth/microsoft/callback`;
+          const iosScheme = "msauth.com.assistantvirtualai.softphone://auth";
+          const androidScheme = "msauth://com.assistantvirtualai.softphone/callback";
           return (
         <IntegrationCard
           integrationKey="ms365" name="Microsoft 365"
@@ -360,12 +364,13 @@ export default function PlanipretIntegrations() {
             </div>
             <p className="mb-3" style={{ fontSize: 11, color: "#4A7FA5", lineHeight: 1.6 }}>
               Ajoutez ces URIs dans <em>App Registration → Authentication</em> selon la plateforme.
-              Tous pointent vers l'Edge Function <code>ms365-oauth-callback</code>.
+              Web = portail admin/mobile PWA · iOS/Android = app native Capacitor · Edge = fonction serveur.
             </p>
             {[
-              { platform: "Web", hint: "Plateforme « Web » — utilisé par le portail admin", uri: callbackUrl },
-              { platform: "iOS / macOS", hint: "Plateforme « Mobile and desktop applications »", uri: callbackUrl },
-              { platform: "Android",     hint: "Plateforme « Mobile and desktop applications »", uri: callbackUrl },
+              { platform: "Web (this origin)", hint: "Plateforme « Web » — portail Planiprêt courant", uri: webCallbackUrl },
+              { platform: "Web (Edge fn)",     hint: "Plateforme « Web » — callback serveur Supabase", uri: edgeCallbackUrl },
+              { platform: "iOS / macOS",       hint: "Plateforme « Mobile and desktop applications »", uri: iosScheme },
+              { platform: "Android",           hint: "Plateforme « Android » — package + signature hash", uri: androidScheme },
             ].map((r) => (
               <div key={r.platform} className="flex items-center gap-2 mb-2 last:mb-0">
                 <div className="flex-shrink-0 px-2 py-1 rounded text-[10px] font-semibold"

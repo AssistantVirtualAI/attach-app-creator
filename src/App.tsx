@@ -423,6 +423,8 @@ const App = () => (
                 <Route path="/planipret/dashboard" element={<Navigate to="/planipret/admin/overview" replace />} />
                 <Route path="/planipret/integrations" element={<Navigate to="/planipret/admin/integrations" replace />} />
                 <Route path="/auth/ms365/callback" element={<Ms365Callback />} />
+                <Route path="/auth/microsoft/callback" element={<Ms365Callback />} />
+                <Route path="/auth/callback" element={<Ms365Callback />} />
                 <Route path="/planipret/audit" element={<AppSeparationGuard app="planipret"><PlanipretAudit /></AppSeparationGuard>} />
                 <Route path="/planipret/store-preflight" element={<AppSeparationGuard app="planipret"><StorePreflightPreview /></AppSeparationGuard>} />
 

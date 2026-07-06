@@ -17,7 +17,8 @@ export default function Ms365Callback() {
       if (!code) { setStatus("error"); setError("Code OAuth manquant"); return; }
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { setStatus("error"); setError("Session expirée — reconnectez-vous"); return; }
-      const redirect_uri = `${window.location.origin}/auth/ms365/callback`;
+      // Must match the redirect URI registered in Azure App Registration.
+      const redirect_uri = `${window.location.origin}/auth/microsoft/callback`;
       const { data, error: e } = await supabase.functions.invoke("ms365-oauth-exchange", { body: { code, redirect_uri } });
       if (e || !(data as any)?.success) {
         setStatus("error"); setError((data as any)?.error ?? e?.message ?? "Échec OAuth");
