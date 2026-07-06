@@ -1555,14 +1555,15 @@ function ActiveCallsTab({ userId, openDialer }: { userId: string; openDialer: (n
   const fetchActive = async () => {
     const { data, error } = await supabase.functions.invoke("pp-ns-calls", { body: { action: "list" } });
     if (error) return;
-    const list = ((data as any)?.calls ?? []) as any[];
+    const raw = data as any;
+    const list = (Array.isArray(raw) ? raw : raw?.calls ?? raw?.items ?? raw?.data ?? []) as any[];
     setActive(list.map((c: any) => ({
-      id: c.id ?? c.call_id,
-      number: c.remote_number ?? c.number ?? "",
-      name: c.remote_name ?? c.name,
+      id: c["call-id"] ?? c.call_id ?? c.callid ?? c.id,
+      number: c.remote_number ?? c.number ?? c["call-term-user"] ?? c["call-orig-user"] ?? "",
+      name: c.remote_name ?? c.name ?? c["caller-id-name"],
       status: (c.state ?? c.status ?? "active") as any,
       startedAt: c.started_at ? new Date(c.started_at).getTime() : Date.now(),
-    })));
+    })).filter((c: ActiveCall) => !!c.id));
   };
 
   useEffect(() => {

@@ -7,7 +7,7 @@
 //     `navigator.mediaDevices.getUserMedia` proxy scoped to Planipret calls.
 //   - Auto network handover (Wi-Fi ↔ LTE) via handoverController.
 //   - Live call-quality sampling via callQualitySampler.
-//   - Outbound fallback to `ns-calls action:start` when WebRTC is not registered
+//   - Outbound fallback to `pp-ns-calls action:start` when WebRTC is not registered
 //     ("both, with fallback" policy).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
