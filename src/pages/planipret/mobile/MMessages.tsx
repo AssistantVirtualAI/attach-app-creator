@@ -1583,11 +1583,20 @@ function TeamsThreadView({ target, onClose }: {
       body: { action: "list", ...invokeBody, top: 40 },
     });
     setLoading(false);
-    if (error || (data as any)?.error) {
-      toast.error((data as any)?.error || error?.message || "Erreur");
+    let payload: any = data ?? {};
+    if (error && (error as any).context?.text) {
+      try { payload = JSON.parse(await (error as any).context.text()); } catch { /* ignore */ }
+    }
+    if (payload?.error === "ms365_not_connected") {
+      toast.error("Microsoft 365 non connecté. Ouvrez Plus → Microsoft 365.");
       return;
     }
-    setMessages(((data as any).messages || []).slice().reverse());
+    if (payload?.error) {
+      toast.error(payload.error + (payload.detail?.error?.message ? `: ${payload.detail.error.message}` : ""));
+      return;
+    }
+    if (error) { toast.error(error.message || "Erreur"); return; }
+    setMessages(((payload.messages) || []).slice().reverse());
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
 
