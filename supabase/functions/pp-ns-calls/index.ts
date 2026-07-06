@@ -64,7 +64,7 @@ Deno.serve(async (req) => {
         "caller-id-number": payload.caller_id_number ?? ctx.extension,
         "caller-id-name": payload.caller_id_name ?? "Courtier Planiprêt",
       };
-      const res = await nsFetch(base, { method: "POST", body: JSON.stringify(nsBody) });
+      const res = await nsFetch(`${base}?callid=${encodeURIComponent(clientCallId)}`, { method: "POST", body: JSON.stringify(nsBody) });
       const body = await res.text();
       let parsed: any = null;
       try { parsed = body ? JSON.parse(body) : null; } catch { /* keep raw */ }
