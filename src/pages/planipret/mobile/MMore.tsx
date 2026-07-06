@@ -87,7 +87,7 @@ export default function MMore() {
   const startMs365OAuth = (cfg: { client_id: string; tenant_id?: string }) => {
     const clientId = cfg.client_id;
     const tenant = cfg.tenant_id || "common";
-    const redirect = `${window.location.origin}/auth/ms365/callback`;
+    const redirect = `${window.location.origin}/auth/microsoft/callback`;
     const scope = encodeURIComponent("openid profile email offline_access User.Read Mail.ReadWrite Mail.Send Calendars.ReadWrite Chat.ReadWrite ChannelMessage.Send Team.ReadBasic.All Channel.ReadBasic.All");
     supabase.auth.getUser().then(({ data: { user } }) => {
       const state = user?.id ?? "";
