@@ -73,7 +73,27 @@ const isMissed = (c: Call) => c.direction === "missed" || c.status === "missed";
 
 const otherNumber = (c: Call) => (isOutbound(c) ? c.to_number : c.from_number) || "";
 const otherName = (c: Call) => (isOutbound(c) ? c.to_name : c.from_name) || "";
-const displayLabel = (c: Call) => otherName(c) || otherNumber(c) || "Inconnu";
+// Label priority: NS caller_id_name → resolved (Maestro/MS/contacts) → phone
+// number → localized "Numéro non résolu" fallback. When the CDR is missing BOTH
+// name and number we log the record so the source can be inspected.
+const UNRESOLVED_FR = "Numéro non résolu";
+const UNRESOLVED_EN = "Unresolved number";
+function displayLabelWith(c: Call, resolved?: string | null, lang: "fr" | "en" = "fr"): string {
+  const name = otherName(c);
+  if (name) return name;
+  if (resolved) return resolved;
+  const num = otherNumber(c);
+  if (num) return num;
+  console.warn("[MCalls] unresolved caller — no name and no number", {
+    id: c.id,
+    ns_call_id: c.ns_call_id,
+    direction: c.direction,
+    started_at: c.started_at,
+    metadata: c.metadata,
+  });
+  return lang === "en" ? UNRESOLVED_EN : UNRESOLVED_FR;
+}
+const displayLabel = (c: Call) => otherName(c) || otherNumber(c) || UNRESOLVED_FR;
 
 const localizedDateTime = (iso: string, lang: "fr" | "en", todayLabel: string, yesterdayLabel: string) => {
   const d = new Date(iso);
