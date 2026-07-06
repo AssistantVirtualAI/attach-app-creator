@@ -96,7 +96,11 @@ export default function PlanipretIntegrations() {
   }, [rows]);
 
   function getField(key: string, field: string, fallback = "") {
-    return draft[key]?.[field] ?? rows[key]?.config_data?.[field] ?? fallback;
+    const backendValues = (backendSecrets[key] as any)?.values as Record<string, string> | undefined;
+    return draft[key]?.[field]
+      ?? rows[key]?.config_data?.[field]
+      ?? backendValues?.[field]
+      ?? fallback;
   }
   function setField(key: string, field: string, value: string) {
     setDraft((d) => ({ ...d, [key]: { ...(d[key] ?? {}), [field]: value } }));
