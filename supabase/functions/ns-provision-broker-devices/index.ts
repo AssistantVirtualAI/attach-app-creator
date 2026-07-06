@@ -114,6 +114,10 @@ Deno.serve(async (req) => {
 
       const create = async (id: string, model: string, needle: string) => {
         if (hasDev(needle)) return { existed: true, id };
+        // TODO (push): when we ship native FCM/APNs on /mplanipret, add
+        //   "device-push-enabled": "yes"
+        // and register the FCM/APNs token on this device so NetSapiens can
+        // wake the app for inbound calls instead of us keeping a WSS open.
         const r = await fetch(base, {
           method: "POST", headers: nsHeaders,
           body: JSON.stringify({ device: id, "authentication-key": sipPassword, "device-provisioning-protocol": "sip", "device-model": model }),
