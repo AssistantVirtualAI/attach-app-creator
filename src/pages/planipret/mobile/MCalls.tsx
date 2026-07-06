@@ -274,15 +274,19 @@ export default function MCalls() {
   }, [load, loadRecordings, registerRefresh]);
 
 
-  // Realtime updates on phone_calls (for new entries)
+  // Realtime updates on phone_calls (for new entries + auto-refresh recordings)
   useEffect(() => {
     if (!userId) return;
     const ch = supabase
       .channel(`planipret-calls:${userId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "planipret_phone_calls", filter: `user_id=eq.${userId}` }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "planipret_phone_calls", filter: `user_id=eq.${userId}` }, () => {
+        load();
+        // A new CDR usually means a fresh recording is (or will be) available.
+        loadRecordings();
+      })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [userId, load]);
+  }, [userId, load, loadRecordings]);
 
   const missedCount = useMemo(() => calls.filter(isMissed).length, [calls]);
 
@@ -296,11 +300,14 @@ export default function MCalls() {
     );
   }, [calls, tab, search]);
 
+  const paged = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
+
   const onRefresh = async () => {
     setRefreshing(true);
-    await load();
+    await Promise.all([load(), tab === "recordings" ? loadRecordings() : Promise.resolve()]);
     setTimeout(() => setRefreshing(false), 300);
   };
+
 
   return (
     <div className="h-full flex flex-col" style={{ background: "var(--pp-bg-base)" }}>
