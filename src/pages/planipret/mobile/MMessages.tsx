@@ -896,7 +896,7 @@ function EmailsList({ profile, openAva: _openAva }: { profile: any; openAva: () 
 
   const load = async () => {
     if (!profile?.ms365_access_token) { setState("no_m365"); return; }
-    setState("loading");
+    setState((s) => (s === "ready" ? s : "loading"));
     const { data, error } = await supabase.functions.invoke("ms365-actions", {
       body: { action: "read_emails", payload: { top: 25 } },
     });
@@ -905,7 +905,14 @@ function EmailsList({ profile, openAva: _openAva }: { profile: any; openAva: () 
     setState("ready");
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [profile?.ms365_access_token]);
+  useEffect(() => {
+    load(); /* eslint-disable-next-line */
+    if (!profile?.ms365_access_token) return;
+    const id = window.setInterval(() => { load(); }, 60_000);
+    const onVis = () => { if (document.visibilityState === "visible") load(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => { window.clearInterval(id); document.removeEventListener("visibilitychange", onVis); };
+  }, [profile?.ms365_access_token]);
 
   return (
     <div className="h-full overflow-y-auto p-3">
