@@ -20,7 +20,7 @@ const AIAuditScreen = lazy(() => import('./AIAuditScreen'));
 const QueuesScreen  = lazy(() => import('./QueuesScreen'));
 const FeaturesScreen = lazy(() => import('./FeaturesScreen'));
 import ScreenSkeleton from '../components/ScreenSkeleton';
-import { useTr } from '../lib/i18n';
+import { useTr, useT } from '../lib/i18n';
 
 
 type Sub = null | 'voicemail' | 'messages' | 'contacts' | 'settings' | 'delete' | 'privacy' | 'datasafety' | 'permissions' | 'support' | 'aiaudit' | 'queues' | 'features';
