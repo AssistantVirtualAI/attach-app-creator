@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Mic, MicOff, Pause, Play, PhoneForwarded, Grid3X3, PhoneOff, Phone,
-  User, Search, X, ChevronLeft, Activity,
+  User, Search, X, ChevronLeft, Activity, Volume2, VolumeX,
 } from "lucide-react";
 import { useMplanipretLang } from "@/hooks/useMplanipretLang";
 import type { useMplanipretSoftphone } from "@/hooks/useMplanipretSoftphone";
@@ -58,6 +58,7 @@ export default function PpActiveCallScreen({
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loadingContacts, setLoadingContacts] = useState(false);
   const [diagOpen, setDiagOpen] = useState(false);
+  const [speakerOn, setSpeakerOn] = useState(false);
 
   useEffect(() => { setAudioEl(audioRef.current); return () => setAudioEl(null); }, [setAudioEl]);
 
@@ -278,10 +279,11 @@ export default function PpActiveCallScreen({
         {view === "main" && !isIncoming && (
           <div className="shrink-0 px-4 pb-6">
             <div
-              className="grid grid-cols-5 gap-2 rounded-[28px] px-3 py-3"
+              className="grid grid-cols-6 gap-2 rounded-[28px] px-3 py-3"
               style={{ background: "rgba(3,10,22,0.72)", border: "1px solid rgba(255,255,255,0.10)", boxShadow: "0 18px 48px rgba(0,0,0,0.42)", backdropFilter: "blur(18px)" }}
             >
               <CallBtn active={snap.muted} onClick={() => (snap.muted ? unmute() : mute())} icon={snap.muted ? <MicOff /> : <Mic />} label={snap.muted ? "Activer" : "Muet"} />
+              <CallBtn active={speakerOn} onClick={() => setSpeakerOn((v) => !v)} icon={speakerOn ? <Volume2 /> : <VolumeX />} label="H.-parleur" />
               <CallBtn active={isHeld} onClick={() => (isHeld ? unhold() : hold())} icon={isHeld ? <Play /> : <Pause />} label={isHeld ? "Reprendre" : "Attente"} />
               <CallBtn onClick={() => setView("transfer")} icon={<PhoneForwarded />} label="Transférer" />
               <CallBtn onClick={() => setView("keypad")} icon={<Grid3X3 />} label="Clavier" />

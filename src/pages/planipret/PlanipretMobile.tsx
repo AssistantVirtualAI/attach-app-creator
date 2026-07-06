@@ -379,30 +379,39 @@ export default function PlanipretMobile() {
   useEffect(() => {
     if (!profile?.user_id) return;
     const refreshActive = async () => {
-      const { data } = await supabase
+      let q: any = supabase
         .from("planipret_phone_calls")
         .select("id,status,direction,from_number,to_number,from_name,to_name,started_at,answered_at")
-        .eq("user_id", profile.user_id)
-        .in("status", ["active", "in_progress", "answered", "ringing"])
+        .in("status", ["active", "in_progress", "answered", "ringing", "outbound_ringing"])
         .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .limit(1);
+      const filters = [
+        profile.id ? `user_id.eq.${profile.id}` : null,
+        profile.user_id ? `user_id.eq.${profile.user_id}` : null,
+        profile.ns_extension ? `extension.eq.${profile.ns_extension}` : null,
+        profile.extension ? `extension.eq.${profile.extension}` : null,
+      ].filter(Boolean).join(",");
+      if (filters) q = q.or(filters);
+      const { data } = await q.maybeSingle();
       const row = data as any;
       setActiveCallId(row?.id ?? null);
+      if (!row?.id) attachRestCall?.(null);
       if (row?.id) {
         const out = row.direction === "outbound" || row.direction === "out";
         attachRestCall?.({
           id: row.id,
           direction: out ? "out" : "in",
           other: (out ? row.to_name || row.to_number : row.from_name || row.from_number) || "—",
+          number: (out ? row.to_number : row.from_number) || "",
           status: String(row.status).includes("ring") ? (out ? "ringing-out" : "ringing-in") : "active",
+          startedAt: row.answered_at ? new Date(row.answered_at).getTime() : row.started_at ? new Date(row.started_at).getTime() : Date.now(),
         });
       }
     };
     refreshActive();
     const ch = supabase
       .channel("mplanipret-active-call")
-      .on("postgres_changes", { event: "*", schema: "public", table: "planipret_phone_calls", filter: `user_id=eq.${profile.user_id}` }, refreshActive)
+      .on("postgres_changes", { event: "*", schema: "public", table: "planipret_phone_calls" }, refreshActive)
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [profile?.user_id, attachRestCall]);

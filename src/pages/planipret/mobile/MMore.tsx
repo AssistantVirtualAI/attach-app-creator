@@ -96,14 +96,16 @@ export default function MMore() {
   };
 
   const connectMs365 = async () => {
-    const { data } = await supabase.from("planipret_integration_secrets").select("config").eq("provider", "microsoft").maybeSingle();
-    const cfg = (data?.config ?? {}) as any;
-    if (!cfg.client_id) {
-      setMsForm({ tenant_id: cfg.tenant_id ?? "", client_id: cfg.client_id ?? "", client_secret: "" });
+    const { data, error } = await supabase.functions.invoke("pp-integration-secrets");
+    if (error) { toast.error("Configuration Microsoft inaccessible", { description: error.message }); return; }
+    const microsoft = ((data as any)?.items ?? []).find((i: any) => i.provider === "microsoft");
+    const cfg = (microsoft?.public_config ?? {}) as any;
+    if (!cfg.client_id && !cfg.client_secret_id) {
+      setMsForm({ tenant_id: cfg.tenant_id ?? "", client_id: cfg.client_id ?? cfg.client_secret_id ?? "", client_secret: "" });
       setMsSetupOpen(true);
       return;
     }
-    startMs365OAuth(cfg);
+    startMs365OAuth({ ...cfg, client_id: cfg.client_id ?? cfg.client_secret_id });
   };
 
   const saveMsCredentials = async () => {
@@ -125,7 +127,8 @@ export default function MMore() {
     });
     setMsSaving(false);
     if (error || (data as any)?.error) {
-      toast.error((data as any)?.error ?? error?.message ?? "Échec de l'enregistrement");
+      const detail = (data as any)?.details ?? (data as any)?.message ?? error?.message;
+      toast.error((data as any)?.error ?? "Échec de l'enregistrement", { description: detail });
       return;
     }
     toast.success("Credentials enregistrés");
@@ -394,7 +397,7 @@ export default function MMore() {
             {(["tenant_id", "client_id", "client_secret"] as const).map((k) => (
               <div key={k} style={{ marginBottom: 12 }}>
                 <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "var(--pp-text-primary)", marginBottom: 4 }}>
-                  {k === "tenant_id" ? "Tenant ID" : k === "client_id" ? "Client ID (Application ID)" : "Client Secret (valeur)"}
+                  {k === "tenant_id" ? "Tenant ID" : k === "client_id" ? "Client ID / Secret ID" : "Client Secret (valeur)"}
                 </label>
                 <input
                   type={k === "client_secret" ? "password" : "text"}
