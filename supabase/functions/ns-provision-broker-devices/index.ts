@@ -114,13 +114,20 @@ Deno.serve(async (req) => {
 
       const create = async (id: string, model: string, needle: string) => {
         if (hasDev(needle)) return { existed: true, id };
-        // TODO (push): when we ship native FCM/APNs on /mplanipret, add
-        //   "device-push-enabled": "yes"
-        // and register the FCM/APNs token on this device so NetSapiens can
-        // wake the app for inbound calls instead of us keeping a WSS open.
+        const isMobile = needle === "_mobile";
+        // core-server is MANDATORY — without it JsSIP/PJSIP cannot register.
         const r = await fetch(base, {
           method: "POST", headers: nsHeaders,
-          body: JSON.stringify({ device: id, "authentication-key": sipPassword, "device-provisioning-protocol": "sip", "device-model": model }),
+          body: JSON.stringify({
+            device: id,
+            "authentication-key": sipPassword,
+            "device-provisioning-protocol": "sip",
+            "device-model": model,
+            "core-server": "core1.cluster1.ucstack.io",
+            "server-nat": isMobile ? "yes" : "no",
+            "transport": isMobile ? "TCP" : "WSS",
+            "device-push-enabled": isMobile ? "yes" : "no",
+          }),
         });
         const data = await nsRead(r);
         return { created: r.ok, status: r.status, id, data };
