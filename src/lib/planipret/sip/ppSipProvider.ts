@@ -18,7 +18,7 @@ export type PpSipStatus = "idle" | "connecting" | "connected" | "registered" | "
 export type PpCallState = "idle" | "ringing-out" | "ringing-in" | "active" | "held" | "ended";
 
 export interface PpSipConfig {
-  wsUrl: string;             // wss://voice.ava-telecom.ca:9002
+  wsUrl: string;             // wss://core1.cluster1.ucstack.io:9002
   domain: string;            // planipret.ca
   username: string;          // <ext>_web
   authUser: string;          // <ext>_web
