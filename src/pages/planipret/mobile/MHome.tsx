@@ -171,6 +171,7 @@ export default function MHome() {
   return (
     <div className="p-4 space-y-4 pb-8" style={{ background: "var(--pp-bg-base)", minHeight: "100%" }}>
       <PWAInstallBanner />
+      <PermissionBanners />
       <ExtensionSyncBanner profile={profile} reloadProfile={reloadProfile} />
 
       {/* ===== HEADER ===== */}
