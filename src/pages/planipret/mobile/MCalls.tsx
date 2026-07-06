@@ -208,6 +208,21 @@ export default function MCalls() {
   }, [userId]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Fetch recordings list (per-extension) when tab is opened
+  useEffect(() => {
+    if (tab !== "recordings" || !userId) return;
+    (async () => {
+      try {
+        const { data } = await supabase.functions.invoke("pp-ns-recordings", { body: { action: "list" } });
+        const items = (data as any)?.items ?? [];
+        setRecordings(items as Call[]);
+      } catch (e) {
+        console.warn("[MCalls] recordings load failed", e);
+      }
+    })();
+  }, [tab, userId]);
+
   useEffect(() => {
     registerRefresh(() => load());
     return () => registerRefresh(null);
