@@ -119,7 +119,7 @@ export default function MMore() {
           tenant_id: msForm.tenant_id.trim(),
           client_id: msForm.client_id.trim(),
           client_secret: msForm.client_secret.trim(),
-          redirect_uri: `${window.location.origin}/auth/ms365/callback`,
+          redirect_uri: `${window.location.origin}/auth/microsoft/callback`,
         },
       },
     });
