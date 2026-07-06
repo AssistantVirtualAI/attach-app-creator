@@ -382,7 +382,7 @@ export default function PlanipretMobile() {
       let q: any = supabase
         .from("planipret_phone_calls")
         .select("id,status,direction,from_number,to_number,from_name,to_name,started_at,answered_at")
-        .in("status", ["active", "in_progress", "answered", "ringing"])
+        .in("status", ["active", "in_progress", "answered", "ringing", "outbound_ringing"])
         .order("created_at", { ascending: false })
         .limit(1);
       const filters = [
