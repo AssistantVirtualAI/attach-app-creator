@@ -1487,8 +1487,19 @@ function Teams365Panel({ profile }: { profile: any }) {
       </div>
 
       {err === "ms365_not_connected" && (
-        <div className="text-xs p-3 rounded-lg" style={{ background: "var(--pp-bg-elevated)", color: "var(--pp-text-muted)" }}>
-          Microsoft 365 n'est pas connecté. Ouvrez Profil → Intégrations → Microsoft 365 pour vous connecter.
+        <div className="rounded-2xl p-6 text-center mt-4" style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)" }}>
+          <Users className="w-10 h-10 mx-auto mb-3" style={{ color: "var(--pp-brand-accent)" }} />
+          <p className="font-semibold" style={{ color: "var(--pp-text-primary)" }}>Microsoft 365 non connecté</p>
+          <p className="text-xs mt-1 mb-3" style={{ color: "var(--pp-text-muted)" }}>
+            Connectez votre compte Microsoft pour voir vos chats Teams, canaux et coéquipiers.
+          </p>
+          <a
+            href="/mplanipret/more"
+            className="inline-block text-xs px-4 py-2 rounded-full text-white font-semibold"
+            style={{ background: "linear-gradient(135deg, var(--pp-brand-accent), var(--pp-brand-accent-2))" }}
+          >
+            Connecter Microsoft 365
+          </a>
         </div>
       )}
       {err && err !== "ms365_not_connected" && (
