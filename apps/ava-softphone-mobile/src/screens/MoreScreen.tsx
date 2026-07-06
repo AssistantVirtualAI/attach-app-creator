@@ -1,6 +1,8 @@
 import React, { useState, Suspense, lazy } from 'react';
 import type { ImpactStyle } from '@capacitor/haptics';
 import { colors, font } from '../lib/theme';
+import { deleteServerContacts, revokeConsent } from '../lib/contactsConsent';
+
 import type { Creds } from '../lib/creds';
 import { Card, SectionTitle, SettingsRow } from '../components/ui/Primitives';
 import { LemtelMark, AvaBadge } from '../components/Brand';
