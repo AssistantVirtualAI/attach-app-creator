@@ -16,7 +16,7 @@ const FALLBACK_PROXY = Deno.env.get("NS_SIP_PROXY") ?? "core1.cluster1.ucstack.i
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-type ClientType = "mobile" | "web" | "widget";
+type ClientType = "mobile" | "widget";
 
 function json(b: unknown, s = 200) {
   return new Response(JSON.stringify(b), { status: s, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -24,7 +24,6 @@ function json(b: unknown, s = 200) {
 
 function normalizeClientType(v: unknown): ClientType {
   if (v === "widget") return "widget";
-  if (v === "web") return "web";
   return "mobile";
 }
 
@@ -113,7 +112,6 @@ Deno.serve(async (req) => {
   }
 
   const resolvedId = deviceIdOf(device) || deviceName;
-  const sipPassword = device["device-sip-registration-password"] ?? device["sip-registration-password"] ?? null;
   const rawCore = (device["core-server"] ?? device["device-sip-registration-core-server"] ?? device["sip-registration-core-server"] ?? "").toString().trim();
   const coreServer = (rawCore || FALLBACK_PROXY).replace(/^https?:\/\//, "").replace(/\/+$/, "");
   const sipUri = device["device-sip-registration-uri"] ?? `sip:${resolvedId}@${domain}`;
@@ -127,8 +125,6 @@ Deno.serve(async (req) => {
     sip_domain: domain,
     sip_proxy: coreServer,
     sip_core_server: coreServer,
-    sip_password: sipPassword,
-    password: sipPassword,
     sip_uri: sipUri,
     sip_state: sipState,
     device_registered: sipState === "registered",
