@@ -15,6 +15,7 @@ import RecordingsList from "@/components/planipret/mobile/recordings/RecordingsL
 import { CallRecordingPlayer } from "@/components/planipret/mobile/call/CallRecordingPlayer";
 import MaestroTab from "@/components/planipret/mobile/call/MaestroTab";
 import { useMplanipretLang } from "@/hooks/useMplanipretLang";
+import { useCallerNames } from "@/lib/planipret/callerLookup";
 
 
 const PRIMARY = "var(--pp-brand-accent-2)";
