@@ -80,29 +80,34 @@ class PpSipProvider {
   }
 
   async init(cfg: PpSipConfig) {
-    if (!cfg.extension || !cfg.sipDomain || !cfg.wssUrl || !cfg.password) {
+    const wssUrl = String(cfg.wssUrl ?? "").trim();
+    if (!cfg.extension || !cfg.sipDomain || !wssUrl || wssUrl === "undefined" || !/^wss?:\/\//i.test(wssUrl) || !cfg.password) {
       this.update({ status: "error", errorCause: "invalid_config" });
       return;
     }
-    const sig = `${cfg.extension}|${cfg.sipDomain}|${cfg.wssUrl}|${cfg.password}`;
+    const cleanCfg = { ...cfg, wssUrl };
+    const sig = `${cleanCfg.extension}|${cleanCfg.sipDomain}|${cleanCfg.wssUrl}|${cleanCfg.password}`;
     if (this.ua && sig === this.lastSig && (this.snap.status === "registered" || this.snap.status === "connected")) {
       return;
     }
     if (this.ua) this.stop();
-    this.cfg = cfg;
+    this.cfg = cleanCfg;
     this.lastSig = sig;
     this.update({ status: "connecting", errorCause: undefined });
 
     try {
-      const urls = Array.from(new Set([cfg.wssUrl, ...(cfg.wssUrls || [])].filter(Boolean))) as string[];
+      const urls = Array.from(new Set([cleanCfg.wssUrl, ...(cleanCfg.wssUrls || [])]
+        .map((u) => String(u ?? "").trim())
+        .filter((u) => /^wss?:\/\//i.test(u)))) as string[];
+      if (!urls.length) throw new Error("No valid SIP WSS URL");
       const sockets = urls.map((u) => new (JsSIP as any).WebSocketInterface(u));
       const ua = new (JsSIP as any).UA({
         sockets,
-        uri: `sip:${cfg.sipUsername}@${cfg.sipDomain}`,
-        password: cfg.password,
-        authorization_user: cfg.sipUsername,
-        realm: cfg.sipDomain,
-        contact_uri: `sip:${cfg.sipUsername}@${cfg.sipDomain};transport=wss`,
+        uri: `sip:${cleanCfg.sipUsername}@${cleanCfg.sipDomain}`,
+        password: cleanCfg.password,
+        authorization_user: cleanCfg.sipUsername,
+        realm: cleanCfg.sipDomain,
+        contact_uri: `sip:${cleanCfg.sipUsername}@${cleanCfg.sipDomain};transport=wss`,
         register: true,
         session_timers: false,
         register_expires: 120,
@@ -195,7 +200,7 @@ class PpSipProvider {
 
 
   async call(number: string) {
-    if (!this.cfg || !this.ua) return;
+    if (!this.cfg || !this.ua) throw new Error("softphone_not_registered");
     this.update({ callState: "ringing-out", remoteIdentity: number, remoteNumber: number, direction: "out", errorCause: undefined });
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
@@ -203,16 +208,18 @@ class PpSipProvider {
         video: false,
       });
       const target = `sip:${number}@${this.cfg.sipDomain}`;
-      this.ua.call(target, {
+      const session = this.ua.call(target, {
         mediaStream,
         mediaConstraints: { audio: true, video: false },
         rtcOfferConstraints: { offerToReceiveAudio: true, offerToReceiveVideo: false },
       });
+      if (!session) throw new Error("call_session_not_created");
     } catch (err: any) {
       const msg = String(err?.message || err);
       this.log("error", `call failed: ${msg}`);
       this.update({ callState: "ended", errorCause: msg });
       setTimeout(() => this.resetCall(), 1500);
+      throw err;
     }
   }
 

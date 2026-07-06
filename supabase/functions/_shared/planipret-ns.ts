@@ -10,6 +10,7 @@ export { corsHeaders };
 
 export type NsContext = {
   userId: string;
+  profileId: string;
   extension: string;
   nsDomain: string;
 };
@@ -163,7 +164,7 @@ export async function requirePlanipretBroker(
 
   const { data: profile, error: profErr } = await supabase
     .from("planipret_profiles")
-    .select("extension, ns_domain, organization_id")
+    .select("id, extension, ns_extension, ns_domain, organization_id")
     .eq("user_id", userId)
     .maybeSingle();
 
@@ -179,7 +180,8 @@ export async function requirePlanipretBroker(
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
-  if (!profile.extension || !profile.ns_domain) {
+  const extension = profile.extension || profile.ns_extension;
+  if (!extension || !profile.ns_domain) {
     // Soft response: profile not yet linked to NS extension.
     // Returning 200 + needs_link lets the UI render an empty state instead of blanking.
     return new Response(
@@ -196,7 +198,7 @@ export async function requirePlanipretBroker(
   }
 
   return {
-    ctx: { userId, extension: profile.extension, nsDomain: profile.ns_domain },
+    ctx: { userId, profileId: profile.id, extension, nsDomain: profile.ns_domain },
     supabase,
     userClient,
   };

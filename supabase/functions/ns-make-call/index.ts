@@ -102,7 +102,7 @@ Deno.serve(async (req) => {
     // CDR row so the Calls tab reflects the outbound attempt.
     try {
       const { error: cdrError } = await admin.from("planipret_phone_calls").insert({
-        user_id: userId,
+        user_id: profile.id,
         organization_id: profile.organization_id,
         ns_call_id: callId,
         ns_callid: callId,

@@ -379,15 +379,18 @@ export default function MMore() {
       {customizeOpen && <CustomizeSheet profile={profile} onClose={() => setCustomizeOpen(false)} onSaved={reloadProfile} />}
       {dndOpen && <DndSheet profile={profile} onClose={() => setDndOpen(false)} onSaved={reloadProfile} />}
       {msSetupOpen && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "flex-end", justifyContent: "center" }} onClick={() => !msSaving && setMsSetupOpen(false)}>
-          <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 480, background: "var(--pp-bg-surface)", borderRadius: "16px 16px 0 0", padding: 20, maxHeight: "90vh", overflowY: "auto" }}>
+        <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.58)", display: "flex", alignItems: "center", justifyContent: "center", padding: "max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom))" }} onClick={() => !msSaving && setMsSetupOpen(false)}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 520, maxHeight: "calc(100vh - 32px)", background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)", borderRadius: 18, display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 24px 80px rgba(0,0,0,0.45)" }}>
+            <div style={{ padding: "18px 18px 10px", borderBottom: "1px solid var(--pp-bg-border)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
               <div style={{ fontSize: 16, fontWeight: 600, color: "var(--pp-text-primary)" }}>Configurer Microsoft 365</div>
-              <button onClick={() => !msSaving && setMsSetupOpen(false)} style={{ background: "none", border: "none", color: "var(--pp-text-muted)" }}><X className="w-5 h-5" /></button>
+              <button onClick={() => !msSaving && setMsSetupOpen(false)} style={{ width: 40, height: 40, borderRadius: 12, background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)", color: "var(--pp-text-muted)", display: "flex", alignItems: "center", justifyContent: "center" }}><X className="w-5 h-5" /></button>
             </div>
-            <p style={{ fontSize: 12, color: "var(--pp-text-muted)", marginBottom: 16 }}>
+            <p style={{ fontSize: 12, lineHeight: 1.45, color: "var(--pp-text-muted)", margin: 0 }}>
               Récupérez ces valeurs dans Azure Portal → App registrations → votre app.
             </p>
+            </div>
+            <div style={{ padding: 18, overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
             {(["tenant_id", "client_id", "client_secret"] as const).map((k) => (
               <div key={k} style={{ marginBottom: 12 }}>
                 <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "var(--pp-text-primary)", marginBottom: 4 }}>
@@ -397,14 +400,16 @@ export default function MMore() {
                   type={k === "client_secret" ? "password" : "text"}
                   value={msForm[k]}
                   onChange={(e) => setMsForm((f) => ({ ...f, [k]: e.target.value }))}
-                  placeholder={k === "tenant_id" ? "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" : ""}
-                  style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid var(--pp-bg-border-2)", background: "var(--pp-bg-elevated)", color: "var(--pp-text-primary)", fontSize: 14 }}
+                  placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                  autoComplete="off"
+                  style={{ width: "100%", minWidth: 0, padding: "12px 12px", borderRadius: 10, border: "1px solid var(--pp-bg-border-2)", background: "var(--pp-bg-elevated)", color: "var(--pp-text-primary)", fontSize: 14, fontFamily: "Fira Code, monospace", boxSizing: "border-box" }}
                 />
               </div>
             ))}
-            <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+            </div>
+            <div style={{ display: "flex", gap: 8, padding: "12px 18px max(18px, env(safe-area-inset-bottom))", borderTop: "1px solid var(--pp-bg-border)", background: "var(--pp-bg-surface)" }}>
               <button onClick={() => setMsSetupOpen(false)} disabled={msSaving} style={{ flex: 1, padding: 12, borderRadius: 8, border: "1px solid var(--pp-bg-border-2)", background: "transparent", color: "var(--pp-text-primary)" }}>Annuler</button>
-              <button onClick={saveMsCredentials} disabled={msSaving} style={{ flex: 1, padding: 12, borderRadius: 8, border: "none", background: "#3FA3F0", color: "white", fontWeight: 600 }}>
+              <button onClick={saveMsCredentials} disabled={msSaving} style={{ flex: 1, padding: 12, borderRadius: 8, border: "none", background: "var(--pp-brand-accent)", color: "var(--pp-on-accent, #fff)", fontWeight: 600 }}>
                 {msSaving ? "Enregistrement..." : "Enregistrer & connecter"}
               </button>
             </div>

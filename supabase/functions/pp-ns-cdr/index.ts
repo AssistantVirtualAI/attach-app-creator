@@ -135,7 +135,7 @@ Deno.serve(async (req) => {
       const runId = runRow?.id as string | undefined;
 
       const rows = items.map((it) => ({
-        user_id: ctx.userId,
+        user_id: ctx.profileId,
         organization_id: AVA_ORG_ID,
         ns_call_id: it.ns_call_id ?? it.ns_cdr_id ?? null,
         ns_callid: it.ns_callid ?? null,

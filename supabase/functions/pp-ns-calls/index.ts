@@ -113,7 +113,7 @@ Deno.serve(async (req) => {
         const nsCallId = parsed?.["call-id"] ?? parsed?.call_id ?? parsed?.id ?? clientCallId;
         try {
           await guard.supabase.from("planipret_phone_calls").insert({
-            user_id: ctx.userId,
+            user_id: ctx.profileId,
             ns_call_id: nsCallId,
             ns_callid: nsCallId,
             ns_domain: ctx.nsDomain,
