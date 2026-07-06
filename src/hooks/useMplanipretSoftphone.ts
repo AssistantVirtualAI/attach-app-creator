@@ -42,6 +42,8 @@ export function useMplanipretSoftphone() {
   const [answeredElsewhere, setAnsweredElsewhere] = useState<AnsweredBy>(null);
   const activeCallRef = useRef<any>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pendingStartedAtRef = useRef<number | null>(null);
+  const emptyPollsRef = useRef(0);
 
   useEffect(() => {
     const un = networkMonitor.subscribe(setNet);
@@ -61,14 +63,17 @@ export function useMplanipretSoftphone() {
       const call = list[0] || null;
       activeCallRef.current = call;
       if (call) {
+        emptyPollsRef.current = 0;
         const cid = call["call-id"] ?? call.call_id ?? call.id ?? "";
         const remote = call["remote-uri"] ?? call["orig-to-uri"] ?? call["term-user"] ?? call.destination ?? "";
         setSnap((s) => ({ ...s, callState: "active", callId: String(cid), remoteNumber: String(remote), remoteIdentity: String(remote), startedAt: s.startedAt ?? Date.now() }));
 
       } else {
-        // No active call — if we were ringing/active, mark ended.
+        emptyPollsRef.current += 1;
         setSnap((s) => {
           if (s.callState === "idle" || s.callState === "ended") return s;
+          const pendingMs = pendingStartedAtRef.current ? Date.now() - pendingStartedAtRef.current : 0;
+          if (s.callState === "ringing-out" && emptyPollsRef.current < 3 && pendingMs < 8_000) return s;
           return { ...s, callState: "ended" };
         });
         setTimeout(() => {
@@ -76,7 +81,10 @@ export function useMplanipretSoftphone() {
             ? { ...s, callState: "idle", callId: "", remoteNumber: "", remoteIdentity: "", direction: null, startedAt: null, muted: false, onHold: false }
             : s));
         }, 2000);
-        stopPolling();
+        if (emptyPollsRef.current >= 3) {
+          pendingStartedAtRef.current = null;
+          stopPolling();
+        }
       }
     } catch {
       /* transient — keep polling */
@@ -94,6 +102,8 @@ export function useMplanipretSoftphone() {
 
   const placeCall = useCallback(async (destination: string): Promise<OutboundResult> => {
     if (!destination) return { via: "none", ok: false, error: "empty destination" };
+    pendingStartedAtRef.current = Date.now();
+    emptyPollsRef.current = 0;
     patch({ callState: "ringing-out", direction: "out", remoteNumber: destination, remoteIdentity: destination, errorCause: undefined, startedAt: null });
     const { data, error } = await supabase.functions.invoke("pp-ns-calls", {
       body: { action: "start", to_number: destination, client_type: "mobile" },
@@ -102,11 +112,21 @@ export function useMplanipretSoftphone() {
     const d = data as any;
     if (error || d?.success === false || d?.error) {
       const msg = d?.error ?? error?.message ?? "Call failed";
+      pendingStartedAtRef.current = null;
       patch({ callState: "ended", errorCause: msg });
       setTimeout(() => setSnap((s) => ({ ...s, callState: "idle", direction: null, remoteNumber: "", remoteIdentity: "" })), 1500);
       return { via: "none", ok: false, error: msg };
     }
     if (d?.call_id) patch({ callId: String(d.call_id) });
+    window.setTimeout(() => {
+      setSnap((s) => {
+        if (s.callState !== "ringing-out" || activeCallRef.current) return s;
+        pendingStartedAtRef.current = null;
+        stopPolling();
+        return { ...s, callState: "ended", errorCause: "Aucun appel actif détecté — le téléphone mobile n’est probablement pas enregistré." };
+      });
+      window.setTimeout(() => setSnap((s) => (s.callState === "ended" ? { ...s, callState: "idle", direction: null, remoteNumber: "", remoteIdentity: "" } : s)), 2500);
+    }, 12_000);
     startPolling();
     return { via: "pbx", ok: true };
   }, [startPolling]);
