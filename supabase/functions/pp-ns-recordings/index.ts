@@ -71,31 +71,71 @@ Deno.serve(async (req) => {
 
     // ── GET liste des enregistrements récents ────────────────────────────────
     if (action === "list") {
-      const limit = Math.min(Number(url.searchParams.get("limit") ?? 50), 200);
-      const end = url.searchParams.get("end") ?? new Date().toISOString();
-      const start = url.searchParams.get("start") ??
+      const limit = Math.min(Number(url.searchParams.get("limit") ?? body.limit ?? 50), 200);
+      const end = url.searchParams.get("end") ?? body.end ?? new Date().toISOString();
+      const start = url.searchParams.get("start") ?? body.start ??
         new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-      // Récupérer les CDRs avec enregistrements depuis Supabase (déjà synchronisés)
-      const { data: recordings, error } = await supabase
+      // 1) Fetch live from NS-API recordings endpoint (per-user extension)
+      let nsItems: any[] = [];
+      try {
+        const nsRes = await nsFetch(
+          `/domains/${encodeURIComponent(ctx.nsDomain)}/users/${encodeURIComponent(ctx.extension)}/recordings` +
+          `?start-time=${encodeURIComponent(start)}&end-time=${encodeURIComponent(end)}&limit=${limit}`,
+          { method: "GET" },
+          { functionName: "pp-ns-recordings" },
+        );
+        if (nsRes.ok) {
+          const raw = await nsRes.json();
+          nsItems = Array.isArray(raw) ? raw : raw?.recordings ?? raw?.data ?? [];
+        } else {
+          console.warn("[pp-ns-recordings] NS list failed", nsRes.status);
+        }
+      } catch (e) {
+        console.warn("[pp-ns-recordings] NS list error", (e as Error).message);
+      }
+
+      // 2) Merge with enriched local CDR rows (transcript, AI, etc.)
+      const { data: local } = await supabase
         .from("planipret_phone_calls")
-        .select("id, ns_call_id, direction, from_number, from_name, to_number, to_name, started_at, duration_seconds, recording_url, ai_summary")
+        .select("id, ns_call_id, direction, from_number, from_name, to_number, to_name, started_at, duration_seconds, recording_url, ai_summary, transcript")
         .eq("user_id", ctx.userId)
-        .not("recording_url", "is", null)
         .gte("started_at", start)
         .lte("started_at", end)
         .order("started_at", { ascending: false })
         .limit(limit);
+      const byNsId = new Map<string, any>();
+      (local ?? []).forEach((r: any) => { if (r.ns_call_id) byNsId.set(r.ns_call_id, r); });
 
-      if (error) {
-        return jsonResponse({ error: "Erreur base de données", details: error.message }, 500);
-      }
-
-      return jsonResponse({
-        ok: true,
-        count: recordings?.length ?? 0,
-        items: recordings ?? [],
+      const items = nsItems.map((it: any, i: number) => {
+        const nsId = it.id ?? it.call_id ?? it.uuid ?? it["cdr-id"] ?? null;
+        const enriched = nsId ? byNsId.get(nsId) : null;
+        const dirRaw = String(it.direction ?? it.call_direction ?? "").toLowerCase();
+        const direction = dirRaw.includes("in") ? "inbound" : "outbound";
+        return {
+          id: enriched?.id ?? nsId ?? `rec-${i}`,
+          ns_call_id: nsId,
+          direction,
+          from_number: it.from_number ?? it.caller_id_number ?? it.orig_from_user
+            ?? it.by_number ?? enriched?.from_number ?? null,
+          from_name: it.from_name ?? it.caller_id_name ?? enriched?.from_name ?? null,
+          to_number: it.to_number ?? it.destination ?? it.term_to_user ?? enriched?.to_number ?? null,
+          to_name: it.to_name ?? enriched?.to_name ?? null,
+          started_at: it.start_time ?? it.started_at ?? it.time_start ?? enriched?.started_at ?? null,
+          duration_seconds: Number(it.duration ?? it.billsec ?? it.time_talking ?? 0) || enriched?.duration_seconds || 0,
+          recording_url: it.url ?? it.recording_url ?? it.recording ?? it.record_url
+            ?? (nsId ? `/functions/v1/pp-ns-recordings?call_id=${encodeURIComponent(nsId)}` : null)
+            ?? enriched?.recording_url ?? null,
+          ai_summary: enriched?.ai_summary ?? null,
+          transcript: enriched?.transcript ?? null,
+        };
       });
+
+      // Fallback: local-only if NS returned nothing
+      const finalItems = items.length ? items
+        : (local ?? []).filter((r: any) => r.recording_url);
+
+      return jsonResponse({ ok: true, count: finalItems.length, items: finalItems });
     }
 
     return jsonResponse({ error: `Action inconnue: ${action}` }, 400);
