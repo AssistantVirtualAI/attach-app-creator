@@ -223,7 +223,7 @@ export function useMplanipretSoftphone() {
     // first; NetSapiens then dials the client and bridges both. No WebRTC,
     // no microphone permission needed on this app.
     const { data, error } = await supabase.functions.invoke("pp-ns-calls", {
-      body: { action: "start", to_number: destination, client_type: "mobile" },
+      body: { action: "start", to_number: destination, client_type: "web" },
 
     });
     const d = data as any;
