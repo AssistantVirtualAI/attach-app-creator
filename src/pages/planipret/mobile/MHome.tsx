@@ -17,6 +17,7 @@ import { TEMP_EMOJI } from "@/components/planipret/leadHelpers";
 import { useMaestroPipelineToasts } from "@/hooks/useMaestroPipelineToasts";
 import { safeEdgeFunction } from "@/lib/safeEdgeFunction";
 import { useMplanipretLang } from "@/hooks/useMplanipretLang";
+import { sipDiagnostics } from "@/lib/planipret/sipDiagnostics";
 
 type Period = "day" | "week" | "month" | "shift";
 
