@@ -174,11 +174,13 @@ export default function RecordingsList({
 
 // ===================== Card =====================
 function RecordingCard({ call, onUpdated }: { call: RecordingCall; onUpdated: (c: RecordingCall) => void }) {
-  const [open, setOpen] = useState<"rec" | "txt" | "ai" | "crm" | null>(() => hasResolvableAudio(call) ? "rec" : null);
+  const [open, setOpen] = useState<"rec" | "txt" | "ai" | "crm" | null>(null);
   const temp = tempIcon(call.lead_temperature);
   const autoPipelineRef = useRef<string | null>(null);
 
+  // Auto-pipeline runs ONLY when the user opens a section (avoids hammering NS-API on list mount).
   useEffect(() => {
+    if (!open) return;
     if (!hasResolvableAudio(call) || autoPipelineRef.current === call.id) return;
     if (call.transcript && call.ai_summary) return;
     autoPipelineRef.current = call.id;
@@ -210,7 +212,8 @@ function RecordingCard({ call, onUpdated }: { call: RecordingCall; onUpdated: (c
         console.warn("[RecordingsList] auto pipeline failed", e);
       }
     })();
-  }, [call, onUpdated]);
+  }, [open, call, onUpdated]);
+
 
   return (
     <li
