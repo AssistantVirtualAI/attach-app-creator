@@ -161,53 +161,94 @@ export default function MHome() {
   }, [profile?.user_id, period]);
 
 
-  const waitForRegistration = (timeoutMs = 8000) => new Promise<boolean>((resolve) => {
+  const waitForRegistration = (timeoutMs = 8000) => new Promise<{ ok: boolean; ms: number }>((resolve) => {
     let done = false;
+    const startedAt = performance.now();
     const finish = (ok: boolean) => {
       if (done) return;
       done = true;
+      const ms = Math.round(performance.now() - startedAt);
       window.removeEventListener("pp:sip-registered", onReg as EventListener);
-      resolve(ok);
+      resolve({ ok, ms });
     };
     const onReg = (e: Event) => {
-      if ((e as CustomEvent).detail?.registered) finish(true);
+      const detail = (e as CustomEvent).detail;
+      console.log("[Reconnect] pp:sip-registered received", detail);
+      if (detail?.registered) finish(true);
     };
     window.addEventListener("pp:sip-registered", onReg as EventListener);
     setTimeout(() => finish(false), timeoutMs);
   });
 
   const reconnect = async () => {
+    const traceId = `rc-${Date.now().toString(36)}`;
+    const online = typeof navigator !== "undefined" ? navigator.onLine : true;
+    console.groupCollapsed(`[Reconnect ${traceId}] start`);
+    console.log("navigator.onLine =", online, "connection =", (navigator as any).connection);
     toast.loading(t("home.reconnecting"), { id: "sip-reconnect" });
+
+    if (!online) {
+      console.warn(`[Reconnect ${traceId}] aborted: offline`);
+      console.groupEnd();
+      toast.dismiss("sip-reconnect");
+      toast.error("Aucune connexion réseau détectée.");
+      return;
+    }
+
+    const t0 = performance.now();
     const [{ data, error, status }, sipRes] = await Promise.all([
       safeEdgeFunction("ns-auth", { body: {} }),
       supabase.functions.invoke("ns-resolve-sip-credentials", { body: { client_type: "mobile" } }),
     ]);
+    const t1 = performance.now();
+    console.log(`[Reconnect ${traceId}] edge functions returned in ${Math.round(t1 - t0)}ms`, {
+      nsAuth: { status, hasData: !!data, error: error ?? null, dataError: (data as any)?.error, success: (data as any)?.success },
+      nsSip: { hasData: !!sipRes.data, ok: (sipRes.data as any)?.ok, error: sipRes.error?.message, sipError: (sipRes.data as any)?.error },
+    });
+
     if (error || (data as any)?.success === false) {
+      console.error(`[Reconnect ${traceId}] ns-auth failed`, { status, error, data });
+      console.groupEnd();
       toast.dismiss("sip-reconnect");
       toast.error(status === 403 ? t("home.phoneUnauthorized") : ((data as any)?.error ?? error ?? t("home.connectionImpossible")));
       return;
     }
     const sip = (sipRes.data ?? {}) as any;
     if (sipRes.error || !sip?.ok) {
+      console.error(`[Reconnect ${traceId}] ns-resolve-sip-credentials failed`, { sipError: sipRes.error, sip });
+      console.groupEnd();
       toast.dismiss("sip-reconnect");
       toast.error(sip?.error ?? sipRes.error?.message ?? t("home.connectionImpossible"));
       return;
     }
+    console.log(`[Reconnect ${traceId}] SIP creds resolved`, {
+      extension: sip.sip_extension,
+      domain: sip.sip_domain,
+      proxy: sip.sip_proxy,
+      hasPassword: !!sip.sip_password,
+    });
+
     const registrationWait = waitForRegistration();
     try {
       sessionStorage.setItem("pp_sip_config", JSON.stringify({
         username: sip.sip_username, password: sip.sip_password,
         domain: sip.sip_domain, proxy: sip.sip_proxy, extension: sip.sip_extension,
       }));
+      console.log(`[Reconnect ${traceId}] dispatching pp:sip-ready (force=true)`);
       window.dispatchEvent(new CustomEvent("pp:sip-ready", { detail: { extension: sip.sip_extension, force: true } }));
-    } catch {}
+    } catch (e) {
+      console.error(`[Reconnect ${traceId}] failed to store SIP config`, e);
+    }
     await reloadProfile();
     loadStats();
-    const registered = await registrationWait;
+    const { ok: registered, ms: waitedMs } = await registrationWait;
+    console.log(`[Reconnect ${traceId}] registration wait finished`, { registered, waitedMs, softphoneStatus: softphone.snap.status });
+    console.groupEnd();
     toast.dismiss("sip-reconnect");
     if (registered) toast.success(t("home.phoneConnected"));
-    else toast.error("Téléphone non enregistré. Réessaie dans quelques secondes.");
+    else toast.error(`Téléphone non enregistré après ${Math.round(waitedMs / 1000)}s. Aucun événement pp:sip-registered reçu. Vérifie le réseau puis réessaie.`);
   };
+
 
   const handleSuggestion = (sug: { kind: string; number?: string; label: string }) => {
     if (sug.kind === "call" && sug.number) { openDialer(sug.number); return; }

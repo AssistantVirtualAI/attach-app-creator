@@ -15,6 +15,7 @@ import CoachOverlay from "@/components/planipret/ava/CoachOverlay";
 import { callAva, type AvaSuggestion } from "@/services/avaProactive";
 import { useAvaDraft } from "@/hooks/useAvaDraft";
 import { useMplanipretLang } from "@/hooks/useMplanipretLang";
+import { useCallerNames } from "@/lib/planipret/callerLookup";
 
 type SubTab = "sms" | "team" | "teams365" | "ava" | "emails" | "roster";
 
@@ -254,35 +255,16 @@ function SmsList({ profile, openDialer, registerRefresh }: any) {
             const unread = th.unread ?? th.unread_count ?? 0;
             const preview = th.last_message ?? th.preview ?? "";
             return (
-              <li key={id || peer}>
-                <button
-                  onClick={() => setActiveThread({ id, number: peer })}
-                  className="w-full px-3 py-3 flex items-center gap-3 rounded-2xl text-left active:opacity-80"
-                  style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)" }}
-                >
-                  <div
-                    className="w-11 h-11 rounded-full flex items-center justify-center text-white text-sm font-semibold flex-shrink-0"
-                    style={{ background: "linear-gradient(135deg, var(--pp-brand-accent), var(--pp-brand-accent-2))" }}
-                  >
-                    {initials(peer)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm truncate" style={{ color: "var(--pp-text-primary)" }}>{peer}</p>
-                    <p className="text-xs truncate" style={{ color: "var(--pp-text-muted)" }}>{preview || t("messages.noContent")}</p>
-                  </div>
-                  <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                    <span className="text-[11px]" style={{ color: "var(--pp-text-faint)" }}>{fmtTime(threadTime(th))}</span>
-                    {unread > 0 && (
-                      <span
-                        className="min-w-[18px] h-[18px] px-1 rounded-full text-white text-[10px] font-semibold flex items-center justify-center"
-                        style={{ background: "var(--pp-danger)" }}
-                      >
-                        {unread}
-                      </span>
-                    )}
-                  </div>
-                </button>
-              </li>
+              <ThreadRow
+                key={id || peer}
+                id={id}
+                peer={peer}
+                unread={unread}
+                preview={preview}
+                time={threadTime(th)}
+                onOpen={() => setActiveThread({ id, number: peer })}
+                emptyLabel={t("messages.noContent")}
+              />
             );
           })}
         </ul>
@@ -328,6 +310,53 @@ function SmsList({ profile, openDialer, registerRefresh }: any) {
     </div>
   );
 }
+
+function ThreadRow({ id, peer, unread, preview, time, onOpen, emptyLabel }: {
+  id: string; peer: string; unread: number; preview: string; time: string;
+  onOpen: () => void; emptyLabel: string;
+}) {
+  const { lang } = useMplanipretLang();
+  const resolved = useCallerNames([peer]);
+  const isJustDigits = /^\+?[\d\s().-]+$/.test(peer);
+  const label = resolved[peer]
+    || (isJustDigits ? peer : peer)
+    || (lang === "en" ? "Unresolved number" : "Numéro non résolu");
+  return (
+    <li>
+      <button
+        onClick={onOpen}
+        className="w-full px-3 py-3 flex items-center gap-3 rounded-2xl text-left active:opacity-80"
+        style={{ background: "var(--pp-bg-surface)", border: "1px solid var(--pp-bg-border-2)" }}
+      >
+        <div
+          className="w-11 h-11 rounded-full flex items-center justify-center text-white text-sm font-semibold flex-shrink-0"
+          style={{ background: "linear-gradient(135deg, var(--pp-brand-accent), var(--pp-brand-accent-2))" }}
+        >
+          {initials(peer)}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-sm truncate" style={{ color: "var(--pp-text-primary)" }}>{label}</p>
+          {resolved[peer] && (
+            <p className="text-[11px] truncate" style={{ color: "var(--pp-text-faint)" }}>{peer}</p>
+          )}
+          <p className="text-xs truncate" style={{ color: "var(--pp-text-muted)" }}>{preview || emptyLabel}</p>
+        </div>
+        <div className="flex flex-col items-end gap-1 flex-shrink-0">
+          <span className="text-[11px]" style={{ color: "var(--pp-text-faint)" }}>{fmtTime(time, lang as "fr" | "en")}</span>
+          {unread > 0 && (
+            <span
+              className="min-w-[18px] h-[18px] px-1 rounded-full text-white text-[10px] font-semibold flex items-center justify-center"
+              style={{ background: "var(--pp-danger)" }}
+            >
+              {unread}
+            </span>
+          )}
+        </div>
+      </button>
+    </li>
+  );
+}
+
 
 function ThreadView({ threadId: thId, number, myExt, userId, onBack, onCall }: {
   threadId: string; number: string; myExt: string; userId: string;

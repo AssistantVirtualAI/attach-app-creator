@@ -15,6 +15,7 @@ import RecordingsList from "@/components/planipret/mobile/recordings/RecordingsL
 import { CallRecordingPlayer } from "@/components/planipret/mobile/call/CallRecordingPlayer";
 import MaestroTab from "@/components/planipret/mobile/call/MaestroTab";
 import { useMplanipretLang } from "@/hooks/useMplanipretLang";
+import { useCallerNames } from "@/lib/planipret/callerLookup";
 
 
 const PRIMARY = "var(--pp-brand-accent-2)";
@@ -72,7 +73,27 @@ const isMissed = (c: Call) => c.direction === "missed" || c.status === "missed";
 
 const otherNumber = (c: Call) => (isOutbound(c) ? c.to_number : c.from_number) || "";
 const otherName = (c: Call) => (isOutbound(c) ? c.to_name : c.from_name) || "";
-const displayLabel = (c: Call) => otherName(c) || otherNumber(c) || "Inconnu";
+// Label priority: NS caller_id_name → resolved (Maestro/MS/contacts) → phone
+// number → localized "Numéro non résolu" fallback. When the CDR is missing BOTH
+// name and number we log the record so the source can be inspected.
+const UNRESOLVED_FR = "Numéro non résolu";
+const UNRESOLVED_EN = "Unresolved number";
+function displayLabelWith(c: Call, resolved?: string | null, lang: "fr" | "en" = "fr"): string {
+  const name = otherName(c);
+  if (name) return name;
+  if (resolved) return resolved;
+  const num = otherNumber(c);
+  if (num) return num;
+  console.warn("[MCalls] unresolved caller — no name and no number", {
+    id: c.id,
+    ns_call_id: c.ns_call_id,
+    direction: c.direction,
+    started_at: c.started_at,
+    metadata: c.metadata,
+  });
+  return lang === "en" ? UNRESOLVED_EN : UNRESOLVED_FR;
+}
+const displayLabel = (c: Call) => otherName(c) || otherNumber(c) || UNRESOLVED_FR;
 
 const localizedDateTime = (iso: string, lang: "fr" | "en", todayLabel: string, yesterdayLabel: string) => {
   const d = new Date(iso);
@@ -377,6 +398,8 @@ function CallRow({ call, onTap, onCall, showCallBtn }: { call: Call; onTap: () =
   const out = isOutbound(call);
   const dirColor = missed ? "var(--pp-danger)" : out ? "var(--pp-success)" : "var(--pp-brand-accent)";
   const Icon = missed ? PhoneMissed : out ? PhoneOutgoing : PhoneIncoming;
+  const names = useCallerNames([otherNumber(call)]);
+  const label = displayLabelWith(call, names[otherNumber(call)], lang as "fr" | "en");
   const hasAi = !!call.ai_summary;
 
   return (
@@ -401,7 +424,7 @@ function CallRow({ call, onTap, onCall, showCallBtn }: { call: Call; onTap: () =
               className="font-semibold text-[15px] truncate"
               style={{ color: missed ? "var(--pp-danger)" : "var(--pp-text-primary)" }}
             >
-              {displayLabel(call) === "Inconnu" ? t("common.unknown") : displayLabel(call)}
+              {label}
             </div>
             <div className="text-xs truncate" style={{ color: "var(--pp-text-muted)" }}>
               {localizedDateTime(call.started_at, lang, t("common.today"), t("common.yesterday"))} · {localizedDuration(call.duration_seconds, lang)}
@@ -763,6 +786,8 @@ function CallDetailSheet({
   const [eventState, setEventState] = useState<Record<string, { creating?: boolean; createdId?: string }>>({});
   const [activeTab, setActiveTab] = useState<"audio" | "transcript" | "coaching" | "maestro">("audio");
   const peerNumber = (call.direction === "outbound" ? call.to_number : call.from_number) ?? "";
+  const _resolvedNames = useCallerNames([peerNumber]);
+  const _callerLabel = displayLabelWith(call, _resolvedNames[peerNumber], lang as "fr" | "en");
 
   // Load insight
   useEffect(() => {
@@ -999,7 +1024,7 @@ function CallDetailSheet({
 
         {/* Caller header */}
         <div className="px-5 pb-3 shrink-0" style={{ borderBottom: "1px solid var(--pp-bg-border)" }}>
-          <div className="text-lg font-bold truncate" style={{ color: "var(--pp-text-primary)" }}>{displayLabel(call) === "Inconnu" ? t("common.unknown") : displayLabel(call)}</div>
+          <div className="text-lg font-bold truncate" style={{ color: "var(--pp-text-primary)" }}>{_callerLabel}</div>
           {otherName(call) && <div className="text-xs mt-0.5" style={{ color: "var(--pp-text-muted)" }}>{otherNumber(call)}</div>}
           <div className="mt-1.5 flex items-center gap-2 text-[11px]" style={{ color: "var(--pp-text-secondary)" }}>
             <span className="px-2 py-0.5 rounded-full font-semibold" style={{ background: `${dirColor}1F`, color: dirColor, border: `1px solid ${dirColor}55` }}>{direction}</span>
@@ -1694,7 +1719,7 @@ function VoicemailsTab({
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className={`text-sm truncate ${vm.is_read ? "" : "font-semibold"}`} style={{ color: "var(--pp-text-primary)" }}>
-                      {vm.from_name || vm.from_number || "Inconnu"}
+                      {vm.from_name || vm.from_number || (console.warn("[MCalls/VM] unresolved voicemail", { id: vm.id, vm }), UNRESOLVED_FR)}
                     </div>
                     <div className="text-[11px]" style={{ color: "var(--pp-text-muted)" }}>
                       {fmtVmDate(vm.received_at ?? vm.created_at)} · {fmtVmDur(vm.duration_seconds)}
