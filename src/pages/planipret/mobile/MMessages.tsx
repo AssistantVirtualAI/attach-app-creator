@@ -1486,7 +1486,12 @@ function Teams365Panel({ profile }: { profile: any }) {
     setChats(payload.chats || []);
     setTeams(payload.teams || []);
   };
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [connected]);
+  useEffect(() => {
+    load(); /* eslint-disable-next-line */
+    if (!connected) return;
+    const id = window.setInterval(() => { load(); }, 60_000);
+    return () => window.clearInterval(id);
+  }, [connected]);
 
   if (active) return <TeamsThreadView target={active} onClose={() => setActive(null)} />;
 
