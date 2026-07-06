@@ -1719,7 +1719,7 @@ function VoicemailsTab({
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className={`text-sm truncate ${vm.is_read ? "" : "font-semibold"}`} style={{ color: "var(--pp-text-primary)" }}>
-                      {vm.from_name || vm.from_number || "Inconnu"}
+                      {vm.from_name || vm.from_number || (console.warn("[MCalls/VM] unresolved voicemail", { id: vm.id, vm }), UNRESOLVED_FR)}
                     </div>
                     <div className="text-[11px]" style={{ color: "var(--pp-text-muted)" }}>
                       {fmtVmDate(vm.received_at ?? vm.created_at)} · {fmtVmDur(vm.duration_seconds)}
