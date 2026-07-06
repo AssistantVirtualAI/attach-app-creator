@@ -65,14 +65,14 @@ export default function MMessages() {
       >
         <h1 className="text-2xl font-bold mb-3" style={{ color: "var(--pp-text-primary)" }}>{t("messages.title")}</h1>
         <div
-          className="flex rounded-full p-1"
-          style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)" }}
+          className="flex gap-1.5 overflow-x-auto no-scrollbar -mx-1 px-1 pb-1"
+          style={{ scrollbarWidth: "none" }}
         >
           {[
             { k: "sms" as SubTab, label: t("messages.tabs.sms"), Icon: MessageSquare },
-            { k: "team" as SubTab, label: t("messages.tabs.team"), Icon: Users },
+            { k: "team" as SubTab, label: t("messages.tabs.team"), Icon: UsersRound },
             { k: "teams365" as SubTab, label: "Teams", Icon: Users },
-            { k: "roster" as SubTab, label: t("messages.tabs.roster"), Icon: Users },
+            { k: "roster" as SubTab, label: t("messages.tabs.roster"), Icon: Contact },
             { k: "ava" as SubTab, label: t("messages.tabs.ava"), Icon: Bot },
             { k: "emails" as SubTab, label: t("messages.tabs.emails"), Icon: Mail },
           ].map((item) => {
@@ -80,16 +80,21 @@ export default function MMessages() {
             return (
               <button
                 key={item.k}
+                type="button"
                 onClick={() => setSub(item.k)}
-                className="flex-1 py-2 text-[11px] font-semibold rounded-full transition flex items-center justify-center gap-1"
+                className="shrink-0 px-3.5 py-2 text-xs font-semibold rounded-full transition flex items-center gap-1.5 active:scale-95"
                 style={
                   active
                     ? {
                         background: "linear-gradient(135deg, var(--pp-brand-accent), var(--pp-brand-accent-2))",
                         color: "white",
-                        boxShadow: "0 2px 10px rgba(46,155,220,0.35)",
+                        boxShadow: "0 4px 14px rgba(46,155,220,0.4)",
                       }
-                    : { color: "var(--pp-text-muted)" }
+                    : {
+                        background: "var(--pp-bg-elevated)",
+                        border: "1px solid var(--pp-bg-border-2)",
+                        color: "var(--pp-text-secondary)",
+                      }
                 }
               >
                 <item.Icon className="w-3.5 h-3.5" /> {item.label}
