@@ -112,7 +112,7 @@ Deno.serve(async (req) => {
       // 2) Merge with enriched local CDR rows (transcript, AI, etc.)
       const { data: local } = await supabase
         .from("planipret_phone_calls")
-        .select("id, ns_call_id, ns_callid, ns_orig_callid, ns_term_callid, extension, direction, from_number, from_name, to_number, to_name, started_at, duration_seconds, recording_url, has_recording, ai_summary, transcript, transcript_segments, transcript_language, ai_coaching, ai_key_points, ai_client_insights, maestro_synced, maestro_client_id, pipeline_state")
+        .select("id, ns_call_id, ns_callid, ns_orig_callid, ns_term_callid, extension, direction, status, from_number, from_name, to_number, to_name, started_at, duration_seconds, recording_url, has_recording, ai_summary, transcript, transcript_segments, transcript_language, ai_coaching, ai_key_points, ai_client_insights, maestro_synced, maestro_client_id, pipeline_state")
         .eq("user_id", ctx.userId)
         .gte("started_at", start)
         .lte("started_at", end)
@@ -184,6 +184,7 @@ Deno.serve(async (req) => {
           ns_term_callid: r.ns_term_callid,
           extension: r.extension ?? ctx.extension,
           direction: r.direction ?? "outbound",
+          status: r.status ?? null,
           from_number: r.from_number,
           from_name: r.from_name,
           to_number: r.to_number,
