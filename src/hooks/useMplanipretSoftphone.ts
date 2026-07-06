@@ -122,7 +122,10 @@ export function useMplanipretSoftphone() {
         if (opts?.force) {
           try { ppSipProvider.stop(); } catch {}
         }
-        const { data, error } = await supabase.functions.invoke("ns-resolve-sip-credentials", { body: { client_type: "mobile" } });
+        // /mplanipret/* is the WEB softphone (browser WebRTC). It MUST use
+        // the `{ext}_web` device — the `{ext}_mobile` device is reserved for
+        // the native iOS/Android app in apps/ava-softphone-mobile.
+        const { data, error } = await supabase.functions.invoke("ns-resolve-sip-credentials", { body: { client_type: "widget" } });
         if (cancelled) return;
         if (error || !data || (data as any)?.error) return;
         const d = data as any;
