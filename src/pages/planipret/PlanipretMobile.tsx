@@ -682,7 +682,7 @@ export default function PlanipretMobile() {
 
 
         <Dialer open={dialerOpen} onClose={() => setDialerOpen(false)} initial={dialerInit} openMessages={(n) => { setDialerOpen(false); navigate(`/mplanipret/messages${n ? `?to=${encodeURIComponent(n)}` : ""}`); }} softphone={softphone} />
-        <ActiveCallOverlay callId={activeCallId} onClosed={() => setActiveCallId(null)} />
+        <PpActiveCallScreen softphone={softphone} />
         <InboundCallOverlay call={inbound} onClose={() => setInbound(null)} />
         {avaOpen && profile?.user_id && (
           profile.voice_agent_enabled
