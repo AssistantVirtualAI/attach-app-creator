@@ -110,10 +110,12 @@ Deno.serve(async (req) => {
       }
 
       // 2) Merge with enriched local CDR rows (transcript, AI, etc.)
+      // Match admin scoping: filter by extension so we include every call on
+      // the broker's extension, even if user_id wasn't tagged at sync time.
       const { data: local } = await supabase
         .from("planipret_phone_calls")
-        .select("id, ns_call_id, ns_callid, ns_orig_callid, ns_term_callid, extension, direction, status, from_number, from_name, to_number, to_name, started_at, duration_seconds, recording_url, has_recording, ai_summary, transcript, transcript_segments, transcript_language, ai_coaching, ai_key_points, ai_client_insights, maestro_synced, maestro_client_id, pipeline_state")
-        .eq("user_id", ctx.userId)
+        .select("id, user_id, ns_call_id, ns_callid, ns_orig_callid, ns_term_callid, extension, direction, status, from_number, from_name, to_number, to_name, started_at, duration_seconds, recording_url, has_recording, ai_summary, transcript, transcript_segments, transcript_language, ai_coaching, ai_key_points, ai_client_insights, maestro_synced, maestro_client_id, pipeline_state")
+        .or(`user_id.eq.${ctx.userId},extension.eq.${ctx.extension}`)
         .gte("started_at", start)
         .lte("started_at", end)
         .order("started_at", { ascending: false })
