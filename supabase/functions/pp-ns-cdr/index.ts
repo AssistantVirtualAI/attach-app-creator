@@ -162,17 +162,45 @@ Deno.serve(async (req) => {
       const withId = rows.filter((r) => r.ns_call_id);
       const withoutId = rows.filter((r) => !r.ns_call_id);
 
+      // Ensure user_id still references a valid planipret_profiles row.
+      // Under concurrent invocations the profile can momentarily be missing —
+      // fall back to null (FK is ON DELETE SET NULL) rather than 500.
+      let safeUserId: string | null = ctx.profileId;
+      const { data: profileCheck } = await supabase
+        .from("planipret_profiles")
+        .select("id")
+        .eq("id", ctx.profileId)
+        .maybeSingle();
+      if (!profileCheck?.id) safeUserId = null;
+      for (const r of rows) (r as any).user_id = safeUserId;
+
+      const tryWrite = async (payload: any[], useNullUser: boolean) => {
+        const finalPayload = useNullUser
+          ? payload.map((r) => ({ ...r, user_id: null }))
+          : payload;
+        if (payload === withId) {
+          return await supabase
+            .from("planipret_phone_calls")
+            .upsert(finalPayload, { onConflict: "ns_call_id", count: "exact", ignoreDuplicates: false });
+        }
+        return await supabase.from("planipret_phone_calls").insert(finalPayload).select("id", { count: "exact" });
+      };
+
       let upserted = 0;
       try {
         if (withId.length) {
-          const { error, count } = await supabase
-            .from("planipret_phone_calls")
-            .upsert(withId, { onConflict: "ns_call_id", count: "exact", ignoreDuplicates: false });
+          let { error, count } = await tryWrite(withId, false);
+          if (error && /foreign key/i.test(error.message)) {
+            ({ error, count } = await tryWrite(withId, true));
+          }
           if (error) throw new Error(error.message);
           upserted = count ?? withId.length;
         }
         if (withoutId.length) {
-          const { error } = await supabase.from("planipret_phone_calls").insert(withoutId);
+          let { error } = await tryWrite(withoutId, false);
+          if (error && /foreign key/i.test(error.message)) {
+            ({ error } = await tryWrite(withoutId, true));
+          }
           if (error) throw new Error(error.message);
         }
       } catch (e) {
