@@ -335,7 +335,7 @@ export default function PlanipretMobile() {
   const { t, lang, setLang } = useMplanipretLang();
   // REST-only call control: outbound calls ring the broker's registered mobile device.
   const softphone = useMplanipretSoftphone();
-  const { attachRestCall } = softphone;
+  const attachRestCall = (softphone as any).attachRestCall as ((a: any) => void) | undefined;
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [accessError, setAccessError] = useState<"unauthenticated" | "missing_profile" | "load_failed" | null>(null);
