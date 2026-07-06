@@ -211,7 +211,7 @@ export function useMplanipretSoftphone() {
   }, [restMode, invokeRest]);
 
   const unhold = useCallback(() => {
-    if (restMode) { void invokeRest("resume"); setRestCall((c) => c ? { ...c, status: "active" } : c); return; }
+    if (restMode) { void invokeRest("unhold"); setRestCall((c) => c ? { ...c, status: "active" } : c); return; }
     ppSipProvider.unhold();
   }, [restMode, invokeRest]);
 
