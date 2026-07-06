@@ -45,11 +45,13 @@ export default function MContacts() {
   const [shared, setShared] = useState<any[]>([]);
   const [directory, setDirectory] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [selected, setSelected] = useState<any | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
 
   const load = useCallback(async (which: Tab) => {
     setLoading(true);
+    setLoadError(null);
     try {
       const action = which === "personal" ? "list" : which === "shared" ? "shared" : "directory";
       const { data, error } = await supabase.functions.invoke("pp-ns-contacts", { body: { action } });
@@ -58,7 +60,10 @@ export default function MContacts() {
         const detail = payload?.error || payload?.body || error.message;
         throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
       }
-      if (payload?.error) throw new Error(payload.error);
+      if (payload?.error) {
+        const extra = payload?.status ? ` (HTTP ${payload.status})` : "";
+        throw new Error(`${payload.error}${extra}`);
+      }
       if (which === "directory") {
         setDirectory(payload?.directory ?? []);
       } else {
@@ -67,8 +72,10 @@ export default function MContacts() {
         else setShared(list);
       }
     } catch (e: any) {
+      const msg = e?.message || "Erreur inconnue";
       console.error("[pp-ns-contacts]", which, e);
-      toast.error(t("contacts.loadFailed") || "Échec chargement contacts", { description: e?.message });
+      setLoadError(msg);
+      toast.error(t("contacts.loadFailed") || "Échec chargement contacts", { description: msg });
     } finally {
       setLoading(false);
     }
