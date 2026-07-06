@@ -51,19 +51,31 @@ Deno.serve(async (req) => {
         dest = "+" + (digits.length === 10 ? "1" + digits : digits);
       }
       const clientCallId = crypto.randomUUID();
+      // Resolve the SIP device to ring. Default: ring the extension (all
+      // registered devices). When the caller specifies client_type=mobile|web
+      // (or explicit call_orig_user), we ring ONLY that surface's device
+      // (e.g. "113_mobile@planipret.ca") so the mobile app rings but not the
+      // desk phone / web widget.
+      const clientType = String(payload.client_type ?? "").toLowerCase();
+      const deviceSuffix = clientType === "mobile" ? "_mobile"
+                         : clientType === "web" || clientType === "widget" ? "_web"
+                         : null;
+      const callOrigUser = payload.call_orig_user
+        ?? (deviceSuffix ? `${ctx.extension}${deviceSuffix}@${ctx.nsDomain}` : `${ctx.extension}@${ctx.nsDomain}`);
       // Official NetSapiens Click-to-Call payload. The agent's device rings
       // first; once they answer NetSapiens dials the client and bridges both.
       const nsBody = {
         "synchronous": "yes",
         "call-id": clientCallId,
         "callid": clientCallId,
-        "call-orig-user": `${ctx.extension}@${ctx.nsDomain}`,
+        "call-orig-user": callOrigUser,
         "call-term-user": dest,
         "destination": dest,
         "auto-answer-enabled": "no",
         "caller-id-number": payload.caller_id_number ?? ctx.extension,
         "caller-id-name": payload.caller_id_name ?? "Courtier Planiprêt",
       };
+
       const res = await nsFetch(`${base}?callid=${encodeURIComponent(clientCallId)}`, { method: "POST", body: JSON.stringify(nsBody) });
       const body = await res.text();
       let parsed: any = null;
