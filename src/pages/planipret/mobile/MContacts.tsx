@@ -53,11 +53,16 @@ export default function MContacts() {
     try {
       const action = which === "personal" ? "list" : which === "shared" ? "shared" : "directory";
       const { data, error } = await supabase.functions.invoke("pp-ns-contacts", { body: { action } });
-      if (error) throw error;
+      const payload: any = data ?? {};
+      if (error) {
+        const detail = payload?.error || payload?.body || error.message;
+        throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+      }
+      if (payload?.error) throw new Error(payload.error);
       if (which === "directory") {
-        setDirectory(((data as any)?.directory ?? []));
+        setDirectory(payload?.directory ?? []);
       } else {
-        const list = ((data as any)?.contacts ?? []).map(normalizeContact);
+        const list = (payload?.contacts ?? []).map(normalizeContact);
         if (which === "personal") setPersonal(list);
         else setShared(list);
       }
