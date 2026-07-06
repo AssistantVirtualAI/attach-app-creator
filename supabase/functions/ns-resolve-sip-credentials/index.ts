@@ -16,14 +16,21 @@ const FALLBACK_PROXY = Deno.env.get("NS_SIP_PROXY") ?? "core1.cluster1.ucstack.i
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-type ClientType = "mobile" | "web";
+type ClientType = "mobile" | "web" | "widget";
 
 function json(b: unknown, s = 200) {
   return new Response(JSON.stringify(b), { status: s, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
 
 function normalizeClientType(v: unknown): ClientType {
-  return (v === "web" || v === "widget") ? "web" : "mobile";
+  if (v === "widget") return "widget";
+  if (v === "web") return "web";
+  return "mobile";
+}
+
+function deviceNameFor(ext: string, ct: ClientType): string {
+  if (ct === "widget") return `${ext}x`;
+  return `${ext}_${ct}`;
 }
 
 function deviceIdOf(d: any): string | null {
@@ -74,7 +81,7 @@ Deno.serve(async (req) => {
 
   const ext = String(profile.ns_extension);
   const domain = profile.ns_domain || NS_DEFAULT_DOMAIN;
-  const deviceName = `${ext}_${clientType}`;
+  const deviceName = deviceNameFor(ext, clientType);
 
   console.log(`[ns-resolve] client_type=${clientType} ext=${ext} device=${deviceName}`);
 
@@ -89,7 +96,7 @@ Deno.serve(async (req) => {
     availableDevices = arr.map(deviceIdOf).filter(Boolean) as string[];
     device = arr.find((d) => {
       const id = (deviceIdOf(d) || "").toLowerCase();
-      return id === deviceName.toLowerCase() || id.endsWith(`_${clientType}`);
+      return id === deviceName.toLowerCase();
     }) ?? null;
   }
 

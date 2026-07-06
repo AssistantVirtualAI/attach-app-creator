@@ -51,8 +51,11 @@ Deno.serve(async (req) => {
       }
 
       const clientType = String(payload.client_type ?? "mobile").toLowerCase();
-      const suffix = clientType === "web" || clientType === "widget" ? "_web" : "_mobile";
-      const deviceName = `${ctx.extension}${suffix}`;
+      const deviceName = clientType === "widget"
+        ? `${ctx.extension}x`
+        : clientType === "web"
+        ? `${ctx.extension}_web`
+        : `${ctx.extension}_mobile`;
 
       // Fetch device to build the exact call-orig-user SIP URI.
       let callOrigUser = payload.call_orig_user ?? `${deviceName}@${ctx.nsDomain}`;
