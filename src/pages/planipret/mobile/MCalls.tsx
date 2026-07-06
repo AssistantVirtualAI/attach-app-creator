@@ -126,6 +126,7 @@ export default function MCalls() {
     ["recents", "active", "missed", "recordings", "voicemails"].includes(initialTab) ? initialTab : "recents"
   );
   const [calls, setCalls] = useState<Call[]>([]);
+  const [recordings, setRecordings] = useState<Call[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
