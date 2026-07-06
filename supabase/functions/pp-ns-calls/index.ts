@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
   const base = `/domains/${encodeURIComponent(ctx.nsDomain)}/users/${encodeURIComponent(ctx.extension)}/calls`;
 
   try {
-    if (req.method === "GET" && action === "list") {
+    if (action === "list") {
       const res = await nsFetch(base, { method: "GET" });
       const body = await res.text();
       return new Response(body, {
