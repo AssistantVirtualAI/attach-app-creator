@@ -199,7 +199,7 @@ export default function PlanipretAdminLayout() {
         return;
       }
       setDialNumber("");
-      toast.success(res.via === "sip" ? "Appel web démarré" : "Appel lancé");
+      toast.success(res.via === "webrtc" ? "Appel web démarré" : "Appel lancé");
     } finally {
       setDialing(false);
     }
