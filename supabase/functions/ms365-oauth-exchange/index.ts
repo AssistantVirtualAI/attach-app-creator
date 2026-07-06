@@ -14,8 +14,11 @@ Deno.serve(async (req) => {
     const { code, redirect_uri } = await req.json();
     if (!code || !redirect_uri) return new Response(JSON.stringify({ success: false, error: "missing code/redirect_uri" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-    const { data: ms } = await admin.from("planipret_integration_secrets").select("config").eq("provider", "microsoft").maybeSingle();
-    const c = (ms?.config ?? {}) as Record<string, string>;
+    const [{ data: ms }, { data: cfg }] = await Promise.all([
+      admin.from("planipret_integration_secrets").select("config").in("provider", ["microsoft", "ms365"]).limit(1).maybeSingle(),
+      admin.from("planipret_integration_config").select("config_data").eq("integration_key", "ms365").maybeSingle(),
+    ]);
+    const c = { ...((cfg?.config_data ?? {}) as Record<string, string>), ...((ms?.config ?? {}) as Record<string, string>) };
     const clientId = c.client_id ?? c.client_secret_id ?? Deno.env.get("MICROSOFT_CLIENT_ID");
     const clientSecret = c.client_secret ?? Deno.env.get("MICROSOFT_CLIENT_SECRET");
     const tenant = c.tenant_id ?? Deno.env.get("MICROSOFT_TENANT_ID") ?? "common";
