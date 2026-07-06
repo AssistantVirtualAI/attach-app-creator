@@ -37,6 +37,7 @@ export default function ActiveCallOverlay({ callId, onClosed }: { callId: string
   const [keypadOpen, setKeypadOpen] = useState(false);
   const [dtmfBuffer, setDtmfBuffer] = useState("");
   const [transferOpen, setTransferOpen] = useState(false);
+  const [transferMode, setTransferMode] = useState<"transfer" | "forward">("transfer");
   const [transferTo, setTransferTo] = useState("");
   const [elapsed, setElapsed] = useState(0);
 
