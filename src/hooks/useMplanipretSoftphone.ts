@@ -272,8 +272,8 @@ export function useMplanipretSoftphone() {
       return { via: "pbx", ok: true };
     }
     console.warn("[softphone] ns-make-call failed", { trace_id: traceId, error: pData?.error ?? primary.error?.message });
-    // Fallback: ns-calls action:start (kept for backward compatibility).
-    const { data, error } = await supabase.functions.invoke("ns-calls", { body: { action: "start", destination } });
+    // Fallback: same canonical Planiprêt NS endpoint used by the mobile UI.
+    const { data, error } = await supabase.functions.invoke("pp-ns-calls", { body: { action: "start", to_number: destination } });
     if (error || (data as any)?.success === false) {
       const msg = pData?.error ?? (data as any)?.error ?? error?.message ?? primary.error?.message ?? "PBX call failed";
       return { via: "none", ok: false, error: msg };

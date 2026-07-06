@@ -76,7 +76,8 @@ export default function ActiveCallOverlay({ callId, onClosed }: { callId: string
   const displayName = call.caller_name || otherParty || t("common.unknown");
 
   const invoke = async (action: string, extra: Record<string, unknown> = {}) => {
-    const { error } = await supabase.functions.invoke("ns-calls", { body: { action, call_id: callId, ...extra } });
+    const normalized = action === "hangup" ? "disconnect" : action === "resume" ? "unhold" : action;
+    const { error } = await supabase.functions.invoke("pp-ns-calls", { body: { action: normalized, call_id: callId, ...extra } });
     if (error) toast.error(error.message);
     return !error;
   };
@@ -87,12 +88,12 @@ export default function ActiveCallOverlay({ callId, onClosed }: { callId: string
   const sendDtmf = async (d: string) => { setDtmfBuffer((b) => (b + d).slice(-16)); await invoke("dtmf", { digit: d }); };
   const doTransfer = async () => {
     if (!transferTo.trim()) return;
-    if (await invoke("transfer", { target: transferTo.trim() })) {
+    if (await invoke("transfer", { destination: transferTo.trim(), target: transferTo.trim() })) {
       toast.success(t("call.transferSent"));
       setTransferOpen(false); setTransferTo("");
     }
   };
-  const hangup = async () => { await invoke("hangup"); onClosed(); };
+  const hangup = async () => { await invoke("disconnect"); onClosed(); };
 
   const KEYS = ["1","2","3","4","5","6","7","8","9","*","0","#"];
 

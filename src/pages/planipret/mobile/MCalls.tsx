@@ -274,16 +274,33 @@ export default function MCalls() {
     try {
       const end = new Date().toISOString();
       const start = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-      await supabase.functions.invoke("pp-ns-cdr", { body: { action: "sync", start, end, limit: 250 } }).catch(() => null);
-      const { data } = await supabase.functions.invoke("pp-ns-recordings", { body: { action: "list", start, end, limit: 100 } });
-      const items = (data as any)?.items ?? [];
-      setRecordings(items as Call[]);
+      let localQuery: any = supabase
+        .from("planipret_phone_calls")
+        .select("*")
+        .not("to_number", "ilike", "%vmail%")
+        .not("to_number", "ilike", "%voicemail%")
+        .not("to_number", "ilike", "%vm@%")
+        .or("has_recording.eq.true,ns_callid.not.is.null,ns_orig_callid.not.is.null,ns_term_callid.not.is.null,recording_url.not.is.null")
+        .gte("started_at", start)
+        .lte("started_at", end)
+        .order("started_at", { ascending: false })
+        .limit(150);
+      if (phoneCallScopeFilter) localQuery = localQuery.or(phoneCallScopeFilter);
+      const { data: local } = await localQuery;
+      setRecordings((local ?? []).map((r: any) => ({
+        ...r,
+        stream_via_proxy: true,
+        proxy_call_db_id: r.id,
+        proxy_ns_callid: r.ns_callid ?? r.ns_orig_callid ?? r.ns_term_callid ?? r.ns_call_id ?? null,
+        has_recording: !!(r.has_recording || r.recording_url || r.ns_callid || r.ns_orig_callid || r.ns_term_callid || r.ns_call_id),
+      })) as Call[]);
+      supabase.functions.invoke("pp-ns-cdr", { body: { action: "sync", start, end, limit: 250 } }).catch(() => null);
     } catch (e) {
       console.warn("[MCalls] recordings load failed", e);
     } finally {
       setRecordingsLoading(false);
     }
-  }, [userId]);
+  }, [userId, phoneCallScopeFilter]);
 
   useEffect(() => { load(); }, [load]);
 
