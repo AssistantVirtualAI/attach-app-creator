@@ -40,48 +40,54 @@ Deno.serve(async (req) => {
 
     if (action === "start") {
       const payload = cachedBody ?? (await req.json().catch(() => ({})));
-      const raw = payload?.to_number;
+      const raw = payload?.to_number ?? payload?.destination;
       if (!raw || typeof raw !== "string") {
-        return jsonResponse({ error: "to_number required" }, 400);
+        return jsonResponse({ success: false, error: "destination required" }, 200);
       }
-      // Normalize to E.164 (NA default: +1XXXXXXXXXX)
       let dest = raw.replace(/[^\d+]/g, "");
       if (!dest.startsWith("+")) {
         const digits = dest.replace(/\D/g, "");
         dest = "+" + (digits.length === 10 ? "1" + digits : digits);
       }
+
+      const clientType = String(payload.client_type ?? "mobile").toLowerCase();
+      const suffix = clientType === "web" || clientType === "widget" ? "_web" : "_mobile";
+      const deviceName = `${ctx.extension}${suffix}`;
+
+      // Fetch device to build the exact call-orig-user SIP URI.
+      let callOrigUser = payload.call_orig_user ?? `${deviceName}@${ctx.nsDomain}`;
+      try {
+        const devRes = await nsFetch(`/domains/${encodeURIComponent(ctx.nsDomain)}/users/${encodeURIComponent(ctx.extension)}/devices/${encodeURIComponent(deviceName)}`, { method: "GET" });
+        if (devRes.ok) {
+          const dd = await devRes.json().catch(() => null);
+          const device = Array.isArray(dd) ? dd[0] : dd;
+          const uri = device?.["device-sip-registration-uri"];
+          if (typeof uri === "string" && uri.length) {
+            callOrigUser = uri.replace(/^sip:/i, "");
+          }
+        }
+      } catch { /* fallback to constructed */ }
+
       const clientCallId = crypto.randomUUID();
-      // Resolve the SIP device to ring. Default: ring the extension (all
-      // registered devices). When the caller specifies client_type=mobile|web
-      // (or explicit call_orig_user), we ring ONLY that surface's device
-      // (e.g. "113_mobile@planipret.ca") so the mobile app rings but not the
-      // desk phone / web widget.
-      const clientType = String(payload.client_type ?? "").toLowerCase();
-      const deviceSuffix = clientType === "mobile" ? "_mobile"
-                         : clientType === "web" || clientType === "widget" ? "_web"
-                         : null;
-      const callOrigUser = payload.call_orig_user
-        ?? (deviceSuffix ? `${ctx.extension}${deviceSuffix}@${ctx.nsDomain}` : `${ctx.extension}@${ctx.nsDomain}`);
-      // Official NetSapiens Click-to-Call payload. The agent's device rings
-      // first; once they answer NetSapiens dials the client and bridges both.
       const nsBody = {
         "synchronous": "yes",
         "call-id": clientCallId,
-        "callid": clientCallId,
         "call-orig-user": callOrigUser,
         "call-term-user": dest,
-        "destination": dest,
         "auto-answer-enabled": "no",
-        "caller-id-number": payload.caller_id_number ?? ctx.extension,
-        "caller-id-name": payload.caller_id_name ?? "Courtier Planiprêt",
       };
 
-      const res = await nsFetch(`${base}?callid=${encodeURIComponent(clientCallId)}`, { method: "POST", body: JSON.stringify(nsBody) });
-      const body = await res.text();
-      let parsed: any = null;
-      try { parsed = body ? JSON.parse(body) : null; } catch { /* keep raw */ }
+      console.log(`[pp-ns-calls] start orig=${callOrigUser} term=${dest} ext=${ctx.extension}`);
 
-      if (res.ok) {
+      const res = await nsFetch(base, { method: "POST", body: JSON.stringify(nsBody) });
+      const text = await res.text();
+      let parsed: any = null;
+      try { parsed = text ? JSON.parse(text) : null; } catch { parsed = text; }
+
+      console.log(`[pp-ns-calls] NS status=${res.status} body=${typeof parsed === "string" ? parsed.slice(0,200) : JSON.stringify(parsed).slice(0,200)}`);
+
+      const ok = res.ok || res.status === 202;
+      if (ok) {
         const nsCallId = parsed?.["call-id"] ?? parsed?.call_id ?? parsed?.id ?? clientCallId;
         try {
           await guard.supabase.from("planipret_phone_calls").insert({
@@ -91,19 +97,30 @@ Deno.serve(async (req) => {
             ns_domain: ctx.nsDomain,
             extension: ctx.extension,
             direction: "outbound",
-            from_number: String(payload.caller_id_number ?? ctx.extension),
+            from_number: String(ctx.extension),
             to_number: dest,
             status: "outbound_ringing",
             started_at: new Date().toISOString(),
-            metadata: { click_to_call: true, client_call_id: clientCallId, ns_response: parsed ?? body },
+            metadata: { click_to_call: true, client_call_id: clientCallId, call_orig_user: callOrigUser },
           });
-        } catch (_e) { /* non-fatal */ }
+        } catch { /* non-fatal */ }
+
+        return jsonResponse({
+          success: true,
+          call_id: nsCallId,
+          call_orig_user: callOrigUser,
+          destination: dest,
+          status: "initiated",
+          message: "Votre téléphone va sonner — décrochez pour parler au client",
+        }, 200);
       }
 
-      return new Response(body || JSON.stringify({ ok: res.ok, call_id: clientCallId }), {
-        status: res.status,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({
+        success: false,
+        error: (typeof parsed === "object" && parsed?.message) || `NS-API error ${res.status}`,
+        ns_status: res.status,
+        debug: { call_orig_user: callOrigUser, call_term_user: dest, extension: ctx.extension, domain: ctx.nsDomain, ns_body: parsed },
+      }, 200);
     }
 
     // Call-control actions: accept either PATCH or POST-with-action-in-body
