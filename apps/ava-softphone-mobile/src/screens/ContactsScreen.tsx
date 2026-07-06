@@ -30,9 +30,10 @@ export default function ContactsScreen({ sp }: { sp: any }) {
   const [newContact, setNewContact] = useState({ name: '', phone: '', email: '', company: '' });
   const [presence, setPresence] = useState<Record<string, Presence>>({});
   const [error, setError] = useState<string | null>(null);
-  const [picker, setPicker] = useState<{ title: string; options: NumberOption[] } | null>(null) as any;
+  const [picker, setPicker] = useState<{ title: string; options: NumberOption[] } | null>(null);
   const [consentOpen, setConsentOpen] = useState(false);
   useEffect(() => { loadConsent().catch(() => {}); }, []);
+
 
 
   const loadPresence = useCallback(async (rows: Contact[] | null) => {
