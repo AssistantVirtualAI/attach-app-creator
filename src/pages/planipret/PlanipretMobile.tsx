@@ -587,7 +587,14 @@ export default function PlanipretMobile() {
 
   return (
     <Frame>
+      {showPrimer && (
+        <PermissionsPrimer
+          extension={profile?.ns_extension || profile?.extension || ""}
+          onDone={() => setShowPrimer(false)}
+        />
+      )}
       <div className="h-full flex flex-col relative overflow-hidden" style={{ background: "var(--pp-bg-base)" }}>
+
         {/* Top brand header — AVA (left) · Planiprêt (center) · Settings (right) */}
         <header
           className="relative flex items-center px-4 pp-mobile-header"
