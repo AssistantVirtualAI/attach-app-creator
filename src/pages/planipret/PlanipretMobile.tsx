@@ -113,7 +113,7 @@ function Dialer({ open, onClose, initial, openMessages, softphone }: { open: boo
       toast.error(("error" in result && result.error) || t("dialer.callFailed"));
       return;
     }
-    toast.success(result.via === "webrtc" ? t("dialer.callStartedWebrtc") : t("dialer.callStarted"));
+    toast.success(t("dialer.callStarted"));
     setNumber("");
     onClose();
   };
