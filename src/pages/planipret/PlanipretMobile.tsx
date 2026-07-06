@@ -28,6 +28,9 @@ import { ROUTES } from "@/lib/routes";
 import { recordRedirect } from "@/lib/debug/navDebug";
 import { useMplanipretSoftphone } from "@/hooks/useMplanipretSoftphone";
 import MicDeniedBanner from "@/components/planipret/mobile/MicDeniedBanner";
+import PermissionsPrimer from "@/components/planipret/mobile/PermissionsPrimer";
+import { hasSeenPrimer } from "@/lib/native/permissions/orchestrator";
+import { bootstrapPushIfNative } from "@/lib/native/pushBootstrap";
 
 
 const ACCENT = "#2E9BDC";
