@@ -219,8 +219,8 @@ export function useMplanipretSoftphone() {
     // Click-to-Call REST (NS-API v2). The broker's registered device rings
     // first; NetSapiens then dials the client and bridges both. No WebRTC,
     // no microphone permission needed on this app.
-    const { data, error } = await supabase.functions.invoke("pp-ns-calls?action=start", {
-      body: { to_number: destination },
+    const { data, error } = await supabase.functions.invoke("pp-ns-calls", {
+      body: { action: "start", to_number: destination },
     });
     const d = data as any;
     if (error || (d && d.error)) {
