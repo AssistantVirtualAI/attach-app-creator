@@ -99,7 +99,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    return j({ chats, teams });
+    return j({ connected: true, chats, teams });
   } catch (e: any) {
     console.error("[ms365-teams-list]", e);
     return j({ error: e?.message ?? "server_error" }, 500);
