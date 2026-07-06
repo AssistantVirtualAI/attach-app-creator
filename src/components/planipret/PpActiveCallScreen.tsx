@@ -57,6 +57,7 @@ export default function PpActiveCallScreen({
   const [transferQuery, setTransferQuery] = useState("");
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loadingContacts, setLoadingContacts] = useState(false);
+  const [diagOpen, setDiagOpen] = useState(false);
 
   useEffect(() => { setAudioEl(audioRef.current); return () => setAudioEl(null); }, [setAudioEl]);
 
