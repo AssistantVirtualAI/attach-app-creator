@@ -148,6 +148,17 @@ export default function MContacts() {
         })}
       </div>
 
+      {loadError && !loading && (
+        <div className="rounded-2xl p-4 mb-3 text-sm" style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)", color: "#dc2626" }}>
+          <div className="font-semibold mb-1">Impossible de charger les contacts</div>
+          <div className="text-xs opacity-80 break-all">{loadError}</div>
+          <button onClick={() => load(tab)} className="mt-2 text-xs px-3 py-1.5 rounded-full font-semibold"
+            style={{ background: "rgba(239,68,68,0.15)", color: "#dc2626" }}>
+            Réessayer
+          </button>
+        </div>
+      )}
+
       {loading && <div className="text-center py-8 text-sm" style={{ color: "var(--pp-text-muted)" }}>{t("common.loading")}</div>}
 
       {!loading && list.length === 0 && (
