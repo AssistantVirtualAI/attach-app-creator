@@ -38,8 +38,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (req.method === "POST" && action === "start") {
-      const payload = await req.json().catch(() => ({}));
+    if (action === "start") {
+      const payload = cachedBody ?? (await req.json().catch(() => ({})));
       const raw = payload?.to_number;
       if (!raw || typeof raw !== "string") {
         return jsonResponse({ error: "to_number required" }, 400);
