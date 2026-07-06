@@ -69,31 +69,44 @@ type Insight = {
 
 // ---------- helpers ----------
 const isOutbound = (c: Call) => c.direction === "outbound";
-const isMissed = (c: Call) => c.direction === "missed" || c.status === "missed";
+const isMissed = (c: Call) => c.direction === "missed" || c.status === "missed" || c.status === "no-answer";
 
-const otherNumber = (c: Call) => (isOutbound(c) ? c.to_number : c.from_number) || "";
+// Normalize NS values like "sip:15145551234@planipret.ca", "tel:+1...",
+// "anonymous", "1000@planipret.ca", or empty strings.
+function cleanNumber(v: unknown): string | null {
+  if (v == null) return null;
+  let s = String(v).trim();
+  if (!s) return null;
+  s = s.replace(/^sips?:/i, "").replace(/^tel:/i, "");
+  const at = s.indexOf("@");
+  if (at !== -1) s = s.slice(0, at);
+  s = s.replace(/^\+?1(\d{10})$/, "$1");
+  if (!s || /^(anonymous|unknown|restricted|private|unavailable)$/i.test(s)) return null;
+  return s;
+}
+function fmtPhone(n: string | null): string | null {
+  if (!n) return null;
+  const d = n.replace(/\D/g, "");
+  if (d.length === 10) return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
+  if (d.length === 11 && d.startsWith("1")) return `(${d.slice(1, 4)}) ${d.slice(4, 7)}-${d.slice(7)}`;
+  return n;
+}
+
+const otherNumber = (c: Call) => cleanNumber(isOutbound(c) ? c.to_number : c.from_number) || "";
 const otherName = (c: Call) => (isOutbound(c) ? c.to_name : c.from_name) || "";
 // Label priority: NS caller_id_name → resolved (Maestro/MS/contacts) → phone
-// number → localized "Numéro non résolu" fallback. When the CDR is missing BOTH
-// name and number we log the record so the source can be inspected.
+// number → localized "Numéro non résolu" fallback.
 const UNRESOLVED_FR = "Numéro non résolu";
 const UNRESOLVED_EN = "Unresolved number";
 function displayLabelWith(c: Call, resolved?: string | null, lang: "fr" | "en" = "fr"): string {
   const name = otherName(c);
   if (name) return name;
   if (resolved) return resolved;
-  const num = otherNumber(c);
+  const num = fmtPhone(otherNumber(c));
   if (num) return num;
-  console.warn("[MCalls] unresolved caller — no name and no number", {
-    id: c.id,
-    ns_call_id: c.ns_call_id,
-    direction: c.direction,
-    started_at: c.started_at,
-    metadata: c.metadata,
-  });
   return lang === "en" ? UNRESOLVED_EN : UNRESOLVED_FR;
 }
-const displayLabel = (c: Call) => otherName(c) || otherNumber(c) || UNRESOLVED_FR;
+const displayLabel = (c: Call) => otherName(c) || fmtPhone(otherNumber(c)) || UNRESOLVED_FR;
 
 const localizedDateTime = (iso: string, lang: "fr" | "en", todayLabel: string, yesterdayLabel: string) => {
   const d = new Date(iso);
@@ -106,7 +119,15 @@ const localizedDateTime = (iso: string, lang: "fr" | "en", todayLabel: string, y
   const sep = lang === "en" ? ":" : "h";
   if (sameDay) return `${todayLabel}, ${hh}${sep}${mm}`;
   if (isYest) return `${yesterdayLabel}, ${hh}${sep}${mm}`;
-  return `${d.toLocaleDateString(lang === "en" ? "en-CA" : "fr-CA", { day: "2-digit", month: "short" })}, ${hh}${sep}${mm}`;
+  return `${d.toLocaleDateString(lang === "en" ? "en-CA" : "fr-CA", { day: "2-digit", month: "short", year: "numeric" })}, ${hh}${sep}${mm}`;
+};
+const dayHeader = (iso: string, lang: "fr" | "en", todayLabel: string, yesterdayLabel: string) => {
+  const d = new Date(iso);
+  const today = new Date();
+  const yest = new Date(); yest.setDate(today.getDate() - 1);
+  if (d.toDateString() === today.toDateString()) return todayLabel;
+  if (d.toDateString() === yest.toDateString()) return yesterdayLabel;
+  return d.toLocaleDateString(lang === "en" ? "en-CA" : "fr-CA", { weekday: "long", day: "2-digit", month: "long" });
 };
 const localizedDuration = (s: number | null, lang: "fr" | "en") => {
   if (!s) return "—";
@@ -115,6 +136,16 @@ const localizedDuration = (s: number | null, lang: "fr" | "en") => {
   if (m === 0) return `${sec} ${lang === "en" ? "sec" : "sec"}`;
   return `${m} min ${sec} sec`;
 };
+const statusInfo = (c: Call, lang: "fr" | "en") => {
+  const s = String(c.status ?? "").toLowerCase();
+  if (isMissed(c)) return { label: lang === "en" ? "Missed" : "Manqué", color: "var(--pp-danger)" };
+  if (s.includes("voicemail") || s.includes("vm")) return { label: lang === "en" ? "Voicemail" : "Messagerie", color: "var(--pp-agent)" };
+  if (s.includes("busy") || s.includes("occup")) return { label: lang === "en" ? "Busy" : "Occupé", color: "var(--pp-warning, #f59e0b)" };
+  if (s.includes("fail") || s.includes("cancel")) return { label: lang === "en" ? "Failed" : "Échoué", color: "var(--pp-danger)" };
+  if ((c.duration_seconds ?? 0) > 0) return { label: lang === "en" ? "Answered" : "Répondu", color: "var(--pp-success)" };
+  return { label: lang === "en" ? "—" : "—", color: "var(--pp-text-muted)" };
+};
+
 
 // ---------- main ----------
 export default function MCalls() {
