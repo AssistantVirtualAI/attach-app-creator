@@ -184,8 +184,12 @@ export default function MHome() {
     };
     const onReg = (e: Event) => {
       const detail = (e as CustomEvent).detail;
+      // Only resolve early on success. Transient ws "disconnected" events fire
+      // repeatedly during (re)connection while the UA is still trying to reach
+      // the PBX — treating them as terminal makes the waiter give up after a
+      // few ms even though registration would succeed a moment later. Let the
+      // poller / timeout decide failure.
       if (detail?.registered) finish(true, "event");
-      else finish(false, `event:${detail?.reason ?? "unregistered"}`);
     };
     const poll = window.setInterval(() => {
       if (softphone?.snap?.status === "registered") finish(true, "poll");
