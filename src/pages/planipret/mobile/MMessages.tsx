@@ -15,6 +15,7 @@ import CoachOverlay from "@/components/planipret/ava/CoachOverlay";
 import { callAva, type AvaSuggestion } from "@/services/avaProactive";
 import { useAvaDraft } from "@/hooks/useAvaDraft";
 import { useMplanipretLang } from "@/hooks/useMplanipretLang";
+import { useCallerNames } from "@/lib/planipret/callerLookup";
 
 type SubTab = "sms" | "team" | "teams365" | "ava" | "emails" | "roster";
 
