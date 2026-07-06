@@ -512,8 +512,8 @@ export default function PlanipretMobile() {
       toast.error(error.message || t("home.connectionImpossible"));
       return;
     }
-    void import("@/lib/native/requestPermissionsAfterLogin").then(m => m.requestPermissionsAfterLogin());
-    // Show the VoIP-standard rationale primer on first native launch after sign-in.
+    // On native, show the VoIP rationale primer (which runs the permission flow).
+    // On web, this is a no-op.
     void hasSeenPrimer().then((seen) => { if (!seen) setShowPrimer(true); });
     toast.success(t("auth.success"));
     setLoading(true);
