@@ -263,24 +263,23 @@ export default function PpActiveCallScreen({
           </div>
         )}
 
-        {/* Action bar (main view) */}
+        {/* Action bar (main view) — market-standard: all controls visible together */}
         {view === "main" && !isIncoming && (
-          <div className="px-6 pb-4">
+          <div className="px-6 pb-8">
             <div className="grid grid-cols-3 gap-4">
               <CallBtn active={snap.muted} onClick={() => (snap.muted ? unmute() : mute())} icon={snap.muted ? <MicOff /> : <Mic />} label={snap.muted ? "Activer" : "Muet"} />
               <CallBtn active={isHeld} onClick={() => (isHeld ? unhold() : hold())} icon={isHeld ? <Play /> : <Pause />} label={isHeld ? "Reprendre" : "Attente"} />
               <CallBtn onClick={() => setView("transfer")} icon={<PhoneForwarded />} label="Transférer" />
               <CallBtn onClick={() => setView("keypad")} icon={<Grid3X3 />} label="Clavier" />
-              <div />
+              <CallBtn danger onClick={() => hangup()} icon={<PhoneOff />} label="Raccrocher" />
               <div />
             </div>
           </div>
         )}
 
-        {/* Bottom bar: answer/reject or hangup */}
-        <div className="pb-8 pt-2 flex items-center justify-center gap-8">
-          {isIncoming ? (
-            <>
+        {/* Bottom bar: answer/reject only for inbound calls */}
+        {isIncoming && <div className="pb-8 pt-2 flex items-center justify-center gap-8">
+          <>
               <button onClick={() => hangup()} aria-label="Refuser"
                 className="rounded-full flex items-center justify-center active:scale-95 transition"
                 style={{ width: 72, height: 72, background: "linear-gradient(135deg, #B91C1C, #E84C4C)", boxShadow: "0 8px 24px rgba(232,76,76,0.5)" }}>
@@ -291,27 +290,21 @@ export default function PpActiveCallScreen({
                 style={{ width: 72, height: 72, background: "linear-gradient(135deg, #15803D, #22C55E)", boxShadow: "0 8px 24px rgba(34,197,94,0.5)" }}>
                 <Phone className="w-7 h-7" />
               </button>
-            </>
-          ) : (
-            <button onClick={() => hangup()} aria-label="Raccrocher"
-              className="rounded-full flex items-center justify-center active:scale-95 transition"
-              style={{ width: 72, height: 72, background: "linear-gradient(135deg, #B91C1C, #E84C4C)", boxShadow: "0 8px 24px rgba(232,76,76,0.5)" }}>
-              <PhoneOff className="w-7 h-7" />
-            </button>
-          )}
-        </div>
+          </>
+        </div>}
       </motion.div>
     </AnimatePresence>
   );
 }
 
-function CallBtn({ icon, label, onClick, active }: { icon: React.ReactNode; label: string; onClick: () => void; active?: boolean }) {
+function CallBtn({ icon, label, onClick, active, danger }: { icon: React.ReactNode; label: string; onClick: () => void; active?: boolean; danger?: boolean }) {
   return (
     <button onClick={onClick} className="flex flex-col items-center gap-1.5 active:scale-95 transition">
       <div className="w-14 h-14 rounded-full flex items-center justify-center"
         style={{
-          background: active ? "rgba(46,155,220,0.25)" : "rgba(255,255,255,0.08)",
-          border: `1px solid ${active ? "rgba(46,155,220,0.5)" : "rgba(255,255,255,0.15)"}`,
+          background: danger ? "linear-gradient(135deg, #B91C1C, #E84C4C)" : active ? "rgba(46,155,220,0.25)" : "rgba(255,255,255,0.08)",
+          border: `1px solid ${danger ? "rgba(232,76,76,0.55)" : active ? "rgba(46,155,220,0.5)" : "rgba(255,255,255,0.15)"}`,
+          boxShadow: danger ? "0 8px 22px rgba(232,76,76,0.45)" : undefined,
           color: "white",
         }}>
         <span className="w-6 h-6 flex items-center justify-center [&>svg]:w-6 [&>svg]:h-6">{icon}</span>
