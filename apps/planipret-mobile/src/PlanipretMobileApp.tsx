@@ -26,30 +26,56 @@ export default function PlanipretMobileApp() {
   const isNative = Capacitor.isNativePlatform();
 
   useEffect(() => {
-    // Surveillance réseau
-    Network.addListener('networkStatusChange', (status) => {
-      setIsOnline(status.connected);
-    });
-
-    // Gestion des deep links (ex: planipret://call?number=+15141234567)
-    if (isNative) {
-      CapApp.addListener('appUrlOpen', (event) => {
-        const url = new URL(event.url);
-        if (url.protocol === 'planipret:') {
-          // Gérer les deep links entrants (appels, notifications)
-          console.log('[PlanipretMobile] Deep link:', event.url);
-        }
+    // Surveillance réseau (best-effort — n'empêche jamais le rendu)
+    try {
+      Network.addListener('networkStatusChange', (status) => {
+        setIsOnline(status.connected);
       });
-
-      // Enregistrement des notifications push
-      registerPushNotifications();
+    } catch (e) {
+      console.log('[PlanipretMobile] Network listener failed:', e);
     }
 
+    if (isNative) {
+      try {
+        CapApp.addListener('appUrlOpen', (event) => {
+          try {
+            const url = new URL(event.url);
+            if (url.protocol === 'planipret:') {
+              console.log('[PlanipretMobile] Deep link:', event.url);
+            }
+          } catch {}
+        });
+      } catch (e) {
+        console.log('[PlanipretMobile] appUrlOpen listener failed:', e);
+      }
+
+      // Push registration ne doit jamais bloquer l'UI
+      try { registerPushNotifications(); } catch (e) { console.log('[PlanipretMobile] push init failed:', e); }
+    }
+
+    // Redirection vers le portail mobile — timeout dur de 3s pour ne jamais
+    // rester bloqué sur le splash si un plugin natif ne répond pas.
+    const target = isNative ? `${PORTAL_URL}${MOBILE_ENTRY}` : MOBILE_ENTRY;
+    const redirect = () => {
+      try {
+        if (!window.location.href.includes(MOBILE_ENTRY)) {
+          window.location.replace(target);
+        }
+      } catch (e) {
+        console.error('[PlanipretMobile] redirect failed:', e);
+      }
+    };
+    const t = window.setTimeout(redirect, 800);
+    const failsafe = window.setTimeout(redirect, 3000);
+
     return () => {
-      Network.removeAllListeners();
-      CapApp.removeAllListeners();
+      window.clearTimeout(t);
+      window.clearTimeout(failsafe);
+      try { Network.removeAllListeners(); } catch {}
+      try { CapApp.removeAllListeners(); } catch {}
     };
   }, [isNative]);
+
 
   // En mode natif, l'app charge le portail web dans une WebView Capacitor
   // La WebView est configurée dans capacitor.config.ts (server.url en dev)
