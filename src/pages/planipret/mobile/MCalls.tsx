@@ -180,7 +180,7 @@ export default function MCalls() {
   const [visibleCount, setVisibleCount] = useState(25);
   const [degraded, setDegraded] = useState<{ active: boolean; reason?: string; reopens_at?: number | null }>({ active: false });
   const recordingsSyncingRef = useRef(false);
-  const callsRefreshDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const callsRefreshDebounceRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
 
   const userId = profile?.id ?? profile?.user_id;
   const profileAuthId = profile?.user_id;
