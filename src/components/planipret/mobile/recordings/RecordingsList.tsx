@@ -4,7 +4,11 @@ import { toast } from "sonner";
 import {
   Play, Pause, Download, RotateCcw, RotateCw, Sparkles, FileText, Bot,
   Loader2, Search, Copy, Check, ChevronDown, Link2, User, Flame, Snowflake, Thermometer, ListChecks,
+  CloudUpload, CloudCheck, CloudOff,
 } from "lucide-react";
+
+export type AudioStatus = "idle" | "uploading" | "uploaded" | "error";
+
 
 type Pipeline = {
   cdr?: "pending" | "done" | "error";
