@@ -18,22 +18,54 @@ import PlanipretMobileApp from './PlanipretMobileApp';
 import './styles.css';
 
 async function bootstrap() {
-  if (Capacitor.isNativePlatform()) {
-    try {
-      // Barre de statut : style sombre sur fond bleu Planiprêt
-      await StatusBar.setStyle({ style: Style.Dark });
-      await StatusBar.setBackgroundColor({ color: '#1A4A8A' });
-    } catch {}
-    try {
-      await SplashScreen.hide();
-    } catch {}
+  try {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        await StatusBar.setStyle({ style: Style.Dark });
+      } catch (e) {
+        console.log('[PlanipretMobile] StatusBar.setStyle not supported:', e);
+      }
+      try {
+        await StatusBar.setBackgroundColor({ color: '#1A4A8A' });
+      } catch (e) {
+        // Not implemented on iOS — safe to ignore
+        console.log('[PlanipretMobile] StatusBar color not supported:', e);
+      }
+      try {
+        await SplashScreen.hide();
+      } catch (e) {
+        console.log('[PlanipretMobile] SplashScreen.hide failed:', e);
+      }
+    }
+  } catch (e) {
+    console.error('[PlanipretMobile] Native init failed, continuing:', e);
   }
 
-  const container = document.getElementById('root');
-  if (!container) throw new Error('Root element not found');
-
-  const root = createRoot(container);
-  root.render(<PlanipretMobileApp />);
+  try {
+    const container = document.getElementById('root');
+    if (!container) throw new Error('Root element not found');
+    const root = createRoot(container);
+    root.render(<PlanipretMobileApp />);
+  } catch (e) {
+    console.error('[PlanipretMobile] Render failed:', e);
+    const el = document.getElementById('root');
+    if (el) {
+      el.innerHTML =
+        '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0A1425;color:#E2E8F0;font-family:system-ui;padding:24px;text-align:center">Impossible de démarrer l\'application. Vérifiez votre connexion et relancez.</div>';
+    }
+  }
 }
 
-bootstrap().catch(console.error);
+// Failsafe: if bootstrap hangs, force root visible + hide splash after 3s so
+// the user is never stuck on the native splash screen.
+setTimeout(() => {
+  try {
+    const el = document.getElementById('root');
+    if (el) el.style.display = 'block';
+    if (Capacitor.isNativePlatform()) {
+      SplashScreen.hide().catch(() => {});
+    }
+  } catch {}
+}, 3000);
+
+bootstrap().catch((e) => console.error('[PlanipretMobile] bootstrap crashed:', e));
