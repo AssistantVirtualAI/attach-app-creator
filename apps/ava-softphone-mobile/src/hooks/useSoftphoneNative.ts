@@ -45,6 +45,35 @@ let nativeCallSnapshot: NativeCallSnapshot = {
 };
 let nativeCallBridgePromise: Promise<void> | null = null;
 
+// Module-level singleton guard: prevents duplicate SIP registrations even
+// across React re-mounts / StrictMode / multiple hook consumers.
+let _registeredKey: string | null = null;
+let _initInFlightKey: string | null = null;
+let _lastConfig: SIPConfig | null = null;
+
+/**
+ * Force a re-registration from outside the hook (e.g. diagnostics panel).
+ * Clears the singleton guard so the next initAccount actually runs.
+ */
+export async function forceNativeReconnect(): Promise<void> {
+  if (!_lastConfig) return;
+  const cfg = _lastConfig;
+  try { await CapacitorPjsip.disconnect(); } catch {}
+  _registeredKey = null;
+  _initInFlightKey = null;
+  try {
+    await CapacitorPjsip.initAccount({
+      extension: cfg.extension,
+      domain: cfg.domain,
+      password: cfg.password,
+      wssUrl: cfg.wssUrl,
+    });
+    _registeredKey = `${cfg.extension}@${cfg.domain}|${cfg.password}|${cfg.wssUrl ?? ''}`;
+  } catch (e) {
+    console.warn('[NativeSIP] forceNativeReconnect failed', e);
+  }
+}
+
 function emitNativeCallSnapshot(patch: Partial<NativeCallSnapshot>) {
   nativeCallSnapshot = { ...nativeCallSnapshot, ...patch };
   nativeCallSubscribers.forEach((subscriber) => subscriber(nativeCallSnapshot));
@@ -232,6 +261,21 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
     const cleanups: Array<() => void> = [];
     let watchdog: ReturnType<typeof setTimeout> | null = null;
 
+    // Module-level singleton: skip the whole registration flow when another
+    // hook instance / mount already registered the same credentials.
+    if (_registeredKey === initKey || _initInFlightKey === initKey) {
+      console.log('[NativeSIP] singleton: already registered/in-flight for %s, skip', initKey);
+      initInFlightRef.current = false;
+      // Still surface a "registered" state locally if the singleton has it.
+      if (_registeredKey === initKey) {
+        setSipStatus('registered');
+        setNativeRegStatus('registered', null);
+      }
+      return;
+    }
+    _initInFlightKey = initKey;
+    _lastConfig = config;
+
     setSipStatus('connecting');
     setSipError('');
     setNativeRegStatus('connecting');
@@ -250,12 +294,16 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
           if (s === 'registered') {
             if (watchdog) { clearTimeout(watchdog); watchdog = null; }
             initInFlightRef.current = false;
+            _initInFlightKey = null;
+            _registeredKey = initKey;
             console.log('[NativeSIP] registered ✓');
             setSipStatus('registered'); setSipError('');
             setNativeRegStatus('registered', null);
           } else if (s === 'error' || s === 'failed') {
             if (watchdog) { clearTimeout(watchdog); watchdog = null; }
             initInFlightRef.current = false;
+            _initInFlightKey = null;
+            _registeredKey = null;
             const msg = d?.reason || `Registration failed${d?.code ? ` (${d.code})` : ''}`;
             console.warn('[NativeSIP] registrationFailed', d);
             setSipStatus('error');
@@ -387,20 +435,33 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
     saveAudioProfile(p);
   }, []);
   const reconnect = useCallback(() => {
+    if (!config) return;
+    const key = `${config.extension}@${config.domain}|${config.password}|${config.wssUrl ?? ''}`;
+    // Skip when the singleton already has an active registration for this key —
+    // duplicate initAccount calls create ghost registrations on FusionPBX.
+    if (_registeredKey === key) {
+      console.log('[NativeSIP] reconnect skipped, already registered for', key);
+      return;
+    }
+    if (_initInFlightKey === key) {
+      console.log('[NativeSIP] reconnect skipped, initAccount in flight for', key);
+      return;
+    }
     setSipError('');
     setSipStatus('connecting');
     setNativeRegStatus('connecting');
-    if (config) {
-      CapacitorPjsip.initAccount({
-        extension: config.extension,
-        domain: config.domain,
-        password: config.password,
-        wssUrl: config.wssUrl,
-      }).catch((e) => {
-        const msg = e?.message || 'reconnect failed';
-        setSipStatus('error'); setSipError(msg); setNativeRegStatus('error', msg);
-      });
-    }
+    _initInFlightKey = key;
+    _lastConfig = config;
+    CapacitorPjsip.initAccount({
+      extension: config.extension,
+      domain: config.domain,
+      password: config.password,
+      wssUrl: config.wssUrl,
+    }).catch((e) => {
+      _initInFlightKey = null;
+      const msg = e?.message || 'reconnect failed';
+      setSipStatus('error'); setSipError(msg); setNativeRegStatus('error', msg);
+    });
   }, [config]);
 
   // Auto-reconnect when the app returns to foreground or the network recovers.

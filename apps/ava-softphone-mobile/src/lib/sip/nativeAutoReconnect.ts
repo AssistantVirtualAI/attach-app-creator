@@ -13,12 +13,24 @@ export async function attachNativeAutoReconnect(reconnect: () => void): Promise<
   const cleanups: Array<() => void> = [];
   if (!Capacitor.isNativePlatform()) return () => {};
 
+  // Debounce re-registration bursts (network flapping, rapid fg/bg cycles)
+  // — each initAccount creates a fresh SIP registration on FusionPBX.
+  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  const scheduleReconnect = (delayMs: number, source: string) => {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      debounceTimer = null;
+      console.log('[NativeSIP] debounced reconnect fired from', source);
+      reconnect();
+    }, delayMs);
+  };
+
   try {
     const { App } = await import('@capacitor/app');
     const sub = await App.addListener('appStateChange', (s) => {
       if (s.isActive) {
-        console.log('[NativeSIP] appStateChange:active → reconnect');
-        reconnect();
+        console.log('[NativeSIP] appStateChange:active → debounced reconnect');
+        scheduleReconnect(1500, 'appStateChange');
       }
     });
     cleanups.push(() => { sub.remove().catch(() => {}); });
@@ -39,11 +51,12 @@ export async function attachNativeAutoReconnect(reconnect: () => void): Promise<
         typeChanged,
       });
       lastType = nextType;
-      if (s.connected) reconnect();
+      if (s.connected) scheduleReconnect(3000, 'networkStatusChange');
     });
     cleanups.push(() => { sub.remove().catch(() => {}); });
   } catch {}
 
+  cleanups.push(() => { if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null; } });
   return () => { cleanups.forEach((c) => { try { c(); } catch {} }); };
 }
 
