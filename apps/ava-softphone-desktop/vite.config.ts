@@ -9,15 +9,40 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
-  // PostCSS disabled — Tailwind is not used in this desktop app and a stray
-  // postcss config in a parent dir breaks the Electron build. Mandatory.
   css: { postcss: false as unknown as any },
   build: {
     outDir: 'dist',
     emptyOutDir: true,
     rollupOptions: {
       external: ['electron'],
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {
+            return 'vendor-react';
+          }
+          if (id.includes('node_modules/@supabase')) {
+            return 'vendor-supabase';
+          }
+          if (id.includes('node_modules/lucide-react')) {
+            return 'vendor-icons';
+          }
+          if (id.includes('node_modules/recharts') || id.includes('node_modules/d3')) {
+            return 'vendor-charts';
+          }
+          if (id.includes('node_modules/date-fns')) {
+            return 'vendor-dates';
+          }
+          if (id.includes('node_modules/')) {
+            return 'vendor-misc';
+          }
+        }
+      }
     },
+    chunkSizeWarningLimit: 600,
+    minify: 'esbuild',
+    target: 'chrome120',
+    sourcemap: false,
+    assetsInlineLimit: 4096,
   },
   base: './',
   server: {
