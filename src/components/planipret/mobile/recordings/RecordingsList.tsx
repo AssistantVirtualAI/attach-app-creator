@@ -371,7 +371,9 @@ export default function RecordingsList({
         />
       ))}
     </ul>
+    </>
   );
+
 }
 
 // ===================== Card =====================
