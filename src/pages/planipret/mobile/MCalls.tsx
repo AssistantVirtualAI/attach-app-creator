@@ -179,6 +179,8 @@ export default function MCalls() {
   const [selected, setSelected] = useState<Call | null>(null);
   const [visibleCount, setVisibleCount] = useState(25);
   const [degraded, setDegraded] = useState<{ active: boolean; reason?: string; reopens_at?: number | null }>({ active: false });
+  const recordingsSyncingRef = useRef(false);
+  const callsRefreshDebounceRef = useRef<number | null>(null);
 
   const userId = profile?.id ?? profile?.user_id;
   const profileAuthId = profile?.user_id;
@@ -271,7 +273,7 @@ export default function MCalls() {
     }
   }, [userId, phoneCallScopeFilter]);
 
-  const loadRecordings = useCallback(async () => {
+  const loadRecordingsFromCache = useCallback(async () => {
     if (!userId) return;
     setRecordingsLoading(true);
     try {
@@ -286,7 +288,7 @@ export default function MCalls() {
         .gte("started_at", start)
         .lte("started_at", end)
         .order("started_at", { ascending: false })
-        .limit(150);
+        .limit(50);
       if (phoneCallScopeFilter) localQuery = localQuery.or(phoneCallScopeFilter);
       const { data: local } = await localQuery;
       setRecordings((local ?? []).filter((r: any) => r.has_recording || r.recording_url || r.ns_callid || r.ns_orig_callid || r.ns_term_callid || r.ns_call_id).map((r: any) => ({
@@ -296,7 +298,6 @@ export default function MCalls() {
         proxy_ns_callid: r.ns_callid ?? r.ns_orig_callid ?? r.ns_term_callid ?? r.ns_call_id ?? null,
         has_recording: !!(r.has_recording || r.recording_url || r.ns_callid || r.ns_orig_callid || r.ns_term_callid || r.ns_call_id),
       })) as Call[]);
-      supabase.functions.invoke("pp-ns-cdr", { body: { action: "sync", start, end, limit: 50 } }).catch(() => null);
     } catch (e) {
       console.warn("[MCalls] recordings load failed", e);
     } finally {
@@ -304,12 +305,34 @@ export default function MCalls() {
     }
   }, [userId, phoneCallScopeFilter]);
 
+  const syncRecordingsInBackground = useCallback(async () => {
+    if (!userId || recordingsSyncingRef.current) return;
+    recordingsSyncingRef.current = true;
+    try {
+      const end = new Date().toISOString();
+      const start = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      await supabase.functions.invoke("pp-ns-cdr", { body: { action: "sync", start, end, limit: 25 } });
+      await loadRecordingsFromCache();
+    } catch (e) {
+      console.warn("[MCalls] recordings sync failed", e);
+    } finally {
+      recordingsSyncingRef.current = false;
+    }
+  }, [userId, loadRecordingsFromCache]);
+
+  const loadRecordings = useCallback(async () => {
+    await loadRecordingsFromCache();
+    void syncRecordingsInBackground();
+  }, [loadRecordingsFromCache, syncRecordingsInBackground]);
+
   useEffect(() => { load(); }, [load]);
 
-  // Fetch recordings when tab is opened
+  // Fetch recordings when tab is opened and keep it actualized without hammering the API.
   useEffect(() => {
     if (tab !== "recordings" || !userId) return;
-    loadRecordings();
+    void loadRecordings();
+    const timer = window.setInterval(() => { void loadRecordings(); }, 30_000);
+    return () => window.clearInterval(timer);
   }, [tab, userId, loadRecordings]);
 
   // Reset pagination when tab or search changes
@@ -329,15 +352,18 @@ export default function MCalls() {
       .on("postgres_changes", { event: "*", schema: "public", table: "planipret_phone_calls" }, (payload: any) => {
         const row = payload?.new ?? payload?.old ?? {};
         if (row.user_id && row.user_id !== userId && row.user_id !== profileAuthId && row.extension !== profileExtension) return;
-        load();
-        // A new CDR usually means a fresh recording is (or will be) available.
-        loadRecordings();
-        window.setTimeout(() => { load(); loadRecordings(); }, 15_000);
-        window.setTimeout(() => { load(); loadRecordings(); }, 45_000);
+        if (callsRefreshDebounceRef.current) window.clearTimeout(callsRefreshDebounceRef.current);
+        callsRefreshDebounceRef.current = window.setTimeout(() => {
+          void load();
+          if (tab === "recordings") void loadRecordings();
+        }, 1_000);
       })
       .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, [userId, profileAuthId, profileExtension, load, loadRecordings]);
+    return () => {
+      if (callsRefreshDebounceRef.current) window.clearTimeout(callsRefreshDebounceRef.current);
+      supabase.removeChannel(ch);
+    };
+  }, [userId, profileAuthId, profileExtension, tab, load, loadRecordings]);
 
   const missedCount = useMemo(() => calls.filter(isMissed).length, [calls]);
 
@@ -476,7 +502,7 @@ export default function MCalls() {
           <>
             <div className="px-4 pt-2 flex items-center justify-end">
               <button
-                onClick={loadRecordings}
+                onClick={() => loadRecordings()}
                 className="text-xs flex items-center gap-1 px-2 py-1"
                 style={{ color: "var(--pp-text-muted)" }}
               >
