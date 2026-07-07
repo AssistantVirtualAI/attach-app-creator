@@ -182,19 +182,27 @@ export default function RecordingsList({
     (async () => {
       for (const call of queue) {
         if (cancelled) break;
+        const who = otherLabel(call);
 
         // Auto-upload / cache audio blob (skip if already cached or blob-backed).
         const alreadyBlob = !!call.recording_url && /^blob:/i.test(String(call.recording_url));
         if (!audioBlobCacheRef.current.has(call.id) && !alreadyBlob) {
           setStatus(call.id, "uploading");
+          const tId = toast.loading(`Upload audio — ${who}`);
           try {
             const url = await fetchAudioBlob(call, { retries: 3, signal: controller.signal });
-            if (cancelled) { URL.revokeObjectURL(url); break; }
+            if (cancelled) { URL.revokeObjectURL(url); toast.dismiss(tId); break; }
             audioBlobCacheRef.current.set(call.id, url);
             setStatus(call.id, "uploaded");
             onUpdated({ ...call, recording_url: url, has_recording: true, stream_via_proxy: true });
-          } catch (e) {
-            if (!cancelled) setStatus(call.id, "error");
+            toast.success(`Audio uploadé — ${who}`, { id: tId });
+          } catch (e: any) {
+            if (!cancelled) {
+              setStatus(call.id, "error");
+              toast.error(`Audio indisponible — ${who}`, { id: tId, description: e?.message });
+            } else {
+              toast.dismiss(tId);
+            }
           }
         } else if (alreadyBlob || audioBlobCacheRef.current.has(call.id)) {
           setStatus(call.id, "uploaded");
@@ -206,25 +214,41 @@ export default function RecordingsList({
           try {
             let working = call;
             if (!working.transcript) {
-              const { data, error } = await supabase.functions.invoke("pp-admin-transcribe", { body: { call_id: callDbId(working) } });
-              if (error) throw error;
-              const tx = (data as any) ?? {};
-              if (tx.transcript) {
-                working = {
-                  ...working,
-                  transcript: tx.transcript,
-                  transcript_segments: tx.segments ?? working.transcript_segments,
-                  transcript_language: tx.language ?? working.transcript_language,
-                };
-                if (!cancelled) onUpdated(working);
+              const tId = toast.loading(`Transcription — ${who}`);
+              try {
+                const { data, error } = await supabase.functions.invoke("pp-admin-transcribe", { body: { call_id: callDbId(working) } });
+                if (error) throw error;
+                const tx = (data as any) ?? {};
+                if (tx.transcript) {
+                  working = {
+                    ...working,
+                    transcript: tx.transcript,
+                    transcript_segments: tx.segments ?? working.transcript_segments,
+                    transcript_language: tx.language ?? working.transcript_language,
+                  };
+                  if (!cancelled) onUpdated(working);
+                  toast.success(`Transcription prête — ${who}`, { id: tId });
+                } else {
+                  toast.dismiss(tId);
+                }
+              } catch (e: any) {
+                toast.error(`Transcription échouée — ${who}`, { id: tId, description: e?.message });
+                throw e;
               }
             }
             if (!cancelled && working.transcript && !working.ai_summary) {
-              const { data, error } = await supabase.functions.invoke("pp-coach-call", {
-                body: { call_id: callDbId(working), transcript: working.transcript, force: true },
-              });
-              if (error) throw error;
-              if (!cancelled) onUpdated(applyCoachPayload(working, data));
+              const tId = toast.loading(`Analyse IA — ${who}`);
+              try {
+                const { data, error } = await supabase.functions.invoke("pp-coach-call", {
+                  body: { call_id: callDbId(working), transcript: working.transcript, force: true },
+                });
+                if (error) throw error;
+                if (!cancelled) onUpdated(applyCoachPayload(working, data));
+                toast.success(`Coaching prêt — ${who}`, { id: tId });
+              } catch (e: any) {
+                toast.error(`Analyse échouée — ${who}`, { id: tId, description: e?.message });
+                throw e;
+              }
             }
           } catch (e) {
             console.warn("[RecordingsList] background pipeline failed", e);
@@ -233,6 +257,7 @@ export default function RecordingsList({
 
         await new Promise((resolve) => window.setTimeout(resolve, 400));
       }
+
     })();
 
     return () => { cancelled = true; controller.abort(); };
