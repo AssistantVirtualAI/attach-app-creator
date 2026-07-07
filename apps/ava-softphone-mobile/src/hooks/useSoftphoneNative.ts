@@ -294,12 +294,16 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
           if (s === 'registered') {
             if (watchdog) { clearTimeout(watchdog); watchdog = null; }
             initInFlightRef.current = false;
+            _initInFlightKey = null;
+            _registeredKey = initKey;
             console.log('[NativeSIP] registered ✓');
             setSipStatus('registered'); setSipError('');
             setNativeRegStatus('registered', null);
           } else if (s === 'error' || s === 'failed') {
             if (watchdog) { clearTimeout(watchdog); watchdog = null; }
             initInFlightRef.current = false;
+            _initInFlightKey = null;
+            _registeredKey = null;
             const msg = d?.reason || `Registration failed${d?.code ? ` (${d.code})` : ''}`;
             console.warn('[NativeSIP] registrationFailed', d);
             setSipStatus('error');
