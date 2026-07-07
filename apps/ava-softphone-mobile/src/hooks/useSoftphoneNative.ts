@@ -261,6 +261,21 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
     const cleanups: Array<() => void> = [];
     let watchdog: ReturnType<typeof setTimeout> | null = null;
 
+    // Module-level singleton: skip the whole registration flow when another
+    // hook instance / mount already registered the same credentials.
+    if (_registeredKey === initKey || _initInFlightKey === initKey) {
+      console.log('[NativeSIP] singleton: already registered/in-flight for %s, skip', initKey);
+      initInFlightRef.current = false;
+      // Still surface a "registered" state locally if the singleton has it.
+      if (_registeredKey === initKey) {
+        setSipStatus('registered');
+        setNativeRegStatus('registered', null);
+      }
+      return;
+    }
+    _initInFlightKey = initKey;
+    _lastConfig = config;
+
     setSipStatus('connecting');
     setSipError('');
     setNativeRegStatus('connecting');
