@@ -214,14 +214,25 @@ export default defineConfig(({ mode }) => {
     },
   },
   build: {
+    minify: "esbuild",
+    target: "chrome120",
+    sourcemap: false,
+    chunkSizeWarningLimit: 600,
     rollupOptions: {
       output: {
         entryFileNames: "assets/[name]-[hash].js",
         chunkFileNames: "assets/[name]-[hash].js",
         assetFileNames: "assets/[name]-[hash][extname]",
+        manualChunks: {
+          "vendor-react": ["react", "react-dom", "react-router-dom"],
+          "vendor-supabase": ["@supabase/supabase-js"],
+          "vendor-ui": ["lucide-react", "date-fns"],
+          "vendor-charts": ["recharts"],
+        },
       },
     },
   },
+
   plugins: [
     react(),
     avaCacheBustPlugin(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_PUBLISHABLE_KEY),
