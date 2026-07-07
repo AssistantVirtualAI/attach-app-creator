@@ -566,6 +566,7 @@ function RecordingSection({ call, onUpdated }: { call: RecordingCall; onUpdated:
           <audio
             ref={audioRef}
             src={playableUrl}
+            preload="metadata"
             onError={() => { setPlaying(false); toast.error("Audio non disponible"); }}
             onPlay={() => setPlaying(true)}
             onPause={() => setPlaying(false)}
@@ -573,6 +574,7 @@ function RecordingSection({ call, onUpdated }: { call: RecordingCall; onUpdated:
             onLoadedMetadata={(e) => setDur((e.target as HTMLAudioElement).duration || 0)}
             className="hidden"
           />
+
           <div className="flex items-center gap-2">
             <button onClick={() => seek(-15)} className="w-9 h-9 rounded-full flex items-center justify-center"
                     style={{ background: "var(--pp-bg-surface)", color: "var(--pp-text-secondary)" }}>
