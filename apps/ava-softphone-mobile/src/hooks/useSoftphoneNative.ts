@@ -45,6 +45,35 @@ let nativeCallSnapshot: NativeCallSnapshot = {
 };
 let nativeCallBridgePromise: Promise<void> | null = null;
 
+// Module-level singleton guard: prevents duplicate SIP registrations even
+// across React re-mounts / StrictMode / multiple hook consumers.
+let _registeredKey: string | null = null;
+let _initInFlightKey: string | null = null;
+let _lastConfig: SIPConfig | null = null;
+
+/**
+ * Force a re-registration from outside the hook (e.g. diagnostics panel).
+ * Clears the singleton guard so the next initAccount actually runs.
+ */
+export async function forceNativeReconnect(): Promise<void> {
+  if (!_lastConfig) return;
+  const cfg = _lastConfig;
+  try { await CapacitorPjsip.disconnect(); } catch {}
+  _registeredKey = null;
+  _initInFlightKey = null;
+  try {
+    await CapacitorPjsip.initAccount({
+      extension: cfg.extension,
+      domain: cfg.domain,
+      password: cfg.password,
+      wssUrl: cfg.wssUrl,
+    });
+    _registeredKey = `${cfg.extension}@${cfg.domain}|${cfg.password}|${cfg.wssUrl ?? ''}`;
+  } catch (e) {
+    console.warn('[NativeSIP] forceNativeReconnect failed', e);
+  }
+}
+
 function emitNativeCallSnapshot(patch: Partial<NativeCallSnapshot>) {
   nativeCallSnapshot = { ...nativeCallSnapshot, ...patch };
   nativeCallSubscribers.forEach((subscriber) => subscriber(nativeCallSnapshot));
