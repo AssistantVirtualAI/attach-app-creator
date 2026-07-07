@@ -10,9 +10,7 @@ import {
   startNativeSipTracking,
   type NativeSipSnapshot,
 } from '../../lib/sip/nativeSipState';
-import { CapacitorPjsip } from '../../lib/sip/nativeSipProvider';
 import { forceNativeReconnect } from '../../hooks/useSoftphoneNative';
-import { Store } from '../../lib/creds';
 import { colors } from '../../lib/theme';
 
 function fmtTime(t: number) {
