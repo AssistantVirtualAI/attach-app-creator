@@ -40,19 +40,11 @@ export default function NativeStatePanel() {
   const reconnect = async () => {
     setBusy(true);
     try {
-      const c = await Store.get();
-      if (!c?.extension || !c?.sipDomain) {
-        await CapacitorPjsip.disconnect().catch(() => {});
-        return;
-      }
-      await CapacitorPjsip.disconnect().catch(() => {});
-      await CapacitorPjsip.initAccount({
-        extension: c.extension,
-        domain: c.sipDomain,
-        password: c.sipPassword || c.accessToken || '',
-        wssUrl: c.wssUrl,
-      });
-    } catch (e) {
+      // Delegate to the single source of truth (useSoftphoneNative). This
+      // avoids the panel triggering a second parallel initAccount, which
+      // caused duplicate SIP registrations on FusionPBX.
+      await forceNativeReconnect();
+    } catch {
       // error already piped into snapshot via plugin event
     } finally {
       setBusy(false);
