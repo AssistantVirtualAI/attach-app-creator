@@ -493,32 +493,7 @@ function RecordingSection({ call, onUpdated }: { call: RecordingCall; onUpdated:
   const fetchRec = async (opts: { play?: boolean } = {}) => {
     setLoading(true);
     try {
-      const projectId = (import.meta as any).env?.VITE_SUPABASE_PROJECT_ID;
-      const anonKey = (import.meta as any).env?.VITE_SUPABASE_PUBLISHABLE_KEY ?? (import.meta as any).env?.VITE_SUPABASE_ANON_KEY;
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!projectId) throw new Error("Backend URL indisponible");
-      const resp = await fetch(`https://${projectId}.supabase.co/functions/v1/ns-get-recording`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: anonKey ?? "",
-          Authorization: `Bearer ${session?.access_token ?? anonKey ?? ""}`,
-        },
-        body: JSON.stringify({
-          call_db_id: callDbId(call),
-          ns_callid: call.proxy_ns_callid ?? call.ns_callid ?? call.ns_orig_callid ?? call.ns_term_callid ?? call.ns_call_id,
-          ns_orig_callid: call.ns_orig_callid,
-          ns_term_callid: call.ns_term_callid,
-          ns_extension: call.extension,
-        }),
-      });
-      const ct = resp.headers.get("Content-Type") ?? "";
-      if (!resp.ok || !ct.includes("audio")) {
-        const j = await resp.json().catch(() => ({}));
-        throw new Error(j?.message ?? j?.error ?? "Audio non disponible");
-      }
-      const blob = await resp.blob();
-      const url = URL.createObjectURL(blob);
+      const url = await fetchAudioBlob(call, { retries: 3 });
       if (localObjectUrlRef.current?.startsWith("blob:")) URL.revokeObjectURL(localObjectUrlRef.current);
       localObjectUrlRef.current = url;
       playAfterLoadRef.current = !!opts.play;
@@ -546,6 +521,7 @@ function RecordingSection({ call, onUpdated }: { call: RecordingCall; onUpdated:
       setLoading(false);
     }
   };
+
 
   useEffect(() => {
     return () => {
