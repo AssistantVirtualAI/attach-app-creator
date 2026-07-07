@@ -435,20 +435,33 @@ export function useSoftphoneNative(config: SIPConfig | null): UseSoftphoneReturn
     saveAudioProfile(p);
   }, []);
   const reconnect = useCallback(() => {
+    if (!config) return;
+    const key = `${config.extension}@${config.domain}|${config.password}|${config.wssUrl ?? ''}`;
+    // Skip when the singleton already has an active registration for this key —
+    // duplicate initAccount calls create ghost registrations on FusionPBX.
+    if (_registeredKey === key) {
+      console.log('[NativeSIP] reconnect skipped, already registered for', key);
+      return;
+    }
+    if (_initInFlightKey === key) {
+      console.log('[NativeSIP] reconnect skipped, initAccount in flight for', key);
+      return;
+    }
     setSipError('');
     setSipStatus('connecting');
     setNativeRegStatus('connecting');
-    if (config) {
-      CapacitorPjsip.initAccount({
-        extension: config.extension,
-        domain: config.domain,
-        password: config.password,
-        wssUrl: config.wssUrl,
-      }).catch((e) => {
-        const msg = e?.message || 'reconnect failed';
-        setSipStatus('error'); setSipError(msg); setNativeRegStatus('error', msg);
-      });
-    }
+    _initInFlightKey = key;
+    _lastConfig = config;
+    CapacitorPjsip.initAccount({
+      extension: config.extension,
+      domain: config.domain,
+      password: config.password,
+      wssUrl: config.wssUrl,
+    }).catch((e) => {
+      _initInFlightKey = null;
+      const msg = e?.message || 'reconnect failed';
+      setSipStatus('error'); setSipError(msg); setNativeRegStatus('error', msg);
+    });
   }, [config]);
 
   // Auto-reconnect when the app returns to foreground or the network recovers.
