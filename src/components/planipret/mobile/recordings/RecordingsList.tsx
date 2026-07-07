@@ -343,6 +343,7 @@ function RecordingSection({ call, onUpdated }: { call: RecordingCall; onUpdated:
   const [cur, setCur] = useState(0);
   const [dur, setDur] = useState(0);
   const [localUrl, setLocalUrl] = useState<string | null>(null);
+  const localObjectUrlRef = useRef<string | null>(null);
   const playableUrl = localUrl ?? (!!call.recording_url && (/^(blob:|data:)/i.test(String(call.recording_url)) || call.stream_via_proxy === false) ? call.recording_url : null);
 
   const fetchRec = async (opts: { play?: boolean } = {}) => {
@@ -374,6 +375,8 @@ function RecordingSection({ call, onUpdated }: { call: RecordingCall; onUpdated:
       }
       const blob = await resp.blob();
       const url = URL.createObjectURL(blob);
+      if (localObjectUrlRef.current?.startsWith("blob:")) URL.revokeObjectURL(localObjectUrlRef.current);
+      localObjectUrlRef.current = url;
       playAfterLoadRef.current = !!opts.play;
       setLocalUrl(url);
       onUpdated({ ...call, recording_url: url, has_recording: true, stream_via_proxy: true });
@@ -386,6 +389,8 @@ function RecordingSection({ call, onUpdated }: { call: RecordingCall; onUpdated:
         });
         const url = (data as any)?.recording_url;
         if (!url) throw new Error("nope");
+        if (localObjectUrlRef.current?.startsWith("blob:")) URL.revokeObjectURL(localObjectUrlRef.current);
+        localObjectUrlRef.current = null;
         playAfterLoadRef.current = !!opts.play;
         setLocalUrl(url);
         onUpdated({ ...call, recording_url: url, stream_via_proxy: false });
@@ -400,10 +405,8 @@ function RecordingSection({ call, onUpdated }: { call: RecordingCall; onUpdated:
 
   useEffect(() => {
     return () => {
-      setLocalUrl((prev) => {
-        if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
-        return null;
-      });
+      if (localObjectUrlRef.current?.startsWith("blob:")) URL.revokeObjectURL(localObjectUrlRef.current);
+      localObjectUrlRef.current = null;
     };
   }, [call.id]);
 
