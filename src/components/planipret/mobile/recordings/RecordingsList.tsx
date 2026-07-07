@@ -165,53 +165,86 @@ export default function RecordingsList({
     [calls]
   );
   const autoPipelineDoneRef = useRef<Set<string>>(new Set());
+  const audioBlobCacheRef = useRef<Map<string, string>>(new Map());
+  const [audioStatus, setAudioStatus] = useState<Record<string, AudioStatus>>({});
 
-  // Background preload for the 5 most recent recordings, throttled one-by-one
-  // so the recordings screen stays responsive and audio is never fetched until Play.
+  const setStatus = (id: string, s: AudioStatus) =>
+    setAudioStatus((prev) => (prev[id] === s ? prev : { ...prev, [id]: s }));
+
+  // Background preload: transcript + AI + audio blob for the 5 most recent recordings.
+  // Runs one-by-one so the recordings screen stays responsive.
   useEffect(() => {
     if (!withRec.length) return;
+    const controller = new AbortController();
     let cancelled = false;
-    const queue = withRec
-      .slice(0, 5)
-      .filter((c) => hasResolvableAudio(c) && (!c.transcript || !c.ai_summary) && !autoPipelineDoneRef.current.has(c.id));
-    if (!queue.length) return;
-    queue.forEach((c) => autoPipelineDoneRef.current.add(c.id));
+    const queue = withRec.slice(0, 5).filter((c) => hasResolvableAudio(c));
 
     (async () => {
       for (const call of queue) {
         if (cancelled) break;
-        try {
-          let working = call;
-          if (!working.transcript) {
-            const { data, error } = await supabase.functions.invoke("pp-admin-transcribe", { body: { call_id: callDbId(working) } });
-            if (error) throw error;
-            const tx = (data as any) ?? {};
-            if (tx.transcript) {
-              working = {
-                ...working,
-                transcript: tx.transcript,
-                transcript_segments: tx.segments ?? working.transcript_segments,
-                transcript_language: tx.language ?? working.transcript_language,
-              };
-              if (!cancelled) onUpdated(working);
-            }
+
+        // Auto-upload / cache audio blob (skip if already cached or blob-backed).
+        const alreadyBlob = !!call.recording_url && /^blob:/i.test(String(call.recording_url));
+        if (!audioBlobCacheRef.current.has(call.id) && !alreadyBlob) {
+          setStatus(call.id, "uploading");
+          try {
+            const url = await fetchAudioBlob(call, { retries: 3, signal: controller.signal });
+            if (cancelled) { URL.revokeObjectURL(url); break; }
+            audioBlobCacheRef.current.set(call.id, url);
+            setStatus(call.id, "uploaded");
+            onUpdated({ ...call, recording_url: url, has_recording: true, stream_via_proxy: true });
+          } catch (e) {
+            if (!cancelled) setStatus(call.id, "error");
           }
-          if (!cancelled && working.transcript && !working.ai_summary) {
-            const { data, error } = await supabase.functions.invoke("pp-coach-call", {
-              body: { call_id: callDbId(working), transcript: working.transcript, force: true },
-            });
-            if (error) throw error;
-            if (!cancelled) onUpdated(applyCoachPayload(working, data));
-          }
-        } catch (e) {
-          console.warn("[RecordingsList] background pipeline failed", e);
+        } else if (alreadyBlob || audioBlobCacheRef.current.has(call.id)) {
+          setStatus(call.id, "uploaded");
         }
-        await new Promise((resolve) => window.setTimeout(resolve, 700));
+
+        // Transcript + coaching pipeline.
+        if (!autoPipelineDoneRef.current.has(call.id) && (!call.transcript || !call.ai_summary)) {
+          autoPipelineDoneRef.current.add(call.id);
+          try {
+            let working = call;
+            if (!working.transcript) {
+              const { data, error } = await supabase.functions.invoke("pp-admin-transcribe", { body: { call_id: callDbId(working) } });
+              if (error) throw error;
+              const tx = (data as any) ?? {};
+              if (tx.transcript) {
+                working = {
+                  ...working,
+                  transcript: tx.transcript,
+                  transcript_segments: tx.segments ?? working.transcript_segments,
+                  transcript_language: tx.language ?? working.transcript_language,
+                };
+                if (!cancelled) onUpdated(working);
+              }
+            }
+            if (!cancelled && working.transcript && !working.ai_summary) {
+              const { data, error } = await supabase.functions.invoke("pp-coach-call", {
+                body: { call_id: callDbId(working), transcript: working.transcript, force: true },
+              });
+              if (error) throw error;
+              if (!cancelled) onUpdated(applyCoachPayload(working, data));
+            }
+          } catch (e) {
+            console.warn("[RecordingsList] background pipeline failed", e);
+          }
+        }
+
+        await new Promise((resolve) => window.setTimeout(resolve, 400));
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => { cancelled = true; controller.abort(); };
   }, [withRec, onUpdated]);
+
+  // Cleanup blob URLs on unmount
+  useEffect(() => () => {
+    for (const url of audioBlobCacheRef.current.values()) {
+      try { URL.revokeObjectURL(url); } catch {}
+    }
+    audioBlobCacheRef.current.clear();
+  }, []);
 
   // Realtime AI insights broadcast
   useEffect(() => {
@@ -257,17 +290,47 @@ export default function RecordingsList({
     );
   }
 
+  const retryAudio = async (call: RecordingCall) => {
+    setStatus(call.id, "uploading");
+    try {
+      const url = await fetchAudioBlob(call, { retries: 3 });
+      const prev = audioBlobCacheRef.current.get(call.id);
+      if (prev) { try { URL.revokeObjectURL(prev); } catch {} }
+      audioBlobCacheRef.current.set(call.id, url);
+      setStatus(call.id, "uploaded");
+      onUpdated({ ...call, recording_url: url, has_recording: true, stream_via_proxy: true });
+    } catch (e: any) {
+      setStatus(call.id, "error");
+      toast.error("Enregistrement indisponible", { description: e?.message });
+    }
+  };
+
   return (
     <ul className="px-3 pt-3 pb-4 space-y-2">
       {withRec.map((c) => (
-        <RecordingCard key={c.id} call={c} onUpdated={onUpdated} />
+        <RecordingCard
+          key={c.id}
+          call={c}
+          onUpdated={onUpdated}
+          audioStatus={audioStatus[c.id] ?? "idle"}
+          cachedAudioUrl={audioBlobCacheRef.current.get(c.id) ?? null}
+          onRetryAudio={() => retryAudio(c)}
+        />
       ))}
     </ul>
   );
 }
 
 // ===================== Card =====================
-function RecordingCard({ call, onUpdated }: { call: RecordingCall; onUpdated: (c: RecordingCall) => void }) {
+function RecordingCard({
+  call, onUpdated, audioStatus, cachedAudioUrl, onRetryAudio,
+}: {
+  call: RecordingCall;
+  onUpdated: (c: RecordingCall) => void;
+  audioStatus: AudioStatus;
+  cachedAudioUrl: string | null;
+  onRetryAudio: () => void;
+}) {
   const [open, setOpen] = useState<"rec" | "txt" | "ai" | "crm" | null>(null);
   const temp = tempIcon(call.lead_temperature);
 
@@ -287,16 +350,20 @@ function RecordingCard({ call, onUpdated }: { call: RecordingCall; onUpdated: (c
             {fmtDate(call.started_at)} · {fmtDuration(call.duration_seconds)}
           </div>
         </div>
-        {temp && (
-          <span
-            className="text-[10px] font-semibold px-2 py-1 rounded-full flex items-center gap-1 shrink-0"
-            style={{ background: `${temp.color}22`, color: temp.color }}
-          >
-            <temp.Icon className="w-3 h-3" />
-            {call.lead_score != null ? `${call.lead_score}` : temp.label}
-          </span>
-        )}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <AudioStatusBadge status={audioStatus} onRetry={onRetryAudio} />
+          {temp && (
+            <span
+              className="text-[10px] font-semibold px-2 py-1 rounded-full flex items-center gap-1"
+              style={{ background: `${temp.color}22`, color: temp.color }}
+            >
+              <temp.Icon className="w-3 h-3" />
+              {call.lead_score != null ? `${call.lead_score}` : temp.label}
+            </span>
+          )}
+        </div>
       </div>
+
 
       {/* Pipeline progress */}
       <PipelineProgress state={call.pipeline_state ?? inferPipeline(call)} />
