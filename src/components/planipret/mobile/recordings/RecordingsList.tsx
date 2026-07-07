@@ -4,7 +4,11 @@ import { toast } from "sonner";
 import {
   Play, Pause, Download, RotateCcw, RotateCw, Sparkles, FileText, Bot,
   Loader2, Search, Copy, Check, ChevronDown, Link2, User, Flame, Snowflake, Thermometer, ListChecks,
+  CloudUpload, CloudOff, CheckCircle2,
 } from "lucide-react";
+
+export type AudioStatus = "idle" | "uploading" | "uploaded" | "error";
+
 
 type Pipeline = {
   cdr?: "pending" | "done" | "error";
@@ -95,6 +99,48 @@ async function fetchNsTranscript(call: RecordingCall) {
   const text = d.segments.map((s: any) => `${s.speaker ?? "Speaker"}: ${s.text}`).join("\n");
   return { text, segments: d.segments, language: d.language ?? null };
 }
+
+// Fetch the audio blob via the backend proxy. Retries with backoff when the
+// recording is not yet available on the PBX ("not ready" / 404 / 425).
+async function fetchAudioBlob(call: RecordingCall, opts: { retries?: number; signal?: AbortSignal } = {}): Promise<string> {
+  const retries = opts.retries ?? 3;
+  const projectId = (import.meta as any).env?.VITE_SUPABASE_PROJECT_ID;
+  const anonKey = (import.meta as any).env?.VITE_SUPABASE_PUBLISHABLE_KEY ?? (import.meta as any).env?.VITE_SUPABASE_ANON_KEY;
+  if (!projectId) throw new Error("Backend URL indisponible");
+  const { data: { session } } = await supabase.auth.getSession();
+  let lastErr: any = null;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    if (opts.signal?.aborted) throw new Error("aborted");
+    try {
+      const resp = await fetch(`https://${projectId}.supabase.co/functions/v1/ns-get-recording`, {
+        method: "POST",
+        signal: opts.signal,
+        headers: {
+          "Content-Type": "application/json",
+          apikey: anonKey ?? "",
+          Authorization: `Bearer ${session?.access_token ?? anonKey ?? ""}`,
+        },
+        body: JSON.stringify(recordingLookupBody(call)),
+      });
+      const ct = resp.headers.get("Content-Type") ?? "";
+      if (resp.ok && ct.includes("audio")) {
+        const blob = await resp.blob();
+        return URL.createObjectURL(blob);
+      }
+      const j = await resp.json().catch(() => ({}));
+      const msg: string = j?.message ?? j?.error ?? `HTTP ${resp.status}`;
+      const retriable = resp.status === 404 || resp.status === 425 || resp.status === 503 || /not ready|processing|pending|indisponible/i.test(msg);
+      lastErr = new Error(msg);
+      if (!retriable || attempt === retries) throw lastErr;
+    } catch (e: any) {
+      lastErr = e;
+      if (e?.name === "AbortError" || attempt === retries) throw e;
+    }
+    await new Promise((r) => window.setTimeout(r, 1500 * (attempt + 1)));
+  }
+  throw lastErr ?? new Error("Audio indisponible");
+}
+
 const tempIcon = (t?: string | null) => {
   if (t === "hot") return { Icon: Flame, color: "var(--pp-danger)", label: "Chaud" };
   if (t === "warm") return { Icon: Thermometer, color: "var(--pp-warning, #f59e0b)", label: "Tiède" };
@@ -119,53 +165,86 @@ export default function RecordingsList({
     [calls]
   );
   const autoPipelineDoneRef = useRef<Set<string>>(new Set());
+  const audioBlobCacheRef = useRef<Map<string, string>>(new Map());
+  const [audioStatus, setAudioStatus] = useState<Record<string, AudioStatus>>({});
 
-  // Background preload for the 5 most recent recordings, throttled one-by-one
-  // so the recordings screen stays responsive and audio is never fetched until Play.
+  const setStatus = (id: string, s: AudioStatus) =>
+    setAudioStatus((prev) => (prev[id] === s ? prev : { ...prev, [id]: s }));
+
+  // Background preload: transcript + AI + audio blob for the 5 most recent recordings.
+  // Runs one-by-one so the recordings screen stays responsive.
   useEffect(() => {
     if (!withRec.length) return;
+    const controller = new AbortController();
     let cancelled = false;
-    const queue = withRec
-      .slice(0, 5)
-      .filter((c) => hasResolvableAudio(c) && (!c.transcript || !c.ai_summary) && !autoPipelineDoneRef.current.has(c.id));
-    if (!queue.length) return;
-    queue.forEach((c) => autoPipelineDoneRef.current.add(c.id));
+    const queue = withRec.slice(0, 5).filter((c) => hasResolvableAudio(c));
 
     (async () => {
       for (const call of queue) {
         if (cancelled) break;
-        try {
-          let working = call;
-          if (!working.transcript) {
-            const { data, error } = await supabase.functions.invoke("pp-admin-transcribe", { body: { call_id: callDbId(working) } });
-            if (error) throw error;
-            const tx = (data as any) ?? {};
-            if (tx.transcript) {
-              working = {
-                ...working,
-                transcript: tx.transcript,
-                transcript_segments: tx.segments ?? working.transcript_segments,
-                transcript_language: tx.language ?? working.transcript_language,
-              };
-              if (!cancelled) onUpdated(working);
-            }
+
+        // Auto-upload / cache audio blob (skip if already cached or blob-backed).
+        const alreadyBlob = !!call.recording_url && /^blob:/i.test(String(call.recording_url));
+        if (!audioBlobCacheRef.current.has(call.id) && !alreadyBlob) {
+          setStatus(call.id, "uploading");
+          try {
+            const url = await fetchAudioBlob(call, { retries: 3, signal: controller.signal });
+            if (cancelled) { URL.revokeObjectURL(url); break; }
+            audioBlobCacheRef.current.set(call.id, url);
+            setStatus(call.id, "uploaded");
+            onUpdated({ ...call, recording_url: url, has_recording: true, stream_via_proxy: true });
+          } catch (e) {
+            if (!cancelled) setStatus(call.id, "error");
           }
-          if (!cancelled && working.transcript && !working.ai_summary) {
-            const { data, error } = await supabase.functions.invoke("pp-coach-call", {
-              body: { call_id: callDbId(working), transcript: working.transcript, force: true },
-            });
-            if (error) throw error;
-            if (!cancelled) onUpdated(applyCoachPayload(working, data));
-          }
-        } catch (e) {
-          console.warn("[RecordingsList] background pipeline failed", e);
+        } else if (alreadyBlob || audioBlobCacheRef.current.has(call.id)) {
+          setStatus(call.id, "uploaded");
         }
-        await new Promise((resolve) => window.setTimeout(resolve, 700));
+
+        // Transcript + coaching pipeline.
+        if (!autoPipelineDoneRef.current.has(call.id) && (!call.transcript || !call.ai_summary)) {
+          autoPipelineDoneRef.current.add(call.id);
+          try {
+            let working = call;
+            if (!working.transcript) {
+              const { data, error } = await supabase.functions.invoke("pp-admin-transcribe", { body: { call_id: callDbId(working) } });
+              if (error) throw error;
+              const tx = (data as any) ?? {};
+              if (tx.transcript) {
+                working = {
+                  ...working,
+                  transcript: tx.transcript,
+                  transcript_segments: tx.segments ?? working.transcript_segments,
+                  transcript_language: tx.language ?? working.transcript_language,
+                };
+                if (!cancelled) onUpdated(working);
+              }
+            }
+            if (!cancelled && working.transcript && !working.ai_summary) {
+              const { data, error } = await supabase.functions.invoke("pp-coach-call", {
+                body: { call_id: callDbId(working), transcript: working.transcript, force: true },
+              });
+              if (error) throw error;
+              if (!cancelled) onUpdated(applyCoachPayload(working, data));
+            }
+          } catch (e) {
+            console.warn("[RecordingsList] background pipeline failed", e);
+          }
+        }
+
+        await new Promise((resolve) => window.setTimeout(resolve, 400));
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => { cancelled = true; controller.abort(); };
   }, [withRec, onUpdated]);
+
+  // Cleanup blob URLs on unmount
+  useEffect(() => () => {
+    for (const url of audioBlobCacheRef.current.values()) {
+      try { URL.revokeObjectURL(url); } catch {}
+    }
+    audioBlobCacheRef.current.clear();
+  }, []);
 
   // Realtime AI insights broadcast
   useEffect(() => {
@@ -211,17 +290,47 @@ export default function RecordingsList({
     );
   }
 
+  const retryAudio = async (call: RecordingCall) => {
+    setStatus(call.id, "uploading");
+    try {
+      const url = await fetchAudioBlob(call, { retries: 3 });
+      const prev = audioBlobCacheRef.current.get(call.id);
+      if (prev) { try { URL.revokeObjectURL(prev); } catch {} }
+      audioBlobCacheRef.current.set(call.id, url);
+      setStatus(call.id, "uploaded");
+      onUpdated({ ...call, recording_url: url, has_recording: true, stream_via_proxy: true });
+    } catch (e: any) {
+      setStatus(call.id, "error");
+      toast.error("Enregistrement indisponible", { description: e?.message });
+    }
+  };
+
   return (
     <ul className="px-3 pt-3 pb-4 space-y-2">
       {withRec.map((c) => (
-        <RecordingCard key={c.id} call={c} onUpdated={onUpdated} />
+        <RecordingCard
+          key={c.id}
+          call={c}
+          onUpdated={onUpdated}
+          audioStatus={audioStatus[c.id] ?? "idle"}
+          cachedAudioUrl={audioBlobCacheRef.current.get(c.id) ?? null}
+          onRetryAudio={() => retryAudio(c)}
+        />
       ))}
     </ul>
   );
 }
 
 // ===================== Card =====================
-function RecordingCard({ call, onUpdated }: { call: RecordingCall; onUpdated: (c: RecordingCall) => void }) {
+function RecordingCard({
+  call, onUpdated, audioStatus, cachedAudioUrl, onRetryAudio,
+}: {
+  call: RecordingCall;
+  onUpdated: (c: RecordingCall) => void;
+  audioStatus: AudioStatus;
+  cachedAudioUrl: string | null;
+  onRetryAudio: () => void;
+}) {
   const [open, setOpen] = useState<"rec" | "txt" | "ai" | "crm" | null>(null);
   const temp = tempIcon(call.lead_temperature);
 
@@ -241,16 +350,20 @@ function RecordingCard({ call, onUpdated }: { call: RecordingCall; onUpdated: (c
             {fmtDate(call.started_at)} · {fmtDuration(call.duration_seconds)}
           </div>
         </div>
-        {temp && (
-          <span
-            className="text-[10px] font-semibold px-2 py-1 rounded-full flex items-center gap-1 shrink-0"
-            style={{ background: `${temp.color}22`, color: temp.color }}
-          >
-            <temp.Icon className="w-3 h-3" />
-            {call.lead_score != null ? `${call.lead_score}` : temp.label}
-          </span>
-        )}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <AudioStatusBadge status={audioStatus} onRetry={onRetryAudio} />
+          {temp && (
+            <span
+              className="text-[10px] font-semibold px-2 py-1 rounded-full flex items-center gap-1"
+              style={{ background: `${temp.color}22`, color: temp.color }}
+            >
+              <temp.Icon className="w-3 h-3" />
+              {call.lead_score != null ? `${call.lead_score}` : temp.label}
+            </span>
+          )}
+        </div>
       </div>
+
 
       {/* Pipeline progress */}
       <PipelineProgress state={call.pipeline_state ?? inferPipeline(call)} />
@@ -333,6 +446,37 @@ function Pill({
   );
 }
 
+function AudioStatusBadge({ status, onRetry }: { status: AudioStatus; onRetry: () => void }) {
+  if (status === "idle") return null;
+  if (status === "uploading") {
+    return (
+      <span className="text-[10px] font-semibold px-2 py-1 rounded-full flex items-center gap-1"
+            style={{ background: "rgba(46,155,220,0.12)", color: "var(--pp-brand-accent)" }}>
+        <Loader2 className="w-3 h-3 animate-spin" />
+        Uploading
+      </span>
+    );
+  }
+  if (status === "uploaded") {
+    return (
+      <span className="text-[10px] font-semibold px-2 py-1 rounded-full flex items-center gap-1"
+            style={{ background: "rgba(34,197,94,0.14)", color: "var(--pp-success)" }}>
+        <CheckCircle2 className="w-3 h-3" />
+        Uploaded
+      </span>
+    );
+  }
+  return (
+    <button onClick={onRetry}
+            className="text-[10px] font-semibold px-2 py-1 rounded-full flex items-center gap-1"
+            style={{ background: "rgba(239,68,68,0.14)", color: "var(--pp-danger)" }}>
+      <CloudOff className="w-3 h-3" />
+      Retry
+    </button>
+  );
+}
+
+
 // ===================== Recording =====================
 function RecordingSection({ call, onUpdated }: { call: RecordingCall; onUpdated: (c: RecordingCall) => void }) {
   const [loading, setLoading] = useState(false);
@@ -349,32 +493,7 @@ function RecordingSection({ call, onUpdated }: { call: RecordingCall; onUpdated:
   const fetchRec = async (opts: { play?: boolean } = {}) => {
     setLoading(true);
     try {
-      const projectId = (import.meta as any).env?.VITE_SUPABASE_PROJECT_ID;
-      const anonKey = (import.meta as any).env?.VITE_SUPABASE_PUBLISHABLE_KEY ?? (import.meta as any).env?.VITE_SUPABASE_ANON_KEY;
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!projectId) throw new Error("Backend URL indisponible");
-      const resp = await fetch(`https://${projectId}.supabase.co/functions/v1/ns-get-recording`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: anonKey ?? "",
-          Authorization: `Bearer ${session?.access_token ?? anonKey ?? ""}`,
-        },
-        body: JSON.stringify({
-          call_db_id: callDbId(call),
-          ns_callid: call.proxy_ns_callid ?? call.ns_callid ?? call.ns_orig_callid ?? call.ns_term_callid ?? call.ns_call_id,
-          ns_orig_callid: call.ns_orig_callid,
-          ns_term_callid: call.ns_term_callid,
-          ns_extension: call.extension,
-        }),
-      });
-      const ct = resp.headers.get("Content-Type") ?? "";
-      if (!resp.ok || !ct.includes("audio")) {
-        const j = await resp.json().catch(() => ({}));
-        throw new Error(j?.message ?? j?.error ?? "Audio non disponible");
-      }
-      const blob = await resp.blob();
-      const url = URL.createObjectURL(blob);
+      const url = await fetchAudioBlob(call, { retries: 3 });
       if (localObjectUrlRef.current?.startsWith("blob:")) URL.revokeObjectURL(localObjectUrlRef.current);
       localObjectUrlRef.current = url;
       playAfterLoadRef.current = !!opts.play;
@@ -402,6 +521,7 @@ function RecordingSection({ call, onUpdated }: { call: RecordingCall; onUpdated:
       setLoading(false);
     }
   };
+
 
   useEffect(() => {
     return () => {
@@ -446,6 +566,7 @@ function RecordingSection({ call, onUpdated }: { call: RecordingCall; onUpdated:
           <audio
             ref={audioRef}
             src={playableUrl}
+            preload="metadata"
             onError={() => { setPlaying(false); toast.error("Audio non disponible"); }}
             onPlay={() => setPlaying(true)}
             onPause={() => setPlaying(false)}
@@ -453,6 +574,7 @@ function RecordingSection({ call, onUpdated }: { call: RecordingCall; onUpdated:
             onLoadedMetadata={(e) => setDur((e.target as HTMLAudioElement).duration || 0)}
             className="hidden"
           />
+
           <div className="flex items-center gap-2">
             <button onClick={() => seek(-15)} className="w-9 h-9 rounded-full flex items-center justify-center"
                     style={{ background: "var(--pp-bg-surface)", color: "var(--pp-text-secondary)" }}>
