@@ -118,6 +118,54 @@ export default function RecordingsList({
     () => calls.filter((c) => hasResolvableAudio(c) || !!c.transcript || !!c.ai_summary),
     [calls]
   );
+  const autoPipelineDoneRef = useRef<Set<string>>(new Set());
+
+  // Background preload for the 5 most recent recordings, throttled one-by-one
+  // so the recordings screen stays responsive and audio is never fetched until Play.
+  useEffect(() => {
+    if (!withRec.length) return;
+    let cancelled = false;
+    const queue = withRec
+      .slice(0, 5)
+      .filter((c) => hasResolvableAudio(c) && (!c.transcript || !c.ai_summary) && !autoPipelineDoneRef.current.has(c.id));
+    if (!queue.length) return;
+    queue.forEach((c) => autoPipelineDoneRef.current.add(c.id));
+
+    (async () => {
+      for (const call of queue) {
+        if (cancelled) break;
+        try {
+          let working = call;
+          if (!working.transcript) {
+            const { data, error } = await supabase.functions.invoke("pp-admin-transcribe", { body: { call_id: callDbId(working) } });
+            if (error) throw error;
+            const tx = (data as any) ?? {};
+            if (tx.transcript) {
+              working = {
+                ...working,
+                transcript: tx.transcript,
+                transcript_segments: tx.segments ?? working.transcript_segments,
+                transcript_language: tx.language ?? working.transcript_language,
+              };
+              if (!cancelled) onUpdated(working);
+            }
+          }
+          if (!cancelled && working.transcript && !working.ai_summary) {
+            const { data, error } = await supabase.functions.invoke("pp-coach-call", {
+              body: { call_id: callDbId(working), transcript: working.transcript, force: true },
+            });
+            if (error) throw error;
+            if (!cancelled) onUpdated(applyCoachPayload(working, data));
+          }
+        } catch (e) {
+          console.warn("[RecordingsList] background pipeline failed", e);
+        }
+        await new Promise((resolve) => window.setTimeout(resolve, 700));
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [withRec, onUpdated]);
 
   // Realtime AI insights broadcast
   useEffect(() => {
@@ -165,56 +213,17 @@ export default function RecordingsList({
 
   return (
     <ul className="px-3 pt-3 pb-4 space-y-2">
-      {withRec.map((c, idx) => (
-        <RecordingCard key={c.id} call={c} onUpdated={onUpdated} autoLoad={idx < 5} />
+      {withRec.map((c) => (
+        <RecordingCard key={c.id} call={c} onUpdated={onUpdated} />
       ))}
     </ul>
   );
 }
 
 // ===================== Card =====================
-function RecordingCard({ call, onUpdated, autoLoad = false }: { call: RecordingCall; onUpdated: (c: RecordingCall) => void; autoLoad?: boolean }) {
+function RecordingCard({ call, onUpdated }: { call: RecordingCall; onUpdated: (c: RecordingCall) => void }) {
   const [open, setOpen] = useState<"rec" | "txt" | "ai" | "crm" | null>(null);
   const temp = tempIcon(call.lead_temperature);
-  const autoPipelineRef = useRef<string | null>(null);
-
-  // Auto-pipeline: runs when the user opens a section, OR when autoLoad is true
-  // (for the top-N most recent items so recordings/transcripts/AI preload).
-  useEffect(() => {
-    const trigger = open || autoLoad;
-    if (!trigger) return;
-    if (!hasResolvableAudio(call) || autoPipelineRef.current === call.id) return;
-    if (call.transcript && call.ai_summary) return;
-    autoPipelineRef.current = call.id;
-    (async () => {
-      try {
-        let working = call;
-        if (!working.transcript) {
-          const { data, error } = await supabase.functions.invoke("pp-admin-transcribe", { body: { call_id: callDbId(working) } });
-          if (error) throw error;
-          const tx = (data as any) ?? {};
-          if (tx.transcript) {
-            working = {
-              ...working,
-              transcript: tx.transcript,
-              transcript_segments: tx.segments ?? working.transcript_segments,
-              transcript_language: tx.language ?? working.transcript_language,
-            };
-            onUpdated(working);
-          }
-        }
-        if (working.transcript && !working.ai_summary) {
-          const { data, error } = await supabase.functions.invoke("pp-coach-call", {
-            body: { call_id: callDbId(working), transcript: working.transcript, force: true },
-          });
-          if (error) throw error;
-          onUpdated(applyCoachPayload(working, data));
-        }
-      } catch (e) {
-        console.warn("[RecordingsList] auto pipeline failed", e);
-      }
-    })();
-  }, [open, autoLoad, call, onUpdated]);
 
 
   return (
@@ -328,14 +337,15 @@ function Pill({
 function RecordingSection({ call, onUpdated }: { call: RecordingCall; onUpdated: (c: RecordingCall) => void }) {
   const [loading, setLoading] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
-  const fetchedRef = useRef(false);
+  const playAfterLoadRef = useRef(false);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [cur, setCur] = useState(0);
   const [dur, setDur] = useState(0);
-  const playableUrl = !!call.recording_url && (/^(blob:|data:)/i.test(String(call.recording_url)) || call.stream_via_proxy === false) ? call.recording_url : null;
+  const [localUrl, setLocalUrl] = useState<string | null>(null);
+  const playableUrl = localUrl ?? (!!call.recording_url && (/^(blob:|data:)/i.test(String(call.recording_url)) || call.stream_via_proxy === false) ? call.recording_url : null);
 
-  const fetchRec = async () => {
+  const fetchRec = async (opts: { play?: boolean } = {}) => {
     setLoading(true);
     try {
       const projectId = (import.meta as any).env?.VITE_SUPABASE_PROJECT_ID;
@@ -364,6 +374,8 @@ function RecordingSection({ call, onUpdated }: { call: RecordingCall; onUpdated:
       }
       const blob = await resp.blob();
       const url = URL.createObjectURL(blob);
+      playAfterLoadRef.current = !!opts.play;
+      setLocalUrl(url);
       onUpdated({ ...call, recording_url: url, has_recording: true, stream_via_proxy: true });
       toast.success("Enregistrement chargé");
     } catch (e: any) {
@@ -374,6 +386,8 @@ function RecordingSection({ call, onUpdated }: { call: RecordingCall; onUpdated:
         });
         const url = (data as any)?.recording_url;
         if (!url) throw new Error("nope");
+        playAfterLoadRef.current = !!opts.play;
+        setLocalUrl(url);
         onUpdated({ ...call, recording_url: url, stream_via_proxy: false });
         toast.success("Enregistrement chargé");
       } catch {
@@ -385,11 +399,19 @@ function RecordingSection({ call, onUpdated }: { call: RecordingCall; onUpdated:
   };
 
   useEffect(() => {
-    if (fetchedRef.current || loading || playableUrl || !hasResolvableAudio(call)) return;
-    fetchedRef.current = true;
-    void fetchRec();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [call.id, playableUrl, loading]);
+    return () => {
+      setLocalUrl((prev) => {
+        if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
+        return null;
+      });
+    };
+  }, [call.id]);
+
+  useEffect(() => {
+    if (!playAfterLoadRef.current || !playableUrl || !audioRef.current) return;
+    playAfterLoadRef.current = false;
+    void audioRef.current.play().catch(() => setPlaying(false));
+  }, [playableUrl]);
 
   const seek = (delta: number) => {
       if (!audioRef.current) return;
@@ -408,20 +430,20 @@ function RecordingSection({ call, onUpdated }: { call: RecordingCall; onUpdated:
     <div className="mt-3 p-3 rounded-xl space-y-2" style={{ background: "var(--pp-bg-elevated)", border: "1px solid var(--pp-bg-border-2)" }}>
       {!playableUrl ? (
         <button
-          onClick={fetchRec}
+          onClick={() => fetchRec({ play: true })}
           disabled={loading}
           className="w-full py-2.5 rounded-lg text-sm font-medium flex items-center justify-center gap-2"
           style={{ background: "var(--pp-bg-surface)", color: "var(--pp-text-primary)", border: "1px solid var(--pp-bg-border-2)" }}
         >
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-          {loading ? "Chargement…" : "Écouter"}
+          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+          {loading ? "Chargement…" : "Play"}
         </button>
       ) : (
         <>
           <audio
             ref={audioRef}
             src={playableUrl}
-            onError={() => { if (!loading && hasResolvableAudio(call)) void fetchRec(); }}
+            onError={() => { setPlaying(false); toast.error("Audio non disponible"); }}
             onPlay={() => setPlaying(true)}
             onPause={() => setPlaying(false)}
             onTimeUpdate={(e) => setCur((e.target as HTMLAudioElement).currentTime)}
