@@ -446,6 +446,37 @@ function Pill({
   );
 }
 
+function AudioStatusBadge({ status, onRetry }: { status: AudioStatus; onRetry: () => void }) {
+  if (status === "idle") return null;
+  if (status === "uploading") {
+    return (
+      <span className="text-[10px] font-semibold px-2 py-1 rounded-full flex items-center gap-1"
+            style={{ background: "rgba(46,155,220,0.12)", color: "var(--pp-brand-accent)" }}>
+        <Loader2 className="w-3 h-3 animate-spin" />
+        Uploading
+      </span>
+    );
+  }
+  if (status === "uploaded") {
+    return (
+      <span className="text-[10px] font-semibold px-2 py-1 rounded-full flex items-center gap-1"
+            style={{ background: "rgba(34,197,94,0.14)", color: "var(--pp-success)" }}>
+        <CheckCircle2 className="w-3 h-3" />
+        Uploaded
+      </span>
+    );
+  }
+  return (
+    <button onClick={onRetry}
+            className="text-[10px] font-semibold px-2 py-1 rounded-full flex items-center gap-1"
+            style={{ background: "rgba(239,68,68,0.14)", color: "var(--pp-danger)" }}>
+      <CloudOff className="w-3 h-3" />
+      Retry
+    </button>
+  );
+}
+
+
 // ===================== Recording =====================
 function RecordingSection({ call, onUpdated }: { call: RecordingCall; onUpdated: (c: RecordingCall) => void }) {
   const [loading, setLoading] = useState(false);
