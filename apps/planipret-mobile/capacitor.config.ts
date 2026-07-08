@@ -17,7 +17,7 @@ const config: CapacitorConfig = {
     scrollEnabled: false,
     contentInset: 'automatic',
     preferredContentMode: 'mobile',
-    webContentsDebuggingEnabled: true,
+    webContentsDebuggingEnabled: false,
   },
   plugins: {
     CapacitorHttp: {
