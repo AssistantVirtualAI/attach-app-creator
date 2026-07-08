@@ -823,7 +823,7 @@ All colors MUST be HSL.
 }
 
 /* === Planiprêt design tokens (Phase 1) === */
-.planipret-scope {
+:root, .planipret-scope {
   --pp-bg-base: #060D1A;
   --pp-bg-surface: #0A1628;
   --pp-bg-elevated: #0D1F35;
