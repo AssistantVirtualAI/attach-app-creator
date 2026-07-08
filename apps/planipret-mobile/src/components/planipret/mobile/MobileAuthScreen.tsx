@@ -2,37 +2,10 @@ import { FormEvent, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Globe, Moon, Sun } from "lucide-react";
+import planipretLogo from "@/assets/planipret-logo.png.asset.json";
+import avaLogo from "@/assets/ava-statistics-logo.png.asset.json";
 import { useMplanipretLang } from "@/hooks/useMplanipretLang";
 import { useMplanipretTheme } from "@/hooks/useMplanipretTheme";
-
-const AvaMark = ({ size = 56 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 56 56" aria-hidden>
-    <defs>
-      <linearGradient id="avaG" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0%" stopColor="#9B7FE8" />
-        <stop offset="100%" stopColor="#5B3FBF" />
-      </linearGradient>
-    </defs>
-    <rect width="56" height="56" rx="14" fill="url(#avaG)" />
-    <text x="50%" y="54%" textAnchor="middle" dominantBaseline="middle"
-      fontFamily="Urbanist,system-ui,sans-serif" fontWeight="800" fontSize="22" fill="#fff">AVA</text>
-  </svg>
-);
-
-const PlanipretMark = ({ size = 56 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 56 56" aria-hidden>
-    <defs>
-      <linearGradient id="ppG" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0%" stopColor="#2E9BDC" />
-        <stop offset="100%" stopColor="#1A4A8A" />
-      </linearGradient>
-    </defs>
-    <rect width="56" height="56" rx="14" fill="url(#ppG)" />
-    <text x="50%" y="54%" textAnchor="middle" dominantBaseline="middle"
-      fontFamily="Urbanist,system-ui,sans-serif" fontWeight="800" fontSize="26" fill="#fff">P</text>
-  </svg>
-);
-
 
 /** Auth screen for /mplanipret. Bilingual, App Store / Play Store-ready. */
 export default function MobileAuthScreen({ onLoggedIn }: { onLoggedIn: () => Promise<void> | void }) {
@@ -84,8 +57,7 @@ export default function MobileAuthScreen({ onLoggedIn }: { onLoggedIn: () => Pro
 
 
   return (
-    <div className="planipret-scope min-h-screen w-full flex flex-col" style={{ background: "var(--pp-bg-base)" }} data-pp-theme={theme}>
-
+    <div className="h-full w-full flex flex-col" style={{ background: "var(--pp-bg-base)" }}>
       {/* Top control row: lang + theme */}
       <div className="flex items-center justify-end gap-2 px-4"
         style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 56px)" }}>
@@ -108,11 +80,12 @@ export default function MobileAuthScreen({ onLoggedIn }: { onLoggedIn: () => Pro
       {/* Logos */}
       <div className="flex flex-col items-center mt-8 mb-6 px-6">
         <div className="flex items-center gap-3">
-          <AvaMark />
+          <img src={avaLogo.url} alt="AVA Statistic" className="w-14 h-14 rounded-2xl object-cover"
+            style={{ boxShadow: "0 4px 18px rgba(155,127,232,0.45)" }} />
           <span style={{ fontFamily: "Urbanist,sans-serif", fontWeight: 800, fontSize: 20, color: "var(--pp-text-faint)" }}>×</span>
-          <PlanipretMark />
+          <img src={planipretLogo.url} alt="Planiprêt" className="w-14 h-14 rounded-2xl object-cover"
+            style={{ boxShadow: "0 4px 18px rgba(46,155,220,0.30)" }} />
         </div>
-
         <h1 style={{ fontFamily: "Urbanist,sans-serif", fontWeight: 700, fontSize: 22, color: "var(--pp-text-primary)", marginTop: 18, letterSpacing: "-0.01em" }}>
           {t("auth.welcomeTitle")}
         </h1>
@@ -186,7 +159,7 @@ export default function MobileAuthScreen({ onLoggedIn }: { onLoggedIn: () => Pro
       {/* Footer */}
       <div className="h-[28px] flex items-center justify-center gap-2 pp-mobile-footer">
         <span style={{ fontFamily: "Urbanist,sans-serif", fontSize: 9, color: "var(--pp-text-muted)", letterSpacing: "0.14em", fontWeight: 600 }}>{t("footer.poweredBy")}</span>
-        <AvaMark size={14} />
+        <img src={avaLogo.url} alt="AVA" className="w-3.5 h-3.5 rounded object-cover" />
         <span style={{ fontFamily: "Urbanist,sans-serif", fontSize: 9, color: "var(--pp-brand-accent-2)", letterSpacing: "0.10em", fontWeight: 700 }}>AVA</span>
         <span style={{ fontSize: 8.5, color: "var(--pp-text-faint)", letterSpacing: "0.1em" }}>· {t("footer.developedBy")}</span>
       </div>
