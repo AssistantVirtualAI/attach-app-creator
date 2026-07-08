@@ -1,11 +1,17 @@
 /**
  * Planiprêt Mobile — Standalone Capacitor app
- * Uses the exact same shell + routes as the /mplanipret route on web.
+ * Uses the exact same shell + routes + providers as /mplanipret on web.
  */
 import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
+import { Toaster as UiToaster } from '@/components/ui/toaster';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { LanguageProvider } from '@/context/LanguageContext';
+import { ThemeProvider } from '@/context/ThemeContext';
+import { OrganizationProvider } from '@/contexts/OrganizationContext';
+import { MplanipretGuard } from '@/components/auth/MplanipretGuard';
 
 const PlanipretMobile = lazy(() => import('@/pages/planipret/PlanipretMobile'));
 const MHome = lazy(() => import('@/pages/planipret/mobile/MHome'));
@@ -21,6 +27,8 @@ const MAvaChat = lazy(() => import('@/pages/planipret/mobile/MAvaChat'));
 const MAvaNotifications = lazy(() => import('@/pages/planipret/mobile/MAvaNotifications'));
 const MExtensionSync = lazy(() => import('@/pages/planipret/mobile/MExtensionSync'));
 
+const queryClient = new QueryClient();
+
 function Fallback() {
   return (
     <div style={{
@@ -34,30 +42,42 @@ function Fallback() {
 
 export default function App() {
   return (
-    <LanguageProvider>
-      <Toaster position="top-center" richColors />
-      <Suspense fallback={<Fallback />}>
-        <Routes>
-          <Route path="/" element={<Navigate to="/mplanipret" replace />} />
-          <Route path="/login" element={<Navigate to="/mplanipret" replace />} />
-          <Route path="/mplanipret" element={<PlanipretMobile />}>
-            <Route index element={<MHome />} />
-            <Route path="home" element={<MHome />} />
-            <Route path="calls" element={<MCalls />} />
-            <Route path="messages" element={<MMessages />} />
-            <Route path="voicemail" element={<MVoicemail />} />
-            <Route path="contacts" element={<MContacts />} />
-            <Route path="more" element={<MMore />} />
-            <Route path="pipeline" element={<MPipeline />} />
-            <Route path="search" element={<MSearch />} />
-            <Route path="stats" element={<MStats />} />
-            <Route path="ava" element={<MAvaChat />} />
-            <Route path="notifications" element={<MAvaNotifications />} />
-            <Route path="extension-sync" element={<MExtensionSync />} />
-          </Route>
-          <Route path="*" element={<Navigate to="/mplanipret" replace />} />
-        </Routes>
-      </Suspense>
-    </LanguageProvider>
+    <QueryClientProvider client={queryClient}>
+      <LanguageProvider>
+        <ThemeProvider>
+          <TooltipProvider>
+            <UiToaster />
+            <Toaster position="top-center" richColors />
+            <OrganizationProvider>
+              <Suspense fallback={<Fallback />}>
+                <Routes>
+                  <Route path="/" element={<Navigate to="/mplanipret" replace />} />
+                  <Route path="/login" element={<Navigate to="/mplanipret" replace />} />
+                  <Route
+                    path="/mplanipret"
+                    element={<MplanipretGuard><PlanipretMobile /></MplanipretGuard>}
+                  >
+                    <Route index element={<MHome />} />
+                    <Route path="home" element={<MHome />} />
+                    <Route path="calls" element={<MCalls />} />
+                    <Route path="messages" element={<MMessages />} />
+                    <Route path="voicemail" element={<MVoicemail />} />
+                    <Route path="contacts" element={<MContacts />} />
+                    <Route path="more" element={<MMore />} />
+                    <Route path="pipeline" element={<MPipeline />} />
+                    <Route path="search" element={<MSearch />} />
+                    <Route path="stats" element={<MStats />} />
+                    <Route path="ava" element={<MAvaChat />} />
+                    <Route path="notifications" element={<MAvaNotifications />} />
+                    <Route path="extension-sync" element={<MExtensionSync />} />
+                  </Route>
+                  <Route path="*" element={<Navigate to="/mplanipret" replace />} />
+                </Routes>
+              </Suspense>
+            </OrganizationProvider>
+          </TooltipProvider>
+        </ThemeProvider>
+      </LanguageProvider>
+    </QueryClientProvider>
   );
 }
