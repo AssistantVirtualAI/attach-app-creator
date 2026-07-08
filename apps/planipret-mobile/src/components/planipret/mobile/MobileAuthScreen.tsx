@@ -84,7 +84,8 @@ export default function MobileAuthScreen({ onLoggedIn }: { onLoggedIn: () => Pro
 
 
   return (
-    <div className="h-full w-full flex flex-col" style={{ background: "var(--pp-bg-base)" }}>
+    <div className="planipret-scope min-h-screen w-full flex flex-col" style={{ background: "var(--pp-bg-base)" }} data-pp-theme={theme}>
+
       {/* Top control row: lang + theme */}
       <div className="flex items-center justify-end gap-2 px-4"
         style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 56px)" }}>
