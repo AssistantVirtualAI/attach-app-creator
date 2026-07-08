@@ -4,8 +4,13 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { Toaster } from 'sonner';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { LanguageProvider } from '@/context/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
 import MobileAuthScreen from '@/components/planipret/mobile/MobileAuthScreen';
+
+const queryClient = new QueryClient();
 
 const MHome = lazy(() => import('@/pages/planipret/mobile/MHome'));
 const MCalls = lazy(() => import('@/pages/planipret/mobile/MCalls'));
