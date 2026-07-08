@@ -2,10 +2,37 @@ import { FormEvent, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Globe, Moon, Sun } from "lucide-react";
-import planipretLogo from "@/assets/planipret-logo.png.asset.json";
-import avaLogo from "@/assets/ava-statistics-logo.png.asset.json";
 import { useMplanipretLang } from "@/hooks/useMplanipretLang";
 import { useMplanipretTheme } from "@/hooks/useMplanipretTheme";
+
+const AvaMark = ({ size = 56 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 56 56" aria-hidden>
+    <defs>
+      <linearGradient id="avaG" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stopColor="#9B7FE8" />
+        <stop offset="100%" stopColor="#5B3FBF" />
+      </linearGradient>
+    </defs>
+    <rect width="56" height="56" rx="14" fill="url(#avaG)" />
+    <text x="50%" y="54%" textAnchor="middle" dominantBaseline="middle"
+      fontFamily="Urbanist,system-ui,sans-serif" fontWeight="800" fontSize="22" fill="#fff">AVA</text>
+  </svg>
+);
+
+const PlanipretMark = ({ size = 56 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 56 56" aria-hidden>
+    <defs>
+      <linearGradient id="ppG" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stopColor="#2E9BDC" />
+        <stop offset="100%" stopColor="#1A4A8A" />
+      </linearGradient>
+    </defs>
+    <rect width="56" height="56" rx="14" fill="url(#ppG)" />
+    <text x="50%" y="54%" textAnchor="middle" dominantBaseline="middle"
+      fontFamily="Urbanist,system-ui,sans-serif" fontWeight="800" fontSize="26" fill="#fff">P</text>
+  </svg>
+);
+
 
 /** Auth screen for /mplanipret. Bilingual, App Store / Play Store-ready. */
 export default function MobileAuthScreen({ onLoggedIn }: { onLoggedIn: () => Promise<void> | void }) {
