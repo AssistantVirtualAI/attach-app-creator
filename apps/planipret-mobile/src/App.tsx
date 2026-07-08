@@ -81,7 +81,7 @@ function Protected({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   return (
-    <>
+    <LanguageProvider>
       <Toaster position="top-center" richColors />
       <Suspense fallback={<Fallback />}>
         <Routes>
@@ -102,6 +102,6 @@ export default function App() {
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </Suspense>
-    </>
+    </LanguageProvider>
   );
 }
