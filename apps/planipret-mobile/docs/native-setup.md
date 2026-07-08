@@ -20,6 +20,9 @@ cd apps/planipret-mobile
 # Installer les dépendances
 npm install
 
+# Vérifier que l'app native est autonome et alignée sur /mplanipret
+npm run audit:native
+
 # Ajouter les plateformes natives
 npx cap add ios
 npx cap add android
@@ -123,4 +126,12 @@ La séparation entre les deux applications est garantie à plusieurs niveaux :
 
 # Build Android
 npm run build:android
+```
+
+Important : ne lancez jamais `npm run build` depuis la racine pour générer l'app native Planiprêt. Utilisez toujours :
+
+```bash
+cd apps/planipret-mobile
+npm run build
+npx cap sync ios     # ou android
 ```

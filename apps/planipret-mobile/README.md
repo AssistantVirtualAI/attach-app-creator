@@ -6,7 +6,9 @@ App name: Planiprêt Mobile
 ## Quickstart
 
 ```bash
+cd apps/planipret-mobile
 npm install
+npm run audit:native
 npm run build
 npx cap add ios
 npx cap sync ios
@@ -16,6 +18,9 @@ npx cap open ios
 
 Android:
 ```bash
+cd apps/planipret-mobile
+npm run audit:native
+npm run build
 npx cap add android
 npx cap sync android
 npx cap open android
@@ -23,6 +28,7 @@ npx cap open android
 
 ## Notes
 
-- Fully standalone — no WebView shell. React Router serves `/login` → `/home` and the mobile pages.
+- Fully standalone — always run commands from `apps/planipret-mobile`, never from the repo root.
+- Uses the same `/mplanipret` routes, mobile pages, components, hooks, i18n and visual assets.
 - Supabase Edge Functions are called via `@supabase/supabase-js` against the shared backend.
 - `@capacitor-community/bluetooth-le@4.x` is pinned for Capacitor 6 compatibility.

@@ -7,14 +7,18 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "postbuild": "node scripts/audit-native.mjs",
     "preview": "vite preview",
     "test": "vitest run",
+    "audit:native": "node scripts/audit-native.mjs",
     "cap:add:ios": "cap add ios",
     "cap:add:android": "cap add android",
-    "sync:ios": "cap sync ios",
-    "sync:android": "cap sync android",
-    "build:ios": "vite build && cap sync ios && cap open ios",
-    "build:android": "vite build && cap sync android && cap open android"
+    "sync:ios": "npm run build && cap sync ios",
+    "sync:android": "npm run build && cap sync android",
+    "build:ios": "npm run audit:native && npm run build && cap sync ios && cap open ios",
+    "build:android": "npm run audit:native && npm run build && cap sync android && cap open android",
+    "native:ios": "npm run build:ios",
+    "native:android": "npm run build:android"
   },
   "dependencies": {
     "@capacitor-community/bluetooth-le": "^6.1.0",
