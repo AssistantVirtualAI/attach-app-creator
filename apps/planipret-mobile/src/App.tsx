@@ -33,24 +33,47 @@ function Fallback() {
 
 function Login() {
   const nav = useNavigate();
+  // On mount, check if a session already exists → jump to /home.
+  // Never block the UI: login screen renders immediately.
+  useEffect(() => {
+    let cancelled = false;
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        if (!cancelled && session) nav('/home', { replace: true });
+      })
+      .catch(() => { /* stay on /login if backend unreachable */ });
+    return () => { cancelled = true; };
+  }, [nav]);
   return <MobileAuthScreen onLoggedIn={() => nav('/home', { replace: true })} />;
 }
 
 function Protected({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<'loading' | 'authed' | 'anon'>('loading');
+  const [state, setState] = useState<'authed' | 'anon' | 'checking'>('checking');
+
   useEffect(() => {
     let mounted = true;
+    // Hard 3s failsafe: if Supabase never resolves, redirect to /login.
+    const timer = setTimeout(() => {
+      if (mounted && state === 'checking') setState('anon');
+    }, 3000);
+
     supabase.auth.getSession().then(({ data }) => {
       if (!mounted) return;
       setState(data.session ? 'authed' : 'anon');
+    }).catch(() => {
+      if (mounted) setState('anon');
     });
+
     const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
       if (!mounted) return;
       setState(session ? 'authed' : 'anon');
     });
-    return () => { mounted = false; sub.subscription.unsubscribe(); };
+
+    return () => { mounted = false; clearTimeout(timer); sub.subscription.unsubscribe(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  if (state === 'loading') return <Fallback />;
+
+  if (state === 'checking') return <Fallback />;
   if (state === 'anon') return <Navigate to="/login" replace />;
   return <>{children}</>;
 }
@@ -61,6 +84,7 @@ export default function App() {
       <Toaster position="top-center" richColors />
       <Suspense fallback={<Fallback />}>
         <Routes>
+          <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<Login />} />
           <Route path="/home" element={<Protected><MHome /></Protected>} />
           <Route path="/calls" element={<Protected><MCalls /></Protected>} />
