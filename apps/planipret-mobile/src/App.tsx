@@ -33,7 +33,7 @@ function Fallback() {
 
 function Login() {
   const nav = useNavigate();
-  return <MobileAuthScreen onAuthenticated={() => nav('/home', { replace: true })} />;
+  return <MobileAuthScreen onLoggedIn={() => nav('/home', { replace: true })} />;
 }
 
 function Protected({ children }: { children: React.ReactNode }) {
