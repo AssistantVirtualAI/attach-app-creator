@@ -6,6 +6,9 @@
    layout before its parent has a measured width. */
 svg { max-width: 100%; max-height: 100%; }
 
+html, body, #root { min-height: 100vh; background: #0A1425; color: #E8EDF5; }
+
+
 
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
 All colors MUST be HSL.
