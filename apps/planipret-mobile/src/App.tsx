@@ -46,8 +46,8 @@ export default function App() {
       <LanguageProvider>
         <ThemeProvider>
           <TooltipProvider>
-            <UiToaster />
             <Toaster position="top-center" richColors />
+
             <OrganizationProvider>
               <Suspense fallback={<Fallback />}>
                 <Routes>
