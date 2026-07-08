@@ -4,6 +4,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { Toaster } from 'sonner';
+import { LanguageProvider } from '@/context/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
 import MobileAuthScreen from '@/components/planipret/mobile/MobileAuthScreen';
 
@@ -80,7 +81,7 @@ function Protected({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   return (
-    <>
+    <LanguageProvider>
       <Toaster position="top-center" richColors />
       <Suspense fallback={<Fallback />}>
         <Routes>
@@ -101,6 +102,6 @@ export default function App() {
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </Suspense>
-    </>
+    </LanguageProvider>
   );
 }
