@@ -10,7 +10,7 @@ import { Toaster } from 'sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { LanguageProvider } from '@/context/LanguageContext';
 import { ThemeProvider } from '@/context/ThemeContext';
-import { OrganizationProvider } from '@/contexts/OrganizationContext';
+import { OrganizationProvider } from '@/context/OrganizationContext';
 import { MplanipretGuard } from '@/components/auth/MplanipretGuard';
 
 const PlanipretMobile = lazy(() => import('@/pages/planipret/PlanipretMobile'));
