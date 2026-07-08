@@ -27,14 +27,11 @@ echo "📦 Installation des dépendances..."
 cd "$APP_DIR"
 npm install --legacy-peer-deps
 
-# 3. Build Vite
-echo "🔨 Build Vite (portail web Planiprêt)..."
-# Le portail web principal doit être buildé en premier
-cd "$(dirname "$(dirname "$APP_DIR")")"  # Racine du monorepo
-npm run build 2>/dev/null || true
+# 3. Audit + build Vite de l'app mobile uniquement
+echo "🔎 Audit app mobile autonome..."
+npm run audit:native
 
-# Build de l'app mobile
-cd "$APP_DIR"
+echo "🔨 Build Vite Planiprêt Mobile uniquement..."
 npm run build
 
 # 4. Synchronisation Capacitor
