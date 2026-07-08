@@ -108,12 +108,11 @@ export default function MobileAuthScreen({ onLoggedIn }: { onLoggedIn: () => Pro
       {/* Logos */}
       <div className="flex flex-col items-center mt-8 mb-6 px-6">
         <div className="flex items-center gap-3">
-          <img src={avaLogo.url} alt="AVA Statistic" className="w-14 h-14 rounded-2xl object-cover"
-            style={{ boxShadow: "0 4px 18px rgba(155,127,232,0.45)" }} />
+          <AvaMark />
           <span style={{ fontFamily: "Urbanist,sans-serif", fontWeight: 800, fontSize: 20, color: "var(--pp-text-faint)" }}>×</span>
-          <img src={planipretLogo.url} alt="Planiprêt" className="w-14 h-14 rounded-2xl object-cover"
-            style={{ boxShadow: "0 4px 18px rgba(46,155,220,0.30)" }} />
+          <PlanipretMark />
         </div>
+
         <h1 style={{ fontFamily: "Urbanist,sans-serif", fontWeight: 700, fontSize: 22, color: "var(--pp-text-primary)", marginTop: 18, letterSpacing: "-0.01em" }}>
           {t("auth.welcomeTitle")}
         </h1>
