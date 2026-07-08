@@ -1,53 +1,37 @@
 /**
- * Planiprêt Mobile — Point d'entrée Capacitor
- * App ID : com.planipret.mobile
- *
- * Ce fichier est le bootstrap natif (iOS/Android).
- * Il charge l'app React qui pointe vers /mplanipret/* du portail web AVA.
- * La séparation Lemtel/Planipret est garantie par :
- *   - AppSeparationGuard (côté web)
- *   - MplanipretGuard (côté web)
- *   - requirePlanipretBroker (côté Edge Functions)
+ * Planiprêt Mobile — Standalone Capacitor app entry
  */
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { SplashScreen } from '@capacitor/splash-screen';
 import { Capacitor } from '@capacitor/core';
-import PlanipretMobileApp from './PlanipretMobileApp';
+import App from './App';
 import './styles.css';
 
 async function bootstrap() {
   try {
     if (Capacitor.isNativePlatform()) {
-      try {
-        await StatusBar.setStyle({ style: Style.Dark });
-      } catch (e) {
-        console.log('[PlanipretMobile] StatusBar.setStyle not supported:', e);
-      }
-      try {
-        await StatusBar.setBackgroundColor({ color: '#1A4A8A' });
-      } catch (e) {
-        // Not implemented on iOS — safe to ignore
-        console.log('[PlanipretMobile] StatusBar color not supported:', e);
-      }
-      try {
-        await SplashScreen.hide();
-      } catch (e) {
-        console.log('[PlanipretMobile] SplashScreen.hide failed:', e);
-      }
+      try { await StatusBar.setStyle({ style: Style.Dark }); } catch (e) { console.log('[PP] StatusBar.setStyle:', e); }
+      try { await StatusBar.setBackgroundColor({ color: '#1A4A8A' }); } catch (e) { console.log('[PP] StatusBar.setBackgroundColor:', e); }
+      try { await SplashScreen.hide(); } catch (e) { console.log('[PP] SplashScreen.hide:', e); }
     }
   } catch (e) {
-    console.error('[PlanipretMobile] Native init failed, continuing:', e);
+    console.error('[PP] Native init failed:', e);
   }
-
   try {
     const container = document.getElementById('root');
     if (!container) throw new Error('Root element not found');
-    const root = createRoot(container);
-    root.render(<PlanipretMobileApp />);
+    createRoot(container).render(
+      <React.StrictMode>
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
+      </React.StrictMode>,
+    );
   } catch (e) {
-    console.error('[PlanipretMobile] Render failed:', e);
+    console.error('[PP] Render failed:', e);
     const el = document.getElementById('root');
     if (el) {
       el.innerHTML =
@@ -56,16 +40,12 @@ async function bootstrap() {
   }
 }
 
-// Failsafe: if bootstrap hangs, force root visible + hide splash after 3s so
-// the user is never stuck on the native splash screen.
 setTimeout(() => {
   try {
     const el = document.getElementById('root');
     if (el) el.style.display = 'block';
-    if (Capacitor.isNativePlatform()) {
-      SplashScreen.hide().catch(() => {});
-    }
+    if (Capacitor.isNativePlatform()) SplashScreen.hide().catch(() => {});
   } catch {}
 }, 3000);
 
-bootstrap().catch((e) => console.error('[PlanipretMobile] bootstrap crashed:', e));
+bootstrap().catch((e) => console.error('[PP] bootstrap crashed:', e));
